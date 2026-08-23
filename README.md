@@ -1,6 +1,6 @@
 ## OpenOx
 
-OpenOx is a protocol behind Ox - a self-evolving agent that lives on your mobile device.
+OpenOx is a protocol for self-evolving personal agents that run locally on mobile devices and gain new capabilities through portable service repositories. Ox for iOS is its reference implementation.
 
 It is built around three principles:
 
@@ -8,11 +8,76 @@ It is built around three principles:
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
 
-[Protocol](PROTOCOL.md) | [Blog](https://ziyzhu.com/introducing-openox) | [Discord](https://discord.gg/7baSAHZTA)
+## Components
 
-## Installation
+```mermaid
+flowchart LR
+    Profile["Ox Profile<br/>Identity · Memory · Skills<br/>Artifacts · Conversations"]
+    Repository["Remote Service Repository<br/>Public Git + ox.json"]
 
-The initial release supports iOS. Install Xcode 26 or later and Bun on a Mac, then clone the repository:
+    subgraph Client["Ox Mobile Client"]
+        Agent["Local agent"]
+        VM["Ox VM<br/>Sandboxed JavaScript · ox.* · virtual filesystem"]
+        Local["Local Service Repository<br/>Editable Git + ox.json"]
+        Agent -->|"writes and executes code"| VM
+        VM -->|"ox.fs creates or revises"| Local
+    end
+
+    subgraph Services["Installed services"]
+        Service["Device (such as Browser)<br/>Web · MCP"]
+        Actions["Actions<br/>typed operations"]
+        Skills["Skills<br/>reusable instructions"]
+        Service --> Actions
+        Service --> Skills
+    end
+
+    Profile <-->|"mounted through ox.fs"| VM
+    Repository -->|"installs"| Service
+    Local -->|"validates and reloads"| Service
+    Service -->|"mounts definitions through ox.fs"| VM
+    VM <-->|"invoke and observe"| Actions
+    Skills -.->|"guides"| Agent
+```
+
+
+- **Ox Client** — A mobile application that implements the OpenOx protocol. It hosts the Ox VM, opens an Ox Profile, and connects the agent to services.
+- **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
+- **Ox VM** — A sandboxed JavaScript runtime where the local agent writes and executes code.
+  - **`ox.*`** — Explicit client capabilities for interacting with the Profile, services, web, user, and mobile device.
+  - **`ox.fs`** — A virtual filesystem that mounts Profile content, system and service skills, service definitions, persisted chats, and user-granted files while enforcing the read and write permissions of each source.
+- **Ox Service Repository** — A versioned collection of services described by an `ox.json` manifest. Each Ox Client has an editable Local repository and can install compatible remote repositories. Each service may provide:
+  - **Actions** — Typed operations the agent can invoke.
+  - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
+
+## Execution and Self-Evolution
+
+The VM has no direct access to the network, host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
+
+The VM is also how Ox evolves. Ox can invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
+
+1. The agent invokes Browser or another attached service from the VM to gather evidence for the required capability.
+2. The agent uses `ox.fs` to write or revise the service manifest, actions, and optional skills in its Local Service Repository.
+3. The client validates and reloads the service.
+4. The agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
+5. Local Git can record the changes for inspection, reversal, and publication.
+
+Ox can therefore gain and apply a capability without rebuilding or updating the client.
+
+## Services and Distribution
+
+OpenOx supports three kinds of services:
+
+1. **Device services** are supplied by the mobile client and expose device capabilities such as Browser.
+2. **Web services** expose actions backed by websites and the user’s browser session.
+3. **MCP services** expose actions provided by an MCP server.
+
+Anyone can publish compatible web and MCP services in a public Git repository containing an `ox.json` manifest. Any compatible mobile client can install that repository and make its services available to the agent. Device services remain part of the client implementation.
+
+## Reference Client
+
+**Ox for iOS** is the reference implementation of an OpenOx client. Its agent runtime and VM run on the user’s iOS device.
+
+Install Xcode 26 or later and Bun on a Mac, then clone the repository:
 
 ```sh
 git clone https://github.com/ziyzhu/openox.git
@@ -43,6 +108,10 @@ ox repository serve /path/to/service-repository --port 8101
 ```
 
 [`examples/service-repository`](examples/service-repository) is a standalone repository users can copy when creating their own remote services.
+
+## Community
+
+[Discord](https://discord.gg/7baSAHZTA)
 
 ## Acknowledgements
 
