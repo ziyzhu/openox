@@ -4266,7 +4266,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "处处可行动"
+            "value" : "助你行动。"
           }
         }
       }
@@ -6232,7 +6232,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "让你安心"
+            "value" : "让你安心。"
           }
         }
       }
@@ -10181,7 +10181,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为你而生，由你掌控"
+            "value" : "由你掌控。"
           }
         }
       }
