@@ -300,7 +300,7 @@ extension Scenario {
             Entry("50", "signin — auth card → resume after sign-in", .signin),
             Entry("53", "recover — tool error, then fall back", .recover),
             Entry("58", "artifact — write, edit, rename, and present", .artifactWorkflow),
-            Entry("59", "skills — create, edit, and rename a user skill", .skillWorkflow),
+            Entry("59", "skills — create, copy, edit, and delete a user skill", .skillWorkflow),
             Entry("60", "budget — truncate oversized tool output", .toolResultBudget),
             Entry("61", "web fetch — HTTP responses plus explicit attachments", .webFetch),
             Entry("62", "web import — explicitly persist an HTTP response", .webImport),
@@ -327,6 +327,7 @@ extension Scenario {
             Entry("84", "local history — commit, time travel, restore, and revert", .localHistoryWorkflow),
             Entry("85", "local history recovery — restore and revert pending test state", .localHistoryRecovery),
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
+            Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
         ]),
     ]
 
@@ -949,14 +950,12 @@ extension Scenario {
             return [
                 .say("Creating and refining a reusable skill.\n"),
                 execute("""
-                const skill = `---
-                name: agent-weekly
-                description: "Prepare a concise weekly review"
-                ---
-
-                Review completed work and choose the next priority.
-                `;
-                await ox.fs.write({ path: "skills/agent-weekly/SKILL.md", content: skill, purpose: "Create review skill" });
+                await ox.skill.create({
+                  name: "agent-weekly",
+                  description: "Prepare a concise weekly review",
+                  instructions: "Review completed work and choose the next priority.",
+                  purpose: "Create review skill"
+                });
                 const before = await ox.fs.read({ path: "skills/agent-weekly/SKILL.md", purpose: "Read review skill" });
                 await ox.fs.edit({
                   path: "skills/agent-weekly/SKILL.md",
@@ -969,11 +968,15 @@ extension Scenario {
                 });
                 const listed = await ox.fs.glob({ pattern: "skills/*/SKILL.md", purpose: "List user skills" });
                 const found = await ox.fs.grep({ pattern: "unfinished work", path: "skills", options: { literal: true }, purpose: "Search skill content" });
+                const copied = await ox.skill.copy({ source: "agent-weekly", name: "agent-weekly-copy", purpose: "Copy review skill" });
+                const deleted = await ox.skill.delete({ name: "agent-weekly-copy", purpose: "Delete copied skill" });
                 console.log({
                   before: before.text,
                   final: "agent-weekly",
                   listed: listed.paths,
-                  matches: found.matches.length
+                  matches: found.matches.length,
+                  copied: copied.name,
+                  deleted: deleted.deleted
                 });
                 """),
             ]
@@ -988,7 +991,7 @@ extension Scenario {
     static let localServiceWorkflow = Scenario(name: "local-service") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const created = await ox.service.createWeb({ domain: "example.test", purpose: "Create test service" });
+            const created = await ox.service.create({ kind: "web", domain: "example.test", purpose: "Create test service" });
             const before = await ox.fs.read({ path: "services/web/example.test/actions.js", purpose: "Read Local actions" });
             let invalid;
             try {
@@ -1017,7 +1020,7 @@ extension Scenario {
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const copied = await ox.service.copyToLocal({ domain: "archive.ph", purpose: "Copy test service" });
+            const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy test service" });
             const before = await ox.fs.read({ path: "services/web/archive.ph/manifest.json", purpose: "Read copied manifest" });
             let invalid;
             try {
@@ -1047,11 +1050,14 @@ extension Scenario {
     static let localHistoryWorkflow = Scenario(name: "local-history") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            await ox.service.createWeb({ domain: "history.test", purpose: "Create history service" });
+            await ox.service.create({ kind: "web", domain: "history.test", purpose: "Create history service" });
             await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "first version", purpose: "Write history note" });
             const first = await ox.service.git.commit({ message: "Add history test service", purpose: "Commit history service" });
             await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "second version", purpose: "Revise history note" });
             const second = await ox.service.git.commit({ message: "Revise history test note", purpose: "Commit revised note" });
+            await ox.fs.delete({ path: "services/web/history.test/NOTES.md", purpose: "Delete history note" });
+            await ox.service.git.restore({ path: "services/web/history.test/NOTES.md", purpose: "Restore history note" });
+            const pathRestored = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify targeted restore" });
             const log = await ox.service.git.log({ limit: 3, purpose: "Read Local history" });
             const shown = await ox.service.git.show({ commitHash: first.commitHash, path: "web/history.test/NOTES.md", purpose: "Read first note" });
             const historical = await ox.service.git.checkout({ commitHash: first.commitHash, purpose: "Visit first version" });
@@ -1072,6 +1078,7 @@ extension Scenario {
             console.log(JSON.stringify({
               first: first.commitHash,
               second: second.commitHash,
+              pathRestored: pathRestored.text,
               log: log.commits.map(commit => commit.commitHash),
               shown: shown.content,
               historical: historical.view,
@@ -1086,6 +1093,7 @@ extension Scenario {
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
               result["first"]?.stringValue?.count == 40,
               result["second"]?.stringValue?.count == 40,
+              result["pathRestored"]?.stringValue == "second version",
               result["log"]?.arrayValue?.count == 3,
               result["shown"]?.stringValue == "first version",
               result["historical"]?.stringValue == "historical",
@@ -1127,7 +1135,7 @@ extension Scenario {
     static let localDiffWorkflow = Scenario(name: "local-diff") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            await ox.service.createWeb({ domain: "diff.test", purpose: "Create diff service" });
+            await ox.service.create({ kind: "web", domain: "diff.test", purpose: "Create diff service" });
             await ox.fs.write({ path: "services/web/diff.test/NOTES.md", content: "diff fixture", purpose: "Write diff fixture" });
             const pending = await ox.service.git.diff({ path: "web/diff.test/NOTES.md", purpose: "Review pending diff" });
             const commit = await ox.service.git.commit({ message: "Add diff test service", purpose: "Commit diff service" });
@@ -1148,6 +1156,27 @@ extension Scenario {
             return [.say("Local diff did not expose matching working and committed patches."), .stop(.stop)]
         }
         return [.say("Reviewed the same Local file as a pending working-tree diff and as a committed historical diff."), .stop(.stop)]
+    }
+
+    static let localDeleteWorkflow = Scenario(name: "local-delete") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            return [execute("""
+            await ox.service.create({ kind: "web", domain: "delete.test", purpose: "Create delete fixture" });
+            await ox.service.git.commit({ message: "Add delete test service", purpose: "Commit delete fixture" });
+            const deleted = await ox.service.delete({ domain: "delete.test", purpose: "Delete Local fixture" });
+            const dirty = await ox.service.git.status({ purpose: "Inspect service deletion" });
+            await ox.service.git.restore({ purpose: "Restore deleted service" });
+            const restored = await ox.fs.read({ path: "services/web/delete.test/manifest.json", purpose: "Verify restored service" });
+            console.log(JSON.stringify({ deleted, dirty: dirty.dirty, restored: restored.text.includes('"domain" : "delete.test"') || restored.text.includes('"domain": "delete.test"') }));
+            """)]
+        }
+        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
+              result["deleted"]?.objectValue?["deleted"]?.boolValue == true,
+              result["dirty"]?.boolValue == true,
+              result["restored"]?.boolValue == true else {
+            return [.say("Local service deletion did not remain recoverable through Git."), .stop(.stop)]
+        }
+        return [.say("Deleted a Local service, observed the pending Git change, and restored it."), .stop(.stop)]
     }
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in

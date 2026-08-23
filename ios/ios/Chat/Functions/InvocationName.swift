@@ -16,8 +16,9 @@ enum InvocationName: String, CaseIterable {
     case serviceFind = "ox.service.find"
     case serviceListAttached = "ox.service.listAttached"
     case serviceInspect = "ox.service.inspect"
-    case serviceCreateWeb = "ox.service.createWeb"
-    case serviceCopyToLocal = "ox.service.copyToLocal"
+    case serviceCreate = "ox.service.create"
+    case serviceCopy = "ox.service.copy"
+    case serviceDelete = "ox.service.delete"
     case serviceGitStatus = "ox.service.git.status"
     case serviceGitLog = "ox.service.git.log"
     case serviceGitShow = "ox.service.git.show"
@@ -31,12 +32,8 @@ enum InvocationName: String, CaseIterable {
     case serviceSolve = "ox.service.solve"
     case servicePayment = "ox.service.pay"
     case serviceDetach = "ox.service.detach"
-    case skillList = "ox.skill.list"
-    case skillRead = "ox.skill.read"
     case skillCreate = "ox.skill.create"
-    case skillUpdate = "ox.skill.update"
-    case skillReplaceText = "ox.skill.replaceText"
-    case skillRename = "ox.skill.rename"
+    case skillCopy = "ox.skill.copy"
     case skillDelete = "ox.skill.delete"
     case memoryRead = "ox.memory.read"
     case memoryWrite = "ox.memory.write"
@@ -70,8 +67,9 @@ enum InvocationName: String, CaseIterable {
         case .serviceFind: L10n.string("Search services")
         case .serviceListAttached: L10n.string("List attached services")
         case .serviceInspect: L10n.string("Inspect a service")
-        case .serviceCreateWeb: L10n.string("Create a web service")
-        case .serviceCopyToLocal: L10n.string("Copy a service to Local")
+        case .serviceCreate: L10n.string("Create a service")
+        case .serviceCopy: L10n.string("Copy a service to Local")
+        case .serviceDelete: L10n.string("Delete a Local service")
         case .serviceGitStatus: L10n.string("Check service changes")
         case .serviceGitLog: L10n.string("Read service history")
         case .serviceGitShow: L10n.string("Read a service commit")
@@ -85,11 +83,8 @@ enum InvocationName: String, CaseIterable {
         case .serviceSolve: L10n.string("Service verification")
         case .servicePayment: L10n.string("Service checkout")
         case .serviceDetach: L10n.string("Detach a service")
-        case .skillList: L10n.string("List skills")
-        case .skillRead: L10n.string("Read a skill")
         case .skillCreate: L10n.string("Create a skill")
-        case .skillUpdate, .skillReplaceText: L10n.string("Update a skill")
-        case .skillRename: L10n.string("Rename a skill")
+        case .skillCopy: L10n.string("Copy a skill")
         case .skillDelete: L10n.string("Delete a skill")
         case .memoryRead: L10n.string("Read memory")
         case .memoryWrite, .memoryReplaceText: L10n.string("Update memory")
@@ -115,12 +110,11 @@ enum InvocationName: String, CaseIterable {
         case .fsList, .fsRead, .fsWrite, .fsEdit, .fsDelete, .fsGlob, .fsGrep: .files
         case .artifactAttach, .artifactList, .artifactImport, .artifactWrite,
              .artifactReplaceText, .artifactRename, .artifactDelete, .artifactPresent: .artifacts
-        case .serviceFind, .serviceListAttached, .serviceInspect, .serviceCreateWeb, .serviceCopyToLocal,
+        case .serviceFind, .serviceListAttached, .serviceInspect, .serviceCreate, .serviceCopy, .serviceDelete,
              .serviceGitStatus, .serviceGitLog, .serviceGitShow, .serviceGitDiff, .serviceGitCheckout, .serviceGitCommit,
              .serviceGitRevert, .serviceGitRestore,
              .serviceAttach, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach: .services
-        case .skillList, .skillRead, .skillCreate, .skillUpdate, .skillReplaceText,
-             .skillRename, .skillDelete: .skills
+        case .skillCreate, .skillCopy, .skillDelete: .skills
         case .memoryRead, .memoryWrite, .memoryReplaceText: .memory
         case .widgetShoveler, .widgetVideo: .widgets
         case .userChoose, .userReportProgress: .chats

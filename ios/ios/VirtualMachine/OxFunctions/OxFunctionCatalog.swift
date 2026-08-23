@@ -7,6 +7,7 @@ nonisolated enum OxFunctionCatalog {
         ("user", "Keep the user informed and ask them to choose."),
         ("web", "Search and fetch the public web."),
         ("fs", "List, read, write, edit, delete, and search Ox files."),
+        ("skill", "Create, copy, and delete Profile-owned skills."),
         ("artifact", "Attach content, import files, rename artifacts, and show existing artifacts."),
         ("widget", "Display structured content in the conversation."),
     ]
@@ -18,6 +19,7 @@ nonisolated enum OxFunctionCatalog {
         OxServices.function,
         OxUser.function,
         OxFileSystem.function,
+        OxSkills.function,
         OxArtifacts.function,
         OxWidgets.function,
     ]

@@ -21,7 +21,7 @@ services/web/<domain>/
 4. Search with `ox.service.find` for the requested host, final host, and plausible parent-domain candidates.
 5. Choose a bare lowercase service domain that equals or is a parent suffix of every base URL host. Keep distinct products or account surfaces as separate services.
 6. Inspect Local Git status.
-7. Create a new Local service with `ox.service.createWeb`, or copy an existing non-Local service with `ox.service.copyToLocal`. Obtain the required approval.
+7. Create a new Local service with `ox.service.create`, or copy an existing non-Local service with `ox.service.copy`. Obtain the required approval.
 8. Use the returned domain as the directory, manifest, and runtime identity.
 9. Read the generated Local files before planning edits.
 
@@ -209,5 +209,5 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 
 - After an activation failure, inspect Git status once and search once for the exact domain; creation may already have written the draft. Continue from discovered Local state or report the repository blocker.
 - If Local is showing history, check out `latest` before authoring.
-- Correct a mistaken identity by showing every pending path and requesting approval for `ox.service.git.restore`; restore erases all uncommitted Local work.
+- Restore one mistakenly deleted source file by passing its `services/` path to `ox.service.git.restore`. Correct a mistaken identity by showing every pending path and requesting approval for a pathless restore, which erases all uncommitted Local work.
 - Use Git `diff`, `log`, and `show` for inspection, `revert` for a committed inverse change, and `restore` only for an intentionally abandoned draft.

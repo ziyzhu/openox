@@ -511,7 +511,14 @@ actor ServiceRepository {
         Log.service.info("ServiceRepository.remove id=\(repositoryID)")
     }
 
-    func createWebService(domain: String) throws {
+    func createService(kind: ServiceKind, id: String) throws {
+        guard kind == .web else {
+            throw Failure(message: "Only Local web services can be created.")
+        }
+        try createWebService(domain: id)
+    }
+
+    private func createWebService(domain: String) throws {
         guard Self.isServiceID(domain), domain.contains(".") else {
             throw Failure(message: "Use a lowercase website domain for the Local service.")
         }
@@ -580,6 +587,43 @@ actor ServiceRepository {
         configuration.resolutions[id] = Self.localID
         try saveConfiguration()
         Log.service.info("ServiceRepository.local copy id=\(id) source=\(source.repositoryID)")
+    }
+
+    func deleteLocalService(id: String) throws -> ServiceKind {
+        _ = try editableLocalRepository()
+        let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
+        guard let index = originalPackage.services.firstIndex(where: { $0.id.runtimeID == id }) else {
+            throw Failure(message: "No Local service exists for \(id).")
+        }
+        let service = originalPackage.services[index]
+        let serviceRoot = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: serviceRoot.path) else {
+            throw Failure(message: "Local source does not exist for \(id).")
+        }
+        let staging = repositoriesRoot.appendingPathComponent(".deleting-\(UUID().uuidString)", isDirectory: true)
+        var package = originalPackage
+        package.services.remove(at: index)
+        let originalConfiguration = configuration
+        do {
+            try FileManager.default.moveItem(at: serviceRoot, to: staging)
+            try Self.writePackage(package, at: localRoot)
+            _ = try Self.loadPackage(at: localRoot, provenance: .local)
+            if configuration.resolutions[id] == Self.localID {
+                configuration.resolutions.removeValue(forKey: id)
+                try saveConfiguration()
+            }
+            try FileManager.default.removeItem(at: staging)
+        } catch {
+            configuration = originalConfiguration
+            try? saveConfiguration()
+            try? Self.writePackage(originalPackage, at: localRoot)
+            if FileManager.default.fileExists(atPath: staging.path) {
+                try? FileManager.default.moveItem(at: staging, to: serviceRoot)
+            }
+            throw error
+        }
+        Log.service.info("ServiceRepository.local delete id=\(id) kind=\(service.id.kind.rawValue)")
+        return service.id.kind
     }
 
     func listSource(kind: ServiceKind, id: String, path: [String]) throws -> [Entry] {
@@ -887,11 +931,15 @@ actor ServiceRepository {
         try? Self.restoreAll(in: repository)
     }
 
-    func gitRestoreLocal() throws -> GitStatus {
+    func gitRestoreLocal(path: String?) throws -> GitStatus {
         let repository = try editableLocalRepository()
-        try Self.restoreAll(in: repository)
+        if let path {
+            try Self.restore(path: path, in: repository)
+        } else {
+            try Self.restoreAll(in: repository)
+        }
         _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        Log.service.info("ServiceRepository.git restore repository=local")
+        Log.service.info("ServiceRepository.git restore repository=local path=\(path ?? "all")")
         return try Self.gitStatus(repositoryID: Self.localID, provenance: .local, root: localRoot)
     }
 
@@ -1456,6 +1504,27 @@ actor ServiceRepository {
                 try FileManager.default.removeItem(at: parent)
                 parent.deleteLastPathComponent()
             }
+        }
+    }
+
+    private static func restore(path: String, in repository: SwiftGitX.Repository) throws {
+        let path = try gitPath(path)
+        let entries = try repository.status()
+        let matching = entries.filter { entry in
+            let candidate = entry.workingTree?.newFile.path ?? entry.index?.newFile.path ?? entry.index?.oldFile.path
+            return candidate == path
+        }
+        guard !matching.isEmpty else {
+            throw Failure(message: "No Local change exists at \(path)")
+        }
+        let untracked = matching.contains { $0.status.contains(.workingTreeNew) }
+        if !untracked {
+            try repository.restore([.workingTree, .staged], paths: [path])
+        } else {
+            let root = try repository.workingDirectory.standardizedFileURL
+            let url = root.appendingPathComponent(path).standardizedFileURL
+            guard url.path.hasPrefix(root.path + "/") else { throw Failure(message: "Invalid untracked path") }
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
         }
     }
 

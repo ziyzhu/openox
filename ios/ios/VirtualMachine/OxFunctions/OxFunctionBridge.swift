@@ -18,8 +18,9 @@ public protocol OxFunctionBridge: AnyObject {
     func findServices(query: String, purpose: String) async throws -> JSONValue?
     func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue?
     func inspectService(domain: String, actions: [String]?, purpose: String) async throws -> JSONValue?
-    func createWebService(domain: String, purpose: String) async throws -> JSONValue?
-    func copyServiceToLocal(domain: String, purpose: String) async throws -> JSONValue?
+    func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue?
+    func copyService(domain: String, purpose: String) async throws -> JSONValue?
+    func deleteService(domain: String, purpose: String) async throws -> JSONValue?
     func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue?
     func serviceGitLog(repository: String, limit: Int, cursor: String?, purpose: String) async throws -> JSONValue?
     func serviceGitShow(repository: String, commitHash: String, path: String?, purpose: String) async throws -> JSONValue?
@@ -27,12 +28,15 @@ public protocol OxFunctionBridge: AnyObject {
     func serviceGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue?
     func serviceGitCommit(message: String, purpose: String) async throws -> JSONValue?
     func serviceGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue?
-    func serviceGitRestore(purpose: String) async throws -> JSONValue?
+    func serviceGitRestore(path: String?, purpose: String) async throws -> JSONValue?
     func attachService(domain: String, purpose: String) async throws -> JSONValue?
     func detachService(domain: String, purpose: String) async throws -> JSONValue?
     func signInService(domain: String, purpose: String) async throws -> JSONValue?
     func solveService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue?
     func payService(domain: String, args: JSONValue, purpose: String) async throws -> JSONValue?
+    func createSkill(name: String, description: String, instructions: String, services: [String], purpose: String) async throws -> JSONValue?
+    func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue?
+    func deleteSkill(name: String, purpose: String) async throws -> JSONValue?
     func reportProgress(message: String, purpose: String) async throws -> JSONValue?
     func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue?
     func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue?

@@ -81,15 +81,38 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
-                    "ox.service.createWeb",
+                    "ox.service.create",
                     .object([
-                        "description": .string("Create a web service in the always-available editable Local repository and select it under `services/web/<domain>/`: `await ox.service.createWeb({ domain, purpose })`. The user approves service creation. The valid skeleton can then be changed with `ox.fs` tools."),
+                        "description": .string("Create a service in the always-available editable Local repository and select it under `services/<kind>/<domain>/`: `await ox.service.create({ kind: \"web\", domain, purpose })`. The user approves service creation. The valid skeleton can then be changed with `ox.fs` tools."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "kind": .object([
+                                    "type": .string("string"),
+                                    "enum": .array([.string("web")]),
+                                ]),
+                                "domain": .object([
+                                    "type": .string("string"),
+                                    "minLength": .int(3),
+                                    "maxLength": .int(253),
+                                ]),
+                            ]),
+                            "required": .array([.string("kind"), .string("domain")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
+                    "ox.service.copy",
+                    .object([
+                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. The user approves the copy. Edit its expanded source under `services/` with `ox.fs`."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
                                 "domain": .object([
                                     "type": .string("string"),
-                                    "minLength": .int(3),
+                                    "minLength": .int(1),
                                     "maxLength": .int(253),
                                 ]),
                             ]),
@@ -100,9 +123,9 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
-                    "ox.service.copyToLocal",
+                    "ox.service.delete",
                     .object([
-                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copyToLocal({ domain, purpose })`. The user approves the copy. Edit its expanded source under `services/` with `ox.fs`."),
+                        "description": .string("Delete one service from the editable Local repository: `await ox.service.delete({ domain, purpose })`. The user approves deletion. The source and Local package entry become uncommitted Git changes; another enabled repository candidate for the same domain becomes active when available."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -226,10 +249,12 @@ nonisolated enum OxServices {
                 (
                     "ox.service.git.restore",
                     .object([
-                        "description": .string("Erase every uncommitted staged, unstaged, and untracked change in Local and restore its live tip: `await ox.service.git.restore({ purpose })`. Requires approval and is unavailable in a historical checkout."),
+                        "description": .string("Restore Local changes from its live tip: `await ox.service.git.restore({ path?, purpose })`. With a changed file `path` from `ox.service.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. Requires approval and is unavailable in a historical checkout."),
                         "inputSchema": .object([
                             "type": .string("object"),
-                            "properties": .object([:]),
+                            "properties": .object([
+                                "path": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(1000)]),
+                            ]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["type": .string("object")]),
@@ -386,15 +411,20 @@ nonisolated enum OxServices {
             }
             ctx.setObject(inspectBlock as AnyObject, forKeyedSubscript: "__nativeServiceInspect" as NSString)
 
-            let createWebBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                env.call { try await $0.createWebService(domain: domain, purpose: purposeValue.toString()!) }
+            let createBlock: @convention(block) (String, String, JSValue) -> JSValue = { kind, domain, purposeValue in
+                env.call { try await $0.createService(kind: kind, domain: domain, purpose: purposeValue.toString()!) }
             }
-            ctx.setObject(createWebBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreateWeb" as NSString)
+            ctx.setObject(createBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreate" as NSString)
 
-            let copyToLocalBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                env.call { try await $0.copyServiceToLocal(domain: domain, purpose: purposeValue.toString()!) }
+            let copyBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
+                env.call { try await $0.copyService(domain: domain, purpose: purposeValue.toString()!) }
             }
-            ctx.setObject(copyToLocalBlock as AnyObject, forKeyedSubscript: "__nativeServiceCopyToLocal" as NSString)
+            ctx.setObject(copyBlock as AnyObject, forKeyedSubscript: "__nativeServiceCopy" as NSString)
+
+            let deleteBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
+                env.call { try await $0.deleteService(domain: domain, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(deleteBlock as AnyObject, forKeyedSubscript: "__nativeServiceDelete" as NSString)
 
             let gitStatusBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call { try await $0.serviceGitStatus(repository: repository, purpose: purposeValue.toString()!) }
@@ -471,8 +501,11 @@ nonisolated enum OxServices {
             }
             ctx.setObject(gitRevertBlock as AnyObject, forKeyedSubscript: "__nativeServiceGitRevert" as NSString)
 
-            let gitRestoreBlock: @convention(block) (JSValue) -> JSValue = { purposeValue in
-                env.call(suspendingTimeout: true) { try await $0.serviceGitRestore(purpose: purposeValue.toString()!) }
+            let gitRestoreBlock: @convention(block) (JSValue, JSValue) -> JSValue = { pathValue, purposeValue in
+                let path = pathValue.isString ? pathValue.toString() : nil
+                return env.call(suspendingTimeout: true) {
+                    try await $0.serviceGitRestore(path: path, purpose: purposeValue.toString()!)
+                }
             }
             ctx.setObject(gitRestoreBlock as AnyObject, forKeyedSubscript: "__nativeServiceGitRestore" as NSString)
 
@@ -516,8 +549,9 @@ nonisolated enum OxServices {
           find: (value) => { const options = __oxOptions(value, 'ox.service.find'); return __nativeServiceFind(String(options.query), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
-          createWeb: (value) => { const options = __oxOptions(value, 'ox.service.createWeb'); return __nativeServiceCreateWeb(String(options.domain), String(options.purpose)); },
-          copyToLocal: (value) => { const options = __oxOptions(value, 'ox.service.copyToLocal'); return __nativeServiceCopyToLocal(String(options.domain), String(options.purpose)); },
+          create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(String(options.kind), String(options.domain), String(options.purpose)); },
+          copy: (value) => { const options = __oxOptions(value, 'ox.service.copy'); return __nativeServiceCopy(String(options.domain), String(options.purpose)); },
+          delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           git: {
             status: (value) => { const options = __oxOptions(value, 'ox.service.git.status'); return __nativeServiceGitStatus(String(options.repository ?? 'local'), String(options.purpose)); },
             log: (value) => { const options = __oxOptions(value, 'ox.service.git.log'); return __nativeServiceGitLog(String(options.repository ?? 'local'), Number(options.limit ?? 20), options.cursor ?? null, String(options.purpose)); },
@@ -526,7 +560,7 @@ nonisolated enum OxServices {
             checkout: (value) => { const options = __oxOptions(value, 'ox.service.git.checkout'); return __nativeServiceGitCheckout(String(options.repository ?? 'local'), String(options.commitHash), String(options.purpose)); },
             commit: (value) => { const options = __oxOptions(value, 'ox.service.git.commit'); return __nativeServiceGitCommit(String(options.message), String(options.purpose)); },
             revert: (value) => { const options = __oxOptions(value, 'ox.service.git.revert'); return __nativeServiceGitRevert(String(options.commitHash), String(options.message), String(options.purpose)); },
-            restore: (value) => { const options = __oxOptions(value, 'ox.service.git.restore'); return __nativeServiceGitRestore(String(options.purpose)); }
+            restore: (value) => { const options = __oxOptions(value, 'ox.service.git.restore'); return __nativeServiceGitRestore(options.path ?? null, String(options.purpose)); }
           },
           attach: (value) => { const options = __oxOptions(value, 'ox.service.attach'); return __nativeServiceAttach(String(options.domain), String(options.purpose)); },
           detach: (value) => { const options = __oxOptions(value, 'ox.service.detach'); return __nativeServiceDetach(String(options.domain), String(options.purpose)); },

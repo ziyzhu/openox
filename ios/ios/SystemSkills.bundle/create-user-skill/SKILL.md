@@ -20,7 +20,7 @@ Establish through concrete examples:
 
 Ask one decisive question at a time when its answer changes the reusable workflow. Use `ox.user.choose` with 2–4 likely answers; its custom-answer path covers anything else. Stop once the workflow can be explained without inventing consequential details.
 
-Inspect existing user skills with `ox.fs.glob` and `ox.fs.read` to avoid duplicate names or overlapping instructions.
+Inspect existing user skills with `ox.fs.glob` and `ox.fs.read` to avoid duplicate names or overlapping instructions. When adapting an existing Profile, `system:`, or `service:` skill, use `ox.skill.copy` to create the Profile-owned starting point.
 
 ## Validate the design
 
@@ -47,7 +47,7 @@ Then call `ox.user.choose` with `Create skill`, `Revise proposal`, and `Cancel`.
 
 ## Write the skill
 
-Use a short lowercase kebab-case name. The `system:` and `service:` namespaces are reserved. Write one `skills/<name>/SKILL.md` file with matching YAML frontmatter, a concise description, optional comma-separated service domains, and durable instructions:
+Use a short lowercase kebab-case name. The `system:` and `service:` namespaces are reserved. Create the accepted skill with `ox.skill.create`, passing its name, description, instructions, and service domains. This writes one canonical `skills/<name>/SKILL.md` file:
 
 ```markdown
 ---
@@ -65,4 +65,4 @@ Write the body as an execution prompt. Use imperative steps, decision rules, the
 
 The skill may use available `ox.*` functions. Its runtime has no shell, filesystem outside Ox's virtual layout, bundled resources, scripts, package installation, browser globals, or ambient network access.
 
-Read an existing file before replacing it and prefer `ox.fs.edit` for focused changes. Read the final skill back and verify its name, description, services, instructions, and trigger boundaries against the accepted proposal.
+Read an existing file before replacing it and prefer `ox.fs.edit` for focused revisions. Read the final skill back and verify its name, description, services, instructions, and trigger boundaries against the accepted proposal. Use `ox.skill.delete` when the user asks to remove a Profile-owned skill.

@@ -73,8 +73,8 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.delete",
-                    "Delete one artifact, skill, or file inside a chosen Files folder: `await ox.fs.delete({ path, purpose })`. Deleting inside a chosen Files folder requires approval unless the user has allowed that action without asking. `MEMORY.md`, `SOUL.md`, and chosen folders themselves cannot be deleted.",
-                    input: object(["path": path("Artifact, skill, or chosen Files path."), "purpose": purpose], required: ["path", "purpose"]),
+                    "Delete one artifact, Profile-owned skill, Local service source file, or file inside a chosen Files folder: `await ox.fs.delete({ path, purpose })`. Resource roots such as Local services use their `ox.service.delete` lifecycle function. Deleting inside a chosen Files folder requires approval unless the user has allowed that action without asking. `MEMORY.md`, `SOUL.md`, and chosen folders themselves cannot be deleted.",
+                    input: object(["path": path("Artifact, skill, Local service source, or chosen Files path."), "purpose": purpose], required: ["path", "purpose"]),
                     output: deletion
                 ),
                 entry(

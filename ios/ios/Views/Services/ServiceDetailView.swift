@@ -59,9 +59,31 @@ struct ServiceDetailView: View {
     @State private var authorizingMCP = false
     @State private var mcpAuthorizationError: String?
     @State private var confirmRemoveMCP = false
+    @State private var confirmDeleteLocalService = false
+    @State private var localServiceDeleteError: String?
     @State private var presentations = AppPresentationCoordinator()
 
     var body: some View {
+        content
+            .alert("Delete Local service?", isPresented: $confirmDeleteLocalService) {
+                Button("Delete", role: .destructive) {
+                    Task { await deleteLocalService() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Deletes this service's editable source from Local. The deletion remains an uncommitted Local Git change, and website sign-ins and data are kept.")
+            }
+            .alert("Couldn't delete Local service", isPresented: Binding(
+                get: { localServiceDeleteError != nil },
+                set: { if !$0 { localServiceDeleteError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(localServiceDeleteError ?? "")
+            }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 header
@@ -184,6 +206,18 @@ struct ServiceDetailView: View {
             }
         }
         .appPresentations(presentations)
+    }
+
+    private func deleteLocalService() async {
+        do {
+            _ = try await serviceManager.deleteLocalService(
+                domain: service.domain,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            dismiss()
+        } catch {
+            localServiceDeleteError = error.localizedDescription
+        }
     }
 
     // MARK: - Auth chip
@@ -605,7 +639,7 @@ struct ServiceDetailView: View {
 
     @ViewBuilder
     private var manageSection: some View {
-        if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
+        if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement || service.isLocalService {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Manage")
                     .font(Theme.Fonts.labelMd)
@@ -632,6 +666,15 @@ struct ServiceDetailView: View {
                             confirmRemoveMCP = true
                         }
                         .accessibilityIdentifier(A11yID.Chat.Attach.disconnectMCP(service.domain))
+                    }
+                    if service.isLocalService {
+                        if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
+                            Divider().padding(.horizontal, Theme.Spacing.md)
+                        }
+                        manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
+                            confirmDeleteLocalService = true
+                        }
+                        .accessibilityIdentifier(A11yID.Chat.Attach.deleteLocalService(service.domain))
                     }
                 }
                 .settingsSurface()

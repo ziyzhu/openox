@@ -1,7 +1,7 @@
 import Foundation
 
 extension Chat {
-    private var skillsMount: SkillsMount {
+    var skillsMount: SkillsMount {
         SkillsMount(repository: repository, scope: scope, services: attachedServices)
     }
 
@@ -785,7 +785,7 @@ extension Chat {
         return (hasLeadingEllipsis ? "…" : "") + body + (hasTrailingEllipsis ? "…" : "")
     }
 
-    private func refreshUserSkills() {
+    func refreshUserSkills() {
         guard StorageRoot.currentScope?.profileID == scope.profileID else { return }
         Skills.shared.refresh()
     }

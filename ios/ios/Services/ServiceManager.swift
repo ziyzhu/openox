@@ -465,10 +465,10 @@ final class ServiceManager {
         }
     }
 
-    func createWebService(domain: String, locale: String?) async throws {
-        try await repository.createWebService(domain: domain)
+    func createService(kind: ServiceRepository.ServiceKind, id: String, locale: String?) async throws {
+        try await repository.createService(kind: kind, id: id)
         _ = await loadRepositories(locale: locale)
-        guard service(domain: domain) != nil else {
+        guard service(domain: id) != nil else {
             throw ServiceRepository.Failure(message: "The Local service could not be activated.")
         }
     }
@@ -479,6 +479,20 @@ final class ServiceManager {
         guard monoRepository?.repositories.contains(where: { $0.id == ServiceRepository.localID }) == true else {
             throw ServiceRepository.Failure(message: "The Local repository is unavailable.")
         }
+    }
+
+    func deleteLocalService(domain: String, locale: String?) async throws -> ServiceRepository.ServiceKind {
+        let kind = try await repository.deleteLocalService(id: domain)
+        _ = await loadRepositories(locale: locale)
+        if service(domain: domain) == nil {
+            savedDomains.remove(domain)
+            let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+            for chatID in Array(attachedServiceDomainsByChat.keys) {
+                attachedServiceDomainsByChat[chatID]?.remove(domain)
+            }
+            updateMCPActivation(from: previous)
+        }
+        return kind
     }
 
     func serviceGitStatus(repositoryID: String) async throws -> ServiceRepository.GitStatus {
@@ -535,8 +549,8 @@ final class ServiceManager {
         }
     }
 
-    func restoreLocalServices(locale: String?) async throws -> ServiceRepository.GitStatus {
-        let status = try await repository.gitRestoreLocal()
+    func restoreLocalServices(path: String?, locale: String?) async throws -> ServiceRepository.GitStatus {
+        let status = try await repository.gitRestoreLocal(path: path)
         _ = await loadRepositories(locale: locale)
         return status
     }

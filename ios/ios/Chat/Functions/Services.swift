@@ -1,13 +1,17 @@
 import Foundation
 
 extension Chat: OxFunctionBridge {
-    public func createWebService(domain: String, purpose: String) async throws -> JSONValue? {
+    public func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue? {
+        guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), serviceKind == .web else {
+            throw RuntimeError.bridge("ox.service.create: kind must be 'web'")
+        }
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let args: JSONValue = .object(["domain": .string(cleanDomain)])
-        return try await tracked(.serviceCreateWeb, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceCreateWeb.rawValue, args: args.toAny())
-            try await self.serviceManager.createWebService(
-                domain: cleanDomain,
+        let args: JSONValue = .object(["kind": .string(kind), "domain": .string(cleanDomain)])
+        return try await tracked(.serviceCreate, args, purpose: purpose) {
+            try await self.requireApproval(action: InvocationName.serviceCreate.rawValue, args: args.toAny())
+            try await self.serviceManager.createService(
+                kind: serviceKind,
+                id: cleanDomain,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             )
             return .object([
@@ -18,15 +22,15 @@ extension Chat: OxFunctionBridge {
         }
     }
 
-    public func copyServiceToLocal(domain: String, purpose: String) async throws -> JSONValue? {
+    public func copyService(domain: String, purpose: String) async throws -> JSONValue? {
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard let service = serviceManager.service(domain: cleanDomain) else {
-            throw RuntimeError.bridge("ox.service.copyToLocal: service '\(cleanDomain)' does not exist.")
+            throw RuntimeError.bridge("ox.service.copy: service '\(cleanDomain)' does not exist.")
         }
         let kind = serviceKind(service)
         let args: JSONValue = .object(["domain": .string(cleanDomain)])
-        return try await tracked(.serviceCopyToLocal, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceCopyToLocal.rawValue, args: args.toAny())
+        return try await tracked(.serviceCopy, args, purpose: purpose) {
+            try await self.requireApproval(action: InvocationName.serviceCopy.rawValue, args: args.toAny())
             try await self.serviceManager.copyServiceToLocal(
                 domain: cleanDomain,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -36,6 +40,38 @@ extension Chat: OxFunctionBridge {
                 "manifestPath": .string("services/\(kind)/\(cleanDomain)/manifest.json"),
                 "source": .string("local"),
             ])
+        }
+    }
+
+    public func deleteService(domain: String, purpose: String) async throws -> JSONValue? {
+        let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let currentService = serviceManager.service(domain: cleanDomain)
+        let args: JSONValue = .object(["domain": .string(cleanDomain)])
+        return try await tracked(.serviceDelete, args, purpose: purpose) {
+            try await self.requireApproval(action: InvocationName.serviceDelete.rawValue, args: args.toAny())
+            let kind = try await self.serviceManager.deleteLocalService(
+                domain: cleanDomain,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            let replacement = self.serviceManager.service(domain: cleanDomain)
+            if replacement == nil {
+                if let currentService { self.serviceManager.setSaved(currentService, false) }
+                self.setAttachedServices(self.attachedServices.filter { $0.domain != cleanDomain })
+            } else if let replacement, self.attachedServices.contains(where: { $0.domain == cleanDomain }) {
+                self.setAttachedServices(self.attachedServices.map { $0.domain == cleanDomain ? replacement : $0 })
+            }
+            var result: [String: JSONValue] = [
+                "domain": .string(cleanDomain),
+                "kind": .string(kind.rawValue),
+                "deleted": .bool(true),
+                "source": .string("local"),
+            ]
+            if let replacement,
+               case .repository(let repository, let provenance) = replacement.definition.source {
+                result["replacementRepository"] = .string(repository)
+                result["replacementProvenance"] = .string(provenance.rawValue)
+            }
+            return .object(result)
         }
     }
 
@@ -160,16 +196,20 @@ extension Chat: OxFunctionBridge {
         }
     }
 
-    public func serviceGitRestore(purpose: String) async throws -> JSONValue? {
+    public func serviceGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
+        let path = try path.map(serviceRestorePath)
         let status = try await serviceManager.serviceGitStatus(repositoryID: ServiceRepository.localID)
-        let args: JSONValue = .object([
+        var fields: [String: JSONValue] = [
             "staged": .array(status.staged.map(JSONValue.string)),
             "unstaged": .array(status.unstaged.map(JSONValue.string)),
             "untracked": .array(status.untracked.map(JSONValue.string)),
-        ])
+        ]
+        if let path { fields["path"] = .string(path) }
+        let args: JSONValue = .object(fields)
         return try await tracked(.serviceGitRestore, args, purpose: purpose) {
             try await self.requireApproval(action: InvocationName.serviceGitRestore.rawValue, args: args.toAny())
             return try Self.encodeToJSON(try await self.serviceManager.restoreLocalServices(
+                path: path,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             ))
         }
@@ -181,6 +221,15 @@ extension Chat: OxFunctionBridge {
             throw RuntimeError.bridge("ox.service.git.\(function): repository must be 'local'")
         }
         return clean
+    }
+
+    private func serviceRestorePath(_ value: String) throws -> String {
+        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let path = clean.hasPrefix("services/") ? String(clean.dropFirst("services/".count)) : clean
+        guard !path.isEmpty else {
+            throw RuntimeError.bridge("ox.service.git.restore: path cannot be empty")
+        }
+        return path
     }
 
     private func serviceCommitMessage(_ value: String, function: String) throws -> String {
