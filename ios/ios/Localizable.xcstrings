@@ -1434,7 +1434,7 @@
         }
       }
     },
-    "Ox is a self-evolving agent\nthat lives on your phone." : {
+    "Ox is a self-evolving agent\nthat lives on your mobile device." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {

@@ -25,7 +25,7 @@ struct OnboardingView: View {
         TabView(selection: $step) {
             titleSlide(
                 title: "Moo Moo",
-                description: "Ox is a self-evolving agent\nthat lives on your phone."
+                description: "Ox is a self-evolving agent\nthat lives on your mobile device."
             )
             .tag(Step.welcome)
 

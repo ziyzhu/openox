@@ -1,6 +1,6 @@
 ## OpenOx
 
-Ox is a self-evolving agent that lives on your phone.
+OpenOx is a protocol behind Ox - a self-evolving agent that lives on your mobile device.
 
 It is built around three principles:
 
@@ -8,7 +8,7 @@ It is built around three principles:
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
 
-[Blog](https://ziyzhu.com/introducing-openox) | [Discord](https://discord.gg/7baSAHZTA)
+[Protocol](PROTOCOL.md) | [Blog](https://ziyzhu.com/introducing-openox) | [Discord](https://discord.gg/7baSAHZTA)
 
 ## Installation
 
