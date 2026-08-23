@@ -1,0 +1,2398 @@
+{
+  "domain": "github.com",
+  "name": "GitHub",
+  "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Sign in to view your repositories, work items, and notifications. Read-only.",
+  "baseUrl": "https://github.com/",
+  "$defs": {
+    "repo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full repository name in owner/repository form."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Repository summary, or null when none is set."
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Primary programming language, or null when GitHub has not detected one."
+        },
+        "stars": {
+          "type": "integer",
+          "description": "Number of stars on the repository."
+        },
+        "topics": {
+          "type": "array",
+          "description": "Repository topics.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether the repository is archived."
+        },
+        "isPrivate": {
+          "type": "boolean",
+          "description": "Whether the repository is private."
+        },
+        "starredByMe": {
+          "type": "boolean",
+          "description": "Whether the signed-in user has starred the repository."
+        },
+        "url": {
+          "type": "string",
+          "description": "GitHub repository URL."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "language",
+        "stars",
+        "topics",
+        "archived",
+        "isPrivate",
+        "starredByMe",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "repoList": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "description": "Repositories in this result page.",
+          "items": {
+            "$ref": "#/$defs/repo"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Cursor for the next result page, or null when there are no more results."
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "thread": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer",
+          "description": "Issue or pull-request number within the repository."
+        },
+        "title": {
+          "type": "string",
+          "description": "Issue or pull-request title."
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Current state reported by GitHub."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Full repository name in owner/repository form."
+        },
+        "author": {
+          "type": "string",
+          "description": "Author's GitHub login."
+        },
+        "comments": {
+          "type": "integer",
+          "description": "Number of conversation comments."
+        },
+        "labels": {
+          "type": "array",
+          "description": "Applied label names.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isPullRequest": {
+          "type": "boolean",
+          "description": "Whether the result is a pull request rather than an issue."
+        },
+        "createdAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Creation time reported by GitHub, or null when unavailable."
+        },
+        "url": {
+          "type": "string",
+          "description": "GitHub issue or pull-request URL."
+        }
+      },
+      "required": [
+        "number",
+        "title",
+        "state",
+        "repo",
+        "author",
+        "comments",
+        "labels",
+        "isPullRequest",
+        "createdAt",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "threadList": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "description": "Issues and pull requests in this result page.",
+          "items": {
+            "$ref": "#/$defs/thread"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Cursor for the next result page, or null when there are no more results."
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to GitHub",
+      "description": "Opens GitHub sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "GitHub sign-in URL."
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check GitHub sign-in",
+      "description": "Checks whether you are signed in to GitHub.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean",
+            "description": "Whether the current GitHub page session is signed in."
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get signed-in user",
+      "description": "Returns the signed-in user's login, avatar, and profile link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "avatarUrl",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listMyRepos",
+      "label": "List my repositories",
+      "description": "Lists repositories owned by the signed-in user, ordered by recent updates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/repoList"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchRepos",
+      "label": "Search repositories",
+      "description": "Finds repositories that match names, topics, languages, activity, or other GitHub search criteria.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "GitHub repository search query. Qualifiers such as language:swift and stars:>100 are supported."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/repoList"
+      },
+      "defaultArgs": {
+        "query": "peach"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchCode",
+      "label": "Search code",
+      "description": "Finds matching code and returns each repository, file path, link, and highlighted snippet. Some results require sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "GitHub code search query. Use repo:owner/repository to restrict results to one repository."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "repo": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "repo",
+                "path",
+                "url",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "DOMParser"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getUser",
+      "label": "Get user profile",
+      "description": "Returns a user's public profile, follower count, and profile link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Exact GitHub login to look up."
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "followers": {
+            "type": "integer"
+          },
+          "repos": {
+            "type": "integer"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "name",
+          "bio",
+          "location",
+          "followers",
+          "repos",
+          "avatarUrl",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "username": "torvalds"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getRepo",
+      "label": "Get repository",
+      "description": "Returns a repository's description, default branch, visibility, stars, forks, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultBranch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stars": {
+            "type": "integer"
+          },
+          "forks": {
+            "type": "integer"
+          },
+          "isPrivate": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "defaultBranch",
+          "stars",
+          "forks",
+          "isPrivate",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listBranches",
+      "label": "List branches",
+      "description": "Lists repository branches page by page, including the default branch and each branch's latest author.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "author": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "isDefault",
+                "author"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listCommits",
+      "label": "List commits",
+      "description": "Lists recent commits on a branch, tag, or commit, including author, date, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oid": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "authoredDate": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "oid",
+                "message",
+                "author",
+                "authoredDate",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRepoContents",
+      "label": "List repository contents",
+      "description": "Lists files and directories at a repository path and revision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "path": {
+            "type": "string",
+            "description": "Directory path within the repository. Omit to list the repository root."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "\"file\" or \"dir\""
+                }
+              },
+              "required": [
+                "name",
+                "path",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getFileContent",
+      "label": "Get file content",
+      "description": "Returns the raw text from one repository file at a branch, tag, or commit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "path": {
+            "type": "string",
+            "description": "File path within the repository."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch."
+          }
+        },
+        "required": [
+          "repo",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo",
+          "path",
+          "ref",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "path": "go.mod"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listIssues",
+      "label": "List issues",
+      "description": "Lists open or closed issues in a repository, ordered by recent updates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Issue state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listPullRequests",
+      "label": "List pull requests",
+      "description": "Lists open or closed pull requests in a repository, ordered by recent updates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Pull-request state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getIssue",
+      "label": "Get issue",
+      "description": "Returns one issue's title, state, body, repository, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Issue number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "state",
+          "body",
+          "repo",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "number": "1"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPullRequest",
+      "label": "Get pull request",
+      "description": "Returns one pull request's title, state, body, repository, and link without its diff or comments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "isPullRequest": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "state",
+          "body",
+          "repo",
+          "isPullRequest",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "number": "13632"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listPullRequestFiles",
+      "label": "List pull request files",
+      "description": "Lists files changed by a pull request with status and line totals.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "additions": {
+                  "type": "integer"
+                },
+                "deletions": {
+                  "type": "integer"
+                },
+                "isBinary": {
+                  "type": "boolean"
+                },
+                "isTooBig": {
+                  "type": "boolean"
+                },
+                "truncatedReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "status",
+                "additions",
+                "deletions",
+                "isBinary",
+                "isTooBig",
+                "truncatedReason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listPullRequestCommits",
+      "label": "List pull request commits",
+      "description": "Lists commits included in a pull request with author, date, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oid": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "authoredDate": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "oid",
+                "message",
+                "author",
+                "authoredDate",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listPullRequestChecks",
+      "label": "List pull request checks",
+      "description": "Lists workflow jobs and statuses attached to a pull request.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "workflow": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "jobId": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "workflow",
+                "status",
+                "runId",
+                "jobId",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listPullRequestReviewThreads",
+      "label": "List pull request review threads",
+      "description": "Lists inline review threads and comments on a pull request, including resolution state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "subjectType": {
+                  "type": "string"
+                },
+                "isResolved": {
+                  "type": "boolean"
+                },
+                "resolvedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "comments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "author": {
+                        "type": "string"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "author",
+                      "body",
+                      "createdAt",
+                      "url"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "subjectType",
+                "isResolved",
+                "resolvedBy",
+                "comments"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2016"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listWorkflowRuns",
+      "label": "List workflow runs",
+      "description": "Lists recent GitHub Actions workflow runs for a repository or one workflow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "workflow": {
+            "type": "string",
+            "description": "Workflow file name or workflow path. Omit to include every workflow."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "runId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "workflow": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "duration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "runId",
+                "title",
+                "workflow",
+                "status",
+                "branch",
+                "createdAt",
+                "duration",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getWorkflowRun",
+      "label": "Get workflow run",
+      "description": "Returns workflow-run status, trigger, revision, duration, and jobs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "runId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions run identifier."
+          }
+        },
+        "required": [
+          "repo",
+          "runId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "workflow": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commitSha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "jobId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "jobId",
+                "name",
+                "status",
+                "duration",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "title",
+          "workflow",
+          "status",
+          "event",
+          "branch",
+          "commitSha",
+          "createdAt",
+          "duration",
+          "jobs",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "runId": "30693303910"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getWorkflowJob",
+      "label": "Get workflow job",
+      "description": "Returns one workflow job's status, timing, and step conclusions without downloading logs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "runId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions run identifier."
+          },
+          "jobId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions job identifier."
+          }
+        },
+        "required": [
+          "repo",
+          "runId",
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "conclusion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "completedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "number",
+                "name",
+                "conclusion",
+                "startedAt",
+                "completedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "jobId",
+          "name",
+          "status",
+          "startedAt",
+          "completedAt",
+          "duration",
+          "steps",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "runId": "30693303910",
+        "jobId": "91351791568"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listNotifications",
+      "label": "List notifications",
+      "description": "Lists the signed-in user's visible notifications with repository, link, and unread state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Notification position returned by a previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "repo": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "title",
+                "repo",
+                "url",
+                "unread"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchIssues",
+      "label": "Search issues and PRs",
+      "description": "Finds issues and pull requests that match repository, state, author, label, text, or other GitHub search criteria.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "GitHub issue search query. Qualifiers such as repo:owner/repository, is:pr, is:open, and label:bug are supported."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {
+        "query": "repo:cli/cli is:issue is:open label:bug"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listMyIssues",
+      "label": "My issues",
+      "description": "Lists open or closed issues assigned to, created by, or mentioning the signed-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "assigned",
+              "created",
+              "mentioned"
+            ],
+            "description": "Relationship to the signed-in user. Defaults to assigned."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Issue state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listMyPullRequests",
+      "label": "My pull requests",
+      "description": "Lists open or closed pull requests created by, assigned to, awaiting review from, or otherwise involving the signed-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "created",
+              "assigned",
+              "review-requested",
+              "involves"
+            ],
+            "description": "Relationship to the signed-in user. Defaults to created."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Pull-request state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCommit",
+      "label": "Get commit",
+      "description": "Returns one commit's message, author, date, parents, changed-file summary, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "sha": {
+            "type": "string",
+            "description": "Full or abbreviated commit SHA."
+          }
+        },
+        "required": [
+          "repo",
+          "sha"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "oid": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authoredDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "changeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "additions": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "deletions": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "oid",
+          "message",
+          "author",
+          "files",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "sha": "0274077b56a5ef8e575358721149cd02888b2a5f"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listIssueComments",
+      "label": "List issue/PR comments",
+      "description": "Lists top-level conversation comments on an issue or pull request in page order; review threads and timeline events are not included.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Issue or pull-request number within the repository."
+          }
+        },
+        "required": [
+          "repo",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "author": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "body": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "author",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "number": "13261"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listReleases",
+      "label": "List releases",
+      "description": "Lists the repository's visible releases with tag, display name, and link, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tag",
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listTags",
+      "label": "List tags",
+      "description": "Lists the repository's visible tags with display name and release link, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tag",
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getReadme",
+      "label": "Get README",
+      "description": "Returns the repository's README as raw text from a branch, tag, or commit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch."
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo",
+          "path",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "GitHub",
+      "description": "协作式软件开发平台。浏览和搜索仓库、代码、分支、提交、议题、拉取请求、审查、检查、工作流运行、发布版本和标签。登录后可查看自己拥有的仓库、相关议题和拉取请求以及通知。只读。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录 GitHub",
+          "description": "打开 GitHub 登录页。"
+        },
+        "getSignInState": {
+          "label": "检查 GitHub 登录状态",
+          "description": "检查你是否已登录 GitHub。"
+        },
+        "getCurrentUser": {
+          "label": "获取已登录用户",
+          "description": "返回已登录用户的登录名、头像和个人资料链接。"
+        },
+        "listMyRepos": {
+          "label": "我的仓库列表",
+          "description": "列出已登录用户拥有的仓库，最近更新的排在前面。"
+        },
+        "searchRepos": {
+          "label": "搜索仓库",
+          "description": "查找符合名称、主题、语言、活跃度或其他 GitHub 搜索条件的仓库。"
+        },
+        "searchCode": {
+          "label": "搜索代码",
+          "description": "查找匹配代码，并返回仓库、文件路径、链接和高亮片段。部分结果需要登录。"
+        },
+        "getUser": {
+          "label": "获取用户资料",
+          "description": "返回用户的公开资料、关注者数量和个人资料链接。"
+        },
+        "getRepo": {
+          "label": "获取仓库",
+          "description": "返回仓库的描述、默认分支、可见性、星标数、复刻数和链接。"
+        },
+        "listBranches": {
+          "label": "分支列表",
+          "description": "分页列出仓库分支，包括默认分支和各分支的最近作者。"
+        },
+        "listCommits": {
+          "label": "提交列表",
+          "description": "列出分支、标签或某次提交上的近期提交，包括作者、日期和链接。"
+        },
+        "listRepoContents": {
+          "label": "列出仓库内容",
+          "description": "列出仓库指定路径和版本下的文件与目录。"
+        },
+        "getFileContent": {
+          "label": "获取文件内容",
+          "description": "返回仓库中某个文件在指定分支、标签或提交上的原始文本。"
+        },
+        "listIssues": {
+          "label": "议题列表",
+          "description": "列出仓库中开启或关闭的议题，按最近更新时间排序。"
+        },
+        "listPullRequests": {
+          "label": "拉取请求列表",
+          "description": "列出仓库中开启或关闭的拉取请求，按最近更新时间排序。"
+        },
+        "getIssue": {
+          "label": "获取议题",
+          "description": "返回单个议题的标题、状态、正文、所属仓库和链接。"
+        },
+        "getPullRequest": {
+          "label": "获取拉取请求",
+          "description": "返回单个拉取请求的标题、状态、正文、所属仓库和链接，不含差异或评论。"
+        },
+        "listPullRequestFiles": {
+          "label": "拉取请求文件列表",
+          "description": "列出拉取请求更改的文件、状态和行数统计。"
+        },
+        "listPullRequestCommits": {
+          "label": "拉取请求提交列表",
+          "description": "列出拉取请求包含的提交，包括作者、日期和链接。"
+        },
+        "listPullRequestChecks": {
+          "label": "拉取请求检查列表",
+          "description": "列出拉取请求关联的工作流任务及其状态。"
+        },
+        "listPullRequestReviewThreads": {
+          "label": "拉取请求审查线程列表",
+          "description": "列出拉取请求中的行内审查线程、评论和解决状态。"
+        },
+        "listWorkflowRuns": {
+          "label": "工作流运行列表",
+          "description": "列出仓库或指定工作流最近的 GitHub Actions 运行记录。"
+        },
+        "getWorkflowRun": {
+          "label": "获取工作流运行",
+          "description": "返回工作流运行的状态、触发方式、版本、耗时和任务。"
+        },
+        "getWorkflowJob": {
+          "label": "获取工作流任务",
+          "description": "返回一个工作流任务的状态、时间和步骤结论，不下载日志。"
+        },
+        "listNotifications": {
+          "label": "通知列表",
+          "description": "列出已登录用户可见的通知，包括所属仓库、链接和未读状态。"
+        },
+        "searchIssues": {
+          "label": "搜索议题与 PR",
+          "description": "查找符合仓库、状态、作者、标签、文本或其他 GitHub 搜索条件的议题和拉取请求。"
+        },
+        "listMyIssues": {
+          "label": "我的议题",
+          "description": "列出指派给已登录用户、由其创建或提及其的开启或关闭议题。"
+        },
+        "listMyPullRequests": {
+          "label": "我的拉取请求",
+          "description": "列出由已登录用户创建、指派给其、等待其审查或以其他方式涉及其的开启或关闭拉取请求。"
+        },
+        "getCommit": {
+          "label": "获取提交",
+          "description": "返回单个提交的信息、作者、日期、父提交、更改文件摘要和链接。"
+        },
+        "listIssueComments": {
+          "label": "议题/PR 评论列表",
+          "description": "按页面顺序列出议题或拉取请求的顶层会话评论，不含审查线程和时间线事件。"
+        },
+        "listReleases": {
+          "label": "发布列表",
+          "description": "列出仓库中可见的发布版本，包括标签、显示名称和链接，最新在前。"
+        },
+        "listTags": {
+          "label": "标签列表",
+          "description": "列出仓库中可见的标签，包括显示名称和发布链接，最新在前。"
+        },
+        "getReadme": {
+          "label": "获取 README",
+          "description": "返回仓库在指定分支、标签或提交上的 README 原始文本。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/github.com/favicon.png"
+}

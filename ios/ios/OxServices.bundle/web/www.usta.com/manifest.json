@@ -1,0 +1,427 @@
+{
+  "domain": "www.usta.com",
+  "name": "USTA",
+  "description": "The national governing body for U.S. tennis. Search USTA-sanctioned tournaments near a location (public), and read the signed-in member's profile, membership, rankings, play history, and upcoming/completed match schedule.",
+  "baseUrl": "https://www.usta.com/",
+  "$defs": {
+    "tournament": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "displayName",
+        "email",
+        "city",
+        "state",
+        "rating"
+      ],
+      "additionalProperties": false
+    },
+    "membership": {
+      "type": "object",
+      "properties": {
+        "memberNumber": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "expirationDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "memberNumber",
+        "type",
+        "status",
+        "startDate",
+        "expirationDate"
+      ],
+      "additionalProperties": false
+    },
+    "ranking": {
+      "type": "object",
+      "properties": {
+        "rank": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "division": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "points": {
+          "type": "string"
+        },
+        "asOfDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rank",
+        "type",
+        "division",
+        "section",
+        "points",
+        "asOfDate"
+      ],
+      "additionalProperties": false
+    },
+    "match": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "opponent": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "score": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "event",
+        "opponent",
+        "result",
+        "score"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign-in URL",
+      "description": "URL of the USTA sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Whether a USTA member is signed in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchTournaments",
+      "label": "Search tournaments",
+      "description": "Finds USTA-sanctioned tournaments near your current location or a city, place, or ZIP code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "distanceMiles": {
+            "type": "number"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tournament"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProfile",
+      "label": "Get my profile",
+      "description": "The signed-in member's account and player profile.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/profile"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getMembership",
+      "label": "Get my membership",
+      "description": "The signed-in member's USTA membership details.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/membership"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getRankings",
+      "label": "Get my rankings",
+      "description": "The signed-in member's USTA rankings.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ranking"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPlayHistory",
+      "label": "Get my play history",
+      "description": "Shows your match history, optionally limited by year or event type.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/match"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getSchedule",
+      "label": "Get my match schedule",
+      "description": "Shows your upcoming matches by default, or your completed matches when requested.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/match"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "status",
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.usta.com/favicon.png"
+}

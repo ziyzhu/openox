@@ -1,0 +1,786 @@
+{
+  "domain": "xiaohongshu.com",
+  "name": "Xiaohongshu",
+  "description": "A Chinese lifestyle and shopping community. Search notes by keyword, browse the home feed (personalized to the signed-in user), read a note's body and engagement counts, browse its comment thread, and extract a note's image and video URLs.",
+  "baseUrl": "https://www.xiaohongshu.com/explore",
+  "$defs": {
+    "note": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorUrl": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "string"
+        },
+        "collects": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cover": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "author",
+        "authorUrl",
+        "content",
+        "likes",
+        "collects",
+        "comments",
+        "tags",
+        "cover",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "comment": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "time": {
+          "type": "string"
+        },
+        "isReply": {
+          "type": "boolean"
+        },
+        "replyTo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "text",
+        "likes",
+        "time",
+        "isReply",
+        "replyTo"
+      ],
+      "additionalProperties": false
+    },
+    "searchResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorUrl": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "string"
+        },
+        "cover": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "author",
+        "authorUrl",
+        "likes",
+        "cover",
+        "url",
+        "publishedAt"
+      ],
+      "additionalProperties": false
+    },
+    "feedItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorUrl": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "string"
+        },
+        "cover": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "author",
+        "authorUrl",
+        "likes",
+        "cover",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "userProfile": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "desc": {
+          "type": "string"
+        },
+        "redId": {
+          "type": "string"
+        },
+        "ipLocation": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "follows": {
+          "type": "string"
+        },
+        "fans": {
+          "type": "string"
+        },
+        "liked": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId",
+        "nickname",
+        "desc",
+        "redId",
+        "ipLocation",
+        "avatar",
+        "follows",
+        "fans",
+        "liked",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "userResult": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "redId": {
+          "type": "string"
+        },
+        "fans": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId",
+        "nickname",
+        "redId",
+        "fans",
+        "avatar",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "trendingQuery": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "noteMedia": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "author",
+        "items"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Xiaohongshu",
+      "description": "Xiaohongshu sign-in URL (QR or phone).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Xiaohongshu.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchNotes",
+      "label": "Search notes",
+      "description": "Search Xiaohongshu notes by keyword. Search one keyword at a time, invoking multiple searches sequentially.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchResult"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "美食"
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "getNote",
+      "label": "Get note",
+      "description": "Shows a note's text, tags, and engagement counts from its link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/note"
+      },
+      "defaultArgs": {
+        "url": "https://www.xiaohongshu.com/search_result/69a5bbe2000000001b0143a7?xsec_token=AB-ne7tgrZmeGZQMLoteGaEvQ-InJ85RbcapVTNaC2nIs=&xsec_source="
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "listComments",
+      "label": "List note comments",
+      "description": "Lists comments and replies for a note.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/comment"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "url": "https://www.xiaohongshu.com/search_result/69a5bbe2000000001b0143a7?xsec_token=AB-ne7tgrZmeGZQMLoteGaEvQ-InJ85RbcapVTNaC2nIs=&xsec_source="
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "listFeed",
+      "label": "Home feed",
+      "description": "Shows the personalized recommendations from your Xiaohongshu home feed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/feedItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "getNoteMedia",
+      "label": "Note media URLs",
+      "description": "Extract image and video URLs from a note page (URLs only, no file downloads).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/noteMedia"
+      },
+      "defaultArgs": {
+        "url": "https://www.xiaohongshu.com/search_result/69a5bbe2000000001b0143a7?xsec_token=AB-ne7tgrZmeGZQMLoteGaEvQ-InJ85RbcapVTNaC2nIs=&xsec_source="
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "listUserNotes",
+      "label": "User's notes",
+      "description": "Notes posted by a Xiaohongshu user, by profile URL or user id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/feedItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "url": "https://www.xiaohongshu.com/user/profile/5bc8bc22fdf8a3000177aee3"
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "getUserProfile",
+      "label": "Get user profile",
+      "description": "A Xiaohongshu user's bio, RED id, location, and follower/fan/like counts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userProfile"
+      },
+      "defaultArgs": {
+        "url": "https://www.xiaohongshu.com/user/profile/5bc8bc22fdf8a3000177aee3"
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "listTrending",
+      "label": "Trending searches",
+      "description": "Trending and suggested search queries on Xiaohongshu.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/trendingQuery"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    },
+    {
+      "id": "searchUsers",
+      "label": "Search users",
+      "description": "Search Xiaohongshu users (accounts) by keyword. Search one keyword at a time, invoking multiple searches sequentially.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 40
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/userResult"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "网球教练"
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "baseUrl": "https://www.xiaohongshu.com/explore"
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "小红书",
+      "description": "生活方式和购物社区。搜索笔记、浏览个性化首页、查看正文和互动数据、阅读评论，并获取图片和视频链接。部分内容需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录小红书",
+          "description": "打开小红书登录页，可使用二维码或手机号登录。"
+        },
+        "getSignInState": {
+          "label": "检查小红书登录状态",
+          "description": "检查你是否已登录小红书。"
+        },
+        "searchNotes": {
+          "label": "搜索笔记",
+          "description": "按关键词搜索小红书笔记。一次搜索一个关键词，多个搜索请依次调用。"
+        },
+        "getNote": {
+          "label": "获取笔记",
+          "description": "通过笔记链接查看正文、标签和互动数据。"
+        },
+        "listComments": {
+          "label": "笔记评论列表",
+          "description": "列出某条笔记的评论和回复。"
+        },
+        "listFeed": {
+          "label": "首页信息流",
+          "description": "显示你的小红书首页个性化推荐。"
+        },
+        "getNoteMedia": {
+          "label": "笔记媒体链接",
+          "description": "从笔记页提取图片和视频链接（仅链接，不下载文件）。"
+        },
+        "listUserNotes": {
+          "label": "用户笔记",
+          "description": "按主页网址或用户 ID 获取某位用户发布的笔记。"
+        },
+        "getUserProfile": {
+          "label": "获取用户资料",
+          "description": "获取小红书用户的简介、小红书号、所在地及关注／粉丝／获赞数据。"
+        },
+        "listTrending": {
+          "label": "热门搜索",
+          "description": "小红书的热门及推荐搜索词。"
+        },
+        "searchUsers": {
+          "label": "搜索用户",
+          "description": "按关键词搜索小红书用户（账号）。一次搜索一个关键词，多个搜索请依次调用。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/xiaohongshu.com/favicon.png",
+  "skills": [
+    {
+      "name": "research",
+      "description": "Search Xiaohongshu notes and assess the credibility of their claims and authors. Use for recommendations, comparisons, firsthand experiences, current trends, products, places, people, or claims when the work should include query refinement, counterevidence, comment review, author-history checks, commercial-bias checks, or corroboration across independent accounts."
+    }
+  ]
+}

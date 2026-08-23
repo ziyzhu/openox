@@ -1,0 +1,610 @@
+{
+  "domain": "www.skinceuticals.com",
+  "name": "SkinCeuticals",
+  "description": "Professional skincare and antioxidant treatments. Search products, compare prices and availability, review product details, manage the cart, continue to the store's checkout, and read signed-in order history.",
+  "baseUrl": "https://www.skinceuticals.com/",
+  "$defs": {
+    "productSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The product ID used to request full details."
+        },
+        "sku": {
+          "type": "string",
+          "description": "The purchasable product SKU."
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reviewCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "sku",
+        "name",
+        "description",
+        "productUrl",
+        "image",
+        "price",
+        "currency",
+        "available",
+        "ratingValue",
+        "reviewCount"
+      ],
+      "additionalProperties": false
+    },
+    "variant": {
+      "type": "object",
+      "properties": {
+        "sku": {
+          "type": "string",
+          "description": "The SKU to use when adding this size to the cart."
+        },
+        "size": {
+          "type": "string"
+        },
+        "price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sku",
+        "size",
+        "price",
+        "currency",
+        "available",
+        "productUrl",
+        "image"
+      ],
+      "additionalProperties": false
+    },
+    "product": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reviewCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/variant"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "productUrl",
+        "image",
+        "ratingValue",
+        "reviewCount",
+        "variants"
+      ],
+      "additionalProperties": false
+    },
+    "cartItem": {
+      "type": "object",
+      "properties": {
+        "lineItemId": {
+          "type": "string",
+          "description": "The cart line identifier."
+        },
+        "id": {
+          "type": "string",
+          "description": "The product ID."
+        },
+        "sku": {
+          "type": "string",
+          "description": "The selected product SKU."
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "unitPrice": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lineItemId",
+        "id",
+        "sku",
+        "name",
+        "description",
+        "size",
+        "quantity",
+        "unitPrice",
+        "total",
+        "currency",
+        "image",
+        "productUrl"
+      ],
+      "additionalProperties": false
+    },
+    "cart": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cartItem"
+          }
+        },
+        "subtotal": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items",
+        "subtotal",
+        "total",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "shippingMethod": {
+          "type": "string"
+        },
+        "trackingNumbers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detailUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "status",
+        "total",
+        "currency",
+        "shippingMethod",
+        "trackingNumbers",
+        "detailUrl"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to SkinCeuticals",
+      "description": "Opens the account page to sign in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check SkinCeuticals sign-in",
+      "description": "Checks whether you are signed in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchProducts",
+      "label": "Search products",
+      "description": "Searches SkinCeuticals products and returns current prices, availability, ratings, and links.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words describing the product, ingredient, or skin concern."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The continuation value returned by the previous search."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "best_sellers",
+              "newest",
+              "price_low",
+              "price_high",
+              "top_rated"
+            ],
+            "default": "relevance",
+            "description": "How to order the matching products."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/productSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProduct",
+      "label": "Get product details",
+      "description": "Returns a product's description, ratings, sizes, prices, availability, and purchase SKUs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A product ID or SKU from search results."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/product"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCart",
+      "label": "View cart",
+      "description": "Returns the current cart with quantities and estimated totals.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/cart"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "updateCartItem",
+      "label": "Update cart item",
+      "description": "Sets one product's cart quantity. A quantity of zero removes it. This prepares the cart but does not place an order or charge money.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The purchasable SKU returned by product search or product details."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The desired quantity. Use zero to remove the product."
+          }
+        },
+        "required": [
+          "sku",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/cart"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "listOrders",
+      "label": "List orders",
+      "description": "Lists signed-in order history with status, totals, shipping method, and tracking numbers. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/order"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPaymentUrl",
+      "label": "Review checkout",
+      "description": "Opens the current cart so you can review it and continue through the store's checkout. Only you can place the order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPaymentState",
+      "label": "Check checkout status",
+      "description": "Checks whether the cart is still pending or a signed-in checkout produced a new order. It never places the order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+            "description": "The checkout episode start in YYYY-MM-DD HH:MM:SS form."
+          },
+          "previousOrderId": {
+            "type": "string",
+            "description": "The newest order ID observed before checkout, used to distinguish a new order from earlier ones."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "none",
+              "pending",
+              "completed"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reference",
+          "total",
+          "currency",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

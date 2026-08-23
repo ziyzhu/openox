@@ -1,0 +1,515 @@
+{
+  "domain": "www.flightaware.com",
+  "name": "FlightAware",
+  "description": "Live flight tracking. Search airports and flights, get a flight's status, route, position, and times, see an airport's live arrival/departure/en-route boards, and pull an airport's daily traffic and cancellation stats. All actions are read-only and public; no sign-in required.",
+  "baseUrl": "https://www.flightaware.com/",
+  "$defs": {
+    "place": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "icao": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iata": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "terminal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "times": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "scheduled": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "estimated": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "actual": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "boardRow": {
+      "type": "object",
+      "properties": {
+        "ident": {
+          "type": "string"
+        },
+        "aircraftType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "place": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "departureTime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "arrivalTime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "search",
+      "label": "Search flights & airports",
+      "description": "Search FlightAware for airports and flights by name, code, or flight number.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "icao": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "iata": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ident": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "registration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dailyOps": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getFlight",
+      "label": "Get flight status",
+      "description": "Get a flight's live status, route, position, aircraft, and scheduled/actual times by ident or flight number.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "ident"
+        ],
+        "properties": {
+          "ident": {
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ident": {
+            "type": "string"
+          },
+          "displayIdent": {
+            "type": "string"
+          },
+          "friendlyIdent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "diverted": {
+            "type": "boolean"
+          },
+          "airline": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "icao": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "iata": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "aircraft": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "origin": {
+            "$ref": "#/$defs/place"
+          },
+          "destination": {
+            "$ref": "#/$defs/place"
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "groundspeed": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "altitude": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "heading": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "coord": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "gateDeparture": {
+            "$ref": "#/$defs/times"
+          },
+          "takeoff": {
+            "$ref": "#/$defs/times"
+          },
+          "landing": {
+            "$ref": "#/$defs/times"
+          },
+          "gateArrival": {
+            "$ref": "#/$defs/times"
+          },
+          "distance": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "elapsed": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "remaining": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "route": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getAirport",
+      "label": "Get airport flight boards",
+      "description": "Get an airport's live arrivals, departures, en-route, and scheduled flight boards by ICAO/IATA code.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "airport"
+        ],
+        "properties": {
+          "airport": {
+            "type": "string"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "airport": {
+            "type": "string"
+          },
+          "arrivals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/boardRow"
+            }
+          },
+          "departures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/boardRow"
+            }
+          },
+          "enroute": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/boardRow"
+            }
+          },
+          "scheduled": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/boardRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getAirportStats",
+      "label": "Get airport traffic stats",
+      "description": "Get an airport's recent daily arrival/departure counts and current cancellation totals.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "airport"
+        ],
+        "properties": {
+          "airport": {
+            "type": "string"
+          },
+          "days": {
+            "type": "number"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "airport": {
+            "type": "string"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "number"
+                },
+                "arrivals": {
+                  "type": "number"
+                },
+                "departures": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "cancellations": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "updated": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.flightaware.com/favicon.png"
+}

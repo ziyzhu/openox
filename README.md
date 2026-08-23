@@ -28,13 +28,21 @@ bun run setup:ios -- --team ABCDE12345 --bundle com.example.openox
 
 The command creates the ignored `ios/Local.xcconfig` with matching app, Share Extension, App Group, iCloud container, and Keychain identifiers. Register the generated App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
 
-Open `ios/ios.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in public service bundle contains the native iOS services and does not require access to a private service repository.
+Open `ios/ios.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in service bundle contains every built-in web, native iOS, and MCP service.
+
+Built-in service sources live under `services/builtin/`. Regenerate the committed iOS bundle after changing them:
+
+```sh
+bun run build:services
+```
 
 To use a different service repository while developing, serve it explicitly:
 
 ```sh
 ox repository serve /path/to/service-repository --port 8101
 ```
+
+[`examples/service-repository`](examples/service-repository) is a standalone repository users can copy when creating their own remote services.
 
 ## Acknowledgements
 

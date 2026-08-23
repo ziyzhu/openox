@@ -1,0 +1,133 @@
+{
+  "domain": "www.google.com",
+  "name": "Google Maps",
+  "description": "A maps and local discovery service. Search places, read business details, and open route choices in Google Maps. No sign-in required.",
+  "baseUrl": "https://www.google.com/maps?hl=en",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "nullableNumber": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "null" }
+      ]
+    },
+    "placeSummary": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "An opaque Google Maps identifier or canonical URL for this place." },
+        "name": { "type": "string" },
+        "url": { "type": "string", "description": "The place page in Google Maps." },
+        "rating": { "$ref": "#/$defs/nullableNumber" },
+        "reviewCount": { "$ref": "#/$defs/nullableNumber" },
+        "details": { "type": "array", "items": { "type": "string" }, "description": "Visible category, address, price, and open-status details when available." },
+        "imageUrl": { "$ref": "#/$defs/nullableString" },
+        "latitude": { "$ref": "#/$defs/nullableNumber" },
+        "longitude": { "$ref": "#/$defs/nullableNumber" }
+      },
+      "required": ["id", "name", "url", "rating", "reviewCount", "details", "imageUrl", "latitude", "longitude"],
+      "additionalProperties": false
+    },
+    "placeDetails": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "An opaque Google Maps identifier or canonical URL for this place." },
+        "name": { "type": "string" },
+        "url": { "type": "string", "description": "The place page in Google Maps." },
+        "address": { "type": "string" },
+        "category": { "type": "string" },
+        "rating": { "$ref": "#/$defs/nullableNumber" },
+        "reviewCount": { "$ref": "#/$defs/nullableNumber" },
+        "priceLevel": { "type": "string" },
+        "openStatus": { "type": "string" },
+        "hours": { "type": "string" },
+        "phone": { "type": "string" },
+        "website": { "$ref": "#/$defs/nullableString" },
+        "imageUrl": { "$ref": "#/$defs/nullableString" },
+        "latitude": { "$ref": "#/$defs/nullableNumber" },
+        "longitude": { "$ref": "#/$defs/nullableNumber" }
+      },
+      "required": ["id", "name", "url", "address", "category", "rating", "reviewCount", "priceLevel", "openStatus", "hours", "phone", "website", "imageUrl", "latitude", "longitude"],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchPlaces",
+      "label": "Search places",
+      "description": "Finds paginated places and local businesses with ratings, visible details, map links, and coordinates when available.",
+      "baseUrl": "https://www.google.com/maps/search/?api=1&query={query}&hl=en",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "minLength": 1, "description": "A place name, address, category, or local search. Include the target city, neighborhood, or coordinates for geographic searches." },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10, "description": "Maximum number of results to return per page." },
+          "cursor": { "type": "string", "minLength": 1, "description": "Opaque cursor returned by the previous page. Pass it back unchanged." }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/$defs/placeSummary" } },
+          "nextCursor": { "oneOf": [{ "type": "string" }, { "type": "null" }] }
+        },
+        "required": ["items", "nextCursor"],
+        "additionalProperties": false
+      },
+      "defaultArgs": { "query": "coffee near Pike Place Market", "limit": 10 },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPlace",
+      "label": "Get place details",
+      "description": "Reads one place's address, category, rating, hours, contact details, map link, and coordinates when available.",
+      "baseUrl": "https://www.google.com/maps/search/?api=1&query={query}&query_place_id={placeId}&hl=en",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "minLength": 1, "description": "The place name or address to open." },
+          "placeId": { "type": "string", "minLength": 1, "description": "An optional Google Maps place identifier used to disambiguate the query." }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/placeDetails" },
+      "defaultArgs": { "query": "Space Needle" },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getDirectionsUrl",
+      "label": "Open directions",
+      "description": "Builds a Google Maps route page for the chosen origin, destination, and travel mode. Google Maps presents the available route choices; this does not start navigation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": { "type": "string", "minLength": 1, "description": "Starting place, address, or latitude and longitude. When omitted, Google Maps may use the device's relevant starting location." },
+          "destination": { "type": "string", "minLength": 1, "description": "Destination place, address, or latitude and longitude." },
+          "originPlaceId": { "type": "string", "minLength": 1, "description": "Optional Google Maps place identifier for the origin. Provide origin when using it." },
+          "destinationPlaceId": { "type": "string", "minLength": 1, "description": "Optional Google Maps place identifier for the destination." },
+          "travelMode": { "type": "string", "enum": ["driving", "walking", "bicycling", "transit"], "default": "driving", "description": "How to travel." }
+        },
+        "required": ["destination"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "url": { "type": "string" } },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "defaultArgs": { "origin": "Pike Place Market", "destination": "Space Needle", "travelMode": "walking" },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

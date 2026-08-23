@@ -1,0 +1,919 @@
+{
+  "domain": "job-boards.greenhouse.io",
+  "name": "Greenhouse Job Boards",
+  "description": "A platform for company-hosted job boards. Browse public openings, search by keyword and filters, read job details and application questions, explore departments, offices, and prospect sections, and look up education choices.",
+  "baseUrl": "https://job-boards.greenhouse.io/embed/job_board?for=greenhouse",
+  "$defs": {
+    "namedFilter": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "boardInput": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Company identifier from its Greenhouse job-board URL."
+        }
+      },
+      "required": [
+        "board"
+      ],
+      "additionalProperties": false
+    },
+    "boardResourceInput": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Company identifier from its Greenhouse job-board URL."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Numeric identifier returned by Greenhouse."
+        }
+      },
+      "required": [
+        "board",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "educationInput": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Company identifier from its Greenhouse job-board URL."
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional words to match against education choices."
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$",
+          "description": "Page value returned by the previous result."
+        }
+      },
+      "required": [
+        "board"
+      ],
+      "additionalProperties": false
+    },
+    "job": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "departments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namedFilter"
+          }
+        },
+        "offices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namedFilter"
+          }
+        },
+        "requisitionId": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "company",
+        "location",
+        "departments",
+        "offices",
+        "requisitionId",
+        "publishedAt",
+        "updatedAt",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "jobPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/job"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "questionOption": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "freeForm": {
+          "type": "boolean"
+        },
+        "declineToAnswer": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "value",
+        "label",
+        "freeForm",
+        "declineToAnswer"
+      ],
+      "additionalProperties": false
+    },
+    "questionField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/questionOption"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "options"
+      ],
+      "additionalProperties": false
+    },
+    "applicationQuestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/questionField"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "description",
+        "required",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "questionGroup": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/applicationQuestion"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "description",
+        "questions"
+      ],
+      "additionalProperties": false
+    },
+    "demographicQuestions": {
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/applicationQuestion"
+          }
+        }
+      },
+      "required": [
+        "header",
+        "description",
+        "questions"
+      ],
+      "additionalProperties": false
+    },
+    "prospectPost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "location",
+        "updatedAt",
+        "language",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "section": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/prospectPost"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "posts"
+      ],
+      "additionalProperties": false
+    },
+    "sectionPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/section"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "educationPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namedFilter"
+          }
+        },
+        "totalCount": {
+          "type": "integer"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "department": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parentId": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "childIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalJobs": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "parentId",
+        "childIds",
+        "totalJobs",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "office": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "parentId": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "childIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "departments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namedFilter"
+          }
+        },
+        "totalJobs": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "location",
+        "parentId",
+        "childIds",
+        "departments",
+        "totalJobs",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "payRange": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "minimum",
+        "maximum",
+        "currency"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getJobBoard",
+      "label": "View job board",
+      "description": "Shows a company's public job board, its open-job count, and the department and office filters available for browsing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "description": "Company identifier from its Greenhouse job-board URL."
+          }
+        },
+        "required": [
+          "board"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "totalJobs": {
+            "type": "integer"
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/namedFilter"
+            }
+          },
+          "offices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/namedFilter"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "totalJobs",
+          "departments",
+          "offices",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listJobs",
+      "label": "Browse jobs",
+      "description": "Lists a company's public openings, optionally narrowed to department or office choices from its job board.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "description": "Company identifier from its Greenhouse job-board URL."
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Department identifiers shown by the job board."
+          },
+          "offices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Office identifiers shown by the job board."
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Page value returned by the previous result."
+          }
+        },
+        "required": [
+          "board"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/jobPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchJobs",
+      "label": "Search jobs",
+      "description": "Searches a company's public openings by keyword, with optional department and office filters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "description": "Company identifier from its Greenhouse job-board URL."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words to match against the company's openings."
+          },
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Department identifiers shown by the job board."
+          },
+          "offices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Office identifiers shown by the job board."
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Page value returned by the previous result."
+          }
+        },
+        "required": [
+          "board",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/jobPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getJob",
+      "label": "Read job",
+      "description": "Reads a public opening's description, location, dates, and any published pay ranges.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "description": "Company identifier from its Greenhouse job-board URL."
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Job identifier from a Greenhouse job result or URL."
+          }
+        },
+        "required": [
+          "board",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "payRanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/payRange"
+            }
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "applicationDeadline": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "company",
+          "location",
+          "description",
+          "payRanges",
+          "publishedAt",
+          "applicationDeadline",
+          "language",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getJobQuestions",
+      "label": "Read application questions",
+      "description": "Shows the questions and answer choices on a public job application, including location, compliance, and optional demographic sections.",
+      "inputSchema": {
+        "$ref": "#/$defs/boardResourceInput"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/applicationQuestion"
+            }
+          },
+          "locationQuestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/applicationQuestion"
+            }
+          },
+          "compliance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/questionGroup"
+            }
+          },
+          "demographicQuestions": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/demographicQuestions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "questions",
+          "locationQuestions",
+          "compliance",
+          "demographicQuestions"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getDepartment",
+      "label": "View department",
+      "description": "Shows a department's hierarchy, open-job count, and filtered job-board link.",
+      "inputSchema": {
+        "$ref": "#/$defs/boardResourceInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/department"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getOffice",
+      "label": "View office",
+      "description": "Shows an office's location, hierarchy, departments, open-job count, and filtered job-board link.",
+      "inputSchema": {
+        "$ref": "#/$defs/boardResourceInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/office"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listSections",
+      "label": "Browse prospect sections",
+      "description": "Lists the board's general-interest and prospect sections with their public posts.",
+      "inputSchema": {
+        "$ref": "#/$defs/boardInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/sectionPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSection",
+      "label": "View prospect section",
+      "description": "Shows one prospect section and its public posts.",
+      "inputSchema": {
+        "$ref": "#/$defs/boardResourceInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/section"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listDegrees",
+      "label": "Browse degrees",
+      "description": "Lists degree choices accepted by a company's Greenhouse applications, optionally filtered by name.",
+      "inputSchema": {
+        "$ref": "#/$defs/educationInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/educationPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listDisciplines",
+      "label": "Browse disciplines",
+      "description": "Lists fields of study accepted by a company's Greenhouse applications, optionally filtered by name.",
+      "inputSchema": {
+        "$ref": "#/$defs/educationInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/educationPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listSchools",
+      "label": "Browse schools",
+      "description": "Lists schools accepted by a company's Greenhouse applications, optionally filtered by name.",
+      "inputSchema": {
+        "$ref": "#/$defs/educationInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/educationPage"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/job-boards.greenhouse.io/favicon.png"
+}

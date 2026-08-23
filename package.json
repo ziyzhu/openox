@@ -8,7 +8,9 @@
     "test:llm": "bun tests/llm/run.ts",
     "test:llm:matrix": "bun tests/llm/matrix.ts",
     "test:services": "bun tests/services/run.ts",
-    "build:ios-services": "bun scripts/ios-services-build.ts",
+    "test:service-builder": "bun test services",
+    "build:services": "bun scripts/ios-services-build.ts",
+    "build:ios-services": "bun run build:services",
     "build:web-worker": "bun scripts/build-public-web-worker.ts",
     "debug-ui": "bun scripts/debug-ui.ts",
     "debug": "bun .agents/skills/ox-debug/ox-debug.ts",
@@ -22,6 +24,7 @@
     "typecheck": "bun scripts/typecheck.ts"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
     "defuddle": "0.19.2"
   },
   "devDependencies": {

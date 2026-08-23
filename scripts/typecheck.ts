@@ -17,6 +17,7 @@ console.log(`PASS models.dev catalog selected=${catalog.selectedModels}`);
 
 const projects = [
   "ox-cli/tsconfig.json",
+  "services/tsconfig.json",
   ".agents/skills/ox-debug/tsconfig.json",
   "dev/tsconfig.json",
   "scripts/tsconfig.json",

@@ -1,0 +1,78 @@
+{
+  "domain": "ios:reminders",
+  "name": "Reminders",
+  "description": "Add to-dos to Reminders without reading your lists.",
+  "icon": {
+    "asset": "ios:reminders"
+  },
+  "permission": "reminders",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Add a to-do without reading your reminder lists.",
+      "id": "add",
+      "inputSchema": {
+        "properties": {
+          "options": {
+            "properties": {
+              "due": {
+                "description": "Optional ISO-8601 due date/time; alerts then.",
+                "type": "string"
+              },
+              "notes": {
+                "description": "Optional notes for the reminder.",
+                "type": "string"
+              },
+              "title": {
+                "description": "The reminder title.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "label": "Add reminder",
+      "outputSchema": {
+        "properties": {
+          "due": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "提醒事项",
+      "description": "无需读取列表即可向“提醒事项”添加待办事项。",
+      "actions": {
+        "add": {
+          "label": "添加提醒事项",
+          "description": "无需读取提醒事项列表即可添加待办事项。"
+        }
+      }
+    }
+  }
+}

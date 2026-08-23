@@ -1,0 +1,568 @@
+{
+  "domain": "instagram.com",
+  "name": "Instagram",
+  "description": "A photo and video sharing network. View profiles, posts, reels, comments, and Explore, or search for people. Read-only; sign-in required.",
+  "baseUrl": "https://www.instagram.com/",
+  "$defs": {
+    "media": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "taken_at": {
+          "type": "integer"
+        },
+        "media_type": {
+          "type": "integer"
+        },
+        "product_type": {
+          "type": "string"
+        },
+        "is_video": {
+          "type": "boolean"
+        },
+        "like_count": {
+          "type": "integer"
+        },
+        "comment_count": {
+          "type": "integer"
+        },
+        "view_count": {
+          "type": "integer"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "video_url": {
+          "type": "string"
+        },
+        "accessibility_caption": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "object",
+          "properties": {
+            "pk": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            },
+            "full_name": {
+              "type": "string"
+            },
+            "is_verified": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pk",
+            "username",
+            "full_name",
+            "is_verified"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "url",
+        "caption",
+        "taken_at",
+        "media_type",
+        "product_type",
+        "is_video",
+        "like_count",
+        "comment_count",
+        "view_count",
+        "image_url",
+        "video_url",
+        "accessibility_caption",
+        "owner"
+      ],
+      "additionalProperties": false
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "pk": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": "string"
+        },
+        "is_verified": {
+          "type": "boolean"
+        },
+        "profile_pic_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pk",
+        "username",
+        "full_name",
+        "is_verified",
+        "profile_pic_url"
+      ],
+      "additionalProperties": false
+    },
+    "mediaPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/media"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign-in URL",
+      "description": "Opens the Instagram sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Instagram.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProfile",
+      "label": "Get user profile",
+      "description": "Fetch an Instagram user's profile (bio, follower/following counts, post count, etc.) by username.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_.]{1,30}$"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pk": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "biography": {
+            "type": "string"
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "is_business": {
+            "type": "boolean"
+          },
+          "follower_count": {
+            "type": "integer"
+          },
+          "following_count": {
+            "type": "integer"
+          },
+          "media_count": {
+            "type": "integer"
+          },
+          "category": {
+            "type": "string"
+          },
+          "external_url": {
+            "type": "string"
+          },
+          "profile_pic_url": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pk",
+          "username",
+          "full_name",
+          "biography",
+          "is_private",
+          "is_verified",
+          "is_business",
+          "follower_count",
+          "following_count",
+          "media_count",
+          "category",
+          "external_url",
+          "profile_pic_url",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "username": "instagram"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserPosts",
+      "label": "List a user's posts",
+      "description": "Lists a user's posts, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_.]{1,30}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/mediaPage"
+      },
+      "defaultArgs": {
+        "username": "instagram"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserReels",
+      "label": "List a user's reels",
+      "description": "Lists a user's reels and clips, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_.]{1,30}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/mediaPage"
+      },
+      "defaultArgs": {
+        "username": "instagram"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPost",
+      "label": "Get a post",
+      "description": "Fetch a single post/reel by its numeric media id, shortcode, or instagram.com/p/<code>/ URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/media"
+      },
+      "defaultArgs": {
+        "id": "https://www.instagram.com/p/DZIeQ8QsJ5x/"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listPostComments",
+      "label": "List a post's comments",
+      "description": "Lists comments on a post selected by its link, short code, or media ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "like_count": {
+                  "type": "integer"
+                },
+                "reply_count": {
+                  "type": "integer"
+                },
+                "created_at": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "text",
+                "username",
+                "like_count",
+                "reply_count",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchUsers",
+      "label": "Search users",
+      "description": "Search Instagram users by name or username (top results).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/user"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "amazon"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listExplore",
+      "label": "List explore grid",
+      "description": "Lists photos and videos from Instagram Explore.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/mediaPage"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "Instagram",
+      "description": "照片和视频分享社区。查看用户资料、帖子、Reels、评论和探索页，也可搜索用户。只读，需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录 Instagram",
+          "description": "打开 Instagram 登录页。"
+        },
+        "getSignInState": {
+          "label": "检查 Instagram 登录状态",
+          "description": "检查你是否已登录 Instagram。"
+        },
+        "getProfile": {
+          "label": "获取用户资料",
+          "description": "按用户名获取 Instagram 用户资料（简介、粉丝/关注数、帖子数等）。"
+        },
+        "listUserPosts": {
+          "label": "用户帖子列表",
+          "description": "列出用户的帖子，最新内容排在前面。"
+        },
+        "listUserReels": {
+          "label": "用户 Reels 列表",
+          "description": "列出用户的 Reels 和短片，最新内容排在前面。"
+        },
+        "getPost": {
+          "label": "获取帖子",
+          "description": "按数字媒体 id、shortcode 或 instagram.com/p/<code>/ 网址获取单条帖子/Reel。"
+        },
+        "listPostComments": {
+          "label": "帖子评论列表",
+          "description": "按帖子链接、短码或媒体 ID 列出评论。"
+        },
+        "searchUsers": {
+          "label": "搜索用户",
+          "description": "按姓名或用户名搜索 Instagram 用户（返回最佳匹配）。"
+        },
+        "listExplore": {
+          "label": "探索页列表",
+          "description": "列出 Instagram 探索页中的照片和视频。"
+        }
+      }
+    }
+  }
+}

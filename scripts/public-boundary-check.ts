@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT } from "./lib.ts";
 
-const tracked = Bun.spawnSync(["git", "ls-files"], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
+const tracked = Bun.spawnSync(["git", "ls-files", "--cached", "--others", "--exclude-standard"], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
 if (tracked.exitCode !== 0) throw new Error(tracked.stderr.toString().trim() || "git ls-files failed");
 
 const files = tracked.stdout.toString().trim().split("\n").filter(Boolean);
@@ -12,8 +12,7 @@ const forbiddenPaths = [
   /^\.github\/workflows\/deploy\.yml$/,
   /^docs\/demo-60s\.md$/,
   /^docs\/LOC\.html$/,
-  /^ios\/ios\/OxServices\.bundle\/(?:mcp|web)\//,
-  /\.har$/,
+  /^(?!services\/builtin\/web\/[^/]+\/actions\.har$).*\.har$/,
   /\.mitm$/,
   /\.mobileprovision$/,
   /\.p12$/,
@@ -24,7 +23,6 @@ const forbiddenText = [
   "group.ai.oxcraft.bot",
   "iCloud.ai.oxcraft.bot",
   "github.com/ziyzhu/openox-dev",
-  "github.com/ziyzhu/openox-services",
 ];
 const failures = files.filter((file) => forbiddenPaths.some((pattern) => pattern.test(file)));
 
@@ -42,4 +40,4 @@ for (const file of files) {
 }
 
 if (failures.length > 0) throw new Error(`Public repository boundary failed:\n${[...new Set(failures)].join("\n")}`);
-console.log(`PASS public boundary ${files.length} tracked files`);
+console.log(`PASS public boundary ${files.length} repository files`);

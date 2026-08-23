@@ -1,0 +1,1220 @@
+{
+  "domain": "www.fda.gov",
+  "name": "FDA",
+  "description": "The U.S. food and drug safety agency. Search official information, browse recalls, read drug labels, check shortages, identify drug products and medical devices, and retrieve FDA pages. No sign-in required.",
+  "baseUrl": "https://www.fda.gov/robots.txt",
+  "$defs": {
+    "searchResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "snippet"
+      ],
+      "additionalProperties": false
+    },
+    "recallListItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "description": "The FDA listing date, normally an ISO timestamp."
+        },
+        "brand": {
+          "type": "string"
+        },
+        "productDescription": {
+          "type": "string"
+        },
+        "productType": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "terminated": {
+          "type": "boolean",
+          "description": "Whether FDA marks the recall as terminated."
+        },
+        "excerpt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "date",
+        "brand",
+        "productDescription",
+        "productType",
+        "reason",
+        "company",
+        "terminated",
+        "excerpt"
+      ],
+      "additionalProperties": false
+    },
+    "recall": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "announcementType": {
+          "type": "string"
+        },
+        "companyAnnouncementDate": {
+          "type": "string"
+        },
+        "fdaPublishDate": {
+          "type": "string"
+        },
+        "productType": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "brands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "productDescription": {
+          "type": "string"
+        },
+        "announcement": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "title",
+        "announcementType",
+        "companyAnnouncementDate",
+        "fdaPublishDate",
+        "productType",
+        "reason",
+        "company",
+        "brands",
+        "productDescription",
+        "announcement"
+      ],
+      "additionalProperties": false
+    },
+    "link": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "page": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          }
+        }
+      },
+      "required": [
+        "url",
+        "title",
+        "text",
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "drugLabelSection": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "uses",
+            "dosage",
+            "warnings",
+            "boxedWarning",
+            "contraindications",
+            "drugInteractions",
+            "adverseReactions",
+            "patientInformation"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "Whether this section was shortened to keep the result readable."
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "text",
+        "truncated"
+      ],
+      "additionalProperties": false
+    },
+    "drugLabel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "setId": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "effectiveTime": {
+          "type": "string"
+        },
+        "matchedCount": {
+          "type": "integer",
+          "description": "Number of labels matching the lookup; the newest match is returned."
+        },
+        "brandNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "genericNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "manufacturerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "productNdcs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "packageNdcs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicationNumbers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/drugLabelSection"
+          }
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "dataLastUpdated": {
+          "type": "string"
+        },
+        "disclaimer": {
+          "type": "string"
+        },
+        "labelingNotice": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "setId",
+        "version",
+        "effectiveTime",
+        "matchedCount",
+        "brandNames",
+        "genericNames",
+        "manufacturerNames",
+        "productNdcs",
+        "packageNdcs",
+        "applicationNumbers",
+        "routes",
+        "sections",
+        "sourceUrl",
+        "dataLastUpdated",
+        "disclaimer",
+        "labelingNotice"
+      ],
+      "additionalProperties": false
+    },
+    "drugShortage": {
+      "type": "object",
+      "properties": {
+        "packageNdc": {
+          "type": "string"
+        },
+        "genericName": {
+          "type": "string"
+        },
+        "proprietaryName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "presentation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "availability": {
+          "type": "string"
+        },
+        "shortageReason": {
+          "type": "string"
+        },
+        "resolvedNote": {
+          "type": "string"
+        },
+        "relatedInformation": {
+          "type": "string"
+        },
+        "relatedInformationUrl": {
+          "type": "string"
+        },
+        "therapeuticCategories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dosageForm": {
+          "type": "string"
+        },
+        "strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "updateDate": {
+          "type": "string"
+        },
+        "changeDate": {
+          "type": "string"
+        },
+        "initialPostingDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "packageNdc",
+        "genericName",
+        "proprietaryName",
+        "companyName",
+        "presentation",
+        "status",
+        "availability",
+        "shortageReason",
+        "resolvedNote",
+        "relatedInformation",
+        "relatedInformationUrl",
+        "therapeuticCategories",
+        "dosageForm",
+        "strengths",
+        "updateDate",
+        "changeDate",
+        "initialPostingDate"
+      ],
+      "additionalProperties": false
+    },
+    "activeIngredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "strength": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "strength"
+      ],
+      "additionalProperties": false
+    },
+    "drugPackage": {
+      "type": "object",
+      "properties": {
+        "packageNdc": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "marketingStartDate": {
+          "type": "string"
+        },
+        "marketingEndDate": {
+          "type": "string"
+        },
+        "sample": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "packageNdc",
+        "description",
+        "marketingStartDate",
+        "marketingEndDate",
+        "sample"
+      ],
+      "additionalProperties": false
+    },
+    "drugProduct": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "productNdc": {
+          "type": "string"
+        },
+        "brandName": {
+          "type": "string"
+        },
+        "genericName": {
+          "type": "string"
+        },
+        "labelerName": {
+          "type": "string"
+        },
+        "productType": {
+          "type": "string"
+        },
+        "dosageForm": {
+          "type": "string"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "marketingCategory": {
+          "type": "string"
+        },
+        "applicationNumber": {
+          "type": "string"
+        },
+        "marketingStartDate": {
+          "type": "string"
+        },
+        "marketingEndDate": {
+          "type": "string"
+        },
+        "listingExpirationDate": {
+          "type": "string"
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "activeIngredients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/activeIngredient"
+          }
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/drugPackage"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "productNdc",
+        "brandName",
+        "genericName",
+        "labelerName",
+        "productType",
+        "dosageForm",
+        "routes",
+        "marketingCategory",
+        "applicationNumber",
+        "marketingStartDate",
+        "marketingEndDate",
+        "listingExpirationDate",
+        "finished",
+        "activeIngredients",
+        "packages"
+      ],
+      "additionalProperties": false
+    },
+    "deviceIdentifier": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "issuingAgency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "issuingAgency"
+      ],
+      "additionalProperties": false
+    },
+    "deviceProductCode": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "deviceClass": {
+          "type": "string"
+        },
+        "regulationNumber": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "deviceClass",
+        "regulationNumber"
+      ],
+      "additionalProperties": false
+    },
+    "medicalDevice": {
+      "type": "object",
+      "properties": {
+        "recordKey": {
+          "type": "string"
+        },
+        "brandName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "deviceDescription": {
+          "type": "string"
+        },
+        "versionOrModelNumber": {
+          "type": "string"
+        },
+        "catalogNumber": {
+          "type": "string"
+        },
+        "recordStatus": {
+          "type": "string"
+        },
+        "commercialDistributionStatus": {
+          "type": "string"
+        },
+        "publishDate": {
+          "type": "string"
+        },
+        "mriSafety": {
+          "type": "string"
+        },
+        "prescription": {
+          "type": "boolean"
+        },
+        "overTheCounter": {
+          "type": "boolean"
+        },
+        "singleUse": {
+          "type": "boolean"
+        },
+        "combinationProduct": {
+          "type": "boolean"
+        },
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/deviceIdentifier"
+          }
+        },
+        "productCodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/deviceProductCode"
+          }
+        }
+      },
+      "required": [
+        "recordKey",
+        "brandName",
+        "companyName",
+        "deviceDescription",
+        "versionOrModelNumber",
+        "catalogNumber",
+        "recordStatus",
+        "commercialDistributionStatus",
+        "publishDate",
+        "mriSafety",
+        "prescription",
+        "overTheCounter",
+        "singleUse",
+        "combinationProduct",
+        "identifiers",
+        "productCodes"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchSite",
+      "label": "Search FDA",
+      "description": "Searches official FDA information and returns matching pages, documents, recalls, and selected health references with summaries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words or phrases to find."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor from a previous result. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "enum": [
+              10,
+              25,
+              50,
+              100
+            ],
+            "default": 25,
+            "description": "Number of results per page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "newest",
+              "oldest"
+            ],
+            "default": "relevance",
+            "description": "Order results by relevance or publication date."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchResult"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "aspirin"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRecalls",
+      "label": "Browse FDA recalls",
+      "description": "Lists FDA recalls newest first. Optionally searches recall text and filters by regulated product or whether FDA has terminated the recall.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Optional words or phrases to find in recall listings."
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "any",
+              "animal-veterinary",
+              "biologics",
+              "cosmetics",
+              "dietary-supplements",
+              "drugs",
+              "food-beverages",
+              "medical-devices",
+              "radiation-emitting-products",
+              "tobacco"
+            ],
+            "default": "any",
+            "description": "Regulated product category to include."
+          },
+          "terminated": {
+            "type": "string",
+            "enum": [
+              "any",
+              "yes",
+              "no"
+            ],
+            "default": "any",
+            "description": "Filter by whether FDA marks a recall as terminated."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor from a previous result. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25,
+            "description": "Number of recalls to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/recallListItem"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getRecall",
+      "label": "Read an FDA recall",
+      "description": "Retrieves a recall's dates, company and product details, reason, and full public announcement. Choose a recall from the recall list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Recall identifier returned by the recall list."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/recall"
+      },
+      "defaultArgs": {
+        "id": "aurobindo-pharma-usa-inc-behalf-aurohealth-issues-voluntary-nationwide-recall-one-1-lot-healthy"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getDrugLabel",
+      "label": "Read an FDA drug label",
+      "description": "Returns the newest matching submitted drug label with selected sections such as uses, dosage, warnings, interactions, and contraindications. FDA advises that submitted labeling may differ from currently distributed or approved labeling.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Drug brand, generic name, or NDC to look up."
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "any",
+              "brand",
+              "generic",
+              "ndc"
+            ],
+            "default": "any",
+            "description": "Kind of drug identifier supplied."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "uses",
+                "dosage",
+                "warnings",
+                "boxedWarning",
+                "contraindications",
+                "drugInteractions",
+                "adverseReactions",
+                "patientInformation"
+              ]
+            },
+            "default": [
+              "uses",
+              "dosage",
+              "warnings",
+              "contraindications",
+              "drugInteractions"
+            ],
+            "description": "Label sections to return. Request fewer sections for more focused answers."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/drugLabel"
+      },
+      "defaultArgs": {
+        "query": "Advil",
+        "field": "brand",
+        "sections": [
+          "uses",
+          "warnings"
+        ]
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchDrugShortages",
+      "label": "Search drug shortages",
+      "description": "Searches FDA drug shortage records by drug name and status, returning presentation, availability, reason, company, and update details.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Brand or generic drug name to find."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Current",
+              "Resolved",
+              "Discontinued",
+              "Any"
+            ],
+            "default": "Current",
+            "description": "Shortage status to include."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor from a previous result. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Number of shortage records to return."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/drugShortage"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "dataLastUpdated": {
+            "type": "string"
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "nextCursor",
+          "sourceUrl",
+          "dataLastUpdated",
+          "disclaimer"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "midazolam",
+        "status": "Current"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "lookupDrug",
+      "label": "Look up an FDA drug product",
+      "description": "Identifies listed drug products and packages by NDC, brand, or generic name. An NDC listing does not mean FDA approval.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ndc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Product or package NDC, including hyphens when available."
+          },
+          "brandName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Drug brand name."
+          },
+          "genericName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Drug generic name."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor from a previous result. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Number of products to return."
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "ndc"
+            ]
+          },
+          {
+            "required": [
+              "brandName"
+            ]
+          },
+          {
+            "required": [
+              "genericName"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/drugProduct"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "dataLastUpdated": {
+            "type": "string"
+          },
+          "disclaimer": {
+            "type": "string"
+          },
+          "approvalNotice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "nextCursor",
+          "sourceUrl",
+          "dataLastUpdated",
+          "disclaimer",
+          "approvalNotice"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "brandName": "Advil"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "lookupDevice",
+      "label": "Look up an FDA medical device",
+      "description": "Identifies medical devices by UDI, brand, or catalog number and returns manufacturer, model, distribution, use, MRI, and product-code details.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "udi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Device identifier printed in the UDI."
+          },
+          "brandName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Medical-device brand name."
+          },
+          "catalogNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Catalog or reference number."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor from a previous result. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Number of devices to return."
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "udi"
+            ]
+          },
+          {
+            "required": [
+              "brandName"
+            ]
+          },
+          {
+            "required": [
+              "catalogNumber"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/medicalDevice"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "dataLastUpdated": {
+            "type": "string"
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "nextCursor",
+          "sourceUrl",
+          "dataLastUpdated",
+          "disclaimer"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "udi": "00386270000668"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPage",
+      "label": "Read an FDA page",
+      "description": "Returns the readable text and useful links from an official FDA page. Use a result from FDA search or provide an FDA page path.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path or full URL on www.fda.gov."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/page"
+      },
+      "defaultArgs": {
+        "path": "/safety/recalls-market-withdrawals-safety-alerts/recall-resources"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "domain": "www.qbitai.com",
+  "name": "QbitAI",
+  "description": "A Chinese AI-industry news publication. Browse the latest articles, search the archive by keyword, and read full article text. No sign-in required.",
+  "baseUrl": "https://www.qbitai.com/",
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "image": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "excerpt",
+        "url",
+        "date",
+        "author",
+        "image"
+      ],
+      "additionalProperties": false
+    },
+    "article": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "image": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "excerpt",
+        "url",
+        "date",
+        "author",
+        "image",
+        "content",
+        "tags"
+      ],
+      "additionalProperties": false
+    },
+    "feed": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listPosts",
+      "label": "List articles",
+      "description": "Lists the latest QbitAI articles.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/feed"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchPosts",
+      "label": "Search articles",
+      "description": "Searches QbitAI articles by keyword.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/feed"
+      },
+      "defaultArgs": {
+        "query": "AI"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPost",
+      "label": "Get article",
+      "description": "Fetch a single article with full text by id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/article"
+      },
+      "defaultArgs": {
+        "id": "436842"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "量子位",
+      "description": "关注人工智能趋势和科技行业突破的中文媒体。浏览最新文章、按关键词搜索往期内容并阅读全文。无需登录。",
+      "actions": {
+        "listPosts": {
+          "label": "文章列表",
+          "description": "列出量子位的最新文章。"
+        },
+        "searchPosts": {
+          "label": "搜索文章",
+          "description": "按关键词搜索量子位文章。"
+        },
+        "getPost": {
+          "label": "获取文章",
+          "description": "按 id 获取单篇文章全文。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/www.qbitai.com/favicon.png"
+}

@@ -1,0 +1,829 @@
+{
+  "domain": "chase.com",
+  "name": "Chase Travel",
+  "description": "A travel-rewards service for cardmembers. View your travel profile, Ultimate Rewards points, travel credits, trips, recent searches, featured deals, and cart. Read-only; sign-in required.",
+  "baseUrl": "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase",
+  "$defs": {
+    "statementCredit": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "availableAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "usedAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expirationDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "availableAmount",
+        "usedAmount",
+        "expirationDate"
+      ],
+      "additionalProperties": false
+    },
+    "trip": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "endDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "status",
+        "startDate",
+        "endDate",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "recentHotelSearch": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkIn": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkOut": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "checkIn",
+        "checkOut",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "recentFlightSearch": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "departureDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "returnDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tripType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "origin",
+        "destination",
+        "departureDate",
+        "returnDate",
+        "tripType"
+      ],
+      "additionalProperties": false
+    },
+    "deal": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "destination",
+        "price",
+        "currency",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "hotel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rating": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "location",
+        "rating",
+        "price",
+        "currency",
+        "imageUrl"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Authenticate provider",
+      "description": "Chase sign-in URL that lands on the Chase Travel home.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Auth state",
+      "description": "Checks whether you are signed in to Chase Travel.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getTravelProfile",
+      "label": "Get travel profile",
+      "description": "The cardmember's Chase Travel profile: cards (nickname, last 4), Ultimate Rewards points balance, credit limit and available credit.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "loyaltyProfileIdentifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "digitalAccountIdentifier": {
+                  "type": [
+                    "number",
+                    "string",
+                    "null"
+                  ]
+                },
+                "accountNicknameText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last4AccountNumber": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rewardsBalanceAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "cardCreditLimitAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "availableCreditAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "enterprisePartyIdentifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "onlineProfileIdentifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "accounts"
+        ]
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getStatementCredits",
+      "label": "Get statement credits",
+      "description": "The cardmember's available statement travel credits (Travel Credit, Edit Credit, Select Hotel Credit, etc.) with caps and renewal dates. Uses the primary card unless digitalAccountIdentifier is given.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "digitalAccountIdentifier": {
+            "type": [
+              "number",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "availableStatementCreditAmount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "rewardsAnniversaryDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statementCredits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/statementCredit"
+            }
+          }
+        },
+        "required": [
+          "statementCredits"
+        ]
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listTrips",
+      "label": "List trips",
+      "description": "The cardmember's Chase Travel trips (flights, hotels, cars, activities).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tripType": {
+            "type": "string",
+            "enum": [
+              "Upcoming",
+              "Past",
+              "Cancelled"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "description": "1-based page number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/trip"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listRecentHotelSearches",
+      "label": "Recent hotel searches",
+      "description": "The cardmember's recent Chase Travel hotel searches with destination and dates.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/recentHotelSearch"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listRecentFlightSearches",
+      "label": "Recent flight searches",
+      "description": "The cardmember's recent Chase Travel flight searches with routes and dates.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/recentFlightSearch"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listDeals",
+      "label": "List travel deals",
+      "description": "Featured Chase Travel deals (hotels, cruises, packages) for the cardmember.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "1-based page number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/deal"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchHotels",
+      "label": "Search hotels",
+      "description": "Searches Chase Travel hotels for a destination and date range. Choose a destination from your recent hotel searches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "checkIn": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "checkOut": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "adults": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "1-based page number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "destination",
+          "checkIn",
+          "checkOut"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "destination": {
+          "adr": {
+            "cc": "US",
+            "n": "SEA - Seattle, WA (SEA-Seattle - Tacoma Intl.), WA",
+            "cn": "Seattle, WA (SEA-Seattle - Tacoma Intl.)",
+            "c": "United States Of America"
+          },
+          "b": {
+            "lat": 47.44363,
+            "lng": -122.30175,
+            "t": "airport"
+          },
+          "loc": {
+            "id": "640850",
+            "t": "airport"
+          },
+          "c": "SEA",
+          "d": "Seattle - Tacoma Intl."
+        },
+        "checkIn": "2026-07-14",
+        "checkOut": "2026-07-18",
+        "adults": 1
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/hotel"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCartCount",
+      "label": "Get cart count",
+      "description": "Number of items in the cardmember's Chase Travel cart.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "numberOfItems": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "totalItems": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "numberOfAddOnItems": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "大通旅行",
+      "description": "面向持卡人的旅行积分服务。查看旅行资料、Ultimate Rewards 积分、旅行额度、行程、近期搜索、精选优惠和购物车。只读，需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录大通旅行",
+          "description": "打开大通旅行登录页。"
+        },
+        "getSignInState": {
+          "label": "检查大通旅行登录状态",
+          "description": "检查你是否已登录大通旅行。"
+        },
+        "getTravelProfile": {
+          "label": "获取旅行档案",
+          "description": "持卡人的大通旅行档案:卡片(昵称、尾号)、Ultimate Rewards 积分余额、信用额度与可用额度。"
+        },
+        "getStatementCredits": {
+          "label": "获取报销额度",
+          "description": "持卡人可用的旅行报销额度(旅行额度、Edit 额度、精选酒店额度等)及其上限与续期日期。"
+        },
+        "listTrips": {
+          "label": "行程列表",
+          "description": "持卡人的大通旅行行程(机票、酒店、租车、活动)。"
+        },
+        "listRecentHotelSearches": {
+          "label": "近期酒店搜索",
+          "description": "持卡人近期的大通旅行酒店搜索(目的地与日期)。"
+        },
+        "listRecentFlightSearches": {
+          "label": "近期机票搜索",
+          "description": "持卡人近期的大通旅行机票搜索(航线与日期)。"
+        },
+        "listDeals": {
+          "label": "旅行优惠",
+          "description": "面向持卡人的大通旅行精选优惠(酒店、邮轮、套餐)。"
+        },
+        "searchHotels": {
+          "label": "搜索酒店",
+          "description": "按目的地和日期搜索大通旅行酒店。请从近期酒店搜索中选择目的地。"
+        },
+        "getCartCount": {
+          "label": "购物车数量",
+          "description": "持卡人大通旅行购物车中的商品数量。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/chase.com/favicon.png"
+}

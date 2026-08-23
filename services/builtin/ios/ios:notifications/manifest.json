@@ -1,0 +1,135 @@
+{
+  "domain": "ios:notifications",
+  "name": "Notifications",
+  "description": "Schedule reminders and alerts on this device.",
+  "icon": {
+    "asset": "ios:notifications"
+  },
+  "permission": "notifications",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Schedule a local notification with a relative or absolute time.",
+      "id": "schedule",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Optional plain-text detail. Do not use Markdown.",
+            "type": "string"
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "seconds": {
+                    "minimum": 1,
+                    "type": "number"
+                  },
+                  "type": {
+                    "enum": [
+                      "relative"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "seconds"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "dateTime": {
+                    "description": "ISO-8601 timestamp with timezone, e.g. 2026-06-25T09:00:00Z.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "enum": [
+                      "absolute"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "dateTime"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "title": {
+            "description": "The notification's short plain-text first line. Do not use Markdown.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "schedule"
+        ],
+        "type": "object"
+      },
+      "label": "Schedule notification",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fireAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fireAt"
+        ],
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "description": "Cancel a pending notification by its stable identifier.",
+      "id": "cancel",
+      "inputSchema": {
+        "properties": {
+          "id": {
+            "description": "The id returned by ios:notifications:schedule.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "label": "Cancel notification",
+      "outputSchema": null,
+      "requireApproval": true,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "通知",
+      "description": "在此设备上安排提醒和通知。",
+      "actions": {
+        "schedule": {
+          "label": "安排通知",
+          "description": "使用相对或绝对时间安排本地通知。"
+        },
+        "cancel": {
+          "label": "取消通知",
+          "description": "使用稳定标识符取消待处理的通知。"
+        }
+      }
+    }
+  }
+}

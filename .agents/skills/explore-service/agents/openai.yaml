@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explore Service"
+  short_description: "Capture and map live service traffic"
+  default_prompt: "Use $explore-service to safely explore this website, capture its authenticated read traffic, and produce an endpoint and response-shape inventory."

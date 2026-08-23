@@ -1,0 +1,1187 @@
+{
+  "domain": "creator.xiaohongshu.com",
+  "name": "Xiaohongshu Creator",
+  "description": "A workspace for Xiaohongshu creators. Review performance, notes, opportunities, guidance, notices, local drafts, and manage published-note visibility. Sign-in required.",
+  "baseUrl": "https://creator.xiaohongshu.com/new/home",
+  "$defs": {
+    "creatorProfile": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "redId": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "followingCount": {
+          "type": "integer"
+        },
+        "followerCount": {
+          "type": "integer"
+        },
+        "receivedLikesAndCollects": {
+          "type": "integer"
+        },
+        "growthLevel": {
+          "type": "integer"
+        },
+        "growthLevelMinimumFollowers": {
+          "type": "integer"
+        },
+        "growthLevelMaximumFollowers": {
+          "type": "integer"
+        },
+        "liveStatus": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "avatar",
+        "redId",
+        "bio",
+        "followingCount",
+        "followerCount",
+        "receivedLikesAndCollects",
+        "growthLevel",
+        "growthLevelMinimumFollowers",
+        "growthLevelMaximumFollowers",
+        "liveStatus"
+      ],
+      "additionalProperties": false
+    },
+    "analyticsPeriod": {
+      "type": "object",
+      "properties": {
+        "startTime": {
+          "type": "integer",
+          "description": "Start of the reporting period in milliseconds since 1970."
+        },
+        "endTime": {
+          "type": "integer",
+          "description": "End of the reporting period in milliseconds since 1970."
+        },
+        "summary": {
+          "type": "string"
+        },
+        "publishedNotes": {
+          "type": "integer"
+        },
+        "publishedImageNotes": {
+          "type": "integer"
+        },
+        "publishedVideoNotes": {
+          "type": "integer"
+        },
+        "impressions": {
+          "type": "integer"
+        },
+        "views": {
+          "type": "integer"
+        },
+        "profileViews": {
+          "type": "integer"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "collects": {
+          "type": "integer"
+        },
+        "comments": {
+          "type": "integer"
+        },
+        "shares": {
+          "type": "integer"
+        },
+        "followersGained": {
+          "type": "integer"
+        },
+        "followersLost": {
+          "type": "integer"
+        },
+        "netFollowersGained": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "startTime",
+        "endTime",
+        "summary",
+        "publishedNotes",
+        "publishedImageNotes",
+        "publishedVideoNotes",
+        "impressions",
+        "views",
+        "profileViews",
+        "likes",
+        "collects",
+        "comments",
+        "shares",
+        "followersGained",
+        "followersLost",
+        "netFollowersGained"
+      ],
+      "additionalProperties": false
+    },
+    "creatorNote": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "visibleTime": {
+          "type": "integer",
+          "description": "When the note became visible, in seconds since 1970."
+        },
+        "scheduledTime": {
+          "type": "integer",
+          "description": "Scheduled publication time in seconds since 1970, or zero when not scheduled."
+        },
+        "permissionCode": {
+          "type": "integer"
+        },
+        "permissionMessage": {
+          "type": "string"
+        },
+        "tabStatus": {
+          "type": "integer"
+        },
+        "sticky": {
+          "type": "boolean"
+        },
+        "cocreated": {
+          "type": "boolean"
+        },
+        "views": {
+          "type": "integer"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "collects": {
+          "type": "integer"
+        },
+        "comments": {
+          "type": "integer"
+        },
+        "shares": {
+          "type": "integer"
+        },
+        "cover": {
+          "type": "string"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "publishedAt",
+        "visibleTime",
+        "scheduledTime",
+        "permissionCode",
+        "permissionMessage",
+        "tabStatus",
+        "sticky",
+        "cocreated",
+        "views",
+        "likes",
+        "collects",
+        "comments",
+        "shares",
+        "cover",
+        "images",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "linkTopic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "creatorActivity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "publishUrl": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "integer"
+        },
+        "endTime": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "reward": {
+          "type": "string"
+        },
+        "followed": {
+          "type": "boolean"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/linkTopic"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "image",
+        "url",
+        "publishUrl",
+        "startTime",
+        "endTime",
+        "status",
+        "reward",
+        "followed",
+        "topics"
+      ],
+      "additionalProperties": false
+    },
+    "inspirationNote": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "likes",
+        "images"
+      ],
+      "additionalProperties": false
+    },
+    "inspirationTopic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "participantCount": {
+          "type": "integer"
+        },
+        "viewCount": {
+          "type": "integer"
+        },
+        "exampleNotes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inspirationNote"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url",
+        "participantCount",
+        "viewCount",
+        "exampleNotes"
+      ],
+      "additionalProperties": false
+    },
+    "inspirationGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inspirationTopic"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "topics"
+      ],
+      "additionalProperties": false
+    },
+    "creationGuidance": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string"
+        },
+        "viewCount": {
+          "type": "integer"
+        },
+        "viewCountText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "noteId",
+        "title",
+        "image",
+        "url",
+        "authorId",
+        "authorName",
+        "authorAvatar",
+        "viewCount",
+        "viewCountText"
+      ],
+      "additionalProperties": false
+    },
+    "creatorNotice": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "type": {
+          "type": "integer"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "backgroundColor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "image",
+        "type",
+        "position",
+        "backgroundColor"
+      ],
+      "additionalProperties": false
+    },
+    "noteAnalyticsTag": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "creatorDraft": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "video",
+            "image",
+            "article",
+            "audio"
+          ]
+        },
+        "updatedAt": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "cover": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "updatedAt",
+        "title",
+        "description",
+        "cover"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Xiaohongshu Creator",
+      "description": "Opens the Xiaohongshu creator sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Xiaohongshu Creator sign-in",
+      "description": "Checks whether you are signed in to the Xiaohongshu creator portal.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCreatorProfile",
+      "label": "Get creator profile",
+      "description": "Gets your creator identity, audience totals, growth level, and live status. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/home",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/creatorProfile"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCreatorAnalytics",
+      "label": "Get creator analytics",
+      "description": "Gets seven-day and thirty-day publishing, reach, engagement, and follower totals. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/home",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sevenDays": {
+            "$ref": "#/$defs/analyticsPeriod"
+          },
+          "thirtyDays": {
+            "$ref": "#/$defs/analyticsPeriod"
+          }
+        },
+        "required": [
+          "sevenDays",
+          "thirtyDays"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreatorNotes",
+      "label": "List creator notes",
+      "description": "Lists your published notes with visibility, scheduling, and engagement details. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/note-manager?source=official",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "The next page value returned by a previous result. Omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/creatorNote"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreatorActivities",
+      "label": "List creator activities",
+      "description": "Lists current creator campaigns, their topics, rewards, dates, and publishing links. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/events",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/creatorActivity"
+            }
+          },
+          "followedCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "followedCount"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreatorInspiration",
+      "label": "List creator inspiration",
+      "description": "Lists recommended topic groups with participation, reach, and example notes. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/inspiration",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/inspirationGroup"
+            }
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreationGuidance",
+      "label": "List creation guidance",
+      "description": "Lists official creator lessons by category. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/college",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "official",
+              "beginner",
+              "account",
+              "content",
+              "monetization"
+            ],
+            "default": "official"
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "The next page value returned by a previous result. Omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/creationGuidance"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreatorNotices",
+      "label": "List creator notices",
+      "description": "Lists notices currently shown on the creator home page. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/home",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/creatorNotice"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getLiveAnalytics",
+      "label": "Get live analytics",
+      "description": "Gets today's live-stream duration, audience, engagement, follower, and earnings totals. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/home",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "validLiveCount": {
+            "type": "integer"
+          },
+          "liveDuration": {
+            "type": "number"
+          },
+          "averageViewers": {
+            "type": "number"
+          },
+          "averageInteractions": {
+            "type": "number"
+          },
+          "newFollowers": {
+            "type": "integer"
+          },
+          "potatoDiamonds": {
+            "type": "number"
+          },
+          "sellerIncome": {
+            "type": "number"
+          },
+          "packageDeals": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "validLiveCount",
+          "liveDuration",
+          "averageViewers",
+          "averageInteractions",
+          "newFollowers",
+          "potatoDiamonds",
+          "sellerIncome",
+          "packageDeals"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getNoteAnalytics",
+      "label": "Get note analytics",
+      "description": "Gets performance and audience availability for one published note. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/statistics/note-detail?noteId={noteId}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "noteId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "cover": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "integer"
+              },
+              "updatedAt": {
+                "type": "integer"
+              },
+              "auditStatus": {
+                "type": "integer"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/noteAnalyticsTag"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "type",
+              "cover",
+              "publishedAt",
+              "updatedAt",
+              "auditStatus",
+              "tags"
+            ],
+            "additionalProperties": false
+          },
+          "impressions": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "views": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "likes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "collects": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "comments": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "shares": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "followersGained": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "averageViewTime": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "coverClickRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fiveSecondCompletionRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fullViewRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "twoSecondExitRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "audienceAvailable": {
+            "type": "boolean"
+          },
+          "audienceMessage": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "videoUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note",
+          "impressions",
+          "views",
+          "likes",
+          "collects",
+          "comments",
+          "shares",
+          "followersGained",
+          "averageViewTime",
+          "coverClickRate",
+          "fiveSecondCompletionRate",
+          "fullViewRate",
+          "twoSecondExitRate",
+          "audienceAvailable",
+          "audienceMessage",
+          "images",
+          "videoUrl"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCreatorDrafts",
+      "label": "List creator drafts",
+      "description": "Lists draft summaries stored locally by the creator portal without returning draft media or raw editor state. Sign-in required.",
+      "baseUrl": "https://creator.xiaohongshu.com/publish/publish",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/creatorDraft"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "updateNoteVisibility",
+      "label": "Change note visibility",
+      "description": "Changes a published note to public, private, or visible only to mutual friends. Sign-in and approval required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/note-manager?source=official",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private",
+              "friends"
+            ]
+          }
+        },
+        "required": [
+          "noteId",
+          "visibility"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private",
+              "friends"
+            ]
+          }
+        },
+        "required": [
+          "noteId",
+          "visibility"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "updatePinnedNote",
+      "label": "Pin or unpin note",
+      "description": "Pins or unpins a published note on your profile. Sign-in and approval required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/note-manager?source=official",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "noteId",
+          "pinned"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "noteId",
+          "pinned"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "deleteCreatorNote",
+      "label": "Delete creator note",
+      "description": "Permanently deletes a published note. Sign-in and approval required.",
+      "baseUrl": "https://creator.xiaohongshu.com/new/note-manager?source=official",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "noteId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "noteId",
+          "deleted"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/creator.xiaohongshu.com/favicon.png"
+}

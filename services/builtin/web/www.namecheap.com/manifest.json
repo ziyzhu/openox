@@ -1,0 +1,105 @@
+{
+  "domain": "www.namecheap.com",
+  "name": "Namecheap",
+  "description": "A domain registrar and web-services provider. Check whether a domain can be registered, see premium pricing when available, and review public registration details.",
+  "baseUrl": "https://www.namecheap.com/domains/registration/results/?domain=openchat",
+  "$defs": {
+    "optionalString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "optionalNumber": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "getDomainAvailability",
+      "label": "Check domain availability",
+      "description": "Checks whether one fully qualified domain can be registered and returns premium pricing and public registration details when Namecheap provides them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+\\.?$",
+            "description": "A fully qualified domain name, such as example.com. Internationalized names must use their ASCII Punycode form."
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "premium": {
+            "type": "boolean"
+          },
+          "lookupType": {
+            "$ref": "#/$defs/optionalString"
+          },
+          "reason": {
+            "$ref": "#/$defs/optionalString"
+          },
+          "createdYear": {
+            "$ref": "#/$defs/optionalNumber"
+          },
+          "registrar": {
+            "$ref": "#/$defs/optionalString"
+          },
+          "registrationPrice": {
+            "$ref": "#/$defs/optionalNumber"
+          },
+          "renewalPrice": {
+            "$ref": "#/$defs/optionalNumber"
+          },
+          "currency": {
+            "$ref": "#/$defs/optionalString"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "available",
+          "premium",
+          "lookupType",
+          "reason",
+          "createdYear",
+          "registrar",
+          "registrationPrice",
+          "renewalPrice",
+          "currency",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

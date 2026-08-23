@@ -1,0 +1,738 @@
+{
+  "domain": "mixpanel.com",
+  "name": "Mixpanel",
+  "description": "A product analytics platform. Browse projects, workspaces, dashboards, saved report results, event definitions, and recent events. Sign-in required. Read-only.",
+  "baseUrl": "https://mixpanel.com/home/",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "listCursor": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "timezone": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "role": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "demo": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "organizationId",
+        "timezone",
+        "role",
+        "demo"
+      ],
+      "additionalProperties": false
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "restricted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "description",
+        "default",
+        "restricted"
+      ],
+      "additionalProperties": false
+    },
+    "dashboard": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "creator": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "modifiedAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "favorited": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "workspaceId",
+        "title",
+        "description",
+        "creator",
+        "createdAt",
+        "modifiedAt",
+        "private",
+        "favorited",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "dashboardDetail": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "creator": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "modifiedAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "favorited": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/report"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "workspaceId",
+        "title",
+        "description",
+        "creator",
+        "createdAt",
+        "modifiedAt",
+        "private",
+        "favorited",
+        "url",
+        "reports"
+      ],
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "chartType": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "description": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "modifiedAt": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "chartType",
+        "description",
+        "createdAt",
+        "modifiedAt"
+      ],
+      "additionalProperties": false
+    },
+    "reportData": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "computedAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "dateFrom": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "dateTo": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "seriesJson": {
+          "type": "string",
+          "description": "The report series as JSON, keyed in the same order as the headers."
+        },
+        "timeComparisonJson": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "The report's comparison series as JSON."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "headers",
+        "computedAt",
+        "dateFrom",
+        "dateTo",
+        "seriesJson",
+        "timeComparisonJson"
+      ],
+      "additionalProperties": false
+    },
+    "eventDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "displayName": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "description": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "status": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "dropped": {
+          "type": "boolean"
+        },
+        "firstSeenAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "modifiedAt": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "name",
+        "displayName",
+        "description",
+        "status",
+        "verified",
+        "hidden",
+        "dropped",
+        "firstSeenAt",
+        "modifiedAt"
+      ],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "occurredAt": {
+          "type": "number",
+          "description": "Unix timestamp in seconds."
+        },
+        "distinctId": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "name",
+        "occurredAt",
+        "distinctId",
+        "properties"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Mixpanel",
+      "description": "Opens Mixpanel sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Mixpanel sign-in",
+      "description": "Checks whether you are signed in to Mixpanel.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get current user",
+      "description": "Returns the signed-in Mixpanel user's name and email address.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listProjects",
+      "label": "List projects",
+      "description": "Lists the Mixpanel projects available to the signed-in user.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/project"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/listCursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listWorkspaces",
+      "label": "List workspaces",
+      "description": "Lists accessible workspaces, optionally within one project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Optional project ID from the project list."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/workspace"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/listCursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listDashboards",
+      "label": "List dashboards",
+      "description": "Lists dashboards in a chosen workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID from the workspace list."
+          }
+        },
+        "required": [
+          "workspaceId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/dashboard"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/listCursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getDashboard",
+      "label": "Get dashboard",
+      "description": "Returns a dashboard and the reports arranged on it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID containing the dashboard."
+          },
+          "id": {
+            "type": "string",
+            "description": "Dashboard ID from the dashboard list."
+          }
+        },
+        "required": [
+          "workspaceId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/dashboardDetail"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getReportData",
+      "label": "Get report data",
+      "description": "Runs a saved dashboard report and returns its current computed series and date range.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project ID containing the report."
+          },
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID containing the dashboard."
+          },
+          "dashboardId": {
+            "type": "string",
+            "description": "Dashboard ID containing the report."
+          },
+          "id": {
+            "type": "string",
+            "description": "Report ID from the dashboard details."
+          }
+        },
+        "required": [
+          "projectId",
+          "workspaceId",
+          "dashboardId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/reportData"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listEventDefinitions",
+      "label": "List event definitions",
+      "description": "Lists the tracked event types defined for a project and workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project ID from the project list."
+          },
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID from the workspace list."
+          }
+        },
+        "required": [
+          "projectId",
+          "workspaceId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/eventDefinition"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/listCursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchEvents",
+      "label": "Search recent events",
+      "description": "Searches recent tracked events and returns their properties, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project ID from the project list."
+          },
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID from the workspace list."
+          },
+          "query": {
+            "type": "string",
+            "description": "Text to match in event names or displayed properties."
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "default": 7,
+            "description": "Number of recent days to search."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [
+          "projectId",
+          "workspaceId",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/event"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/listCursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/mixpanel.com/favicon.png"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "aws",
+  "name": "AWS",
+  "description": "Connect to AWS services and documentation.",
+  "endpoint": "https://aws-mcp.us-east-1.api.aws/mcp",
+  "transport": "streamable-http"
+}

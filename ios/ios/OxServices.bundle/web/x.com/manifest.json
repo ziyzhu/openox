@@ -1,0 +1,1030 @@
+{
+  "domain": "x.com",
+  "name": "X",
+  "description": "The real-time public conversation network. Read profiles, tweets, timelines, threads, search, trending, bookmarks, likes, verified-blue followers, following, notifications, and long-form articles. All actions are read-only; bookmarks, notifications, and the home timeline are scoped to the signed-in account.",
+  "baseUrl": "https://x.com/home",
+  "$defs": {
+    "quotedTweet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "has_media": {
+          "type": "boolean"
+        },
+        "media_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "author",
+        "name",
+        "text",
+        "created_at",
+        "url",
+        "has_media",
+        "media_urls"
+      ],
+      "additionalProperties": false
+    },
+    "card": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "domain": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "tweet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "retweets": {
+          "type": "integer"
+        },
+        "replies": {
+          "type": "integer"
+        },
+        "views": {
+          "type": "integer"
+        },
+        "is_retweet": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "has_media": {
+          "type": "boolean"
+        },
+        "media_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "card": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/card"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quoted_tweet": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/quotedTweet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "author",
+        "name",
+        "text",
+        "likes",
+        "retweets",
+        "replies",
+        "views",
+        "is_retweet",
+        "created_at",
+        "url",
+        "has_media",
+        "media_urls",
+        "card",
+        "quoted_tweet"
+      ],
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "screen_name": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "followers": {
+          "type": "integer"
+        },
+        "following": {
+          "type": "integer"
+        },
+        "tweets": {
+          "type": "integer"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "screen_name",
+        "name",
+        "bio",
+        "location",
+        "url",
+        "followers",
+        "following",
+        "tweets",
+        "likes",
+        "verified",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "userRow": {
+      "type": "object",
+      "properties": {
+        "screen_name": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "followers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "screen_name",
+        "name",
+        "bio",
+        "followers"
+      ],
+      "additionalProperties": false
+    },
+    "trendRow": {
+      "type": "object",
+      "properties": {
+        "rank": {
+          "type": "integer"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rank",
+        "topic",
+        "category"
+      ],
+      "additionalProperties": false
+    },
+    "notification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "action",
+        "author",
+        "text",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "article": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "cover_image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "media_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "title",
+        "author",
+        "content",
+        "url",
+        "cover_image_url",
+        "media_urls"
+      ],
+      "additionalProperties": false
+    },
+    "threadEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "retweets": {
+          "type": "integer"
+        },
+        "replies": {
+          "type": "integer"
+        },
+        "in_reply_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "has_media": {
+          "type": "boolean"
+        },
+        "media_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "card": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/card"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quoted_tweet": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/quotedTweet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "author",
+        "name",
+        "text",
+        "likes",
+        "retweets",
+        "replies",
+        "in_reply_to",
+        "created_at",
+        "url",
+        "has_media",
+        "media_urls",
+        "card",
+        "quoted_tweet"
+      ],
+      "additionalProperties": false
+    },
+    "tweetPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tweet"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "userPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/userRow"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to X",
+      "description": "X sign-in URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to X.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProfile",
+      "label": "Get user profile",
+      "description": "Fetch an X user profile (bio, follower counts, etc.). Defaults to the logged-in user when no username is given.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/profile"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listTweets",
+      "label": "List user tweets",
+      "description": "Recent tweets from a user (excludes pinned). Defaults to the logged-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchTweets",
+      "label": "Search tweets",
+      "description": "Searches X posts and supports familiar filters such as exact phrases, posts from an account, and posts since a date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "product": {
+            "type": "string",
+            "enum": [
+              "top",
+              "live",
+              "photos",
+              "videos"
+            ],
+            "default": "top"
+          },
+          "from": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "has": {
+            "type": "string",
+            "enum": [
+              "media",
+              "images",
+              "videos",
+              "links",
+              "replies"
+            ]
+          },
+          "exclude": {
+            "type": "string",
+            "enum": [
+              "replies",
+              "retweets",
+              "media",
+              "links"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 15
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "query": "claude ai"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listTimeline",
+      "label": "List home timeline",
+      "description": "Logged-in user's home timeline. type=for-you (algorithmic, default) or following (chronological).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "for-you",
+              "following"
+            ],
+            "default": "for-you"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "type": "for-you"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listThread",
+      "label": "List tweet thread",
+      "description": "Original tweet + reply thread for a given tweet id or status URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tweetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "required": [
+          "tweetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/threadEntry"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "tweetId": "20"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listTrending",
+      "label": "List trending topics",
+      "description": "Lists trending topics from X Explore.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/trendRow"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listBookmarks",
+      "label": "List bookmarks",
+      "description": "Your saved tweets (newest first).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listLikes",
+      "label": "List liked tweets",
+      "description": "Liked tweets of a user. Defaults to the logged-in user (likes are private on X — only the owner can read them).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listVerifiedFollowers",
+      "label": "List verified followers",
+      "description": "Lists Blue-verified accounts that follow a user. It does not include followers without Blue verification. Defaults to your account.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listFollowing",
+      "label": "List following",
+      "description": "Accounts a user follows. Defaults to the logged-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listNotifications",
+      "label": "List notifications",
+      "description": "Logged-in user's notifications feed (mentions, likes, replies, follows).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/notification"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getArticle",
+      "label": "Get article",
+      "description": "Shows an X Article as clean, readable text with its cover and inline image links.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tweetId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "tweetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/article"
+      },
+      "defaultArgs": {
+        "tweetId": "1234567890"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "X",
+      "description": "实时公共对话网络。查看用户资料、帖子、时间线、讨论串、热门趋势、书签、点赞、关注、通知和长文。部分内容需登录；所有操作均为只读。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录 X",
+          "description": "打开 X 登录页。"
+        },
+        "getSignInState": {
+          "label": "检查 X 登录状态",
+          "description": "检查你是否已登录 X。"
+        },
+        "getProfile": {
+          "label": "获取用户资料",
+          "description": "获取 X 用户资料（简介、粉丝数等）。未提供用户名时默认为已登录用户。"
+        },
+        "listTweets": {
+          "label": "用户推文列表",
+          "description": "用户的最新推文（不含置顶）。默认为已登录用户。"
+        },
+        "searchTweets": {
+          "label": "搜索推文",
+          "description": "搜索 X 帖子，并支持精确短语、指定账号和起始日期等常用筛选条件。"
+        },
+        "listTimeline": {
+          "label": "主页时间线",
+          "description": "已登录用户的主页时间线。type=for-you（算法推荐，默认）或 following（按时间顺序）。"
+        },
+        "listThread": {
+          "label": "推文串列表",
+          "description": "给定推文 id 或状态网址的原推文及回复串。"
+        },
+        "listTrending": {
+          "label": "热门趋势列表",
+          "description": "列出 X 探索页中的热门趋势。"
+        },
+        "listBookmarks": {
+          "label": "书签列表",
+          "description": "你收藏的推文（最新在前）。"
+        },
+        "listLikes": {
+          "label": "点赞推文列表",
+          "description": "某用户点赞的推文。默认为已登录用户（X 上点赞为私密——仅本人可查看）。"
+        },
+        "listVerifiedFollowers": {
+          "label": "认证粉丝列表",
+          "description": "列出关注某位用户的蓝标认证账户，不包括未获得蓝标认证的粉丝。默认为你的账户。"
+        },
+        "listFollowing": {
+          "label": "关注列表",
+          "description": "某用户关注的账户。默认为已登录用户。"
+        },
+        "listNotifications": {
+          "label": "通知列表",
+          "description": "已登录用户的通知信息流（提及、点赞、回复、关注）。"
+        },
+        "getArticle": {
+          "label": "获取长文",
+          "description": "以清晰易读的文本显示 X 长文，并提供封面和正文图片链接。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/x.com/favicon.png",
+  "skills": [
+    {
+      "name": "research",
+      "description": "Research claims, events, trends, and accounts on X with thread context and source assessment. Use when investigating posts, reactions, timelines, or an author's credibility, including focused searches, thread reconstruction, posting-history checks, and corroboration across independent accounts."
+    }
+  ]
+}

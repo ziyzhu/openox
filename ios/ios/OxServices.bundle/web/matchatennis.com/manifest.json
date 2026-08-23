@@ -1,0 +1,304 @@
+{
+  "domain": "matchatennis.com",
+  "name": "Matcha Tennis",
+  "description": "Tennis court discovery and booking app. Covers public and club courts in Seattle and San Francisco: list every known place with provider, location, and surface tags, then read one place's courts and their reservable time slots.",
+  "baseUrl": "https://matchatennis.com/",
+  "$defs": {
+    "coordinate": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number"
+        },
+        "lng": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "additionalProperties": false
+    },
+    "placeSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coordinate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/coordinate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timezone": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "courtCount": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provider",
+        "tags",
+        "coordinate",
+        "timezone",
+        "courtCount",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "description": "Local start time at the place, YYYY-MM-DDTHH:mm"
+        },
+        "durationMinutes": {
+          "type": "number"
+        },
+        "state": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "RESERVABLE",
+                "EXPIRED"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "start",
+        "durationMinutes",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "court": {
+      "type": "object",
+      "properties": {
+        "mrn": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        }
+      },
+      "required": [
+        "mrn",
+        "name",
+        "tags",
+        "slots"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listPlaces",
+      "label": "List places",
+      "description": "Lists tennis venues with their name, operator, location, tags, and number of courts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Opaque cursor from a previous page"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/placeSummary"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPlace",
+      "label": "Place detail",
+      "description": "Read one place by id: its courts and their time slots with local start time, duration, and RESERVABLE/EXPIRED state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Place id from listPlaces"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coordinate": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/coordinate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "courtCount": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          },
+          "courts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/court"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "tags",
+          "coordinate",
+          "timezone",
+          "courtCount",
+          "url",
+          "courts"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "抹茶网球",
+      "description": "网球场发现与预订应用。覆盖西雅图和旧金山的公共及俱乐部球场：列出所有已知场地（含运营方、位置和标签），并查看某个场地的球场及可预订时段。",
+      "actions": {
+        "listPlaces": {
+          "label": "列出场地",
+          "description": "列出网球场地的名称、运营方、位置、标签和球场数量。"
+        },
+        "getPlace": {
+          "label": "场地详情",
+          "description": "按 id 查看某个场地：其球场及时段，含当地开始时间、时长和 RESERVABLE/EXPIRED 状态。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/matchatennis.com/favicon.png"
+}

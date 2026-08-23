@@ -34,6 +34,11 @@ from a private S3 bucket. MCP services contain `manifest.json`. Native iOS
 services can appear only in the built-in repository; an external repository that
 lists one is rejected. Existing source service manifest schemas are unchanged.
 
+Built-in authoring sources live in `services/builtin/`. `bun run build:services`
+compiles their runtime artifacts into the committed
+`ios/ios/OxServices.bundle`. A complete standalone remote repository example
+lives in `examples/service-repository/`.
+
 Ox accepts additional repositories only through public HTTPS URLs without
 embedded credentials. It clones into staging, validates the repository, removes
 `.git`, and atomically replaces the installed `HEAD` snapshot. Symbolic links and

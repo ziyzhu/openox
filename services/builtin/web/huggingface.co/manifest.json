@@ -1,0 +1,146 @@
+{
+  "domain": "huggingface.co",
+  "name": "Hugging Face",
+  "description": "An open machine-learning community. Browse trending models and datasets, filter models by library, and discover Spaces by category. No sign-in required.",
+  "baseUrl": "https://huggingface.co/",
+  "$defs": {
+    "model": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "task": { "type": ["string", "null"] },
+        "downloads": { "type": "integer" },
+        "likes": { "type": "integer" },
+        "parameters": { "type": ["number", "null"] },
+        "gated": { "type": "boolean" },
+        "updatedAt": { "type": ["string", "null"] },
+        "url": { "type": "string" }
+      },
+      "required": ["id", "author", "task", "downloads", "likes", "parameters", "gated", "updatedAt", "url"],
+      "additionalProperties": false
+    },
+    "dataset": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "downloads": { "type": "integer" },
+        "likes": { "type": "integer" },
+        "gated": { "type": "boolean" },
+        "benchmark": { "type": "boolean" },
+        "updatedAt": { "type": ["string", "null"] },
+        "url": { "type": "string" }
+      },
+      "required": ["id", "author", "downloads", "likes", "gated", "benchmark", "updatedAt", "url"],
+      "additionalProperties": false
+    },
+    "space": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "category": { "type": ["string", "null"] },
+        "sdk": { "type": ["string", "null"] },
+        "likes": { "type": "integer" },
+        "running": { "type": "boolean" },
+        "updatedAt": { "type": ["string", "null"] },
+        "url": { "type": "string" }
+      },
+      "required": ["id", "title", "author", "description", "category", "sdk", "likes", "running", "updatedAt", "url"],
+      "additionalProperties": false
+    },
+    "modelList": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/model" } },
+        "nextCursor": { "type": ["string", "null"] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    },
+    "datasetList": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/dataset" } },
+        "nextCursor": { "type": ["string", "null"] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    },
+    "spaceList": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/space" } },
+        "nextCursor": { "type": ["string", "null"] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listModels",
+      "label": "Browse models",
+      "description": "Lists trending models with popularity, task, size, access, and update details. Optionally filters by a library such as pytorch or tf.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library": { "type": "string", "description": "Optional Hugging Face library filter, such as pytorch or tf" },
+          "cursor": { "type": "string", "description": "Cursor returned by the previous page" }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/modelList" },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listDatasets",
+      "label": "Browse datasets",
+      "description": "Lists trending datasets with popularity, access, benchmark, and update details.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": { "type": "string", "description": "Cursor returned by the previous page" }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/datasetList" },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listSpaces",
+      "label": "Discover Spaces",
+      "description": "Lists machine-learning demos and apps in a Hugging Face category, including stopped Spaces.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": { "type": "string", "description": "Category slug, such as video-generation" }
+        },
+        "required": ["category"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/spaceList" },
+      "defaultArgs": { "category": "video-generation" },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "Hugging Face",
+      "description": "开放的机器学习社区。浏览热门模型和数据集，按库筛选模型，并按类别发现 Spaces。无需登录。",
+      "actions": {
+        "listModels": { "label": "浏览模型", "description": "列出热门模型及其热度、任务、规模、访问限制和更新时间，也可按 pytorch、tf 等库筛选。" },
+        "listDatasets": { "label": "浏览数据集", "description": "列出热门数据集及其热度、访问限制、基准属性和更新时间。" },
+        "listSpaces": { "label": "发现 Spaces", "description": "按 Hugging Face 类别列出机器学习演示和应用，包括已停止运行的 Space。" }
+      }
+    }
+  }
+}

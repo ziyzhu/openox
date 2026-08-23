@@ -31,7 +31,7 @@ const REMOTE_REPOSITORY = process.env.OX_REPOSITORY_URL ?? null;
 const REMOTE_MIRROR = join(homedir(), ".cache", "openox", "repository-remote.git");
 
 function localGitDir(): { ok: true; dir: string } | { ok: false; error: string } {
-  if (!LOCAL_REPOSITORY) return { ok: false, error: "set OX_REPOSITORY to a local OpenOx Services checkout" };
+  if (!LOCAL_REPOSITORY) return { ok: false, error: "set OX_REPOSITORY to a local service repository checkout" };
   const r = spawnSync("git", ["-C", LOCAL_REPOSITORY, "rev-parse", "--absolute-git-dir"], { encoding: "utf8" });
   if (r.status !== 0) return { ok: false, error: r.stderr.trim() || `${LOCAL_REPOSITORY} is not a Git repository` };
   return { ok: true, dir: r.stdout.trim() };
@@ -71,7 +71,7 @@ const RECORD = "\x1e";
 
 function git(dir: string, args: string[]): { ok: true; stdout: string } | { ok: false; error: string } {
   if (!existsSync(dir)) {
-    return { ok: false, error: `OpenOx Services Git directory does not exist: ${dir}` };
+    return { ok: false, error: `Service repository Git directory does not exist: ${dir}` };
   }
   const r = spawnSync("git", [`--git-dir=${dir}`, ...args], { encoding: "utf8" });
   if (r.status !== 0) {

@@ -1,0 +1,904 @@
+{
+  "domain": "secure.bankofamerica.com",
+  "name": "Bank of America",
+  "description": "A U.S. consumer bank. View accounts, balances, transactions, payment and transfer activity, statements, spending insights, and BankAmeriDeals cash-back offers. Read-only; sign-in required.",
+  "baseUrl": "https://secure.bankofamerica.com/myaccounts/ao/accounts-overview.go",
+  "$defs": {
+    "paymentActivityFilterAccount": {
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accountName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "activityTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "identifier",
+        "displayName",
+        "accountName",
+        "activityTypes"
+      ],
+      "additionalProperties": false
+    },
+    "paymentActivity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmationNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "amount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transactionDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "updatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transferType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "memo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cancelEligible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "editEligible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "approveEligible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "confirmationNumber",
+        "source",
+        "target",
+        "amount",
+        "status",
+        "type",
+        "direction",
+        "transactionDate",
+        "createdAt",
+        "updatedAt",
+        "category",
+        "transferType",
+        "memo",
+        "cancelEligible",
+        "editEligible",
+        "approveEligible"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "locales": {
+    "zh-Hans": {
+      "name": "美国银行",
+      "description": "美国个人银行服务。查看账户、余额、交易、付款和转账记录、对账单、消费洞察和 BankAmeriDeals 返现优惠。只读，需登录。",
+      "actions": {
+        "getPayTransferUrl": {
+          "label": "打开付款和转账",
+          "description": "打开付款和转账记录页面。"
+        },
+        "getSignInUrl": {
+          "label": "登录美国银行",
+          "description": "打开美国银行登录页。"
+        },
+        "getSignInState": {
+          "label": "检查美国银行登录状态",
+          "description": "检查你是否已登录美国银行。"
+        },
+        "listAccounts": {
+          "label": "账户列表",
+          "description": "列出你的账户，以及查看每个账户所需的信息。"
+        },
+        "getAccount": {
+          "label": "获取账户明细",
+          "description": "读取单个账户的明细。"
+        },
+        "getPaymentActivityFilters": {
+          "label": "付款记录筛选条件",
+          "description": "读取可用于筛选付款和转账记录的账户、日期范围、状态和类型。"
+        },
+        "listPaymentActivities": {
+          "label": "付款和转账记录",
+          "description": "列出付款、转账、电汇、账单支付和 Zelle 记录，可按账户、日期、金额、类型、状态或关键词筛选。"
+        },
+        "listTransactions": {
+          "label": "交易列表",
+          "description": "列出单个账户的近期交易。"
+        },
+        "listStatements": {
+          "label": "对账单列表",
+          "description": "列出某账户某年的对账单文件。"
+        },
+        "getSpending": {
+          "label": "消费洞察",
+          "description": "读取按类别划分的消费洞察。"
+        },
+        "listDeals": {
+          "label": "返现优惠",
+          "description": "列出 BankAmeriDeals 返现优惠。"
+        }
+      }
+    }
+  },
+  "actions": [
+    {
+      "id": "getPayTransferUrl",
+      "label": "Open Pay & Transfer",
+      "description": "Opens your payment and transfer activity page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Bank of America",
+      "description": "Opens the Bank of America sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Bank of America sign-in",
+      "description": "Checks whether you are signed in to Bank of America.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listAccounts",
+      "label": "List accounts",
+      "description": "Lists your accounts and the information needed to view each one.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "accountToken": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mask": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "balance": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "getAccount",
+      "label": "Get account detail",
+      "description": "Shows details for an account selected from your account list.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountToken"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountToken": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mask": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "balance": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "getPaymentActivityFilters",
+      "label": "Get payment activity filters",
+      "description": "Lists the accounts, date ranges, statuses, and activity types available for filtering payment and transfer history.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fromAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/paymentActivityFilterAccount"
+            }
+          },
+          "toAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/paymentActivityFilterAccount"
+            }
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dateOptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fromDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "fromAccounts",
+          "toAccounts",
+          "statuses",
+          "dateOptions",
+          "activityTypes",
+          "fromDate",
+          "toDate"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listPaymentActivities",
+      "label": "List payments and transfers",
+      "description": "Lists payments, transfers, wires, bill payments, and Zelle activity, with optional account, date, amount, type, status, and keyword filters.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The next page returned by the previous call."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "timeframe": {
+            "type": "string",
+            "enum": [
+              "THIRTYDAYS",
+              "SIXTYDAYS",
+              "NINETYDAYS",
+              "DEFAULTDAYS",
+              "THREEMONTHS",
+              "SIXMONTHS",
+              "TWELVEMONTHS",
+              "EIGHTEENMONTHS",
+              "EXTENDEDHISTORY",
+              "CUSTOMDATE"
+            ],
+            "default": "DEFAULTDAYS",
+            "description": "A date range returned by getPaymentActivityFilters, or CUSTOMDATE with fromDate and toDate."
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "Start date for CUSTOMDATE."
+          },
+          "toDate": {
+            "type": "string",
+            "description": "End date for CUSTOMDATE."
+          },
+          "fromAccountIdentifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Source account identifiers returned by getPaymentActivityFilters."
+          },
+          "toAccountIdentifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Destination account identifiers returned by getPaymentActivityFilters."
+          },
+          "keyword": {
+            "type": "string"
+          },
+          "minimumAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maximumAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "activityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Activity types returned by getPaymentActivityFilters."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Statuses returned by getPaymentActivityFilters."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/paymentActivity"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listTransactions",
+      "label": "List transactions",
+      "description": "Lists recent transactions for one of your accounts.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountToken": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "accountToken"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "displayAmount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "runningBalance": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "transactionToken": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listStatements",
+      "label": "List statements",
+      "description": "List statement documents for one account in a given year.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountToken": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          }
+        },
+        "required": [
+          "accountToken"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "docId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "docTypeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "getSpending",
+      "label": "Spending insights",
+      "description": "Read spending-by-category insights for the signed-in customer.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "amount": {
+                  "type": [
+                    "number",
+                    "string",
+                    "null"
+                  ]
+                },
+                "displayAmount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "percentage": {
+                  "type": [
+                    "number",
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "amount",
+                "displayAmount",
+                "percentage"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "categories"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listDeals",
+      "label": "List deals",
+      "description": "List BankAmeriDeals cashback offers.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                },
+                "merchant": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cashBack": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                },
+                "expirationDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "merchant",
+                "title",
+                "description",
+                "cashBack",
+                "expirationDate",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    }
+  ]
+}

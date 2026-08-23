@@ -1,0 +1,401 @@
+{
+  "domain": "www.facebook.com",
+  "name": "Facebook",
+  "description": "A social network for communities and local commerce. Read group posts, friend suggestions, and Marketplace listings; sign-in required.",
+  "baseUrl": "https://www.facebook.com/",
+  "$defs": {
+    "post": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "author",
+        "message",
+        "createdAt",
+        "url",
+        "imageUrl"
+      ],
+      "additionalProperties": false
+    },
+    "postPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/post"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "person": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "mutualContext": {
+          "type": "string"
+        },
+        "profilePictureUrl": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "mutualContext",
+        "profilePictureUrl",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "personPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/person"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "listing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "sellerName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer"
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "price",
+        "location",
+        "sellerName",
+        "createdAt",
+        "imageUrl",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "listingPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/listing"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Facebook",
+      "description": "Opens the Facebook sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Facebook sign-in",
+      "description": "Checks whether you are signed in to Facebook.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listGroupPosts",
+      "label": "List group posts",
+      "description": "Lists posts from a Facebook group you can view.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "The numeric group ID from the group's Facebook URL."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5,
+            "description": "The maximum number of posts to request."
+          }
+        },
+        "required": [
+          "groupId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/postPage"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listFriendSuggestions",
+      "label": "List friend suggestions",
+      "description": "Lists people Facebook currently suggests you may know.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20,
+            "description": "The maximum number of suggestions to request."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/personPage"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listMarketplace",
+      "label": "Browse Marketplace",
+      "description": "Lists Facebook Marketplace items near a chosen location.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The center latitude for nearby results."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The center longitude for nearby results."
+          },
+          "radiusKm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 65,
+            "description": "The search radius in kilometers."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 12,
+            "description": "The maximum number of listings to request."
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/listingPage"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchMarketplace",
+      "label": "Search Marketplace",
+      "description": "Searches Facebook Marketplace near a chosen location.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words describing the item to find."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The center latitude for nearby results."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The center longitude for nearby results."
+          },
+          "radiusKm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 65,
+            "description": "The search radius in kilometers."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 24,
+            "description": "The maximum number of listings to request."
+          }
+        },
+        "required": [
+          "query",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/listingPage"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.facebook.com/favicon.png"
+}

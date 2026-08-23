@@ -1,0 +1,1138 @@
+{
+  "domain": "developer.apple.com",
+  "name": "Apple Developer",
+  "description": "Official resources for building on Apple platforms. Browse frameworks and technologies, read reference documentation, search symbols, follow Develop in Swift tutorials, and explore Developer Forums topics, posts, search results, and discussions. Public and read-only; no sign-in required.",
+  "baseUrl": "https://developer.apple.com/documentation",
+  "$defs": {
+    "topicList": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "abstract": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "description": "Documentation path; pass to getDocumentation."
+              }
+            },
+            "required": [
+              "title",
+              "abstract",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "title",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Whether this is an article or a hands-on project."
+        },
+        "abstract": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volume": {
+          "type": "string"
+        },
+        "chapter": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "Tutorial path; pass to getTutorial."
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "kind",
+        "abstract",
+        "volume",
+        "chapter",
+        "path",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialResource": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialStep": {
+      "type": "object",
+      "properties": {
+        "instruction": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mediaUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mediaAlt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "previewUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "instruction",
+        "caption",
+        "code",
+        "mediaUrl",
+        "mediaAlt",
+        "previewUrl"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialTask": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "introduction": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tutorialStep"
+          }
+        }
+      },
+      "required": [
+        "title",
+        "introduction",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialAssessment": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "correct": {
+                "type": "boolean"
+              },
+              "justification": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "correct",
+              "justification"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "question",
+        "choices"
+      ],
+      "additionalProperties": false
+    },
+    "tutorialDestination": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "Tutorial path; pass to getTutorial."
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "path",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "forumTopic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "url": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "parentId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/nullableString"
+            }
+          ],
+          "description": "Parent topic identifier, or null for a top-level topic."
+        },
+        "level": {
+          "type": "integer",
+          "description": "Depth in the topic hierarchy, starting at zero."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "slug",
+        "path",
+        "url",
+        "parentId",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "forumItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Forum post or reply identifier."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "post",
+            "reply"
+          ]
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Thread identifier; pass to getForumThread."
+        },
+        "answerId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/nullableString"
+            }
+          ],
+          "description": "Reply identifier when the result targets a particular answer."
+        },
+        "title": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "topic": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "subtopic": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "replies": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "boosts": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "views": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "activity": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "answered": {
+          "type": "boolean"
+        },
+        "appleRecommended": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "threadId",
+        "answerId",
+        "title",
+        "excerpt",
+        "topic",
+        "subtopic",
+        "tags",
+        "replies",
+        "boosts",
+        "views",
+        "activity",
+        "answered",
+        "appleRecommended",
+        "path",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "forumPost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "question",
+            "answer"
+          ]
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorUrl": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "body": {
+          "type": "string"
+        },
+        "originalPoster": {
+          "type": "boolean"
+        },
+        "appleEmployee": {
+          "type": "boolean"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "appleRecommended": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "author",
+        "authorUrl",
+        "createdAt",
+        "body",
+        "originalPoster",
+        "appleEmployee",
+        "accepted",
+        "appleRecommended"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listTechnologies",
+      "label": "List frameworks & technologies",
+      "description": "Lists Apple frameworks and technologies by category, such as App Frameworks and Graphics & Games.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "abstract": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "group": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Documentation path; pass to getDocumentation."
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "abstract",
+                "group",
+                "path",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getDocumentation",
+      "label": "Get documentation page",
+      "description": "Shows a framework, symbol, or article reference page, including its summary, availability, declaration, discussion, parameters, and related topics. Accepts a documentation path or full Apple Developer URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Documentation path or full URL."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Role heading, e.g. Framework, Class, Article."
+          },
+          "abstract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "introducedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "beta": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "introducedAt",
+                "beta"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "declaration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "discussion": {
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/topicList"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "kind",
+          "abstract",
+          "platforms",
+          "declaration",
+          "parameters",
+          "discussion",
+          "topics",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "path": "documentation/Foundation"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listTutorials",
+      "label": "List Develop in Swift tutorials",
+      "description": "Lists the Develop in Swift learning path by volume and chapter, including articles, hands-on projects, and related learning resources.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "abstract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tutorialItem"
+            }
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tutorialResource"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "abstract",
+          "items",
+          "resources",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getTutorial",
+      "label": "Get tutorial",
+      "description": "Shows a Develop in Swift article or hands-on project, including instructions, source code, media, knowledge checks, and the suggested next page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Tutorial path or full Apple Developer tutorial URL."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Whether this is an article or a hands-on project."
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abstract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tutorialTask"
+            }
+          },
+          "assessments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tutorialAssessment"
+            }
+          },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/tutorialDestination"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "kind",
+          "category",
+          "abstract",
+          "content",
+          "tasks",
+          "assessments",
+          "next",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "path": "tutorials/develop-in-swift/hello-swiftui"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchSymbols",
+      "label": "Search symbols in a framework",
+      "description": "Searches a framework for symbols and articles whose titles contain the query. Each result can be opened as a documentation page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "framework": {
+            "type": "string",
+            "description": "Framework slug, e.g. \"foundation\", \"swiftui\"."
+          },
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max hits (default 50, max 200)."
+          }
+        },
+        "required": [
+          "framework",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "type",
+                "path",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "framework": "foundation",
+        "query": "UnitConverter"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listForumTopics",
+      "label": "List forum topics",
+      "description": "Lists Developer Forums topics and subtopics with their descriptions and hierarchy.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/forumTopic"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listForumPosts",
+      "label": "Browse forum posts",
+      "description": "Lists Developer Forums posts ordered by recent activity, replies, boosts, or creation date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Page returned by a previous result."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "activity",
+              "replies",
+              "boosts",
+              "created"
+            ],
+            "default": "activity"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "default": "desc"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/forumItem"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchForumPosts",
+      "label": "Search forum posts",
+      "description": "Searches Developer Forums posts and replies, with ordering by relevance or date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page returned by a previous result."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "lastUpdated",
+              "newest",
+              "oldest"
+            ],
+            "default": "relevance"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/forumItem"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "SwiftUI"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getForumThread",
+      "label": "Get forum discussion",
+      "description": "Shows a Developer Forums question and one page of replies, including authors, dates, topics, tags, and discussion status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Thread identifier from a forum post or search result."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Reply page returned by a previous result."
+          },
+          "answerId": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Optional reply identifier to open the page containing that answer. Takes precedence over the reply page."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topic": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "subtopic": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "question": {
+            "$ref": "#/$defs/forumPost"
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/forumPost"
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "replies": {
+                "$ref": "#/$defs/nullableString"
+              },
+              "boosts": {
+                "$ref": "#/$defs/nullableString"
+              },
+              "views": {
+                "$ref": "#/$defs/nullableString"
+              },
+              "participants": {
+                "$ref": "#/$defs/nullableString"
+              }
+            },
+            "required": [
+              "replies",
+              "boosts",
+              "views",
+              "participants"
+            ],
+            "additionalProperties": false
+          },
+          "currentPage": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "path": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "topic",
+          "subtopic",
+          "tags",
+          "question",
+          "replies",
+          "stats",
+          "currentPage",
+          "totalPages",
+          "nextCursor",
+          "path",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "11124"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "Apple 开发者",
+      "description": "为 Apple 平台开发提供的官方资源。浏览框架与技术，阅读参考文档，搜索符号，学习“使用 Swift 开发”教程，并探索开发者论坛中的主题、帖子、搜索结果和讨论。公开且只读；无需登录。",
+      "actions": {
+        "listTechnologies": {
+          "label": "框架与技术列表",
+          "description": "按类别列出 Apple 框架与技术，例如 App Frameworks 和 Graphics & Games。"
+        },
+        "getDocumentation": {
+          "label": "获取文档页面",
+          "description": "显示框架、符号或文章的参考页面，包括摘要、可用性、声明、讨论、参数和相关主题。可使用文档路径或完整的 Apple 开发者网址。"
+        },
+        "listTutorials": {
+          "label": "列出“使用 Swift 开发”教程",
+          "description": "按单元和章节列出“使用 Swift 开发”学习路径，包括文章、动手项目和相关学习资源。"
+        },
+        "getTutorial": {
+          "label": "获取教程",
+          "description": "显示“使用 Swift 开发”文章或动手项目，包括操作说明、源代码、媒体、知识检查和建议阅读的下一页。"
+        },
+        "searchSymbols": {
+          "label": "在框架中搜索符号",
+          "description": "在一个框架中搜索标题包含查询内容的符号和文章。每条结果都可继续打开为文档页面。"
+        },
+        "listForumTopics": {
+          "label": "列出论坛主题",
+          "description": "列出开发者论坛的主题和子主题，并显示说明与层级关系。"
+        },
+        "listForumPosts": {
+          "label": "浏览论坛帖子",
+          "description": "列出开发者论坛帖子，可按最近活动、回复数、点赞数或创建日期排序。"
+        },
+        "searchForumPosts": {
+          "label": "搜索论坛帖子",
+          "description": "搜索开发者论坛中的帖子和回复，并可按相关性或日期排序。"
+        },
+        "getForumThread": {
+          "label": "获取论坛讨论",
+          "description": "显示开发者论坛中的问题和一页回复，包括作者、日期、主题、标签和讨论状态。"
+        }
+      }
+    }
+  }
+}

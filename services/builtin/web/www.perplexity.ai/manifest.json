@@ -1,0 +1,374 @@
+{
+  "domain": "www.perplexity.ai",
+  "name": "Perplexity",
+  "description": "An AI-powered answer engine. Ask web questions, review cited answers and place results, and browse your signed-in search history.",
+  "baseUrl": "https://www.perplexity.ai/",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableInteger": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableBoolean": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "snippet"
+      ],
+      "additionalProperties": false
+    },
+    "place": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "numReviews": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "priceRange": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "isOpen": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "phone": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "address",
+        "rating",
+        "numReviews",
+        "priceRange",
+        "isOpen",
+        "phone"
+      ],
+      "additionalProperties": false
+    },
+    "answer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The answer entry identifier."
+        },
+        "threadId": {
+          "type": "string",
+          "description": "The search thread identifier."
+        },
+        "query": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "places": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/place"
+          }
+        },
+        "relatedQueries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "threadId",
+        "query",
+        "answer",
+        "sources",
+        "places",
+        "relatedQueries",
+        "status",
+        "createdAt",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "threadSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "answerPreview": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "unread",
+        "status",
+        "answerPreview",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Perplexity",
+      "description": "Opens Perplexity sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Perplexity sign-in",
+      "description": "Checks whether you are signed in to Perplexity.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "askQuestion",
+      "label": "Ask Perplexity",
+      "description": "Asks a web question and returns the answer, cited sources, related questions, and any place results. This creates a new item in Perplexity history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The question to ask."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/answer"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "listThreads",
+      "label": "List recent searches",
+      "description": "Lists recent searches from your Perplexity history. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/threadSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getThread",
+      "label": "Get search thread",
+      "description": "Gets answers, cited sources, related questions, and place results from a Perplexity search thread. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The thread identifier from recent searches."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "updatedAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/answer"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "entries",
+          "nextCursor",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ]
+}

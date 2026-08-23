@@ -1,0 +1,447 @@
+{
+  "domain": "taobao.com",
+  "name": "Taobao",
+  "description": "China's biggest consumer shopping marketplace. Search products by keyword across Taobao and Tmall, read a product's details (price, favorites, sku options, images) and buyer Q&A, and — for the signed-in account — check if an item is favorited and read the current user and cart item count.",
+  "baseUrl": "https://www.taobao.com",
+  "$defs": {
+    "searchItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "originalPrice": {
+          "type": "string"
+        },
+        "sales": {
+          "type": "string"
+        },
+        "shop": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "price",
+        "originalPrice",
+        "sales",
+        "shop",
+        "location",
+        "image",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "favorites": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "string"
+        },
+        "skuText": {
+          "type": "string"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "price",
+        "favorites",
+        "comments",
+        "skuText",
+        "images",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "question": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "answerCount": {
+          "type": "integer"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "date"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "question",
+        "answerCount",
+        "answers"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Taobao",
+      "description": "Taobao sign-in URL (QR or phone).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Taobao.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchItems",
+      "label": "Search products",
+      "description": "Search Taobao and Tmall products by keyword.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 48
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "玩具"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getItem",
+      "label": "Get product",
+      "description": "Fetch a product's title, price, favorites, comment count, sku options, and images by item id or product URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/item"
+      },
+      "defaultArgs": {
+        "id": "942450046156"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getMe",
+      "label": "Get current user",
+      "description": "The signed-in user's nickname and id.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "nick": {
+            "type": "string"
+          },
+          "displayNick": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "nick",
+          "displayNick"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCartCount",
+      "label": "Cart item count",
+      "description": "Number of items in the signed-in user's shopping cart.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "isFavorited",
+      "label": "Check if favorited",
+      "description": "Whether a product is in the signed-in user's favorites, by item id or product URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "favorited": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "favorited"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "942450046156"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listItemQuestions",
+      "label": "Product Q&A",
+      "description": "Buyer questions and top answers (问大家) for a product, paginated, by item id or product URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/question"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "942450046156"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "淘宝",
+      "description": "综合网购平台。搜索淘宝和天猫商品，查看价格、款式、图片和买家问答。登录后还可查看收藏状态和购物车数量。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录淘宝",
+          "description": "打开淘宝登录页，可使用二维码或手机号登录。"
+        },
+        "getSignInState": {
+          "label": "检查淘宝登录状态",
+          "description": "检查你是否已登录淘宝。"
+        },
+        "searchItems": {
+          "label": "搜索商品",
+          "description": "按关键词搜索淘宝和天猫商品。"
+        },
+        "getItem": {
+          "label": "获取商品",
+          "description": "按商品 ID 或商品网址获取标题、价格、收藏数、评论数、SKU 选项和图片。"
+        },
+        "getMe": {
+          "label": "获取当前用户",
+          "description": "已登录用户的昵称和 ID。"
+        },
+        "getCartCount": {
+          "label": "购物车数量",
+          "description": "已登录用户购物车中的商品数量。"
+        },
+        "isFavorited": {
+          "label": "是否已收藏",
+          "description": "按商品 ID 或商品网址查询某件商品是否在已登录用户的收藏中。"
+        },
+        "listItemQuestions": {
+          "label": "商品问大家",
+          "description": "按商品 ID 或商品网址分页获取买家提问和热门回答（问大家）。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/taobao.com/favicon.png"
+}

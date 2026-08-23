@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Web Service"
+  short_description: "Implement and verify Ox web service actions"
+  default_prompt: "Use $add-web-service to implement this Ox web service from captured evidence, add replay fixtures, and verify it end to end."

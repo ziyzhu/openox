@@ -1,0 +1,709 @@
+{
+  "domain": "mail.google.com",
+  "name": "Gmail",
+  "description": "A personal email service. List signed-in accounts, browse and search mailboxes, read complete conversations, and create, update, send, or discard drafts. Sign-in required.",
+  "baseUrl": "https://mail.google.com/mail/_/bscframe",
+  "$defs": {
+    "account": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Stable account identifier to pass to mailbox actions."
+        },
+        "email": {
+          "type": "string"
+        },
+        "primary": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accountId",
+        "email",
+        "primary"
+      ],
+      "additionalProperties": false
+    },
+    "threadSummary": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Gmail account containing this conversation."
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable Gmail thread id."
+        },
+        "subject": {
+          "type": "string"
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "snippet": {
+          "type": "string"
+        },
+        "latestAt": {
+          "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
+        },
+        "starred": {
+          "type": "boolean"
+        },
+        "hasAttachments": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "id",
+        "subject",
+        "participants",
+        "snippet",
+        "latestAt",
+        "unread",
+        "starred",
+        "hasAttachments",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "threadPage": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Gmail account used for this page."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/threadSummary"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "accountId",
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "attachment": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "size"
+      ],
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "recipients": {
+          "type": "string"
+        },
+        "sentAt": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attachment"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "recipients",
+        "sentAt",
+        "body",
+        "attachments"
+      ],
+      "additionalProperties": false
+    },
+    "thread": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Gmail account containing this conversation."
+        },
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "id",
+        "subject",
+        "messages",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "draft": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Gmail account containing this draft."
+        },
+        "id": {
+          "type": "string",
+          "description": "Opaque Gmail draft id."
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Opaque Gmail thread id used to reopen this draft."
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subject": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "id",
+        "threadId",
+        "to",
+        "subject",
+        "body",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "draftResult": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "$ref": "#/$defs/draft"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Gmail",
+      "description": "Opens Google sign-in for Gmail.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Gmail sign-in",
+      "description": "Checks whether your Gmail mailbox is available.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listAccounts",
+      "label": "List Gmail accounts",
+      "description": "Lists the Gmail accounts available in your current Google sign-in session.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/account"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listThreads",
+      "label": "Browse mailbox threads",
+      "description": "Lists one page of conversations from a selected account and mailbox such as Inbox, Starred, Sent, Drafts, Spam, Trash, or All Mail.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier returned by List Gmail accounts. Uses the primary account when omitted."
+          },
+          "mailbox": {
+            "type": "string",
+            "enum": [
+              "inbox",
+              "starred",
+              "sent",
+              "drafts",
+              "spam",
+              "trash",
+              "all"
+            ],
+            "default": "inbox",
+            "description": "Mailbox to browse."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Gmail page route returned by the previous page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadPage"
+      },
+      "defaultArgs": {
+        "mailbox": "inbox"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchThreads",
+      "label": "Search Gmail",
+      "description": "Searches a selected account with Gmail keywords and operators, returning matching conversations.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier returned by List Gmail accounts. Uses the primary account when omitted."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Gmail advanced-search query. Use dates such as after:2026/07/01 and before:2026/08/01, or relative dates such as newer_than:7d and older_than:1y. Combine terms with uppercase OR or AND, braces, parentheses, -, or quoted phrases. Common operators include from:, to:, subject:, label:, category:, is:, in:anywhere, has:attachment, filename:, larger:, smaller:, and header:."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Gmail page route returned by the previous page."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/threadPage"
+      },
+      "defaultArgs": {
+        "query": "is:unread"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getThread",
+      "label": "Read Gmail conversation",
+      "description": "Reads every message in a selected conversation, including sender, recipients, date, body, and attachment names and sizes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier from the mailbox or search result. Uses the primary account when omitted."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?:[A-Za-z0-9_-]+|#thread-[A-Za-z]:[0-9]+)$",
+            "description": "Thread id from a mailbox or search result. Gmail conversation URL ids must first be resolved through mailbox browsing or search."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/thread"
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "baseUrl": "https://mail.google.com/mail/_/bscframe"
+    },
+    {
+      "id": "createDraft",
+      "label": "Create Gmail draft",
+      "description": "Creates and opens a new Gmail draft with recipients, subject, and plain-text body.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#inbox",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier returned by List Gmail accounts. Uses the primary account when omitted."
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "pattern": "^[^\\s@]+@[^\\s@]+$"
+            },
+            "description": "Email addresses to place in the To field."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain-text message body. Newlines are preserved as paragraphs."
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/draftResult"
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "updateDraft",
+      "label": "Update Gmail draft",
+      "description": "Reopens a Gmail draft and replaces any provided recipients, subject, or plain-text body.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier from the draft. Uses the primary account when omitted."
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^#msg-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft id returned by Create or Update Gmail draft."
+          },
+          "threadId": {
+            "type": "string",
+            "pattern": "^#thread-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft thread id returned alongside the draft id."
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "pattern": "^[^\\s@]+@[^\\s@]+$"
+            },
+            "description": "Replacement email addresses for the To field."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "Replacement plain-text message body. Newlines are preserved as paragraphs."
+          }
+        },
+        "required": [
+          "id",
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/draftResult"
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "sendDraft",
+      "label": "Send Gmail draft",
+      "description": "Sends an existing Gmail draft after confirming it has recipients, a subject, and a body.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier from the draft. Uses the primary account when omitted."
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^#msg-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft id returned by Create or Update Gmail draft."
+          },
+          "threadId": {
+            "type": "string",
+            "pattern": "^#thread-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft thread id returned alongside the draft id."
+          }
+        },
+        "required": [
+          "id",
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "sent": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "id",
+          "threadId",
+          "sent",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "discardDraft",
+      "label": "Discard Gmail draft",
+      "description": "Permanently discards an existing Gmail draft.",
+      "baseUrl": "https://mail.google.com/mail/u/0/?authuser={accountId}#drafts",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 3,
+            "pattern": "^[^\\s@]+@[^\\s@]+$",
+            "description": "Account identifier from the draft. Uses the primary account when omitted."
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^#msg-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft id returned by Create or Update Gmail draft."
+          },
+          "threadId": {
+            "type": "string",
+            "pattern": "^#thread-[A-Za-z]:[A-Za-z0-9_-]+$",
+            "description": "Draft thread id returned alongside the draft id."
+          }
+        },
+        "required": [
+          "id",
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "discarded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accountId",
+          "id",
+          "threadId",
+          "discarded"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "Gmail 邮箱",
+      "description": "个人电子邮件服务。列出已登录的账号，浏览和搜索邮箱，阅读完整对话，以及创建、更新、发送或丢弃草稿。需要登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录 Gmail",
+          "description": "打开 Google 登录页面以使用 Gmail。"
+        },
+        "getSignInState": {
+          "label": "检查 Gmail 登录状态",
+          "description": "检查你的 Gmail 邮箱是否可用。"
+        },
+        "listAccounts": {
+          "label": "列出 Gmail 账号",
+          "description": "列出当前 Google 登录会话中可用的 Gmail 账号。"
+        },
+        "listThreads": {
+          "label": "浏览邮箱会话",
+          "description": "列出所选账号的收件箱、已加星标、已发送、草稿、垃圾邮件、回收站或所有邮件中的一页会话。"
+        },
+        "searchThreads": {
+          "label": "搜索 Gmail",
+          "description": "使用 Gmail 关键词和运算符搜索所选账号，并返回匹配的会话。"
+        },
+        "getThread": {
+          "label": "阅读 Gmail 会话",
+          "description": "阅读所选会话中的每封邮件，包括发件人、收件人、日期、正文和附件名称及大小。"
+        },
+        "createDraft": {
+          "label": "创建 Gmail 草稿",
+          "description": "创建并打开一封包含收件人、主题和纯文本正文的新 Gmail 草稿。"
+        },
+        "updateDraft": {
+          "label": "更新 Gmail 草稿",
+          "description": "重新打开 Gmail 草稿，并替换所提供的收件人、主题或纯文本正文。"
+        },
+        "sendDraft": {
+          "label": "发送 Gmail 草稿",
+          "description": "确认草稿包含收件人、主题和正文后，发送现有 Gmail 草稿。"
+        },
+        "discardDraft": {
+          "label": "丢弃 Gmail 草稿",
+          "description": "永久丢弃现有 Gmail 草稿。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/mail.google.com/favicon.png"
+}

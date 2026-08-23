@@ -1,0 +1,261 @@
+{
+  "domain": "www.uscis.gov",
+  "name": "USCIS",
+  "description": "The U.S. federal immigration agency. Search forms, policies, news, and guides; read agency pages; or find official form downloads. No sign-in required.",
+  "baseUrl": "https://www.uscis.gov/",
+  "actions": [
+    {
+      "id": "searchSite",
+      "label": "Search USCIS",
+      "description": "Searches USCIS and returns matching pages with their titles, links, and summaries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "url",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "green card"
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.uscis.gov/"
+    },
+    {
+      "id": "getPage",
+      "label": "Read a USCIS page",
+      "description": "Shows the title, readable text, and useful links from a USCIS page. Accepts a USCIS page path or full link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path or full URL on www.uscis.gov, e.g. \"/i-130\" or \"/policy-manual/volume-7-part-l\"."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "text",
+          "links"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "path": "/i-129f"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listNews",
+      "label": "List USCIS news",
+      "description": "Lists USCIS news releases and alerts, newest first, with their date, summary, and link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Opaque page cursor from a previous call. Omit for the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "url",
+                "date",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getForm",
+      "label": "Download a USCIS form",
+      "description": "Get the downloadable PDFs for a USCIS form (the form plus its instructions). Pass a form number like \"I-130\" or \"I-129F\". Returns each file's label, URL, and size info.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "string",
+            "description": "Form number, e.g. \"I-130\"."
+          }
+        },
+        "required": [
+          "form"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "info": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "info"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "form",
+          "title",
+          "url",
+          "files"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "form": "I-129F"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

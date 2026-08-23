@@ -1,0 +1,2259 @@
+{
+  "domain": "amazon.com",
+  "name": "Amazon",
+  "description": "The world's largest online store. Search and sort the catalog, read product, offer, delivery, and review details, explore product rankings by category, and add or remove cart items. For the signed-in account, search purchase history, browse regular, open, and digital orders, track packages, and view buy-again suggestions, wishlists, Subscribe & Save subscriptions, and Prime membership.",
+  "baseUrl": "https://www.amazon.com/",
+  "$defs": {
+    "searchResult": {
+      "type": "object",
+      "properties": {
+        "rank": {
+          "type": "integer"
+        },
+        "asin": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reviewCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "isSponsored": {
+          "type": "boolean"
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offerListingId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "brandId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "addToCartPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cartType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minOrderQuantity": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxOrderQuantity": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "isPrime": {
+          "type": "boolean"
+        },
+        "deliveryText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rank",
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency",
+        "ratingValue",
+        "reviewCount",
+        "isSponsored",
+        "badges",
+        "offerListingId",
+        "brandId",
+        "addToCartPath",
+        "cartType",
+        "merchantId",
+        "minOrderQuantity",
+        "maxOrderQuantity",
+        "isPrime",
+        "deliveryText"
+      ],
+      "additionalProperties": false
+    },
+    "product": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "brand": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reviewCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "breadcrumbs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "brand",
+        "priceText",
+        "priceValue",
+        "currency",
+        "ratingValue",
+        "reviewCount",
+        "breadcrumbs",
+        "bullets"
+      ],
+      "additionalProperties": false
+    },
+    "offer": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "soldBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shipsFrom": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isAmazonSold": {
+          "type": "boolean"
+        },
+        "isAmazonFulfilled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "asin",
+        "priceText",
+        "soldBy",
+        "shipsFrom",
+        "isAmazonSold",
+        "isAmazonFulfilled"
+      ],
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verifiedPurchase": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "ratingValue",
+        "author",
+        "date",
+        "body",
+        "verifiedPurchase"
+      ],
+      "additionalProperties": false
+    },
+    "reviewsPage": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": "string"
+        },
+        "averageRatingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "totalReviewCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qaUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/review"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asin",
+        "averageRatingValue",
+        "totalReviewCount",
+        "qaUrls",
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "orderItem": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "productUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "quantity"
+      ],
+      "additionalProperties": false
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "placedDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "placedText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "totalText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "totalValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "statusDetail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "orderDetailsUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/orderItem"
+          }
+        }
+      },
+      "required": [
+        "orderId",
+        "placedDate",
+        "placedText",
+        "totalText",
+        "totalValue",
+        "currency",
+        "status",
+        "statusDetail",
+        "orderDetailsUrl",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "charge": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "amountText": {
+          "type": "string"
+        },
+        "amountValue": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "amountText",
+        "amountValue"
+      ],
+      "additionalProperties": false
+    },
+    "orderShipment": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trackingUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "trackingUrl"
+      ],
+      "additionalProperties": false
+    },
+    "orderDetailItem": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "productUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "merchant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deliveryFrequency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "returnEligibility": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency",
+        "quantity",
+        "merchant",
+        "deliveryFrequency",
+        "returnEligibility"
+      ],
+      "additionalProperties": false
+    },
+    "trackingEvent": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "time",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "cartItem": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "cartType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "productUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selected": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "inStock": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "deliveryText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "asin",
+        "quantity",
+        "cartType",
+        "merchantId",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency",
+        "selected",
+        "inStock",
+        "deliveryText"
+      ],
+      "additionalProperties": false
+    },
+    "buyAgainItem": {
+      "type": "object",
+      "properties": {
+        "asin": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "wishlist": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "wishlistItem": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "asin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "productUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "byline": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "addedText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency",
+        "byline",
+        "addedText"
+      ],
+      "additionalProperties": false
+    },
+    "subscription": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "detailsText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "image",
+        "detailsText"
+      ],
+      "additionalProperties": false
+    },
+    "rankingItem": {
+      "type": "object",
+      "properties": {
+        "rank": {
+          "type": "integer"
+        },
+        "asin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "productUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ratingValue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reviewCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rank",
+        "asin",
+        "title",
+        "productUrl",
+        "image",
+        "priceText",
+        "priceValue",
+        "currency",
+        "ratingValue",
+        "reviewCount"
+      ],
+      "additionalProperties": false
+    },
+    "rankingCategory": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Amazon",
+      "description": "Amazon sign-in URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Amazon.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchProducts",
+      "label": "Search products",
+      "description": "Searches Amazon products. You can narrow results to a department and sort by price, reviews, newest arrivals, or best sellers.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 60
+          },
+          "department": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "featured",
+              "price_asc",
+              "price_desc",
+              "reviews",
+              "newest",
+              "bestsellers"
+            ],
+            "default": "featured"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchResult"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "wireless mouse"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listDepartments",
+      "label": "List departments",
+      "description": "Lists the Amazon departments available for narrowing a product search.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "departments"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProduct",
+      "label": "Get product",
+      "description": "Product page facts — title, brand, price, rating, breadcrumbs, and feature bullets — by ASIN or product URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/product"
+      },
+      "defaultArgs": {
+        "input": "B005EJH6Z4"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getOffer",
+      "label": "Get offer",
+      "description": "Buy box seller and fulfillment facts — sold by, ships from, and whether Amazon sells or fulfills it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/offer"
+      },
+      "defaultArgs": {
+        "input": "B005EJH6Z4"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listReviews",
+      "label": "List reviews",
+      "description": "Lists customer reviews and the rating summary for a product.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/reviewsPage"
+      },
+      "defaultArgs": {
+        "input": "B005EJH6Z4"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchOrders",
+      "label": "Search orders",
+      "description": "Searches your complete Amazon purchase history for products matching a phrase and returns each match with its order number and purchase date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A product name or phrase to find in past orders."
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/order"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "desk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listOrders",
+      "label": "List orders",
+      "description": "Lists your orders with order numbers, dates, totals, delivery status, and items. You can browse regular, open, or digital orders and limit regular orders by time period.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeFilter": {
+            "type": "string",
+            "default": "months-3",
+            "description": "last30, months-3, or year-YYYY (e.g. year-2025)"
+          },
+          "orderFilter": {
+            "type": "string",
+            "enum": [
+              "orders",
+              "open",
+              "digital"
+            ],
+            "default": "orders",
+            "description": "Choose regular order history, orders that are still open, or digital orders."
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/order"
+            }
+          },
+          "totalCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getOrderDetails",
+      "label": "Get order details",
+      "description": "Full detail for one order — placed date, ship-to address, payment method, charge breakdown (subtotal, discounts, tax, grand total), line items with unit price / seller / return window / Subscribe & Save cadence, shipment statuses with tracking URLs, and the invoice URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "Order id like 114-1234567-1234567, or an order-details URL"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "orderDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "orderDateText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipToLines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "paymentMethod": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "charges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/charge"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/orderDetailItem"
+            }
+          },
+          "shipments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/orderShipment"
+            }
+          },
+          "invoiceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "orderDate",
+          "orderDateText",
+          "shipToLines",
+          "paymentMethod",
+          "charges",
+          "items",
+          "shipments",
+          "invoiceUrl"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "input": "114-6933364-7384239"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "trackPackage",
+      "label": "Track package",
+      "description": "Shows a shipment's current status, tracking number, carrier, and event history. Choose a shipment from an order or order details.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "A /gp/your-account/ship-track URL"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trackingId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/trackingEvent"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "trackingId",
+          "carrier",
+          "events"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "input": "https://www.amazon.com/gp/your-account/ship-track?itemId=jmkonsjosorpsup&orderId=114-6933364-7384239&shipmentId=PsPJZwPTj&packageIndex=0"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCart",
+      "label": "Get cart",
+      "description": "Lists current cart items across the main Amazon, Fresh, and Amazon Now carts. Main-cart items include the line id needed to remove one, title, price, selection, stock, and delivery details.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/cartItem"
+            }
+          },
+          "subtotals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "subtotals"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "deleteCartItem",
+      "label": "Remove cart item",
+      "description": "Removes one item from the main Amazon cart using the line id returned by the cart. This changes the cart but does not place an order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "The main-cart line id returned by the cart action."
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "asin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "itemId",
+          "asin"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "addToCart",
+      "label": "Add to cart",
+      "description": "Adds a retail or local-store product to the matching cart. An offer returned by product search can select the exact seller and cart; otherwise Amazon's current offer is resolved from the product.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "default": 1,
+            "minimum": 1
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "offerListingId": {
+            "type": "string"
+          },
+          "addToCartPath": {
+            "type": "string"
+          },
+          "cartType": {
+            "type": "string",
+            "enum": [
+              "RETAIL",
+              "LOCAL_MARKET"
+            ]
+          },
+          "merchantId": {
+            "type": "string"
+          },
+          "minOrderQuantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxOrderQuantity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "asin": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "cartCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "asin",
+          "quantity",
+          "cartCount"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "input": "B00AR0ZZX0"
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "getCheckout",
+      "label": "Review checkout",
+      "description": "Reviews an in-progress local-store checkout, including the subtotal, fees, tax, tip, total, and delivery window. Nothing is purchased.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "purchaseId": {
+            "type": "string"
+          },
+          "csrf": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "orderTotal": {
+            "type": ["string", "null"]
+          },
+          "subtotal": {
+            "type": ["string", "null"]
+          },
+          "deliveryFee": {
+            "type": ["string", "null"]
+          },
+          "estimatedTax": {
+            "type": ["string", "null"]
+          },
+          "tip": {
+            "type": ["string", "null"]
+          },
+          "deliveryWindow": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "purchaseId",
+          "csrf",
+          "brandId",
+          "orderTotal",
+          "subtotal",
+          "deliveryFee",
+          "estimatedTax",
+          "tip",
+          "deliveryWindow"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "setTip",
+      "label": "Set delivery tip",
+      "description": "Sets the driver tip in U.S. dollars for an in-progress local-store checkout. This does not place the order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "purchaseId": {
+            "type": "string"
+          },
+          "csrf": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "purchaseId",
+          "csrf"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "purchaseId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "purchaseId",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "amount": 0,
+        "purchaseId": "",
+        "csrf": ""
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "placeOrder",
+      "label": "Place order",
+      "description": "Places the in-progress local-store order. This spends real money and is final, so review the checkout first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purchaseId": {
+            "type": "string"
+          },
+          "csrf": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "purchaseId",
+          "csrf"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "purchaseId": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "ok",
+          "purchaseId",
+          "orderId"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "purchaseId": "",
+        "csrf": ""
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "listBuyAgain",
+      "label": "List buy-again items",
+      "description": "Lists products you buy repeatedly, along with their current prices.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/buyAgainItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listWishlists",
+      "label": "List wishlists",
+      "description": "Lists your wish lists with their names and links, ready for opening or browsing.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/wishlist"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listWishlistItems",
+      "label": "List wishlist items",
+      "description": "Lists the products on a wish list, including title, price, byline, and when each was added.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "description": "Wishlist id or URL from listWishlists"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "list"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/wishlistItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "list": "2ODQBFXUV64HX"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listSubscriptions",
+      "label": "List Subscribe & Save subscriptions",
+      "description": "The user's active Subscribe & Save subscription cards from the Manage Your Deliveries page. Empty when the account has no active subscriptions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/subscription"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPrimeMembership",
+      "label": "Get Prime membership",
+      "description": "The user's Prime membership facts — plan, price, billing period, renewal date, and last payment date.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memberName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priceText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priceValue": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "billingPeriod": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "renewalDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "renewalText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastPaymentDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastPaymentText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "memberName",
+          "plan",
+          "priceText",
+          "priceValue",
+          "currency",
+          "billingPeriod",
+          "renewalDate",
+          "renewalText",
+          "lastPaymentDate",
+          "lastPaymentText"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listRankingCategories",
+      "label": "List ranking categories",
+      "description": "Lists the categories available for a Best Sellers, New Releases, or Movers & Shakers ranking. Use a returned category URL to browse that category's ranked products.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "enum": [
+              "bestsellers",
+              "new_releases",
+              "movers_shakers"
+            ],
+            "default": "bestsellers"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/rankingCategory"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "list": "bestsellers"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRankings",
+      "label": "List rankings",
+      "description": "Lists ranked products from Amazon Best Sellers, New Releases, or Movers & Shakers, optionally within a category.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "enum": [
+              "bestsellers",
+              "new_releases",
+              "movers_shakers"
+            ],
+            "default": "bestsellers"
+          },
+          "category": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/rankingItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "list": "bestsellers"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "亚马逊",
+      "description": "综合网上商城。搜索商品并排序，查看商品、报价、配送和评论，按类别浏览排行榜，以及添加或移除购物车商品。登录后还可搜索购买记录，查看普通订单、未完成订单、数字订单、包裹、再次购买建议、心愿单、定期购和 Prime 会员信息。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录亚马逊",
+          "description": "打开亚马逊登录页。"
+        },
+        "getSignInState": {
+          "label": "检查亚马逊登录状态",
+          "description": "检查你是否已登录亚马逊。"
+        },
+        "searchProducts": {
+          "label": "搜索商品",
+          "description": "搜索亚马逊商品。可按部门缩小范围，并按价格、评价、新品或畅销程度排序。"
+        },
+        "listDepartments": {
+          "label": "部门列表",
+          "description": "列出可用于缩小商品搜索范围的亚马逊部门。"
+        },
+        "getProduct": {
+          "label": "获取商品",
+          "description": "按 ASIN 或商品网址返回商品页信息——标题、品牌、价格、评分、面包屑及功能要点。"
+        },
+        "getOffer": {
+          "label": "获取报价",
+          "description": "返回购买框的卖家与配送信息——售出方、发货方，以及是否由亚马逊销售或配送。"
+        },
+        "listReviews": {
+          "label": "评论列表",
+          "description": "列出某件商品的买家评论和评分汇总。"
+        },
+        "searchOrders": {
+          "label": "搜索订单",
+          "description": "在完整的亚马逊购买记录中搜索与关键词匹配的商品，并返回对应的订单号和购买日期。"
+        },
+        "listOrders": {
+          "label": "订单列表",
+          "description": "列出你的订单，包括订单号、日期、总额、配送状态和商品。可查看普通订单、未完成订单或数字订单，并按时间筛选普通订单。"
+        },
+        "getOrderDetails": {
+          "label": "获取订单详情",
+          "description": "单个订单的完整详情——下单日期、收货地址、支付方式、费用明细（小计、折扣、税费、总计）、含单价/卖家/退货期限/定期购周期的商品明细、含追踪网址的发货状态，以及发票网址。"
+        },
+        "trackPackage": {
+          "label": "追踪包裹",
+          "description": "显示单次发货的当前状态、追踪号、承运商和物流记录。请从订单或订单详情中选择发货信息。"
+        },
+        "getCart": {
+          "label": "获取购物车",
+          "description": "列出亚马逊主购物车、Fresh 和 Amazon Now 购物车中的当前商品。主购物车商品还包含可用于移除商品的行编号、标题、价格、选中状态、库存和配送信息。"
+        },
+        "deleteCartItem": {
+          "label": "移除购物车商品",
+          "description": "使用购物车返回的行编号，从亚马逊主购物车移除一件商品。此操作会更改购物车，但不会下单。"
+        },
+        "addToCart": {
+          "label": "加入购物车",
+          "description": "将零售或本地商店商品加入对应的购物车。可使用商品搜索返回的报价来指定卖家和购物车，否则会采用亚马逊当前提供的报价。"
+        },
+        "getCheckout": {
+          "label": "查看结账信息",
+          "description": "查看本地商店结账中的小计、费用、税费、小费、总额和配送时间。不会购买任何商品。"
+        },
+        "setTip": {
+          "label": "设置配送小费",
+          "description": "为进行中的本地商店结账设置美元小费。不会提交订单。"
+        },
+        "placeOrder": {
+          "label": "提交订单",
+          "description": "提交进行中的本地商店订单。此操作会实际扣款且不可撤销，请先核对结账信息。"
+        },
+        "listBuyAgain": {
+          "label": "再次购买列表",
+          "description": "列出你经常购买的商品及其当前价格。"
+        },
+        "listWishlists": {
+          "label": "心愿单列表",
+          "description": "列出你的心愿单及其名称和链接，可继续打开或浏览。"
+        },
+        "listWishlistItems": {
+          "label": "心愿单商品",
+          "description": "列出某个心愿单中的商品，包括标题、价格、副标题和加入时间。"
+        },
+        "listSubscriptions": {
+          "label": "定期购订阅列表",
+          "description": "来自\"管理你的配送\"页的用户有效定期购订阅卡片。账户无有效订阅时为空。"
+        },
+        "getPrimeMembership": {
+          "label": "获取 Prime 会员",
+          "description": "用户的 Prime 会员信息——套餐、价格、计费周期、续费日期及上次付款日期。"
+        },
+        "listRankingCategories": {
+          "label": "排行榜类别",
+          "description": "列出畅销榜、新品榜或飙升榜可用的类别。可使用返回的类别网址浏览该类别的排名商品。"
+        },
+        "listRankings": {
+          "label": "排行榜列表",
+          "description": "列出亚马逊畅销榜、新品榜或飙升榜中的商品，也可限定到某个类别。"
+        }
+      }
+    }
+  }
+}

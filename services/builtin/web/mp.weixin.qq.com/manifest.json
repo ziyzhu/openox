@@ -1,0 +1,105 @@
+{
+  "domain": "mp.weixin.qq.com",
+  "name": "Weixin Official Accounts",
+  "description": "A public-article publishing platform. Read shared articles with their account, publication details, text, cover, and inline images. Public and read-only; no sign-in required.",
+  "baseUrl": "https://mp.weixin.qq.com/",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "nullableInteger": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "null" }
+      ]
+    },
+    "articleImage": {
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The image's reading order, matching the article's [Image N] marker."
+        },
+        "url": {
+          "type": "string",
+          "description": "The full-resolution Weixin image URL."
+        },
+        "alt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "width": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "height": {
+          "$ref": "#/$defs/nullableInteger"
+        }
+      },
+      "required": ["index", "url", "alt", "width", "height"],
+      "additionalProperties": false
+    },
+    "article": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "accountName": { "type": "string" },
+        "publishedAt": { "type": "string" },
+        "summary": { "type": "string" },
+        "url": { "type": "string" },
+        "coverImageUrl": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "content": {
+          "type": "string",
+          "description": "The article text with [Image N] markers preserving inline image positions."
+        },
+        "images": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/articleImage" }
+        }
+      },
+      "required": ["title", "accountName", "publishedAt", "summary", "url", "coverImageUrl", "content", "images"],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getArticle",
+      "label": "Read article",
+      "description": "Reads a shared Weixin Official Account article, including its text, cover, and inline images in reading order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https://mp\\.weixin\\.qq\\.com/s/[A-Za-z0-9_-]+(?:[?#].*)?$",
+            "description": "A shared Weixin article URL beginning with https://mp.weixin.qq.com/s/."
+          }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/article" },
+      "defaultArgs": {
+        "url": "https://mp.weixin.qq.com/s/example-article"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "微信公众号",
+      "description": "一个公开文章发布平台。读取分享文章的公众号、发布时间、正文、封面和文中图片。公开且只读，无需登录。",
+      "actions": {
+        "getArticle": {
+          "label": "读取文章",
+          "description": "读取分享的微信公众号文章，包括正文、封面和按阅读顺序排列的文中图片。"
+        }
+      }
+    }
+  }
+}

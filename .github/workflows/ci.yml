@@ -8,8 +8,13 @@ on:
       - "dev/**"
       - "tooling/**"
       - "scripts/**"
+      - "services/**"
+      - "examples/service-repository/**"
+      - "ios/ios/OxServices.bundle/**"
       - "ios/**/*.xcstrings"
       - ".agents/skills/ox-debug/**"
+      - ".agents/skills/add-web-service/**"
+      - ".agents/skills/explore-service/**"
       - "package.json"
       - "bun.lock"
       - "tsconfig.base.json"
@@ -21,8 +26,13 @@ on:
       - "dev/**"
       - "tooling/**"
       - "scripts/**"
+      - "services/**"
+      - "examples/service-repository/**"
+      - "ios/ios/OxServices.bundle/**"
       - "ios/**/*.xcstrings"
       - ".agents/skills/ox-debug/**"
+      - ".agents/skills/add-web-service/**"
+      - ".agents/skills/explore-service/**"
       - "package.json"
       - "bun.lock"
       - "tsconfig.base.json"
@@ -42,3 +52,9 @@ jobs:
 
       - name: Typecheck
         run: bun install --frozen-lockfile && bun run typecheck
+
+      - name: Test service builder
+        run: bun run test:service-builder
+
+      - name: Verify generated service bundle
+        run: bun run build:services && git diff --exit-code -- ios/ios/OxServices.bundle

@@ -1,0 +1,295 @@
+{
+  "domain": "en.wikipedia.org",
+  "name": "Wikipedia",
+  "description": "The free online encyclopedia. Search articles by full text, fetch article summaries or full section-by-section text, and find related articles. No sign-in required.",
+  "baseUrl": "https://en.wikipedia.org/",
+  "$defs": {
+    "searchResult": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Canonical underscore title; pass to getArticle / getArticleSummary"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "description",
+        "excerpt",
+        "url",
+        "thumbnailUrl"
+      ],
+      "additionalProperties": false
+    },
+    "searchResults": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/searchResult"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "\"standard\" or \"disambiguation\""
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extract": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "updatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "type",
+        "description",
+        "extract",
+        "url",
+        "thumbnailUrl",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "article": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string",
+                "description": "Empty string for the lead section"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "heading",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "sections"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchArticles",
+      "label": "Search articles",
+      "description": "Full-text search over English Wikipedia. Returns matching articles with excerpts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/searchResults"
+      },
+      "defaultArgs": {
+        "query": "skill"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRelatedArticles",
+      "label": "Related articles",
+      "description": "Articles similar to the given article title.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/searchResults"
+      },
+      "defaultArgs": {
+        "title": "Skill"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getArticleSummary",
+      "label": "Article summary",
+      "description": "Shows the opening summary for an article title and indicates when the title could refer to several topics.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/summary"
+      },
+      "defaultArgs": {
+        "title": "Skill"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getArticle",
+      "label": "Full article",
+      "description": "Shows the full article as plain text, organized by section. For long articles, the summary is usually a quicker starting point.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/article"
+      },
+      "defaultArgs": {
+        "title": "Skill"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "维基百科",
+      "description": "英文维基百科，只读。按全文搜索条目，获取条目摘要或逐节全文，并查找相关条目。无需登录。",
+      "actions": {
+        "searchArticles": {
+          "label": "搜索条目",
+          "description": "对英文维基百科进行全文搜索。返回匹配的条目及摘录。"
+        },
+        "listRelatedArticles": {
+          "label": "相关条目",
+          "description": "返回与给定条目标题相似的条目。"
+        },
+        "getArticleSummary": {
+          "label": "条目摘要",
+          "description": "显示某个条目标题的开篇摘要，并提示该标题是否可能对应多个主题。"
+        },
+        "getArticle": {
+          "label": "完整条目",
+          "description": "显示条目的完整纯文本，并按章节整理。对于长条目，先看摘要通常更快捷。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/en.wikipedia.org/favicon.png"
+}

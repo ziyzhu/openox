@@ -1,0 +1,275 @@
+{
+  "domain": "ios:browser",
+  "name": "Browser",
+  "description": "Inspect and interact with attached web-service pages, including their signed-in sessions.",
+  "icon": {
+    "system": "safari"
+  },
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Navigate Browser to a website.",
+      "id": "navigate",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "description": "An absolute HTTP or HTTPS URL.",
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "label": "Navigate",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Add a chat row the user can tap to view Browser's live page.",
+      "id": "inspect",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "View Page",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "shown": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "shown"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Execute arbitrary JavaScript in an attached web service's page. This can read or change signed-in website data and send information over the network.",
+      "id": "executeJavaScript",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "script": {
+            "description": "An async JavaScript function body. Return a JSON-compatible value.",
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "script"
+        ],
+        "type": "object"
+      },
+      "label": "Execute JavaScript",
+      "outputSchema": {},
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "description": "Pause automation and let the user sign in or complete a human-only step in Browser. Active network capture and injected scripts are cleared before the page is shown.",
+      "id": "interact",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instructions": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["instructions"],
+        "type": "object"
+      },
+      "label": "User Interaction",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": { "type": "boolean" }
+        },
+        "required": ["completed"],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Install a document-start script for selected domains and reload Browser. The script runs in matching main frames and subframes until cleared.",
+      "id": "injectScript",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "domains": {
+            "items": { "minLength": 1, "type": "string" },
+            "type": "array"
+          },
+          "script": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["domains", "script"],
+        "type": "object"
+      },
+      "label": "Inject Script",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": { "type": ["string", "null"] }
+        },
+        "required": ["url"],
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "description": "Remove every session-scoped injected script and reload Browser.",
+      "id": "clearInjectedScripts",
+      "inputSchema": { "additionalProperties": false, "properties": {}, "type": "object" },
+      "label": "Clear Injected Scripts",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": { "type": ["string", "null"] }
+        },
+        "required": ["url"],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Start a fresh redacted network capture at document start and reload Browser. Captures fetch, XHR, forms, resources, and WebSocket opens from main frames and subframes.",
+      "id": "startCapture",
+      "inputSchema": { "additionalProperties": false, "properties": {}, "type": "object" },
+      "label": "Start Network Capture",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": { "type": ["string", "null"] }
+        },
+        "required": ["url"],
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "description": "Add a labeled marker to the active capture before performing an operation.",
+      "id": "markCapture",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "label": { "maxLength": 200, "minLength": 1, "type": "string" }
+        },
+        "required": ["label"],
+        "type": "object"
+      },
+      "label": "Mark Network Capture",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "marked": { "type": "boolean" }
+        },
+        "required": ["marked"],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "List captured exchange metadata without request or response bodies.",
+      "id": "listCapturedExchanges",
+      "inputSchema": { "additionalProperties": false, "properties": {}, "type": "object" },
+      "label": "List Network Exchanges",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "exchanges": { "items": {}, "type": "array" }
+        },
+        "required": ["exchanges"],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read one captured exchange, including bounded and redacted bodies when accessible to the page.",
+      "id": "readCapturedExchange",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": { "maxLength": 100, "minLength": 1, "type": "string" }
+        },
+        "required": ["id"],
+        "type": "object"
+      },
+      "label": "Read Network Exchange",
+      "outputSchema": { "type": "object" },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Stop network capture while retaining its current records for inspection.",
+      "id": "stopCapture",
+      "inputSchema": { "additionalProperties": false, "properties": {}, "type": "object" },
+      "label": "Stop Network Capture",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "stopped": { "type": "boolean" }
+        },
+        "required": ["stopped"],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "浏览器",
+      "description": "检查已附加的网页服务页面并与其交互，包括其中的登录会话。",
+      "actions": {
+        "navigate": {
+          "label": "前往页面",
+          "description": "将浏览器导航到网站。"
+        },
+        "inspect": {
+          "label": "查看页面",
+          "description": "在聊天中添加一行，用户可轻点查看“浏览器”的实时页面。"
+        },
+        "executeJavaScript": {
+          "label": "执行 JavaScript",
+          "description": "在已附加的网页服务页面中执行任意 JavaScript。这可以读取或更改已登录的网站数据，并通过网络发送信息。"
+        }
+      }
+    }
+  }
+}

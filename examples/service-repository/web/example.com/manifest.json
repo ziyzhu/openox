@@ -1,0 +1,42 @@
+{
+  "domain": "example.com",
+  "name": "Example",
+  "description": "A minimal remote service. Read the current example page.",
+  "baseUrl": "https://example.com/",
+  "actions": [
+    {
+      "id": "getPage",
+      "label": "Read example page",
+      "description": "Read the title and heading from the current page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The document title."
+          },
+          "heading": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The primary page heading, or null when absent."
+          }
+        },
+        "required": [
+          "title",
+          "heading"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

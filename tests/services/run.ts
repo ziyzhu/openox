@@ -123,7 +123,7 @@ function parseOptions(args: string[]): Options {
       if (!args[++index]) throw new Error("--device requires ox-qa-N");
     } else if (argument === "--repository") {
       const value = args[++index];
-      if (!value) throw new Error("--repository requires a local OpenOx Services checkout");
+      if (!value) throw new Error("--repository requires a local service repository");
       repository = resolve(value);
     } else if (argument.startsWith("--")) {
       throw new Error(`Unknown option ${argument}`);

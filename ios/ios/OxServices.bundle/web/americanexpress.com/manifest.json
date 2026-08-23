@@ -1,0 +1,474 @@
+{
+  "domain": "americanexpress.com",
+  "name": "Amex Travel",
+  "description": "A travel-booking service for cardmembers. View your traveler profile, saved loyalty programs, and detailed flight, hotel, and car bookings. Read-only; sign-in required.",
+  "baseUrl": "https://www.americanexpress.com/en-us/travel",
+  "$defs": {
+    "loyalty": {
+      "type": "object",
+      "properties": {
+        "program": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "membershipNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vendor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "program",
+        "membershipNumber",
+        "vendor",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "trip": {
+      "type": "object",
+      "properties": {
+        "tripId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bookingDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "endDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tripId",
+        "bookingDate",
+        "title",
+        "type",
+        "status",
+        "startDate",
+        "endDate",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "segment": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "endDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmationNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "origin",
+        "destination",
+        "startDate",
+        "endDate",
+        "status",
+        "confirmationNumber"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Authenticate provider",
+      "description": "Amex account sign-in URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Auth state",
+      "description": "Checks whether you are signed in to Amex Travel.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getProfile",
+      "label": "Get traveler profile",
+      "description": "The cardmember's Amex Travel profile: name and number of cards on file.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profileId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cardsCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cardsCount"
+        ]
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listLoyalties",
+      "label": "List loyalty programs",
+      "description": "The cardmember's saved airline/hotel loyalty programs (frequent flyer numbers, vendor).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/loyalty"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listTrips",
+      "label": "List trips",
+      "description": "Lists your Amex Travel flight, hotel, and car bookings, with the details needed to open each trip.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tripType": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/trip"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getTrip",
+      "label": "Get trip details",
+      "description": "Shows the full booking details for a trip selected from your trip list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string"
+          },
+          "bookingDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          }
+        },
+        "required": [
+          "tripId",
+          "bookingDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bookingDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "travelers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/segment"
+            }
+          }
+        },
+        "required": [
+          "tripId",
+          "bookingDate",
+          "title",
+          "type",
+          "status",
+          "startDate",
+          "endDate",
+          "destination",
+          "travelers",
+          "segments"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "tripId": "ZO-AX1055-23480",
+        "bookingDate": "2026-06-06"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "运通旅行",
+      "description": "面向持卡人的旅行预订服务。查看旅客资料、已保存的常旅客计划，以及机票、酒店和租车预订详情。只读，需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录运通账户",
+          "description": "打开运通账户登录页。"
+        },
+        "getSignInState": {
+          "label": "检查运通旅行登录状态",
+          "description": "检查你是否已登录运通旅行。"
+        },
+        "getProfile": {
+          "label": "获取旅客档案",
+          "description": "持卡人的运通旅行档案:姓名与名下卡片数量。"
+        },
+        "listLoyalties": {
+          "label": "常旅客计划列表",
+          "description": "持卡人保存的航司/酒店常旅客计划(常旅客号、供应商)。"
+        },
+        "listTrips": {
+          "label": "行程列表",
+          "description": "列出你的运通旅行机票、酒店和租车预订，并提供打开每段行程所需的信息。"
+        },
+        "getTrip": {
+          "label": "获取行程详情",
+          "description": "显示从行程列表中选定行程的完整预订详情。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/americanexpress.com/favicon.png"
+}

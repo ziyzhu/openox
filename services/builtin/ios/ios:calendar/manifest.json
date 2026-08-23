@@ -1,0 +1,87 @@
+{
+  "domain": "ios:calendar",
+  "name": "Calendar",
+  "description": "Add events to your calendar without reading it.",
+  "icon": {
+    "asset": "ios:calendar"
+  },
+  "permission": "calendar",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Add an event without reading your calendar.",
+      "id": "addEvent",
+      "inputSchema": {
+        "properties": {
+          "options": {
+            "properties": {
+              "end": {
+                "description": "ISO-8601 end. Defaults to one hour after start.",
+                "type": "string"
+              },
+              "location": {
+                "description": "Optional location text.",
+                "type": "string"
+              },
+              "notes": {
+                "description": "Optional notes for the event.",
+                "type": "string"
+              },
+              "start": {
+                "description": "ISO-8601 start, e.g. 2026-06-25T09:00:00Z.",
+                "type": "string"
+              },
+              "title": {
+                "description": "The event title.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "title",
+              "start"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "label": "Add event",
+      "outputSchema": {
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "日历",
+      "description": "无需读取日历即可向其中添加日程。",
+      "actions": {
+        "addEvent": {
+          "label": "添加日程",
+          "description": "无需读取日历即可添加日程。"
+        }
+      }
+    }
+  }
+}

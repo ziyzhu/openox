@@ -1,0 +1,116 @@
+{
+  "domain": "www.usvisascheduling.com",
+  "name": "USTravelDocs",
+  "description": "U.S. visa appointment scheduling. Check the current application's consular post and available appointment dates without booking or rescheduling.",
+  "baseUrl": "https://www.usvisascheduling.com/en-US/schedule/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to USTravelDocs",
+      "description": "Opens USTravelDocs so the user can sign in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check USTravelDocs sign-in",
+      "description": "Checks whether the scheduling page is signed in without making another website request.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getAppointmentAvailability",
+      "label": "Check appointment availability",
+      "description": "Checks the current application's consular post and available appointment dates once. It does not book, reschedule, poll, or automatically retry.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "description": "Consular post checked for availability"
+          },
+          "applicantCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of applicants included in the check"
+          },
+          "visaClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Visa classes for the applicants in the current application"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether the site returned at least one appointment date"
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Appointment dates exactly as returned by USTravelDocs"
+          }
+        },
+        "required": [
+          "post",
+          "applicantCount",
+          "visaClasses",
+          "available",
+          "dates"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "blocking": true,
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.usvisascheduling.com/favicon.png",
+  "skills": [
+    {
+      "name": "security-questions",
+      "description": "Handle USTravelDocs security-question prompts during sign-in. Use when the user asks which security questions are configured, authentication reaches the security-question step, or sign-in must be handed back to the user securely."
+    }
+  ]
+}

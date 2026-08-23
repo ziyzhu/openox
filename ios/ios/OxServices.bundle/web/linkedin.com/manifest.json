@@ -1,0 +1,717 @@
+{
+  "domain": "linkedin.com",
+  "name": "LinkedIn",
+  "description": "A professional networking platform. View profiles, your home feed and messages, or search for people, organizations, and jobs. Read-only; sign-in required.",
+  "baseUrl": "https://www.linkedin.com/feed/",
+  "$defs": {
+    "message": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "deliveredAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sender",
+        "subject",
+        "text",
+        "deliveredAt"
+      ],
+      "additionalProperties": false
+    },
+    "searchItem": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "urn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "subtitle",
+        "detail",
+        "summary",
+        "url",
+        "urn"
+      ],
+      "additionalProperties": false
+    },
+    "jobItem": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobId",
+        "title",
+        "company",
+        "location",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "feedPost": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "integer"
+        },
+        "comments": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "urn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "headline",
+        "text",
+        "likes",
+        "comments",
+        "url",
+        "urn"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign-in URL",
+      "description": "Opens the LinkedIn sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to LinkedIn.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getMe",
+      "label": "Get my profile",
+      "description": "Fetch the signed-in member's own profile: name, headline, public identifier, and profile URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "publicIdentifier": {
+            "type": "string"
+          },
+          "memberUrn": {
+            "type": "string"
+          },
+          "plainId": {
+            "type": "string"
+          },
+          "premiumSubscriber": {
+            "type": "boolean"
+          },
+          "profileUrl": {
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "firstName",
+          "lastName",
+          "headline",
+          "publicIdentifier",
+          "memberUrn",
+          "plainId",
+          "premiumSubscriber",
+          "profileUrl",
+          "photoUrl"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getProfile",
+      "label": "Get a member's profile",
+      "description": "Fetch any LinkedIn member's public profile by their vanity name or profile URL (e.g. 'williamhgates' or a linkedin.com/in/... URL): name, headline, summary, location, work positions, and education.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "publicIdentifier": {
+            "type": "string"
+          },
+          "premium": {
+            "type": "boolean"
+          },
+          "influencer": {
+            "type": "boolean"
+          },
+          "profileUrl": {
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "string"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "startYear": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "endYear": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "company",
+                "startYear",
+                "endYear"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "educations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "school": {
+                  "type": "string"
+                },
+                "degree": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                },
+                "startYear": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "endYear": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "school",
+                "degree",
+                "field",
+                "startYear",
+                "endYear"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "firstName",
+          "lastName",
+          "headline",
+          "summary",
+          "location",
+          "publicIdentifier",
+          "premium",
+          "influencer",
+          "profileUrl",
+          "photoUrl",
+          "positions",
+          "educations"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "publicId": "williamhgates"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listConversations",
+      "label": "List inbox conversations",
+      "description": "Lists your recent message conversations with their participants and latest message.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "participants": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "unreadCount": {
+                  "type": "integer"
+                },
+                "read": {
+                  "type": "boolean"
+                },
+                "groupChat": {
+                  "type": "boolean"
+                },
+                "lastActivityAt": {
+                  "type": "integer"
+                },
+                "lastMessage": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/message"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "participants",
+                "unreadCount",
+                "read",
+                "groupChat",
+                "lastActivityAt",
+                "lastMessage",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getConversation",
+      "label": "Get conversation messages",
+      "description": "Lists the messages in a selected conversation, oldest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/message"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listFeed",
+      "label": "Read home feed",
+      "description": "Shows your home feed, most recent first, with each post's author, text, likes, and comments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/feedPost"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "search",
+      "label": "Search LinkedIn",
+      "description": "Searches LinkedIn for people, companies, groups, schools, and courses.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "amazon"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchJobs",
+      "label": "Search jobs",
+      "description": "Searches LinkedIn jobs by keyword and optional location, with the title, company, location, and link for each result.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/jobItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "software engineer"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "领英",
+      "description": "职业社交平台。查看个人资料、主页动态和私信，也可搜索用户、组织和职位。只读，需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录领英",
+          "description": "打开领英登录页。"
+        },
+        "getSignInState": {
+          "label": "检查领英登录状态",
+          "description": "检查你是否已登录领英。"
+        },
+        "getMe": {
+          "label": "获取我的资料",
+          "description": "获取已登录成员本人的资料:姓名、头衔、公开标识符和主页网址。"
+        },
+        "getProfile": {
+          "label": "获取成员资料",
+          "description": "按公开标识符或主页网址（如 'williamhgates' 或 linkedin.com/in/... 网址）获取任意领英成员的公开资料:姓名、头衔、简介、所在地、工作经历和教育背景。"
+        },
+        "listConversations": {
+          "label": "收件箱会话列表",
+          "description": "列出你的近期私信会话，包括参与者和最新一条消息。"
+        },
+        "getConversation": {
+          "label": "获取会话消息",
+          "description": "列出所选会话中的消息，最早的消息排在前面。"
+        },
+        "listFeed": {
+          "label": "查看主页动态",
+          "description": "查看你的主页动态，最新内容排在前面，并显示每条动态的作者、正文、点赞数和评论数。"
+        },
+        "search": {
+          "label": "搜索领英",
+          "description": "在领英中搜索用户、公司、群组、学校和课程。"
+        },
+        "searchJobs": {
+          "label": "搜索职位",
+          "description": "按关键词和可选地点搜索领英职位，并显示职位名称、公司、地点和链接。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/linkedin.com/favicon.png"
+}

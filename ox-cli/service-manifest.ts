@@ -8,7 +8,7 @@ import {
   type Action,
   type JSONSchema,
   type Manifest,
-} from "./server-ir/manifest.ts";
+} from "../services/manifest.ts";
 
 export {
   BOT_CONTROL_STATE_ACTION_ID,

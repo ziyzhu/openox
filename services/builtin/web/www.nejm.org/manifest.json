@@ -1,0 +1,278 @@
+{
+  "domain": "www.nejm.org",
+  "name": "NEJM",
+  "description": "A leading peer-reviewed medical journal. Search articles, browse specialties, and read available abstracts and full-text sections. Public and read-only; no sign-in required.",
+  "baseUrl": "https://www.nejm.org/action/autoCompleteSearchService?partialQuery=zzzzunlikelyqueryzzzz",
+  "$defs": {
+    "articleSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The article DOI."
+        },
+        "title": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "The publication date as displayed by NEJM."
+        },
+        "articleType": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "pdfUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "articleSection": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchArticles",
+      "label": "Search articles",
+      "description": "Searches NEJM by keyword, author, title, or citation and returns one page of matching articles with publication details and snippets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keyword, author, title, or citation to find."
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Page cursor returned by the previous search."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/articleSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "cardiology"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listSpecialtyArticles",
+      "label": "Browse a specialty",
+      "description": "Lists one page of articles from an NEJM medical specialty with publication details and links.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "specialty": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "Specialty slug from an NEJM specialty page, such as cardiology."
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Page cursor returned by the previous specialty page."
+          }
+        },
+        "required": [
+          "specialty"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The specialty name displayed by NEJM."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/articleSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "items",
+          "totalCount",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "specialty": "cardiology"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getArticle",
+      "label": "Read an article",
+      "description": "Reads an NEJM article's metadata, notices, topics, abstract, and any full-text sections available to the public.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 9,
+            "pattern": "^10\\.1056/.+$",
+            "description": "NEJM article DOI from search or specialty results."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "articleType": {
+            "type": "string"
+          },
+          "abstract": {
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/articleSection"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "pdfUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "authors",
+          "topics",
+          "notices",
+          "sections",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "10.1056/NEJM199810153391601"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

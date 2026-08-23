@@ -1,0 +1,817 @@
+{
+  "domain": "www.doordash.com",
+  "name": "DoorDash",
+  "description": "A local delivery marketplace. Read store and retail product details, inspect the active cart, review checkout on DoorDash, and read order history and receipts.",
+  "baseUrl": "https://www.doordash.com/home",
+  "$defs": {
+    "money": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "display": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "amount",
+        "currency",
+        "display"
+      ],
+      "additionalProperties": false
+    },
+    "store": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "deliveryAvailable": {
+          "type": "boolean"
+        },
+        "eta": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unavailableReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "distance": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priceRange": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rating": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ratingCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "url",
+        "imageUrl",
+        "isActive",
+        "deliveryAvailable",
+        "eta",
+        "unavailableReason",
+        "distance",
+        "priceRange",
+        "rating",
+        "ratingCount"
+      ],
+      "additionalProperties": false
+    },
+    "product": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "storeId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "price": {
+          "$ref": "#/$defs/money"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rating": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ratingCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "additionalVariants": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "canQuickAdd": {
+          "type": "boolean"
+        },
+        "defaultQuantity": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "storeId",
+        "name",
+        "description",
+        "imageUrl",
+        "price",
+        "unit",
+        "rating",
+        "ratingCount",
+        "additionalVariants",
+        "canQuickAdd",
+        "defaultQuantity"
+      ],
+      "additionalProperties": false
+    },
+    "cartItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "price": {
+          "$ref": "#/$defs/money"
+        },
+        "imageUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storeId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "itemId",
+        "name",
+        "quantity",
+        "price",
+        "imageUrl",
+        "storeId"
+      ],
+      "additionalProperties": false
+    },
+    "cart": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fulfillmentType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isPickup": {
+          "type": "boolean"
+        },
+        "isConvenience": {
+          "type": "boolean"
+        },
+        "hasError": {
+          "type": "boolean"
+        },
+        "store": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "imageUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "imageUrl",
+            "url"
+          ],
+          "additionalProperties": false
+        },
+        "subtotal": {
+          "$ref": "#/$defs/money"
+        },
+        "total": {
+          "$ref": "#/$defs/money"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cartItem"
+          }
+        },
+        "checkoutUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "fulfillmentType",
+        "isPickup",
+        "isConvenience",
+        "hasError",
+        "store",
+        "subtotal",
+        "total",
+        "items",
+        "checkoutUrl"
+      ],
+      "additionalProperties": false
+    },
+    "orderSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    "receiptItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "originalQuantity": {
+          "type": "number"
+        },
+        "unitPrice": {
+          "$ref": "#/$defs/money"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "specialInstructions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "substitutionPreference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "itemId",
+        "name",
+        "description",
+        "quantity",
+        "originalQuantity",
+        "unitPrice",
+        "options",
+        "specialInstructions",
+        "substitutionPreference"
+      ],
+      "additionalProperties": false
+    },
+    "receiptLineItem": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "amount": {
+          "$ref": "#/$defs/money"
+        },
+        "originalAmount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "label",
+        "note",
+        "amount",
+        "originalAmount"
+      ],
+      "additionalProperties": false
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "storeName": {
+          "type": "string"
+        },
+        "commissionMessage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disclaimer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptLineItem"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptItem"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "storeName",
+        "commissionMessage",
+        "disclaimer",
+        "total",
+        "lineItems",
+        "items"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to DoorDash",
+      "description": "Opens DoorDash sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check DoorDash sign-in",
+      "description": "Checks whether you are signed in to DoorDash.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStore",
+      "label": "Get DoorDash store",
+      "description": "Gets delivery availability, ETA, rating, and other details for a DoorDash store ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "storeId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "store": {
+            "$ref": "#/$defs/store"
+          }
+        },
+        "required": [
+          "store"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchStoreItems",
+      "label": "Search items in a DoorDash store",
+      "description": "Searches products in one grocery, convenience, or retail DoorDash store.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "required": [
+          "storeId",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/product"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCart",
+      "label": "Get DoorDash cart",
+      "description": "Gets the signed-in account's active DoorDash cart, or null when there is no active cart.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/cart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cart"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listOrders",
+      "label": "List DoorDash orders",
+      "description": "Lists the signed-in account's most recent DoorDash orders with receipt IDs and visible summaries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/orderSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getOrder",
+      "label": "Get DoorDash receipt",
+      "description": "Gets receipt totals and items for a DoorDash order-cart ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderCartId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "orderCartId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/$defs/order"
+          }
+        },
+        "required": [
+          "order"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getPaymentUrl",
+      "label": "Review DoorDash checkout",
+      "description": "Opens DoorDash checkout so you can review the active cart. Only you can place the order.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPaymentState",
+      "label": "Check DoorDash checkout status",
+      "description": "Checks whether a cart is pending or a newly completed order appeared. It never places an order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "previousOrderId": {
+            "type": "string",
+            "description": "The newest order-cart ID observed before checkout."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "none",
+              "pending",
+              "completed"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reference",
+          "total",
+          "currency",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

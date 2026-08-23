@@ -103,9 +103,9 @@ Inspect actions before invoking one. Check `requireAuth`, `requireApproval`, and
 
 Use the `system:create-skill` instructions in `ios/ios/Chat/BuiltInSkills.swift` as the design guide for triggers, workflow boundaries, validation examples, and execution-prompt style. Adapt only its design guidance: `ox skill create` writes user-owned `skills/<name>/SKILL.md` files and does not create registry service skills.
 
-Create a service skill in the independent OpenOx Services checkout at `src/services/web/<domain>/skills/<name>/SKILL.md`. Use a short lowercase kebab-case name without a namespace, matching `name` and `description` frontmatter, and include only `SKILL.md`; bundled resources and `agents/openai.yaml` are unsupported. Inspect the service manifest and actions first, and mention only capabilities the service exposes.
+Create a built-in service skill at `services/builtin/web/<domain>/skills/<name>/SKILL.md`. Use a short lowercase kebab-case name without a namespace, matching `name` and `description` frontmatter, and include only `SKILL.md`; bundled resources and `agents/openai.yaml` are unsupported. Inspect the service manifest and actions first, and mention only capabilities the service exposes.
 
-Run the service repository's build, then validate with `ox --repository <service-repository> service skills -s <domain> --json`. Never hand-edit generated Server IR.
+Run `bun run build:services`, then validate with `ox --repository ios/ios/OxServices.bundle service skills -s <domain> --json`. Never hand-edit generated Server IR.
 
 ## Exercise services in the running DEBUG app
 
@@ -126,7 +126,7 @@ Use committed cases from `replay.ts` or `replay.cases.json` and responses from `
 Replay is fail-closed: unmatched requests are terminated locally.
 
 ```sh
-bun run test:services -- <domain>[:<action>[:<case>]] --repository <service-repository> --device <claimed-ox-qa-N>
+bun run test:services -- <domain>[:<action>[:<case>]] --repository ios/ios/OxServices.bundle --device <claimed-ox-qa-N>
 OX_SERVER_SOURCE=<service-source>/web ox --repository <generated-repository> --runtime chrome service test --import <domain>:<action>[:<case>] --har <path> [--args '{}'] [--update]
 OX_SERVER_SOURCE=<service-source>/web ox --repository <generated-repository> --runtime chrome service test --record <domain>:<action>[:<case>] [--args '{}'] [--update]
 ```

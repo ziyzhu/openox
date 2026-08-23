@@ -1,0 +1,856 @@
+{
+  "domain": "secure.chase.com",
+  "name": "Chase",
+  "description": "A major U.S. consumer bank. List your credit card accounts with balances and payment due dates, read one account's detail (statement balance, available credit, APRs, autopay, last payment), list recent card transactions, and read your rewards point balances across cards.",
+  "baseUrl": "https://secure.chase.com/web/auth/dashboard",
+  "$defs": {
+    "accountSummary": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "nickname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mask": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cardType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accountTileType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currentBalance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "availableBalance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "nextPaymentDueDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nextPaymentAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pastDueAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "paymentDueDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "dueStatus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lockStatus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "closed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rewardsSummary": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "nickname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mask": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cardType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rewardsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cardRewardType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "balance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currentRewardsBalance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rewardsDollarBalance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "asOfDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "payee": {
+      "type": "object",
+      "properties": {
+        "payeeId": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "payeeName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payeeNickname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payeeLabel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payeeAccountMask": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payeeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nextPaymentDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nextPaymentAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "paymentDueInDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "blocked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "paidInFull": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "transaction": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pending": {
+          "type": "boolean"
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "postDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "amount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "creditDebitCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "typeGroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expenseCategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantCity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantState": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merchantCategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "earnedRewardsAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last4CardNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disputed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "locales": {
+    "zh-Hans": {
+      "name": "大通银行",
+      "description": "美国个人银行服务。查看信用卡账户、余额、还款到期日、账户明细、近期交易和积分余额，还可向已保存的收款人支付账单。需登录。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录大通银行",
+          "description": "打开大通银行登录页。"
+        },
+        "getSignInState": {
+          "label": "检查大通登录状态",
+          "description": "检查你是否已登录大通银行。"
+        },
+        "listAccounts": {
+          "label": "账户列表",
+          "description": "列出已登录用户的账户及余额、还款到期信息。"
+        },
+        "getAccount": {
+          "label": "获取账户明细",
+          "description": "读取单张卡账户的明细：账单余额、可用额度、年利率、自动还款、最近一次还款。"
+        },
+        "listTransactions": {
+          "label": "交易列表",
+          "description": "列出单张卡账户近期的已入账和待处理交易。"
+        },
+        "getRewards": {
+          "label": "获取积分余额",
+          "description": "读取用户各卡的积分余额。"
+        },
+        "listPayees": {
+          "label": "收款人列表",
+          "description": "列出可在大通账单支付中支付的收款人（信用卡、贷款、商户）。"
+        },
+        "createPayment": {
+          "label": "支付账单",
+          "description": "使用你选择的账户、金额和可用付款日期，向已保存的收款人安排账单付款。提交前需你批准。"
+        }
+      }
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Chase",
+      "description": "Opens the Chase sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Chase sign-in",
+      "description": "Checks whether you are signed in to Chase.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listAccounts",
+      "label": "List accounts",
+      "description": "List the signed-in customer's accounts with balances and payment due info.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/accountSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "getAccount",
+      "label": "Get account detail",
+      "description": "Read one card account's detail: statement balance, available credit, APRs, autopay, last payment.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          }
+        },
+        "required": [
+          "accountId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mask": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cardType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentBalance": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "availableCredit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "creditLimit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastStmtBalance": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastStmtDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "remainingStmtBalance": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pendingChargesAmount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "nextPaymentDueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextPaymentAmount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "pastDueAmount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastPaymentAmount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastPaymentDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purchaseAPR": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "cashAPR": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "autoPayEnrolled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "rewardsEligible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "lockStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listTransactions",
+      "label": "List transactions",
+      "description": "List posted and pending transactions for one card account, newest first. Defaults to the last 2 years; pass startDate/endDate (YYYY-MM-DD) to narrow.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD; defaults to 2 years ago."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD; defaults to today."
+          }
+        },
+        "required": [
+          "accountId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/transaction"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "getRewards",
+      "label": "Get rewards balances",
+      "description": "Read rewards point balances across the customer's cards.",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/rewardsSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "listPayees",
+      "label": "List payees",
+      "description": "List bill-pay payees the customer can pay (credit cards, loans, merchants).",
+      "requireAuth": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/payee"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false
+    },
+    {
+      "id": "createPayment",
+      "label": "Pay a bill",
+      "description": "Schedules a bill payment to a saved payee using your chosen account, amount, and available payment date. Requires your approval before submission.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payeeId": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paymentDate": {
+            "type": "string",
+            "description": "YYYYMMDD; defaults to the earliest available date."
+          },
+          "fundingAccountId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Defaults to the default funding account."
+          },
+          "paymentOption": {
+            "type": "string",
+            "enum": [
+              "STATEMENT_BALANCE",
+              "CURRENT_BALANCE",
+              "MINIMUM_PAYMENT_DUE",
+              "INTEREST_SAVING_BALANCE",
+              "REMAINING_STATEMENT_BALANCE",
+              "OTHER_AMOUNT"
+            ]
+          }
+        },
+        "required": [
+          "payeeId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "paymentId": {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "paymentDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "processDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payeeLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fundingAccountMask": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

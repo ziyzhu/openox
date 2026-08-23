@@ -1,0 +1,482 @@
+{
+  "domain": "www.ncbi.nlm.nih.gov",
+  "name": "NCBI",
+  "description": "The U.S. hub for biomedical research data. Search Entrez databases, get PubMed suggestions, read article details and indexing terms, find similar or citing articles, and compare a term across NCBI databases. Read-only and public; no sign-in required.",
+  "baseUrl": "https://www.ncbi.nlm.nih.gov/",
+  "$defs": {
+    "link": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "meshTerm": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "qualifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "majorTopic": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "qualifiers",
+        "majorTopic",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "substance": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "registryNumber": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "db": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "doi": {
+          "type": "string"
+        },
+        "volume": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "string"
+        },
+        "pages": {
+          "type": "string"
+        },
+        "publicationTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "abstract": {
+          "type": "string"
+        },
+        "meshTerms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/meshTerm"
+          }
+        },
+        "substances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/substance"
+          }
+        },
+        "fullTextLinks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "db",
+        "title",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listDatabases",
+      "label": "List databases",
+      "description": "Lists the Entrez databases available to search, including PubMed, PMC, Gene, Protein, Nucleotide, MeSH, OMIM, and ClinVar.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "suggestSearchTerms",
+      "label": "Suggest PubMed searches",
+      "description": "Suggests popular PubMed search phrases as you enter a term.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "platelet"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "search",
+      "label": "Search a database",
+      "description": "Searches an Entrez database and returns matching records with their title, authors, source, date, and link. PubMed is searched by default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "db": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/record"
+            }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "count",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "psoriasis"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getRecord",
+      "label": "Get a record",
+      "description": "Shows a record from an Entrez database. PubMed records include available abstracts, citation details, publication types, MeSH terms, substances, and full-text links. PubMed is used by default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "db": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/record"
+      },
+      "defaultArgs": {
+        "id": "42336609",
+        "db": "pubmed"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listRelatedArticles",
+      "label": "Find related PubMed articles",
+      "description": "Lists either similar PubMed articles or articles that cite a given PubMed record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "similar",
+              "citedBy"
+            ],
+            "default": "similar"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/record"
+            }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "count",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "203039",
+        "kind": "similar"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "databaseCounts",
+      "label": "Where a term appears",
+      "description": "Shows how many matches a term has across the literature, gene, protein, genome, health, and chemistry databases presented by NCBI. A missing count means NCBI did not provide one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "db": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "count": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "db",
+                "label",
+                "category",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "psoriasis"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "美国国家生物技术信息中心",
+      "description": "检索美国国家生物技术信息中心的 Entrez 数据库，获取 PubMed 检索建议，阅读文章详情和索引词，查找相似或引用文章，并比较某个术语在各 NCBI 数据库中的结果数。只读且公开，无需登录。",
+      "actions": {
+        "listDatabases": {
+          "label": "列出数据库",
+          "description": "列出可搜索的 Entrez 数据库，包括 PubMed、PMC、基因、蛋白质、核苷酸、MeSH、OMIM 和 ClinVar。"
+        },
+        "suggestSearchTerms": {
+          "label": "推荐 PubMed 检索词",
+          "description": "根据输入内容推荐常用的 PubMed 检索短语。"
+        },
+        "search": {
+          "label": "检索数据库",
+          "description": "在 Entrez 数据库中搜索，并返回匹配记录的标题、作者、来源、日期和链接。默认搜索 PubMed。"
+        },
+        "getRecord": {
+          "label": "获取记录",
+          "description": "显示 Entrez 数据库中的一条记录。PubMed 记录会包含现有摘要、引文详情、出版类型、MeSH 主题词、物质和全文链接；默认使用 PubMed。"
+        },
+        "listRelatedArticles": {
+          "label": "查找相关 PubMed 文章",
+          "description": "列出与指定 PubMed 记录相似的文章，或引用该记录的文章。"
+        },
+        "databaseCounts": {
+          "label": "术语出现位置",
+          "description": "显示某个术语在 NCBI 所列文献、基因、蛋白质、基因组、健康和化学数据库中的匹配数量。缺少数量表示 NCBI 未提供。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/www.ncbi.nlm.nih.gov/favicon.png"
+}

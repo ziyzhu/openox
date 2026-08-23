@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { buildArtifacts } from "../services/build.ts";
 import { ROOT } from "./lib.ts";
 
 const destination = join(ROOT, "ios", "ios", "OxServices.bundle");
@@ -15,25 +16,6 @@ const localPackage = `{
   "version" : 1
 }
 `;
-
-function repositoryRoot(args: string[]): string {
-  const index = args.indexOf("--repository");
-  const value = index >= 0 ? args[index + 1] : Bun.env.OX_SERVER_ROOT;
-  if (!value) throw new Error("Pass --repository <service-repository> or set OX_SERVER_ROOT");
-  const root = resolve(value);
-  if (!existsSync(join(root, "src", "export.ts"))) throw new Error(`not a service repository checkout: ${root}`);
-  return root;
-}
-
-async function exportRepository(root: string, output: string): Promise<void> {
-  const process = Bun.spawn(["bun", "run", "export", "--output", output], {
-    cwd: root,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await process.exited;
-  if (code !== 0) throw new Error(`OpenOx Services export exited ${code}`);
-}
 
 async function git(root: string, args: string[], environment: Record<string, string> = {}): Promise<void> {
   const process = Bun.spawn(["git", "-C", root, ...args], {
@@ -66,6 +48,7 @@ async function initializeRepository(root: string, message: string): Promise<void
   await git(root, ["read-tree", "HEAD"]);
   await git(root, ["-c", "pack.threads=1", "-c", "pack.writeReverseIndex=false", "repack", "-adq"]);
   await git(root, ["prune-packed"]);
+  await rm(join(metadata, "objects", "info", "packs"), { force: true });
 }
 
 async function addLocalRepositorySeed(root: string): Promise<void> {
@@ -80,11 +63,7 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
 }
 
 try {
-  await exportRepository(repositoryRoot(Bun.argv.slice(2)), staging);
-  const repository = JSON.parse(await readFile(join(staging, "ox.json"), "utf8")) as {
-    services: string[];
-    contentHash?: string;
-  };
+  const repository = await buildArtifacts(staging, { name: "Built-in" });
   await addLocalRepositorySeed(staging);
   await rm(backup, { recursive: true, force: true });
   const hadPrevious = existsSync(destination);

@@ -1,0 +1,68 @@
+{
+  "domain": "ios:contacts",
+  "name": "Contacts",
+  "description": "Look up contact details by name for tasks that need an email address or phone number.",
+  "icon": {
+    "asset": "ios:contacts"
+  },
+  "permission": "contacts",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Find matching names, phone numbers, and email addresses in Contacts.",
+      "id": "search",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "A name or partial name to match against the user's contacts.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "label": "Search contacts",
+      "outputSchema": {
+        "items": {
+          "properties": {
+            "emails": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "phones": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "通讯录",
+      "description": "对于需要电子邮件地址或电话号码的任务，可按姓名查找联系人信息。",
+      "actions": {
+        "search": {
+          "label": "搜索联系人",
+          "description": "在“通讯录”中查找匹配的姓名、电话号码和电子邮件地址。"
+        }
+      }
+    }
+  }
+}

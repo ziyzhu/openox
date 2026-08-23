@@ -1,0 +1,263 @@
+{
+  "domain": "www.1point3acres.com",
+  "name": "1Point3Acres",
+  "description": "A Chinese community for life and careers abroad. Search and read discussions about study, jobs, interviews, visas, and U.S. immigration, or check green-card dates and H-1B sponsorship rankings.",
+  "baseUrl": "https://www.1point3acres.com/",
+  "$defs": {
+    "thread": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "string" },
+        "subject": { "type": "string" },
+        "summary": { "type": "string" },
+        "author": { "type": "string" },
+        "forum": { "type": "string" },
+        "fid": { "type": ["integer", "null"] },
+        "threadType": { "type": "string" },
+        "replies": { "type": "integer" },
+        "views": { "type": "integer" },
+        "dateline": { "type": "integer" },
+        "lastpost": { "type": "integer" },
+        "url": { "type": "string" }
+      },
+      "required": ["tid", "subject", "summary", "author", "forum", "replies", "views", "url"],
+      "additionalProperties": false
+    },
+    "threadPage": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/thread" } },
+        "nextCursor": { "type": ["string", "null"] }
+      },
+      "required": ["items", "nextCursor"],
+      "additionalProperties": false
+    },
+    "bulletinRegion": {
+      "type": "object",
+      "properties": {
+        "actionDate": { "type": ["string", "null"] },
+        "filingDate": { "type": ["string", "null"] }
+      },
+      "required": ["actionDate", "filingDate"],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign-in URL",
+      "description": "URL of the sign-in page.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "url": { "type": "string" } },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Auth state",
+      "description": "Whether the user is signed in.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "signedIn": { "type": "boolean" } },
+        "required": ["signedIn"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Current user",
+      "description": "Profile of the signed-in user: username, group, credits and points.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uid": { "type": "string" },
+          "username": { "type": "string" },
+          "group": { "type": "string" },
+          "credits": { "type": "integer" },
+          "points": { "type": "integer" },
+          "isVip": { "type": "boolean" }
+        },
+        "required": ["uid", "username"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchThreads",
+      "label": "Search threads",
+      "description": "Searches forum discussions by exact keywords or by meaning.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query." },
+          "type": { "type": "string", "enum": ["keywords", "semantic"], "default": "keywords" },
+          "days": { "type": "integer", "default": 365, "description": "Restrict to threads from the last N days." },
+          "cursor": { "type": "string", "description": "Pagination cursor from a previous page." },
+          "limit": { "type": "integer", "default": 20 }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/threadPage" },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listThreads",
+      "label": "List forum threads",
+      "description": "Lists the newest discussions in a chosen forum, such as jobs, work visas, H-1B, or green-card immigration. You can also narrow results to a forum topic.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fid": { "type": "integer", "description": "Numeric forum id." },
+          "typeid": { "type": "integer", "description": "Optional thread-type filter within the forum." },
+          "cursor": { "type": "string", "description": "Pagination cursor (page number) from a previous page." },
+          "limit": { "type": "integer", "default": 20 }
+        },
+        "required": ["fid"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/$defs/threadPage" },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getThread",
+      "label": "Read thread",
+      "description": "Shows a discussion's original post and replies.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tid": { "type": "string", "description": "Thread id." },
+          "page": { "type": "integer", "default": 1 }
+        },
+        "required": ["tid"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tid": { "type": "string" },
+          "subject": { "type": "string" },
+          "page": { "type": "integer" },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pid": { "type": "string" },
+                "author": { "type": "string" },
+                "date": { "type": "string" },
+                "content": { "type": "string" }
+              },
+              "required": ["pid", "author", "content"],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": { "type": ["string", "null"] }
+        },
+        "required": ["tid", "subject", "page", "posts", "nextCursor"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getVisaBulletin",
+      "label": "Visa bulletin",
+      "description": "Latest US employment-based green-card visa bulletin priority dates (final action and filing dates) per category and country of chargeability.",
+      "inputSchema": { "type": "object", "additionalProperties": false },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currentMonth": { "type": "string" },
+          "prevMonth": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": { "type": "string" },
+                "china": { "$ref": "#/$defs/bulletinRegion" },
+                "india": { "$ref": "#/$defs/bulletinRegion" },
+                "mexico": { "$ref": "#/$defs/bulletinRegion" },
+                "philippines": { "$ref": "#/$defs/bulletinRegion" },
+                "vietnam": { "$ref": "#/$defs/bulletinRegion" },
+                "restOfWorld": { "$ref": "#/$defs/bulletinRegion" }
+              },
+              "required": ["category", "china", "india", "restOfWorld"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["currentMonth", "items"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getH1bRankings",
+      "label": "H-1B rankings",
+      "description": "Top H-1B sponsors ranked by filings, broken down by company, city, or job title, with filing counts and average salary.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "by": { "type": "string", "enum": ["companies", "cities", "jobs"], "default": "companies" },
+          "rankBy": { "type": "string", "default": "fillings" }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "by": { "type": "string" },
+          "rankBy": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "count": { "type": "integer" },
+                "avgSalary": { "type": "integer" }
+              },
+              "required": ["name", "count", "avgSalary"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["by", "items"],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "一亩三分地",
+      "description": "面向海外生活与职业发展的中文社区。搜索和阅读留学、求职、面试、签证和美国移民讨论，也可查询绿卡排期和 H-1B 担保排名。",
+      "actions": {
+        "getSignInUrl": { "label": "登录一亩三分地", "description": "打开一亩三分地登录页。" },
+        "getSignInState": { "label": "检查一亩三分地登录状态", "description": "检查你是否已登录一亩三分地。" },
+        "searchThreads": { "label": "搜索帖子", "description": "按精确关键词或内容含义搜索论坛讨论。" },
+        "listThreads": { "label": "板块帖子列表", "description": "列出所选板块中的最新讨论，例如求职、工作签证、H-1B 或绿卡移民，也可按板块主题缩小范围。" },
+        "getThread": { "label": "阅读帖子", "description": "显示某个讨论的楼主帖和回复。" },
+        "getVisaBulletin": { "label": "签证公告排期", "description": "最新美国职业移民绿卡排期(表 A 排期日与表 B 递交日),按类别和出生地国家区分。" },
+        "getH1bRankings": { "label": "H-1B 担保排名", "description": "按申请量排名的 H-1B 担保大户,可按公司、城市或职位细分,含申请数与平均薪资。" },
+        "getCurrentUser": { "label": "当前用户", "description": "已登录用户的资料:用户名、用户组、积分与大米。" }
+      }
+    }
+  }
+}

@@ -1,0 +1,479 @@
+{
+  "domain": "ios:location",
+  "name": "Location",
+  "description": "Read your approximate, city-level location for nearby search, local prices, and weather.",
+  "icon": {
+    "asset": "ios:location"
+  },
+  "permission": "location",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Get your approximate, city-level location.",
+      "id": "current",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Current location",
+      "outputSchema": {
+        "properties": {
+          "accuracy": {
+            "type": "string"
+          },
+          "authorizationAccuracy": {
+            "type": "string"
+          },
+          "capturedAt": {
+            "type": "string"
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "countryCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "horizontalAccuracyMeters": {
+            "type": "number"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Search Apple Maps near you while keeping your precise coordinate on device.",
+      "id": "searchNearby",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "type": "string"
+          },
+          "radiusMeters": {
+            "maximum": 50000,
+            "minimum": 100,
+            "type": "number"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "label": "Search nearby",
+      "outputSchema": {
+        "items": {
+          "properties": {
+            "address": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "category": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "city": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "country": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "countryCode": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "distanceMeters": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "latitude": {
+              "type": "number"
+            },
+            "longitude": {
+              "type": "number"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timezone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Resolve an address into Apple Maps places.",
+      "id": "resolve",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "label": "Resolve address",
+      "outputSchema": {
+        "items": {
+          "properties": {
+            "address": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "category": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "city": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "country": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "countryCode": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "distanceMeters": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "latitude": {
+              "type": "number"
+            },
+            "longitude": {
+              "type": "number"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timezone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Calculate distance and ETA from your current location.",
+      "id": "route",
+      "inputSchema": {
+        "properties": {
+          "destination": {
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "automobile",
+              "walking",
+              "transit",
+              "cycling"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "type": "object"
+      },
+      "label": "Route and ETA",
+      "outputSchema": {
+        "properties": {
+          "destination": {
+            "properties": {
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "countryCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "distanceMeters": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timezone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "distanceMeters": {
+            "type": "number"
+          },
+          "expectedArrivalAt": {
+            "type": "string"
+          },
+          "expectedDepartureAt": {
+            "type": "string"
+          },
+          "expectedTravelTimeSeconds": {
+            "type": "number"
+          },
+          "transport": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Open a resolved place or directions in Apple Maps.",
+      "id": "openInMaps",
+      "inputSchema": {
+        "properties": {
+          "directionsMode": {
+            "enum": [
+              "automobile",
+              "walking",
+              "transit",
+              "cycling"
+            ],
+            "type": "string"
+          },
+          "placeID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "placeID"
+        ],
+        "type": "object"
+      },
+      "label": "Open in Maps",
+      "outputSchema": {
+        "properties": {
+          "opened": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "定位",
+      "description": "读取精确到城市级别的大致位置，用于附近搜索、当地价格和天气查询。",
+      "actions": {
+        "current": {
+          "label": "当前位置",
+          "description": "获取精确到城市级别的大致位置。"
+        },
+        "searchNearby": {
+          "label": "搜索附近地点",
+          "description": "在 Apple 地图中搜索附近地点，同时将你的精确坐标保留在设备上。"
+        },
+        "resolve": {
+          "label": "解析地址",
+          "description": "将地址解析为 Apple 地图中的地点。"
+        },
+        "route": {
+          "label": "路线和预计到达时间",
+          "description": "根据你的当前位置计算距离和预计到达时间。"
+        },
+        "openInMaps": {
+          "label": "在地图中打开",
+          "description": "在 Apple 地图中打开已解析的地点或路线。"
+        }
+      }
+    }
+  }
+}

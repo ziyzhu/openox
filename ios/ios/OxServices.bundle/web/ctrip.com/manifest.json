@@ -1,0 +1,628 @@
+{
+  "domain": "ctrip.com",
+  "name": "Ctrip",
+  "description": "China's largest online travel agency. Search flight cities, get a city-pair's lowest-price calendar, browse cheapest-destination flight deals, look up hotel cities and search hotels with live prices, and read the signed-in member's profile.",
+  "baseUrl": "https://www.ctrip.com/",
+  "$defs": {
+    "flightCity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nameEn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "nameEn"
+      ]
+    },
+    "hotelCity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cityId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nameEN": {
+          "type": "string"
+        },
+        "countryName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cityId",
+        "name",
+        "nameEN",
+        "countryName"
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Ctrip",
+      "description": "Ctrip passport sign-in URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Ctrip.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchFlightCities",
+      "label": "Search flight cities",
+      "description": "Look up Ctrip flight city codes by Chinese name, English name, or pinyin.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/flightCity"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "上海"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getFlightPriceCalendar",
+      "label": "Flight price calendar",
+      "description": "Shows the lowest round-trip price by date between two cities. Choose cities from the flight-city search and use dates in YYYY-MM-DD format.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromCity": {
+            "type": "string"
+          },
+          "toCity": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "returnDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fromCity",
+          "toCity",
+          "startDate"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fromCity": {
+            "type": "string"
+          },
+          "toCity": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "departDate": {
+                  "type": "string"
+                },
+                "returnDate": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "totalPrice": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "departDate",
+                "returnDate",
+                "price",
+                "totalPrice"
+              ]
+            }
+          }
+        },
+        "required": [
+          "fromCity",
+          "toCity",
+          "currency",
+          "prices"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "fromCity": "SHA",
+        "toCity": "BJS",
+        "startDate": "2026-06-25",
+        "returnDate": "2026-06-28"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listFlightDeals",
+      "label": "Flight deals",
+      "description": "Shows the cheapest destinations you can fly to from a chosen city over the next 30 days.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromCity": {
+            "type": "string"
+          },
+          "fromName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fromCity"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "destination": {
+                  "type": "string"
+                },
+                "destCode": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": "string"
+                },
+                "lowestPrice": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "departDate": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destination",
+                "destCode",
+                "image",
+                "lowestPrice",
+                "departDate",
+                "currency"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "fromCity": "SHA",
+        "fromName": "上海"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchHotels",
+      "label": "Search hotels",
+      "description": "Searches hotels in a chosen city for a date range, with current nightly prices. Use dates in YYYY-MM-DD format.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cityId": {
+            "type": "number"
+          },
+          "checkIn": {
+            "type": "string"
+          },
+          "checkOut": {
+            "type": "string"
+          },
+          "page": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cityId",
+          "checkIn",
+          "checkOut"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "hotelId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "nameEn": {
+                  "type": "string"
+                },
+                "star": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "score": {
+                  "type": "string"
+                },
+                "reviews": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "displayPrice": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                },
+                "zone": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "string"
+                },
+                "lng": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hotelId",
+                "name",
+                "nameEn",
+                "star",
+                "score",
+                "reviews",
+                "price",
+                "displayPrice",
+                "address",
+                "zone",
+                "image",
+                "lat",
+                "lng"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "cityId": 2,
+        "checkIn": "2026-07-10",
+        "checkOut": "2026-07-11"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getMemberInfo",
+      "label": "Member profile",
+      "description": "The signed-in Ctrip member's name, VIP grade, and unread message count.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "vipGrade": {
+            "type": "number"
+          },
+          "vipGradeName": {
+            "type": "string"
+          },
+          "unreadMessages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "signedIn",
+          "userName",
+          "vipGrade",
+          "vipGradeName",
+          "unreadMessages"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchFlights",
+      "label": "Search flights",
+      "description": "Searches current one-way flights for a chosen route and date. If results are still loading, try the same search again. A security check may occasionally need to be completed on screen.",
+      "baseUrl": "https://flights.ctrip.com/online/channel/domestic",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "airline": {
+                  "type": "string"
+                },
+                "flightNo": {
+                  "type": "string"
+                },
+                "aircraft": {
+                  "type": "string"
+                },
+                "departTime": {
+                  "type": "string"
+                },
+                "departAirport": {
+                  "type": "string"
+                },
+                "arriveTime": {
+                  "type": "string"
+                },
+                "arriveAirport": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "cabin": {
+                  "type": "string"
+                },
+                "seatsLeft": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "airline",
+                "flightNo",
+                "aircraft",
+                "departTime",
+                "departAirport",
+                "arriveTime",
+                "arriveAirport",
+                "price",
+                "cabin",
+                "seatsLeft"
+              ]
+            }
+          },
+          "pending": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "pending",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "from": "SHA",
+        "to": "BJS",
+        "date": "2026-07-10"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchHotelCities",
+      "label": "Search hotel cities",
+      "description": "Look up Ctrip hotel city ids by Chinese or English name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/hotelCity"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "北京"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/ctrip.com/favicon.png"
+}

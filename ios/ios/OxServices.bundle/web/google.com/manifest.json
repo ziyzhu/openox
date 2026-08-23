@@ -1,0 +1,357 @@
+{
+  "domain": "google.com",
+  "name": "Google",
+  "description": "A web search engine. Find news, images, videos, and query suggestions. No sign-in required.",
+  "baseUrl": "https://www.google.com/",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "newsResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "publishedText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "site",
+        "source",
+        "publishedAt",
+        "publishedText"
+      ],
+      "additionalProperties": false
+    },
+    "imageResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "sourceUrl",
+        "site",
+        "thumbnailUrl"
+      ],
+      "additionalProperties": false
+    },
+    "videoResult": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "creator": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "snippet": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "publishedText": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "site",
+        "source",
+        "creator",
+        "snippet",
+        "duration",
+        "publishedText",
+        "thumbnailUrl"
+      ],
+      "additionalProperties": false
+    },
+    "newsPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/newsResult"
+          }
+        },
+        "nextCursor": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "imagePage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/imageResult"
+          }
+        },
+        "nextCursor": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "videoPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/videoResult"
+          }
+        },
+        "nextCursor": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "listSuggestions",
+      "label": "Autocomplete suggestions",
+      "description": "Suggests searches that complete a partial query.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial search query to complete."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "haik"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchNews",
+      "label": "Search news",
+      "description": "Finds current news articles with publishers and publication times.",
+      "baseUrl": "https://www.google.com/search?q={query}&tbm=nws&hl=en&start={cursor}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The news topic to search for."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The result offset returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10,
+            "description": "Maximum number of articles to return."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/newsPage"
+      },
+      "defaultArgs": {
+        "query": "Seattle",
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchImages",
+      "label": "Search images",
+      "description": "Finds image previews and the pages that publish them.",
+      "baseUrl": "https://www.google.com/search?q={query}&udm=2&hl=en",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The images to search for."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10,
+            "description": "Maximum number of image previews to return."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/imagePage"
+      },
+      "defaultArgs": {
+        "query": "Seattle",
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchVideos",
+      "label": "Search videos",
+      "description": "Finds videos with sources, creators, durations, and previews.",
+      "baseUrl": "https://www.google.com/search?q={query}&udm=7&hl=en",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The videos to search for."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10,
+            "description": "Maximum number of videos to return."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/videoPage"
+      },
+      "defaultArgs": {
+        "query": "Seattle",
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "谷歌",
+      "description": "网页搜索引擎。查找新闻、图片、视频和查询建议。无需登录。",
+      "actions": {
+        "listSuggestions": {
+          "label": "自动补全建议",
+          "description": "为未输入完整的查询提供搜索建议。"
+        },
+        "searchNews": {
+          "label": "搜索新闻",
+          "description": "查找最新新闻文章、发布媒体和发布时间。"
+        },
+        "searchImages": {
+          "label": "搜索图片",
+          "description": "查找图片预览及其发布页面。"
+        },
+        "searchVideos": {
+          "label": "搜索视频",
+          "description": "查找视频及其来源、创作者、时长和预览。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/google.com/favicon.png"
+}

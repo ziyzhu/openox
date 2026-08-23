@@ -4,6 +4,7 @@
   "workspaces": {
     "": {
       "dependencies": {
+        "@sinclair/typebox": "^0.34.49",
         "defuddle": "0.19.2",
       },
       "devDependencies": {

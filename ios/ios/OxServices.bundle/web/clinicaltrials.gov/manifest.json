@@ -1,0 +1,1348 @@
+{
+  "domain": "clinicaltrials.gov",
+  "name": "ClinicalTrials.gov",
+  "description": "The U.S. National Library of Medicine registry for clinical studies. Search studies, inspect eligibility and recruiting locations, and read posted results. Public and read-only; no sign-in required.",
+  "baseUrl": "https://clinicaltrials.gov/api/v2/version",
+  "$defs": {
+    "nearby": {
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "radiusMiles": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "radiusMiles"
+      ],
+      "additionalProperties": false
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "phoneExtension": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "site": {
+      "type": "object",
+      "properties": {
+        "facility": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        },
+        "distanceMiles": {
+          "type": "number"
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contact"
+          }
+        }
+      },
+      "required": [
+        "contacts"
+      ],
+      "additionalProperties": false
+    },
+    "intervention": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "otherNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "otherNames"
+      ],
+      "additionalProperties": false
+    },
+    "plannedOutcome": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "measure": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "timeFrame": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "measure"
+      ],
+      "additionalProperties": false
+    },
+    "group": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "arm": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "interventionNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "interventionNames"
+      ],
+      "additionalProperties": false
+    },
+    "groupValue": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "numSubjects": {
+          "type": "string"
+        },
+        "numEvents": {
+          "type": "number"
+        },
+        "numAffected": {
+          "type": "number"
+        },
+        "numAtRisk": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "groupId"
+      ],
+      "additionalProperties": false
+    },
+    "measurement": {
+      "type": "object",
+      "properties": {
+        "classTitle": {
+          "type": "string"
+        },
+        "categoryTitle": {
+          "type": "string"
+        },
+        "groupId": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "spread": {
+          "type": "string"
+        },
+        "lowerLimit": {
+          "type": "string"
+        },
+        "upperLimit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "groupId"
+      ],
+      "additionalProperties": false
+    },
+    "analysis": {
+      "type": "object",
+      "properties": {
+        "groupIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pValue": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "parameterValue": {
+          "type": "string"
+        },
+        "confidenceIntervalPercent": {
+          "type": "string"
+        },
+        "lowerLimit": {
+          "type": "string"
+        },
+        "upperLimit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "groupIds"
+      ],
+      "additionalProperties": false
+    },
+    "resultMeasure": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "populationDescription": {
+          "type": "string"
+        },
+        "reportingStatus": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "dispersion": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "timeFrame": {
+          "type": "string"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        },
+        "measurements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/measurement"
+          }
+        },
+        "measurementsTruncated": {
+          "type": "boolean"
+        },
+        "analyses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/analysis"
+          }
+        }
+      },
+      "required": [
+        "title",
+        "groups",
+        "measurements",
+        "measurementsTruncated",
+        "analyses"
+      ],
+      "additionalProperties": false
+    },
+    "searchResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "acronym": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "statusVerified": {
+          "type": "string"
+        },
+        "studyType": {
+          "type": "string"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "interventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/intervention"
+          }
+        },
+        "sponsor": {
+          "type": "string"
+        },
+        "briefSummary": {
+          "type": "string"
+        },
+        "enrollmentCount": {
+          "type": "number"
+        },
+        "enrollmentType": {
+          "type": "string"
+        },
+        "sex": {
+          "type": "string"
+        },
+        "minimumAge": {
+          "type": "string"
+        },
+        "maximumAge": {
+          "type": "string"
+        },
+        "healthyVolunteers": {
+          "type": "boolean"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "primaryCompletionDate": {
+          "type": "string"
+        },
+        "completionDate": {
+          "type": "string"
+        },
+        "firstPosted": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "hasResults": {
+          "type": "boolean"
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/site"
+          }
+        },
+        "sitesCount": {
+          "type": "integer"
+        },
+        "sitesTruncated": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status",
+        "phases",
+        "conditions",
+        "interventions",
+        "hasResults",
+        "sites",
+        "sitesCount",
+        "sitesTruncated",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "pmid": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "citation"
+      ],
+      "additionalProperties": false
+    },
+    "link": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "design": {
+      "type": "object",
+      "properties": {
+        "allocation": {
+          "type": "string"
+        },
+        "interventionModel": {
+          "type": "string"
+        },
+        "primaryPurpose": {
+          "type": "string"
+        },
+        "observationalModel": {
+          "type": "string"
+        },
+        "timePerspective": {
+          "type": "string"
+        },
+        "masking": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "eligibility": {
+      "type": "object",
+      "properties": {
+        "criteria": {
+          "type": "string"
+        },
+        "healthyVolunteers": {
+          "type": "boolean"
+        },
+        "sex": {
+          "type": "string"
+        },
+        "genderBased": {
+          "type": "boolean"
+        },
+        "genderDescription": {
+          "type": "string"
+        },
+        "minimumAge": {
+          "type": "string"
+        },
+        "maximumAge": {
+          "type": "string"
+        },
+        "standardAges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "studyPopulation": {
+          "type": "string"
+        },
+        "samplingMethod": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "standardAges"
+      ],
+      "additionalProperties": false
+    },
+    "study": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "officialTitle": {
+          "type": "string"
+        },
+        "acronym": {
+          "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "lastKnownStatus": {
+          "type": "string"
+        },
+        "whyStopped": {
+          "type": "string"
+        },
+        "statusVerified": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "primaryCompletionDate": {
+          "type": "string"
+        },
+        "completionDate": {
+          "type": "string"
+        },
+        "firstPosted": {
+          "type": "string"
+        },
+        "resultsFirstPosted": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "sponsor": {
+          "type": "string"
+        },
+        "sponsorClass": {
+          "type": "string"
+        },
+        "collaborators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "briefSummary": {
+          "type": "string"
+        },
+        "detailedDescription": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "studyType": {
+          "type": "string"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enrollmentCount": {
+          "type": "number"
+        },
+        "enrollmentType": {
+          "type": "string"
+        },
+        "design": {
+          "$ref": "#/$defs/design"
+        },
+        "arms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arm"
+          }
+        },
+        "interventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/intervention"
+          }
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/plannedOutcome"
+          }
+        },
+        "eligibility": {
+          "$ref": "#/$defs/eligibility"
+        },
+        "centralContacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contact"
+          }
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/site"
+          }
+        },
+        "sitesCount": {
+          "type": "integer"
+        },
+        "sitesTruncated": {
+          "type": "boolean"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          }
+        },
+        "hasResults": {
+          "type": "boolean"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "dataTimestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "aliases",
+        "status",
+        "collaborators",
+        "conditions",
+        "keywords",
+        "phases",
+        "design",
+        "arms",
+        "interventions",
+        "outcomes",
+        "eligibility",
+        "centralContacts",
+        "sites",
+        "sitesCount",
+        "sitesTruncated",
+        "references",
+        "links",
+        "hasResults",
+        "sourceUrl",
+        "dataTimestamp"
+      ],
+      "additionalProperties": false
+    },
+    "flowPeriod": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "comment": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/groupValue"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "values"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "withdrawals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "comment": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/groupValue"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "values"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "title",
+        "milestones",
+        "withdrawals"
+      ],
+      "additionalProperties": false
+    },
+    "participantFlow": {
+      "type": "object",
+      "properties": {
+        "recruitmentDetails": {
+          "type": "string"
+        },
+        "preAssignmentDetails": {
+          "type": "string"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        },
+        "periods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/flowPeriod"
+          }
+        }
+      },
+      "required": [
+        "groups",
+        "periods"
+      ],
+      "additionalProperties": false
+    },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "populationDescription": {
+          "type": "string"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        },
+        "measures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resultMeasure"
+          }
+        },
+        "measuresCount": {
+          "type": "integer"
+        },
+        "measuresTruncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "groups",
+        "measures",
+        "measuresCount",
+        "measuresTruncated"
+      ],
+      "additionalProperties": false
+    },
+    "eventGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "deathsAffected": {
+          "type": "number"
+        },
+        "deathsAtRisk": {
+          "type": "number"
+        },
+        "seriousAffected": {
+          "type": "number"
+        },
+        "seriousAtRisk": {
+          "type": "number"
+        },
+        "otherAffected": {
+          "type": "number"
+        },
+        "otherAtRisk": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "adverseEvent": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "type": "string"
+        },
+        "organSystem": {
+          "type": "string"
+        },
+        "assessmentType": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "stats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/groupValue"
+          }
+        }
+      },
+      "required": [
+        "term",
+        "stats"
+      ],
+      "additionalProperties": false
+    },
+    "adverseEvents": {
+      "type": "object",
+      "properties": {
+        "frequencyThreshold": {
+          "type": "string"
+        },
+        "timeFrame": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eventGroup"
+          }
+        },
+        "seriousEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adverseEvent"
+          }
+        },
+        "seriousEventsCount": {
+          "type": "integer"
+        },
+        "seriousEventsTruncated": {
+          "type": "boolean"
+        },
+        "otherEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adverseEvent"
+          }
+        },
+        "otherEventsCount": {
+          "type": "integer"
+        },
+        "otherEventsTruncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "groups",
+        "seriousEvents",
+        "seriousEventsCount",
+        "seriousEventsTruncated",
+        "otherEvents",
+        "otherEventsCount",
+        "otherEventsTruncated"
+      ],
+      "additionalProperties": false
+    },
+    "studyResults": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "resultsFirstPosted": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "participantFlow": {
+          "$ref": "#/$defs/participantFlow"
+        },
+        "baseline": {
+          "$ref": "#/$defs/baseline"
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resultMeasure"
+          }
+        },
+        "outcomesCount": {
+          "type": "integer"
+        },
+        "outcomesTruncated": {
+          "type": "boolean"
+        },
+        "adverseEvents": {
+          "$ref": "#/$defs/adverseEvents"
+        },
+        "limitations": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "dataTimestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status",
+        "outcomes",
+        "outcomesCount",
+        "outcomesTruncated",
+        "sourceUrl",
+        "dataTimestamp"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchStudies",
+      "label": "Search clinical studies",
+      "description": "Searches ClinicalTrials.gov with structured status, location, phase, study type, sex, age, posted-results, update-date, sorting, and pagination filters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Condition, treatment, sponsor, title, study ID, outcome, or general search terms."
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "all",
+              "condition",
+              "intervention",
+              "title",
+              "outcome",
+              "sponsor",
+              "studyId"
+            ],
+            "default": "all"
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "NOT_YET_RECRUITING",
+                "RECRUITING",
+                "ENROLLING_BY_INVITATION",
+                "ACTIVE_NOT_RECRUITING",
+                "SUSPENDED",
+                "TERMINATED",
+                "COMPLETED",
+                "WITHDRAWN",
+                "UNKNOWN",
+                "WITHHELD",
+                "NO_LONGER_AVAILABLE",
+                "TEMPORARILY_NOT_AVAILABLE",
+                "AVAILABLE",
+                "APPROVED_FOR_MARKETING"
+              ]
+            }
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text city, state, postal code, country, or facility search."
+          },
+          "nearby": {
+            "$ref": "#/$defs/nearby"
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "EARLY_PHASE1",
+                "PHASE1",
+                "PHASE2",
+                "PHASE3",
+                "PHASE4",
+                "NA"
+              ]
+            }
+          },
+          "studyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INTERVENTIONAL",
+                "OBSERVATIONAL",
+                "EXPANDED_ACCESS"
+              ]
+            }
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "FEMALE",
+              "MALE"
+            ]
+          },
+          "age": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "description": "Candidate age in years; keeps studies whose registered age range includes it."
+          },
+          "hasResults": {
+            "type": "boolean"
+          },
+          "updatedAfter": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Keep studies last updated on or after this YYYY-MM-DD date."
+          },
+          "advancedQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional ClinicalTrials.gov Essie expression appended to the structured filters."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "newestPosted",
+              "recentlyUpdated",
+              "startDate"
+            ],
+            "default": "relevance"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque nextCursor returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/searchResult"
+            }
+          },
+          "totalCount": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dataTimestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "dataTimestamp"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "breast cancer",
+        "field": "condition",
+        "statuses": [
+          "RECRUITING",
+          "NOT_YET_RECRUITING"
+        ],
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStudy",
+      "label": "Read a clinical study",
+      "description": "Reads one study's registration details, design, eligibility, planned outcomes, sponsor, contacts, references, and recruiting locations.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^NCT\\d{8}$",
+            "description": "ClinicalTrials.gov NCT identifier."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optionally rank and return sites matching this place."
+          },
+          "nearby": {
+            "$ref": "#/$defs/nearby"
+          },
+          "siteLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/study"
+      },
+      "defaultArgs": {
+        "id": "NCT04280705"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStudyResults",
+      "label": "Read posted study results",
+      "description": "Reads bounded, structured posted results for one study, including participant flow, baseline measures, outcomes, statistical analyses, adverse events, and limitations when available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^NCT\\d{8}$",
+            "description": "ClinicalTrials.gov NCT identifier with posted results."
+          },
+          "outcomeLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          },
+          "eventLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/studyResults"
+      },
+      "defaultArgs": {
+        "id": "NCT04280705"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "ClinicalTrials.gov 临床试验注册库",
+      "description": "美国国家医学图书馆维护的临床研究注册库。可搜索研究、查看入组条件和招募地点，并阅读已发布结果。公开且只读；无需登录。",
+      "actions": {
+        "searchStudies": {
+          "label": "搜索临床研究",
+          "description": "搜索 ClinicalTrials.gov，并可按状态、地点、阶段、研究类型、性别、年龄、结果发布情况和更新日期筛选。"
+        },
+        "getStudy": {
+          "label": "读取临床研究",
+          "description": "读取一项研究的注册信息、设计、入组条件、预设结局、申办方、联系人、参考资料和研究地点。"
+        },
+        "getStudyResults": {
+          "label": "读取已发布结果",
+          "description": "读取一项研究的结构化结果，包括参与者流程、基线指标、结局、统计分析、不良事件和局限性。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/clinicaltrials.gov/favicon.png",
+  "skills": [
+    {
+      "name": "clinical-trials",
+      "description": "Search and interpret ClinicalTrials.gov study registrations and posted results. Use when finding trials, assessing registered eligibility and recruiting sites, comparing study designs, or summarizing registry results."
+    }
+  ]
+}

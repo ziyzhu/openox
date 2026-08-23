@@ -1,0 +1,418 @@
+{
+  "domain": "www.nature.com",
+  "name": "Nature",
+  "description": "A leading scientific research publisher. Search articles with author, journal, type, date, and relevance filters; read article metadata and available sections; browse journals; and explore each journal's featured and recent content. Public and read-only; no sign-in required.",
+  "baseUrl": "https://www.nature.com/search?q=zzzzunlikelyqueryzzzz",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "articleSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Nature article identifier; pass to getArticle."
+        },
+        "title": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "articleType": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "publishedAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "journal": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "openAccess": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "authors",
+        "summary",
+        "articleType",
+        "publishedAt",
+        "journal",
+        "openAccess",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "articleSection": {
+      "type": "object",
+      "properties": {
+        "heading": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "heading",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "journalContentGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/articleSummary"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "heading",
+        "items"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchArticles",
+      "label": "Search articles",
+      "description": "Searches Nature articles by terms, with optional author, title, journal, article type, publication-year, and result-order filters. Returns 50 results per page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Terms that may appear anywhere in an article record."
+          },
+          "author": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only show articles whose author list contains this text."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only show articles whose title contains this text."
+          },
+          "journal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Nature journal identifier from listJournals, such as gt."
+          },
+          "articleType": {
+            "type": "string",
+            "enum": [
+              "research",
+              "reviews",
+              "comments-and-opinion",
+              "research-highlights",
+              "amendments-and-corrections",
+              "correspondence",
+              "advertorial",
+              "books-and-arts",
+              "editorial",
+              "news",
+              "news-and-views",
+              "protocols",
+              "special-features"
+            ],
+            "description": "Broad Nature article category."
+          },
+          "startYear": {
+            "type": "integer",
+            "minimum": 1800,
+            "maximum": 2100,
+            "description": "Earliest publication year to include."
+          },
+          "endYear": {
+            "type": "integer",
+            "minimum": 1800,
+            "maximum": 2100,
+            "description": "Latest publication year to include."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "date_desc",
+              "date_asc"
+            ],
+            "default": "relevance",
+            "description": "Sort by relevance, newest first, or oldest first."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Page cursor returned by an earlier search."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/articleSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "cardiology"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getArticle",
+      "label": "Read an article",
+      "description": "Reads an article's title, authors, summary, subjects, publication details, available sections, and PDF link when offered. Full text depends on what Nature makes available on the article page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Nature article identifier, Nature article URL, or DOI."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "doi": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "title": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "articleType": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "publishedAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "journal": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "openAccess": {
+            "type": "boolean"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/articleSection"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "pdfUrl": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "id",
+          "doi",
+          "title",
+          "authors",
+          "summary",
+          "subjects",
+          "articleType",
+          "publishedAt",
+          "journal",
+          "openAccess",
+          "sections",
+          "url",
+          "pdfUrl"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "s41746-026-03002-9"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listJournals",
+      "label": "Browse journals",
+      "description": "Lists Nature journals with the identifiers used for journal detail and filtered article search.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Journal identifier; pass to getJournal or use as a journal search filter."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getJournal",
+      "label": "Explore a journal",
+      "description": "Shows a Nature journal's description, identifiers, and its available featured, issue, or recent article groups.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Journal identifier from listJournals, such as gt."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "issns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/journalContentGroup"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "issns",
+          "groups",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "id": "gt"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

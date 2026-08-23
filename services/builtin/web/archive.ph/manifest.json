@@ -1,0 +1,269 @@
+{
+  "domain": "archive.ph",
+  "name": "Archive.ph",
+  "description": "A permanent webpage snapshot archive. Find saved versions, inspect capture details, and create new snapshots. Human verification may be required when saving.",
+  "baseUrl": "https://archive.ph/",
+  "$defs": {
+    "capture": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The five-character Archive.ph capture identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "The captured page title."
+        },
+        "originalUrl": {
+          "type": "string",
+          "description": "The original webpage URL."
+        },
+        "archiveUrl": {
+          "type": "string",
+          "description": "The permanent Archive.ph capture URL."
+        },
+        "capturedAt": {
+          "type": "string",
+          "description": "When Archive.ph saved the page."
+        },
+        "screenshotUrl": {
+          "type": "string",
+          "description": "The full-page screenshot URL."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "originalUrl",
+        "archiveUrl",
+        "capturedAt",
+        "screenshotUrl"
+      ],
+      "additionalProperties": false
+    },
+    "captureSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "originalUrl": {
+          "type": "string"
+        },
+        "archiveUrl": {
+          "type": "string"
+        },
+        "capturedAt": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "originalUrl",
+        "archiveUrl",
+        "capturedAt",
+        "thumbnailUrl"
+      ],
+      "additionalProperties": false
+    },
+    "urlInput": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https?://",
+          "description": "The live webpage URL to save."
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "urlOutput": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "searchCaptures",
+      "label": "Search captures",
+      "description": "Finds saved snapshots for a webpage URL, domain, subdomain pattern, or URL prefix.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A webpage URL, domain such as example.com, subdomain pattern such as *.example.com, or URL prefix ending in *."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Reserved for pagination; omit for the current Archive.ph result page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Maximum number of captures to return."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/captureSummary"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "example.com",
+        "limit": 20
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCapture",
+      "label": "Get capture",
+      "description": "Gets a saved snapshot's title, original link, permanent link, save time, and screenshot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9]{5}$",
+            "description": "The five-character capture identifier."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/capture"
+      },
+      "defaultArgs": {
+        "id": "ADfzs"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "createCapture",
+      "label": "Save webpage snapshot",
+      "description": "Creates a permanent public snapshot of the webpage. Approval required. If Archive.ph requests human verification, continue through its verification card.",
+      "inputSchema": {
+        "$ref": "#/$defs/urlInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/capture"
+      },
+      "defaultArgs": {
+        "url": "https://example.com/"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "getBotControlUrl",
+      "label": "Verify on Archive.ph",
+      "description": "Opens Archive.ph so you can complete any human verification required to save the webpage.",
+      "inputSchema": {
+        "$ref": "#/$defs/urlInput"
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/urlOutput"
+      },
+      "defaultArgs": {
+        "url": "https://example.com/"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getBotControlState",
+      "label": "Check Archive.ph verification",
+      "description": "Checks whether human verification finished and produced the requested snapshot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "description": "The live webpage URL being saved."
+          },
+          "pageUrl": {
+            "type": "string",
+            "description": "The current Archive.ph verification page supplied by the client."
+          }
+        },
+        "required": [
+          "url",
+          "pageUrl"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "url": "https://example.com/",
+        "pageUrl": "https://archive.ph/"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}

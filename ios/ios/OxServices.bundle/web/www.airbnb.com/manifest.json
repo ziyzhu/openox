@@ -1,0 +1,1382 @@
+{
+  "domain": "www.airbnb.com",
+  "name": "Airbnb",
+  "description": "A marketplace for stays and travel services. Search filtered homes and local services, inspect listings, availability, and reviews, and review signed-in trips, reservation details, and wishlist contents. Open Airbnb checkout to personally review and complete a stay reservation.",
+  "baseUrl": "https://www.airbnb.com/",
+  "$defs": {
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stay": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "reviewCount": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "priceText": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "longitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "imageUrl": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "name",
+        "title",
+        "subtitle",
+        "rating",
+        "reviewCount",
+        "priceText",
+        "details",
+        "badges",
+        "latitude",
+        "longitude",
+        "imageUrl"
+      ],
+      "additionalProperties": false
+    },
+    "stayAmenity": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "details": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "group",
+        "available",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "stayDetails": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "propertyType": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "guestCapacity": {
+          "type": "number"
+        },
+        "bedrooms": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "beds": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "bathrooms": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "reviewCount": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "hostSuperhost": {
+          "type": "boolean"
+        },
+        "highlights": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "amenities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stayAmenity"
+          }
+        },
+        "houseRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "safety": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "longitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "imageUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "name",
+        "propertyType",
+        "location",
+        "description",
+        "guestCapacity",
+        "bedrooms",
+        "beds",
+        "bathrooms",
+        "rating",
+        "reviewCount",
+        "hostName",
+        "hostSuperhost",
+        "highlights",
+        "amenities",
+        "houseRules",
+        "safety",
+        "latitude",
+        "longitude",
+        "imageUrls"
+      ],
+      "additionalProperties": false
+    },
+    "stayReview": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "number"
+        },
+        "comments": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "localizedDate": {
+          "type": "string"
+        },
+        "reviewerName": {
+          "type": "string"
+        },
+        "reviewerLocation": {
+          "type": "string"
+        },
+        "reviewerPhotoUrl": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "response": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "rating",
+        "comments",
+        "language",
+        "createdAt",
+        "localizedDate",
+        "reviewerName",
+        "reviewerLocation",
+        "reviewerPhotoUrl",
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "stayAvailabilityDay": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "availableForCheckIn": {
+          "type": "boolean"
+        },
+        "availableForCheckOut": {
+          "type": "boolean"
+        },
+        "minNights": {
+          "type": "number"
+        },
+        "maxNights": {
+          "type": "number"
+        },
+        "priceText": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "date",
+        "available",
+        "availableForCheckIn",
+        "availableForCheckOut",
+        "minNights",
+        "maxNights",
+        "priceText"
+      ],
+      "additionalProperties": false
+    },
+    "stayAvailabilityMonth": {
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stayAvailabilityDay"
+          }
+        }
+      },
+      "required": [
+        "month",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "priceText": {
+          "type": "string"
+        },
+        "secondaryPriceText": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "reviewCount": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "yearsOfExperience": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "imageUrl": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "name",
+        "category",
+        "description",
+        "location",
+        "priceText",
+        "secondaryPriceText",
+        "rating",
+        "reviewCount",
+        "yearsOfExperience",
+        "imageUrl"
+      ],
+      "additionalProperties": false
+    },
+    "tripSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "listingId": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string"
+        },
+        "endTime": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "confirmationCode": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "pendingExpiresAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "guestCount": {
+          "type": "number"
+        },
+        "travelerCount": {
+          "type": "number"
+        },
+        "travelerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "longitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "imageUrl": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "listingId",
+        "name",
+        "status",
+        "startTime",
+        "endTime",
+        "timeZone",
+        "confirmationCode",
+        "pendingExpiresAt",
+        "guestCount",
+        "travelerCount",
+        "travelerNames",
+        "latitude",
+        "longitude",
+        "imageUrl",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "trip": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "listingId": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string"
+        },
+        "endTime": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "latitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "longitude": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "confirmationCode": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "reservationStatus": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "pendingExpiresAt": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "guestCount": {
+          "type": "number"
+        },
+        "guestNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "travelerCount": {
+          "type": "number"
+        },
+        "travelerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "bedrooms": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "beds": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "bathrooms": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "reviewCount": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "imageUrl": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "url": {
+          "type": "string"
+        },
+        "messageUrl": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "listingId",
+        "name",
+        "status",
+        "startTime",
+        "endTime",
+        "timeZone",
+        "address",
+        "latitude",
+        "longitude",
+        "confirmationCode",
+        "reservationStatus",
+        "pendingExpiresAt",
+        "guestCount",
+        "guestNames",
+        "travelerCount",
+        "travelerNames",
+        "hostName",
+        "bedrooms",
+        "beds",
+        "bathrooms",
+        "rating",
+        "reviewCount",
+        "imageUrl",
+        "url",
+        "messageUrl"
+      ],
+      "additionalProperties": false
+    },
+    "wishlist": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "itemCount": {
+          "type": "number"
+        },
+        "guestCount": {
+          "type": "number"
+        },
+        "adults": {
+          "type": "number"
+        },
+        "children": {
+          "type": "number"
+        },
+        "infants": {
+          "type": "number"
+        },
+        "stayIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "experienceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "placeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checkIn": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "checkOut": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "collaborative": {
+          "type": "boolean"
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "collaboratorNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "imageUrl": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url",
+        "itemCount",
+        "guestCount",
+        "adults",
+        "children",
+        "infants",
+        "stayIds",
+        "experienceIds",
+        "placeIds",
+        "checkIn",
+        "checkOut",
+        "private",
+        "collaborative",
+        "ownerName",
+        "collaboratorNames",
+        "imageUrl"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Airbnb",
+      "description": "Opens the Airbnb sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Airbnb sign-in",
+      "description": "Checks whether you are signed in to Airbnb.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchStays",
+      "label": "Search stays",
+      "description": "Searches Airbnb homes for exact travel dates and guest counts, optionally filtering by bathrooms, free parking, and maximum price, with displayed prices, ratings, key room details, and listing links.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination, neighborhood, or landmark."
+          },
+          "checkIn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-in date in YYYY-MM-DD format."
+          },
+          "checkOut": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-out date in YYYY-MM-DD format."
+          },
+          "adults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16,
+            "default": 1
+          },
+          "children": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15,
+            "default": 0
+          },
+          "infants": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "pets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "minBathrooms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "Minimum number of bathrooms."
+          },
+          "freeParking": {
+            "type": "boolean",
+            "default": false,
+            "description": "Only return homes offering free parking."
+          },
+          "maxPrice": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "Maximum Airbnb price-filter amount in USD for the selected stay."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination token returned by the previous search."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 18,
+            "default": 18
+          }
+        },
+        "required": [
+          "query",
+          "checkIn",
+          "checkOut"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/stay"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStay",
+      "label": "Get stay details",
+      "description": "Returns one Airbnb home's description, capacity, rooms, rating, host, amenities, rules, safety notes, approximate location, and photos. Choose a home from stay search.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Listing id or Airbnb room URL returned by stay search."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/stayDetails"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStayAvailability",
+      "label": "Check stay availability",
+      "description": "Returns daily availability for one Airbnb home across up to 12 months, including allowed arrival and departure dates, stay-length rules, and displayed daily prices when available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Listing id or Airbnb room URL returned by stay search."
+          },
+          "startMonth": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "description": "First calendar month in YYYY-MM format."
+          },
+          "months": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "default": 12,
+            "description": "Number of consecutive months to return."
+          }
+        },
+        "required": [
+          "id",
+          "startMonth"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/stayAvailabilityMonth"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "months"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listStayReviews",
+      "label": "List stay reviews",
+      "description": "Lists guest reviews for one Airbnb home with ratings, dates, reviewer details, comments, and host responses.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Listing id or Airbnb room URL returned by stay search."
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Offset returned by the previous review page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24,
+            "default": 24
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/stayReview"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPaymentUrl",
+      "label": "Review stay checkout",
+      "description": "Opens Airbnb checkout for the selected home, dates, and guests so you can review the price and policies, then personally submit and pay for the reservation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Listing id or Airbnb room URL returned by stay search."
+          },
+          "checkIn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-in date in YYYY-MM-DD format."
+          },
+          "checkOut": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-out date in YYYY-MM-DD format."
+          },
+          "adults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16,
+            "default": 1
+          },
+          "children": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15,
+            "default": 0
+          },
+          "infants": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "pets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "default": "USD",
+            "description": "Three-letter currency code for displayed checkout prices."
+          },
+          "isWorkTrip": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to mark the reservation as a work trip."
+          }
+        },
+        "required": [
+          "listingId",
+          "checkIn",
+          "checkOut"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.airbnb.com/"
+    },
+    {
+      "id": "getPaymentState",
+      "label": "Check stay checkout",
+      "description": "Checks whether the selected Airbnb reservation is awaiting your review, has been submitted, or is no longer active. A submitted reservation includes its confirmation code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Listing id or Airbnb room URL returned by stay search."
+          },
+          "checkIn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-in date in YYYY-MM-DD format."
+          },
+          "checkOut": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Check-out date in YYYY-MM-DD format."
+          },
+          "adults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16,
+            "default": 1
+          },
+          "children": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15,
+            "default": 0
+          },
+          "infants": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "pets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "default": "USD",
+            "description": "Three-letter currency code used at checkout."
+          },
+          "isWorkTrip": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the reservation is marked as a work trip."
+          },
+          "since": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+            "description": "Checkout episode start in YYYY-MM-DD HH:MM:SS local time."
+          }
+        },
+        "required": [
+          "listingId",
+          "checkIn",
+          "checkOut"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "completed"
+            ]
+          },
+          "reference": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reference"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false,
+      "baseUrl": "https://www.airbnb.com/"
+    },
+    {
+      "id": "searchServices",
+      "label": "Search services",
+      "description": "Searches nearby Airbnb services by keyword, such as chefs, massage, photography, or training, for a chosen date and map location.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Service category, name, or description keyword."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Service date in YYYY-MM-DD format."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination token returned by the previous search."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "required": [
+          "query",
+          "latitude",
+          "longitude",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/service"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "listTrips",
+      "label": "List trips",
+      "description": "Lists upcoming or past Airbnb trips with dates, reservation and listing references, approximate coordinates, traveler counts and names, pending-reservation expiry, and links when available. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past"
+            ],
+            "default": "upcoming"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination token returned by the previous trip list."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tripSummary"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "kind": "upcoming",
+        "limit": 10
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getTrip",
+      "label": "Get trip details",
+      "description": "Returns one Airbnb trip's dates, address and approximate coordinates, reservation status, references and pending expiry, traveler details, host, home details, and messaging link. Choose a trip from your trip list. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trip id or trip URL returned by the trip list."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/trip"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listWishlists",
+      "label": "List wishlists",
+      "description": "Lists your Airbnb wishlists with travel dates, adult, child, and infant counts, saved stay, experience, and place IDs, owner and collaborator names, privacy, and links. Sign-in required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Offset returned by the previous wishlist page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 12
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/wishlist"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "limit": 12
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "爱彼迎",
+      "description": "住宿与旅行服务平台。筛选房源和本地服务，查看房源详情、可订日期与评价，并查看登录账户中的行程、预订详情和心愿单内容。还可打开爱彼迎结算页，由你亲自核对并完成住宿预订。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录爱彼迎",
+          "description": "打开爱彼迎登录页。"
+        },
+        "getSignInState": {
+          "label": "检查爱彼迎登录状态",
+          "description": "检查你是否已登录爱彼迎。"
+        },
+        "searchStays": {
+          "label": "搜索住宿",
+          "description": "按准确出行日期和住客人数搜索爱彼迎房源，可筛选最少浴室数、免费停车和最高价格，并返回页面显示的价格、评分、主要房间信息和房源链接。"
+        },
+        "getStay": {
+          "label": "获取房源详情",
+          "description": "返回单个爱彼迎房源的介绍、容纳人数、房间、评分、房东、设施、规则、安全提示、大致位置和照片。请先从住宿搜索中选择房源。"
+        },
+        "getStayAvailability": {
+          "label": "查看房源可订日期",
+          "description": "返回单个爱彼迎房源最多十二个月的每日可订状态、入住和退房资格、最短和最长住宿晚数，以及可用时显示的每日价格。"
+        },
+        "listStayReviews": {
+          "label": "房源评价列表",
+          "description": "列出单个爱彼迎房源的住客评价，包括评分、日期、评价者信息、正文和房东回复。"
+        },
+        "getPaymentUrl": {
+          "label": "核对住宿结算",
+          "description": "打开所选房源、日期和住客对应的爱彼迎结算页，供你核对价格与政策，并亲自提交和支付预订。"
+        },
+        "getPaymentState": {
+          "label": "检查住宿结算状态",
+          "description": "检查所选爱彼迎预订是等待你核对、已经提交，还是已不再有效。已提交的预订会包含确认码。"
+        },
+        "searchServices": {
+          "label": "搜索服务",
+          "description": "按关键词、日期和地图位置搜索附近的爱彼迎服务，例如私厨、按摩、摄影或训练。"
+        },
+        "listTrips": {
+          "label": "行程列表",
+          "description": "列出即将开始或已经结束的爱彼迎行程，包括日期、预订和房源编号、大致坐标、旅行者人数与姓名、待处理预订的过期时间及可用链接。需要登录。"
+        },
+        "getTrip": {
+          "label": "获取行程详情",
+          "description": "返回单个爱彼迎行程的日期、地址和大致坐标、预订状态、编号和待处理过期时间、旅行者、房东、房源信息及消息链接。请先从行程列表选择行程。需要登录。"
+        },
+        "listWishlists": {
+          "label": "心愿单列表",
+          "description": "列出你的爱彼迎心愿单，包括出行日期、成人、儿童和婴儿人数、已收藏的房源、体验和地点编号、所有者与协作者、隐私状态和链接。需要登录。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/www.airbnb.com/favicon.png"
+}

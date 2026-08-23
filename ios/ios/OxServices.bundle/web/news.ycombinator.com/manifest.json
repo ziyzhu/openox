@@ -1,0 +1,449 @@
+{
+  "domain": "news.ycombinator.com",
+  "name": "Hacker News",
+  "description": "A tech and startup news aggregator. Browse stories from feeds like top, new, best, ask, show, jobs, and front page. Read item pages with full comment trees, look up user profiles, and reply to comments as the signed-in user.",
+  "baseUrl": "https://news.ycombinator.com/",
+  "$defs": {
+    "feed": {
+      "type": "string",
+      "enum": [
+        "top",
+        "new",
+        "best",
+        "ask",
+        "show",
+        "jobs",
+        "front"
+      ]
+    },
+    "story": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "externalUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "domain": {
+          "type": "string"
+        },
+        "score": {
+          "type": "integer"
+        },
+        "author": {
+          "type": "string"
+        },
+        "age": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "integer"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url",
+        "externalUrl",
+        "domain",
+        "score",
+        "author",
+        "age",
+        "comments",
+        "hidden"
+      ],
+      "additionalProperties": false
+    },
+    "comment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "level": {
+          "type": "integer"
+        },
+        "age": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "author",
+        "level",
+        "age",
+        "text",
+        "parentId"
+      ],
+      "additionalProperties": false
+    },
+    "userProfile": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "karma": {
+          "type": "integer"
+        },
+        "created": {
+          "type": "string"
+        },
+        "about": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "karma",
+        "created",
+        "about"
+      ],
+      "additionalProperties": false
+    },
+    "post": {
+      "type": "object",
+      "properties": {
+        "story": {
+          "$ref": "#/$defs/story"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/comment"
+          }
+        }
+      },
+      "required": [
+        "story",
+        "comments"
+      ],
+      "additionalProperties": false
+    },
+    "me": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "karma": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "user",
+        "karma"
+      ],
+      "additionalProperties": false
+    },
+    "ok": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Hacker News",
+      "description": "Hacker News sign-in URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check provider sign-in",
+      "description": "Checks whether you are signed in to Hacker News.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Signed-in user",
+      "description": "Signed-in user's handle and karma.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/me"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listStories",
+      "label": "List stories",
+      "description": "Lists stories from a selected Hacker News feed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "$ref": "#/$defs/feed"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/story"
+            }
+          },
+          "nextCursor": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "feed": "top"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getStory",
+      "label": "Get story",
+      "description": "Fetch a story by id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/story"
+      },
+      "defaultArgs": {
+        "id": "1"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "getPost",
+      "label": "Get post with comments",
+      "description": "Story + full comment tree.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/post"
+      },
+      "defaultArgs": {
+        "id": "1"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "createComment",
+      "label": "Reply to comment",
+      "description": "Post a reply to a comment.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "parentId",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/ok"
+      },
+      "defaultArgs": {
+        "parentId": "1",
+        "text": "test reply"
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
+      "id": "getUser",
+      "label": "Get HN user profile",
+      "description": "Fetch a user's public profile by username.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userProfile"
+      },
+      "defaultArgs": {
+        "username": "pg"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "Hacker News",
+      "description": "已登录用户的 Hacker News。浏览 top、new、best、ask、show、jobs 和首页等信息流中的故事。阅读包含完整评论树的条目页面，查看用户资料，并回复评论。",
+      "actions": {
+        "getSignInUrl": {
+          "label": "登录 Hacker News",
+          "description": "打开 Hacker News 登录页。"
+        },
+        "getSignInState": {
+          "label": "检查 Hacker News 登录状态",
+          "description": "检查你是否已登录 Hacker News。"
+        },
+        "getCurrentUser": {
+          "label": "已登录用户",
+          "description": "已登录用户的用户名及 karma。"
+        },
+        "listStories": {
+          "label": "故事列表",
+          "description": "列出所选 Hacker News 信息流中的故事。"
+        },
+        "getStory": {
+          "label": "获取故事",
+          "description": "按 id 获取故事。"
+        },
+        "getPost": {
+          "label": "获取帖子及评论",
+          "description": "故事及完整评论树。"
+        },
+        "createComment": {
+          "label": "回复评论",
+          "description": "对某条评论发表回复。"
+        },
+        "getUser": {
+          "label": "获取 HN 用户资料",
+          "description": "按用户名获取用户的公开资料。"
+        }
+      }
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/news.ycombinator.com/favicon.png",
+  "skills": [
+    {
+      "name": "display",
+      "description": "How to present Hacker News story feeds, discussions, and profiles clearly."
+    }
+  ]
+}

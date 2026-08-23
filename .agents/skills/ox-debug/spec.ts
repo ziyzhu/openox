@@ -3,14 +3,14 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dispatch, fail, header, info, need, ok, sh, sh$, step, C, type SubCommand } from "./lib.ts";
-import { readSkills } from "../../../ox-cli/server-ir/skills.ts";
-import { validateIOSManifest, validateMCPManifest, type CatalogKind } from "../../../ox-cli/server-ir/catalog.ts";
+import { readSkills } from "../../../services/skills.ts";
+import { validateIOSManifest, validateMCPManifest, type CatalogKind } from "../../../services/catalog.ts";
 import {
   HOST_PATTERN,
   validateJSONSchemaProfile,
   validateStandardActions,
   type JSONSchema,
-} from "../../../ox-cli/server-ir/manifest.ts";
+} from "../../../services/manifest.ts";
 
 export const SUBS: Record<string, SubCommand> = {
   verify: {
