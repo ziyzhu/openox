@@ -31,6 +31,8 @@ async function git(root: string, args: string[], environment: Record<string, str
 
 async function initializeRepository(root: string, message: string): Promise<void> {
   await git(root, ["init", "-q", "--initial-branch=main"]);
+  await git(root, ["config", "core.ignorecase", "true"]);
+  await git(root, ["config", "core.precomposeunicode", "true"]);
   await git(root, ["config", "user.name", "Ox"]);
   await git(root, ["config", "user.email", "local@ox.invalid"]);
   await git(root, ["add", "-A"]);
