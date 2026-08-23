@@ -1,12 +1,14 @@
 ## OpenOx
 
-OpenOx is a protocol for self-evolving personal agents that run locally on mobile devices, work with any model, and gain new capabilities through portable service repositories. Ox for iOS is its reference implementation.
+OpenOx is a protocol for self-evolving agents that run locally on mobile devices.
 
-It is built around three principles:
+Each such agent is called an Ox and follows three principles:
 
 1. Acts everywhere. Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you.
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
+
+The first implementation of Ox is an iOS app whose source code is included in this repository. You can download it through TestFlight: https://testflight.apple.com/join/Y3x7nxj9.
 
 ## Components
 
@@ -77,7 +79,7 @@ OpenOx supports three kinds of services:
 
 Anyone can publish compatible web and MCP services in a public Git repository containing an `ox.json` manifest. Any compatible mobile client can install that repository and make its services available to the agent. Device services remain part of the client implementation.
 
-## Reference Client
+## The first Ox
 
 **Ox for iOS** is the reference implementation of an OpenOx client. Its agent runtime and VM run on the user’s iOS device.
 
