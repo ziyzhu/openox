@@ -1,6 +1,6 @@
 ## OpenOx
 
-OpenOx is a protocol for self-evolving personal agents that run locally on mobile devices and gain new capabilities through portable service repositories. Ox for iOS is its reference implementation.
+OpenOx is a protocol for self-evolving personal agents that run locally on mobile devices, work with any model, and gain new capabilities through portable service repositories. Ox for iOS is its reference implementation.
 
 It is built around three principles:
 
@@ -11,36 +11,41 @@ It is built around three principles:
 ## Components
 
 ```mermaid
-flowchart LR
+flowchart TB
     Profile["Ox Profile<br/>Identity · Memory · Skills<br/>Artifacts · Conversations"]
-    Repository["Remote Service Repository<br/>Public Git + ox.json"]
+    Model["Any model<br/>Any provider"]
+    Remote["Remote Service Repositories<br/>Public Git + ox.json"]
 
     subgraph Client["Ox Mobile Client"]
+        direction TB
         Agent["Local agent"]
         VM["Ox VM<br/>Sandboxed JavaScript · ox.* · virtual filesystem"]
         Local["Local Service Repository<br/>Editable Git + ox.json"]
         Agent -->|"writes and executes code"| VM
-        VM -->|"ox.fs creates or revises"| Local
+        VM -->|"creates or revises via ox.fs"| Local
     end
 
-    subgraph Services["Installed services"]
-        Service["Device (such as Browser)<br/>Web · MCP"]
-        Actions["Actions<br/>typed operations"]
-        Skills["Skills<br/>reusable instructions"]
-        Service --> Actions
-        Service --> Skills
+    Services["Installed service definitions<br/>Actions · Skills"]
+
+    subgraph Interfaces["Service interfaces"]
+        direction LR
+        Device["Device-native interface<br/>(Device Service)"]
+        Web["Web page<br/>(Web Service)"]
+        MCP["MCP server<br/>(MCP Service)"]
     end
 
     Profile <-->|"mounted through ox.fs"| VM
-    Repository -->|"installs"| Service
-    Local -->|"validates and reloads"| Service
-    Service -->|"mounts definitions through ox.fs"| VM
-    VM <-->|"invoke and observe"| Actions
-    Skills -.->|"guides"| Agent
+    Model <-->|"provider-neutral"| Agent
+    Remote -->|"installs"| Services
+    Local -->|"validates and reloads"| Services
+    VM <-->|"invokes actions · reads skills"| Services
+    Services --> Device
+    Services --> Web
+    Services --> MCP
 ```
 
-
 - **Ox Client** — A mobile application that implements the OpenOx protocol. It hosts the Ox VM, opens an Ox Profile, and connects the agent to services.
+- **Model** — The language model selected by the user. OpenOx does not prescribe a model or provider; the client adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
 - **Ox VM** — A sandboxed JavaScript runtime where the local agent writes and executes code.
   - **`ox.*`** — Explicit client capabilities for interacting with the Profile, services, web, user, and mobile device.
