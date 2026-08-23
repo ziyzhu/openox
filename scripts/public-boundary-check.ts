@@ -11,6 +11,7 @@ const forbiddenPaths = [
   /^\.github\/workflows\/deploy\.yml$/,
   /^docs\/demo-60s\.md$/,
   /^docs\/LOC\.html$/,
+  /^ios\/ios\/OxServices\.bundle\/(?:mcp|web)\//,
   /\.har$/,
   /\.mitm$/,
   /\.mobileprovision$/,
