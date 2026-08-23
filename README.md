@@ -91,13 +91,13 @@ cd openox
 bun install
 ```
 
-Generate a local signing configuration using an Apple Developer Team ID and a reverse-DNS bundle identifier owned by that team:
+Generate a local signing configuration using your Apple Developer Team ID:
 
 ```sh
-bun run setup:ios -- --team ABCDE12345 --bundle com.example.openox
+bun run setup:ios -- --team ABCDE12345
 ```
 
-The command creates the ignored `ios/Local.xcconfig` with matching app, Share Extension, App Group, iCloud container, and Keychain identifiers. Register the generated App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
+The command derives a unique `ai.openox.local.ABCDE12345` bundle identifier from the team ID and creates the ignored `ios/Local.xcconfig` with matching app, Share Extension, App Group, iCloud container, and Keychain identifiers. Pass `--bundle com.example.openox` to use a reverse-DNS bundle identifier owned by your team instead. Register the generated App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
 
 Open `ios/ios.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in service bundle contains every built-in web, native iOS, and MCP service.
 
