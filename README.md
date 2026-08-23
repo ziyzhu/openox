@@ -46,7 +46,7 @@ bun install --frozen-lockfile
 bun run typecheck
 ```
 
-The repository contains the iOS app, Share Extension, Ox CLI, debugger, tests, documentation, and website source. Production infrastructure, official signing, release automation, and private service implementations are intentionally not dependencies of this repository.
+The repository contains the iOS app, Share Extension, Ox CLI, debugger, tests, and documentation. Production infrastructure, the marketing website, official signing, release automation, and private service implementations are intentionally not dependencies of this repository.
 
 ## Acknowledgements
 

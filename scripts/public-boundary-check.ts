@@ -8,6 +8,7 @@ if (tracked.exitCode !== 0) throw new Error(tracked.stderr.toString().trim() || 
 const files = tracked.stdout.toString().trim().split("\n").filter(Boolean);
 const forbiddenPaths = [
   /^cdk\//,
+  /^web\//,
   /^\.github\/workflows\/deploy\.yml$/,
   /^docs\/demo-60s\.md$/,
   /^docs\/LOC\.html$/,

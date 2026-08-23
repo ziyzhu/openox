@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://openox.ai/sitemap.xml
