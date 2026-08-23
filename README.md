@@ -8,7 +8,7 @@ It is built around three principles:
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
 
-[Blog](https://ziyzhu/introducing-openox) | [Discord](https://discord.gg/7baSAHZTA)
+[Blog](https://ziyzhu.com/introducing-openox) | [Discord](https://discord.gg/7baSAHZTA)
 
 ## Installation
 
