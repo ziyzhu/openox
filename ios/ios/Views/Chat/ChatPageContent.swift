@@ -1,13 +1,20 @@
 import SwiftUI
 
 struct ChatBlock: Identifiable, Equatable {
+    enum ResponseFooterPhase: Equatable {
+        case streaming
+        case settled
+
+        var isVisible: Bool { self == .settled }
+    }
+
     enum Kind: Equatable {
         case userText(String, attachments: [Artifact])
         case userSkill(UserSkillInvocation, attachments: [Artifact])
         case agentContent(ContentItem)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
-        case responseFooter(text: String)
+        case responseFooter(text: String, phase: ResponseFooterPhase)
     }
 
     let id: UUID
@@ -136,8 +143,7 @@ extension ChatBlock {
 
         let activeTurnID = thinkingActivity?.turnID ?? (isBusy ? sources.last?.turnID : nil)
         let blocks = projectedTurns.flatMap { turn in
-            guard turn.id != activeTurnID,
-                  let sourceBlockID = turn.footerSourceBlockID,
+            guard let sourceBlockID = turn.footerSourceBlockID,
                   let createdAt = turn.footerCreatedAt else { return turn.blocks }
             let text = turn.footerText.joined(separator: "\n\n")
             guard !text.isEmpty else { return turn.blocks }
@@ -145,7 +151,10 @@ extension ChatBlock {
                 id: StableID.uuid("chat.turn.\(turn.id.rawValue.uuidString).footer"),
                 sourceBlockID: sourceBlockID,
                 createdAt: createdAt,
-                kind: .responseFooter(text: text),
+                kind: .responseFooter(
+                    text: text,
+                    phase: turn.id == activeTurnID ? .streaming : .settled
+                ),
                 spacingBefore: MarkdownText.responseFooterSpacing
             )]
         }

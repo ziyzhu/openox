@@ -1317,11 +1317,13 @@ struct BlockView: View, Equatable {
 struct ResponseFooterBlockView: View, Equatable {
     let id: UUID
     let text: String
+    let isVisible: Bool
     let controls: MessageControls
 
     static func == (lhs: ResponseFooterBlockView, rhs: ResponseFooterBlockView) -> Bool {
         lhs.id == rhs.id
             && lhs.text == rhs.text
+            && lhs.isVisible == rhs.isVisible
             && lhs.controls.isCopied == rhs.controls.isCopied
             && lhs.controls.isSpeaking == rhs.controls.isSpeaking
             && lhs.controls.canMutate == rhs.controls.canMutate
@@ -1371,6 +1373,9 @@ struct ResponseFooterBlockView: View, Equatable {
         }
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
     }
 
     private func iconButton(

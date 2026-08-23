@@ -674,10 +674,11 @@ struct ChatPage: View {
     @ViewBuilder
     private func chatBlockHost(_ block: ChatBlock) -> some View {
         switch block.kind {
-        case .responseFooter(let text):
+        case .responseFooter(let text, let phase):
             ResponseFooterBlockView(
                 id: block.id,
                 text: text,
+                isVisible: phase.isVisible,
                 controls: messageControls(sourceBlockID: block.sourceBlockID)
             )
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction:
