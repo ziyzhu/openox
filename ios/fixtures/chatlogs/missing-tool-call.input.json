@@ -1,0 +1,83 @@
+{
+  "turns": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 700800000,
+        "attachments": [],
+        "intent": "Look up the result"
+      }
+    },
+    {
+      "agent": {
+        "at": 700800001,
+        "generations": [
+          {
+            "assistantMessage": {
+              "content": [
+                {
+                  "thinking": {
+                    "thinking": "Use the attached service."
+                  },
+                  "type": "thinking"
+                }
+              ],
+              "model": "mock",
+              "stopReason": "toolUse",
+              "timestamp": 700800001,
+              "usage": {
+                "cachedInput": 0,
+                "input": 10,
+                "output": 5,
+                "totalTokens": 15
+              }
+            },
+            "at": 700800001,
+            "id": "10000000-0000-4000-8000-000000000002",
+            "model": "mock",
+            "outcome": {
+              "at": 700800002,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700800002,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "10000000-0000-4000-8000-000000000002",
+            "id": "10000000-0000-4000-8000-000000000003",
+            "toolCall": {
+              "arguments": {
+                "source": "return await ox.service.invoke({ name: \"web:example.com:lookup\", input: {} })"
+              },
+              "id": "2A8F3815-D500-4C1E-B073-0E223F22385A",
+              "name": "run_javascript",
+              "providerItemID": "fc_fixture"
+            },
+            "toolResult": {
+              "content": [
+                {
+                  "text": {
+                    "text": "{\"ok\":true}"
+                  },
+                  "type": "text"
+                }
+              ],
+              "isError": false,
+              "timestamp": 700800001,
+              "toolCallId": "2A8F3815-D500-4C1E-B073-0E223F22385A",
+              "toolName": "run_javascript"
+            },
+            "type": "wire"
+          }
+        ]
+      },
+      "id": "10000000-0000-4000-8000-000000000004",
+      "type": "agent"
+    }
+  ]
+}

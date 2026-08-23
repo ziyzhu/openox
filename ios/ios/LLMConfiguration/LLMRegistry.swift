@@ -1,0 +1,202 @@
+import Foundation
+import Observation
+
+@MainActor
+@Observable
+final class LLMRegistry {
+    static let shared = LLMRegistry()
+
+    private let builtInClients: [LLMRegion: [any LLMClient]]
+    private(set) var customProviders: [CustomLLMProvider] {
+        didSet { Self.persist(customProviders) }
+    }
+    private(set) var customProviderLoading: Set<UUID> = []
+    private(set) var customProviderErrors: [UUID: String] = [:]
+
+    var clients: [any LLMClient] {
+        clients(for: AppRegion.shared.region)
+    }
+
+    private var selectedModelIds: [String: String] {
+        didSet { UserDefaults.standard.set(selectedModelIds, forKey: Self.selectedKey) }
+    }
+
+    private(set) var defaultClient: String {
+        didSet { UserDefaults.standard.set(defaultClient, forKey: Self.defaultClientKey) }
+    }
+
+    private static let selectedKey = "llm.selectedModels"
+    private static let defaultClientKey = "llm.defaultClient"
+    private static let customProvidersKey = "llm.customProviders"
+
+    private init() {
+        let region = AppRegion.shared.region
+        let leadingClients: [any LLMClient] = [
+            ChatGPTResponsesClient(),
+            GeminiClient(),
+            GitHubCopilotClient(),
+        ]
+        let middleClients: [any LLMClient] = [OpenAIClient.make(), AnthropicClient.make(), BedrockClient(), XAIClient.make()]
+        var prefixClients: [any LLMClient] = []
+        if MockLLMClient.isEnabled {
+            prefixClients.append(MockLLMClient())
+            Log.agent.info("LLMRegistry added MockLLMClient")
+        }
+        var builtInClients: [LLMRegion: [any LLMClient]] = [:]
+        for candidate in LLMRegion.allCases {
+            var clients = prefixClients
+            clients.append(contentsOf: leadingClients)
+            clients.append(contentsOf: ProviderCatalog.leadingClients(for: candidate))
+            clients.append(contentsOf: middleClients)
+            clients.append(contentsOf: ProviderCatalog.trailingClients(for: candidate))
+            builtInClients[candidate] = clients
+        }
+        let customProviders = Self.loadCustomProviders()
+        let configuredClients = builtInClients[region, default: []] + customProviders.map(\.client)
+        let availableClients = configuredClients.filter { client in
+            client.models.contains { client.supportsTools(for: $0) }
+        }
+        self.builtInClients = builtInClients
+        self.customProviders = customProviders
+        self.selectedModelIds = UserDefaults.standard.dictionary(forKey: Self.selectedKey) as? [String: String] ?? [:]
+        let configuredClientIDs = Set(availableClients.map(\.id) + customProviders.map(\.clientID))
+        let storedDefault = UserDefaults.standard.string(forKey: Self.defaultClientKey)
+        self.defaultClient = storedDefault.flatMap { configuredClientIDs.contains($0) ? $0 : nil } ?? availableClients[0].id
+        UserDefaults.standard.set(self.defaultClient, forKey: Self.defaultClientKey)
+        Log.agent.info("LLMRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(self.defaultClient) region=\(region.rawValue)")
+        for provider in customProviders {
+            Task { [weak self] in
+                await self?.refresh(provider)
+            }
+        }
+    }
+
+    func client(id: String) -> (any LLMClient)? {
+        clients.first { $0.id == id }
+    }
+
+    func client(id: String, in region: LLMRegion) -> (any LLMClient)? {
+        clients(for: region).first { $0.id == id && $0.regions.contains(region) }
+    }
+
+    func isCustomProviderPending(clientID: String) -> Bool {
+        guard let provider = customProviders.first(where: { $0.clientID == clientID }) else { return false }
+        return provider.models.isEmpty && customProviderErrors[provider.id] == nil
+    }
+
+    func clients(in region: LLMRegion) -> [any LLMClient] {
+        clients(for: region).filter { $0.regions.contains(region) }
+    }
+
+    func client(forSnapshot id: String?) -> any LLMClient {
+        if let id, let client = client(id: id) { return client }
+        if let id, let provider = customProviders.first(where: { $0.clientID == id }) { return provider.client }
+        return newSessionClient
+    }
+
+    func model(forSnapshot id: String?, client: any LLMClient) -> ProviderModel {
+        if let id, let model = client.models.first(where: { $0.id == id }) { return model }
+        if let id, customProviders.contains(where: { $0.clientID == client.id }) {
+            return CustomLLMModel(id: id, supportsTools: true).modelInfo
+        }
+        return selected(for: client.id)
+    }
+
+    var newSessionClient: any LLMClient {
+        let region = AppRegion.shared.region
+        let inRegion = clients(in: region)
+        if let preferred = client(id: defaultClient), preferred.regions.contains(region), !preferred.models.isEmpty {
+            return preferred
+        }
+        return inRegion.first(where: { !$0.models.isEmpty }) ?? clients.first(where: { !$0.models.isEmpty })!
+    }
+
+    func selected(for clientID: String) -> ProviderModel {
+        selected(for: clientID, in: AppRegion.shared.region)
+    }
+
+    func selected(for clientID: String, in region: LLMRegion) -> ProviderModel {
+        let regionalClients = clients(in: region)
+        let client = regionalClients.first { $0.id == clientID } ?? regionalClients[0]
+        if let modelId = selectedModelIds[client.id],
+           let model = client.models.first(where: { $0.id == modelId }) {
+            return model
+        }
+        return client.models.first ?? newSessionClient.models[0]
+    }
+
+    func select(_ model: ProviderModel, in clientID: String) {
+        selectedModelIds[clientID] = model.id
+        defaultClient = clientID
+        Log.agent.info("LLMRegistry.select client=\(clientID) model=\(model.id)")
+    }
+
+    func upsert(_ provider: CustomLLMProvider) {
+        customProviderErrors.removeValue(forKey: provider.id)
+        if let index = customProviders.firstIndex(where: { $0.id == provider.id }) {
+            customProviders[index] = provider
+            Log.agent.info("LLMRegistry.custom updated client=\(provider.clientID) models=\(provider.models.count)")
+        } else {
+            customProviders.append(provider)
+            Log.agent.info("LLMRegistry.custom added client=\(provider.clientID) models=\(provider.models.count)")
+        }
+    }
+
+    func refresh(_ provider: CustomLLMProvider) async {
+        guard !customProviderLoading.contains(provider.id) else { return }
+        customProviderLoading.insert(provider.id)
+        customProviderErrors.removeValue(forKey: provider.id)
+        defer { customProviderLoading.remove(provider.id) }
+        do {
+            let models = try await CustomLLMProviderDiscovery.models(
+                baseURL: provider.baseURL,
+                apiKey: Credentials.key(for: provider.clientID)
+            )
+            guard let index = customProviders.firstIndex(where: {
+                $0.id == provider.id && $0.baseURL == provider.baseURL
+            }) else { return }
+            customProviders[index].models = models
+            Log.agent.info("LLMRegistry.custom discovered client=\(provider.clientID) models=\(models.count)")
+        } catch {
+            guard customProviders.contains(where: {
+                $0.id == provider.id && $0.baseURL == provider.baseURL
+            }) else { return }
+            customProviderErrors[provider.id] = error.localizedDescription
+            Log.agent.error("LLMRegistry.custom discovery failed client=\(provider.clientID) error=\(error.localizedDescription)")
+        }
+    }
+
+    func remove(_ provider: CustomLLMProvider) {
+        customProviders.removeAll { $0.id == provider.id }
+        customProviderLoading.remove(provider.id)
+        customProviderErrors.removeValue(forKey: provider.id)
+        selectedModelIds.removeValue(forKey: provider.clientID)
+        Credentials.clear(for: provider.client.credentialID)
+        if defaultClient == provider.clientID {
+            defaultClient = builtInClients[AppRegion.shared.region]![0].id
+        }
+        Log.agent.info("LLMRegistry.custom removed client=\(provider.clientID)")
+    }
+
+    private static func loadCustomProviders() -> [CustomLLMProvider] {
+        ProfileMigrator.migrateCustomLLMProviders(
+            defaults: .standard,
+            key: customProvidersKey
+        )
+    }
+
+    private static func persist(_ providers: [CustomLLMProvider]) {
+        do {
+            UserDefaults.standard.set(try JSONEncoder().encode(providers), forKey: customProvidersKey)
+        } catch {
+            Log.agent.error("LLMRegistry.custom encode failed error=\(error.localizedDescription)")
+        }
+    }
+
+    private func clients(for region: LLMRegion) -> [any LLMClient] {
+        let candidates = builtInClients[region, default: []] + customProviders.map(\.client)
+        return candidates.filter { client in
+            client.models.contains { client.supportsTools(for: $0) }
+        }
+    }
+}

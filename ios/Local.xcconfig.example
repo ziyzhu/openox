@@ -1,0 +1,8 @@
+OX_DEVELOPMENT_TEAM = ABCDE12345
+OX_BUNDLE_IDENTIFIER = com.example.openox
+OX_APP_GROUP_IDENTIFIER = group.com.example.openox
+OX_ICLOUD_CONTAINER_IDENTIFIER = iCloud.com.example.openox
+OX_KEYCHAIN_SERVICE = com.example.openox.llm
+OX_WEBSITE_DATA_NAMESPACE = com.example.openox.web-profile
+OX_AGENT_SKILL_TYPE_IDENTIFIER = ai.openox.agent-skill
+OX_CHAT_TYPE_IDENTIFIER = ai.openox.chat

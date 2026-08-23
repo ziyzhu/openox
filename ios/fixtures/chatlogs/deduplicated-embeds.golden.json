@@ -1,0 +1,394 @@
+{
+  "blocks": [
+    {
+      "createdAt": 701000000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Create and refine a skill",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 701000002,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "items": [
+          {
+            "skill": {
+              "description": "Prepare a weekly review with unfinished work",
+              "instructions": "Review completed and unfinished work.",
+              "name": "weekly-review",
+              "services": []
+            }
+          }
+        ],
+        "type": "agentContent"
+      }
+    },
+    {
+      "createdAt": 701000004,
+      "id": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "kind": {
+        "attachments": [],
+        "text": "Update it again",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 701000005,
+      "id": "4E074085-62BE-5B8B-A0CE-05C1DECFE3AD",
+      "kind": {
+        "items": [
+          {
+            "skill": {
+              "description": "Prepare a Friday review",
+              "instructions": "Review the week every Friday.",
+              "name": "weekly-review",
+              "services": []
+            }
+          }
+        ],
+        "type": "agentContent"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "D1000000-0000-4000-8000-000000000001"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "D1000000-0000-4000-8000-000000000002"
+    },
+    {
+      "blockID": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "turnID": "D1000000-0000-4000-8000-000000000003"
+    },
+    {
+      "blockID": "4E074085-62BE-5B8B-A0CE-05C1DECFE3AD",
+      "turnID": "D1000000-0000-4000-8000-000000000004"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "turns": [
+    {
+      "id": "D1000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 701000000,
+        "attachments": [],
+        "intent": "Create and refine a skill"
+      }
+    },
+    {
+      "agent": {
+        "at": 701000001,
+        "generations": [
+          {
+            "at": 701000001,
+            "id": "D1000000-0000-4000-8000-000000000010",
+            "model": "mock",
+            "outcome": {
+              "at": 701000002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 701000002,
+            "id": "D1000000-0000-4000-8000-000000000011",
+            "model": "mock",
+            "outcome": {
+              "at": 701000003,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 701000003,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a weekly review",
+                      "instructions": "Review completed work.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "created",
+                  "type": "succeeded"
+                },
+                "source": "create skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000010",
+            "id": "D1000000-0000-4000-8000-000000000020",
+            "type": "action"
+          },
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a weekly review with unfinished work",
+                      "instructions": "Review completed and unfinished work.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "refined",
+                  "type": "succeeded"
+                },
+                "source": "refine skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000011",
+            "id": "D1000000-0000-4000-8000-000000000021",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "D1000000-0000-4000-8000-000000000002",
+      "type": "agent"
+    },
+    {
+      "id": "D1000000-0000-4000-8000-000000000003",
+      "type": "user",
+      "user": {
+        "at": 701000004,
+        "attachments": [],
+        "intent": "Update it again"
+      }
+    },
+    {
+      "agent": {
+        "at": 701000005,
+        "generations": [
+          {
+            "at": 701000005,
+            "id": "D1000000-0000-4000-8000-000000000012",
+            "model": "mock",
+            "outcome": {
+              "at": 701000006,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 701000006,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a Friday review",
+                      "instructions": "Review the week every Friday.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "updated",
+                  "type": "succeeded"
+                },
+                "source": "update skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000012",
+            "id": "D1000000-0000-4000-8000-000000000022",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "D1000000-0000-4000-8000-000000000004",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Create and refine a skill"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 701000000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "toolCall": {
+              "arguments": {
+                "source": "create skill"
+              },
+              "id": "D1000000-0000-4000-8000-000000000020",
+              "name": "execute"
+            },
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 701000001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "toolResult": {
+        "content": [
+          {
+            "text": {
+              "text": "created"
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "timestamp": 701000001,
+        "toolCallId": "D1000000-0000-4000-8000-000000000020",
+        "toolName": "execute"
+      },
+      "type": "toolResult"
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "toolCall": {
+              "arguments": {
+                "source": "refine skill"
+              },
+              "id": "D1000000-0000-4000-8000-000000000021",
+              "name": "execute"
+            },
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 701000002,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "toolResult": {
+        "content": [
+          {
+            "text": {
+              "text": "refined"
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "timestamp": 701000002,
+        "toolCallId": "D1000000-0000-4000-8000-000000000021",
+        "toolName": "execute"
+      },
+      "type": "toolResult"
+    },
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Update it again"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 701000004
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "toolCall": {
+              "arguments": {
+                "source": "update skill"
+              },
+              "id": "D1000000-0000-4000-8000-000000000022",
+              "name": "execute"
+            },
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 701000005,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "toolResult": {
+        "content": [
+          {
+            "text": {
+              "text": "updated"
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "timestamp": 701000005,
+        "toolCallId": "D1000000-0000-4000-8000-000000000022",
+        "toolName": "execute"
+      },
+      "type": "toolResult"
+    }
+  ]
+}

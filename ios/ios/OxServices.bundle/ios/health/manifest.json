@@ -1,0 +1,489 @@
+{
+  "domain": "ios:health",
+  "name": "Health",
+  "description": "Read bounded activity, sleep, workout, vital, and body summaries allowed by iOS.",
+  "icon": {
+    "asset": "ios:health"
+  },
+  "permission": "health",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Read bounded daily activity totals from Apple Health.",
+      "id": "activity",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Exclusive ISO-8601 end timestamp, no more than 31 days after start.",
+            "type": "string"
+          },
+          "start": {
+            "description": "Inclusive ISO-8601 start timestamp.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
+      "label": "Read activity",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "activeEnergyKcal": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": "string"
+                },
+                "exerciseMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "steps": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "walkingRunningDistanceMeters": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "activeEnergyKcal",
+                "date",
+                "exerciseMinutes",
+                "steps",
+                "walkingRunningDistanceMeters"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "days"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read bounded daily body-measurement trends from Apple Health.",
+      "id": "body.summary",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Exclusive ISO-8601 end timestamp, no more than 31 days after start.",
+            "type": "string"
+          },
+          "start": {
+            "description": "Inclusive ISO-8601 start timestamp.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
+      "label": "Read body trends",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bodyFatPercent": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": "string"
+                },
+                "leanBodyMassKg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "weightKg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "bodyFatPercent",
+                "date",
+                "leanBodyMassKg",
+                "weightKg"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "days"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read bounded daily sleep totals from Apple Health.",
+      "id": "sleep.summary",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Exclusive ISO-8601 end timestamp, no more than 31 days after start.",
+            "type": "string"
+          },
+          "start": {
+            "description": "Inclusive ISO-8601 start timestamp.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
+      "label": "Read sleep",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "asleepMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "awakeMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "coreMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": "string"
+                },
+                "deepMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "inBedMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "remMinutes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "asleepMinutes",
+                "awakeMinutes",
+                "coreMinutes",
+                "date",
+                "deepMinutes",
+                "inBedMinutes",
+                "remMinutes"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "days"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read bounded daily vital summaries from Apple Health.",
+      "id": "vitals.summary",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Exclusive ISO-8601 end timestamp, no more than 31 days after start.",
+            "type": "string"
+          },
+          "start": {
+            "description": "Inclusive ISO-8601 start timestamp.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
+      "label": "Read vitals",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "heartRateVariabilityMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "respiratoryRatePerMinute": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "restingHeartRateBpm": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "date",
+                "heartRateVariabilityMs",
+                "respiratoryRatePerMinute",
+                "restingHeartRateBpm"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "timezone",
+          "days"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "List bounded workout summaries from Apple Health.",
+      "id": "workouts.list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Exclusive ISO-8601 end timestamp, no more than 31 days after start.",
+            "type": "string"
+          },
+          "start": {
+            "description": "Inclusive ISO-8601 start timestamp.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      },
+      "label": "List workouts",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "workouts": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "activeEnergyKcal": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "activity": {
+                  "type": "string"
+                },
+                "activityTypeCode": {
+                  "type": "integer"
+                },
+                "distanceMeters": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "durationMinutes": {
+                  "type": "number"
+                },
+                "end": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "activity",
+                "activityTypeCode",
+                "start",
+                "end",
+                "durationMinutes",
+                "activeEnergyKcal",
+                "distanceMeters"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "workouts",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "健康",
+      "description": "读取 iOS 允许范围内的活动、睡眠、锻炼、生命体征和身体指标摘要。",
+      "actions": {
+        "activity": {
+          "label": "读取活动数据",
+          "description": "读取 Apple 健康中限定范围的每日活动总量。"
+        },
+        "body.summary": {
+          "label": "读取身体指标趋势",
+          "description": "读取 Apple 健康中限定范围的每日身体测量趋势。"
+        },
+        "sleep.summary": {
+          "label": "读取睡眠数据",
+          "description": "读取 Apple 健康中限定范围的每日睡眠总量。"
+        },
+        "vitals.summary": {
+          "label": "读取生命体征",
+          "description": "读取 Apple 健康中限定范围的每日生命体征摘要。"
+        },
+        "workouts.list": {
+          "label": "列出锻炼记录",
+          "description": "列出 Apple 健康中限定范围的锻炼摘要。"
+        }
+      }
+    }
+  }
+}

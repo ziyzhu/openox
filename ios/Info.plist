@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Ox</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>OXAppGroupIdentifier</key>
+	<string>$(OX_APP_GROUP_IDENTIFIER)</string>
+	<key>OXICloudContainerIdentifier</key>
+	<string>$(OX_ICLOUD_CONTAINER_IDENTIFIER)</string>
+	<key>OXKeychainService</key>
+	<string>$(OX_KEYCHAIN_SERVICE)</string>
+	<key>OXWebsiteDataNamespace</key>
+	<string>$(OX_WEBSITE_DATA_NAMESPACE)</string>
+	<key>OXAgentSkillTypeIdentifier</key>
+	<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+	<key>OXChatTypeIdentifier</key>
+	<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Ziyuan Zhu</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).chat.*</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>NSContactsUsageDescription</key>
+	<string>Ox looks up a contact’s number so it can pre-fill a text message you ask it to send. You always tap Send yourself.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Ox adds events to your calendar when you ask it to. It never reads your calendar.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Ox adds reminders to your Reminders list when you ask it to. It never reads your reminders.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Ox uses the camera to capture photos to attach to your chat.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ox uses your approximate location to help with nearby search, local prices, and weather.</string>
+	<key>NSLocationDefaultAccuracyReduced</key>
+	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Ox reads health summaries you choose to share, including activity, sleep, workouts, vitals, and body measurements.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Ox never writes to Apple Health. It only reads health summaries you explicitly choose to share.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Agent Skill</string>
+			<key>UTTypeIdentifier</key>
+			<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>skill</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.agent-skill+zip</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Ox Chat</string>
+			<key>UTTypeIdentifier</key>
+			<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>chat</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.ox.chat+zip</string>
+			</dict>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Agent Skill</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Ox Chat</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>$(OX_ICLOUD_CONTAINER_IDENTIFIER)</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Ox</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connect to model servers you add on your local network.</string>
+</dict>
+</plist>

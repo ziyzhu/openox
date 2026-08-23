@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ox · dev</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <div class="title">ox · dev</div>
+    <nav class="tabs">
+      <button class="tab" data-tab="chat" aria-current="true">Chats</button>
+      <button class="tab" data-tab="services">Services</button>
+      <button class="tab" data-tab="agent">Agents</button>
+      <button class="tab" data-tab="diagnostics">Diagnostics</button>
+      <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="registry">Registry</button>
+    </nav>
+    <div class="meta" id="meta">connecting…</div>
+    <select class="select sim-select" id="sim-select" title="simulator"></select>
+  </header>
+
+  <main id="view-chat">
+    <div class="chat-tabs" id="chat-list"></div>
+
+    <div class="usage" id="usage" hidden>
+      <div class="usage-bar" id="usage-bar"></div>
+      <div class="usage-legend" id="usage-legend"></div>
+    </div>
+
+    <div class="chat-grid">
+      <section class="pane" id="pane-system">
+        <h2>System prompt</h2>
+        <div class="content sysbreakdown">
+          <h3>Scaffold</h3>
+          <div class="sysblock" id="system"></div>
+          <h3>Persona (SOUL.md)</h3>
+          <div class="sysblock" id="soul"></div>
+          <h3>Memory</h3>
+          <div class="sysblock" id="memory"></div>
+        </div>
+      </section>
+
+      <section class="pane" id="pane-tools">
+        <h2>Tools <span class="count" id="tools-count"></span></h2>
+        <div class="content" id="tools"></div>
+      </section>
+
+      <section class="pane" id="pane-messages">
+        <h2>Messages <span class="count" id="messages-count"></span></h2>
+        <div class="content" id="messages"></div>
+      </section>
+
+      <section class="pane" id="pane-blocks">
+        <h2>Blocks <span class="count" id="blocks-count"></span></h2>
+        <div class="content" id="blocks"></div>
+      </section>
+    </div>
+  </main>
+
+  <main id="view-services" hidden>
+    <section class="pane" id="pane-services-list">
+      <h2>Services <span class="count" id="services-count"></span></h2>
+      <div class="content" id="services-list"></div>
+    </section>
+
+    <section class="pane" id="pane-action">
+      <h2 id="action-title">Action</h2>
+      <div class="content" id="action-form"></div>
+    </section>
+
+    <section class="pane" id="pane-result">
+      <h2>Result <span class="count" id="result-meta"></span></h2>
+      <div class="content" id="result"></div>
+    </section>
+  </main>
+
+  <main id="view-agent" hidden>
+    <section class="pane" id="pane-agent-controls">
+      <h2>Run agent</h2>
+      <div class="content" id="agent-controls"></div>
+    </section>
+
+    <section class="pane" id="pane-agent-result">
+      <h2>Response <span class="count" id="agent-meta"></span></h2>
+      <div class="content" id="agent-result"></div>
+    </section>
+  </main>
+
+  <main id="view-diagnostics" hidden>
+    <section class="pane" id="pane-transcript">
+      <h2>Transcript <span class="count" id="diagnostics-meta"></span>
+        <span class="logs-toolbar">
+          <button class="logs-btn" id="diagnostics-refresh">Refresh</button>
+        </span>
+      </h2>
+      <div class="content" id="diagnostics-transcript"></div>
+    </section>
+
+    <section class="pane" id="pane-performance">
+      <h2>Performance</h2>
+      <div class="content" id="diagnostics-performance"></div>
+    </section>
+
+    <section class="pane" id="pane-sandbox">
+      <h2>Agent sandbox</h2>
+      <div class="content" id="diagnostics-sandbox"></div>
+    </section>
+  </main>
+
+  <main id="view-logs" hidden>
+    <section class="pane" id="pane-logs">
+      <h2>Logs <span class="count" id="logs-count"></span>
+        <span class="logs-toolbar">
+          <select id="logs-level" class="select">
+            <option value="">all</option>
+            <option value="debug">debug+</option>
+            <option value="info">info+</option>
+            <option value="warning">warning+</option>
+            <option value="error">error</option>
+          </select>
+          <input id="logs-grep" class="logs-grep" placeholder="filter…" spellcheck="false" />
+          <button class="logs-btn" id="logs-refresh">Refresh</button>
+          <button class="logs-btn" id="logs-copy">Copy</button>
+        </span>
+      </h2>
+      <div class="content" id="logs-list"></div>
+    </section>
+  </main>
+
+  <main id="view-registry" hidden>
+    <section class="pane" id="pane-timeline">
+      <h2>Timeline <span class="count" id="timeline-count"></span>
+        <span class="logs-toolbar">
+          <select id="registry-source" class="select">
+            <option value="local">Local</option>
+            <option value="remote">Remote repository</option>
+          </select>
+        </span>
+      </h2>
+      <div class="content" id="timeline"></div>
+    </section>
+
+    <section class="pane" id="pane-checkin">
+      <h2 id="checkin-title">Check-in</h2>
+      <div class="content" id="checkin"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

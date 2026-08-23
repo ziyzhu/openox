@@ -1,0 +1,126 @@
+{
+  "blocks": [
+    {
+      "createdAt": 700300000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Start a long task",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 700300001,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "trace": {
+          "completedAt": 700300003,
+          "entries": [
+            {
+              "kind": "reasoning",
+              "reasoning": {
+                "id": "C7C157AA-9231-5FBC-A2D3-2CB2FDE0A821",
+                "text": "I started but did not finish."
+              }
+            }
+          ]
+        },
+        "type": "thinking"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "86763102-6FF7-5649-89B6-EA3AC73292FB"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "638BF9B0-4152-55F2-B2DE-BDB6733619A9"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1
+  ],
+  "turns": [
+    {
+      "id": "86763102-6FF7-5649-89B6-EA3AC73292FB",
+      "type": "user",
+      "user": {
+        "at": 700300000,
+        "attachments": [],
+        "intent": "Start a long task"
+      }
+    },
+    {
+      "agent": {
+        "at": 700300001,
+        "generations": [
+          {
+            "at": 700300001,
+            "id": "1F71CE76-04A7-5352-9B12-729E4FFFEAB5",
+            "model": "mock",
+            "outcome": {
+              "at": 700300003,
+              "type": "cancelled"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700300003,
+          "type": "cancelled"
+        },
+        "steps": [
+          {
+            "generation": "1F71CE76-04A7-5352-9B12-729E4FFFEAB5",
+            "id": "D7C0573D-2503-58DF-8AC8-9DE763864F83",
+            "reasoning": "I started but did not finish.",
+            "type": "reasoning"
+          }
+        ]
+      },
+      "id": "638BF9B0-4152-55F2-B2DE-BDB6733619A9",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Start a long task"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 700300000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "thinking": {
+              "thinking": "I started but did not finish."
+            },
+            "type": "thinking"
+          }
+        ],
+        "errorMessage": "aborted",
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700300001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    }
+  ]
+}

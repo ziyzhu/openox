@@ -1,0 +1,150 @@
+{
+  "blocks": [
+    {
+      "createdAt": 700400000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Delete the draft",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 700400001,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "options": [
+          "Delete",
+          "Cancel"
+        ],
+        "prompt": "Delete the draft?",
+        "promptKind": "permission",
+        "type": "confirm"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "839D0DDD-B31A-5290-93BD-4DEB211CFF7D"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "BDD047E9-EDCF-556E-861A-D8AD6688E1AC"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1
+  ],
+  "turns": [
+    {
+      "id": "839D0DDD-B31A-5290-93BD-4DEB211CFF7D",
+      "type": "user",
+      "user": {
+        "at": 700400000,
+        "attachments": [],
+        "intent": "Delete the draft"
+      }
+    },
+    {
+      "agent": {
+        "at": 700400001,
+        "generations": [
+          {
+            "at": 700400001,
+            "id": "2050D2C4-32D3-5351-BF11-06B9071DEE66",
+            "model": "mock",
+            "outcome": {
+              "type": "running"
+            }
+          }
+        ],
+        "outcome": {
+          "type": "running"
+        },
+        "steps": [
+          {
+            "action": {
+              "confirm": {
+                "options": [
+                  "Delete",
+                  "Cancel"
+                ],
+                "outcome": {
+                  "type": "pending"
+                },
+                "prompt": "Delete the draft?"
+              },
+              "type": "confirm"
+            },
+            "generation": "2050D2C4-32D3-5351-BF11-06B9071DEE66",
+            "id": "A9A3D042-5596-57B9-98A9-34A7B75025D0",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "BDD047E9-EDCF-556E-861A-D8AD6688E1AC",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Delete the draft"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 700400000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "toolCall": {
+              "arguments": {
+                "body": "Delete the draft?"
+              },
+              "id": "A9A3D042-5596-57B9-98A9-34A7B75025D0",
+              "name": "ask_user_confirmation"
+            },
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700400001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "toolResult": {
+        "content": [
+          {
+            "text": {
+              "text": ""
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "timestamp": 700400001,
+        "toolCallId": "A9A3D042-5596-57B9-98A9-34A7B75025D0",
+        "toolName": "ask_user_confirmation"
+      },
+      "type": "toolResult"
+    }
+  ]
+}

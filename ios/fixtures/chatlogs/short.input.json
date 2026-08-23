@@ -1,0 +1,65 @@
+{
+  "turns": [
+    {
+      "id": "F911A809-2201-598E-96E3-E0407A96F5E4",
+      "type": "user",
+      "user": {
+        "at": 700100000,
+        "attachments": [],
+        "intent": "Say hello"
+      }
+    },
+    {
+      "agent": {
+        "at": 700100001,
+        "generations": [
+          {
+            "assistantMessage": {
+              "content": [
+                {
+                  "text": {
+                    "text": "Hello.",
+                    "textSignature": "{\"id\":\"msg_fixture\",\"phase\":\"final_answer\",\"v\":1}"
+                  },
+                  "type": "text"
+                }
+              ],
+              "model": "mock",
+              "rawStopReason": "completed",
+              "responseID": "resp_fixture",
+              "stopReason": "stop",
+              "timestamp": 700100001,
+              "usage": {
+                "cachedInput": 0,
+                "input": 1,
+                "output": 1,
+                "totalTokens": 2
+              }
+            },
+            "at": 700100001,
+            "id": "4A55F50A-5B9B-5C06-B216-F07AC0407C95",
+            "model": "mock",
+            "outcome": {
+              "at": 700100002,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700100002,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "4A55F50A-5B9B-5C06-B216-F07AC0407C95",
+            "id": "8A2515D5-E6EA-57EF-B6FA-64778C0F71AE",
+            "text": "Hello.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "3EEC6C79-F562-579D-9BA3-9ACEC7C393A3",
+      "type": "agent"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "turns": [
+    {
+      "id": "A1000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 700700000,
+        "attachments": [],
+        "intent": "Check the value and summarize it"
+      }
+    },
+    {
+      "agent": {
+        "at": 700700001,
+        "generations": [
+          {
+            "at": 700700001,
+            "id": "A1000000-0000-4000-8000-000000000010",
+            "model": "mock",
+            "outcome": {
+              "at": 700700002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700700002,
+            "id": "A1000000-0000-4000-8000-000000000011",
+            "model": "mock",
+            "outcome": {
+              "at": 700700003,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700700003,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "A1000000-0000-4000-8000-000000000010",
+            "id": "A1000000-0000-4000-8000-000000000003",
+            "reasoning": "Inspect the value first.",
+            "type": "reasoning"
+          },
+          {
+            "action": {
+              "execute": {
+                "outcome": {
+                  "output": "42",
+                  "type": "succeeded"
+                },
+                "source": "return 42",
+                "effects": []
+              },
+              "type": "execute"
+            },
+            "generation": "A1000000-0000-4000-8000-000000000010",
+            "id": "A1000000-0000-4000-8000-000000000004",
+            "type": "action"
+          },
+          {
+            "generation": "A1000000-0000-4000-8000-000000000011",
+            "id": "A1000000-0000-4000-8000-000000000005",
+            "text": "The value is 42.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "A1000000-0000-4000-8000-000000000002",
+      "type": "agent"
+    }
+  ]
+}

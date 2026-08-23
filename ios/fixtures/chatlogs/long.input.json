@@ -1,0 +1,116 @@
+{
+  "turns": [
+    {
+      "id": "39CB1739-AD03-50C8-A455-6E8A4B5F3F62",
+      "type": "user",
+      "user": {
+        "at": 700200000,
+        "attachments": [],
+        "intent": "Work through this carefully"
+      }
+    },
+    {
+      "agent": {
+        "at": 700200001,
+        "generations": [
+          {
+            "at": 700200001,
+            "id": "5BE2F747-F4E3-5684-BC06-24703B06A001",
+            "model": "mock",
+            "outcome": {
+              "at": 700200003,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700200003,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "5BE2F747-F4E3-5684-BC06-24703B06A001",
+            "id": "F139EE03-0CB3-520A-AC23-474C76AF58FF",
+            "reasoning": "First inspect the request.\n\nThen choose the smallest useful action.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "5BE2F747-F4E3-5684-BC06-24703B06A001",
+            "id": "F6C12E10-C278-5C5A-8F69-CB3E298AAF2C",
+            "text": "I checked the request.",
+            "type": "text"
+          },
+          {
+            "action": {
+              "execute": {
+                "outcome": {
+                  "output": "{\"ok\":true}",
+                  "type": "succeeded"
+                },
+                "source": "return { ok: true }",
+                "effects": []
+              },
+              "type": "execute"
+            },
+            "generation": "5BE2F747-F4E3-5684-BC06-24703B06A001",
+            "id": "89A9F359-9957-5CA4-A797-05DB9DEA27B3",
+            "type": "action"
+          },
+          {
+            "generation": "5BE2F747-F4E3-5684-BC06-24703B06A001",
+            "id": "D484D3C9-A996-526E-97CF-1C70D8382A1E",
+            "text": " The action succeeded.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "0FE338F8-AA76-5CA2-8270-609389C5A92A",
+      "type": "agent"
+    },
+    {
+      "id": "DEDE37E0-2AEE-506E-A4F9-414AED86423B",
+      "type": "user",
+      "user": {
+        "at": 700200004,
+        "attachments": [],
+        "intent": "Summarize"
+      }
+    },
+    {
+      "agent": {
+        "at": 700200005,
+        "generations": [
+          {
+            "at": 700200005,
+            "id": "3551F025-D9D0-5188-98C9-3928DF0F346D",
+            "model": "mock",
+            "outcome": {
+              "at": 700200006,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700200006,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "3551F025-D9D0-5188-98C9-3928DF0F346D",
+            "id": "9BEF42E9-B5CE-5469-B59C-643E52646993",
+            "reasoning": "Everything passed.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "3551F025-D9D0-5188-98C9-3928DF0F346D",
+            "id": "514B7CEB-8729-525A-85AE-8D006DED2597",
+            "text": "Everything passed.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "51E358EA-D597-5857-BFA4-2FDDEA734C94",
+      "type": "agent"
+    }
+  ]
+}

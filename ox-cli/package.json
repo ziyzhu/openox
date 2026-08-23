@@ -1,0 +1,11 @@
+{
+  "name": "ox-cli",
+  "author": "Ziyuan Zhu",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "bin": { "ox": "./ox.ts" }
+}

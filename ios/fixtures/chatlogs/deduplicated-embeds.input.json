@@ -1,0 +1,157 @@
+{
+  "turns": [
+    {
+      "id": "D1000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 701000000,
+        "attachments": [],
+        "intent": "Create and refine a skill"
+      }
+    },
+    {
+      "agent": {
+        "at": 701000001,
+        "generations": [
+          {
+            "at": 701000001,
+            "id": "D1000000-0000-4000-8000-000000000010",
+            "model": "mock",
+            "outcome": {
+              "at": 701000002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 701000002,
+            "id": "D1000000-0000-4000-8000-000000000011",
+            "model": "mock",
+            "outcome": {
+              "at": 701000003,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 701000003,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a weekly review",
+                      "instructions": "Review completed work.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "created",
+                  "type": "succeeded"
+                },
+                "source": "create skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000010",
+            "id": "D1000000-0000-4000-8000-000000000020",
+            "type": "action"
+          },
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a weekly review with unfinished work",
+                      "instructions": "Review completed and unfinished work.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "refined",
+                  "type": "succeeded"
+                },
+                "source": "refine skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000011",
+            "id": "D1000000-0000-4000-8000-000000000021",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "D1000000-0000-4000-8000-000000000002",
+      "type": "agent"
+    },
+    {
+      "id": "D1000000-0000-4000-8000-000000000003",
+      "type": "user",
+      "user": {
+        "at": 701000004,
+        "attachments": [],
+        "intent": "Update it again"
+      }
+    },
+    {
+      "agent": {
+        "at": 701000005,
+        "generations": [
+          {
+            "at": 701000005,
+            "id": "D1000000-0000-4000-8000-000000000012",
+            "model": "mock",
+            "outcome": {
+              "at": 701000006,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 701000006,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "skill": {
+                      "description": "Prepare a Friday review",
+                      "instructions": "Review the week every Friday.",
+                      "name": "weekly-review",
+                      "services": []
+                    },
+                    "type": "skill"
+                  }
+                ],
+                "outcome": {
+                  "output": "updated",
+                  "type": "succeeded"
+                },
+                "source": "update skill"
+              },
+              "type": "execute"
+            },
+            "generation": "D1000000-0000-4000-8000-000000000012",
+            "id": "D1000000-0000-4000-8000-000000000022",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "D1000000-0000-4000-8000-000000000004",
+      "type": "agent"
+    }
+  ]
+}

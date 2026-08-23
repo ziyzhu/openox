@@ -1,0 +1,62 @@
+{
+  "domain": "ios:messages",
+  "name": "Messages",
+  "description": "Open a message pre-filled with a recipient and body for you to review and send.",
+  "icon": {
+    "asset": "ios:messages"
+  },
+  "permission": "contacts",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "description": "Open a pre-filled message for you to review and send.",
+      "id": "compose",
+      "inputSchema": {
+        "properties": {
+          "options": {
+            "properties": {
+              "body": {
+                "description": "The message text to pre-fill. The user can edit it before sending.",
+                "type": "string"
+              },
+              "to": {
+                "description": "Who to text — a contact name like \"Mom\" or a phone number. Omit to let the user pick the recipient in the composer.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "label": "Compose message",
+      "outputSchema": {
+        "properties": {
+          "disposition": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "信息",
+      "description": "打开已填好收件人和正文的信息，供你检查并发送。",
+      "actions": {
+        "compose": {
+          "label": "编写信息",
+          "description": "打开已填好的信息，供你检查并发送。"
+        }
+      }
+    }
+  }
+}

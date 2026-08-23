@@ -1,0 +1,51 @@
+{
+  "turns": [
+    {
+      "id": "F8E905C7-761C-5732-92B9-31A92754DFAF",
+      "type": "user",
+      "user": {
+        "at": 700500000,
+        "attachments": [],
+        "intent": "Fetch the result"
+      }
+    },
+    {
+      "agent": {
+        "at": 700500001,
+        "generations": [
+          {
+            "at": 700500001,
+            "id": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "model": "mock",
+            "outcome": {
+              "at": 700500003,
+              "message": "network unavailable",
+              "type": "failed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700500003,
+          "message": "network unavailable",
+          "type": "failed"
+        },
+        "steps": [
+          {
+            "generation": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "id": "D91F35ED-B95B-526A-98B5-1D4FD63185C9",
+            "reasoning": "The request failed before a result arrived.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "id": "6F44DB34-EE9E-5A06-B90D-F83AC41FA900",
+            "text": "I couldn't fetch the result.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "E0232010-3DDC-5E08-88DB-D89E78FE61CF",
+      "type": "agent"
+    }
+  ]
+}

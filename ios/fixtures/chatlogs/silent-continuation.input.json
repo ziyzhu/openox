@@ -1,0 +1,64 @@
+{
+  "turns": [
+    {
+      "id": "AF083401-4BF3-5BB2-B72B-0BC8000E2050",
+      "type": "user",
+      "user": {
+        "at": 700600000,
+        "attachments": [],
+        "intent": "Start the task"
+      }
+    },
+    {
+      "agent": {
+        "at": 700600001,
+        "generations": [
+          {
+            "at": 700600001,
+            "id": "C531C760-C598-58EC-9D75-0C78C98D7492",
+            "model": "mock",
+            "outcome": {
+              "at": 700600002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700600003,
+            "id": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "model": "mock",
+            "outcome": {
+              "at": 700600005,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700600005,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "C531C760-C598-58EC-9D75-0C78C98D7492",
+            "id": "52EA99AF-5924-5B9D-ACE6-BFDAF6FCECCE",
+            "text": "First response.",
+            "type": "text"
+          },
+          {
+            "generation": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "id": "ACD96114-F84A-5F5A-9383-61610E49B4D1",
+            "reasoning": "Resume after the silent event.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "id": "7E4D197B-1061-5B53-8ED5-6B9EBE2123E1",
+            "text": "Continuation complete.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "462E0B87-06EC-5328-ADFF-2F86A5A0FB3E",
+      "type": "agent"
+    }
+  ]
+}

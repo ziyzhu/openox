@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Built-in",
+  "services": [
+    "ios:browser",
+    "ios:calendar",
+    "ios:contacts",
+    "ios:files",
+    "ios:health",
+    "ios:location",
+    "ios:messages",
+    "ios:notifications",
+    "ios:reminders"
+  ]
+}

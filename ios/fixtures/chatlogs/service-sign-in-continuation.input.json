@@ -1,0 +1,151 @@
+{
+  "turns": [
+    {
+      "id": "A2000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 700800000,
+        "attachments": [],
+        "intent": "Look up my recent orders"
+      }
+    },
+    {
+      "agent": {
+        "at": 700800001,
+        "generations": [
+          {
+            "at": 700800001,
+            "id": "A2000000-0000-4000-8000-000000000010",
+            "model": "mock",
+            "outcome": {
+              "at": 700800002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700800003,
+            "id": "A2000000-0000-4000-8000-000000000011",
+            "model": "mock",
+            "outcome": {
+              "at": 700800004,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700800005,
+            "id": "A2000000-0000-4000-8000-000000000012",
+            "model": "mock",
+            "outcome": {
+              "at": 700800006,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700800006,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "type": "invocation",
+                    "invocation": {
+                      "args": {
+                        "limit": 10
+                      },
+                      "id": "A2000000-0000-4000-8000-000000000020",
+                      "name": "ox.service.invoke(web:example.com:listOrders)",
+                      "outcome": {
+                        "failed": {
+                          "_0": "Sign in required"
+                        }
+                      },
+                      "purpose": "Look up recent orders"
+                    }
+                  },
+                  {
+                    "type": "invocation",
+                    "invocation": {
+                      "args": {
+                        "domain": "example.com"
+                      },
+                      "id": "A2000000-0000-4000-8000-000000000021",
+                      "name": "ox.service.signIn",
+                      "outcome": {
+                        "succeeded": {}
+                      },
+                      "purpose": "Sign in to view recent orders"
+                    }
+                  },
+                  {
+                    "type": "serviceControl",
+                    "serviceControl": {
+                      "domain": "example.com",
+                      "serviceName": "Example",
+                      "type": "signIn"
+                    }
+                  }
+                ],
+                "outcome": {
+                  "output": "Sign in required",
+                  "type": "failed"
+                },
+                "source": "await ox.service.invoke({ service: 'example.com', action: 'listOrders', args: { limit: 10 } })"
+              },
+              "type": "execute"
+            },
+            "generation": "A2000000-0000-4000-8000-000000000010",
+            "id": "A2000000-0000-4000-8000-000000000003",
+            "type": "action"
+          },
+          {
+            "action": {
+              "execute": {
+                "effects": [
+                  {
+                    "type": "invocation",
+                    "invocation": {
+                      "args": {
+                        "limit": 10
+                      },
+                      "id": "A2000000-0000-4000-8000-000000000022",
+                      "name": "ox.service.invoke(web:example.com:listOrders)",
+                      "outcome": {
+                        "succeeded": {
+                          "_0": {
+                            "items": []
+                          }
+                        }
+                      },
+                      "purpose": "Look up recent orders"
+                    }
+                  }
+                ],
+                "outcome": {
+                  "output": "[]",
+                  "type": "succeeded"
+                },
+                "source": "await ox.service.invoke({ service: 'example.com', action: 'listOrders', args: { limit: 10 } })"
+              },
+              "type": "execute"
+            },
+            "generation": "A2000000-0000-4000-8000-000000000011",
+            "id": "A2000000-0000-4000-8000-000000000004",
+            "type": "action"
+          },
+          {
+            "generation": "A2000000-0000-4000-8000-000000000012",
+            "id": "A2000000-0000-4000-8000-000000000005",
+            "text": "Here are your recent orders.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "A2000000-0000-4000-8000-000000000002",
+      "type": "agent"
+    }
+  ]
+}

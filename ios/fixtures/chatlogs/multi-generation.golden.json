@@ -1,0 +1,222 @@
+{
+  "blocks": [
+    {
+      "createdAt": 700700000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Check the value and summarize it",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 700700001,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "trace": {
+          "completedAt": 700700002,
+          "entries": [
+            {
+              "kind": "reasoning",
+              "reasoning": {
+                "id": "790A9623-B551-5923-8395-D027F43B37EF",
+                "text": "Inspect the value first."
+              }
+            }
+          ]
+        },
+        "type": "thinking"
+      }
+    },
+    {
+      "createdAt": 700700002,
+      "id": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "kind": {
+        "items": [
+          {
+            "text": "The value is 42."
+          }
+        ],
+        "type": "agentContent"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "A1000000-0000-4000-8000-000000000001"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "A1000000-0000-4000-8000-000000000002"
+    },
+    {
+      "blockID": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "turnID": "A1000000-0000-4000-8000-000000000002"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1,
+    1
+  ],
+  "turns": [
+    {
+      "id": "A1000000-0000-4000-8000-000000000001",
+      "type": "user",
+      "user": {
+        "at": 700700000,
+        "attachments": [],
+        "intent": "Check the value and summarize it"
+      }
+    },
+    {
+      "agent": {
+        "at": 700700001,
+        "generations": [
+          {
+            "at": 700700001,
+            "id": "A1000000-0000-4000-8000-000000000010",
+            "model": "mock",
+            "outcome": {
+              "at": 700700002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700700002,
+            "id": "A1000000-0000-4000-8000-000000000011",
+            "model": "mock",
+            "outcome": {
+              "at": 700700003,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700700003,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "A1000000-0000-4000-8000-000000000010",
+            "id": "A1000000-0000-4000-8000-000000000003",
+            "reasoning": "Inspect the value first.",
+            "type": "reasoning"
+          },
+          {
+            "action": {
+              "execute": {
+                "effects": [],
+                "outcome": {
+                  "output": "42",
+                  "type": "succeeded"
+                },
+                "source": "return 42"
+              },
+              "type": "execute"
+            },
+            "generation": "A1000000-0000-4000-8000-000000000010",
+            "id": "A1000000-0000-4000-8000-000000000004",
+            "type": "action"
+          },
+          {
+            "generation": "A1000000-0000-4000-8000-000000000011",
+            "id": "A1000000-0000-4000-8000-000000000005",
+            "text": "The value is 42.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "A1000000-0000-4000-8000-000000000002",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Check the value and summarize it"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 700700000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "thinking": {
+              "thinking": "Inspect the value first."
+            },
+            "type": "thinking"
+          },
+          {
+            "toolCall": {
+              "arguments": {
+                "source": "return 42"
+              },
+              "id": "A1000000-0000-4000-8000-000000000004",
+              "name": "execute"
+            },
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700700001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "toolResult": {
+        "content": [
+          {
+            "text": {
+              "text": "42"
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false,
+        "timestamp": 700700001,
+        "toolCallId": "A1000000-0000-4000-8000-000000000004",
+        "toolName": "execute"
+      },
+      "type": "toolResult"
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "text": {
+              "text": "The value is 42."
+            },
+            "type": "text"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700700002,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    }
+  ]
+}

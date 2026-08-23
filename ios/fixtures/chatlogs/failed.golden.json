@@ -1,0 +1,157 @@
+{
+  "blocks": [
+    {
+      "createdAt": 700500000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Fetch the result",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 700500001,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "trace": {
+          "completedAt": 700500003,
+          "entries": [
+            {
+              "kind": "reasoning",
+              "reasoning": {
+                "id": "5E7B6470-A278-5821-890C-DEC0832C18F3",
+                "text": "The request failed before a result arrived."
+              }
+            }
+          ]
+        },
+        "type": "thinking"
+      }
+    },
+    {
+      "createdAt": 700500001,
+      "id": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "kind": {
+        "items": [
+          {
+            "text": "I couldn't fetch the result."
+          }
+        ],
+        "type": "agentContent"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "F8E905C7-761C-5732-92B9-31A92754DFAF"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "E0232010-3DDC-5E08-88DB-D89E78FE61CF"
+    },
+    {
+      "blockID": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "turnID": "E0232010-3DDC-5E08-88DB-D89E78FE61CF"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1,
+    1
+  ],
+  "turns": [
+    {
+      "id": "F8E905C7-761C-5732-92B9-31A92754DFAF",
+      "type": "user",
+      "user": {
+        "at": 700500000,
+        "attachments": [],
+        "intent": "Fetch the result"
+      }
+    },
+    {
+      "agent": {
+        "at": 700500001,
+        "generations": [
+          {
+            "at": 700500001,
+            "id": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "model": "mock",
+            "outcome": {
+              "at": 700500003,
+              "message": "network unavailable",
+              "type": "failed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700500003,
+          "message": "network unavailable",
+          "type": "failed"
+        },
+        "steps": [
+          {
+            "generation": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "id": "D91F35ED-B95B-526A-98B5-1D4FD63185C9",
+            "reasoning": "The request failed before a result arrived.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "7DA914F5-93F8-5A9F-8432-5511708378E7",
+            "id": "6F44DB34-EE9E-5A06-B90D-F83AC41FA900",
+            "text": "I couldn't fetch the result.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "E0232010-3DDC-5E08-88DB-D89E78FE61CF",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Fetch the result"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 700500000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "thinking": {
+              "thinking": "The request failed before a result arrived."
+            },
+            "type": "thinking"
+          },
+          {
+            "text": {
+              "text": "I couldn't fetch the result."
+            },
+            "type": "text"
+          }
+        ],
+        "errorMessage": "network unavailable",
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700500001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    }
+  ]
+}

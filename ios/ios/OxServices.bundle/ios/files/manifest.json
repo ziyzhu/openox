@@ -1,0 +1,18 @@
+{
+  "domain": "ios:files",
+  "name": "Files",
+  "description": "Let Ox access folders you choose in Files.",
+  "icon": {
+    "asset": "ios:files"
+  },
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [],
+  "locales": {
+    "zh-Hans": {
+      "name": "文件",
+      "description": "允许 Ox 访问你在“文件”中选择的文件夹。"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "turns": [
+    {
+      "id": "839D0DDD-B31A-5290-93BD-4DEB211CFF7D",
+      "type": "user",
+      "user": {
+        "at": 700400000,
+        "attachments": [],
+        "intent": "Delete the draft"
+      }
+    },
+    {
+      "agent": {
+        "at": 700400001,
+        "generations": [
+          {
+            "at": 700400001,
+            "id": "2050D2C4-32D3-5351-BF11-06B9071DEE66",
+            "model": "mock",
+            "outcome": {
+              "type": "running"
+            }
+          }
+        ],
+        "outcome": {
+          "type": "running"
+        },
+        "steps": [
+          {
+            "action": {
+              "confirm": {
+                "options": [
+                  "Delete",
+                  "Cancel"
+                ],
+                "outcome": {
+                  "type": "pending"
+                },
+                "prompt": "Delete the draft?"
+              },
+              "type": "confirm"
+            },
+            "generation": "2050D2C4-32D3-5351-BF11-06B9071DEE66",
+            "id": "A9A3D042-5596-57B9-98A9-34A7B75025D0",
+            "type": "action"
+          }
+        ]
+      },
+      "id": "BDD047E9-EDCF-556E-861A-D8AD6688E1AC",
+      "type": "agent"
+    }
+  ]
+}

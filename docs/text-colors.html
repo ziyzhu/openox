@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en" data-theme="creator">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Ox Text Colors</title>
+  <style>
+    :root {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      color: var(--on-surface);
+      background: var(--background);
+      font-synthesis: none;
+    }
+
+    html[data-theme="creator"] {
+      color-scheme: light;
+      --primary: #ffa500;
+      --surface: #fffdf7;
+      --surface-sunken: #fbe9c7;
+      --bubble: #fbe9c7;
+      --background: #fff6e6;
+      --on-surface: #3a2410;
+      --on-surface-muted: #7a5a3a;
+      --on-primary: #fffdf7;
+      --error: #b8422e;
+      --border: rgb(58 36 16 / 12%);
+      --shadow: rgb(87 47 13 / 10%);
+    }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --primary: #ffa500;
+      --surface: #ffffff;
+      --surface-sunken: #f2f2f7;
+      --bubble: #f2f2f7;
+      --background: #f5f5f5;
+      --on-surface: #000000;
+      --on-surface-muted: #8e8e93;
+      --on-primary: #fffdf7;
+      --error: #b8422e;
+      --border: rgb(0 0 0 / 10%);
+      --shadow: rgb(0 0 0 / 7%);
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --primary: #f5a030;
+      --surface: #1c1c1e;
+      --surface-sunken: #2c2c2e;
+      --bubble: #1c1c1e;
+      --background: #0a0a0a;
+      --on-surface: #ececec;
+      --on-surface-muted: #9a9a9a;
+      --on-primary: #fffdf7;
+      --error: #e25a45;
+      --border: rgb(255 255 255 / 12%);
+      --shadow: rgb(0 0 0 / 28%);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      background: var(--background);
+      transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    main {
+      width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 64px;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif;
+      font-size: clamp(36px, 6vw, 64px);
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+    }
+
+    .intro {
+      max-width: 610px;
+      margin: 16px 0 0;
+      color: var(--on-surface-muted);
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .theme-picker {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 8px 24px var(--shadow);
+    }
+
+    .theme-picker button {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 10px;
+      color: var(--on-surface-muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .theme-picker button[aria-pressed="true"] {
+      color: var(--on-primary);
+      background: var(--primary);
+    }
+
+    .sample {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sample-copy,
+    .sample-actions {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: 0 12px 32px var(--shadow);
+    }
+
+    .sample-copy {
+      padding: 24px;
+    }
+
+    .sample-copy h2 {
+      margin: 0 0 8px;
+      font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .sample-copy p {
+      margin: 0;
+      color: var(--on-surface-muted);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .sample-copy .user-bubble {
+      width: fit-content;
+      max-width: min(80%, 360px);
+      margin: 20px 0 0 auto;
+      padding: 10px 14px;
+      border-radius: 18px 18px 5px 18px;
+      color: var(--on-surface);
+      background: var(--bubble);
+    }
+
+    .sample-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .sample-meta span:nth-child(1) {
+      color: var(--primary);
+    }
+
+    .sample-meta span:nth-child(2) {
+      color: var(--primary);
+    }
+
+    .sample-meta span:nth-child(3) {
+      color: var(--error);
+    }
+
+    .sample-actions {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px;
+    }
+
+    .primary-action,
+    .secondary-action {
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+
+    .primary-action {
+      color: var(--on-primary);
+      background: var(--primary);
+    }
+
+    .secondary-action {
+      color: var(--on-surface);
+      background: var(--surface-sunken);
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .color-card {
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr);
+      min-height: 210px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: 0 12px 32px var(--shadow);
+    }
+
+    .swatch {
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      padding: 18px 10px;
+      color: var(--swatch-label);
+      background: var(--swatch);
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .color-card-copy {
+      display: flex;
+      flex-direction: column;
+      padding: 22px;
+    }
+
+    .token {
+      margin: 0;
+      color: var(--on-surface-muted);
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: 12px;
+    }
+
+    .color-card h2 {
+      margin: 7px 0 8px;
+      font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif;
+      font-size: 21px;
+      letter-spacing: -0.015em;
+    }
+
+    .description {
+      margin: 0;
+      color: var(--on-surface-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .use {
+      margin: auto 0 0;
+      padding-top: 18px;
+      color: var(--on-surface);
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+      color: var(--on-surface-muted);
+      font-size: 13px;
+    }
+
+    .spectrum {
+      display: flex;
+      flex: 1;
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+    }
+
+    .spectrum span {
+      flex: 1;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding-top: 28px;
+      }
+
+      header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .theme-picker {
+        align-self: flex-start;
+      }
+
+      .sample,
+      .palette {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 460px) {
+      main {
+        width: min(100% - 20px, 1100px);
+      }
+
+      .theme-picker {
+        width: 100%;
+      }
+
+      .theme-picker button {
+        flex: 1;
+        padding-inline: 6px;
+      }
+
+      .color-card {
+        grid-template-columns: 1fr;
+      }
+
+      .swatch {
+        min-height: 88px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Ox design system</p>
+        <h1>Text colors</h1>
+        <p class="intro">Warm neutrals carry the conversation. Harvest gold appears only when meaning needs emphasis.</p>
+      </div>
+      <nav class="theme-picker" aria-label="Preview theme">
+        <button type="button" data-theme="creator" aria-pressed="true">Ox</button>
+        <button type="button" data-theme="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme="dark" aria-pressed="false">Dark</button>
+      </nav>
+    </header>
+
+    <section class="sample" aria-label="Text colors in context">
+      <article class="sample-copy">
+        <h2>A grounded, capable companion</h2>
+        <p>Body copy stays calm and legible. Supporting details recede without disappearing, leaving emphasis to the moments that matter.</p>
+        <p class="user-bubble">Can you summarize this for me?</p>
+        <div class="sample-meta">
+          <span>Connected</span>
+          <span>Active selection</span>
+          <span>Action required</span>
+        </div>
+      </article>
+      <div class="sample-actions">
+        <button type="button" class="primary-action">Primary action</button>
+        <button type="button" class="secondary-action">Secondary action</button>
+      </div>
+    </section>
+
+    <section class="palette" aria-label="Ox semantic text palette">
+      <article class="color-card" data-color="on-surface">
+        <div class="swatch"></div>
+        <div class="color-card-copy">
+          <p class="token">onSurface</p>
+          <h2>Warm espresso</h2>
+          <p class="description">Deep brown in Ox, true black in Light, and a softened near-white in Dark.</p>
+          <p class="use">Body text · titles · primary reading</p>
+        </div>
+      </article>
+
+      <article class="color-card" data-color="on-surface-muted">
+        <div class="swatch"></div>
+        <div class="color-card-copy">
+          <p class="token">onSurfaceMuted</p>
+          <h2>Dusty walnut</h2>
+          <p class="description">An earthy mid-tone that becomes familiar iOS gray in the neutral themes.</p>
+          <p class="use">Metadata · captions · placeholders · disabled states</p>
+        </div>
+      </article>
+
+      <article class="color-card" data-color="on-primary">
+        <div class="swatch"></div>
+        <div class="color-card-copy">
+          <p class="token">onPrimary</p>
+          <h2>Warm cream</h2>
+          <p class="description">A parchment-tinted white that feels gentler than pure white while retaining strong contrast.</p>
+          <p class="use">Labels and icons on harvest-gold controls</p>
+        </div>
+      </article>
+
+      <article class="color-card" data-color="primary">
+        <div class="swatch"></div>
+        <div class="color-card-copy">
+          <p class="token">primary</p>
+          <h2>Harvest gold</h2>
+          <p class="description">A ripe, sunny orange with enough depth to feel energetic without becoming fluorescent.</p>
+          <p class="use">Active selections · key actions · mentions · warnings</p>
+        </div>
+      </article>
+
+      <article class="color-card" data-color="error">
+        <div class="swatch"></div>
+        <div class="color-card-copy">
+          <p class="token">error</p>
+          <h2>Brick red</h2>
+          <p class="description">A dark earthen red with brown undertones: serious and clear without becoming alarmist.</p>
+          <p class="use">Errors · failures · destructive actions</p>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      <span>espresso</span>
+      <div class="spectrum" aria-hidden="true">
+        <span style="background: var(--on-surface)"></span>
+        <span style="background: var(--on-surface-muted)"></span>
+        <span style="background: var(--on-primary)"></span>
+        <span style="background: var(--primary)"></span>
+        <span style="background: var(--error)"></span>
+      </div>
+      <span>field accents</span>
+    </footer>
+  </main>
+
+  <script>
+    const palettes = {
+      creator: {
+        "on-surface": "#3A2410",
+        "on-surface-muted": "#7A5A3A",
+        "on-primary": "#FFFDF7",
+        primary: "#FFA500",
+        error: "#B8422E"
+      },
+      light: {
+        "on-surface": "#000000",
+        "on-surface-muted": "#8E8E93",
+        "on-primary": "#FFFDF7",
+        primary: "#FFA500",
+        error: "#B8422E"
+      },
+      dark: {
+        "on-surface": "#ECECEC",
+        "on-surface-muted": "#9A9A9A",
+        "on-primary": "#FFFDF7",
+        primary: "#F5A030",
+        error: "#E25A45"
+      }
+    };
+
+    const root = document.documentElement;
+    const buttons = [...document.querySelectorAll(".theme-picker button")];
+    const cards = [...document.querySelectorAll(".color-card")];
+
+    function luminance(hex) {
+      const values = hex.match(/[a-f\d]{2}/gi).map(value => parseInt(value, 16) / 255);
+      const channels = values.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    }
+
+    function applyTheme(theme) {
+      root.dataset.theme = theme;
+      buttons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.theme === theme)));
+      cards.forEach(card => {
+        const hex = palettes[theme][card.dataset.color];
+        const swatch = card.querySelector(".swatch");
+        swatch.textContent = hex;
+        swatch.style.setProperty("--swatch", hex);
+        swatch.style.setProperty("--swatch-label", luminance(hex) > 0.48 ? "#26180F" : "#FFFDF7");
+      });
+    }
+
+    buttons.forEach(button => button.addEventListener("click", () => applyTheme(button.dataset.theme)));
+    applyTheme("creator");
+  </script>
+</body>
+</html>

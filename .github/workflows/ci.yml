@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ox-cli/**"
+      - "dev/**"
+      - "tooling/**"
+      - "scripts/**"
+      - "ios/**/*.xcstrings"
+      - ".agents/skills/ox-debug/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.base.json"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ox-cli/**"
+      - "dev/**"
+      - "tooling/**"
+      - "scripts/**"
+      - "ios/**/*.xcstrings"
+      - ".agents/skills/ox-debug/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.base.json"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Typecheck
+        run: bun install --frozen-lockfile && bun run typecheck

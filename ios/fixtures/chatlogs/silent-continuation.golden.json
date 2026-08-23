@@ -1,0 +1,208 @@
+{
+  "blocks": [
+    {
+      "createdAt": 700600000,
+      "id": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "kind": {
+        "attachments": [],
+        "text": "Start the task",
+        "type": "userText"
+      }
+    },
+    {
+      "createdAt": 700600001,
+      "id": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "kind": {
+        "items": [
+          {
+            "text": "First response."
+          }
+        ],
+        "type": "agentContent"
+      }
+    },
+    {
+      "createdAt": 700600003,
+      "id": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "kind": {
+        "trace": {
+          "completedAt": 700600005,
+          "entries": [
+            {
+              "kind": "reasoning",
+              "reasoning": {
+                "id": "825DCB68-DA46-5027-A8B2-710014FB29EF",
+                "text": "Resume after the silent event."
+              }
+            }
+          ]
+        },
+        "type": "thinking"
+      }
+    },
+    {
+      "createdAt": 700600003,
+      "id": "4E074085-62BE-5B8B-A0CE-05C1DECFE3AD",
+      "kind": {
+        "items": [
+          {
+            "text": "Continuation complete."
+          }
+        ],
+        "type": "agentContent"
+      }
+    }
+  ],
+  "blockSources": [
+    {
+      "blockID": "5FECEB66-FFC8-5F38-9952-786C6D696C79",
+      "turnID": "AF083401-4BF3-5BB2-B72B-0BC8000E2050"
+    },
+    {
+      "blockID": "6B86B273-FF34-5CE1-9D6B-804EFF5A3F57",
+      "turnID": "462E0B87-06EC-5328-ADFF-2F86A5A0FB3E"
+    },
+    {
+      "blockID": "D4735E3A-265E-56EE-A03F-59718B9B5D03",
+      "turnID": "462E0B87-06EC-5328-ADFF-2F86A5A0FB3E"
+    },
+    {
+      "blockID": "4E074085-62BE-5B8B-A0CE-05C1DECFE3AD",
+      "turnID": "462E0B87-06EC-5328-ADFF-2F86A5A0FB3E"
+    }
+  ],
+  "blockTurns": [
+    0,
+    1,
+    1,
+    1
+  ],
+  "turns": [
+    {
+      "id": "AF083401-4BF3-5BB2-B72B-0BC8000E2050",
+      "type": "user",
+      "user": {
+        "at": 700600000,
+        "attachments": [],
+        "intent": "Start the task"
+      }
+    },
+    {
+      "agent": {
+        "at": 700600001,
+        "generations": [
+          {
+            "at": 700600001,
+            "id": "C531C760-C598-58EC-9D75-0C78C98D7492",
+            "model": "mock",
+            "outcome": {
+              "at": 700600002,
+              "type": "completed"
+            }
+          },
+          {
+            "at": 700600003,
+            "id": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "model": "mock",
+            "outcome": {
+              "at": 700600005,
+              "type": "completed"
+            }
+          }
+        ],
+        "outcome": {
+          "at": 700600005,
+          "type": "completed"
+        },
+        "steps": [
+          {
+            "generation": "C531C760-C598-58EC-9D75-0C78C98D7492",
+            "id": "52EA99AF-5924-5B9D-ACE6-BFDAF6FCECCE",
+            "text": "First response.",
+            "type": "text"
+          },
+          {
+            "generation": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "id": "ACD96114-F84A-5F5A-9383-61610E49B4D1",
+            "reasoning": "Resume after the silent event.",
+            "type": "reasoning"
+          },
+          {
+            "generation": "7EC9731D-F282-57B4-869C-47A40A29413E",
+            "id": "7E4D197B-1061-5B53-8ED5-6B9EBE2123E1",
+            "text": "Continuation complete.",
+            "type": "text"
+          }
+        ]
+      },
+      "id": "462E0B87-06EC-5328-ADFF-2F86A5A0FB3E",
+      "type": "agent"
+    }
+  ],
+  "wireMessages": [
+    {
+      "type": "user",
+      "user": {
+        "content": [
+          {
+            "text": {
+              "text": "Start the task"
+            },
+            "type": "text"
+          }
+        ],
+        "timestamp": 700600000
+      }
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "text": {
+              "text": "First response."
+            },
+            "type": "text"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700600001,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    },
+    {
+      "assistant": {
+        "content": [
+          {
+            "thinking": {
+              "thinking": "Resume after the silent event."
+            },
+            "type": "thinking"
+          },
+          {
+            "text": {
+              "text": "Continuation complete."
+            },
+            "type": "text"
+          }
+        ],
+        "model": "mock",
+        "stopReason": "stop",
+        "timestamp": 700600003,
+        "usage": {
+          "cachedInput": 0,
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "assistant"
+    }
+  ]
+}

@@ -1,0 +1,408 @@
+# Virtual Machine + Virtual File System
+
+```text
+MODEL-TO-NATIVE EXECUTION
+
+LLM
+└── execute { source }
+    ├── source limit: 100,000 characters
+    └── ChatJavaScriptTool
+        ├── beginExecution(source)
+        ├── VirtualMachine.run(source, bridge: Chat)
+        │   └── serialized tail
+        │       ├── wait for the preceding execution
+        │       └── VirtualMachineRuntime.run
+        │           ├── shared thread: agent-javascript
+        │           ├── reusable JSVirtualMachine
+        │           ├── reusable JSContext
+        │           ├── current weak bridge -> calling Chat
+        │           ├── wrap source
+        │           │   └── (async () => { <source> })()
+        │           │       └── .then(__nativeResolve, __nativeReject)
+        │           ├── JavaScript
+        │           │   ├── standard JavaScriptCore language/runtime
+        │           │   ├── frozen console
+        │           │   ├── non-writable globalThis.ox binding
+        │           │   ├── no DOM
+        │           │   ├── no Node.js
+        │           │   ├── no shell
+        │           │   ├── no direct native filesystem
+        │           │   └── no direct network API
+        │           └── Swift bridge promises
+        │               ├── execute bridge work on MainActor
+        │               ├── resolve/reject back on agent-javascript
+        │               └── cancel tracked bridge tasks when settled
+        ├── finishExecution(output, isError)
+        └── ToolResult
+            ├── model-visible text <- console.* logs
+            ├── diagnosticContent <- structured logs + error
+            ├── transient attachments <- execution attachments
+            └── JavaScript return value <- discarded by execute
+```
+
+```text
+RUNTIME OWNERSHIP + LIFETIME
+
+App process
+├── VirtualMachineThread.shared
+│   └── one long-lived CFRunLoop thread for JavaScriptCore work
+└── ChatManager
+    ├── active Profile scope
+    ├── one VirtualMachine actor
+    │   ├── one VirtualMachineRuntime
+    │   ├── one reusable JSVirtualMachine
+    │   └── one reusable JSContext
+    ├── Chat A ─┐
+    ├── Chat B ─┼── share the ChatManager VirtualMachine
+    └── Chat C ─┘
+
+execution N
+├── bridge -> Chat that initiated execution N
+├── async-function locals die with execution N
+└── explicit globalThis mutations can survive into execution N+1
+
+active Profile scope changes
+└── ChatManager replaces VirtualMachine
+    └── JSVirtualMachine + JSContext + explicit globals reset
+```
+
+```text
+EXECUTION STATE MACHINE
+
+queued
+└── wait for previous tail
+    └── running
+        ├── sync exception
+        │   └── failed + captured console logs
+        ├── rejected promise
+        │   └── failed + captured console logs
+        ├── task cancellation
+        │   ├── mark settled
+        │   ├── cancel timeout task
+        │   ├── cancel bridge tasks
+        │   └── CancellationError
+        ├── active-time budget exhausted
+        │   └── timeout after 60 seconds + captured console logs
+        └── resolved promise
+            └── completed + captured console logs
+
+60-second active-time clock
+├── normally running during bridge calls
+└── suspended during
+    ├── ox.service.invoke
+    ├── ox.service.signIn
+    ├── ox.service.solve
+    ├── ox.service.pay
+    └── ox.user.choose
+```
+
+```text
+JAVASCRIPT CAPABILITY TREE
+
+ox
+├── app
+│   └── inspect
+├── artifact
+│   ├── attach
+│   ├── import
+│   ├── present
+│   └── rename
+├── fs
+│   ├── delete
+│   ├── edit
+│   ├── glob
+│   ├── grep
+│   ├── list
+│   ├── read
+│   └── write
+├── service
+│   ├── attach
+│   ├── detach
+│   ├── find
+│   ├── inspect
+│   ├── invoke
+│   ├── listAttached
+│   ├── pay
+│   ├── signIn
+│   └── solve
+├── user
+│   ├── choose
+│   └── reportProgress
+├── web
+│   ├── fetch
+│   └── search
+└── widget
+    ├── shoveler
+    └── video
+
+every ox.* function
+├── requires options.purpose
+│   ├── string
+│   ├── 1..80 characters
+│   └── user-visible step label
+├── validates input against its closed schema
+│   ├── required fields
+│   ├── value types
+│   ├── enums
+│   ├── ranges
+│   ├── array constraints
+│   └── unknown top-level fields rejected
+└── exposes non-enumerable function.help()
+    └── description + input schema + output schema
+```
+
+```text
+BRIDGE CALL FLOW
+
+JavaScript
+└── ox.<namespace>.<function>(options)
+    ├── __oxOptions
+    │   ├── require one options object
+    │   └── validate against __oxHelpCatalog
+    └── __native<Function>(...)
+        └── OxFunctionEnvironment.call
+            └── JavaScript Promise
+                ├── Task @MainActor
+                │   └── OxFunctionBridge
+                │       └── Chat
+                │           ├── authorization
+                │           ├── approval / user handoff when required
+                │           ├── app inspection / storage / service / web operation
+                │           ├── structured diagnostic log
+                │           └── JSONValue result or localized error
+                └── agent-javascript thread
+                    ├── resolve(JSON-compatible value)
+                    └── reject(JavaScript Error)
+```
+
+```text
+VIRTUAL FILESYSTEM TREE
+
+.
+├── MEMORY.md                                      [profile mutation rules]
+├── SOUL.md                                        [profile mutation rules]
+├── artifacts/                                     [profile mutation rules]
+│   └── <validated-filename>                       [file]
+├── skills/                                        [mixed sources]
+│   ├── system:create-canvas/                      [read-only]
+│   │   └── SKILL.md
+│   ├── system:create-note/                        [read-only]
+│   │   └── SKILL.md
+│   ├── system:create-service-skill/               [read-only]
+│   │   └── SKILL.md
+│   ├── system:create-user-skill/                  [read-only]
+│   │   └── SKILL.md
+│   ├── system:create-web-service/                 [read-only]
+│   │   └── SKILL.md
+│   ├── <user-skill>/                              [writable outside temporary chats]
+│   │   └── SKILL.md
+│   └── service:<domain>:<skill>/                  [read-only; attached services only]
+│       └── SKILL.md
+├── services/                                      [read-only]
+│   ├── web/
+│   │   └── <domain>/manifest.json
+│   ├── ios/
+│   │   └── <service-id>/manifest.json
+│   └── mcp/
+│       └── <service-id>/manifest.json
+└── files/                                         [ios:files attachment required]
+    └── <folder-grant-id>/
+        └── <selected external folder descendants>
+
+conditional branches
+├── artifacts/*                  <- active Profile contents
+├── skills/<user-skill>/*        <- active Profile contents
+├── skills/service:*/*           <- attached service skills
+├── services/<kind>/*            <- current MonoRepository
+└── files/*                      <- user-selected security-scoped grants
+```
+
+```text
+VIRTUAL PATH GRAMMAR
+
+accepted
+├── MEMORY.md
+├── SOUL.md
+├── artifacts
+├── artifacts/<validated-filename>
+├── skills
+├── skills/<local-kebab-name>
+├── skills/<local-kebab-name>/SKILL.md
+├── skills/system:<local-kebab-name>
+├── skills/system:<local-kebab-name>/SKILL.md
+├── skills/service:<domain>:<local-kebab-name>
+├── skills/service:<domain>:<local-kebab-name>/SKILL.md
+├── services
+├── services/<web|ios|mcp>
+├── services/<web|ios|mcp>/<service-id>
+├── services/<web|ios|mcp>/<service-id>/manifest.json
+├── files
+├── files/<folder-grant-id>
+└── files/<folder-grant-id>/<descendant...>
+
+rejected
+├── empty path                              except list/glob default root
+├── /absolute/path
+├── path/
+├── path\component
+├── ./component
+├── ../component
+├── component/../component
+└── any shape outside the grammar above
+```
+
+```text
+VIRTUAL PATH -> BACKING SOURCE
+
+MEMORY.md
+└── UserMemory.shared
+
+SOUL.md
+└── Soul.shared
+
+artifacts/<name>
+└── ProfileRepository
+    └── active ProfileScope
+
+skills/<user-name>/SKILL.md
+└── ProfileRepository
+    └── active ProfileScope
+
+skills/system:<name>/SKILL.md
+└── app bundle
+    └── SystemSkills.bundle/<name>/SKILL.md
+        ├── parse local name: <name>
+        ├── reject service dependencies
+        ├── namespace in memory: system:<name>
+        └── serialize into the virtual file
+
+skills/service:<domain>:<name>/SKILL.md
+└── attached Service
+    └── service package skill
+
+services/<kind>/<id>/manifest.json
+└── ServiceManager
+    └── normalized service definition
+
+files/<grant-id>/<path...>
+└── DeviceFolderStore
+    ├── security-scoped bookmark
+    ├── coordinated access
+    ├── hidden files skipped during listing/search
+    └── symbolic links excluded during listing/search
+```
+
+```text
+FILESYSTEM OPERATIONS + MUTATION BOUNDARIES
+
+ox.fs
+├── list
+│   └── directory only
+├── read
+│   └── file only; bounded text or typed unsupported result
+├── glob
+│   └── paths only
+├── grep
+│   └── searchable text content only
+├── write
+│   ├── MEMORY.md
+│   ├── SOUL.md
+│   ├── artifacts/<name>
+│   ├── skills/<user-name>/SKILL.md
+│   └── files/<grant-id>/<existing-parent>/<file>
+├── edit
+│   ├── exact unique replacements
+│   ├── non-overlapping edits
+│   └── one standalone append when oldText is empty
+└── delete
+    ├── artifacts/<name>                    [approval required]
+    ├── skills/<user-name>[/SKILL.md]
+    └── files/<grant-id>/<regular-file>      [approval required]
+
+always read-only
+├── skills/system:*/*
+├── skills/service:*/*
+├── services/*/*/manifest.json
+├── virtual directories
+└── external directories
+
+temporary chat
+├── MEMORY.md mutation                      [denied]
+├── SOUL.md mutation                        [denied]
+├── artifacts/* mutation                    [denied]
+├── user skills mutation                    [denied]
+└── files/<grant-id> mutation               [allowed only through ios:files + approval]
+```
+
+```text
+FILESYSTEM CALL PIPELINE
+
+ox.fs.<operation>
+└── VirtualFileSystem.location(rawPath)
+    ├── normalize + validate path grammar
+    └── typed Location
+        └── Chat.authorizeFileAccess
+            ├── Profile-owned areas
+            │   └── no Files-service authorization
+            └── files/<grant-id>
+                ├── require attached ios:files service
+                ├── require existing folder grant
+                └── require approval for write/edit/delete
+                    └── operation
+                        ├── read/list/search
+                        │   └── backing source -> bounded JSON result
+                        └── write/edit/delete
+                            ├── require writable source
+                            ├── require non-temporary chat when Profile-backed
+                            ├── serialize through per-path mutation coordinator
+                            ├── persist through the backing source
+                            ├── update chat artifact/skill presentation
+                            └── return virtual item metadata
+```
+
+```text
+HARD LIMITS
+
+execute
+├── source                       <= 100,000 characters
+├── active execution time       <= 60 seconds
+├── model-visible console text  <= 16,000 characters
+│   └── truncated output keeps a 4,000-character tail
+├── ox.web.fetch calls       <= 8 per execution
+├── fetched bytes               <= 20 MiB per execution
+├── transient attachments       <= 4 per execution
+└── transient attachment bytes  <= 20 MiB per execution
+
+ox.fs
+├── text read default           <= 20,000 bytes
+├── text read/write maximum     <= 200 KiB
+├── search files                <= 1,000
+├── search bytes                <= 2 MiB
+├── displayed search line       <= 500 characters
+├── list result default/max     <= 50 / 100 items
+├── glob result default/max     <= 100 / 1,000 paths
+├── grep result default/max     <= 100 / 200 matches
+└── grep context                <= 5 lines per side
+```
+
+```text
+FAILURE + OBSERVABILITY FLOW
+
+failure source
+├── path validation
+├── schema validation
+├── authorization / approval
+├── backing storage
+├── service / web operation
+├── JavaScript exception
+├── rejected bridge promise
+├── timeout
+└── cancellation
+    └── error boundary
+        ├── localized model-visible error
+        ├── console logs preserved on JavaScript failure/timeout
+        ├── structured Chat tool diagnostic content
+        └── user-owned on-device logs
+            ├── Agent: VM lifecycle, timeout, exception, cancellation
+            └── Session: bridge operation, purpose, path/count/size/outcome
+```
