@@ -23,7 +23,7 @@ flowchart TB
         Agent["Local agent"]
         VM["Ox VM<br/>Sandboxed JavaScript · ox.* · virtual filesystem"]
         Local["Local Service Repository<br/>Editable Git + ox.json"]
-        Services["Installed service definitions<br/>Stored on mobile · Actions · Skills"]
+        Services["Installed services<br/>Stored on mobile · Actions · Skills"]
         Agent -->|"writes and executes code"| VM
         VM -->|"creates or revises via ox.fs"| Local
     end
