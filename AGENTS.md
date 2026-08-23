@@ -19,6 +19,16 @@
 1. Repository URLs must not contain credentials.
 1. Local provider keys belong in the gitignored `secrets/API_KEYS.json` and must never be printed, logged, committed, or passed through command-line arguments.
 
+## Uncommitted Local State
+
+1. Never force-add ignored local state or generated artifacts.
+1. `ios/Local.xcconfig` contains the active Apple team and app identifiers. Create development values with `bun run setup:ios`; official values remain outside this repository and Xcode Cloud writes the file from workflow environment variables through `ios/ci_scripts/ci_post_clone.sh`.
+1. `.env`, `.env.*`, and `secrets/API_KEYS.json` contain local configuration or provider credentials and must remain local or in the appropriate secret manager.
+1. `docs/SIMULATOR_BOOTSTRAP.local.json` contains machine-specific simulator bootstrap inputs and must remain local.
+1. HAR, mitmproxy, browser, simulator, trace, recording, result-bundle, and diagnostic artifacts may contain user data or credentials. Keep them outside the repository even when they reproduce a bug.
+1. Build products, dependency caches, derived data, user-specific Xcode state, and generated reports remain ignored and reproducible.
+1. Never replace the tracked public service bundle with a private production bundle. Assemble production services only in a disposable or internal checkout.
+
 ## Layout
 
 1. `ios/` contains the iOS app and Share Extension.
