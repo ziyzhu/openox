@@ -177,8 +177,7 @@ nonisolated enum ProviderCatalog {
                 overrides: [.china: "https://ark.cn-beijing.volces.com/api/v3"]
             ),
             regionalCredentials: true,
-            reasoningReplayModelIDs: ["dola-seed-2-1-turbo-260628", "doubao-seed-2-0-lite-260428"],
-            reasoningControl: .disabled(.thinking),
+            reasoningReplayModelIDs: CuratedProviderModels.arkReasoningReplayModelIDs,
             website: regionalURL("https://console.byteplus.com/ark/region:ark+ap-southeast-1/apikey", overrides: [.china: "https://console.volcengine.com/ark/region:ark+cn-beijing/apikey"])
         ),
     ]
