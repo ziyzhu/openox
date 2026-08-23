@@ -35,12 +35,7 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
             case .notDetermined: return .notDetermined
             @unknown default: return .denied
             }
-        case .health:
-            switch await HealthProvider.shared.authorizationRequestState() {
-            case .unavailable: return .denied
-            case .shouldRequest: return .notDetermined
-            case .unnecessary: return .granted
-            }
+        case .health: return .denied
         }
     }
 
@@ -56,12 +51,7 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
             await CalendarProvider.shared.requestRemindersAccess()
         case .contacts:
             _ = await ContactsProvider.shared.authorized()
-        case .health:
-            do {
-                try await HealthProvider.shared.requestAccess()
-            } catch {
-                Log.ui.error("IOSService.permission health request failed \(error.localizedDescription)")
-            }
+        case .health: break
         }
         return await state()
     }

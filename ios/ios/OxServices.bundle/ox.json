@@ -1,13 +1,12 @@
 {
   "version": 1,
   "name": "Built-in",
-  "contentHash": "b10de4d66c4983b810a64903ee985b751075af6a76ebbdf3eeb7ed9ca182ab85",
+  "contentHash": "bf59e6c7be198dd51729c447380d4855e4b82d65866e1420b04441f67bcf198f",
   "services": [
     "ios:browser",
     "ios:calendar",
     "ios:contacts",
     "ios:files",
-    "ios:health",
     "ios:location",
     "ios:messages",
     "ios:notifications",

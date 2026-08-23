@@ -380,51 +380,6 @@
       }
     },
     {
-      "id": "javascript-health-activity",
-      "prompt": "The Health iOS service is attached. Use `ox.service.invoke({ name: \"ios:health:activity\", input: { start, end }, purpose })`. Read activity from 2026-07-01T00:00:00Z through 2026-07-07T23:59:59Z and print it.",
-      "expect": {
-        "javascriptCalls": ["ox.service.invoke", "console.log"],
-        "javascriptCallCounts": { "ox.service.invoke": 1 },
-        "javascriptArgumentPatterns": { "ox.service.invoke": ["start\\s*:\\s*[\"']2026-07-01T00:00:00Z[\"']", "end\\s*:\\s*[\"']2026-07-07T23:59:59Z[\"']"] }
-      }
-    },
-    {
-      "id": "javascript-health-body-summary",
-      "prompt": "The Health iOS service is attached. Use `ox.service.invoke({ name: \"ios:health:body.summary\", input: { start, end }, purpose })`. Read body trends from 2026-07-01T00:00:00Z through 2026-07-07T23:59:59Z and print them.",
-      "expect": {
-        "javascriptCalls": ["ox.service.invoke", "console.log"],
-        "javascriptCallCounts": { "ox.service.invoke": 1 },
-        "javascriptArgumentPatterns": { "ox.service.invoke": ["start\\s*:\\s*[\"']2026-07-01T00:00:00Z[\"']", "end\\s*:\\s*[\"']2026-07-07T23:59:59Z[\"']"] }
-      }
-    },
-    {
-      "id": "javascript-health-sleep-summary",
-      "prompt": "The Health iOS service is attached. Use `ox.service.invoke({ name: \"ios:health:sleep.summary\", input: { start, end }, purpose })`. Read sleep totals from 2026-07-01T00:00:00Z through 2026-07-07T23:59:59Z and print them.",
-      "expect": {
-        "javascriptCalls": ["ox.service.invoke", "console.log"],
-        "javascriptCallCounts": { "ox.service.invoke": 1 },
-        "javascriptArgumentPatterns": { "ox.service.invoke": ["start\\s*:\\s*[\"']2026-07-01T00:00:00Z[\"']", "end\\s*:\\s*[\"']2026-07-07T23:59:59Z[\"']"] }
-      }
-    },
-    {
-      "id": "javascript-health-vitals-summary",
-      "prompt": "The Health iOS service is attached. Use `ox.service.invoke({ name: \"ios:health:vitals.summary\", input: { start, end }, purpose })`. Read vital summaries from 2026-07-01T00:00:00Z through 2026-07-07T23:59:59Z and print them.",
-      "expect": {
-        "javascriptCalls": ["ox.service.invoke", "console.log"],
-        "javascriptCallCounts": { "ox.service.invoke": 1 },
-        "javascriptArgumentPatterns": { "ox.service.invoke": ["start\\s*:\\s*[\"']2026-07-01T00:00:00Z[\"']", "end\\s*:\\s*[\"']2026-07-07T23:59:59Z[\"']"] }
-      }
-    },
-    {
-      "id": "javascript-health-workouts-list",
-      "prompt": "The Health iOS service is attached. Use `ox.service.invoke({ name: \"ios:health:workouts.list\", input: { start, end }, purpose })`. List workouts from 2026-07-01T00:00:00Z through 2026-07-07T23:59:59Z and print them.",
-      "expect": {
-        "javascriptCalls": ["ox.service.invoke", "console.log"],
-        "javascriptCallCounts": { "ox.service.invoke": 1 },
-        "javascriptArgumentPatterns": { "ox.service.invoke": ["start\\s*:\\s*[\"']2026-07-01T00:00:00Z[\"']", "end\\s*:\\s*[\"']2026-07-07T23:59:59Z[\"']"] }
-      }
-    },
-    {
       "id": "javascript-notification-cancel",
       "prompt": "The Notifications iOS service is attached. Use `ox.service.invoke({ name: \"ios:notifications:cancel\", input: { id }, purpose })` to cancel pending notification notify-123 and print the disposition.",
       "expect": {

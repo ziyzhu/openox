@@ -634,16 +634,6 @@ final class Chat: Identifiable {
             return try await composeMessage(options: fields["options"], purpose: purpose)
         case ("ios:contacts", "search"):
             return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
-        case ("ios:health", "activity"):
-            return try await readHealthActivity(start: fields["start"]?.stringValue, end: fields["end"]?.stringValue, purpose: purpose)
-        case ("ios:health", "body.summary"):
-            return try await readHealthBody(start: fields["start"]?.stringValue, end: fields["end"]?.stringValue, purpose: purpose)
-        case ("ios:health", "sleep.summary"):
-            return try await readHealthSleep(start: fields["start"]?.stringValue, end: fields["end"]?.stringValue, purpose: purpose)
-        case ("ios:health", "vitals.summary"):
-            return try await readHealthVitals(start: fields["start"]?.stringValue, end: fields["end"]?.stringValue, purpose: purpose)
-        case ("ios:health", "workouts.list"):
-            return try await readHealthWorkouts(start: fields["start"]?.stringValue, end: fields["end"]?.stringValue, purpose: purpose)
         default:
             throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
         }

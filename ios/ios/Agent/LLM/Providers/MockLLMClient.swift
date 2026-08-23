@@ -305,7 +305,6 @@ extension Scenario {
             Entry("61", "web fetch — HTTP responses plus explicit attachments", .webFetch),
             Entry("62", "web import — explicitly persist an HTTP response", .webImport),
             Entry("63", "html update — revise and redisplay", .htmlUpdate),
-            Entry("64", "health — read activity with private-data approval", .healthRead),
             Entry("65", "fail-fast — settle a late service invocation", .failFastInvocation),
             Entry("66", "settled compaction — compact after the final response", .settledCompaction),
             Entry("67", "overflow recovery — compact and retry once", .overflowRecovery),
@@ -892,27 +891,6 @@ extension Scenario {
             return [.say("Web response import failed."), .stop(.stop)]
         }
         return [.say("Imported the fetched response as web-health.txt."), .stop(.stop)]
-    }
-
-    static let healthRead = Scenario(name: "health") { ctx in
-        if ctx.turn == 0 {
-            return [
-                .say("Reading one day of activity.\n"),
-                execute("""
-                const activity = await ox.service.invoke({
-                  name: "ios:health:activity",
-                  input: {
-                    start: "2026-07-14T00:00:00Z",
-                    end: "2026-07-15T00:00:00Z"
-                  },
-                  purpose: "Verify permission reuse"
-                });
-                console.log(activity);
-                """),
-            ]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        return [.say(result.contains("ERROR") ? "Health read failed." : "Health read finished."), .stop(.stop)]
     }
 
     static let failFastInvocation = Scenario(name: "fail-fast") { ctx in

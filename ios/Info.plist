@@ -76,10 +76,6 @@
 	<string>Ox uses your approximate location to help with nearby search, local prices, and weather.</string>
 	<key>NSLocationDefaultAccuracyReduced</key>
 	<true/>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Ox reads health summaries you choose to share, including activity, sleep, workouts, vitals, and body measurements.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Ox never writes to Apple Health. It only reads health summaries you explicitly choose to share.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

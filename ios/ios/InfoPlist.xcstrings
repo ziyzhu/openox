@@ -101,40 +101,6 @@
         }
       }
     },
-    "NSHealthShareUsageDescription" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Ox reads health summaries you choose to share, including activity, sleep, workouts, vitals, and body measurements."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 会读取你选择共享的健康摘要，包括活动、睡眠、体能训练、生命体征和身体测量数据。"
-          }
-        }
-      }
-    },
-    "NSHealthUpdateUsageDescription" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Ox never writes to Apple Health. It only reads health summaries you explicitly choose to share."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 不会向 Apple 健康写入任何数据，只会读取你明确选择共享的健康摘要。"
-          }
-        }
-      }
-    },
     "NSHumanReadableCopyright" : {
       "comment" : "Copyright (human-readable)",
       "extractionState" : "extracted_with_value",
