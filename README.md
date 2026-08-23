@@ -1,6 +1,6 @@
 ## OpenOx
 
-OpenOx is a protocol for self-evolving agents that run locally on mobile devices.
+OpenOx is a protocol for self-evolving agents that live on mobile devices.
 
 Each such agent is called an Ox and follows three principles:
 
