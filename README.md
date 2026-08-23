@@ -1,15 +1,14 @@
 ## OpenOx
 
-```txt
-XOOX
-XXXX
-OXXO
-OXXO
-```
+Ox is a self-evolving agent that lives on your phone.
 
-Ox is a personal animal that lives on your phone.
+It is built around three principles:
 
-[Blog](https://ziyzhu/introducing-openox), [Discord Server](https://discord.gg/7baSAHZTA).
+1. Acts everywhere. Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you.
+2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
+3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
+
+[Blog](https://ziyzhu/introducing-openox) | [Discord Server](https://discord.gg/7baSAHZTA)
 
 ## Installation
 
@@ -36,17 +35,6 @@ To use a different service repository while developing, serve it explicitly:
 ```sh
 ox repository serve /path/to/service-repository --port 8101
 ```
-
-## Development
-
-Install dependencies and run the repository checks:
-
-```sh
-bun install --frozen-lockfile
-bun run typecheck
-```
-
-The repository contains the iOS app, Share Extension, Ox CLI, debugger, tests, and documentation. Production infrastructure, the marketing website, official signing, release automation, and private service implementations are intentionally not dependencies of this repository.
 
 ## Acknowledgements
 
