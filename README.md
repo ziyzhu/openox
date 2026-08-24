@@ -123,6 +123,9 @@ ox repository serve /path/to/service-repository --port 8101
 
 [Pi](https://github.com/earendil-works/pi): Ox's main Swift agent loop referenced Pi.
 
+CloudFlare and Kenton Varda: Ox's architecture was influenced by Code Mode and agent sandboxing.
+
 [OpenCLI](https://github.com/jackwener/opencli): Ox's web service integration referenced some crawling techniques from OpenCLI.
 
 [Defuddle](https://github.com/kepano/defuddle): Ox's HTML to Markdown parser uses Defuddle.
+
