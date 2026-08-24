@@ -208,25 +208,27 @@ final class ServiceWebsiteDataCoordinator {
     }
 
     private func clearCookies(in store: WKWebsiteDataStore) async {
-        let cookieStore = store.httpCookieStore
-        for cookie in await allCookies(in: store) {
-            await withCheckedContinuation { continuation in
-                cookieStore.delete(cookie) { continuation.resume() }
-            }
-        }
+        await deleteCookies(await allCookies(in: store), from: store)
     }
 
     private func clearCookies(for site: String, in store: WKWebsiteDataStore) async -> Int {
-        let cookieStore = store.httpCookieStore
         let cookies = await allCookies(in: store).filter {
             Self.site(for: $0.domain) == site
         }
-        for cookie in cookies {
-            await withCheckedContinuation { continuation in
-                cookieStore.delete(cookie) { continuation.resume() }
+        await deleteCookies(cookies, from: store)
+        return cookies.count
+    }
+
+    private func deleteCookies(_ cookies: [HTTPCookie], from store: WKWebsiteDataStore) async {
+        await withTaskGroup(of: Void.self) { group in
+            for cookie in cookies {
+                group.addTask { @MainActor in
+                    await withCheckedContinuation { continuation in
+                        store.httpCookieStore.delete(cookie) { continuation.resume() }
+                    }
+                }
             }
         }
-        return cookies.count
     }
 
     private func setCookies(_ cookies: [HTTPCookie], in store: WKWebsiteDataStore) async {
