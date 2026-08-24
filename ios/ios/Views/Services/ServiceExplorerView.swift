@@ -115,7 +115,6 @@ struct ServiceExplorerView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        if filter == .all { requestServiceBanner }
                         if isRefreshingServices {
                             MonoRepositoryLoadingStatus(
                                 accessibilityIdentifier: A11yID.Chat.Attach.servicesLoading
@@ -284,39 +283,6 @@ struct ServiceExplorerView: View {
             .scaledToFill()
             .frame(width: 44, height: 44)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-    }
-
-    private var requestServiceBanner: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.Colors.primary)
-                .accessibilityHidden(true)
-            Text(requestServiceMessage)
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .tint(Theme.Colors.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier(A11yID.Chat.Attach.requestServiceBanner)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.md)
-        .background {
-            Color.clear.glassEffect(
-                .regular.tint(Theme.Colors.surface.dynamic),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-            )
-        }
-        .padding(.vertical, Theme.Spacing.sm)
-    }
-
-    private var requestServiceMessage: AttributedString {
-        var message = AttributedString(localized: "Can't find the service you need? Ask Ox or reach out on Discord to request one.")
-        if let discord = message.range(of: "Discord") {
-            message[discord].link = OxLinks.discord
-        }
-        return message
     }
 
     private var connectMCPRow: some View {

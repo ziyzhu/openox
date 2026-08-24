@@ -1169,6 +1169,10 @@ struct ChatPage: View {
             let isResting = !composerFocused && composer.isEmpty
             firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
                 isResting: isResting,
+                showsPromptTemplates: !chat.isBusy
+                    && composer.draft.isEmpty
+                    && composer.draftAttachments.isEmpty
+                    && chat.attachedServices.isEmpty,
                 showsArtifactButton: isResting && !chatArtifacts.isEmpty
             )
         case .permission,

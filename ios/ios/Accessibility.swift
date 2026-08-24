@@ -173,6 +173,12 @@ nonisolated enum A11yID {
         static let temporaryToggle = "chat.temporaryToggle"
         static let temporaryEmpty = "chat.temporaryEmpty"
         static let persistedEmpty = "chat.persistedEmpty"
+        static let newActions = "chat.newActions"
+        static let newActionsService = "chat.newActions.service"
+        static let newActionsFeatures = "chat.newActions.features"
+        static let newWorkflows = "chat.newWorkflows"
+        static let newWorkflowServices = "chat.newWorkflow.services"
+        static let newWorkflowOutcome = "chat.newWorkflow.outcome"
         static func modelOption(_ modelId: String) -> String { "chat.modelOption.\(modelId)" }
         static func modelKey(_ clientId: String) -> String { "chat.modelKey.\(clientId)" }
         static func modelKeySignIn(_ clientId: String) -> String { "chat.modelKeySignIn.\(clientId)" }
@@ -240,7 +246,6 @@ nonisolated enum A11yID {
             static func mcpConnecting(_ id: String) -> String { "chat.attach.mcpConnecting.\(id)" }
             static func retryMCP(_ id: String) -> String { "chat.attach.retryMCP.\(id)" }
             static let mcpEndpoint = "chat.attach.mcpEndpoint"
-            static let requestServiceBanner = "chat.attach.requestServiceBanner"
             static func startChat(_ domain: String) -> String { "chat.attach.startChat.\(domain)" }
             static func save(_ domain: String) -> String { "chat.attach.save.\(domain)" }
             static func service(_ domain: String) -> String { "chat.attach.service.\(domain)" }

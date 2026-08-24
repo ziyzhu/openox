@@ -373,13 +373,37 @@ enum AttachmentChoice {
 struct ChatComposer: View, Equatable {
     static let restingVerticalOffset = Theme.Spacing.md
     static let artifactButtonHeight: CGFloat = 28
+    static let promptTemplateOverlayOffset = Theme.Size.minimumTouchTarget + Theme.Spacing.xs
 
-    static func firstSurfaceTopOffset(isResting: Bool, showsArtifactButton: Bool) -> CGFloat {
+    static func firstSurfaceTopOffset(
+        isResting: Bool,
+        showsPromptTemplates: Bool,
+        showsArtifactButton: Bool
+    ) -> CGFloat {
         let restingOffset = isResting ? restingVerticalOffset : 0
-        let artifactTouchInset = showsArtifactButton
-            ? max(0, (Theme.Size.minimumTouchTarget - artifactButtonHeight) / 2)
-            : 0
-        return Theme.Spacing.sm + restingOffset + artifactTouchInset
+        let surfaceTouchInset: CGFloat = if showsPromptTemplates {
+            max(0, (Theme.Size.minimumTouchTarget - Theme.Size.chipHeight) / 2)
+        } else if showsArtifactButton {
+            max(0, (Theme.Size.minimumTouchTarget - artifactButtonHeight) / 2)
+        } else {
+            0
+        }
+        let promptTemplateOffset = showsPromptTemplates ? -promptTemplateOverlayOffset : 0
+        return Theme.Spacing.sm + restingOffset + promptTemplateOffset + surfaceTouchInset
+    }
+
+    private enum PromptTemplate: String, Identifiable {
+        case actions
+        case workflows
+
+        var id: String { rawValue }
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .actions: "New Actions"
+            case .workflows: "New Workflow"
+            }
+        }
     }
 
     @Bindable var composer: ChatComposerModel
@@ -409,6 +433,9 @@ struct ChatComposer: View, Equatable {
     @State private var composerTextHeight: CGFloat = 22
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
+    @State private var promptTemplate: PromptTemplate?
+    @State private var promptPrimaryInput = ""
+    @State private var promptSecondaryInput = ""
 
     @Environment(\.appTheme) private var appTheme
 
@@ -450,6 +477,18 @@ struct ChatComposer: View, Equatable {
             .onChange(of: composer.draft) { previous, current in
                 guard previous.first != "/", current.first == "/" else { return }
                 Skills.shared.refresh()
+            }
+            .alert(promptTemplate?.title ?? "", isPresented: promptTemplatePresented) {
+                if let promptTemplate {
+                    promptFields(promptTemplate)
+                    Button("Cancel", role: .cancel, action: resetPromptTemplate)
+                    Button("Add Prompt", action: applyPromptTemplate)
+                        .disabled(!promptTemplateIsComplete)
+                }
+            } message: {
+                if let promptTemplate {
+                    promptMessage(promptTemplate)
+                }
             }
     }
 
@@ -602,6 +641,13 @@ struct ChatComposer: View, Equatable {
                     .id(appTheme)
             }
         }
+        .overlay(alignment: .top) {
+            if showsPromptTemplates {
+                promptTemplateStrip
+                    .offset(y: -Self.promptTemplateOverlayOffset)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
+        }
     }
 
     private var composerShape: RoundedRectangle {
@@ -610,6 +656,130 @@ struct ChatComposer: View, Equatable {
 
     private var showsArtifactButton: Bool {
         isResting && !chatArtifacts.isEmpty
+    }
+
+    private var showsPromptTemplates: Bool {
+        !isBusy
+            && composer.draft.isEmpty
+            && composer.draftAttachments.isEmpty
+            && attachedServices.isEmpty
+    }
+
+    private var promptTemplatePresented: Binding<Bool> {
+        Binding(
+            get: { promptTemplate != nil },
+            set: { presented in
+                if !presented { resetPromptTemplate() }
+            }
+        )
+    }
+
+    private var promptTemplateIsComplete: Bool {
+        !promptPrimaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var promptTemplateStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    promptTemplateButton(
+                        "New Actions",
+                        systemImage: "hammer",
+                        template: .actions,
+                        accessibilityIdentifier: A11yID.Chat.newActions
+                    )
+                    promptTemplateButton(
+                        "New Workflows",
+                        systemImage: "point.topright.arrow.triangle.backward.to.point.bottomleft.scurvepath",
+                        template: .workflows,
+                        accessibilityIdentifier: A11yID.Chat.newWorkflows
+                    )
+                }
+            }
+            .frame(minWidth: promptTemplateStripWidth)
+        }
+    }
+
+    private var promptTemplateStripWidth: CGFloat {
+        isResting ? restingWidth : max(0, containerWidth - horizontalSpacing * 2)
+    }
+
+    private func promptTemplateButton(
+        _ title: LocalizedStringKey,
+        systemImage: String,
+        template: PromptTemplate,
+        accessibilityIdentifier: String
+    ) -> some View {
+        Button {
+            resetPromptTemplate()
+            promptTemplate = template
+            Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(Theme.Fonts.labelMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .padding(.horizontal, Theme.Spacing.md)
+                .frame(height: Theme.Size.chipHeight)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .minimumTouchTarget()
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    @ViewBuilder
+    private func promptFields(_ template: PromptTemplate) -> some View {
+        switch template {
+        case .actions:
+            TextField("Service or domain", text: $promptPrimaryInput)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityLabel("Service or domain")
+                .accessibilityIdentifier(A11yID.Chat.newActionsService)
+            TextField("Features", text: $promptSecondaryInput)
+                .accessibilityLabel("Features")
+                .accessibilityIdentifier(A11yID.Chat.newActionsFeatures)
+        case .workflows:
+            TextField("Services needed", text: $promptPrimaryInput)
+                .accessibilityLabel("Services needed")
+                .accessibilityIdentifier(A11yID.Chat.newWorkflowServices)
+            TextField("What should it achieve?", text: $promptSecondaryInput)
+                .accessibilityLabel("What should it achieve?")
+                .accessibilityIdentifier(A11yID.Chat.newWorkflowOutcome)
+        }
+    }
+
+    @ViewBuilder
+    private func promptMessage(_ template: PromptTemplate) -> some View {
+        switch template {
+        case .actions:
+            Text("Describe the service and the actions you want Ox to add.")
+        case .workflows:
+            Text("Describe the services the skill needs and its goal.")
+        }
+    }
+
+    private func applyPromptTemplate() {
+        guard let promptTemplate, promptTemplateIsComplete else { return }
+        let primary = promptPrimaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        composer.draft = switch promptTemplate {
+        case .actions:
+            "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nFeatures: \(secondary)"
+        case .workflows:
+            "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)"
+        }
+        Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
+        resetPromptTemplate()
+        DispatchQueue.main.async { fieldFocused.wrappedValue = true }
+    }
+
+    private func resetPromptTemplate() {
+        promptTemplate = nil
+        promptPrimaryInput = ""
+        promptSecondaryInput = ""
     }
 
     private var artifactCountLabel: String {
