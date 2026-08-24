@@ -767,9 +767,9 @@ struct ChatComposer: View, Equatable {
         let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
         composer.draft = switch promptTemplate {
         case .actions:
-            "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nFeatures: \(secondary)"
+            String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nFeatures: \(secondary)")
         case .workflows:
-            "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)"
+            String(localized: "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
         }
         Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
         resetPromptTemplate()
