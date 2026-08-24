@@ -67,7 +67,19 @@
     action("getSignInState", {
       async invoke() {
         try {
-          return { signedIn: !!getStore("user")?.loggedIn };
+          const response = await fetch(`${ORIGIN}/notification`, {
+            method: "HEAD",
+            credentials: "include",
+            redirect: "follow",
+            cache: "no-store"
+          });
+          const url = new URL(response.url);
+          const signedOut = response.redirected && url.origin === ORIGIN && url.pathname === "/login";
+          const signedIn = !response.redirected && url.origin === ORIGIN && url.pathname === "/notification";
+          log(`getSignInState: status=${response.status} redirected=${response.redirected} path=${url.pathname}`);
+          if (!signedIn && !signedOut)
+            throw new Error("unexpected authentication response");
+          return { signedIn };
         } catch (e) {
           log("getSignInState: " + (e?.message ?? String(e)));
           throw e;

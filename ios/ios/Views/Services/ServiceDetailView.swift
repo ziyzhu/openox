@@ -49,6 +49,7 @@ struct ServiceDetailView: View {
     @State private var skills: [Manifest.Skill] = []
     @State private var loadingManifest = true
     @State private var refreshingAuth = true
+    @State private var signingOut = false
     @State private var descriptionExpanded = false
     @State private var descriptionFullHeight: CGFloat = 0
     @State private var descriptionLimitedHeight: CGFloat = 0
@@ -242,9 +243,20 @@ struct ServiceDetailView: View {
                                 : A11yID.Chat.Attach.signIn(service.domain)
                         )
                 case .signedIn, .authorized:
-                    Button("Sign out") { Task { await service.signOut() } }
-                        .buttonStyle(OxChipButton(filled: false))
-                        .accessibilityIdentifier(A11yID.Chat.Attach.signOut(service.domain))
+                    if signingOut {
+                        ServiceSignInButton(
+                            signingIn: true,
+                            isDisabled: true,
+                            layout: .compact,
+                            action: {}
+                        )
+                        .accessibilityLabel(String(localized: "Signing out…"))
+                        .accessibilityIdentifier(A11yID.Chat.Attach.signOutProgress(service.domain))
+                    } else {
+                        Button("Sign out") { Task { await signOut() } }
+                            .buttonStyle(OxChipButton(filled: false))
+                            .accessibilityIdentifier(A11yID.Chat.Attach.signOut(service.domain))
+                    }
                 case .notRequired:
                     EmptyView()
                 }
@@ -284,6 +296,13 @@ struct ServiceDetailView: View {
         ) {
             Task { await service.signIn(using: presentations, source: .serviceDetail) }
         }
+    }
+
+    private func signOut() async {
+        guard !signingOut else { return }
+        signingOut = true
+        defer { signingOut = false }
+        await service.signOut()
     }
 
     private func authorizeMCP() async {

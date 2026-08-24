@@ -8364,6 +8364,17 @@
         }
       }
     },
+    "Signing out…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在退出登录…"
+          }
+        }
+      }
+    },
     "Siri" : {
       "extractionState" : "manual",
       "localizations" : {

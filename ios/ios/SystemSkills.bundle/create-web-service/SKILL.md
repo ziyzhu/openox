@@ -129,9 +129,11 @@ Add authentication when useful actions depend on a signed-in browser session:
 
 1. Mark those useful actions `requireAuth: true`.
 2. Add `getSignInUrl({}): {url}` and `getSignInState({}): {signedIn}` with exact empty inputs.
-3. Return a stable allowed sign-in URL and derive state from observed signed-in page behavior.
-4. Let probe failures throw instead of treating them as signed-out state.
-5. Inspect current state. When signed out, call `await ox.service.signIn({ domain, purpose })`, let the user complete the handoff, confirm signed-in state, then invoke an authenticated action.
+3. Return a stable allowed sign-in URL and make `getSignInState` a fresh, session-authoritative, read-only probe. Prefer an observed cookie-authenticated identity response or a lightweight protected `HEAD` or `GET` whose status or redirect distinguishes signed-in and signed-out sessions.
+4. Use readable cookies only when their lifetime and logout behavior are verified. Use hydrated stores, page globals, and DOM markers only as a last resort because the handoff page and hidden action page are separate web pages that share credentials but not in-memory JavaScript state.
+5. Return `signedIn: false` only for an observed unauthenticated response. Let unexpected status, redirect, parsing, CORS, signature, verification, and network failures throw. If a site-generated API cannot be fetched directly with the page session, choose another observed signal instead of recreating its signatures.
+6. Verify the probe on the hidden action page while signed out, immediately after sign-in completes on the handoff page, after an action-page reload, and after sign-out. Keep it cheap because iOS polls it during the handoff.
+7. Inspect current state. When signed out, call `await ox.service.signIn({ domain, purpose })`, let the user complete the handoff, confirm signed-in state, then invoke an authenticated action.
 
 ### Bot control
 

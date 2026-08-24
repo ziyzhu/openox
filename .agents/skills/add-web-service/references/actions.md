@@ -74,6 +74,24 @@ Choose authentication:
 - **Inherited:** let the page issue requests when signatures come from
   unreproducible or obfuscated JavaScript. Never forge those headers.
 
+Make `getSignInState` a fresh, session-authoritative probe. Prefer, in order, an
+observed cookie-authenticated identity API with explicit authenticated and
+unauthenticated responses, or a lightweight protected `HEAD`/`GET` whose
+status or redirect distinguishes those states. Use a readable cookie only when
+its lifetime and logout behavior are verified. Treat hydrated stores, page
+globals, and DOM markers as a last resort because a separate authentication
+handoff can update shared credentials without refreshing the action page's
+in-memory state.
+
+Verify the probe from a distinct action page before sign-in, immediately after
+sign-in through the user-operated handoff, after an action-page reload, and
+after sign-out. A page-generated API is not a direct-fetch candidate merely
+because the site can call it: if the action receives a signature, verification,
+CORS, or request-mode failure, classify it as inherited authentication and
+choose another observed signal or capture the page-issued request. Auth probes
+run frequently, so keep them read-only and cheap. Return `signedIn: false` only
+for an observed unauthenticated response; throw on unexpected failures.
+
 Choose extraction:
 
 - **HTML parse:** fetch and parse SSR HTML when it already contains the data.
