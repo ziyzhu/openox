@@ -412,6 +412,7 @@ struct ChatComposer: View, Equatable {
     let fieldFocused: FocusState<Bool>.Binding
     let isFieldFocused: Bool
     let sessionID: UUID
+    let isChatEmpty: Bool
     let isBusy: Bool
     let iconButtonSize: CGFloat
     let composerButtonSize: CGFloat
@@ -445,6 +446,7 @@ struct ChatComposer: View, Equatable {
             && lhs.chatArtifacts == rhs.chatArtifacts
             && lhs.isFieldFocused == rhs.isFieldFocused
             && lhs.sessionID == rhs.sessionID
+            && lhs.isChatEmpty == rhs.isChatEmpty
             && lhs.isBusy == rhs.isBusy
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
@@ -659,7 +661,8 @@ struct ChatComposer: View, Equatable {
     }
 
     private var showsPromptTemplates: Bool {
-        !isBusy
+        isChatEmpty
+            && !isBusy
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
             && attachedServices.isEmpty

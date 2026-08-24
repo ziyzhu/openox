@@ -687,7 +687,7 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func dockHost(_ dock: ChatDock) -> some View {
+    private func dockHost(_ dock: ChatDock, isChatEmpty: Bool) -> some View {
         switch dock.kind {
         case .permission(let request):
             PermissionRequestCard(request: request) { option in
@@ -721,27 +721,27 @@ struct ChatPage: View {
                     }
                 )
                 .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock
+                composerBlock(isChatEmpty: isChatEmpty)
             }
         case .permissionAcknowledgement(let acknowledgement):
             VStack(spacing: 0) {
                 PermissionAcknowledgementView(acknowledgement: acknowledgement)
                     .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock
+                composerBlock(isChatEmpty: isChatEmpty)
             }
         case .choiceAcknowledgement(let acknowledgement):
             VStack(spacing: 0) {
                 ChoiceAcknowledgementView(acknowledgement: acknowledgement)
                     .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock
+                composerBlock(isChatEmpty: isChatEmpty)
             }
         case .composer:
-            composerBlock
+            composerBlock(isChatEmpty: isChatEmpty)
         }
     }
 
-    private var composerBlock: some View {
-        inputBar
+    private func composerBlock(isChatEmpty: Bool) -> some View {
+        inputBar(isChatEmpty: isChatEmpty)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
                 guard viewportLayout.measureComposer(bounds) else { return }
                 scroller.viewportResized()
@@ -1161,7 +1161,7 @@ struct ChatPage: View {
         .accessibilityIdentifier(A11yID.Chat.scrollToBottom)
     }
 
-    private func scrollToBottomOffset(for dock: ChatDock) -> CGFloat {
+    private func scrollToBottomOffset(for dock: ChatDock, isChatEmpty: Bool) -> CGFloat {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
         let firstSurfaceTop: CGFloat
         switch dock.kind {
@@ -1169,7 +1169,7 @@ struct ChatPage: View {
             let isResting = !composerFocused && composer.isEmpty
             firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
                 isResting: isResting,
-                showsPromptTemplates: !chat.isBusy
+                showsPromptTemplates: isChatEmpty
                     && composer.draft.isEmpty
                     && composer.draftAttachments.isEmpty
                     && chat.attachedServices.isEmpty,
@@ -1185,7 +1185,7 @@ struct ChatPage: View {
         return firstSurfaceTop - Theme.Spacing.md - composerButtonSize - touchTargetInset
     }
 
-    private var inputBar: some View {
+    private func inputBar(isChatEmpty: Bool) -> some View {
         ChatComposer(
             composer: composer,
             attachedServices: chat.attachedServices,
@@ -1193,6 +1193,7 @@ struct ChatPage: View {
             fieldFocused: $composerFocused,
             isFieldFocused: composerFocused,
             sessionID: chat.id,
+            isChatEmpty: isChatEmpty,
             isBusy: chat.isBusy,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
@@ -1223,12 +1224,13 @@ struct ChatPage: View {
         _ dock: ChatDock,
         chatBlocks: [ChatBlock]
     ) -> some View {
-        dockHost(dock)
+        let isChatEmpty = chat.canChangeRetention && chatBlocks.isEmpty
+        return dockHost(dock, isChatEmpty: isChatEmpty)
             .transition(.opacity)
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
                     scrollToBottomButton(chatBlocks)
-                        .offset(y: scrollToBottomOffset(for: dock))
+                        .offset(y: scrollToBottomOffset(for: dock, isChatEmpty: isChatEmpty))
                         .transition(.opacity)
                 }
             }
