@@ -101,7 +101,8 @@ JAVASCRIPT CAPABILITY TREE
 
 ox
 ├── app
-│   └── inspect
+│   ├── inspect
+│   └── renameChat
 ├── artifact
 │   ├── attach
 │   ├── import
@@ -117,14 +118,30 @@ ox
 │   └── write
 ├── service
 │   ├── attach
+│   ├── copy
+│   ├── create
+│   ├── delete
 │   ├── detach
 │   ├── find
+│   ├── git
+│   │   ├── checkout
+│   │   ├── commit
+│   │   ├── diff
+│   │   ├── log
+│   │   ├── restore
+│   │   ├── revert
+│   │   ├── show
+│   │   └── status
 │   ├── inspect
 │   ├── invoke
 │   ├── listAttached
 │   ├── pay
 │   ├── signIn
 │   └── solve
+├── skill
+│   ├── copy
+│   ├── create
+│   └── delete
 ├── user
 │   ├── choose
 │   └── reportProgress
@@ -198,13 +215,21 @@ VIRTUAL FILESYSTEM TREE
 │   │   └── SKILL.md
 │   └── service:<domain>:<skill>/                  [read-only; attached services only]
 │       └── SKILL.md
-├── services/                                      [read-only]
+├── services/                                      [source-aware]
 │   ├── web/
-│   │   └── <domain>/manifest.json
+│   │   └── <domain>/
+│   │       ├── manifest.json                      [all sources]
+│   │       └── <source descendants>               [Local only]
 │   ├── ios/
-│   │   └── <service-id>/manifest.json
+│   │   └── <service-id>/
+│   │       └── manifest.json
 │   └── mcp/
-│       └── <service-id>/manifest.json
+│       └── <service-id>/
+│           └── manifest.json
+├── chats/                                         [read-only]
+│   └── <chat-uuid>/
+│       ├── chat.json                              [stored metadata]
+│       └── turns.jsonl                            [stored transcript]
 └── files/                                         [ios:files attachment required]
     └── <folder-grant-id>/
         └── <selected external folder descendants>
@@ -213,7 +238,8 @@ conditional branches
 ├── artifacts/*                  <- active Profile contents
 ├── skills/<user-skill>/*        <- active Profile contents
 ├── skills/service:*/*           <- attached service skills
-├── services/<kind>/*            <- current MonoRepository
+├── services/<kind>/*            <- current MonoRepository; Local source expands
+├── chats/*                       <- active Profile persisted chats
 └── files/*                      <- user-selected security-scoped grants
 ```
 
@@ -235,7 +261,11 @@ accepted
 ├── services
 ├── services/<web|ios|mcp>
 ├── services/<web|ios|mcp>/<service-id>
-├── services/<web|ios|mcp>/<service-id>/manifest.json
+├── services/<web|ios|mcp>/<service-id>/<non-hidden-descendant...>
+├── chats
+├── chats/<chat-uuid>
+├── chats/<chat-uuid>/chat.json
+├── chats/<chat-uuid>/turns.jsonl
 ├── files
 ├── files/<folder-grant-id>
 └── files/<folder-grant-id>/<descendant...>
@@ -280,9 +310,20 @@ skills/service:<domain>:<name>/SKILL.md
 └── attached Service
     └── service package skill
 
-services/<kind>/<id>/manifest.json
+services/<kind>/<id>/<path...>
 └── ServiceManager
-    └── normalized service definition
+    ├── Bundled, Development, or Remote candidate
+    │   └── normalized manifest only; read-only
+    └── Local candidate
+        └── expanded repository source; writable at the live tip
+
+chats/<chat-uuid>/chat.json
+└── ProfileRepository
+    └── canonical stored metadata
+
+chats/<chat-uuid>/turns.jsonl
+└── ProfileRepository
+    └── canonical stored transcript
 
 files/<grant-id>/<path...>
 └── DeviceFolderStore
@@ -309,6 +350,7 @@ ox.fs
 │   ├── SOUL.md
 │   ├── artifacts/<name>
 │   ├── skills/<user-name>/SKILL.md
+│   ├── services/<kind>/<id>/<Local-source-file>
 │   └── files/<grant-id>/<existing-parent>/<file>
 ├── edit
 │   ├── exact unique replacements
@@ -317,12 +359,14 @@ ox.fs
 └── delete
     ├── artifacts/<name>                    [approval required]
     ├── skills/<user-name>[/SKILL.md]
+    ├── services/<kind>/<id>/<Local-source-path>
     └── files/<grant-id>/<regular-file>      [approval required]
 
 always read-only
 ├── skills/system:*/*
 ├── skills/service:*/*
-├── services/*/*/manifest.json
+├── Bundled, Development, and Remote service source
+├── chats/*
 ├── virtual directories
 └── external directories
 
@@ -341,23 +385,26 @@ ox.fs.<operation>
 └── VirtualFileSystem.location(rawPath)
     ├── normalize + validate path grammar
     └── typed Location
-        └── Chat.authorizeFileAccess
-            ├── Profile-owned areas
-            │   └── no Files-service authorization
-            └── files/<grant-id>
-                ├── require attached ios:files service
-                ├── require existing folder grant
-                └── require approval for write/edit/delete
-                    └── operation
-                        ├── read/list/search
-                        │   └── backing source -> bounded JSON result
-                        └── write/edit/delete
-                            ├── require writable source
-                            ├── require non-temporary chat when Profile-backed
-                            ├── serialize through per-path mutation coordinator
-                            ├── persist through the backing source
-                            ├── update chat artifact/skill presentation
-                            └── return virtual item metadata
+        ├── Chat.authorizeFileAccess
+        │   ├── Profile-owned, chat, and service areas
+        │   │   └── no Files-service authorization
+        │   └── files/<grant-id>
+        │       ├── require attached ios:files service
+        │       ├── require existing folder grant
+        │       └── require approval for write/edit/delete
+        └── operation
+            ├── read/list/search
+            │   └── backing source -> bounded JSON result
+            └── write/edit/delete
+                ├── require writable source
+                │   ├── Profile-owned mutable path
+                │   ├── Local service source at its live tip
+                │   └── regular file under a folder grant
+                ├── require non-temporary chat when Profile-backed
+                ├── serialize through per-path mutation coordinator
+                ├── persist through the backing source
+                ├── update chat artifact/skill presentation
+                └── return virtual item metadata
 ```
 
 ```text
@@ -377,7 +424,8 @@ ox.fs
 ├── text read default           <= 20,000 bytes
 ├── text read/write maximum     <= 200 KiB
 ├── search files                <= 1,000
-├── search bytes                <= 2 MiB
+├── search bytes                <= 2 MiB normally
+├── explicit chat search bytes  <= 16 MiB
 ├── displayed search line       <= 500 characters
 ├── list result default/max     <= 50 / 100 items
 ├── glob result default/max     <= 100 / 1,000 paths

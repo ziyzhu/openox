@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenOx Components</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #171717;
+      background: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      overflow: auto;
+      background: #ffffff;
+    }
+
+    .diagram {
+      position: relative;
+      flex: none;
+      width: clamp(900px, calc(100vw - 48px), 1800px);
+      aspect-ratio: 1800 / 1070;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .group {
+      position: absolute;
+      z-index: 0;
+      border: 1px solid #222222;
+      background: #ffffff;
+    }
+
+    .client {
+      left: 21.1111%;
+      top: 2.8037%;
+      width: 52.2222%;
+      height: 65.4206%;
+    }
+
+    .interfaces {
+      left: 15%;
+      top: 73.3645%;
+      width: 64.4444%;
+      height: 23.8318%;
+    }
+
+    .group-title {
+      position: absolute;
+      z-index: 3;
+      margin: 0;
+      font-size: clamp(15px, 1.08vw, 20px);
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .client-title { left: 22.2222%; top: 4.6729%; }
+
+    .interfaces-title {
+      left: 16.1111%;
+      top: 75.7009%;
+      padding: 0 6px;
+      background: #ffffff;
+    }
+
+    .node {
+      position: absolute;
+      z-index: 2;
+      display: grid;
+      place-content: center;
+      padding: 6px 12px;
+      border: 1px solid #222222;
+      background: #ffffff;
+      text-align: center;
+      font-size: clamp(11px, 0.98vw, 18px);
+      line-height: 1.24;
+    }
+
+    .node h2,
+    .node p {
+      margin: 0;
+      font: inherit;
+    }
+
+    .node code,
+    .edge-label code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.9em;
+    }
+
+    .model { left: 1.6667%; top: 10.7477%; width: 17.7778%; height: 8.0374%; }
+    .profile { left: 22.7778%; top: 29.9065%; width: 13.3333%; height: 9.8131%; }
+    .agent { left: 38.3333%; top: 10.7477%; width: 17.7778%; height: 8.0374%; }
+    .vm { left: 38.3333%; top: 29.9065%; width: 17.7778%; height: 9.8131%; }
+    .local-repository { left: 25%; top: 51.8692%; width: 17.7778%; height: 8.8785%; }
+    .services { left: 51.6667%; top: 50.9346%; width: 17.7778%; height: 10.2804%; }
+    .remote-repositories { left: 81.1111%; top: 51.8692%; width: 17.7778%; height: 8.8785%; }
+    .device { left: 18.3333%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
+    .web { left: 38.8889%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
+    .mcp { left: 59.4444%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
+
+    .connections {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .connection {
+      fill: none;
+      stroke: #111111;
+      stroke-width: 1.25;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .edge-label {
+      position: absolute;
+      z-index: 3;
+      padding: 1px 4px;
+      background: #ffffff;
+      color: #111111;
+      font-size: clamp(9px, 0.78vw, 14px);
+      font-style: italic;
+      line-height: 1.18;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .provider-label { left: 24.7222%; top: 12.6168%; width: 10%; }
+    .profile-label { left: 23.3333%; top: 40.6542%; width: 16%; }
+    .agent-label { left: 47.5%; top: 23.3645%; }
+    .local-label { left: 31.3333%; top: 45.3271%; width: 10%; }
+    .invoke-label { left: 52.3333%; top: 44.3925%; }
+    .validate-label { left: 43%; top: 54.2056%; width: 8.3%; }
+    .install-label { left: 71.6667%; top: 54.2056%; width: 7%; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="diagram" aria-labelledby="diagram-title">
+    <h1 id="diagram-title" class="sr-only">OpenOx components and service interfaces</h1>
+
+    <section class="group client" aria-labelledby="client-title"></section>
+    <h2 id="client-title" class="group-title client-title">Ox Mobile Client</h2>
+
+    <section class="group interfaces" aria-labelledby="interfaces-title"></section>
+    <h2 id="interfaces-title" class="group-title interfaces-title">Service interfaces</h2>
+
+    <article class="node model"><h2>Any model</h2><p>Any provider</p></article>
+    <article class="node profile"><h2>Ox Profile</h2><p>Identity · Memory · Skills</p><p>Artifacts · Conversations</p></article>
+    <article class="node agent"><h2>Local agent</h2></article>
+    <article class="node vm"><h2>Ox VM</h2><p>Sandboxed JavaScript · <code>ox.*</code></p><p>Virtual filesystem</p></article>
+    <article class="node local-repository"><h2>Local Service Repository</h2><p>Editable Git + <code>ox.json</code></p></article>
+    <article class="node services"><h2>Installed services</h2><p>Stored on mobile</p><p>Actions · Skills</p></article>
+    <article class="node remote-repositories"><h2>Remote Service Repositories</h2><p>Public Git + <code>ox.json</code></p></article>
+    <article class="node device"><h2>Device-native interface</h2><p>(Device Service)</p></article>
+    <article class="node web"><h2>Web page</h2><p>(Web Service)</p></article>
+    <article class="node mcp"><h2>MCP server</h2><p>(MCP Service)</p></article>
+
+    <svg class="connections" viewBox="0 0 1800 1070" aria-hidden="true">
+      <defs>
+        <marker id="arrow" markerWidth="7" markerHeight="7" refX="6.5" refY="3.5" orient="auto" markerUnits="strokeWidth">
+          <path d="M 0 0 L 7 3.5 L 0 7 Z" fill="#111111"></path>
+        </marker>
+        <marker id="arrow-start" markerWidth="7" markerHeight="7" refX="0.5" refY="3.5" orient="auto" markerUnits="strokeWidth">
+          <path d="M 7 0 L 0 3.5 L 7 7 Z" fill="#111111"></path>
+        </marker>
+      </defs>
+      <path class="connection" d="M 350 158 L 690 158" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 650 372 L 690 372" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 850 201 L 850 320" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 760 425 L 610 555" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 940 425 L 1030 545" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 770 603 L 930 600" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1460 603 L 1250 600" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1090 655 L 1090 760 L 480 760 L 480 895" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1090 760 L 850 760 L 850 895" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1090 760 L 1220 760 L 1220 895" marker-end="url(#arrow)"></path>
+    </svg>
+
+    <div class="edge-label provider-label">provider-neutral</div>
+    <div class="edge-label profile-label">mounted through <code>ox.fs</code></div>
+    <div class="edge-label agent-label">writes and executes code</div>
+    <div class="edge-label local-label">creates or revises<br>via <code>ox.fs</code></div>
+    <div class="edge-label invoke-label">invokes actions<br>reads skills</div>
+    <div class="edge-label validate-label">validates and reloads</div>
+    <div class="edge-label install-label">installs</div>
+  </main>
+</body>
+</html>

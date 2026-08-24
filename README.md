@@ -12,40 +12,9 @@ The first implementation of Ox is an iOS app whose source code is included in th
 
 ## Components
 
-```mermaid
-flowchart TB
-    Profile["Ox Profile<br/>Identity · Memory · Skills<br/>Artifacts · Conversations"]
-    Model["Any model<br/>Any provider"]
-    Remote["Remote Service Repositories<br/>Public Git + ox.json"]
+![OpenOx components](docs/openox-components.png)
 
-    subgraph Client["Ox Mobile Client"]
-        direction TB
-        Agent["Local agent"]
-        VM["Ox VM<br/>Sandboxed JavaScript · ox.* · virtual filesystem"]
-        Local["Local Service Repository<br/>Editable Git + ox.json"]
-        Services["Installed services<br/>Stored on mobile · Actions · Skills"]
-        Agent -->|"writes and executes code"| VM
-        VM -->|"creates or revises via ox.fs"| Local
-    end
-
-    subgraph Interfaces["Service interfaces"]
-        direction LR
-        Device["Device-native interface<br/>(Device Service)"]
-        Web["Web page<br/>(Web Service)"]
-        MCP["MCP server<br/>(MCP Service)"]
-    end
-
-    Profile <-->|"mounted through ox.fs"| VM
-    Model <-->|"provider-neutral"| Agent
-    Remote -->|"installs"| Services
-    Local -->|"validates and reloads"| Services
-    VM <-->|"invokes actions · reads skills"| Services
-    Services --> Device
-    Services --> Web
-    Services --> MCP
-```
-
-- **Ox Client** — A mobile application that implements the OpenOx protocol. It hosts the Ox VM, opens an Ox Profile, and connects the agent to services.
+- **Ox Client** - A mobile application that implements the OpenOx protocol. It hosts the Ox VM, opens an Ox Profile, and connects the agent to services.
 - **Model** — The language model selected by the user. OpenOx does not prescribe a model or provider; the client adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
 - **Ox VM** — A sandboxed JavaScript runtime where the local agent writes and executes code.
@@ -58,6 +27,8 @@ flowchart TB
 ## Execution and Self-Evolution
 
 The VM has no direct access to the network, host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
+
+The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in [`docs/VM.md`](docs/VM.md).
 
 The VM is also how Ox evolves. Ox can invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
 
@@ -128,4 +99,3 @@ CloudFlare and Kenton Varda: Ox's architecture was influenced by Code Mode and a
 [OpenCLI](https://github.com/jackwener/opencli): Ox's web service integration referenced some crawling techniques from OpenCLI.
 
 [Defuddle](https://github.com/kepano/defuddle): Ox's HTML to Markdown parser uses Defuddle.
-
