@@ -699,6 +699,7 @@ struct ChatComposer: View, Equatable {
             }
             .frame(minWidth: promptTemplateStripWidth)
         }
+        .scrollClipDisabled()
     }
 
     private var promptTemplateStripWidth: CGFloat {
