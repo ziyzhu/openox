@@ -28,18 +28,6 @@
 1. Keep machine-specific state, build products, dependency caches, diagnostics, recordings, traces, and generated reports outside the repository unless they are intentionally reviewed fixtures.
 1. When collaborators need an uncommitted file, provide a sanitized example or generator that contains no private values.
 
-## Layout
-
-1. `ios/` contains the iOS app and Share Extension.
-1. `cli/` contains the Bun service CLI.
-1. `service-sdk/` contains reusable service contracts, validation, helpers, and replay tooling published as `@openox/service-sdk`.
-1. `services/` contains official built-in service sources and the generated repository package published as `@openox/services`.
-1. `examples/service-repository/` is a standalone remote service repository example.
-1. `dev/` contains the debugger SPA for a running debug build.
-1. `ios/tests/llm/` contains real-model evaluation and benchmarks for the iOS agent.
-1. `services/tests/` contains simulator service replay tooling.
-1. `.agents/skills/` contains repository development skills.
-
 ## npm Releases
 
 1. Public npm package source, verification, and Trusted Publishing workflows belong in this repository so provenance resolves to the public source revision.
@@ -64,10 +52,3 @@
 1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `ios/ios/OxServices.bundle` changes.
 1. Use `ox` for chats, logs, agent replay, and Server IR verification.
 1. Use `bun run test:chat-projection` to replay the committed projection fixtures through a running DEBUG app; pass `--update` only to accept a reviewed projection change.
-
-## Documentation
-
-1. `DESIGN.md` defines the brand and visual language.
-1. `docs/SECURITY.md` defines the credential-firewall threat model.
-1. `docs/STORAGE.md` defines persisted storage and must be updated after persistence changes.
-1. `docs/SERVICE_REPOSITORIES.md` defines repository-backed services.
