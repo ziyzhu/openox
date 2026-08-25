@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { runOnce } from "../../../scripts/debug-ws.ts";
+import { runOnce } from "../../../cli/debug-ws.ts";
 import { loadAPIKeys, type APIKeys, type LLMRegion } from "../../../scripts/sim-bootstrap-lib.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../scripts/qa-config.ts";
 import { ROOT } from "../../../scripts/lib.ts";

@@ -1,9 +1,9 @@
 import { ROOT } from "./lib.ts";
 
-export const publicWebWorkerEntry = `${ROOT}/scripts/public-web-worker.ts`;
-export const publicWebWorkerOutput = `${ROOT}/ios/ios/PublicWeb/PublicWebWorker.js`;
+const publicWebWorkerEntry = `${ROOT}/scripts/public-web-worker.ts`;
+const publicWebWorkerOutput = `${ROOT}/ios/ios/PublicWeb/PublicWebWorker.js`;
 
-export async function buildPublicWebWorker(): Promise<string> {
+async function buildPublicWebWorker(): Promise<string> {
   const result = await Bun.build({
     entrypoints: [publicWebWorkerEntry],
     target: "browser",

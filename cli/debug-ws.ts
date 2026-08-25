@@ -4,8 +4,6 @@ export type DebugResult =
   | ({ ok: true } & Record<string, unknown>)
   | ({ ok: false; error: string } & Record<string, unknown>);
 
-export type Result = DebugResult;
-
 export function debugEndpoint(): string {
   const value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
   try {

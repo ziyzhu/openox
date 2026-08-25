@@ -1,6 +1,6 @@
 ---
 name: ox-cli
-description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, inspect, or watch chats; read structured logs; run agents; inspect or call a VM; administer Profiles; inspect or verify service repositories; invoke live services; and replay service fixtures. Use the ox-debug skill only for projection reducer fixture replay.
+description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, inspect, or watch chats; read structured logs; run agents; inspect or call a VM; administer Profiles; inspect or verify service repositories; invoke live services; and replay service fixtures.
 ---
 
 # Ox CLI
@@ -29,7 +29,7 @@ or tab session IDs; a live service is addressed by its domain.
 - Use `ox --repository <origin> service` for offline service manifests,
   actions, skills, and replay fixture authoring.
 - Use `ox --host <endpoint> service` for live service operations.
-- Use `bun run debug` with the ox-debug skill only for projection reducer replay.
+- Use `bun run test:chat-projection` for repository projection fixture replay.
 - Use `sim` for iOS Simulator interaction.
 
 ## Connect to a Host and VM

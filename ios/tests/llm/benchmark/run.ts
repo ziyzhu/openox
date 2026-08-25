@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
 import { ROOT } from "../../../../scripts/lib.ts";
-import { debugEndpoint } from "../../../../scripts/debug-ws.ts";
+import { debugEndpoint } from "../../../../cli/debug-ws.ts";
 import { loadEvalContext, request, type ResolvedTarget } from "../eval/live.ts";
 import { parseTarget, scoreResponse, validateCases, type EvalCase, type EvalTarget } from "../eval/scorer.ts";
 

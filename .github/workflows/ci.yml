@@ -12,8 +12,8 @@ on:
       - "examples/service-repository/**"
       - "ios/ios/OxServices.bundle/**"
       - "ios/tests/**"
+      - "ios/fixtures/chatlogs/**"
       - "ios/**/*.xcstrings"
-      - ".agents/skills/ox-debug/**"
       - ".agents/skills/promote-web-service/**"
       - "package.json"
       - "bun.lock"
@@ -31,8 +31,8 @@ on:
       - "examples/service-repository/**"
       - "ios/ios/OxServices.bundle/**"
       - "ios/tests/**"
+      - "ios/fixtures/chatlogs/**"
       - "ios/**/*.xcstrings"
-      - ".agents/skills/ox-debug/**"
       - ".agents/skills/promote-web-service/**"
       - "package.json"
       - "bun.lock"
@@ -64,8 +64,11 @@ jobs:
       - name: Typecheck
         run: bun install --frozen-lockfile && bun run typecheck
 
-      - name: Test service builder
-        run: bun run test:service-builder
+      - name: Test units
+        run: bun run test:unit
+
+      - name: Verify generated public web worker
+        run: bun run build:web-worker && git diff --exit-code -- ios/ios/PublicWeb/PublicWebWorker.js
 
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- ios/ios/OxServices.bundle

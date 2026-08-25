@@ -22,7 +22,6 @@ const projects = [
   "cli/tsconfig.json",
   "service-sdk/tsconfig.json",
   "services/tsconfig.json",
-  ".agents/skills/ox-debug/tsconfig.json",
   "scripts/tsconfig.json",
   "ios/tests/llm/tsconfig.json",
   "services/tests/tsconfig.json",

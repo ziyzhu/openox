@@ -1,5 +1,5 @@
 import { ROOT } from "./lib.ts";
-import { runDebug } from "./debug-ws.ts";
+import { runOnce } from "../cli/debug-ws.ts";
 import {
   type BootstrapProfile,
   type LLMRegion,
@@ -9,6 +9,23 @@ import {
   parseBootstrapOptions,
   prepareBootstrap,
 } from "./sim-bootstrap-lib.ts";
+
+function usage(): string {
+  return `Usage: bun run sim:bootstrap --device ox-qa-N [options]
+
+Bootstraps credentials, artifacts, and optional website data into a running DEBUG app.
+
+Options:
+  --device <ox-qa-N>             Target numbered simulator
+  --keys <path>                  API key file (default secrets/API_KEYS.json)
+  --profile <path>               Bootstrap profile describing artifacts, providers, and website data
+  --website-data-from <ox-qa-N>  Copy website data from another running simulator
+  -h, --help                     Display this help`;
+}
+
+function runDebug(port: number, payload: Record<string, unknown>, timeoutMs: number) {
+  return runOnce({ ...payload, id: crypto.randomUUID() }, timeoutMs, `ws://127.0.0.1:${port}`);
+}
 
 async function command(cmd: string[]): Promise<string> {
   const process = Bun.spawn({ cmd, cwd: ROOT, stdout: "pipe", stderr: "pipe" });
@@ -107,7 +124,8 @@ async function bootstrap(args: string[]): Promise<void> {
 
 try {
   const args = Bun.argv.slice(2);
-  await bootstrap(args);
+  if (args.includes("-h") || args.includes("--help")) console.log(usage());
+  else await bootstrap(args);
 } catch (error) {
   console.error(`error: ${(error as Error).message}`);
   process.exitCode = 1;

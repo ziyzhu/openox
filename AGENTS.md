@@ -62,7 +62,8 @@
 1. For iOS and UX behavior, exercise the flow manually with `sim` and preserve screenshots or videos outside the repository.
 1. Before pushing, run `bun run typecheck` and the smallest relevant tests.
 1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `ios/ios/OxServices.bundle` changes.
-1. Use `bun run debug` for chats, logs, agent replay, and Server IR verification.
+1. Use `ox` for chats, logs, agent replay, and Server IR verification.
+1. Use `bun run test:chat-projection` to replay the committed projection fixtures through a running DEBUG app; pass `--update` only to accept a reviewed projection change.
 
 ## Documentation
 

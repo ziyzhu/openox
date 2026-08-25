@@ -63,7 +63,9 @@ jobs:
       - name: Verify repository
         run: |
           bun run typecheck
-          bun run test:service-builder
+          bun run test:unit
+          bun run build:web-worker
+          git diff --exit-code -- ios/ios/PublicWeb/PublicWebWorker.js
           bun run build:services
           git diff --exit-code -- ios/ios/OxServices.bundle
 
