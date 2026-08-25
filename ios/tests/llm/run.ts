@@ -1,4 +1,4 @@
-import { ROOT } from "../../scripts/lib.ts";
+import { ROOT } from "../../../scripts/lib.ts";
 
 type Options = {
   targets: string[];
@@ -57,15 +57,15 @@ if (import.meta.main) {
   try {
     const args = Bun.argv.slice(2);
     if (!args.includes("--target")) {
-      process.exitCode = await run("tests/llm/matrix.ts", args);
+      process.exitCode = await run("ios/tests/llm/matrix.ts", args);
       process.exit();
     }
     const options = parseOptions(args);
     if (options) {
       const args = sharedArguments(options);
-      const evalExit = await run("tests/llm/eval/run.ts", args);
+      const evalExit = await run("ios/tests/llm/eval/run.ts", args);
       process.exitCode = evalExit === 0
-        ? await run("tests/llm/benchmark/run.ts", args)
+        ? await run("ios/tests/llm/benchmark/run.ts", args)
         : evalExit;
     }
   } catch (error) {

@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 import { operationBaselines } from "./operations.ts";
 
 type JsonObject = Record<string, any>;

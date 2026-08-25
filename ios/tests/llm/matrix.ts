@@ -3,10 +3,10 @@ import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { runOnce } from "../../scripts/debug-ws.ts";
-import { loadAPIKeys, type APIKeys, type LLMRegion } from "../../scripts/sim-bootstrap-lib.ts";
-import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../scripts/qa-config.ts";
-import { ROOT } from "../../scripts/lib.ts";
+import { runOnce } from "../../../scripts/debug-ws.ts";
+import { loadAPIKeys, type APIKeys, type LLMRegion } from "../../../scripts/sim-bootstrap-lib.ts";
+import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../scripts/qa-config.ts";
+import { ROOT } from "../../../scripts/lib.ts";
 import { scoreResponse, validateCases, type EvalCase } from "./eval/scorer.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
@@ -389,7 +389,7 @@ async function runMatrix(options: Options): Promise<void> {
   const keys = await loadAPIKeys(options.keysPath);
   const selectedRegions = options.regions.filter((region) => keyedProviders(keys, region).length > 0);
   if (selectedRegions.length === 0) throw new Error("No API keys match the selected regions");
-  const corpus = validateCases(await Bun.file(join(ROOT, "tests/llm/cases/acceptance.json")).json());
+  const corpus = validateCases(await Bun.file(join(ROOT, "ios/tests/llm/cases/acceptance.json")).json());
   const testCase = corpus.find((candidate) => candidate.id === "javascript-web-search-discovery");
   if (!testCase) throw new Error("Missing javascript-web-search-discovery acceptance case");
   const config = qaConfig(options.device);

@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
-import { ROOT } from "../../../scripts/lib.ts";
-import { debugEndpoint } from "../../../scripts/debug-ws.ts";
+import { ROOT } from "../../../../scripts/lib.ts";
+import { debugEndpoint } from "../../../../scripts/debug-ws.ts";
 import { loadEvalContext, request, type ResolvedTarget } from "../eval/live.ts";
 import { parseTarget, scoreResponse, validateCases, type EvalCase, type EvalTarget } from "../eval/scorer.ts";
 
@@ -182,12 +182,12 @@ function passRate(value: string): number {
 }
 
 function usage(): string {
-  return `Usage: bun tests/llm/benchmark/run.ts --target <provider=client:model> [options]
+  return `Usage: bun ios/tests/llm/benchmark/run.ts --target <provider=client:model> [options]
 
 Options:
   --target <provider=client:model>  Model to benchmark; repeat for more targets
   --case <id>                      Benchmark selected scenarios; repeat as needed
-  --cases <path>                   Eval corpus path (default tests/llm/cases/acceptance.json)
+  --cases <path>                   Eval corpus path (default ios/tests/llm/cases/acceptance.json)
   --chat <id>                      Fresh chat whose rendered prompt and tools seed every run
   --runs <count>                   Measured trials per case and target (default 5)
   --warmups <count>                Unmeasured warmups per case and target (default 1)
@@ -198,7 +198,7 @@ Options:
   --fail-regression-percent <n>    Fail when median TTFT or total time regresses by more than n%
 
 Example:
-  OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 bun tests/llm/benchmark/run.ts --target openai=chatgpt:gpt-5.6-sol`;
+  OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 bun ios/tests/llm/benchmark/run.ts --target openai=chatgpt:gpt-5.6-sol`;
 }
 
 function parseOptions(args: string[]): Options | undefined {
@@ -210,7 +210,7 @@ function parseOptions(args: string[]): Options | undefined {
   const options: Options = {
     targets: [],
     caseIds: [],
-    casesPath: resolve(ROOT, "tests/llm/cases/acceptance.json"),
+    casesPath: resolve(ROOT, "ios/tests/llm/cases/acceptance.json"),
     chat: "",
     runs: 5,
     warmups: 1,

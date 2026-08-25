@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cookie } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cookie } from "@openox/service-sdk/action-lib";
 
 const install: ActionInstaller = ({ action, log }) => {
   const ORIGIN = "https://www.taobao.com";

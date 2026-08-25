@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "./builtin/web/action.ts";
+import type { ActionInstaller } from "./action.ts";
 
 type CaptureRegistration = {
   pattern: RegExp;

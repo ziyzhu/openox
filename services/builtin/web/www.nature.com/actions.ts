@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cleanText, pageCursor } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cleanText, pageCursor } from "@openox/service-sdk/action-lib";
 
 const ORIGIN = "https://www.nature.com";
 const START_URL = `${ORIGIN}/search?q=zzzzunlikelyqueryzzzz`;

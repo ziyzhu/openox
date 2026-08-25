@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const install: ActionInstaller = ({ action, retryFetch }) => {
   const API = "https://qao9lxc60h.execute-api.us-west-2.amazonaws.com/prod";

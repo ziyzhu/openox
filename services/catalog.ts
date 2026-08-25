@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { validateJSONSchemaProfile } from "./manifest.ts";
+import { validateJSONSchemaProfile } from "@openox/service-sdk/manifest";
 
 const ID_RE = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const IOS_ID_RE = /^ios:[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

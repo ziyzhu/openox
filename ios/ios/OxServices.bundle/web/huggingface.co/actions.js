@@ -1,5 +1,5 @@
 (() => {
-  // services/action-lib.ts
+  // service-sdk/action-lib.ts
   function pageCursor(value, firstPage) {
     return Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
   }
@@ -100,7 +100,7 @@
   };
   var actions_default = install;
 
-  // services/action-runtime.ts
+  // service-sdk/action-runtime.ts
   var patternMatches = (pattern, value) => {
     pattern.lastIndex = 0;
     const matched = pattern.test(value);

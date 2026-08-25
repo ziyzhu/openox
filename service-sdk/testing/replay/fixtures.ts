@@ -4,9 +4,9 @@ import { basename, dirname, join, relative } from "node:path";
 import * as ts from "typescript";
 import {
   validateAgainstSchema,
-  type ServiceAction,
+  type Action as ServiceAction,
   type ServiceManifest,
-} from "../../../ox-cli/service-manifest.ts";
+} from "../../manifest.ts";
 import type { ReplayCaseDefinition } from "./types.ts";
 import { assertNoReusableSecrets } from "./proxy.ts";
 

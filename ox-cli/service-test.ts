@@ -6,13 +6,13 @@ import { ChromeBrowser } from "./chrome/browser.ts";
 import { ChromeServiceSession } from "./chrome/service.ts";
 import { createServiceRuntime } from "./service-runtime.ts";
 import { type ServiceManifest } from "./service-manifest.ts";
-import type { ReplayCaseDefinition } from "../tests/services/replay/types.ts";
+import type { ReplayCaseDefinition } from "@openox/service-sdk/testing/replay/types";
 import {
   auditServiceFixtures,
   readReplayCaseDefinitions,
   writeServiceReplayCase,
   type ServiceReplayCase,
-} from "../tests/services/replay/fixtures.ts";
+} from "@openox/service-sdk/testing/replay/fixtures";
 import {
   sanitizeRecordedHar,
   selectRecordedRequestOccurrences,
@@ -20,7 +20,7 @@ import {
   startRecordingProxy,
   startReplayProxy,
   type RecordedRequest,
-} from "../tests/services/replay/proxy.ts";
+} from "@openox/service-sdk/testing/replay/proxy";
 import { fail, type CliContext } from "./lib.ts";
 
 type Runtime = "chrome" | "ios";

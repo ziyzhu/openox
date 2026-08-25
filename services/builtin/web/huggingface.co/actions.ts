@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { pageCursor } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { pageCursor } from "@openox/service-sdk/action-lib";
 
 const install: ActionInstaller = ({ action, retryFetch, log }) => {
   const ORIGIN = "https://huggingface.co";

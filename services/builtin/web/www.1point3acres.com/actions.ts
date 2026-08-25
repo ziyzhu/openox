@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const API = "https://api.1point3acres.com";
 const TRPC = "https://trpc.1point3acres.com/trpc";

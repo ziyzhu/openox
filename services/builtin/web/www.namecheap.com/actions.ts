@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cleanText } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cleanText } from "@openox/service-sdk/action-lib";
 
 const install: ActionInstaller = ({ action, retryFetch, log }) => {
   const normalizedDomain = (value: unknown): string => {

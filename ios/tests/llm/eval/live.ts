@@ -1,4 +1,4 @@
-import { runOnce } from "../../../scripts/debug-ws.ts";
+import { runOnce } from "../../../../scripts/debug-ws.ts";
 import type { EvalTarget } from "./scorer.ts";
 
 type Model = {

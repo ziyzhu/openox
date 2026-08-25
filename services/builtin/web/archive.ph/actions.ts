@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const ORIGIN = "https://archive.ph";
 const CAPTURE_ID = /^[A-Za-z0-9]{5}$/;

@@ -1,5 +1,5 @@
-import { cleanText } from "../../../action-lib.ts";
-import type { ActionInstaller } from "../action.ts";
+import { cleanText } from "@openox/service-sdk/action-lib";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 type DatabaseCount = {
   db: string;

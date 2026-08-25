@@ -6,6 +6,7 @@ import { artifacts, chats, memory, profiles, skills, soul } from "./ox-content.t
 import { skill, SUBS as skillSubs } from "./user-skills.ts";
 import { herdr } from "./herdr.ts";
 import { repository, SUBS as repositorySubs } from "./repositories.ts";
+import packageMetadata from "./package.json";
 
 const groups: Record<string, CommandGroup> = {
   profiles: { fn: profiles, desc: "List Profiles in iCloud Drive (--json)" },
@@ -21,4 +22,4 @@ const groups: Record<string, CommandGroup> = {
   service: { fn: service, desc: "Inspect and exercise services", subs: serviceSubs },
 };
 
-await runCli("ox", "Inspect a Profile, create skills, and exercise services", groups, process.argv.slice(2));
+await runCli("ox", packageMetadata.version, "Inspect a Profile, create skills, and exercise services", groups, process.argv.slice(2));

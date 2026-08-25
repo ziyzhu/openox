@@ -1,16 +1,16 @@
 import { existsSync, readdirSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   validateServiceManifest,
   type Manifest,
   type ServiceManifest,
   HOST_PATTERN,
-} from "./manifest.ts";
+} from "@openox/service-sdk/manifest";
 import { logInfo } from "./log.ts";
-import { readSkills } from "./skills.ts";
-import type { ActionInstaller } from "./builtin/web/action.ts";
+import { readSkills } from "@openox/service-sdk/skills";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 export const SOURCE_ROOT = resolve(import.meta.dir, "builtin", "web");
 export const SERVICE_ASSET_BASE_URL = "https://openox.ai/assets/services";
@@ -149,7 +149,7 @@ async function renderActions(
   domain: string,
   actionsPath: string,
 ): Promise<string | { error: string }> {
-  const runtimePath = join(import.meta.dir, "action-runtime.ts");
+  const runtimePath = fileURLToPath(import.meta.resolve("@openox/service-sdk/action-runtime"));
   const entrySource = [
     `import install from ${JSON.stringify(actionsPath)};`,
     `import { installService } from ${JSON.stringify(runtimePath)};`,
@@ -160,6 +160,7 @@ async function renderActions(
   await Bun.write(entryPath, entrySource);
   const result = await Bun.build({
     entrypoints: [entryPath],
+    root: resolve(import.meta.dir, ".."),
     target: "browser",
     format: "iife",
     minify: false,
@@ -172,6 +173,9 @@ async function renderActions(
   const js = (await result.outputs[0].text())
     .split("\n")
     .filter(line => !line.trim().endsWith(`/${entryName}`))
+    .map(line => line
+      .replace("  // ../service-sdk/", "  // service-sdk/")
+      .replace("  // builtin/web/", "  // services/builtin/web/"))
     .join("\n");
   logInfo(`build actions ${domain} bytes=${js.length}`);
   return js;

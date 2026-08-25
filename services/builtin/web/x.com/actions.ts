@@ -1,5 +1,5 @@
 
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 export type ArticleBody = {
   content: string;

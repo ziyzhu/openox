@@ -9,8 +9,6 @@
 
 Ox CLI inspects and manages Profile content and exercises Ox services from a terminal. It can read a Profile's memory, soul, skills, artifacts, and chats, create user skills, inspect service definitions on disk, and run service actions through either the Ox iOS app or a dedicated headed Chrome profile.
 
-The CLI is currently distributed from the Ox repository rather than a package registry.
-
 ## Connect Ox to Herdr
 
 Start an MCP bridge to the default local Herdr session and expose it privately
@@ -46,15 +44,35 @@ keystrokes, pane closure, forced worktree removal, direct pane layout mutation,
 or Herdr maintenance. Ox requests approval before invoking every remote MCP
 tool.
 
-## Install from source
+## Install
 
-Ox CLI requires [Bun](https://bun.sh/). The Chrome runtime also requires Google Chrome Stable.
+Ox CLI requires [Bun](https://bun.sh/) 1.3 or newer. The Chrome runtime also requires Google Chrome Stable.
+
+```sh
+bun install --global @openox/cli
+ox --version
+```
+
+You can also install through npm after installing Bun:
+
+```sh
+npm install --global @openox/cli
+```
+
+Run a command without keeping a global installation with `bunx`:
+
+```sh
+bunx @openox/cli --help
+```
+
+### Install from source
 
 ```sh
 git clone https://github.com/ziyzhu/openox.git
 cd openox
 bun install
 cd ox-cli
+bun run build
 bun link
 ox --help
 ```
@@ -194,7 +212,7 @@ ox --runtime chrome service invoke example.com:changeSomething \
 
 Only pass `--approve` when you intend the action's external effect.
 
-The Chrome runtime is a local developer and automation harness. It runs service action code inside authenticated pages and does not provide the iOS app's credential-firewall guarantee. Use it only with trusted service definitions and trusted local operators. See [Security](../docs/SECURITY.md) for the complete threat model.
+The Chrome runtime is a local developer and automation harness. It runs service action code inside authenticated pages and does not provide the iOS app's credential-firewall guarantee. Use it only with trusted service definitions and trusted local operators. See [Security](https://github.com/ziyzhu/openox/blob/main/docs/SECURITY.md) for the complete threat model.
 
 ## Test services offline
 
@@ -316,6 +334,28 @@ From the repository root:
 
 ```sh
 bun run typecheck
+cd ox-cli
+bun run build
+bun run package:check
 ```
 
-The CLI source lives in `ox-cli/`. Select service repositories explicitly rather than depending on a particular checkout.
+`package:check` builds the publishable bundle, verifies the tarball contents, installs the tarball into a temporary global prefix, and exercises the installed CLI. Select service repositories explicitly rather than depending on a particular checkout.
+
+## Release
+
+The version in `package.json` is the release source of truth. Update it on `main`, run the package check, then create a matching `ox-cli-v<version>` tag. The publish workflow refuses tags that do not match the package version or commits that are not on `main`.
+
+The first npm release must be published interactively with two-factor authentication:
+
+```sh
+cd ox-cli
+bun package-check.ts --output /tmp/ox-cli-release
+npm publish /tmp/ox-cli-release/openox-cli-0.1.0.tgz --access public
+```
+
+After the first release, configure npm Trusted Publishing for the `ziyzhu/openox` repository, `.github/workflows/publish-npm.yml` workflow, and `npm-publish` environment. Subsequent releases are published by pushing the matching tag:
+
+```sh
+git tag ox-cli-v0.1.0
+git push origin ox-cli-v0.1.0
+```

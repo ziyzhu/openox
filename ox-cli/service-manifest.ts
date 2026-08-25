@@ -8,7 +8,7 @@ import {
   type Action,
   type JSONSchema,
   type Manifest,
-} from "../services/manifest.ts";
+} from "@openox/service-sdk/manifest";
 
 export {
   BOT_CONTROL_STATE_ACTION_ID,

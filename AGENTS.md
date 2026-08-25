@@ -32,12 +32,20 @@
 
 1. `ios/` contains the iOS app and Share Extension.
 1. `ox-cli/` contains the Bun service CLI.
-1. `services/` contains built-in service sources and the Server IR compiler.
+1. `service-sdk/` contains reusable service contracts, validation, helpers, and replay tooling published as `@openox/service-sdk`.
+1. `services/` contains official built-in service sources and the generated repository package published as `@openox/services`.
 1. `examples/service-repository/` is a standalone remote service repository example.
 1. `dev/` contains the debugger SPA for a running debug build.
-1. `tests/llm/` contains real-model evaluation and benchmarks.
-1. `tests/services/` contains simulator service replay tooling.
+1. `ios/tests/llm/` contains real-model evaluation and benchmarks for the iOS agent.
+1. `services/tests/` contains simulator service replay tooling.
 1. `.agents/skills/` contains repository development skills.
+
+## npm Releases
+
+1. Public npm package source, verification, and Trusted Publishing workflows belong in this repository so provenance resolves to the public source revision.
+1. Bootstrap an unregistered package only from an exact `package:check` tarball through an interactive npm session with two-factor authentication.
+1. After bootstrap, publish only through `.github/workflows/publish-npm.yml`; never store an npm publication token in this repository or `openox-dev`.
+1. Use the protected `npm-publish` environment and matching `ox-cli-v*`, `service-sdk-v*`, or `services-v*` tags from `main`.
 
 ## Build and Test
 

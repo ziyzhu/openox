@@ -19,7 +19,7 @@ import {
   repositoryServicePath,
   type RepositoryPackage,
   type RepositoryService,
-} from "./repository.ts";
+} from "@openox/service-sdk/repository";
 
 async function contentHash(root: string): Promise<string> {
   const files: string[] = [];

@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const ORIGIN = "https://www.usta.com";
 const ACCOUNT = "https://account.usta.com";

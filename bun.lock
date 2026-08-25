@@ -17,17 +17,43 @@
       "version": "0.0.1",
     },
     "ox-cli": {
-      "name": "ox-cli",
+      "name": "@openox/cli",
+      "version": "0.1.0",
       "bin": {
-        "ox": "./ox.ts",
+        "ox": "./dist/ox.js",
       },
       "dependencies": {
         "@sinclair/typebox": "^0.34.49",
+        "typescript": "^5",
+      },
+      "devDependencies": {
+        "@openox/service-sdk": "0.1.0",
+      },
+    },
+    "service-sdk": {
+      "name": "@openox/service-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@sinclair/typebox": "^0.34.49",
+        "typescript": "^5",
+      },
+    },
+    "services": {
+      "name": "@openox/services",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@openox/service-sdk": "0.1.0",
       },
     },
   },
   "packages": {
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
+
+    "@openox/cli": ["@openox/cli@workspace:ox-cli"],
+
+    "@openox/service-sdk": ["@openox/service-sdk@workspace:service-sdk"],
+
+    "@openox/services": ["@openox/services@workspace:services"],
 
     "@ox/dev": ["@ox/dev@workspace:dev"],
 
@@ -72,8 +98,6 @@
     "mathml-to-latex": ["mathml-to-latex@1.8.0", "", { "dependencies": { "@xmldom/xmldom": "^0.9.10" } }, "sha512-gQ0uK3zqB8HwlfaXJkEL5rgaZNbKUiBMmBP/B/W+b+t6KcseLSuYb1b0BjLgS9ZiQa24ePkqTX8/6FaQuDL7wQ=="],
 
     "nth-check": ["nth-check@3.0.1", "", { "dependencies": { "boolbase": "^2.0.0" } }, "sha512-GX0gsdbGVCgnRgbeGaubfjpBXyYRWOOCVeYh08bSQvDZqxz5ndXs1OTfAt/h36G1xvI94YIspsI0sVFqAV9+RQ=="],
-
-    "ox-cli": ["ox-cli@workspace:ox-cli"],
 
     "temml": ["temml@0.13.4", "", {}, "sha512-k1yolMBswx34Jw9hZn5Xh2/GBlwqlW+wiN7QaUYUMhSa1ypfti6rlCfSmCxWyooxH1G32C/Z+qVvgAsBOELZBQ=="],
 

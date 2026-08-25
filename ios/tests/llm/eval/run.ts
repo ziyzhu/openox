@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { ROOT } from "../../../scripts/lib.ts";
+import { ROOT } from "../../../../scripts/lib.ts";
 import { acceptanceCases, boundedSuiteTimeout, defaultProviderConcurrency, defaultSuiteTimeoutMs, parallelMap } from "./execution.ts";
 import { loadEvalContext, request, type EvalSnapshot, type ResolvedTarget } from "./live.ts";
 import { evalGroups, parseTarget, passesThreshold, scoreResponse, validateCases, validateProviderCoverage, type EvalCase, type EvalGroup, type EvalTarget } from "./scorer.ts";
@@ -179,13 +179,13 @@ function positiveInteger(value: string, flag: string): number {
 }
 
 function usage(): string {
-  return `Usage: bun tests/llm/eval/run.ts --target <provider=client:model> --target <provider=client:model> [options]
+  return `Usage: bun ios/tests/llm/eval/run.ts --target <provider=client:model> --target <provider=client:model> [options]
 
 Options:
   --target <provider=client:model>  Repeat for every provider and model
   --case <id>                      Run selected cases only; repeat as needed
   --group <tool>                   Run one acceptance tool group; repeat as needed
-  --cases <path>                   Corpus path (default tests/llm/cases/acceptance.json)
+  --cases <path>                   Corpus path (default ios/tests/llm/cases/acceptance.json)
   --chat <id>                      Chat whose rendered Ox prompt and tools seed every run
   --runs <count>                   Trials per case and target (default 3)
   --min-pass-rate <0..1>           Required rate per case and target (default 2/3)
@@ -196,8 +196,8 @@ Options:
   --allow-single-provider          Permit a focused one-provider diagnostic run
 
 Examples:
-  bun tests/llm/eval/run.ts --target openai=chatgpt:gpt-5.6-sol --target google=gemini:gemini-3.6-flash
-  bun tests/llm/eval/run.ts --target openai=chatgpt:gpt-5.6-sol --allow-single-provider --group execute`;
+  bun ios/tests/llm/eval/run.ts --target openai=chatgpt:gpt-5.6-sol --target google=gemini:gemini-3.6-flash
+  bun ios/tests/llm/eval/run.ts --target openai=chatgpt:gpt-5.6-sol --allow-single-provider --group execute`;
 }
 
 function parseOptions(args: string[]): Options | undefined {
@@ -208,7 +208,7 @@ function parseOptions(args: string[]): Options | undefined {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const options: Options = {
     targets: [],
-    casesPath: join(ROOT, "tests/llm/cases/acceptance.json"),
+    casesPath: join(ROOT, "ios/tests/llm/cases/acceptance.json"),
     caseIds: [],
     groups: [],
     chat: "",

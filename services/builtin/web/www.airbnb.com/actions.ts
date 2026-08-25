@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cleanText } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cleanText } from "@openox/service-sdk/action-lib";
 
 const ORIGIN = "https://www.airbnb.com";
 const API_KEY = "d306zoyjsyarp7ifhu67rjxn52tv0t20";

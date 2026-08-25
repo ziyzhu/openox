@@ -17,12 +17,13 @@ console.log(`PASS models.dev catalog selected=${catalog.selectedModels}`);
 
 const projects = [
   "ox-cli/tsconfig.json",
+  "service-sdk/tsconfig.json",
   "services/tsconfig.json",
   ".agents/skills/ox-debug/tsconfig.json",
   "dev/tsconfig.json",
   "scripts/tsconfig.json",
-  "tests/llm/tsconfig.json",
-  "tests/services/tsconfig.json",
+  "ios/tests/llm/tsconfig.json",
+  "services/tests/tsconfig.json",
 ];
 
 const results = await Promise.all(projects.map(async (project) => {

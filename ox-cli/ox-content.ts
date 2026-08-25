@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { readSkills } from "../services/skills.ts";
+import { readSkills } from "@openox/service-sdk/skills";
 import { C, fail, terminalText, type CliContext } from "./lib.ts";
 
 type ProfileConfig = {

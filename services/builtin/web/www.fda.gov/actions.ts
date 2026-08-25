@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cleanText, pageCursor } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cleanText, pageCursor } from "@openox/service-sdk/action-lib";
 
 const ORIGIN = "https://www.fda.gov";
 const API_ORIGIN = "https://api.fda.gov";

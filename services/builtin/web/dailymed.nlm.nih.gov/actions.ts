@@ -1,5 +1,5 @@
-import type { ActionInstaller } from "../action.ts";
-import { cleanText, pageCursor } from "../../../action-lib.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
+import { cleanText, pageCursor } from "@openox/service-sdk/action-lib";
 
 const ORIGIN = "https://dailymed.nlm.nih.gov";
 const START_URL = `${ORIGIN}/dailymed/autocomplete.cfm?key=search&returntype=json&term=zzzzunlikelyqueryzzzz`;

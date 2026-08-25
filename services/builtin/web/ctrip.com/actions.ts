@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const install: ActionInstaller = ({ action, log }) => {
   const BASE_URL = "https://www.ctrip.com/";

@@ -1,4 +1,4 @@
-import type { ActionInstaller } from "../action.ts";
+import type { ActionInstaller } from "@openox/service-sdk/action";
 
 const ORIGIN = "https://clinicaltrials.gov";
 const API = `${ORIGIN}/api/v2`;

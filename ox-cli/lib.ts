@@ -72,6 +72,7 @@ function printUsage(program: string, description: string, groups: Record<string,
   console.log(`  ${terminalText("--repository <origin>", [C.sky])}  ${terminalText("Service repository path or Git URL", [C.dim])}`);
   console.log(`  ${terminalText("--runtime <ios|chrome>", [C.sky])}  ${terminalText("Service execution runtime (default: ios)", [C.dim])}`);
   console.log(`  ${terminalText("--session <id>", [C.sky])}          ${terminalText("Target runtime service/tab or named Herdr session", [C.dim])}`);
+  console.log(`  ${terminalText("-v, --version", [C.sky])}          ${terminalText("Display the installed version and exit", [C.dim])}`);
   console.log(`  ${terminalText("-h, --help", [C.sky])}             ${terminalText("Display this menu and exit", [C.dim])}`);
   console.log("");
 }
@@ -150,6 +151,7 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
 
 export async function runCli(
   program: string,
+  version: string,
   description: string,
   groups: Record<string, CommandGroup>,
   args: string[],
@@ -160,6 +162,10 @@ export async function runCli(
   } catch (error) {
     writeError(`error: ${(error as Error).message}`);
     process.exitCode = 1;
+    return;
+  }
+  if (parsed.rest.length === 1 && (parsed.rest[0] === "-v" || parsed.rest[0] === "--version")) {
+    console.log(version);
     return;
   }
   const [name, ...rest] = parsed.rest;
