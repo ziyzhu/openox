@@ -45,6 +45,7 @@
 1. Build iOS only with `sim`, never `xcodebuild`.
 1. Before simulator testing, start one repository server and verify its `/health` endpoint.
 1. Each concurrent process must use its own numbered simulator and matching service, repository, and debug ports.
+1. Reuse the fixed `ox-qa-1` through `ox-qa-5` simulator pool; do not create additional numbered QA simulators.
 1. Rebuild and install after switching worktrees.
 1. A green build is not verification; use repository health, build, launch, exercise, fix, and repeat.
 1. For iOS and UX behavior, exercise the flow manually with `sim` and preserve screenshots or videos outside the repository.

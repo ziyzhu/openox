@@ -8,8 +8,8 @@ type QaConfig = {
 export const targetedQaDevice = "ox-qa-1";
 
 function qaIndex(device: string): number {
-  const match = /^ox-qa(?:-([1-9]\d?))?$/.exec(device);
-  if (!match) throw new Error(`QA device must be ox-qa or ox-qa-N for N from 1 to 99, got ${device}`);
+  const match = /^ox-qa(?:-([1-5]))?$/.exec(device);
+  if (!match) throw new Error(`QA device must be ox-qa or ox-qa-N for N from 1 to 5, got ${device}`);
   return match[1] === undefined ? 0 : Number(match[1]);
 }
 
