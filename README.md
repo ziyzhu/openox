@@ -95,7 +95,7 @@ Anyone can publish compatible web and MCP services in a public Git repository co
 apps/          runnable iOS and command-line Clients; iOS also contains the reference Host
 packages/      reusable npm packages and service build tooling
 repositories/  authored service repositories, including the built-in collection
-protocol/      language-neutral interoperability contracts and conformance material
+protocol/      canonical interoperability schemas and generated JSON Schemas
 examples/      standalone projects users can copy
 docs/          architecture, security, storage, and operational documentation
 tooling/       repository build, test, release, and simulator automation

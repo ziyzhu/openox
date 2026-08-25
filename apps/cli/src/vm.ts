@@ -4,7 +4,7 @@ import {
   VMControlRequestSchema,
   VMControlResponseSchema,
   VM_PROTOCOL_VERSION,
-} from "../../../protocol/host/schema.ts";
+} from "../../../protocol/host.ts";
 import { runOnce, type DebugResult } from "./debug-ws.ts";
 import { dispatch, fail, failResult, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
 

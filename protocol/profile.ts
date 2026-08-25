@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ISO8601DateSchema, UUIDSchema } from "../schema.ts";
+import { ISO8601DateSchema, UUIDSchema } from "./schema.ts";
 
 export const PROFILE_SCHEMA_VERSION = "2026-08-17-runtime";
 export const CHAT_SCHEMA_VERSION = 1;

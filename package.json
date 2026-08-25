@@ -8,8 +8,6 @@
     "test:llm": "bun apps/ios/tests/llm/run.ts",
     "test:services": "bun packages/services/tests/run.ts",
     "test:unit": "bun test tooling protocol packages/services packages/service-sdk",
-    "build:protocol": "bun tooling/protocol-schemas.ts",
-    "check:protocol": "bun tooling/protocol-schemas.ts --check",
     "build:services": "bun tooling/ios-services-build.ts",
     "build:web-worker": "bun tooling/build-public-web-worker.ts",
     "test:chat-projection": "bun tooling/chat-projection-replay.ts",

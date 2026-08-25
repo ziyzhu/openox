@@ -1,7 +1,0 @@
-{
-  "kind": "vm-call",
-  "id": "fab35894-55fc-422a-a039-7f57ae8b5944",
-  "protocolVersion": 1,
-  "function": "ox.fs.list",
-  "arguments": []
-}

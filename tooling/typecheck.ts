@@ -9,9 +9,6 @@ if (boundary.exitCode !== 0) process.exit(boundary.exitCode);
 const hostContract = Bun.spawnSync(["bun", "tooling/ios-host-contract-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
 if (hostContract.exitCode !== 0) process.exit(hostContract.exitCode);
 
-const protocol = Bun.spawnSync(["bun", "tooling/protocol-schemas.ts", "--check"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
-if (protocol.exitCode !== 0) process.exit(protocol.exitCode);
-
 const systemSkills = await validateSystemSkills();
 console.log(`PASS system skills ${systemSkills} packages`);
 

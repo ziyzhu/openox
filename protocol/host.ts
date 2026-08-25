@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { JSONObjectSchema, JSONValueSchema, OPENOX_PROTOCOL_VERSION } from "../schema.ts";
+import { JSONObjectSchema, JSONValueSchema, OPENOX_PROTOCOL_VERSION } from "./schema.ts";
 
 export const VM_PROTOCOL_VERSION = OPENOX_PROTOCOL_VERSION;
 
