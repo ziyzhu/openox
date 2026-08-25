@@ -66,15 +66,15 @@ struct ServiceDetailView: View {
 
     var body: some View {
         content
-            .alert("Delete Local plugin?", isPresented: $confirmDeleteLocalService) {
+            .alert("Delete Local service?", isPresented: $confirmDeleteLocalService) {
                 Button("Delete", role: .destructive) {
                     Task { await deleteLocalService() }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Deletes this plugin's editable source from Local. The deletion remains an uncommitted Local Git change, and website sign-ins and data are kept.")
+                Text("Deletes this service's editable source from Local. The deletion remains an uncommitted Local Git change, and website sign-ins and data are kept.")
             }
-            .alert("Couldn't delete Local plugin", isPresented: Binding(
+            .alert("Couldn't delete Local service", isPresented: Binding(
                 get: { localServiceDeleteError != nil },
                 set: { if !$0 { localServiceDeleteError = nil } }
             )) {
@@ -472,7 +472,7 @@ struct ServiceDetailView: View {
                     }
                 }
             } else if actions.isEmpty {
-                Text("This plugin exposes no actions.")
+                Text("This service exposes no actions.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.horizontal, Theme.Spacing.md)
@@ -500,7 +500,7 @@ struct ServiceDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Theme.Spacing.lg)
                 } else if skills.isEmpty {
-                    Text("This plugin exposes no skills.")
+                    Text("This service exposes no skills.")
                         .font(Theme.Fonts.bodySm)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.horizontal, Theme.Spacing.md)
@@ -581,7 +581,7 @@ struct ServiceDetailView: View {
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this plugin to a chat, giving Ox its actions, skills, and your signed-in data."
+        case .signedIn: "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data."
         case .onDevice: "Its actions and permitted device data become available to this chat."
         case .remote: "Its remote tools can receive arguments from this chat and return data to Ox."
         }
@@ -666,7 +666,7 @@ struct ServiceDetailView: View {
                     .padding(.horizontal, Theme.Spacing.md)
                 VStack(spacing: 0) {
                     if canInspectPage {
-                        manageRow("Inspect plugin page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
+                        manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
                             inspectPage()
                         }
                         .accessibilityIdentifier(A11yID.Chat.Attach.inspectPage(service.domain))
@@ -690,7 +690,7 @@ struct ServiceDetailView: View {
                         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
                             Divider().padding(.horizontal, Theme.Spacing.md)
                         }
-                        manageRow("Delete Local plugin", tint: AnyShapeStyle(Theme.Colors.error)) {
+                        manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmDeleteLocalService = true
                         }
                         .accessibilityIdentifier(A11yID.Chat.Attach.deleteLocalService(service.domain))

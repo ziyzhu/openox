@@ -55,13 +55,13 @@ struct ChatImportView: View {
 
                 if !proposal.header.serviceDomains.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Referenced plugins")
+                        Text("Referenced services")
                             .font(Theme.Fonts.labelMd)
                             .foregroundStyle(Theme.Colors.onSurface)
                         Text(verbatim: proposal.header.serviceDomains.joined(separator: ", "))
                             .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        Text("Plugins won't be attached automatically.")
+                        Text("Services won't be attached automatically.")
                             .font(Theme.Fonts.caption)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }

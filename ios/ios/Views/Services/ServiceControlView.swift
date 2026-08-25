@@ -105,7 +105,7 @@ struct ServiceControlView: View {
             switch control {
             case .signIn: isMCP ? String(localized: "Authorize to continue") : String(localized: "Sign in to continue")
             case .botControl: String(localized: "Complete the site's human verification to continue")
-            case .payment: String(localized: "Review and complete the payment in the plugin")
+            case .payment: String(localized: "Review and complete the payment on the service")
             }
         }
     }

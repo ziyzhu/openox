@@ -82,9 +82,9 @@ struct SkillContextMenuPreview: View {
                 if !skill.services.isEmpty {
                     Label {
                         if skill.services.count == 1 {
-                            Text("1 plugin")
+                            Text("1 service")
                         } else {
-                            Text("\(skill.services.count) plugins")
+                            Text("\(skill.services.count) services")
                         }
                     } icon: {
                         Image(systemName: "puzzlepiece.extension")

@@ -217,7 +217,7 @@ struct SettingsSheet: View {
                                 OxServerView()
                             } label: {
                                 SettingsDisclosureRow(
-                                    title: "Plugin Repositories",
+                                    title: "Service Repositories",
                                     value: Text("\(serverManager.repositories.count(where: \.isEnabled)) enabled")
                                 )
                             }

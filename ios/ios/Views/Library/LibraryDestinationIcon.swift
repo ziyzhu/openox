@@ -7,7 +7,7 @@ enum LibraryDestination {
 
     var title: LocalizedStringKey {
         switch self {
-        case .services: "Plugins"
+        case .services: "Services"
         case .artifacts: "Artifacts"
         case .skills: "Skills"
         }

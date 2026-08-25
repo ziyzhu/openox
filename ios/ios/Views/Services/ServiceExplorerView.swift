@@ -101,10 +101,10 @@ struct ServiceExplorerView: View {
             if !ready {
                 Color.clear
             } else if isLoadingServices {
-                ContentLoadingView(label: "Loading plugins…")
+                ContentLoadingView(label: "Loading services…")
             } else if let serviceLoadFailure {
                 ContentUnavailableView {
-                    Label("Couldn't load plugins", systemImage: "exclamationmark.triangle")
+                    Label("Couldn't load services", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(serviceLoadFailure)
                 } actions: {
@@ -141,7 +141,7 @@ struct ServiceExplorerView: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .background(Theme.Colors.background)
-        .navigationTitle("Plugins")
+        .navigationTitle("Services")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -154,7 +154,7 @@ struct ServiceExplorerView: View {
                 filterMenu
             }
         }
-        .searchable(text: $query, isPresented: $searchPresented, prompt: "Search plugins")
+        .searchable(text: $query, isPresented: $searchPresented, prompt: "Search services")
         .alert("Connect remote MCP", isPresented: $connectingMCP) {
             TextField("https://example.com/mcp", text: $mcpEndpoint)
                 .textInputAutocapitalization(.never)
