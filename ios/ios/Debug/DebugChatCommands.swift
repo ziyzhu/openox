@@ -1,14 +1,15 @@
 #if targetEnvironment(simulator)
 import Foundation
 
-extension DebugCommandRouter {
+extension OxHostAPI {
     @MainActor
     static func handleGetLatestResponse(
         _ command: IDRequest,
+        chatManager: ChatManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
         Task { @MainActor in
-            let response = await chatManager?.latestCompletedResponse()
+            let response = await chatManager.latestCompletedResponse()
             reply(encode(GetLatestResponseResult(
                 id: command.id,
                 ok: true,
@@ -20,14 +21,15 @@ extension DebugCommandRouter {
     @MainActor
     static func handleRunDeadlineChat(
         _ command: RunDeadlineChatRequest,
+        chatManager: ChatManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
-        guard let chat = chatManager?.current, !chat.isBusy else {
+        guard let chat = chatManager.current, !chat.isBusy else {
             reply(encode(RunDeadlineChatResult(
                 id: command.id,
                 ok: false,
                 outcome: "unavailable",
-                busy: chatManager?.current?.isBusy == true,
+                busy: chatManager.current?.isBusy == true,
                 prompts: [],
                 elapsedMilliseconds: 0,
                 error: "idle chat unavailable"
@@ -76,13 +78,13 @@ extension DebugCommandRouter {
 
     @MainActor
 
-    static func handleListChats(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
-        guard let manager = chatManager else {
-            reply(encode(ListChatsResult(id: command.id, ok: false, chats: nil, error: "session manager unavailable")))
-            return
-        }
-        let currentId = manager.currentId
-        let chats = manager.orderedSummaries.map { summary in
+    static func handleListChats(
+        _ command: IDRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
+        let currentId = chatManager.currentId
+        let chats = chatManager.orderedSummaries.map { summary in
             ChatRow(
                 id: summary.id.uuidString,
                 title: summary.displayTitle,
@@ -92,18 +94,18 @@ extension DebugCommandRouter {
                 active: summary.id == currentId
             )
         }
-        Log.agent.debug("DebugCommandRouter.list-chats id=\(command.id) count=\(chats.count)")
+        Log.agent.debug("OxHostAPI.list-chats id=\(command.id) count=\(chats.count)")
         reply(encode(ListChatsResult(id: command.id, ok: true, chats: chats, error: nil)))
     }
 
     @MainActor
-    static func handleGetChat(_ command: SessionRequest, reply: @escaping @MainActor (Data) -> Void) {
-        guard let manager = chatManager else {
-            reply(encode(GetChatResult(id: command.id, ok: false, data: nil, error: "session manager unavailable")))
-            return
-        }
+    static func handleGetChat(
+        _ command: SessionRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         let session: Chat?
-        switch resolveSession(manager, command.sessionId) {
+        switch resolveSession(chatManager, command.sessionId) {
         case .found(let s): session = s
         case .error(let error):
             reply(encode(GetChatResult(id: command.id, ok: false, data: nil, error: error)))
@@ -113,7 +115,7 @@ extension DebugCommandRouter {
             reply(encode(GetChatResult(id: command.id, ok: true, data: nil, error: nil)))
             return
         }
-        Log.agent.debug("DebugCommandRouter.get-chat id=\(command.id) session=\(session.id)")
+        Log.agent.debug("OxHostAPI.get-chat id=\(command.id) session=\(session.id)")
         reply(encode(GetChatResult(id: command.id, ok: true, data: DebugSnapshot(session), error: nil)))
     }
 
@@ -172,7 +174,7 @@ extension DebugCommandRouter {
                 }
             )
         }
-        Log.agent.debug("DebugCommandRouter.list-models id=\(command.id) count=\(clients.count)")
+        Log.agent.debug("OxHostAPI.list-models id=\(command.id) count=\(clients.count)")
         reply(encode(ListModelsResult(id: command.id, region: AppRegion.shared.region.rawValue, clients: clients)))
     }
 
@@ -190,15 +192,6 @@ extension DebugCommandRouter {
             )
         }
         reply(encode(GetLogsResult(id: command.id, logs: logs)))
-    }
-
-    @MainActor
-    static func handleGetTranscript(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
-        guard let viewportController else {
-            reply(encode(GetTranscriptResult(id: command.id, ok: false, transcript: nil, error: "transcript unavailable")))
-            return
-        }
-        reply(encode(GetTranscriptResult(id: command.id, ok: true, transcript: viewportController.debugSnapshot(), error: nil)))
     }
 
     @MainActor
@@ -226,9 +219,10 @@ extension DebugCommandRouter {
     @MainActor
     static func handleOpenTranscriptFixture(
         _ command: TurnsRequest,
+        chatManager: ChatManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
-        guard let snapshot = chatManager?.debugOpenTranscriptFixture(turns: command.turns) else {
+        guard let snapshot = chatManager.debugOpenTranscriptFixture(turns: command.turns) else {
             reply(encode(TranscriptPerformanceResult(
                 kind: "open-transcript-fixture-result",
                 id: command.id,
@@ -248,18 +242,22 @@ extension DebugCommandRouter {
     }
 
     @MainActor
-    static func handleRetainBaselineSessions(_ command: CountRequest, reply: @escaping @MainActor (Data) -> Void) {
-        let count = chatManager?.debugRetainBaselineSessions(count: max(0, command.count)) ?? 0
+    static func handleRetainBaselineSessions(
+        _ command: CountRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
+        let count = chatManager.debugRetainBaselineSessions(count: max(0, command.count))
         reply(encode(RetainBaselineSessionsResult(id: command.id, count: count)))
     }
 
     @MainActor
-    static func handleRepositorySaveGate(_ command: RepositoryGateRequest, reply: @escaping @MainActor (Data) -> Void) {
-        guard let manager = chatManager else {
-            reply(encode(RepositorySaveGateResult(id: command.id, ok: false, entered: nil, error: "chat manager unavailable")))
-            return
-        }
-        guard command.domain == "save", let entered = manager.debugControlRepositorySaveGate(command.action) else {
+    static func handleRepositorySaveGate(
+        _ command: RepositoryGateRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
+        guard command.domain == "save", let entered = chatManager.debugControlRepositorySaveGate(command.action) else {
             reply(encode(RepositorySaveGateResult(id: command.id, ok: false, entered: nil, error: "expected hold, release, or status for save")))
             return
         }

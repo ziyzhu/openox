@@ -7,18 +7,18 @@ struct OxApp: App {
     @State private var skillImports = SkillImportCoordinator()
     @State private var chatImports = ChatImportCoordinator()
     @State private var presentations = AppPresentationCoordinator.shared
-    private let runtime: OxRuntime
+    private let client: OxClient
 
     init() {
-        let runtime = OxRuntime.shared
-        self.runtime = runtime
+        let host = IOSHost.shared
+        client = OxClient(host: host)
         AppRegion.shared.start()
         Log.app.info("Device.launch id=\(Device.id) internal=\(Device.isInternal)")
         PerfMonitor.shared.start()
         #if targetEnvironment(simulator)
         Task { @MainActor in
             DebugServer.shared.onCommand = { data, reply in
-                DebugCommandRouter.handle(data, serviceManager: runtime.serviceManager, reply: reply)
+                OxHostAPI.handle(data, host: host, reply: reply)
             }
             DebugServer.shared.start()
         }
@@ -30,7 +30,7 @@ struct OxApp: App {
             Group {
                 if onboarded {
                     RootView(
-                        runtime: runtime,
+                        client: client,
                         skillImports: skillImports,
                         chatImports: chatImports
                     )
@@ -38,7 +38,7 @@ struct OxApp: App {
                     OnboardingView { onboarded = true }
                 }
             }
-            .environment(runtime.serviceManager)
+            .environment(client.services)
             .themed()
             .appPresentations(presentations)
             .onOpenURL { url in

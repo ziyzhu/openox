@@ -1,17 +1,15 @@
-import Foundation
+enum HostPreparationPhase {
+    case opening
+    case updating
+    case loadingChats
+}
 
 @MainActor
-final class OxRuntime {
-    enum PreparationPhase {
-        case opening
-        case updating
-        case loadingChats
-    }
+final class IOSHost: OxHost {
+    static let shared = IOSHost()
 
-    static let shared = OxRuntime()
-
-    let serviceManager: ServiceManager
-    let chatManager: ChatManager
+    let services: ServiceManager
+    let chats: ChatManager
 
     private var preparationTask: Task<Void, Never>?
     private var isPrepared = false
@@ -21,8 +19,8 @@ final class OxRuntime {
     }
 
     init(serviceManager: ServiceManager, presentations: AppPresentations) {
-        self.serviceManager = serviceManager
-        chatManager = ChatManager(
+        services = serviceManager
+        chats = ChatManager(
             repository: .shared,
             storage: .shared,
             llmRegistry: .shared,
@@ -31,7 +29,7 @@ final class OxRuntime {
         )
     }
 
-    func prepare(onPhase: (@MainActor (PreparationPhase) -> Void)? = nil) async {
+    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async {
         if isPrepared { return }
         if let preparationTask {
             await preparationTask.value
@@ -44,12 +42,12 @@ final class OxRuntime {
             onPhase?(.updating)
             await StorageRoot.shared.migrateActive()
             onPhase?(.loadingChats)
-            await chatManager.loadSummariesNow()
+            await chats.loadSummariesNow()
             _ = Soul.shared
             _ = UserMemory.shared
             await UserMemory.shared.waitUntilCurrent()
             isPrepared = true
-            Log.app.info("OxRuntime prepared")
+            Log.app.info("IOSHost prepared")
         }
         preparationTask = task
         await task.value

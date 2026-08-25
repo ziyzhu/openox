@@ -9,8 +9,8 @@ struct ReadLatestOxResponseIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let runtime = try await OxIntentSupport.readyRuntime()
-        guard let response = await runtime.chatManager.latestCompletedResponse() else {
+        let client = try await OxIntentSupport.readyClient()
+        guard let response = await client.chats.latestCompletedResponse() else {
             let message = String(localized: "Ox doesn't have a completed response yet.")
             return .result(value: message, dialog: "\(message)")
         }

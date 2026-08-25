@@ -27,9 +27,9 @@ struct AskOxIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
         let budget = OxIntentBudget()
-        let runtime = try await OxIntentSupport.readyRuntime()
+        let client = try await OxIntentSupport.readyClient()
         let question = try OxIntentSupport.prompt(prompt)
-        let chat = runtime.chatManager.startNewChat()
+        let chat = client.chats.startNewChat()
         Log.app.info("AskOxIntent start chars=\(question.count)")
         let completion = await OxIntentSupport.waitForCompletion(
             budget: budget,

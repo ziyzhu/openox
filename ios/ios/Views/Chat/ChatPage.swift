@@ -312,7 +312,7 @@ struct ChatPage: View {
         .onAppear {
             Log.ui.info("ChatPage.onAppear chat=\(chat.id) title=\(chat.title)")
             #if targetEnvironment(simulator)
-            DebugCommandRouter.composer = composer
+            DebugUIAPI.composer = composer
             #endif
         }
         .onDisappear {

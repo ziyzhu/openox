@@ -159,7 +159,7 @@ final class ChatViewportController {
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
         self.chatID = chatID
         #if targetEnvironment(simulator)
-        DebugCommandRouter.viewportController = self
+        DebugUIAPI.viewportController = self
         #endif
         frame = nil
         pendingFrame = nil

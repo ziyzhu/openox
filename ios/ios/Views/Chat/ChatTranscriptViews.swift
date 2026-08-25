@@ -875,12 +875,12 @@ struct EditMessageView: View {
         .onAppear {
             #if targetEnvironment(simulator)
             let draft = $draft
-            DebugCommandRouter.setEditDraft = { draft.wrappedValue = $0 }
+            DebugUIAPI.setEditDraft = { draft.wrappedValue = $0 }
             #endif
         }
         .onDisappear {
             #if targetEnvironment(simulator)
-            DebugCommandRouter.setEditDraft = nil
+            DebugUIAPI.setEditDraft = nil
             #endif
         }
         .task {

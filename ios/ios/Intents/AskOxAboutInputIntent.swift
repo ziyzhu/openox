@@ -54,11 +54,11 @@ struct AskOxAboutInputIntent: AppIntent {
                 try await $prompt.requestValue("What would you like to know about this input?")
             }
         }
-        let runtime = try await OxIntentSupport.readyRuntime()
+        let client = try await OxIntentSupport.readyClient()
         let hasText = resolvedText?.isEmpty == false
         let question = try OxIntentSupport.combinedPrompt(question: resolvedPrompt, text: resolvedText, url: url)
-        let artifacts = try await OxIntentSupport.importArtifacts(files, using: runtime.chatManager)
-        let chat = runtime.chatManager.startNewChat()
+        let artifacts = try await OxIntentSupport.importArtifacts(files, using: client.chats)
+        let chat = client.chats.startNewChat()
         Log.app.info(
             "AskOxAboutInputIntent start promptChars=\(resolvedPrompt.count) text=\(hasText) url=\(url != nil) files=\(artifacts.count)"
         )

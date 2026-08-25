@@ -12,7 +12,7 @@ struct StopOxIntent: AppIntent {
         guard UserDefaults.standard.bool(forKey: "app.hasCompletedOnboarding") else {
             throw OxIntentError.onboardingRequired
         }
-        let count = OxRuntime.shared.chatManager.stopActiveResponses()
+        let count = OxClient.shared.chats.stopActiveResponses()
         if count == 0 {
             return .result(value: false, dialog: "Ox isn't responding right now.")
         }

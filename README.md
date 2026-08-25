@@ -66,6 +66,10 @@ Anyone can publish compatible web and MCP services in a public Git repository co
 
 **Ox for iOS** is the reference implementation of both an Ox Client and an Ox Host. Its agent runtime and VM run on the user’s iOS device, while the embedded Client supplies the native interface.
 
+The native Client reaches the `OxHost` contract in process, while the development
+CLI reaches that same Host through `OxHostAPI` over loopback WebSocket. Both paths
+share the Host-owned chat, service, Profile, model, and VM runtime.
+
 Install Xcode 26 or later and Bun on a Mac, then clone the repository:
 
 ```sh

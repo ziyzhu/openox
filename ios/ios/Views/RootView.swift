@@ -467,10 +467,10 @@ struct RootView: View {
         }
     }
 
-    private let runtime: OxRuntime
+    private let client: OxClient
     private let skillImports: SkillImportCoordinator
     private let chatImports: ChatImportCoordinator
-    private var manager: ServiceManager { runtime.serviceManager }
+    private var manager: ServiceManager { client.services }
     private var storage: StorageRoot { .shared }
     @State private var chats: ChatManager
     @State private var compactPage: CompactPage = .workspace
@@ -500,14 +500,14 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
-        runtime: OxRuntime,
+        client: OxClient,
         skillImports: SkillImportCoordinator,
         chatImports: ChatImportCoordinator
     ) {
-        self.runtime = runtime
+        self.client = client
         self.skillImports = skillImports
         self.chatImports = chatImports
-        _chats = State(initialValue: runtime.chatManager)
+        _chats = State(initialValue: client.chats)
     }
 
     private var isSplitLayout: Bool {
@@ -636,9 +636,6 @@ struct RootView: View {
         presentedRoot
             .onAppear {
                 bootstrap()
-                #if targetEnvironment(simulator)
-                DebugCommandRouter.chatManager = chats
-                #endif
             }
             .onDisappear {
                 activeProfileMonitor.deactivate()
@@ -1065,7 +1062,7 @@ struct RootView: View {
 
     private func loadProfile() {
         Task {
-            await runtime.prepare { phase in
+            await client.prepare { phase in
                 switch phase {
                 case .opening: transitionStartup(to: .opening)
                 case .updating: transitionStartup(to: .updating)
@@ -1198,7 +1195,7 @@ extension ChatSidebar: Equatable {
 #Preview {
     let serviceManager = ServiceManager()
     RootView(
-        runtime: OxRuntime(serviceManager: serviceManager, presentations: .unavailable),
+        client: OxClient.preview(serviceManager: serviceManager),
         skillImports: SkillImportCoordinator(),
         chatImports: ChatImportCoordinator()
     )

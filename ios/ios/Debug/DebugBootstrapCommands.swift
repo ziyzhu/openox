@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 import UniformTypeIdentifiers
 
-extension DebugCommandRouter {
+extension OxHostAPI {
     @MainActor
     static func handleSetRegion(_ command: SetRegionRequest, reply: @escaping @MainActor (Data) -> Void) {
         guard let region = LLMRegion(rawValue: command.region) else {
@@ -32,7 +32,7 @@ extension DebugCommandRouter {
         } else {
             Credentials.set(key, for: credentialID)
         }
-        Log.agent.info("DebugCommandRouter.set-key client=\(clientId) credential=\(credentialID) chars=\(key.count)")
+        Log.agent.info("OxHostAPI.set-key client=\(clientId) credential=\(credentialID) chars=\(key.count)")
         reply(encode(StatusResult(kind: "set-key-result", id: command.id)))
     }
 
@@ -79,7 +79,7 @@ extension DebugCommandRouter {
                     }
                 }
                 let names = installed.map(\.fileName)
-                Log.app.info("DebugCommandRouter.bootstrap-artifacts count=\(names.count) files=\(names.joined(separator: ","))")
+                Log.app.info("OxHostAPI.bootstrap-artifacts count=\(names.count) files=\(names.joined(separator: ","))")
                 reply(encode(BootstrapArtifactsResult(
                     id: command.id,
                     ok: true,
@@ -90,7 +90,7 @@ extension DebugCommandRouter {
                 for artifact in created.reversed() {
                     _ = try? await ProfileRepository.shared.deleteArtifact(named: artifact.fileName, in: scope)
                 }
-                Log.app.error("DebugCommandRouter.bootstrap-artifacts imported=\(created.count) failed=\(error.localizedDescription)")
+                Log.app.error("OxHostAPI.bootstrap-artifacts imported=\(created.count) failed=\(error.localizedDescription)")
                 reply(encode(BootstrapArtifactsResult(
                     id: command.id,
                     ok: false,
@@ -117,7 +117,7 @@ extension DebugCommandRouter {
                     named: command.name,
                     in: scope
                 )
-                Log.app.info("DebugCommandRouter.write-artifact file=\(artifact.fileName) bytes=\(command.data.count)")
+                Log.app.info("OxHostAPI.write-artifact file=\(artifact.fileName) bytes=\(command.data.count)")
                 reply(encode(StatusResult(kind: "write-artifact-result", id: command.id)))
             } catch {
                 reply(encode(StatusResult(
@@ -148,7 +148,7 @@ extension DebugCommandRouter {
                 }
                 reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: true, data: data, bytes: data.count, error: nil)))
             } catch {
-                Log.service.error("DebugCommandRouter.websiteData export failed scope=global error=\(error.localizedDescription)")
+                Log.service.error("OxHostAPI.websiteData export failed scope=global error=\(error.localizedDescription)")
                 reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: error.localizedDescription)))
             }
         }
@@ -173,7 +173,7 @@ extension DebugCommandRouter {
                 try await serviceManager.restoreWebsiteData(command.data)
                 reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: true, data: nil, bytes: command.data.count, error: nil)))
             } catch {
-                Log.service.error("DebugCommandRouter.websiteData restore failed scope=global error=\(error.localizedDescription)")
+                Log.service.error("OxHostAPI.websiteData restore failed scope=global error=\(error.localizedDescription)")
                 reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: error.localizedDescription)))
             }
         }

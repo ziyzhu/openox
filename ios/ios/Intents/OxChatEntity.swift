@@ -50,7 +50,7 @@ struct OxChatQuery: EntityStringQuery {
 
     @MainActor
     private func entities() async throws -> [OxChatEntity] {
-        let runtime = try await OxIntentSupport.readyRuntime()
-        return runtime.chatManager.orderedSummaries.prefix(20).map(OxChatEntity.init)
+        let client = try await OxIntentSupport.readyClient()
+        return client.chats.orderedSummaries.prefix(20).map(OxChatEntity.init)
     }
 }

@@ -81,13 +81,13 @@ final class OxIntentBudget {
 
 enum OxIntentSupport {
     @MainActor
-    static func readyRuntime() async throws -> OxRuntime {
+    static func readyClient() async throws -> OxClient {
         guard UserDefaults.standard.bool(forKey: "app.hasCompletedOnboarding") else {
             throw OxIntentError.onboardingRequired
         }
-        let runtime = OxRuntime.shared
-        await runtime.prepare()
-        return runtime
+        let client = OxClient.shared
+        await client.prepare()
+        return client
     }
 
     static func prompt(_ value: String) throws -> String {

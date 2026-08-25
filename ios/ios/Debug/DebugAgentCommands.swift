@@ -1,7 +1,7 @@
 #if targetEnvironment(simulator)
 import Foundation
 
-extension DebugCommandRouter {
+extension OxHostAPI {
     struct RunAgentResult: Encodable {
         let kind = "run-agent-result"
         let id: String
@@ -47,7 +47,11 @@ extension DebugCommandRouter {
 
 
     @MainActor
-    static func handleRunAgent(_ command: RunAgentRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleRunAgent(
+        _ command: RunAgentRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         let id = command.id
         let sessionId = command.sessionId
         let clientId = command.clientId
@@ -57,12 +61,10 @@ extension DebugCommandRouter {
         let hasSession = !(sessionId ?? "").isEmpty
 
         @MainActor func fail(_ message: String) {
-            Log.agent.error("DebugCommandRouter.run-agent id=\(id) failed: \(message)")
+            Log.agent.error("OxHostAPI.run-agent id=\(id) failed: \(message)")
             reply(encode(RunAgentResult(id: id, ok: false, client: nil, model: nil,
                                         message: nil, ttftMs: nil, toolReadyMs: nil, totalMs: nil, error: message)))
         }
-
-        guard let manager = chatManager else { return fail("session manager unavailable") }
 
         let registry = LLMRegistry.shared
         guard let client = registry.client(id: clientId) else { return fail("unknown client: \(clientId)") }
@@ -78,7 +80,7 @@ extension DebugCommandRouter {
 
         if hasSession || !hasPrompt {
             let session: Chat
-            switch resolveSession(manager, sessionId) {
+            switch resolveSession(chatManager, sessionId) {
             case .error(let error): return fail(error)
             case .found(nil): return fail("no active chat")
             case .found(let resolved?): session = resolved
@@ -123,7 +125,7 @@ extension DebugCommandRouter {
         }
 
         guard !messages.isEmpty else { return fail("nothing to run: provide a prompt or a chat with messages") }
-        Log.agent.debug("DebugCommandRouter.run-agent id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
+        Log.agent.debug("OxHostAPI.run-agent id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
 
         let start = Date()
         Task { @MainActor in
@@ -132,7 +134,7 @@ extension DebugCommandRouter {
             @MainActor func finish(_ message: AssistantMessage) {
                 let totalMs = Int(Date().timeIntervalSince(start) * 1000)
                 let ok = message.stopReason != .error && message.stopReason != .aborted
-                Log.agent.debug("DebugCommandRouter.run-agent id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
+                Log.agent.debug("OxHostAPI.run-agent id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
                 reply(encode(RunAgentResult(
                     id: id, ok: ok,
                     client: .init(id: client.id, displayName: client.displayName),
@@ -171,7 +173,11 @@ extension DebugCommandRouter {
 
     @MainActor
 
-    static func handleVirtualMachineEval(_ command: VirtualMachineEvalRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleVirtualMachineEval(
+        _ command: VirtualMachineEvalRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         let script = command.script
 
         @MainActor func fail(_ message: String) {
@@ -179,15 +185,14 @@ extension DebugCommandRouter {
         }
 
         guard !script.isEmpty else { return fail("missing script") }
-        guard let manager = chatManager else { return fail("session manager unavailable") }
         let session: Chat
-        switch resolveSession(manager, command.sessionId) {
+        switch resolveSession(chatManager, command.sessionId) {
         case .error(let error): return fail(error)
         case .found(nil):       return fail("no active chat")
         case .found(let resolved?): session = resolved
         }
 
-        Log.agent.debug("DebugCommandRouter.virtual-machine-eval id=\(command.id) session=\(session.id.uuidString) bytes=\(script.utf8.count)")
+        Log.agent.debug("OxHostAPI.virtual-machine-eval id=\(command.id) session=\(session.id.uuidString) bytes=\(script.utf8.count)")
         Task { @MainActor in
             do {
                 let result = try await session.runDebugSnippet(script)
@@ -216,14 +221,14 @@ extension DebugCommandRouter {
     static let vmProtocolVersion = 1
 
     @MainActor
-    static func handleVMInspect(_ command: VMRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleVMInspect(
+        _ command: VMRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-inspect-result", reply: reply) else { return }
-        guard let manager = chatManager else {
-            reply(vmFailure(id: command.id, kind: "vm-inspect-result", error: "session manager unavailable"))
-            return
-        }
         let session: Chat?
-        switch resolveSession(manager, command.sessionId) {
+        switch resolveSession(chatManager, command.sessionId) {
         case .error(let error):
             reply(vmFailure(id: command.id, kind: "vm-inspect-result", error: error))
             return
@@ -268,14 +273,14 @@ extension DebugCommandRouter {
     }
 
     @MainActor
-    static func handleVMListSessions(_ command: VMRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleVMListSessions(
+        _ command: VMRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-list-sessions-result", reply: reply) else { return }
-        guard let manager = chatManager else {
-            reply(vmFailure(id: command.id, kind: "vm-list-sessions-result", error: "session manager unavailable"))
-            return
-        }
-        let currentID = manager.currentId
-        let sessions = manager.debugSessions().sorted { left, right in
+        let currentID = chatManager.currentId
+        let sessions = chatManager.debugSessions().sorted { left, right in
             if left.id == currentID { return true }
             if right.id == currentID { return false }
             return left.createdAt > right.createdAt
@@ -327,7 +332,11 @@ extension DebugCommandRouter {
     }
 
     @MainActor
-    static func handleVMCall(_ command: VMCallRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleVMCall(
+        _ command: VMCallRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-call-result", reply: reply) else { return }
         guard command.arguments.objectValue != nil else {
             reply(vmFailure(id: command.id, kind: "vm-call-result", error: "VM function arguments must be an object"))
@@ -339,6 +348,7 @@ extension DebugCommandRouter {
         }
         let source = "return await \(command.function)(\(command.arguments.jsonString()));"
         executeVM(
+            chatManager: chatManager,
             id: command.id,
             kind: "vm-call-result",
             sessionID: command.sessionId,
@@ -349,13 +359,18 @@ extension DebugCommandRouter {
     }
 
     @MainActor
-    static func handleVMEval(_ command: VMEvalRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleVMEval(
+        _ command: VMEvalRequest,
+        chatManager: ChatManager,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-eval-result", reply: reply) else { return }
         guard !command.script.isEmpty else {
             reply(vmFailure(id: command.id, kind: "vm-eval-result", error: "missing script"))
             return
         }
         executeVM(
+            chatManager: chatManager,
             id: command.id,
             kind: "vm-eval-result",
             sessionID: command.sessionId,
@@ -367,6 +382,7 @@ extension DebugCommandRouter {
 
     @MainActor
     static func executeVM(
+        chatManager: ChatManager,
         id: String,
         kind: String,
         sessionID: String?,
@@ -374,12 +390,8 @@ extension DebugCommandRouter {
         logLabel: String,
         reply: @escaping @MainActor (Data) -> Void
     ) {
-        guard let manager = chatManager else {
-            reply(vmFailure(id: id, kind: kind, error: "session manager unavailable"))
-            return
-        }
         let session: Chat
-        switch resolveSession(manager, sessionID) {
+        switch resolveSession(chatManager, sessionID) {
         case .error(let error):
             reply(vmFailure(id: id, kind: kind, error: error))
             return
@@ -388,7 +400,7 @@ extension DebugCommandRouter {
             return
         case .found(let resolved?): session = resolved
         }
-        Log.agent.debug("DebugCommandRouter.\(logLabel) id=\(id) session=\(session.id.uuidString)")
+        Log.agent.debug("OxHostAPI.\(logLabel) id=\(id) session=\(session.id.uuidString)")
         Task { @MainActor in
             do {
                 let result = try await session.runDebugSnippet(source)

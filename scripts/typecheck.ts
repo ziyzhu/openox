@@ -6,6 +6,9 @@ import { validateSystemSkills } from "./system-skills-check.ts";
 const boundary = Bun.spawnSync(["bun", "scripts/public-boundary-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
 if (boundary.exitCode !== 0) process.exit(boundary.exitCode);
 
+const hostContract = Bun.spawnSync(["bun", "scripts/ios-host-contract-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
+if (hostContract.exitCode !== 0) process.exit(hostContract.exitCode);
+
 const systemSkills = await validateSystemSkills();
 console.log(`PASS system skills ${systemSkills} packages`);
 

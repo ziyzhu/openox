@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 import UniformTypeIdentifiers
 
-extension DebugCommandRouter {
+extension DebugUIAPI {
     @MainActor
     static func handleSetComposerDraft(_ command: PromptRequest, reply: @escaping @MainActor (Data) -> Void) {
         guard let composer else {

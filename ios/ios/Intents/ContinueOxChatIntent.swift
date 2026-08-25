@@ -22,18 +22,18 @@ struct ContinueOxChatIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
         let budget = OxIntentBudget()
-        let runtime = try await OxIntentSupport.readyRuntime()
+        let client = try await OxIntentSupport.readyClient()
         let question = try OxIntentSupport.prompt(prompt)
         Log.app.info("ContinueOxChatIntent start chat=\(chat.id) chars=\(question.count)")
         let completion = await OxIntentSupport.waitForCompletion(
             budget: budget,
             chat: {
-                guard runtime.chatManager.currentId == chat.id else { return nil }
-                return runtime.chatManager.current
+                guard client.chats.currentId == chat.id else { return nil }
+                return client.chats.current
             },
             interaction: { try await requestOxInput($0) }
         ) {
-            await runtime.chatManager.continueAndWait(
+            await client.chats.continueAndWait(
                 chat.id,
                 prompt: question,
                 replyStyle: .spokenBrief
