@@ -46,9 +46,9 @@ jobs:
         id: release
         run: |
           case "$GITHUB_REF_NAME" in
-            ox-cli-v*) package_directory="cli"; tag_prefix="ox-cli-v" ;;
-            service-sdk-v*) package_directory="service-sdk"; tag_prefix="service-sdk-v" ;;
-            services-v*) package_directory="services"; tag_prefix="services-v" ;;
+            ox-cli-v*) package_directory="apps/cli"; package_key="cli"; tag_prefix="ox-cli-v" ;;
+            service-sdk-v*) package_directory="packages/service-sdk"; package_key="service-sdk"; tag_prefix="service-sdk-v" ;;
+            services-v*) package_directory="packages/services"; package_key="services"; tag_prefix="services-v" ;;
             *) exit 1 ;;
           esac
           version="$(node -p "require('./$package_directory/package.json').version")"
@@ -56,6 +56,7 @@ jobs:
           git fetch origin main:refs/remotes/origin/main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           echo "package_directory=$package_directory" >> "$GITHUB_OUTPUT"
+          echo "package_key=$package_key" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -65,9 +66,9 @@ jobs:
           bun run typecheck
           bun run test:unit
           bun run build:web-worker
-          git diff --exit-code -- ios/ios/PublicWeb/PublicWebWorker.js
+          git diff --exit-code -- apps/ios/OpenOx/Host/Services/Web/PublicWeb/PublicWebWorker.js
           bun run build:services
-          git diff --exit-code -- ios/ios/OxServices.bundle
+          git diff --exit-code -- apps/ios/OpenOx/Resources/OxServices.bundle
 
       - name: Build and verify package
         run: bun "${{ steps.release.outputs.package_directory }}/package-check.ts" --output "$RUNNER_TEMP/npm-package"
@@ -81,6 +82,6 @@ jobs:
 
       - name: Publish package
         run: |
-          bun scripts/npm-publish.ts \
-            --directory "${{ steps.release.outputs.package_directory }}" \
+          bun tooling/npm-publish.ts \
+            --directory "${{ steps.release.outputs.package_key }}" \
             --tarball "${{ steps.artifact.outputs.tarball }}"

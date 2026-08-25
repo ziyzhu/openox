@@ -1,0 +1,50 @@
+{
+  "name": "@openox/services",
+  "version": "0.1.0",
+  "description": "Official built-in service repository for Ox",
+  "author": "Ziyuan Zhu",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src/repository.ts",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/repository.ts",
+    "./repository.json": "./dist/repository/repository.json",
+    "./web/*": "./dist/repository/web/*",
+    "./ios/*": "./dist/repository/ios/*",
+    "./mcp/*": "./dist/repository/mcp/*"
+  },
+  "scripts": {
+    "build": "bun package-build.ts",
+    "export": "bun export.ts",
+    "package:check": "bun package-check.ts",
+    "prepack": "bun run build"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "keywords": [
+    "openox",
+    "services",
+    "automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyzhu/openox.git",
+    "directory": "packages/services"
+  },
+  "homepage": "https://github.com/ziyzhu/openox/tree/main/packages/services",
+  "bugs": {
+    "url": "https://github.com/ziyzhu/openox/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@openox/service-sdk": "0.1.0"
+  }
+}

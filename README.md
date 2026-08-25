@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Ox app icon" src="/ios/ios/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="160" height="160">
+<img alt="Ox app icon" src="/apps/ios/OpenOx/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="160" height="160">
 
 <h1>OpenOx</h1>
 
@@ -19,7 +19,7 @@ OpenOx: A protocol for self-evolving agents that live on mobile devices.
 
 ---
 
-Each such agent is called an Ox and follows three principles:
+Each such agent is called an Ox that implements the following three principles:
 
 1. Acts everywhere. Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you.
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
@@ -33,12 +33,13 @@ The first implementation of Ox is an iOS Client and Host whose source code is in
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
+- **Ox Agent** — The reasoning and tool-using process that pursues the user's goals using the selected model, the state in an Ox Profile, and the capabilities exposed through the Ox VM.
 - **Ox Model Provider** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
 - **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code.
   - **`ox.*`** — Explicit Host capabilities for interacting with the Profile, services, web, user, and device.
   - **`ox.fs`** — A virtual filesystem that mounts Profile content, system and service skills, service definitions, persisted chats, and user-granted files while enforcing the read and write permissions of each source.
-- **Ox Service Repository** — A versioned collection of services described by an `ox.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service may provide:
+- **Ox Service Repository** — A versioned collection of services described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service may provide:
   - **Actions** — Typed operations the agent can invoke.
   - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
 
@@ -86,7 +87,23 @@ OpenOx supports three kinds of services:
 2. **Web services** expose actions backed by websites and the user’s browser session.
 3. **MCP services** expose actions provided by an MCP server.
 
-Anyone can publish compatible web and MCP services in a public Git repository containing an `ox.json` manifest. Any compatible Host can install that repository and make its services available to the agent. Device services remain part of the Host implementation.
+Anyone can publish compatible web and MCP services in a public Git repository containing a `repository.json` manifest. Any compatible Host can install that repository and make its services available to the agent. Device services remain part of the Host implementation.
+
+## Repository Layout
+
+```text
+apps/          runnable iOS and command-line Clients; iOS also contains the reference Host
+packages/      reusable npm packages and service build tooling
+repositories/  authored service repositories, including the built-in collection
+protocol/      language-neutral interoperability contracts and conformance material
+examples/      standalone projects users can copy
+docs/          architecture, security, storage, and operational documentation
+tooling/       repository build, test, release, and simulator automation
+```
+
+`repositories/builtin/` is the source of truth for services shipped with Ox.
+`packages/services/dist/` and the committed iOS `OxServices.bundle` are generated
+from that repository.
 
 ## The first Ox
 
@@ -111,11 +128,11 @@ Generate a local signing configuration using your Apple Developer Team ID:
 bun run setup:ios -- --team ABCDE12345
 ```
 
-The command derives a unique `ai.openox.local.ABCDE12345` bundle identifier from the team ID and creates the ignored `ios/Local.xcconfig` with matching app, Share Extension, App Group, iCloud container, and Keychain identifiers. Pass `--bundle com.example.openox` to use a reverse-DNS bundle identifier owned by your team instead. Register the generated App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
+The command derives a unique `ai.openox.local.ABCDE12345` bundle identifier from the team ID and creates the ignored `apps/ios/Local.xcconfig` with matching app, Share Extension, App Group, iCloud container, and Keychain identifiers. Pass `--bundle com.example.openox` to use a reverse-DNS bundle identifier owned by your team instead. Register the generated App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
 
-Open `ios/ios.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in service bundle contains every built-in web, native iOS, and MCP service.
+Open `apps/ios/OpenOx.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in service bundle contains every built-in web, native iOS, and MCP service.
 
-Built-in service sources live under `services/builtin/`. Regenerate the committed iOS bundle after changing them:
+Built-in service sources live under `repositories/builtin/`. Regenerate the committed iOS bundle after changing them:
 
 ```sh
 bun run build:services

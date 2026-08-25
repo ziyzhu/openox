@@ -14,18 +14,18 @@ Require all of the following before changing built-in service source:
 - Ox created or copied the service into Local through `skills/system:manage-services/SKILL.md`.
 - Ox explored the live site through `ios:browser`, presented the action plan, and received separate confirmation before authoring.
 - Ox verified every promoted action and applicable authentication or handoff boundary in iOS.
-- The Local service has a user-approved Git commit with no unrelated pending Local changes.
+- The Local service has a user-approved saved revision with no unrelated pending Local changes.
 - The user explicitly requested promotion into the official built-in repository.
 
 If any precondition is missing, return to Ox on the requested simulator. Do not substitute terminal Chrome, mitmproxy exploration, direct source editing, or inferred endpoint behavior.
 
 ## Export the Local source
 
-Read `manifest.json`, `actions.js`, Local Git status, and the exact Local commit through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.
+Read `manifest.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 
-The official source currently uses compiled Server IR. Use an existing lossless importer when available. If the repository cannot ingest Local `manifest.json` and `actions.js` without translating or redesigning the implementation, stop and identify the missing generic promotion tooling. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
+The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. The built-in source stores the audited `favicon.png` and omits Local `faviconUrl` because the build assigns the public built-in asset URL. The build must reject syntax errors, unsupported ABI versions, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
 ## Replay evidence
 
@@ -41,9 +41,11 @@ Replay verification may exercise already declared actions, but must not become e
 
 Import each sanitized case through the current replay tooling and run it fail-closed through the authoritative iOS harness.
 
+For page-owned DOM actions, do not retain a raw authenticated SPA capture when making it replayable would require private user payloads, reusable session state, or an unbounded application shell. Use a minimal same-origin structural replay derived only from selectors, routes, and states already verified live by Ox. Replace identities and user-authored content with explicit fixture values, exercise the exact committed action code, and describe this as structural regression coverage rather than endpoint evidence. Do not use a synthetic page to invent or redesign behavior that Ox did not verify live.
+
 ## Icon
 
-Use the Local manifest's verified public `faviconUrl` as evidence. Fetch the official compact mark with `scripts/favicon-128.sh <domain>` and audit it with `scripts/favicon-audit.sh <path-to-favicon.png>`.
+Use the Local manifest's verified public `faviconUrl` as evidence. Fetch the official compact mark with `.agents/skills/promote-web-service/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/promote-web-service/scripts/favicon-audit.sh <path-to-favicon.png>`.
 
 Require an official square source that is at least 128×128, remains recognizable at 20 px, has an intentional background in the central safe area, and renders cleanly on light and dark backgrounds. Never upscale, reconstruct brand artwork, or accept a generic substitute.
 
@@ -56,6 +58,6 @@ bun run build:services
 bun run typecheck
 ```
 
-Verify the generated `ios/ios/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the Ox Local commit, promoted files, replay cases, authentication boundaries, icon evidence, checks run, and any remaining limitation.
+Verify the generated `apps/ios/OpenOx/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, replay cases, authentication boundaries, icon evidence, checks run, and any remaining limitation.
 
 Do not commit repository changes unless the user separately requests it.

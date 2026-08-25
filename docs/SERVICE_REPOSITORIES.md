@@ -3,8 +3,8 @@
 Ox resolves services from four repository provenances: Bundled, Remote,
 Development, and Local. Bundled ships in the iOS app, Remote repositories are
 installed from public git URLs, Development is supplied by the simulator's Ox
-Server, and Local is stored on-device for authoring. Every repository has an
-`ox.json` file at its root. The file is an explicit inventory; Ox does not
+Server, and Local is stored on-device for authoring. Every repository has a
+`repository.json` file at its root. The file is an explicit inventory; Ox does not
 discover services by scanning folders.
 
 ```json
@@ -26,17 +26,21 @@ the service directory by replacing the first colon with a slash, so
 `web:example.com` resolves to `web/example.com` and `ios:browser` resolves to
 `ios/browser`.
 
-Web services contain `manifest.json` and `actions.js`. Their optional
+Web services contain `service.json` and `actions.js`. Their optional
 `faviconUrl` is an absolute public HTTPS URL; favicon image files are not part of
 the generated repository or app bundle. Ox's built-in web icons use stable
 `https://openox.ai/assets/services/<domain>/favicon.png` URLs served by CloudFront
-from a private S3 bucket. MCP services contain `manifest.json`. Native iOS
+from a private S3 bucket. MCP services contain `service.json`. Native iOS
 services can appear only in the built-in repository; an external repository that
 lists one is rejected. Existing source service manifest schemas are unchanged.
 
-Built-in authoring sources live in `services/builtin/`. `bun run build:services`
+Current writers emit `repository.json` and `service.json`. Readers also accept
+the legacy `ox.json` and `manifest.json` filenames so existing repositories can
+be opened and republished in the current layout.
+
+Built-in authoring sources live in `repositories/builtin/`. `bun run build:services`
 compiles their runtime artifacts into the committed
-`ios/ios/OxServices.bundle`. A complete standalone remote repository example
+`apps/ios/OpenOx/Resources/OxServices.bundle`. A complete standalone remote repository example
 lives in `examples/service-repository/`.
 
 Ox accepts additional repositories only through public HTTPS URLs without
@@ -67,7 +71,7 @@ Local selects the Local candidate.
 Bundled, Remote, and Development repositories are read-only. Local is editable,
 but its source does not create a separate virtual mount: every selected service
 still resolves at `services/<kind>/<id>/`. Read-only services expose only
-`manifest.json`; Local services expose their additional source files and accept
+`service.json`; Local services expose their additional source files and accept
 validated `ox.fs` writes, edits, and deletes. Those mutations do not reload a
 running attachment. Calling `ox.service.attach` attaches a missing service or
 replaces that chat's existing attachment from the current source, allowing

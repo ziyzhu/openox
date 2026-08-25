@@ -12,7 +12,7 @@
         "typescript": "^5",
       },
     },
-    "cli": {
+    "apps/cli": {
       "name": "@openox/cli",
       "version": "0.1.0",
       "bin": {
@@ -26,7 +26,7 @@
         "@openox/service-sdk": "0.1.0",
       },
     },
-    "service-sdk": {
+    "packages/service-sdk": {
       "name": "@openox/service-sdk",
       "version": "0.1.0",
       "dependencies": {
@@ -34,7 +34,7 @@
         "typescript": "^5",
       },
     },
-    "services": {
+    "packages/services": {
       "name": "@openox/services",
       "version": "0.1.0",
       "devDependencies": {
@@ -45,11 +45,11 @@
   "packages": {
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
 
-    "@openox/cli": ["@openox/cli@workspace:cli"],
+    "@openox/cli": ["@openox/cli@workspace:apps/cli"],
 
-    "@openox/service-sdk": ["@openox/service-sdk@workspace:service-sdk"],
+    "@openox/service-sdk": ["@openox/service-sdk@workspace:packages/service-sdk"],
 
-    "@openox/services": ["@openox/services@workspace:services"],
+    "@openox/services": ["@openox/services@workspace:packages/services"],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.50", "", {}, "sha512-ydBWw0G6WFwWHzh9RK4B5c690UkreOG0llq0r+DaI7LgKgxigf8mhHzIPI3S0850g1BPkq/zpuCfrq4QFgUlTQ=="],
 

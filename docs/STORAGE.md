@@ -67,7 +67,7 @@ types remain authoritative in their `Codable` implementations.
 
 The application bundle identifier, Share Extension bundle identifier, app group,
 iCloud container, Keychain service, and website-data namespace come from
-`ios/OpenOx.xcconfig` plus the optional ignored `ios/Local.xcconfig` override.
+`apps/ios/OpenOx.xcconfig` plus the optional ignored `apps/ios/Local.xcconfig` override.
 
 Primary owners:
 
@@ -87,7 +87,7 @@ Primary owners:
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Debug/LogFile.swift
 - Shared note inbox — owner: Storage/SharedNoteInbox.swift and ShareExtension
-- Developer bootstrap credentials — owner: scripts/sim-bootstrap.ts
+- Developer bootstrap credentials — owner: tooling/sim-bootstrap.ts
 
 ## Shared preferences
 
@@ -237,7 +237,7 @@ skills/
 
 services/
 └── <kind>/<id>/
-    ├── manifest.json                            read-only except Local
+    ├── service.json                            read-only except Local
     └── ...                                      visible and editable only for Local
 
 chats/
@@ -322,7 +322,7 @@ each generated manifest stores an `https://openox.ai/assets/services/<domain>/fa
 URL backed by a private S3 bucket through CloudFront. The app downloads bounded
 PNG or JPEG data without cookies or credential storage and keeps successful
 images in memory for the process lifetime. Every service source has a top-level
-`ox.json` with a string array of canonical `<kind>:<identity>` service IDs.
+`repository.json` with a string array of canonical `<kind>:<identity>` service IDs.
 The kind and relative path are derived from the ID; for example,
 `web:example.com` resolves to `web/example.com`.
 
@@ -398,7 +398,7 @@ accounts store the global credential under the provider ID and the China
 credential under `<provider-id>:china`. Signing out removes the corresponding
 regional Keychain item.
 
-Built-in provider keys in `ios/ios/Secrets.swift` are compile-time binary
+Built-in provider keys in `apps/ios/OpenOx/Host/ModelProviders/Secrets.swift` are compile-time binary
 contents rather than device storage.
 
 ## Logs

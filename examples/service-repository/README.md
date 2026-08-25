@@ -2,7 +2,7 @@
 
 This directory is a complete repository Ox can install or serve. Copy it into
 its own Git repository, replace `example.com` with the target domain, and update
-`ox.json`, `manifest.json`, and `actions.js` together.
+`repository.json`, `service.json`, and `actions.js` together.
 
 Validate or serve it from the OpenOx checkout:
 

@@ -4,11 +4,12 @@ set -euo pipefail
 
 DOMAIN="${1:-}"
 if [ -z "$DOMAIN" ]; then
-  echo "Usage: $0 <domain>" >&2
+  echo "Usage: $0 <domain> [verified-favicon-url]" >&2
   exit 1
 fi
 
 BASE_URL="https://$DOMAIN/"
+CANDIDATE_URL="${2:-}"
 OUTPUT_FILE="./favicon.png"
 TMP_DIR=$(mktemp -d)
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -95,6 +96,12 @@ try_url() {
   log "trying $label: $url"
   fetch "$url" "$candidate" && rasterize "$candidate" "$label"
 }
+
+if [ -n "$CANDIDATE_URL" ]; then
+  if try_url "$CANDIDATE_URL" "verified manifest faviconUrl"; then
+    exit 0
+  fi
+fi
 
 HTML_FILE="$TMP_DIR/index.html"
 if ! fetch "$BASE_URL" "$HTML_FILE"; then

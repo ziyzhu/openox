@@ -1,0 +1,51 @@
+{
+  "name": "@openox/service-sdk",
+  "version": "0.1.0",
+  "description": "Author, validate, and test Ox services",
+  "author": "Ziyuan Zhu",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    "./action": "./src/action.ts",
+    "./action-lib": "./src/action-lib.ts",
+    "./manifest": "./src/manifest.ts",
+    "./repository": "./src/repository.ts",
+    "./skills": "./src/skills.ts",
+    "./testing/replay/fixtures": "./src/testing/replay/fixtures.ts",
+    "./testing/replay/proxy": "./src/testing/replay/proxy.ts",
+    "./testing/replay/types": "./src/testing/replay/types.ts"
+  },
+  "scripts": {
+    "package:check": "bun package-check.ts"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "keywords": [
+    "openox",
+    "services",
+    "sdk",
+    "automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyzhu/openox.git",
+    "directory": "packages/service-sdk"
+  },
+  "homepage": "https://github.com/ziyzhu/openox/tree/main/packages/service-sdk",
+  "bugs": {
+    "url": "https://github.com/ziyzhu/openox/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
+    "typescript": "^5"
+  }
+}

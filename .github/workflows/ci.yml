@@ -4,16 +4,16 @@ on:
   push:
     branches: [main]
     paths:
-      - "cli/**"
+      - "apps/cli/**"
       - "tooling/**"
-      - "scripts/**"
-      - "service-sdk/**"
-      - "services/**"
+      - "packages/service-sdk/**"
+      - "packages/services/**"
+      - "repositories/**"
       - "examples/service-repository/**"
-      - "ios/ios/OxServices.bundle/**"
-      - "ios/tests/**"
-      - "ios/fixtures/chatlogs/**"
-      - "ios/**/*.xcstrings"
+      - "apps/ios/OpenOx/Resources/OxServices.bundle/**"
+      - "apps/ios/tests/**"
+      - "apps/ios/fixtures/chatlogs/**"
+      - "apps/ios/**/*.xcstrings"
       - ".agents/skills/promote-web-service/**"
       - "package.json"
       - "bun.lock"
@@ -23,16 +23,16 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "cli/**"
+      - "apps/cli/**"
       - "tooling/**"
-      - "scripts/**"
-      - "service-sdk/**"
-      - "services/**"
+      - "packages/service-sdk/**"
+      - "packages/services/**"
+      - "repositories/**"
       - "examples/service-repository/**"
-      - "ios/ios/OxServices.bundle/**"
-      - "ios/tests/**"
-      - "ios/fixtures/chatlogs/**"
-      - "ios/**/*.xcstrings"
+      - "apps/ios/OpenOx/Resources/OxServices.bundle/**"
+      - "apps/ios/tests/**"
+      - "apps/ios/fixtures/chatlogs/**"
+      - "apps/ios/**/*.xcstrings"
       - ".agents/skills/promote-web-service/**"
       - "package.json"
       - "bun.lock"
@@ -68,13 +68,13 @@ jobs:
         run: bun run test:unit
 
       - name: Verify generated public web worker
-        run: bun run build:web-worker && git diff --exit-code -- ios/ios/PublicWeb/PublicWebWorker.js
+        run: bun run build:web-worker && git diff --exit-code -- apps/ios/OpenOx/Host/Services/Web/PublicWeb/PublicWebWorker.js
 
       - name: Verify generated service bundle
-        run: bun run build:services && git diff --exit-code -- ios/ios/OxServices.bundle
+        run: bun run build:services && git diff --exit-code -- apps/ios/OpenOx/Resources/OxServices.bundle
 
       - name: Verify npm packages
         run: |
-          bun run --cwd service-sdk package:check
-          bun run --cwd services package:check
-          bun run --cwd cli package:check
+          bun run --cwd packages/service-sdk package:check
+          bun run --cwd packages/services package:check
+          bun run --cwd apps/cli package:check

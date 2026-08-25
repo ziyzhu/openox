@@ -304,7 +304,7 @@ An attacker intercepts a repository update to inject malicious service code.
 **Mitigation:** the default repository is inside the code-signed app. Additional
 repositories must be public HTTPS git URLs without embedded credentials, so TLS
 authenticates the selected host and Ox ships no reusable repository secret.
-Updates clone into staging, validate `ox.json`, manifest identity, file sizes,
+Updates clone into staging, validate `repository.json`, manifest identity, file sizes,
 paths, and symbolic links, reject external native iOS services, and replace the
 active snapshot only after validation. A maliciously configured repository
 remains trusted input rather than a transport attack.

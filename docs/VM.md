@@ -323,14 +323,14 @@ VIRTUAL FILESYSTEM TREE
 ├── services/                                      [source-aware]
 │   ├── web/
 │   │   └── <domain>/
-│   │       ├── manifest.json                      [all sources]
+│   │       ├── service.json                      [all sources]
 │   │       └── <source descendants>               [Local only]
 │   ├── ios/
 │   │   └── <service-id>/
-│   │       └── manifest.json
+│   │       └── service.json
 │   └── mcp/
 │       └── <service-id>/
-│           └── manifest.json
+│           └── service.json
 ├── chats/                                         [read-only]
 │   └── <chat-uuid>/
 │       ├── chat.json                              [stored metadata]
