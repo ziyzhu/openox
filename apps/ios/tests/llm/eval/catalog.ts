@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 export async function virtualMachineHelperNames(root: string): Promise<string[]> {
-  const directory = join(root, "apps/ios/OpenOx/Host/VM/OxFunctions");
+  const directory = join(root, "apps/ios/Ox/Host/VM/OxFunctions");
   const catalogSource = await Bun.file(join(directory, "OxFunctionCatalog.swift")).text();
   const owners = [...catalogSource.matchAll(/\b(Ox[A-Za-z0-9]+)\.function\b/g)].map((match) => match[1]!);
   if (owners.length === 0) throw new Error("OxFunctionCatalog.all has no function owners");

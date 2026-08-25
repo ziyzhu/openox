@@ -1,7 +1,17 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { JSONObjectSchema, JSONValueSchema, OPENOX_PROTOCOL_VERSION } from "./schema.ts";
 
-export const VM_PROTOCOL_VERSION = OPENOX_PROTOCOL_VERSION;
+export const VM_PROTOCOL_VERSION = 1;
+
+const JSONValueSchema = Type.Recursive(Self => Type.Union([
+  Type.Null(),
+  Type.Boolean(),
+  Type.Number(),
+  Type.String(),
+  Type.Array(Self),
+  Type.Record(Type.String(), Self),
+]), { $id: "JSONValue" });
+
+const JSONObjectSchema = Type.Record(Type.String(), JSONValueSchema);
 
 const RequestIDSchema = Type.String({ minLength: 1 });
 const SessionIDSchema = Type.Optional(Type.String({ minLength: 1 }));

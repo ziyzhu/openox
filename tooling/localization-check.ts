@@ -4,8 +4,8 @@ const ROOT = resolve(import.meta.dir, "..");
 
 const REQUIRED_LOCALES = ["zh-Hans"];
 const CATALOG_PATHS = [
-  "apps/ios/OpenOx/Resources/Localizations/Localizable.xcstrings",
-  "apps/ios/OpenOx/Resources/Localizations/InfoPlist.xcstrings",
+  "apps/ios/Ox/Resources/Localizations/Localizable.xcstrings",
+  "apps/ios/Ox/Resources/Localizations/InfoPlist.xcstrings",
   "apps/ios/ShareExtension/Localizable.xcstrings",
 ];
 const PLACEHOLDER = /%(?:\d+\$)?(?:lld|ld|d|@|f|s)/g;

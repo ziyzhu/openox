@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { buildArtifacts } from "../packages/services/src/build.ts";
 import { ROOT } from "./lib.ts";
 
-const destination = join(ROOT, "apps", "ios", "OpenOx", "Resources", "OxServices.bundle");
+const destination = join(ROOT, "apps", "ios", "Ox", "Resources", "OxServices.bundle");
 const temporary = await mkdtemp(join(dirname(destination), ".ox-services-bundle-"));
 const staging = join(temporary, "repository");
 const backup = join(dirname(destination), ".ox-services-bundle-previous");

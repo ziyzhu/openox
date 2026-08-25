@@ -5,7 +5,7 @@
 1. User data is allowed in logs; credentials and reusable secrets are not.
 1. Keep enough structured logs to diagnose production issues.
 1. Prefer composition, explicit state, and small changes.
-1. Keep persisted-storage migration and legacy-format handling in `apps/ios/OpenOx/Host/Profile/ProfileMigration.swift`.
+1. Keep persisted-storage migration and legacy-format handling in `apps/ios/Ox/Host/Profile/ProfileMigration.swift`.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.
 1. Reference Apple development documentation for iOS changes.
@@ -50,6 +50,6 @@
 1. A green build is not verification; use repository health, build, launch, exercise, fix, and repeat.
 1. For iOS and UX behavior, exercise the flow manually with `sim` and preserve screenshots or videos outside the repository.
 1. Before pushing, run `bun run typecheck` and the smallest relevant tests.
-1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/OpenOx/Resources/OxServices.bundle` changes.
+1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/Ox/Resources/OxServices.bundle` changes.
 1. Use `ox` for chats, logs, agent replay, and Server IR verification.
 1. Use `bun run test:chat-projection` to replay the committed projection fixtures through a running DEBUG app; pass `--update` only to accept a reviewed projection change.

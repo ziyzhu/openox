@@ -1,7 +1,7 @@
 import { ROOT } from "./lib.ts";
 
 const publicWebWorkerEntry = `${ROOT}/tooling/public-web-worker.ts`;
-const publicWebWorkerOutput = `${ROOT}/apps/ios/OpenOx/Host/Services/Web/PublicWeb/PublicWebWorker.js`;
+const publicWebWorkerOutput = `${ROOT}/apps/ios/Ox/Host/Services/Web/PublicWeb/PublicWebWorker.js`;
 
 async function buildPublicWebWorker(): Promise<string> {
   const result = await Bun.build({

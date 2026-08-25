@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT } from "./lib.ts";
 
-const systemSkillsRoot = join(ROOT, "apps/ios/OpenOx/Resources/SystemSkills.bundle");
+const systemSkillsRoot = join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"];
 const expectedReferences = new Map([

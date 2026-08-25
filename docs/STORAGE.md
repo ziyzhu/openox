@@ -67,7 +67,7 @@ types remain authoritative in their `Codable` implementations.
 
 The application bundle identifier, Share Extension bundle identifier, app group,
 iCloud container, Keychain service, and website-data namespace come from
-`apps/ios/OpenOx.xcconfig` plus the optional ignored `apps/ios/Local.xcconfig` override.
+`apps/ios/Ox.xcconfig` plus the optional ignored `apps/ios/Local.xcconfig` override.
 
 Primary owners:
 
@@ -398,7 +398,7 @@ accounts store the global credential under the provider ID and the China
 credential under `<provider-id>:china`. Signing out removes the corresponding
 regional Keychain item.
 
-Built-in provider keys in `apps/ios/OpenOx/Host/ModelProviders/Secrets.swift` are compile-time binary
+Built-in provider keys in `apps/ios/Ox/Host/ModelProviders/Secrets.swift` are compile-time binary
 contents rather than device storage.
 
 ## Logs

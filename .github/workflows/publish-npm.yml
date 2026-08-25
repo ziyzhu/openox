@@ -66,9 +66,9 @@ jobs:
           bun run typecheck
           bun run test:unit
           bun run build:web-worker
-          git diff --exit-code -- apps/ios/OpenOx/Host/Services/Web/PublicWeb/PublicWebWorker.js
+          git diff --exit-code -- apps/ios/Ox/Host/Services/Web/PublicWeb/PublicWebWorker.js
           bun run build:services
-          git diff --exit-code -- apps/ios/OpenOx/Resources/OxServices.bundle
+          git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 
       - name: Build and verify package
         run: bun "${{ steps.release.outputs.package_directory }}/package-check.ts" --output "$RUNNER_TEMP/npm-package"

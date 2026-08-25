@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { ROOT, fail } from "./lib.ts";
 
 const source = "https://models.dev/catalog.json";
-const catalogPath = join(ROOT, "apps/ios/OpenOx/Host/ModelProviders/models-dev-catalog.json");
-const selectionPath = join(ROOT, "apps/ios/OpenOx/Host/ModelProviders/models-dev-selection.json");
+const catalogPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/models-dev-catalog.json");
+const selectionPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/models-dev-selection.json");
 const expectedClients = {
   global: [
     "chatgpt", "openai", "anthropic", "gemini", "github-copilot", "xai", "opencode-go",

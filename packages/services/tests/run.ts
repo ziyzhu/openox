@@ -7,7 +7,7 @@ import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../tooling/q
 import { ROOT } from "../../../tooling/lib.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
-const PROJECT = join(ROOT, "apps/ios/OpenOx.xcodeproj");
+const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");
 const SCHEME = "ios";
 
 type Options = {

@@ -10,7 +10,7 @@ import { ROOT } from "../../../../tooling/lib.ts";
 import { scoreResponse, validateCases, type EvalCase } from "./eval/scorer.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
-const PROJECT = join(ROOT, "apps/ios/OpenOx.xcodeproj");
+const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");
 const SCHEME = "ios";
 const REGIONS: LLMRegion[] = ["global", "china"];
 

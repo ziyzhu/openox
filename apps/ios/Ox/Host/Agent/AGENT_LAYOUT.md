@@ -1,6 +1,6 @@
 # Ox agent runtime
 
-`apps/ios/OpenOx/Host/Agent` is Ox's provider-neutral agent runtime. Ox owns its APIs,
+`apps/ios/Ox/Host/Agent` is Ox's provider-neutral agent runtime. Ox owns its APIs,
 state model, tests, and evolution. Pi is a useful semantic reference for agent-loop
 and provider behavior, but it is not a dependency, compatibility target, or source
 tree to mirror:

@@ -10,7 +10,7 @@ on:
       - "packages/services/**"
       - "repositories/**"
       - "examples/service-repository/**"
-      - "apps/ios/OpenOx/Resources/OxServices.bundle/**"
+      - "apps/ios/Ox/Resources/OxServices.bundle/**"
       - "apps/ios/tests/**"
       - "apps/ios/fixtures/chatlogs/**"
       - "apps/ios/**/*.xcstrings"
@@ -29,7 +29,7 @@ on:
       - "packages/services/**"
       - "repositories/**"
       - "examples/service-repository/**"
-      - "apps/ios/OpenOx/Resources/OxServices.bundle/**"
+      - "apps/ios/Ox/Resources/OxServices.bundle/**"
       - "apps/ios/tests/**"
       - "apps/ios/fixtures/chatlogs/**"
       - "apps/ios/**/*.xcstrings"
@@ -68,10 +68,10 @@ jobs:
         run: bun run test:unit
 
       - name: Verify generated public web worker
-        run: bun run build:web-worker && git diff --exit-code -- apps/ios/OpenOx/Host/Services/Web/PublicWeb/PublicWebWorker.js
+        run: bun run build:web-worker && git diff --exit-code -- apps/ios/Ox/Host/Services/Web/PublicWeb/PublicWebWorker.js
 
       - name: Verify generated service bundle
-        run: bun run build:services && git diff --exit-code -- apps/ios/OpenOx/Resources/OxServices.bundle
+        run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 
       - name: Verify npm packages
         run: |

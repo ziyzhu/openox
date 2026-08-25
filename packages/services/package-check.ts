@@ -29,9 +29,9 @@ try {
   await run(["bun", "package-build.ts"], import.meta.dir);
   const [packagedManifest, bundledManifest] = await Promise.all([
     readFile(join(import.meta.dir, "dist", "repository", "repository.json"), "utf8"),
-    readFile(resolve(import.meta.dir, "../../apps/ios/OpenOx/Resources/OxServices.bundle/repository.json"), "utf8"),
+    readFile(resolve(import.meta.dir, "../../apps/ios/Ox/Resources/OxServices.bundle/repository.json"), "utf8"),
   ]);
-  if (packagedManifest !== bundledManifest) throw new Error("npm repository differs from apps/ios/OpenOx/Resources/OxServices.bundle");
+  if (packagedManifest !== bundledManifest) throw new Error("npm repository differs from apps/ios/Ox/Resources/OxServices.bundle");
 
   const packed = await run(["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", packageDirectory], import.meta.dir);
   const reports = JSON.parse(packed) as PackReport[];

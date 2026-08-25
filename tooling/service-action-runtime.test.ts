@@ -12,7 +12,7 @@ type RuntimeWindow = {
   __openOxCreateServiceRuntime?: (domain: string) => RuntimeWindow["ox"];
 };
 
-const source = await Bun.file(join(ROOT, "apps/ios/OpenOx/Host/Services/Web/ServiceActionRuntime.js")).text();
+const source = await Bun.file(join(ROOT, "apps/ios/Ox/Host/Services/Web/ServiceActionRuntime.js")).text();
 
 function runtime(): NonNullable<RuntimeWindow["ox"]> {
   const target: RuntimeWindow = {
