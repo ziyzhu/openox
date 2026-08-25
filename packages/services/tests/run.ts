@@ -68,11 +68,10 @@ async function ensureDevice(device: string): Promise<void> {
   const inventory = await commandJSON<SimInventory>(["sim", "devices"]);
   const simulators = Object.values(inventory.devices ?? {}).flat() as Array<{ name?: unknown }>;
   if (simulators.some((candidate) => candidate.name === device)) return;
-  const sources = device === targetedQaDevice
-    ? ["ox-ci-pro-1"]
-    : [targetedQaDevice, "ox-ci-pro-1"];
-  const source = sources.find((name) => simulators.some((candidate) => candidate.name === name));
-  if (!source) throw new Error(`Cannot create ${device}: no QA simulator template is available`);
+  const source = device === targetedQaDevice ? undefined : targetedQaDevice;
+  if (!source || !simulators.some((candidate) => candidate.name === source)) {
+    throw new Error(`Cannot create ${device}: no QA simulator template is available`);
+  }
   await command(["sim", "devices", "clone", source, device]);
 }
 
