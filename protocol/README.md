@@ -15,6 +15,12 @@ The current normative surfaces are:
 - `security/` for approvals, credentials, isolation, and trust boundaries.
 - `conformance/` for implementation-independent valid, invalid, and scenario fixtures.
 
-Until machine-readable schemas are extracted here, the detailed VM, storage,
-service repository, and security contracts remain in `docs/` and the canonical
-validators remain in `packages/service-sdk/`.
+Each surface contains focused contract documents rather than one monolithic
+specification. Machine-readable service schemas and their conformance fixtures
+live here; the canonical runtime validators remain in `packages/service-sdk/`.
+Host, Agent, VM, Profile, and security documents describe the current contract
+and explicitly identify surfaces that are not yet portable or remotely exposed.
+
+`VERSION` is the major interoperability version. Compatible additions may be
+made within a major version. Breaking changes require a new version directory
+or an explicit migration before this value changes.

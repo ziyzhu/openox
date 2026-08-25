@@ -1,0 +1,30 @@
+{
+  "domain": "example.com",
+  "name": "Example",
+  "baseUrl": "https://example.com/",
+  "actions": [
+    {
+      "id": "ping",
+      "label": "Ping",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ]
+}
