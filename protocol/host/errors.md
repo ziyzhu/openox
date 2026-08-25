@@ -1,13 +1,15 @@
-# Host Errors
+# VM Control Responses and Errors
 
-A command response repeats the request identifier and indicates success or
-failure. Failure is terminal for that command and must not be represented as a
-successful value.
+Status: Normative for protocol version 1 development Hosts.
 
-The current version 1 simulator transport returns a human-readable `error`
-string. Portable error codes, retry classification, and structured details are
-reserved work. Clients must not parse current error prose as a stable API.
+Every response MUST match `vm-control-response.schema.json`, repeat the request
+`id`, use the corresponding result `kind`, and contain `protocolVersion: 1`.
 
-Transport failure, unsupported protocol version, invalid arguments, denied
-approval, unavailable session, and Host execution failure remain distinct
-conditions even when a transport cannot yet encode them separately.
+A successful response has `ok: true`, MAY contain a JSON `value`, MAY contain
+ordered `{ level, message }` logs, and MUST NOT contain `error`.
+
+A failed response has `ok: false`, MUST contain a nonempty `error`, MAY contain
+logs produced before failure, and MUST NOT contain `value`.
+
+Version 1 error text is diagnostic and not machine-readable. Clients MUST NOT
+branch on its wording. Transport failures occur outside this response envelope.

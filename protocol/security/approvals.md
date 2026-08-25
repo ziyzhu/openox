@@ -1,5 +1,7 @@
 # Approvals
 
+Status: Normative.
+
 Approval is required before a sensitive or externally visible effect, not
 afterward. The request identifies the operation and the material arguments the
 user is authorizing.

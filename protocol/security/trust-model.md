@@ -1,5 +1,7 @@
 # Trust Model
 
+Status: Normative.
+
 The user, selected Host, and installed application are trusted to enforce local
 policy. Model output, VM source, service repositories, remote content, web
 pages, MCP servers, imported Profiles, and transport peers are untrusted input.

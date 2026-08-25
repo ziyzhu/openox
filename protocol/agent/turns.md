@@ -1,5 +1,7 @@
 # Turns
 
+Status: Draft. Version 1 does not publish a machine-readable turn schema.
+
 A chat is an ordered sequence of semantic turns with stable identifiers. User
 turns, agent generations, reasoning, text, executions, prompts, tool calls, and
 effects are durable semantics. Client UI blocks and model-provider messages are

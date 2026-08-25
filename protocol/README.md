@@ -1,26 +1,43 @@
 # OpenOx Protocol
 
-This directory owns the language-neutral contracts required for independent
-OpenOx Clients, Hosts, Profiles, VMs, and service repositories to interoperate.
-Platform implementations live under `apps/`; reusable implementation libraries
-live under `packages/`.
+This directory contains the implementation-independent contracts required for
+OpenOx implementations to exchange service metadata, control a Host VM, and
+read the portable metadata in an Ox Profile.
 
-The current normative surfaces are:
+`VERSION` is the OpenOx protocol major version. Version 1 currently standardizes
+only the surfaces marked Normative in `STATUS.md`. A document marked Draft is
+design guidance and does not establish interoperability.
 
-- `host/` for Client–Host lifecycle, commands, events, and transport mappings.
-- `agent/` for observable turns, messages, tool calls, and stop reasons.
-- `vm/` for JavaScript execution, `ox.*`, permissions, and virtual filesystem behavior.
-- `profile/` for the portable Profile layout and persisted chat formats.
-- `services/` for `repository.json`, `service.json`, actions, and repository compatibility.
-- `security/` for approvals, credentials, isolation, and trust boundaries.
-- `conformance/` for implementation-independent valid, invalid, and scenario fixtures.
+The words MUST, MUST NOT, REQUIRED, SHOULD, SHOULD NOT, and MAY are normative as
+defined by RFC 2119 when they appear in a Normative document.
 
-Each surface contains focused contract documents rather than one monolithic
-specification. Machine-readable service schemas and their conformance fixtures
-live here; the canonical runtime validators remain in `packages/service-sdk/`.
-Host, Agent, VM, Profile, and security documents describe the current contract
-and explicitly identify surfaces that are not yet portable or remotely exposed.
+## Sources of truth
 
-`VERSION` is the major interoperability version. Compatible additions may be
-made within a major version. Breaking changes require a new version directory
-or an explicit migration before this value changes.
+Executable TypeBox definitions in `schema.ts` and each surface's `schema.ts`
+are the canonical structural schemas. The adjacent `*.schema.json` files are
+generated language-neutral JSON Schema artifacts. Run:
+
+```sh
+bun run build:protocol
+bun run check:protocol
+```
+
+Generated schemas MUST match their TypeScript sources. Conformance fixtures
+MUST pass the tests under `conformance/`. Semantic requirements that JSON Schema
+cannot express are stated in the surface documents and enforced by the
+reference validators.
+
+## Surfaces
+
+- `services/` defines `repository.json`, `service.json`, actions, and repository compatibility.
+- `host/` defines the version 1 VM control request and response envelopes.
+- `profile/` defines `profile.json`, current `chat.json` metadata, and the portable directory layout.
+- `vm/` defines execution, values, function discovery, and virtual filesystem invariants.
+- `security/` defines authority, approval, credential, and isolation requirements.
+- `agent/` records the draft provider-neutral Agent model; it is not yet a wire or storage schema.
+- `conformance/` contains accepted and rejected examples tested against the canonical schemas.
+
+Platform implementations live under `apps/`. Reusable implementation libraries
+live under `packages/`. An implementation is conformant only to the specific
+Normative surfaces it implements; directory presence alone does not imply full
+OpenOx conformance.

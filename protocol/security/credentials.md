@@ -1,5 +1,7 @@
 # Credentials
 
+Status: Normative.
+
 Reusable credentials belong to the platform credential store or the isolated
 service session that owns them. They do not belong in Profiles, repositories,
 logs, VM values, model prompts, command-line arguments, fixtures, or artifacts.

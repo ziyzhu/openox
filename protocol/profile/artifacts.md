@@ -1,5 +1,7 @@
 # Artifacts
 
+Status: Normative filesystem behavior; `.saved.json` has no published version 1 schema.
+
 Artifacts are ordinary files in the flat `artifacts/` directory. Their
 case-insensitive basename is the stable Profile-local identity. `.saved.json`
 records which basenames the user explicitly saved.

@@ -1,5 +1,7 @@
 # VM Execution
 
+Status: Normative.
+
 VM source runs in an isolated language runtime with no ambient network, shell,
 device, or Host filesystem access. Host capabilities are available only through
 the injected `ox.*` catalog.

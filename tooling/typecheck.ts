@@ -9,6 +9,9 @@ if (boundary.exitCode !== 0) process.exit(boundary.exitCode);
 const hostContract = Bun.spawnSync(["bun", "tooling/ios-host-contract-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
 if (hostContract.exitCode !== 0) process.exit(hostContract.exitCode);
 
+const protocol = Bun.spawnSync(["bun", "tooling/protocol-schemas.ts", "--check"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
+if (protocol.exitCode !== 0) process.exit(protocol.exitCode);
+
 const systemSkills = await validateSystemSkills();
 console.log(`PASS system skills ${systemSkills} packages`);
 
@@ -25,6 +28,7 @@ const projects = [
   "tooling/tsconfig.json",
   "apps/ios/tests/llm/tsconfig.json",
   "packages/services/tests/tsconfig.json",
+  "protocol/tsconfig.json",
 ];
 
 const results = await Promise.all(projects.map(async (project) => {

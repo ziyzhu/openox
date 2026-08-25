@@ -1,5 +1,7 @@
 # Virtual Filesystem
 
+Status: Normative namespace and authority rules.
+
 The VM exposes Profile memory, soul, artifacts, skills, selected service
 definitions, persisted chats, and user-granted files through virtual paths.
 Virtual paths do not reveal backing Host paths.

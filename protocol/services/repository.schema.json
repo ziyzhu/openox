@@ -1,31 +1,35 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://oxcraft.ai/schemas/repository-v1.json",
-  "title": "OpenOx Service Repository",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["version", "name", "services"],
+  "$id": "https://oxcraft.ai/schemas/repository-v1.json",
+  "type": "object",
+  "required": [
+    "version",
+    "name",
+    "services"
+  ],
   "properties": {
     "version": {
-      "const": 1
+      "const": 1,
+      "type": "number"
     },
     "name": {
-      "type": "string",
       "minLength": 1,
-      "maxLength": 100
+      "maxLength": 100,
+      "type": "string"
     },
     "contentHash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
     },
     "services": {
-      "type": "array",
       "maxItems": 256,
+      "type": "array",
       "items": {
-        "type": "string",
         "minLength": 5,
         "maxLength": 253,
-        "pattern": "^(?:web|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        "pattern": "^(?:web|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+        "type": "string"
       }
     }
   }

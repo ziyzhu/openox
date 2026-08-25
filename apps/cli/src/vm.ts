@@ -1,8 +1,14 @@
 import { readFile } from "node:fs/promises";
+import { Value } from "@sinclair/typebox/value";
+import {
+  VMControlRequestSchema,
+  VMControlResponseSchema,
+  VM_PROTOCOL_VERSION,
+} from "../../../protocol/host/schema.ts";
 import { runOnce, type DebugResult } from "./debug-ws.ts";
 import { dispatch, fail, failResult, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
 
-const protocolVersion = 1;
+const protocolVersion = VM_PROTOCOL_VERSION;
 
 type VMResult = DebugResult & {
   protocolVersion?: number;
@@ -181,17 +187,20 @@ async function request(
   timeoutMs: number,
   fields: Record<string, unknown> = {},
 ): Promise<VMResult> {
-  const result = await runOnce({
+  const envelope = {
     kind,
     id: crypto.randomUUID(),
     protocolVersion,
-    ...(context.chat ? { sessionId: context.chat } : {}),
+    ...(context.chat && kind !== "vm-functions" ? { sessionId: context.chat } : {}),
     ...fields,
-  }, timeoutMs, context.host) as VMResult;
-  if (!result.ok) failResult(kind, result.error);
-  if (result.protocolVersion !== protocolVersion) {
-    fail(`VM protocol mismatch: Host returned ${String(result.protocolVersion)}, expected ${protocolVersion}`);
+  };
+  if (!Value.Check(VMControlRequestSchema, envelope)) fail(`invalid ${kind} request`);
+  const result = await runOnce(envelope, timeoutMs, context.host) as VMResult;
+  if (result.protocolVersion !== undefined && !Value.Check(VMControlResponseSchema, result)) {
+    fail(`Host returned an invalid ${kind} response`);
   }
+  if (!result.ok) failResult(kind, result.error);
+  if (!Value.Check(VMControlResponseSchema, result)) fail(`Host omitted the ${kind} protocol envelope`);
   return result;
 }
 

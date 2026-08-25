@@ -1,5 +1,7 @@
 # Tools
 
+Status: Draft Agent model. VM function validation and approval requirements are Normative.
+
 The Agent executes code through the VM and reaches Host capabilities through
 advertised `ox.*` functions. Each call has a name, closed input contract,
 declared output contract, and an observable result or error.

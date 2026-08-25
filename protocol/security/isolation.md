@@ -1,5 +1,7 @@
 # Isolation
 
+Status: Normative.
+
 The VM has no ambient network, device, shell, or Host filesystem authority.
 Browser-backed services execute against their own allowed domain and retain web
 credentials in the website data store. Repository source is data until the Host

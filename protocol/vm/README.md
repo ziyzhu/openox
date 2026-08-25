@@ -1,10 +1,12 @@
 # VM Contract
 
-This surface owns JavaScript execution, values, limits, cancellation, `ox.*`
-function discovery and invocation, permissions, approvals, and the virtual
-filesystem. The current detailed contract is in `docs/VM.md`.
+Status: Normative invariants with dynamically discovered function schemas.
 
-- `execution.md` defines isolation, lifetime, limits, and cancellation.
-- `values.md` defines values that cross the VM boundary.
-- `functions.md` defines `ox.*` discovery and invocation.
-- `filesystem.md` defines the mounted namespace and authority rules.
+The VM boundary consists of JSON values, isolated source execution, the runtime
+`ox.*` function catalog, and a virtual filesystem. A compatible Host MAY use any
+language engine, but MUST preserve the observable constraints in this directory.
+
+The envelope used to inspect and invoke the VM is defined in `host/schema.ts`.
+Individual function schemas are supplied by `vm-functions` at runtime because
+availability depends on the Host, platform, Profile, session, and attached
+services.

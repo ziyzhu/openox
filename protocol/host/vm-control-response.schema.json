@@ -1,0 +1,462 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxcraft.ai/schemas/vm-control-response-v1.json",
+  "anyOf": [
+    {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-inspect-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": true,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "value": {
+              "$ref": "#/$defs/JSONValue"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion",
+            "error"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-inspect-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": false,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-functions-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": true,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "value": {
+              "$ref": "#/$defs/JSONValue"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion",
+            "error"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-functions-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": false,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-call-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": true,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "value": {
+              "$ref": "#/$defs/JSONValue"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion",
+            "error"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-call-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": false,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-eval-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": true,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "value": {
+              "$ref": "#/$defs/JSONValue"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "id",
+            "ok",
+            "protocolVersion",
+            "error"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vm-eval-result",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ok": {
+              "const": false,
+              "type": "boolean"
+            },
+            "protocolVersion": {
+              "const": 1,
+              "type": "number"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "level",
+                  "message"
+                ],
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "JSONValue": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JSONValue"
+          }
+        },
+        {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {
+              "$ref": "#/$defs/JSONValue"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

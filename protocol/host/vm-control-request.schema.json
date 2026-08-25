@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxcraft.ai/schemas/vm-control-request-v1.json",
+  "anyOf": [
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "protocolVersion"
+      ],
+      "properties": {
+        "kind": {
+          "const": "vm-inspect",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocolVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "protocolVersion"
+      ],
+      "properties": {
+        "kind": {
+          "const": "vm-functions",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocolVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "function": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "protocolVersion",
+        "function",
+        "arguments"
+      ],
+      "properties": {
+        "kind": {
+          "const": "vm-call",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocolVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "function": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "arguments": {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {
+              "$ref": "#/$defs/JSONValue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "protocolVersion",
+        "script"
+      ],
+      "properties": {
+        "kind": {
+          "const": "vm-eval",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocolVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "script": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "JSONValue": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JSONValue"
+          }
+        },
+        {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {
+              "$ref": "#/$defs/JSONValue"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

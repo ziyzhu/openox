@@ -1,12 +1,18 @@
 # Host Contract
 
-This surface will define Client–Host lifecycle, capability negotiation, chat
-commands, streaming events, approvals, service attachment, transport mappings,
-and stable errors. The iOS implementation currently lives in
-`apps/ios/OpenOx/Host/`.
+Status: mixed. The VM control envelopes in `schema.ts` are Normative for version
+1 development Hosts. Remote lifecycle and event delivery are Draft.
 
-- `lifecycle.md` defines Host selection, connection, and session binding.
-- `commands.md` separates portable VM operations from development controls.
-- `events.md` defines ordering and delivery requirements for observable events.
-- `errors.md` defines error behavior across transports.
-- `transports/` maps the same Host contract to embedded and WebSocket clients.
+The version 1 control surface contains exactly four request kinds:
+
+- `vm-inspect`
+- `vm-functions`
+- `vm-call`
+- `vm-eval`
+
+Other commands accepted by the iOS DEBUG simulator are test automation APIs and
+MUST NOT be advertised as OpenOx Host protocol commands.
+
+`vm-control-request.schema.json` and `vm-control-response.schema.json` are
+generated from `schema.ts`. `commands.md`, `errors.md`, and `transports/`
+define behavior not captured structurally.

@@ -1,5 +1,7 @@
 # Chats
 
+Status: `chat.json` metadata is Normative. `turns.jsonl` and `context.json` are not yet standardized.
+
 Each chat directory contains metadata in `chat.json`, one semantic turn per
 line in `turns.jsonl`, and an optional provider-neutral continuation checkpoint
 in `context.json`.

@@ -1,5 +1,7 @@
 # In-Process Transport
 
+Status: Normative ownership mapping; language bindings are implementation-specific.
+
 An embedded Client dispatches typed operations directly to its Host. It does
 not serialize requests, open a loopback socket, or create a second runtime.
 

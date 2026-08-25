@@ -1,5 +1,7 @@
 # Stop Reasons
 
+Status: Draft. The categories below are design targets, not version 1 encoded values.
+
 A generation ends with an explicit outcome. The portable categories are
 completed, cancelled, failed, context exhausted, and awaiting user input.
 

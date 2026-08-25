@@ -1,10 +1,12 @@
-# Agent Contract
+# Agent Model
 
-This surface will define observable turns, messages, tool calls, tool results,
-stop reasons, usage, and context checkpoints without prescribing a model
-provider or reasoning implementation.
+Status: Draft. Version 1 defines no portable Agent wire schema or complete
+`turns.jsonl` schema.
 
-- `turns.md` defines the durable conversation sequence.
-- `messages.md` defines provider-neutral inputs and outputs.
-- `tools.md` defines calls, results, approvals, and effects.
-- `stop-reasons.md` defines terminal generation outcomes.
+These documents identify the provider-neutral concepts the reference Host must
+eventually expose: semantic turns, messages, tool activity, terminal outcomes,
+usage, and context checkpoints. They MUST NOT be used to claim cross-Host Agent
+or transcript compatibility.
+
+The current persisted representation is owned by the iOS reference
+implementation and documented in `docs/STORAGE.md`.

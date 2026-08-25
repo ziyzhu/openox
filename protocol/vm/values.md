@@ -1,5 +1,7 @@
 # VM Values
 
+Status: Normative.
+
 Values crossing the portable VM boundary are JSON null, booleans, finite
 numbers, strings, arrays, and string-keyed objects. Function arguments are
 objects unless a function contract explicitly states otherwise.
