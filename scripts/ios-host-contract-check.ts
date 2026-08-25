@@ -41,18 +41,34 @@ if (!client.includes("private let host: any OxHost")) {
 }
 
 const app = await readFile(join(ROOT, "ios/ios/App.swift"), "utf8");
-if (!app.includes("OxClient(host: host)") || !app.includes("OxHostAPI.handle(data, host: host")) {
-  failures.push("ios/ios/App.swift: composition root must connect the iOS Client and Host API to one Host");
+if (!app.includes("OxClient(host: host)") || !app.includes("WebSocketOxHostTransport(host: host)")) {
+  failures.push("ios/ios/App.swift: composition root must connect in-process and WebSocket transports to one Host");
 }
 
-const api = await readFile(join(ROOT, "ios/ios/Debug/OxHostAPI.swift"), "utf8");
-if (!api.includes("host: any OxHost")) {
-  failures.push("ios/ios/Debug/OxHostAPI.swift: Host API must target the OxHost contract");
+const hostProtocol = await readFile(join(ROOT, "ios/ios/Host/OxHostProtocol.swift"), "utf8");
+if (!hostProtocol.includes("host: any OxHost")) {
+  failures.push("ios/ios/Host/OxHostProtocol.swift: Host protocol must target the OxHost contract");
 }
 for (const forbidden of ["viewportController", "ChatComposerModel", "setEditDraft:"]) {
-  if (api.includes(forbidden)) {
-    failures.push(`ios/ios/Debug/OxHostAPI.swift: UI automation state must remain in DebugUIAPI (${forbidden})`);
+  if (hostProtocol.includes(forbidden)) {
+    failures.push(`ios/ios/Host/OxHostProtocol.swift: UI automation state must remain in DebugUIAPI (${forbidden})`);
   }
+}
+
+const webSocketTransport = await readFile(
+  join(ROOT, "ios/ios/Host/WebSocketOxHostTransport.swift"),
+  "utf8",
+);
+if (!webSocketTransport.includes("OxHostProtocol.handle(data, host: self.host)")) {
+  failures.push("ios/ios/Host/WebSocketOxHostTransport.swift: WebSocket transport must dispatch through OxHostProtocol");
+}
+if (webSocketTransport.includes("onCommand")) {
+  failures.push("ios/ios/Host/WebSocketOxHostTransport.swift: transport must bind directly to its Host");
+}
+
+const allSource = await Promise.all((await swiftFiles(join(ROOT, "ios/ios"))).map((file) => readFile(file, "utf8")));
+if (allSource.some((source) => source.includes("DebugServer") || source.includes("OxHostAPI"))) {
+  failures.push("ios/ios: legacy DebugServer or OxHostAPI reference remains");
 }
 
 if (failures.length > 0) throw new Error(`iOS Host contract failed:\n${failures.join("\n")}`);

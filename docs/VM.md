@@ -22,11 +22,10 @@ current iOS app
             └── JavaScriptCore Ox VM
 
 Ox CLI
-└── WebSocket
-    └── DebugServer
-        └── OxHostAPI
-            └── OxHost
-                └── IOSHost
+└── WebSocketOxHostTransport
+    └── OxHostProtocol
+        └── OxHost
+            └── IOSHost
 ```
 
 Clients target Hosts rather than depending on a VM engine. A Host owns VM
@@ -39,10 +38,11 @@ The CLI expresses those resources as `--host <ws-url>` and
 `--profile <path>` and does not imply a Host connection or chat-backed VM.
 
 The iOS Client calls the `OxHost` contract in process and preserves the
-observable Swift models used by the native interface. It does not serialize
-local operations or create a loopback network dependency. The WebSocket is a
-transport adapter into `OxHostAPI`, which dispatches to the same `IOSHost`; it
-does not own a second runtime or select Host state through the view hierarchy.
+observable Swift models used by the native interface. That in-process path is
+direct Swift dispatch: it does not serialize local operations or create a
+loopback network dependency. `WebSocketOxHostTransport` carries the same Host
+protocol to the CLI and dispatches to the same `IOSHost`; it does not own a
+second runtime or select Host state through the view hierarchy.
 Simulator-only view and composer automation remains behind `DebugUIAPI`.
 
 The iOS Host currently exposes version 1 of the control protocol from DEBUG

@@ -1,7 +1,7 @@
 #if targetEnvironment(simulator)
 import Foundation
 
-enum OxHostAPI {
+enum OxHostProtocol {
     @MainActor
     static func handle(
         _ data: Data,

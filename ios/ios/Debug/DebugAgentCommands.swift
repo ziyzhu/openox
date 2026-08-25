@@ -1,7 +1,7 @@
 #if targetEnvironment(simulator)
 import Foundation
 
-extension OxHostAPI {
+extension OxHostProtocol {
     struct RunAgentResult: Encodable {
         let kind = "run-agent-result"
         let id: String
@@ -61,7 +61,7 @@ extension OxHostAPI {
         let hasSession = !(sessionId ?? "").isEmpty
 
         @MainActor func fail(_ message: String) {
-            Log.agent.error("OxHostAPI.run-agent id=\(id) failed: \(message)")
+            Log.agent.error("OxHostProtocol.run-agent id=\(id) failed: \(message)")
             reply(encode(RunAgentResult(id: id, ok: false, client: nil, model: nil,
                                         message: nil, ttftMs: nil, toolReadyMs: nil, totalMs: nil, error: message)))
         }
@@ -125,7 +125,7 @@ extension OxHostAPI {
         }
 
         guard !messages.isEmpty else { return fail("nothing to run: provide a prompt or a chat with messages") }
-        Log.agent.debug("OxHostAPI.run-agent id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
+        Log.agent.debug("OxHostProtocol.run-agent id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
 
         let start = Date()
         Task { @MainActor in
@@ -134,7 +134,7 @@ extension OxHostAPI {
             @MainActor func finish(_ message: AssistantMessage) {
                 let totalMs = Int(Date().timeIntervalSince(start) * 1000)
                 let ok = message.stopReason != .error && message.stopReason != .aborted
-                Log.agent.debug("OxHostAPI.run-agent id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
+                Log.agent.debug("OxHostProtocol.run-agent id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
                 reply(encode(RunAgentResult(
                     id: id, ok: ok,
                     client: .init(id: client.id, displayName: client.displayName),
@@ -192,7 +192,7 @@ extension OxHostAPI {
         case .found(let resolved?): session = resolved
         }
 
-        Log.agent.debug("OxHostAPI.virtual-machine-eval id=\(command.id) session=\(session.id.uuidString) bytes=\(script.utf8.count)")
+        Log.agent.debug("OxHostProtocol.virtual-machine-eval id=\(command.id) session=\(session.id.uuidString) bytes=\(script.utf8.count)")
         Task { @MainActor in
             do {
                 let result = try await session.runDebugSnippet(script)
@@ -367,7 +367,7 @@ extension OxHostAPI {
             return
         case .found(let resolved?): session = resolved
         }
-        Log.agent.debug("OxHostAPI.\(logLabel) id=\(id) session=\(session.id.uuidString)")
+        Log.agent.debug("OxHostProtocol.\(logLabel) id=\(id) session=\(session.id.uuidString)")
         Task { @MainActor in
             do {
                 let result = try await session.runDebugSnippet(source)

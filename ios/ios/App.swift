@@ -8,19 +8,23 @@ struct OxApp: App {
     @State private var chatImports = ChatImportCoordinator()
     @State private var presentations = AppPresentationCoordinator.shared
     private let client: OxClient
+    #if targetEnvironment(simulator)
+    private let webSocketTransport: WebSocketOxHostTransport
+    #endif
 
     init() {
         let host = IOSHost.shared
         client = OxClient(host: host)
+        #if targetEnvironment(simulator)
+        let webSocketTransport = WebSocketOxHostTransport(host: host)
+        self.webSocketTransport = webSocketTransport
+        #endif
         AppRegion.shared.start()
         Log.app.info("Device.launch id=\(Device.id) internal=\(Device.isInternal)")
         PerfMonitor.shared.start()
         #if targetEnvironment(simulator)
         Task { @MainActor in
-            DebugServer.shared.onCommand = { data, reply in
-                OxHostAPI.handle(data, host: host, reply: reply)
-            }
-            DebugServer.shared.start()
+            webSocketTransport.start()
         }
         #endif
     }

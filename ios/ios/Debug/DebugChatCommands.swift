@@ -1,7 +1,7 @@
 #if targetEnvironment(simulator)
 import Foundation
 
-extension OxHostAPI {
+extension OxHostProtocol {
     @MainActor
     static func handleGetLatestResponse(
         _ command: IDRequest,
@@ -94,7 +94,7 @@ extension OxHostAPI {
                 active: summary.id == currentId
             )
         }
-        Log.agent.debug("OxHostAPI.list-chats id=\(command.id) count=\(chats.count)")
+        Log.agent.debug("OxHostProtocol.list-chats id=\(command.id) count=\(chats.count)")
         reply(encode(ListChatsResult(id: command.id, ok: true, chats: chats, error: nil)))
     }
 
@@ -115,7 +115,7 @@ extension OxHostAPI {
             reply(encode(GetChatResult(id: command.id, ok: true, data: nil, error: nil)))
             return
         }
-        Log.agent.debug("OxHostAPI.get-chat id=\(command.id) session=\(session.id)")
+        Log.agent.debug("OxHostProtocol.get-chat id=\(command.id) session=\(session.id)")
         reply(encode(GetChatResult(id: command.id, ok: true, data: DebugSnapshot(session), error: nil)))
     }
 
@@ -174,7 +174,7 @@ extension OxHostAPI {
                 }
             )
         }
-        Log.agent.debug("OxHostAPI.list-models id=\(command.id) count=\(clients.count)")
+        Log.agent.debug("OxHostProtocol.list-models id=\(command.id) count=\(clients.count)")
         reply(encode(ListModelsResult(id: command.id, region: AppRegion.shared.region.rawValue, clients: clients)))
     }
 

@@ -2,7 +2,7 @@
 import Foundation
 import WebKit
 
-extension OxHostAPI {
+extension OxHostProtocol {
     @MainActor
     static func handleSetAttachedService(
         _ command: SetAttachedServiceRequest,
@@ -112,7 +112,7 @@ extension OxHostAPI {
             reply(encode(StatusResult(kind: "action-result", id: command.id, error: "missing id/domain/action")))
             return
         }
-        Log.agent.debug("OxHostAPI.invoke-action id=\(command.id) \(domain):\(action)")
+        Log.agent.debug("OxHostProtocol.invoke-action id=\(command.id) \(domain):\(action)")
         withService(id: command.id, domain: domain, kind: "action-result", serviceManager: serviceManager, reply: reply) { svc in
             if svc.isMCPService {
                 guard await svc.loadManifest(reason: .debug) != nil else {
@@ -159,7 +159,7 @@ extension OxHostAPI {
             reply(encode(StatusResult(kind: "evaluate-result", id: command.id, error: "missing id/domain/script")))
             return
         }
-        Log.agent.debug("OxHostAPI.evaluate id=\(command.id) domain=\(domain) bytes=\(script.utf8.count)")
+        Log.agent.debug("OxHostProtocol.evaluate id=\(command.id) domain=\(domain) bytes=\(script.utf8.count)")
         withService(id: command.id, domain: domain, kind: "evaluate-result", serviceManager: serviceManager, reply: reply) { svc in
             resultPayload(await svc.debugEvaluate(script))
         }
@@ -176,7 +176,7 @@ extension OxHostAPI {
             reply(encode(StatusResult(kind: "reload-service-result", id: command.id, error: "missing id/domain")))
             return
         }
-        Log.agent.debug("OxHostAPI.reload-service id=\(command.id) domain=\(command.domain)")
+        Log.agent.debug("OxHostProtocol.reload-service id=\(command.id) domain=\(command.domain)")
         withService(id: command.id, domain: command.domain, kind: "reload-service-result", serviceManager: serviceManager, reply: reply) { svc in
             let url: URL?
             if svc.domain == "ios:browser" {
@@ -205,7 +205,7 @@ extension OxHostAPI {
             reply(encode(StatusResult(kind: "refresh-service-auth-result", id: command.id, error: "missing id/domain")))
             return
         }
-        Log.agent.debug("OxHostAPI.refresh-service-auth id=\(command.id) domain=\(command.domain)")
+        Log.agent.debug("OxHostProtocol.refresh-service-auth id=\(command.id) domain=\(command.domain)")
         withService(id: command.id, domain: command.domain, kind: "refresh-service-auth-result", serviceManager: serviceManager, reply: reply) { service in
             await service.refreshSignInState(reason: .debug)
             return ActionPayload(ok: true, value: .string(service.signInState.rawValue), error: nil)
@@ -219,7 +219,7 @@ extension OxHostAPI {
         serviceManager: ServiceManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
-        Log.agent.debug("OxHostAPI.sync-mono-repository id=\(command.id)")
+        Log.agent.debug("OxHostProtocol.sync-mono-repository id=\(command.id)")
         Task { @MainActor in
             let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             let manager = serviceManager
@@ -229,7 +229,7 @@ extension OxHostAPI {
                 await manager.refreshServices(locale: locale)
             }
             let failure: String? = { if case .failed(let m) = manager.repositoryState { return m }; return nil }()
-            Log.agent.debug("OxHostAPI.sync-mono-repository id=\(command.id) monoRepository=\(manager.monoRepositoryHash ?? "nil") changed=\(changed)")
+            Log.agent.debug("OxHostProtocol.sync-mono-repository id=\(command.id) monoRepository=\(manager.monoRepositoryHash ?? "nil") changed=\(changed)")
             reply(encode(SyncMonoRepositoryResult(
                 id: command.id,
                 ok: failure == nil,
@@ -247,7 +247,7 @@ extension OxHostAPI {
         serviceManager: ServiceManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
-        Log.agent.debug("OxHostAPI.list-services id=\(command.id)")
+        Log.agent.debug("OxHostProtocol.list-services id=\(command.id)")
 
         Task { @MainActor in
             let mgr = serviceManager
@@ -286,7 +286,7 @@ extension OxHostAPI {
                     favicon: favicon
                 ))
             }
-            Log.agent.debug("OxHostAPI.list-services id=\(command.id) count=\(services.count)")
+            Log.agent.debug("OxHostProtocol.list-services id=\(command.id) count=\(services.count)")
             reply(encode(ListServicesResult(id: command.id, services: services)))
         }
     }

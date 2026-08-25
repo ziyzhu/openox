@@ -2,16 +2,16 @@
 import Foundation
 
 enum DebugUIAPI {
-    typealias IDRequest = OxHostAPI.IDRequest
-    typealias PromptRequest = OxHostAPI.PromptRequest
-    typealias StatusResult = OxHostAPI.StatusResult
-    typealias ComposerFormattingResult = OxHostAPI.ComposerFormattingResult
+    typealias IDRequest = OxHostProtocol.IDRequest
+    typealias PromptRequest = OxHostProtocol.PromptRequest
+    typealias StatusResult = OxHostProtocol.StatusResult
+    typealias ComposerFormattingResult = OxHostProtocol.ComposerFormattingResult
 
     @MainActor weak static var composer: ChatComposerModel?
     @MainActor static var setEditDraft: ((String) -> Void)?
 
     static func encode<T: Encodable>(_ value: T) -> Data {
-        OxHostAPI.encode(value)
+        OxHostProtocol.encode(value)
     }
 }
 #endif

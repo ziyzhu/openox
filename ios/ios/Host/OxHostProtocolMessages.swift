@@ -2,7 +2,7 @@
 import Foundation
 import UIKit
 
-extension OxHostAPI {
+extension OxHostProtocol {
     struct ReducerFixtureInput: Decodable {
         let name: String
         let turns: [Turn]
