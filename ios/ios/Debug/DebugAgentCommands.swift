@@ -142,8 +142,9 @@ extension OxHostProtocol {
                     error: ok ? nil : message.errorMessage)))
             }
 
+            let modelMessages = await ModelAdapterPipeline.transform(messages: messages, model: model)
             let stream = client.stream(model: model, systemPrompt: systemPrompt,
-                                       messages: messages, tools: tools, options: options)
+                                       messages: modelMessages, tools: tools, options: options)
             do {
                 for try await event in stream {
                     switch event {
