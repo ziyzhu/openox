@@ -29,16 +29,7 @@ The first implementation of Ox is an iOS Client and Host whose source code is in
 
 ## Components
 
-```mermaid
-flowchart LR
-    Client[Ox Client] -->|Host protocol| Host[Ox Host]
-    Host --> Profile[Ox Profile]
-    Host --> Model[Ox Model Provider]
-    Host --> VM[Ox VM]
-    VM --> Capabilities[ox.* capabilities]
-    VM --> Skills[Skills and VFS]
-    Capabilities --> Services[Device, web, and MCP services]
-```
+![OpenOx components](docs/openox-components.png)
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.

@@ -44,18 +44,18 @@
       background: #ffffff;
     }
 
-    .client {
+    .host {
       left: 21.1111%;
       top: 2.8037%;
-      width: 52.2222%;
+      width: 54.4444%;
       height: 65.4206%;
     }
 
     .interfaces {
-      left: 15%;
-      top: 73.3645%;
-      width: 64.4444%;
-      height: 23.8318%;
+      left: 21.1111%;
+      top: 73.8318%;
+      width: 54.4444%;
+      height: 23.3645%;
     }
 
     .group-title {
@@ -67,10 +67,10 @@
       line-height: 1;
     }
 
-    .client-title { left: 22.2222%; top: 4.6729%; }
+    .host-title { left: 22.2222%; top: 4.6729%; }
 
     .interfaces-title {
-      left: 16.1111%;
+      left: 22.2222%;
       top: 75.7009%;
       padding: 0 6px;
       background: #ffffff;
@@ -101,16 +101,19 @@
       font-size: 0.9em;
     }
 
-    .model { left: 1.6667%; top: 10.7477%; width: 17.7778%; height: 8.0374%; }
-    .profile { left: 22.7778%; top: 29.9065%; width: 13.3333%; height: 9.8131%; }
-    .agent { left: 38.3333%; top: 10.7477%; width: 17.7778%; height: 8.0374%; }
-    .vm { left: 38.3333%; top: 29.9065%; width: 17.7778%; height: 9.8131%; }
-    .local-repository { left: 25%; top: 51.8692%; width: 17.7778%; height: 8.8785%; }
-    .services { left: 51.6667%; top: 50.9346%; width: 17.7778%; height: 10.2804%; }
-    .remote-repositories { left: 81.1111%; top: 51.8692%; width: 17.7778%; height: 8.8785%; }
-    .device { left: 18.3333%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
-    .web { left: 38.8889%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
-    .mcp { left: 59.4444%; top: 83.6449%; width: 16.6667%; height: 8.4112%; }
+    .client-node { left: 1.6667%; top: 10.7477%; width: 16.6667%; height: 8.4112%; }
+    .host-api { left: 23.8889%; top: 10.7477%; width: 13.8889%; height: 8.4112%; }
+    .agent { left: 43.8889%; top: 10.7477%; width: 12.2222%; height: 8.4112%; }
+    .model-adapter { left: 62.2222%; top: 10.7477%; width: 12.2222%; height: 8.4112%; }
+    .model { left: 81.6667%; top: 10.7477%; width: 16.6667%; height: 8.4112%; }
+    .profile { left: 23.8889%; top: 30.8411%; width: 13.8889%; height: 10.2804%; }
+    .vm { left: 43.8889%; top: 29.9065%; width: 15.5556%; height: 11.215%; }
+    .local-repository { left: 23.8889%; top: 52.3364%; width: 17.7778%; height: 8.8785%; }
+    .services { left: 56.6667%; top: 51.4019%; width: 16.6667%; height: 10.7477%; }
+    .remote-repositories { left: 81.1111%; top: 52.3364%; width: 17.2222%; height: 8.8785%; }
+    .device { left: 23.3333%; top: 82.243%; width: 15%; height: 8.4112%; }
+    .web { left: 40.8333%; top: 82.243%; width: 15%; height: 8.4112%; }
+    .mcp { left: 58.3333%; top: 82.243%; width: 15%; height: 8.4112%; }
 
     .connections {
       position: absolute;
@@ -132,8 +135,7 @@
     .edge-label {
       position: absolute;
       z-index: 3;
-      padding: 1px 4px;
-      background: #ffffff;
+      padding: 0;
       color: #111111;
       font-size: clamp(9px, 0.78vw, 14px);
       font-style: italic;
@@ -142,13 +144,15 @@
       white-space: nowrap;
     }
 
-    .provider-label { left: 24.7222%; top: 12.6168%; width: 10%; }
-    .profile-label { left: 23.3333%; top: 40.6542%; width: 16%; }
-    .agent-label { left: 47.5%; top: 23.3645%; }
-    .local-label { left: 31.3333%; top: 45.3271%; width: 10%; }
-    .invoke-label { left: 52.3333%; top: 44.3925%; }
-    .validate-label { left: 43%; top: 54.2056%; width: 8.3%; }
-    .install-label { left: 71.6667%; top: 54.2056%; width: 7%; }
+    .host-label { left: 17.2222%; top: 8.4112%; width: 7.7778%; }
+    .provider-label { left: 74.4444%; top: 8.4112%; width: 7.2222%; }
+    .agent-label { left: 51.1111%; top: 23.3645%; width: 10%; }
+    .profile-label { left: 36.1111%; top: 42.0561%; width: 13.8889%; }
+    .adapter-label { left: 56.1111%; top: 8.4112%; width: 7.7778%; }
+    .local-label { left: 33.3333%; top: 48.1308%; width: 10%; }
+    .invoke-label { left: 59.4444%; top: 43.9252%; width: 10%; }
+    .validate-label { left: 43.8889%; top: 53.7383%; width: 11.1111%; }
+    .install-label { left: 73.8889%; top: 53.7383%; width: 7%; }
 
     .sr-only {
       position: absolute;
@@ -165,20 +169,23 @@
 </head>
 <body>
   <main class="diagram" aria-labelledby="diagram-title">
-    <h1 id="diagram-title" class="sr-only">OpenOx components and service interfaces</h1>
+    <h1 id="diagram-title" class="sr-only">OpenOx Client, Host, Agent, Profile, VM, services, and service interfaces</h1>
 
-    <section class="group client" aria-labelledby="client-title"></section>
-    <h2 id="client-title" class="group-title client-title">Ox Mobile Client</h2>
+    <section class="group host" aria-labelledby="host-title"></section>
+    <h2 id="host-title" class="group-title host-title">Ox Host</h2>
 
     <section class="group interfaces" aria-labelledby="interfaces-title"></section>
     <h2 id="interfaces-title" class="group-title interfaces-title">Service interfaces</h2>
 
-    <article class="node model"><h2>Any model</h2><p>Any provider</p></article>
+    <article class="node client-node"><h2>Ox Client</h2><p>Mobile · Desktop · Web · CLI</p></article>
+    <article class="node model"><h2>Ox Model Provider</h2><p>Any model · Any provider</p></article>
+    <article class="node host-api"><h2>Ox Host API</h2><p>Chats · Services · Lifecycle</p></article>
+    <article class="node agent"><h2>Ox Agent</h2><p>Reasoning · Tool use</p></article>
     <article class="node profile"><h2>Ox Profile</h2><p>Identity · Memory · Skills</p><p>Artifacts · Conversations</p></article>
-    <article class="node agent"><h2>Local agent</h2></article>
-    <article class="node vm"><h2>Ox VM</h2><p>Sandboxed JavaScript · <code>ox.*</code></p><p>Virtual filesystem</p></article>
+    <article class="node vm"><h2>Ox VM</h2><p>Sandboxed JavaScript · <code>ox.*</code></p><p>Skills · Virtual filesystem</p></article>
+    <article class="node model-adapter"><h2>Model adapter</h2><p>Provider-neutral agent loop</p></article>
     <article class="node local-repository"><h2>Local Service Repository</h2><p>Editable Git + <code>ox.json</code></p></article>
-    <article class="node services"><h2>Installed services</h2><p>Stored on mobile</p><p>Actions · Skills</p></article>
+    <article class="node services"><h2>Installed services</h2><p>Available to Host</p><p>Actions · Skills</p></article>
     <article class="node remote-repositories"><h2>Remote Service Repositories</h2><p>Public Git + <code>ox.json</code></p></article>
     <article class="node device"><h2>Device-native interface</h2><p>(Device Service)</p></article>
     <article class="node web"><h2>Web page</h2><p>(Web Service)</p></article>
@@ -193,21 +200,26 @@
           <path d="M 7 0 L 0 3.5 L 7 7 Z" fill="#111111"></path>
         </marker>
       </defs>
-      <path class="connection" d="M 350 158 L 690 158" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 650 372 L 690 372" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 850 201 L 850 320" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 760 425 L 610 555" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 940 425 L 1030 545" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 770 603 L 930 600" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 1460 603 L 1250 600" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 1090 655 L 1090 760 L 480 760 L 480 895" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 1090 760 L 850 760 L 850 895" marker-end="url(#arrow)"></path>
-      <path class="connection" d="M 1090 760 L 1220 760 L 1220 895" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 330 160 L 430 160" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 680 160 L 790 160" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1010 160 L 1120 160" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1340 160 L 1470 160" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 900 205 L 900 320" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 680 385 L 790 385" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 850 440 L 850 500 L 590 500 L 590 560" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1045 440 L 1045 550" marker-start="url(#arrow-start)" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 750 607 L 1020 607" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1460 607 L 1320 607" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1170 665 L 1170 855 L 555 855 L 555 880" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1170 855 L 870 855 L 870 880" marker-end="url(#arrow)"></path>
+      <path class="connection" d="M 1170 855 L 1185 855 L 1185 880" marker-end="url(#arrow)"></path>
     </svg>
 
-    <div class="edge-label provider-label">provider-neutral</div>
-    <div class="edge-label profile-label">mounted through <code>ox.fs</code></div>
+    <div class="edge-label host-label">in-process or remote</div>
+    <div class="edge-label provider-label">provider API</div>
     <div class="edge-label agent-label">writes and executes code</div>
+    <div class="edge-label profile-label">mounted through <code>ox.fs</code></div>
+    <div class="edge-label adapter-label">provider-neutral</div>
     <div class="edge-label local-label">creates or revises<br>via <code>ox.fs</code></div>
     <div class="edge-label invoke-label">invokes actions<br>reads skills</div>
     <div class="edge-label validate-label">validates and reloads</div>
