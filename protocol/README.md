@@ -1,43 +1,41 @@
 # OpenOx Protocol
 
-This directory contains the implementation-independent contracts required for
-OpenOx implementations to exchange service metadata, control a Host VM, and
-read the portable metadata in an Ox Profile.
+This directory defines OpenOx's implementation-independent contracts. It separates portable data and behavior from the current iOS, CLI, and service-runtime implementations.
 
-`VERSION` is the OpenOx protocol major version. Version 1 currently standardizes
-only the surfaces marked Normative in `STATUS.md`. A document marked Draft is
-design guidance and does not establish interoperability.
+Protocol requirements use **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** in their RFC 2119 sense. Only surfaces marked **Normative** are compatibility contracts.
 
-The words MUST, MUST NOT, REQUIRED, SHOULD, SHOULD NOT, and MAY are normative as
-defined by RFC 2119 when they appear in a Normative document.
+`VERSION` contains the protocol major version. A breaking change to a normative contract requires a major-version change.
 
-## Sources of truth
+## Schemas
 
-Executable TypeBox definitions in `schema.ts` and each surface's `schema.ts`
-are the canonical structural schemas. The adjacent `*.schema.json` files are
-generated language-neutral JSON Schema artifacts. Run:
+TypeBox definitions are the source of truth:
 
-```sh
-bun run build:protocol
-bun run check:protocol
-```
+- `host/schema.ts`
+- `profile/schema.ts`
+- `services/schema.ts`
 
-Generated schemas MUST match their TypeScript sources. Conformance fixtures
-MUST pass the tests under `conformance/`. Semantic requirements that JSON Schema
-cannot express are stated in the surface documents and enforced by the
-reference validators.
+Their generated JSON Schemas are committed beside them for non-TypeScript consumers. Run `bun run build:protocol` to regenerate them and `bun run check:protocol` to verify generated output and conformance fixtures.
 
-## Surfaces
+A conforming value MUST match its generated schema and any semantic requirements in the corresponding surface document. JSON Schema alone is not the complete contract.
 
-- `services/` defines `repository.json`, `service.json`, actions, and repository compatibility.
-- `host/` defines the version 1 VM control request and response envelopes.
-- `profile/` defines `profile.json`, current `chat.json` metadata, and the portable directory layout.
-- `vm/` defines execution, values, function discovery, and virtual filesystem invariants.
-- `security/` defines authority, approval, credential, and isolation requirements.
-- `agent/` records the draft provider-neutral Agent model; it is not yet a wire or storage schema.
-- `conformance/` contains accepted and rejected examples tested against the canonical schemas.
+## Surfaces and status
 
-Platform implementations live under `apps/`. Reusable implementation libraries
-live under `packages/`. An implementation is conformant only to the specific
-Normative surfaces it implements; directory presence alone does not imply full
-OpenOx conformance.
+| Surface | Status | Contract |
+| --- | --- | --- |
+| Service repository inventory | Normative | `services/schema.ts#RepositoryPackageSchema` and `services/README.md` |
+| Web service metadata | Normative | `services/schema.ts#ServicePackageSchema` and `services/README.md` |
+| VM control | Normative for development Hosts | `host/schema.ts` and `host/README.md` |
+| Profile identity metadata | Normative | `profile/schema.ts#ProfileConfigSchema` and `profile/README.md` |
+| Chat metadata | Normative for schema version 1 | `profile/schema.ts#ChatMetadataSchema` and `profile/README.md` |
+| VM values and capability isolation | Normative | `vm/README.md` |
+| Profile directory ownership | Normative | `profile/README.md` |
+| Security boundaries | Normative | `security/README.md` |
+| Remote Host lifecycle and events | Draft | `host/README.md` |
+| Agent turns and messages | Draft | `agent/README.md` |
+| `turns.jsonl` and `context.json` encoding | Reference implementation | `docs/STORAGE.md` |
+
+The development Host protocol does not define production remote authentication, discovery, reconnection, or event delivery.
+
+## Ownership
+
+Applications and packages implement these contracts; they do not redefine them. Conformance fixtures cover only the normative schemas and semantics represented in `conformance/`. Implementation-specific storage, UI projection, provider adapters, and deployment behavior remain outside the portable protocol.
