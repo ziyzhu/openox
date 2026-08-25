@@ -201,16 +201,20 @@ VIRTUAL FILESYSTEM TREE
 ├── artifacts/                                     [profile mutation rules]
 │   └── <validated-filename>                       [file]
 ├── skills/                                        [mixed sources]
-│   ├── system:create-canvas/                      [read-only]
-│   │   └── SKILL.md
-│   ├── system:create-note/                        [read-only]
-│   │   └── SKILL.md
-│   ├── system:create-service-skill/               [read-only]
-│   │   └── SKILL.md
-│   ├── system:create-user-skill/                  [read-only]
-│   │   └── SKILL.md
-│   ├── system:create-web-service/                 [read-only]
-│   │   └── SKILL.md
+│   ├── system:manage-artifacts/                   [read-only]
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── canvas.md
+│   │       └── note.md
+│   ├── system:manage-skills/                      [read-only]
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── service-skill.md
+│   │       └── user-skill.md
+│   ├── system:manage-services/                    [read-only]
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       └── web-service.md
 │   ├── <user-skill>/                              [writable outside temporary chats]
 │   │   └── SKILL.md
 │   └── service:<domain>:<skill>/                  [read-only; attached services only]

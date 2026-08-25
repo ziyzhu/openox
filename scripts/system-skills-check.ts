@@ -4,13 +4,12 @@ import { ROOT } from "./lib.ts";
 
 const systemSkillsRoot = join(ROOT, "ios/ios/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const expectedPackages = [
-  "create-canvas",
-  "create-note",
-  "create-service-skill",
-  "create-user-skill",
-  "create-web-service",
-];
+const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"];
+const expectedReferences = new Map([
+  ["manage-artifacts", ["canvas.md", "note.md"]],
+  ["manage-services", ["web-service.md"]],
+  ["manage-skills", ["service-skill.md", "user-skill.md"]],
+]);
 
 function scalar(value: string): string {
   try {
@@ -63,6 +62,27 @@ export async function validateSystemSkills(): Promise<number> {
       failures.push(...validatePackage(directory.name, await readFile(path, "utf8")));
     } catch (error) {
       failures.push(`${directory.name}: cannot read SKILL.md: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const referencesRoot = join(systemSkillsRoot, directory.name, "references");
+    try {
+      const references = (await readdir(referencesRoot, { withFileTypes: true }))
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name)
+        .sort((left, right) => left.localeCompare(right));
+      const expected = expectedReferences.get(directory.name) ?? [];
+      if (JSON.stringify(references) !== JSON.stringify(expected)) {
+        failures.push(`${directory.name}: expected references ${expected.join(", ")}; found ${references.join(", ")}`);
+      }
+      for (const reference of references) {
+        if (!reference.endsWith(".md") || !localName.test(reference.slice(0, -3))) {
+          failures.push(`${directory.name}: invalid reference name ${reference}`);
+        }
+        if (!(await readFile(join(referencesRoot, reference), "utf8")).trim()) {
+          failures.push(`${directory.name}: empty reference ${reference}`);
+        }
+      }
+    } catch (error) {
+      failures.push(`${directory.name}: cannot read references: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   if (failures.length > 0) throw new Error(`System skill validation failed:\n${failures.join("\n")}`);

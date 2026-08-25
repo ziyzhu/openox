@@ -1,9 +1,4 @@
----
-name: create-web-service
-description: Create, extend, repair, verify, and commit an Ox Local web service entirely within the iOS app.
----
-
-# Create a Web Service
+# Web Service
 
 Deliver one useful, verified Local service from live website evidence. Work inside Ox with awaited `ox.*` calls, `ios:browser`, the virtual filesystem, and Local Git. Author browser-ready JavaScript directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
 
@@ -37,7 +32,7 @@ Inspect nearby service contracts through their manifests and `ox.service.inspect
 - `oftendining.com`: approved preparation and user-owned payment.
 - `matchatennis.com`: nested schemas.
 
-Read `actions.js` when an example is already Local. Use `system:create-service-skill` later when verified actions need reusable multi-action guidance.
+Read `actions.js` when an example is already Local. Read `skills/system:manage-skills/SKILL.md` later when verified actions need reusable multi-action guidance.
 
 ## 2. Observe the website
 
@@ -90,7 +85,7 @@ End the response after presenting the plan. Continue authoring only after a late
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. Each accepted mutation validates and reloads the Local service.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `system:create-service-skill` after actions are verified.
+Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
 
 Every action has:
 
@@ -192,7 +187,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 6. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries.
 7. Request separate approval before invoking a live mutation.
 8. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
-9. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `system:create-service-skill`.
+9. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
 10. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
 11. Verify the favicon URL structurally and report whether its avatar was visually observed.
 12. Stop capture and clear installed document-start scripts.

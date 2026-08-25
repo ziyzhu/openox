@@ -1,9 +1,4 @@
----
-name: create-service-skill
-description: Create or revise reusable agent guidance owned by one Ox Local web service after its action surface exists.
----
-
-# Create a Service Skill
+# Service Skill
 
 Create a service skill when one service needs reusable reasoning or a multi-action workflow that its action schemas cannot express. The skill travels with that service and becomes available as `service:<domain>:<name>` whenever the service is attached.
 
@@ -13,7 +8,7 @@ services/web/<domain>/
 └── skills/<name>/SKILL.md
 ```
 
-Use a user skill instead when the workflow belongs to the Profile, combines multiple services, or primarily captures the user's preferences. Use `system:create-web-service` first when actions are missing or need repair.
+Use a user skill instead when the workflow belongs to the Profile, combines multiple services, or primarily captures the user's preferences. Read `skills/system:manage-services/SKILL.md` first when actions are missing or need repair.
 
 ## 1. Establish the service contract
 
@@ -79,6 +74,8 @@ For a new skill:
 
 For a revision, read both files and keep the manifest description aligned with the skill frontmatter. Use `ox.fs.edit` for focused changes.
 
+For deletion, read the skill file and manifest, remove the matching manifest declaration, delete `services/web/<domain>/skills/<name>/SKILL.md`, and verify that no stale declaration or file remains. Show the affected paths before any broad restore if the deletion is abandoned.
+
 ## 5. Verify activation
 
 1. Read the final source file and manifest back.
@@ -86,7 +83,7 @@ For a revision, read both files and keep the manifest description aligned with t
 3. Confirm the manifest declares each skill once and every declaration has a matching valid file.
 4. Confirm the Local service remains attached and discoverable.
 5. Read `skills/service:<domain>:<name>/SKILL.md` to prove the service skill is available in this chat.
-6. Recheck the two trigger examples and the boundary example against the final description and instructions.
+6. For creation or revision, recheck the two trigger examples and the boundary example against the final description and instructions. For deletion, prove both the declaration and file are absent.
 
 ## 6. Review and commit
 

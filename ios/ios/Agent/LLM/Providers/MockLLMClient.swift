@@ -327,6 +327,7 @@ extension Scenario {
             Entry("85", "local history recovery — restore and revert pending test state", .localHistoryRecovery),
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
+            Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
         ]),
     ]
 
@@ -916,13 +917,15 @@ extension Scenario {
             return [
                 .say("Loading the skill-authoring instructions.\n"),
                 execute("""
-                const skill = await ox.fs.read({ path: "skills/system:create-user-skill/SKILL.md", purpose: "Read skill instructions" });
-                console.log(skill.text);
+                const manager = await ox.fs.read({ path: "skills/system:manage-skills/SKILL.md", purpose: "Read skill manager" });
+                const workflow = await ox.fs.read({ path: "skills/system:manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
+                console.log(manager.text + "\n" + workflow.text);
                 """),
             ]
         }
         if ctx.turn == 1 {
-            guard ctx.resultText("execute")?.contains("# Create a User Skill") == true else {
+            guard ctx.resultText("execute")?.contains("# Manage Skills") == true,
+                  ctx.resultText("execute")?.contains("# User Skill") == true else {
                 return [.say("The skill instructions could not be loaded."), .stop(.stop)]
             }
             return [
@@ -1159,21 +1162,17 @@ extension Scenario {
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
         let userSkill = "- `skills/grocery-planner/SKILL.md` — Plan a weekly grocery list from meals, dietary needs, and pantry items."
-        let createCanvas = "- `skills/system:create-canvas/SKILL.md` — Create and present a responsive visual or interactive Canvas, including explainers, simulators, charts, comparisons, maps, and small offline tools."
-        let createNote = "- `skills/system:create-note/SKILL.md` — Create or revise a persistent Markdown note."
-        let createServiceSkill = "- `skills/system:create-service-skill/SKILL.md` — Create or revise reusable agent guidance owned by one Ox Local web service after its action surface exists."
-        let createUserSkill = "- `skills/system:create-user-skill/SKILL.md` — Design, create, or revise a reusable Profile-owned user skill, optionally using one or more services."
-        let createWebService = "- `skills/system:create-web-service/SKILL.md` — Create, extend, repair, verify, and commit an Ox Local web service entirely within the iOS app."
+        let manageArtifacts = "- `skills/system:manage-artifacts/SKILL.md` — Create, inspect, revise, import, rename, present, attach, or delete Profile artifacts, with specialized guidance for Markdown notes and interactive HTML canvases."
+        let manageServices = "- `skills/system:manage-services/SKILL.md` — Create, inspect, copy, update, verify, version, or delete Ox service definitions and Local web-service source. Do not use merely to invoke a service."
+        let manageSkills = "- `skills/system:manage-skills/SKILL.md` — Create, inspect, revise, copy, or delete Profile-owned and Local service-owned skills while respecting read-only system and external service skills."
         let serviceSkill = "- `skills/service:127.0.0.1:sanity/SKILL.md` — Deterministic fixture workflow for validating service skill loading."
         let expectsService = ctx.latestUserSaid("attached")
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = ctx.systemPrompt.contains(createCanvas)
-            && ctx.systemPrompt.contains(createNote)
-            && ctx.systemPrompt.contains(createServiceSkill)
-            && ctx.systemPrompt.contains(createUserSkill)
-            && ctx.systemPrompt.contains(createWebService)
+        let hasStableSystemSkills = ctx.systemPrompt.contains(manageArtifacts)
+            && ctx.systemPrompt.contains(manageServices)
+            && ctx.systemPrompt.contains(manageSkills)
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
             .first
@@ -1224,6 +1223,32 @@ extension Scenario {
             ? "Stable prompt prefix ready."
             : (expectsService ? "Attached skill catalog ready." : "Ox skill catalog ready.")
         return [.say(result), .stop(.stop)]
+    }
+
+    static let systemSkillReferences = Scenario(name: "system-skill-references") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            return [execute("""
+            const manager = await ox.fs.read({ path: "skills/system:manage-skills/SKILL.md", purpose: "Read skill manager" });
+            const references = await ox.fs.list({ path: "skills/system:manage-skills/references", purpose: "List skill references" });
+            const user = await ox.fs.read({ path: "skills/system:manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
+            const matched = await ox.fs.glob({ path: "skills/system:manage-skills", pattern: "references/*.md", purpose: "Find skill references" });
+            console.log(JSON.stringify({ manager: manager.text.includes("# Manage Skills"), references: references.items.map(item => item.path), user: user.text.includes("# User Skill"), matched: matched.paths }));
+            """)]
+        }
+        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
+              result["manager"]?.boolValue == true,
+              result["user"]?.boolValue == true,
+              result["references"]?.arrayValue?.compactMap(\.stringValue) == [
+                "skills/system:manage-skills/references/service-skill.md",
+                "skills/system:manage-skills/references/user-skill.md",
+              ],
+              result["matched"]?.arrayValue?.compactMap(\.stringValue) == [
+                "skills/system:manage-skills/references/service-skill.md",
+                "skills/system:manage-skills/references/user-skill.md",
+              ] else {
+            return [.say("System skill references were not mounted correctly."), .stop(.stop)]
+        }
+        return [.say("System skill references loaded progressively."), .stop(.stop)]
     }
 
     static let memoryOnDemand = Scenario(name: "memory-on-demand") { ctx in

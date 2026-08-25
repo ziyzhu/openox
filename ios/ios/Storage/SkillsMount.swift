@@ -17,9 +17,15 @@ struct SkillsMount {
         let description: String
         let content: String
         let source: Source
+        let references: [BuiltInSkills.Reference]
 
         var directoryPath: String { "skills/\(name)" }
         var filePath: String { "\(directoryPath)/\(SkillFiles.fileName)" }
+        var referenceDirectoryPath: String { "\(directoryPath)/references" }
+
+        func referencePath(_ reference: BuiltInSkills.Reference) -> String {
+            "\(referenceDirectoryPath)/\(reference.name)"
+        }
     }
 
     let repository: ProfileRepository
@@ -46,11 +52,18 @@ struct SkillsMount {
                 name: skill.name,
                 description: skill.description,
                 content: SkillFiles.serialize(skill),
-                source: .user
+                source: .user,
+                references: []
             )
         }
         entries.append(contentsOf: BuiltInSkills.all.map {
-            Entry(name: $0.name, description: $0.description, content: $0.content, source: .system)
+            Entry(
+                name: $0.name,
+                description: $0.description,
+                content: $0.content,
+                source: .system,
+                references: $0.references
+            )
         })
         await withTaskGroup(of: Void.self) { group in
             for service in services {
@@ -64,7 +77,8 @@ struct SkillsMount {
                     name: "service:\(service.domain):\(skill.name)",
                     description: skill.description,
                     content: content,
-                    source: .service(service.domain)
+                    source: .service(service.domain),
+                    references: []
                 ))
             }
         }
@@ -77,7 +91,8 @@ struct SkillsMount {
                 name: builtIn.name,
                 description: builtIn.description,
                 content: builtIn.content,
-                source: .system
+                source: .system,
+                references: builtIn.references
             )
         }
         if name.hasPrefix("service:") {
@@ -95,7 +110,8 @@ struct SkillsMount {
                 name: name,
                 description: skill.description,
                 content: content,
-                source: .service(service.domain)
+                source: .service(service.domain),
+                references: []
             )
         }
         guard SkillFiles.isUserName(name) else { throw SkillError.missing(name) }
@@ -104,8 +120,17 @@ struct SkillsMount {
             name: skill.name,
             description: skill.description,
             content: SkillFiles.serialize(skill),
-            source: .user
+            source: .user,
+            references: []
         )
+    }
+
+    func reference(skill name: String, named referenceName: String) async throws -> BuiltInSkills.Reference {
+        let skill = try await entry(named: name)
+        guard let reference = skill.references.first(where: { $0.name == referenceName }) else {
+            throw SkillError.missing("\(name)/references/\(referenceName)")
+        }
+        return reference
     }
 
     func requireWritable(name: String, path: String) async throws {

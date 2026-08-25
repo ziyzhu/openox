@@ -1,9 +1,4 @@
----
-name: create-canvas
-description: Create and present a responsive visual or interactive Canvas, including explainers, simulators, charts, comparisons, maps, and small offline tools.
----
-
-# Create a Canvas
+# Canvas
 
 Create a Canvas when a visual relationship, adjustable scenario, simulation, chart, map, comparison, or small tool will communicate better than chat prose or a note. Use the smallest composition that makes the idea clear.
 

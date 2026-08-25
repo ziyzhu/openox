@@ -1,11 +1,6 @@
----
-name: create-user-skill
-description: Design, create, or revise a reusable Profile-owned user skill, optionally using one or more services.
----
+# User Skill
 
-# Create a User Skill
-
-Default to doing the task directly. Create a user skill when the user wants a recurring workflow with variable inputs and a stable outcome. Keep durable preferences in memory.
+Default to doing the task directly. Create a user skill when the user wants a recurring workflow with variable inputs and a stable outcome. Keep durable preferences in memory. Use this guidance for creating or substantially revising a Profile-owned skill; the manager entrypoint covers simple reads, copies, and deletions.
 
 One skill owns one trigger and one outcome. Split independent triggers or outputs into separate skills.
 
