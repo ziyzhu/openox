@@ -907,6 +907,17 @@ extension Service {
         )
     }
 
+    convenience init(
+        definition: ServiceDefinition,
+        actions: String,
+        skills: [String: String],
+        manager: ServiceManager
+    ) {
+        self.init(definition: definition, manager: manager)
+        resolutionState = .idle(Resolved(actions: actions, skills: skills))
+        capabilityState = .ready
+    }
+
     func relocalize(from definition: ServiceDefinition) {
         guard definition.domain == domain else {
             Log.service.error("Service.relocalize domain-mismatch actual=\(definition.domain) expected=\(domain)")

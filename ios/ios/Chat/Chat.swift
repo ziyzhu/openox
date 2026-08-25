@@ -1685,7 +1685,7 @@ final class Chat: Identifiable {
         guard let separator = action.lastIndex(of: ":") else { return action }
         let domain = String(action[..<separator])
         let actionID = String(action[action.index(after: separator)...])
-        guard let service = serviceManager.service(domain: domain) else {
+        guard let service = attachedService(domain: domain) ?? serviceManager.service(domain: domain) else {
             return action
         }
         return "\(service.title) - \(service.actionLabel(for: actionID) ?? actionID)"
@@ -1938,7 +1938,7 @@ final class Chat: Identifiable {
     }
 
     func signInService(domain: String, resumeAgent: Bool = true) async -> Bool {
-        guard let service = serviceManager.service(domain: domain) else {
+        guard let service = attachedService(domain: domain) else {
             Log.session.error("Chat.signInService no service domain=\(domain)")
             return false
         }
@@ -1957,7 +1957,7 @@ final class Chat: Identifiable {
     }
 
     func completeBotControl(domain: String, args: JSONValue, resumeAgent: Bool = true) async -> Bool {
-        guard let service = serviceManager.service(domain: domain) else {
+        guard let service = attachedService(domain: domain) else {
             Log.session.error("Chat.completeBotControl no service domain=\(domain)")
             return false
         }
@@ -1975,7 +1975,7 @@ final class Chat: Identifiable {
     }
 
     func completePayment(domain: String, args: JSONValue) async -> JSONValue? {
-        guard let service = serviceManager.service(domain: domain) else {
+        guard let service = attachedService(domain: domain) else {
             Log.session.error("Chat.completePayment no service domain=\(domain)")
             return nil
         }
@@ -2504,12 +2504,16 @@ final class Chat: Identifiable {
     func setAttachedServices(_ services: [Service]) {
         let domains = services.map(\.domain)
         guard domains != attachedServiceDomains else {
-            resolveAttachedServices()
+            replaceAttachedServices(services)
             return
         }
         attachedServiceDomains = domains
         replaceAttachedServices(services)
         onPersistableChange?()
+    }
+
+    func attachedService(domain: String) -> Service? {
+        attachedServices.first { $0.domain == domain }
     }
 
     @discardableResult
@@ -2553,9 +2557,15 @@ final class Chat: Identifiable {
     }
 
     private func replaceAttachedServices(_ services: [Service]) {
-        guard services.map(\.domain) != attachedServices.map(\.domain) else { return }
-        let added = services.filter { !attachedServices.contains($0) }
-        let removed = attachedServices.filter { !services.contains($0) }
+        let unchanged = services.count == attachedServices.count
+            && zip(services, attachedServices).allSatisfy { pair in pair.0 === pair.1 }
+        guard !unchanged else { return }
+        let added = services.filter { candidate in
+            !attachedServices.contains { $0 === candidate }
+        }
+        let removed = attachedServices.filter { candidate in
+            !services.contains { $0 === candidate }
+        }
         if removed.contains(where: { $0.domain == "ios:browser" }) {
             serviceManager.browserActionSessions.closeSession(for: id)
         }

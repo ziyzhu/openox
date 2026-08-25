@@ -346,8 +346,10 @@ Legacy Local source without Git metadata follows the same working-tree path. The
 repository never introduces another virtual directory: its selected services
 resolve directly into `services/<kind>/<id>/`. Local mutations are atomic,
 reject traversal and symbolic links, validate the
-repository package, then validate the affected service before the `MonoRepository`
-reloads. A failed semantic validation restores the prior file.
+repository package, then validate the affected service before returning. A failed
+semantic validation restores the prior file. Accepted working-tree changes remain
+drafts for running chats; `ox.service.attach` explicitly replaces that chat's
+existing attachment from the current source when the draft is ready to test.
 
 Only Local exposes Git status, history, diff, checkout, commit, revert, and
 restore operations. Checkout detaches its working view without moving `main`;

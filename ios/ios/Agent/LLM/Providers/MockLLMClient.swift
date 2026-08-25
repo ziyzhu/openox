@@ -982,20 +982,65 @@ extension Scenario {
             }
             const after = await ox.fs.read({ path: "services/web/example.test/actions.js", purpose: "Verify Local rollback" });
             await ox.fs.write({ path: "services/web/example.test/NOTES.md", content: "Local authoring fixture", purpose: "Write Local note" });
+            const manifestPath = "services/web/example.test/manifest.json";
+            const manifest = await ox.fs.read({ path: manifestPath, purpose: "Read Local manifest" });
+            const firstManifest = JSON.parse(manifest.text);
+            firstManifest.actions = [{
+              id: "version",
+              label: "Version",
+              description: "Draft one",
+              inputSchema: { type: "object", properties: {}, additionalProperties: false },
+              outputSchema: {
+                type: "object",
+                properties: { value: { type: "string" } },
+                required: ["value"],
+                additionalProperties: false
+              },
+              requireApproval: false,
+              requireAuth: false
+            }];
+            const firstSource = JSON.stringify(firstManifest, null, 2);
+            await ox.fs.write({ path: manifestPath, content: firstSource, purpose: "Write first test draft" });
+            const firstAttach = await ox.service.attach({ domain: "example.test", purpose: "Load first test draft" });
+            const first = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect first test draft" });
+            await ox.fs.edit({
+              path: manifestPath,
+              edits: [{ oldText: '"description": "Draft one"', newText: '"description": "Draft two"' }],
+              purpose: "Write second test draft"
+            });
+            const stale = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect loaded test draft" });
+            const secondAttach = await ox.service.attach({ domain: "example.test", purpose: "Load second test draft" });
+            const second = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect second test draft" });
             const listed = await ox.fs.list({ path: "services/web/example.test", purpose: "List Local source" });
-            console.log(JSON.stringify({ created, before: before.text, after: after.text, invalid, paths: listed.items.map(item => item.path) }));
+            console.log(JSON.stringify({
+              created,
+              before: before.text,
+              after: after.text,
+              invalid,
+              firstAttach,
+              first: first.actions.version.description,
+              stale: stale.actions.version.description,
+              secondAttach,
+              second: second.actions.version.description,
+              paths: listed.items.map(item => item.path)
+            }));
             """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
               result["created"]?.objectValue?["source"]?.stringValue == "local",
               result["before"]?.stringValue == result["after"]?.stringValue,
               result["invalid"]?.stringValue?.contains("actions.js syntax") == true,
+              result["firstAttach"]?.objectValue?["reloaded"]?.boolValue == false,
+              result["first"]?.stringValue == "Draft one",
+              result["stale"]?.stringValue == "Draft one",
+              result["secondAttach"]?.objectValue?["reloaded"]?.boolValue == true,
+              result["second"]?.stringValue == "Draft two",
               result["paths"]?.arrayValue?.contains(.string("services/web/example.test/manifest.json")) == true,
               result["paths"]?.arrayValue?.contains(.string("services/web/example.test/actions.js")) == true,
               result["paths"]?.arrayValue?.contains(.string("services/web/example.test/NOTES.md")) == true else {
             return [.say("Local service authoring did not preserve its validation boundary."), .stop(.stop)]
         }
-        return [.say("Created Local source, rejected invalid actions, restored the prior file, and wrote an additional source file."), .stop(.stop)]
+        return [.say("Created Local source, preserved the loaded draft across edits, and explicitly reloaded the next coherent draft."), .stop(.stop)]
     }
 
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in

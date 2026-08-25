@@ -83,7 +83,7 @@ End the response after presenting the plan. Continue authoring only after a late
 
 ## 4. Author manifest.json
 
-Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. Each accepted mutation validates and reloads the Local service.
+Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. Each accepted mutation validates the Local source while leaving running attachments unchanged. Finish a coherent set of edits before reloading it for verification.
 
 Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
 
@@ -180,7 +180,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 ## 7. Verify in iOS
 
 1. Read every changed file back.
-2. Attach the Local service by its bare domain.
+2. Call `ox.service.attach` with the Local service's bare domain. This attaches it when missing or reloads this chat's existing attachment from the current source. Repeat only after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and dispatcher parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke every new or changed action with a small success case.

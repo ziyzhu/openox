@@ -580,7 +580,6 @@ final class ServiceManager {
             }
             throw error
         }
-        _ = await loadRepositories(locale: monoRepositoryLocale)
     }
 
     func deleteServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws {
@@ -592,7 +591,6 @@ final class ServiceManager {
             try? await repository.writeLocalSource(kind: kind.repositoryKind, id: domain, path: path, data: previous)
             throw error
         }
-        _ = await loadRepositories(locale: monoRepositoryLocale)
     }
 
     func serviceSourcePaths(kind: ServicesMount.Kind, domain: String) async throws -> [String] {
@@ -657,6 +655,40 @@ final class ServiceManager {
             }
             try await validateLocalService(kind: kind, domain: service.runtimeID)
         }
+    }
+
+    func serviceForAttachment(domain: String) async throws -> Service {
+        guard let service = service(domain: domain) else {
+            throw ServiceRepository.Failure(message: "Service not found")
+        }
+        guard service.isWebService else {
+            _ = await service.loadManifest(reason: .attach)
+            return service
+        }
+
+        let definition: ServiceDefinition
+        if service.isLocalService {
+            try await validateLocalService(kind: .web, domain: domain)
+            let manifestData = try await repository.readSource(kind: .web, id: domain, path: ["manifest.json"])
+            let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
+            definition = try ServiceDefinition(
+                manifest: Manifest.localized(raw, locale: monoRepositoryLocale),
+                repositoryID: ServiceRepository.localID,
+                provenance: .local
+            )
+        } else {
+            definition = service.definition
+        }
+
+        guard let source = await repository.source(domain: domain, skills: definition.skills.map(\.name)) else {
+            throw ServiceRepository.Failure(message: "Service files are unavailable")
+        }
+        return Service(
+            definition: definition,
+            actions: source.actions,
+            skills: source.skills,
+            manager: self
+        )
     }
 
     private func mutateRepositories(

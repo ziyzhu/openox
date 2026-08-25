@@ -397,23 +397,28 @@ extension Chat {
         guard !domain.isEmpty else {
             throw RuntimeError.bridge("ox.service.attach: requires a non-empty domain")
         }
-        guard let service = serviceManager.service(domain: domain) else {
+        guard serviceManager.service(domain: domain) != nil else {
             throw RuntimeError.bridge("ox.service.attach: no service with domain '\(domain)'. Inspect services/<kind>/<id>/manifest.json to get a valid domain.")
         }
-        if attachedServices.contains(service) {
-            Log.session.info("bridge.service.attach already attached domain=\(domain)")
-            return try Self.encodeToJSON(service.snapshot(attached: true))
-        }
-        try await gateServiceAttach(service)
-        if service.isMCPService {
-            _ = await service.loadManifest(reason: .attach)
-        }
+        let existing = attachedService(domain: domain)
+        let service = try await serviceManager.serviceForAttachment(domain: domain)
+        if existing == nil { try await gateServiceAttach(service) }
         return try await tracked(.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
             serviceManager.setSaved(service, true)
-            setAttachedServices(attachedServices + [service])
+            if let existing, let index = attachedServices.firstIndex(where: { $0 === existing }) {
+                var services = attachedServices
+                services[index] = service
+                setAttachedServices(services)
+            } else {
+                setAttachedServices(attachedServices + [service])
+            }
+            guard case .object(var result) = try Self.encodeToJSON(service.snapshot(attached: true)) else {
+                throw RuntimeError.bridge("ox.service.attach: failed to encode service snapshot")
+            }
+            result["reloaded"] = .bool(existing != nil)
             let snapshot = service.snapshot(attached: true)
-            Log.session.info("bridge.service.attach attached domain=\(domain) signIn=\(snapshot.signIn.rawValue)")
-            return try Self.encodeToJSON(snapshot)
+            Log.session.info("bridge.service.attach domain=\(domain) reloaded=\(existing != nil) signIn=\(snapshot.signIn.rawValue)")
+            return .object(result)
         }
     }
 
@@ -421,10 +426,7 @@ extension Chat {
         guard !domain.isEmpty else {
             throw RuntimeError.bridge("ox.service.signIn: requires a non-empty domain")
         }
-        guard let service = serviceManager.service(domain: domain) else {
-            throw RuntimeError.bridge("ox.service.signIn: no service with domain '\(domain)'. Inspect services/<kind>/<id>/manifest.json to get a valid domain.")
-        }
-        guard attachedServices.contains(service) else {
+        guard let service = attachedService(domain: domain) else {
             throw RuntimeError.bridge("ox.service.signIn: \(domain) is not attached to this chat")
         }
         guard service.supportsAuthentication else {
@@ -462,10 +464,7 @@ extension Chat {
         guard args.objectValue != nil else {
             throw RuntimeError.bridge("ox.service.solve: args must be an object")
         }
-        guard let service = serviceManager.service(domain: domain) else {
-            throw RuntimeError.bridge("ox.service.solve: no service with domain '\(domain)'. Inspect services/<kind>/<id>/manifest.json to get a valid domain.")
-        }
-        guard attachedServices.contains(service) else {
+        guard let service = attachedService(domain: domain) else {
             throw RuntimeError.bridge("ox.service.solve: \(domain) is not attached to this chat")
         }
         guard service.supportsBotControl else {
@@ -489,10 +488,7 @@ extension Chat {
         guard args.objectValue != nil else {
             throw RuntimeError.bridge("ox.service.pay: args must be an object")
         }
-        guard let service = serviceManager.service(domain: domain) else {
-            throw RuntimeError.bridge("ox.service.pay: no service with domain '\(domain)'. Inspect services/<kind>/<id>/manifest.json to get a valid domain.")
-        }
-        guard attachedServices.contains(service) else {
+        guard let service = attachedService(domain: domain) else {
             throw RuntimeError.bridge("ox.service.pay: \(domain) is not attached to this chat")
         }
         guard service.definition.action(Manifest.PAYMENT_URL_ACTION_ID, includingStandard: true) != nil,
@@ -515,14 +511,14 @@ extension Chat {
             guard !domain.isEmpty else {
                 throw RuntimeError.bridge("ox.service.detach: requires a non-empty domain")
             }
-            guard let service = serviceManager.service(domain: domain) else {
+            guard let service = attachedService(domain: domain) ?? serviceManager.service(domain: domain) else {
                 throw RuntimeError.bridge("ox.service.detach: no service with domain '\(domain)'.")
             }
-            guard attachedServices.contains(service) else {
+            guard attachedService(domain: domain) != nil else {
                 Log.session.info("bridge.service.detach not attached domain=\(domain)")
                 return try Self.encodeToJSON(service.snapshot(attached: false))
             }
-            setAttachedServices(attachedServices.filter { $0 != service })
+            setAttachedServices(attachedServices.filter { $0.domain != domain })
             Log.session.info("bridge.service.detach detached domain=\(domain)")
             return try Self.encodeToJSON(service.snapshot(attached: false))
         }

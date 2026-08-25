@@ -68,7 +68,10 @@ Bundled, Remote, and Development repositories are read-only. Local is editable,
 but its source does not create a separate virtual mount: every selected service
 still resolves at `services/<kind>/<id>/`. Read-only services expose only
 `manifest.json`; Local services expose their additional source files and accept
-validated `ox.fs` writes, edits, and deletes.
+validated `ox.fs` writes, edits, and deletes. Those mutations do not reload a
+running attachment. Calling `ox.service.attach` attaches a missing service or
+replaces that chat's existing attachment from the current source, allowing
+several coherent edits to be tested together without requiring a commit.
 
 Agents inspect Local through `ox.service.git.status`, `diff`, `log`, and `show`.
 Diff reviews the current working tree, one commit against its parent, or two

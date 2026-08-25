@@ -1262,7 +1262,7 @@ struct ChatPage: View {
               isAttached(item.control) else { return nil }
         if case .signIn(let domain, _) = item.control,
            runningServiceControlID != item.id,
-           serviceManager.service(domain: domain)?.signInState.isAuthenticated == true {
+           chat.attachedService(domain: domain)?.signInState.isAuthenticated == true {
             return nil
         }
         return item
@@ -1285,7 +1285,7 @@ struct ChatPage: View {
     private func resolveSignInControl(_ item: Chat.PendingServiceControl?) async {
         guard let item,
               case .signIn(let domain, _) = item.control,
-              let service = serviceManager.service(domain: domain) else { return }
+              let service = chat.attachedService(domain: domain) else { return }
         Log.ui.info("ChatPage.authProbe start chat=\(chat.id) domain=\(domain) state=\(service.signInState.rawValue)")
         await service.resolveSignInState(reason: .chatOpen)
         guard !Task.isCancelled else {

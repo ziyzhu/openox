@@ -263,7 +263,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.attach",
                     .object([
-                        "description": .string("Attach an Ox Server service by domain after inspecting its `services/<kind>/<id>/manifest.json`: `await ox.service.attach({ domain, purpose })`. Saves the service and attaches it to the chat (it appears in the attachment bar, same as a user-attached service). The user is asked to approve the attach the first time — if they decline, this throws, so surface that and don't retry blindly. Returns the service snapshot with its cached sign-in status; a `requireAuth` action revalidates before use. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
+                        "description": .string("Attach an Ox Server service by domain after inspecting its `services/<kind>/<id>/manifest.json`: `await ox.service.attach({ domain, purpose })`. The first call saves and attaches the service to this chat; a later call reloads that chat's attachment from the current service source so a coherent set of Local edits can be tested. Source writes do not reload running attachments. The user is asked to approve the first attach only — if they decline, this throws, so surface that and don't retry blindly. Returns the service snapshot with `reloaded` indicating whether an existing attachment was replaced; a `requireAuth` action revalidates before use. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
