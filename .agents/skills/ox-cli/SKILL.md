@@ -1,6 +1,6 @@
 ---
 name: ox-cli
-description: Connect to an Ox Host or administer Profiles and service repositories through the `ox` CLI. Use when discovering chats; inspecting a Host or VM; discovering or calling `ox.*` functions; evaluating VM JavaScript; reading VM-visible skills; discovering iCloud Profiles; reading Profile content; creating a user skill; inspecting service definitions; invoking live service actions through a Host; or replaying service fixtures. For live app chats, logs, agent replay, and Server IR conformance, use the ox-debug skill instead.
+description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, inspect, or watch chats; read structured logs; run agents; inspect or call a VM; administer Profiles; inspect or verify service repositories; invoke live services; and replay service fixtures. Use the ox-debug skill only for projection reducer fixture replay.
 ---
 
 # Ox CLI
@@ -21,14 +21,15 @@ or tab session IDs; a live service is addressed by its domain.
 
 ## Choose the correct surface
 
+- Use `ox discover` to find iOS Simulator Hosts exposed by a running sim daemon.
+- Use `ox chat`, `ox logs`, and `ox agent` for Host-client introspection.
 - Use `ox vm` for Host inspection, VM functions, VM-visible skills, and
   execution through the agent's actual capability boundary.
 - Use `ox --profile <path>` for direct Profile file operations.
 - Use `ox --repository <origin> service` for offline service manifests,
   actions, skills, and replay fixture authoring.
 - Use `ox --host <endpoint> service` for live service operations.
-- Use `bun run debug` with the ox-debug skill for live chats, logs, agent
-  replay, reducer diagnostics, and Server IR conformance.
+- Use `bun run debug` with the ox-debug skill only for projection reducer replay.
 - Use `sim` for iOS Simulator interaction.
 
 ## Connect to a Host and VM
@@ -37,7 +38,9 @@ Target the default DEBUG iOS Simulator Host with `ox vm`. Pass
 `--host <ws-url>` or set `OX_HOST_ENDPOINT` for another Host.
 
 ```sh
-ox vm sessions
+ox chat list
+ox chat inspect
+ox logs --level warning
 ox vm inspect
 ox vm functions
 ox vm help ox.fs.read
@@ -48,6 +51,7 @@ ox vm skill read <name>
 Use `--chat <chat-id>` when the active chat is not the intended VM:
 
 ```sh
+ox --chat <chat-id> chat inspect
 ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read --args '<json>'
 ```
@@ -87,6 +91,7 @@ permission for the terminal or agent host.
 ```sh
 ox repository inspect <path-or-url>
 ox repository validate <path-or-url>
+ox repository verify <git-url>
 ox repository serve <path-or-url> [--port 8100]
 ox --repository <path-or-url> service list [--json]
 ox --repository <path-or-url> service inspect -s <domain>
@@ -100,7 +105,7 @@ requirement before invoking it.
 ## Exercise live services through a Host
 
 ```sh
-ox [--host <ws-url>] service status [--timeout 30000]
+ox [--host <ws-url>] service status [--json] [--timeout 30000]
 ox [--host <ws-url>] service invoke <domain>:<action> --args '<json>' [--approve] [--timeout 30000]
 ox [--host <ws-url>] service eval <domain> --script '<javascript>' [--timeout 30000]
 ox [--host <ws-url>] service reload <domain> [--timeout 30000]
@@ -141,7 +146,7 @@ ox herdr [--port 8787] [--herdr-session <name>] [--local-only]
 ```
 
 `--herdr-session` is command-local and refers only to a named Herdr session.
-It is unrelated to Host VM sessions.
+It is unrelated to Host chat selection.
 
 ## Diagnose live connection failures
 
@@ -149,8 +154,7 @@ It is unrelated to Host VM sessions.
 2. Run `ox vm inspect` or `ox service status` as the smallest probe.
 3. Check `--host`, `OX_HOST_ENDPOINT`, then the compatibility
    `OX_DEBUG_ENDPOINT`.
-4. Use the ox-debug skill to inspect structured Host logs before widening to
-   device logs.
+4. Run `ox logs --level warning` before widening to device logs.
 
 Report the exact command, Host endpoint selection method, target resource, and
 relevant failure text when blocked. Never print credentials or repository URLs

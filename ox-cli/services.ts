@@ -96,18 +96,38 @@ async function reload(args: string[], context: CliContext): Promise<void> {
 
 async function status(args: string[], context: CliContext): Promise<void> {
   let timeoutMs = 30000;
+  let json = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
     if (a === "--timeout") { timeoutMs = Number(args[++i]) || 30000; }
+    else if (a === "--json") { json = true; }
     else if (a === "-h" || a === "--help") {
-      console.log(`Usage: ox service status [--timeout 30000]`);
+      console.log(`Usage: ox service status [--json] [--timeout 30000]`);
       return;
     }
   }
   const host = createHostServiceRuntime(context.host);
   const result = await host.status(timeoutMs);
   if (result.ok) {
-    console.log(JSON.stringify(result.services ?? [], null, 2));
+    const services = (result.services ?? []) as Array<Record<string, unknown>>;
+    if (json) {
+      console.log(JSON.stringify(services, null, 2));
+      return;
+    }
+    if (!services.length) {
+      console.log("(no services)");
+      return;
+    }
+    const width = Math.max(...services.map(service => String(service.domain ?? "").length));
+    for (const service of services) {
+      const domain = String(service.domain ?? "");
+      const phase = String(service.phase ?? "unknown");
+      const signIn = String(service.signIn ?? "unknown");
+      const pages = Number(service.pageCount ?? 0);
+      const active = Number(service.activeInvocations ?? 0);
+      const queued = Number(service.queuedInvocations ?? 0);
+      console.log(`${domain.padEnd(width + 2)}${phase} · auth ${signIn} · pages ${pages} · actions ${active} active/${queued} queued`);
+    }
   } else {
     failResult("status", result.error);
   }

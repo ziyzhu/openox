@@ -121,9 +121,6 @@ struct SelectableText: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        #if targetEnvironment(simulator)
-        DebugTranscriptPerformance.recordSelectableTextView()
-        #endif
         let view = SelectableTextView()
         view.isEditable = false
         view.isSelectable = true

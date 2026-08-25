@@ -202,12 +202,17 @@ export async function runCli(
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
   const profileCommands = new Set(["memory", "soul", "skills", "artifacts", "chats", "skill"]);
+  const hostCommands = new Set(["discover", "chat", "agent", "logs", "vm"]);
+  const chatCommands = new Set(["chat", "agent", "vm"]);
   const liveServiceCommands = new Set(["status", "invoke", "eval", "reload", "sync", "test"]);
   const repositoryServiceCommands = new Set(["list", "inspect", "actions", "skills"]);
-  if (context.chat && command !== "vm") throw new Error("--chat applies only to ox vm");
+  if (context.chat && !chatCommands.has(command)) throw new Error("--chat applies only to ox chat, ox agent, and ox vm");
+  if (context.chat && ((command === "chat" && subcommand === "list") || (command === "agent" && subcommand === "list"))) {
+    throw new Error(`--chat does not apply to ox ${command} list`);
+  }
   if (context.profile && !profileCommands.has(command)) throw new Error("--profile applies only to direct Profile administration commands");
-  if (context.host && command !== "vm" && !(command === "service" && (!subcommand || liveServiceCommands.has(subcommand)))) {
-    throw new Error("--host applies only to ox vm and live ox service commands");
+  if (context.host && !hostCommands.has(command) && !(command === "service" && (!subcommand || liveServiceCommands.has(subcommand)))) {
+    throw new Error("--host applies only to live Ox Host commands");
   }
   if (context.repository && command !== "repository" && !(command === "service" && (!subcommand || repositoryServiceCommands.has(subcommand)))) {
     throw new Error("--repository applies only to ox repository and offline ox service commands");

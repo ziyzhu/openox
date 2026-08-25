@@ -273,39 +273,6 @@ extension OxHostAPI {
     }
 
     @MainActor
-    static func handleVMListSessions(
-        _ command: VMRequest,
-        chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
-    ) {
-        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-list-sessions-result", reply: reply) else { return }
-        let currentID = chatManager.currentId
-        let sessions = chatManager.debugSessions().sorted { left, right in
-            if left.id == currentID { return true }
-            if right.id == currentID { return false }
-            return left.createdAt > right.createdAt
-        }.map { session in
-            JSONValue.object([
-                "id": .string(session.id.uuidString),
-                "title": .string(session.title),
-                "active": .bool(session.id == currentID),
-                "temporary": .bool(session.isTemporary),
-                "model": .string(session.model.id),
-                "createdAt": .string(iso(session.createdAt)),
-            ])
-        }
-        reply(encode(VMControlResult(
-            kind: "vm-list-sessions-result",
-            id: command.id,
-            ok: true,
-            protocolVersion: vmProtocolVersion,
-            value: .object(["sessions": .array(sessions)]),
-            logs: nil,
-            error: nil
-        )))
-    }
-
-    @MainActor
     static func handleVMFunctions(_ command: VMFunctionsRequest, reply: @escaping @MainActor (Data) -> Void) {
         guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-functions-result", reply: reply) else { return }
         let catalog = OxFunctionCatalog.build()

@@ -404,6 +404,7 @@ extension Chat {
         let service = try await serviceManager.serviceForAttachment(domain: domain)
         if existing == nil { try await gateServiceAttach(service) }
         return try await tracked(.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
+            serviceManager.selectServiceForAttachment(service)
             serviceManager.setSaved(service, true)
             if let existing, let index = attachedServices.firstIndex(where: { $0 === existing }) {
                 var services = attachedServices

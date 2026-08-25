@@ -6,9 +6,17 @@ import { skill, SUBS as skillSubs } from "./user-skills.ts";
 import { herdr } from "./herdr.ts";
 import { repository, SUBS as repositorySubs } from "./repositories.ts";
 import { vm, SUBS as vmSubs } from "./vm.ts";
+import { chat, SUBS as chatSubs } from "./chat.ts";
+import { agent, SUBS as agentSubs } from "./agent.ts";
+import { discover } from "./discover.ts";
+import { logs } from "./logs.ts";
 import packageMetadata from "./package.json";
 
 const groups: Record<string, CommandGroup> = {
+  discover: { fn: discover, desc: "Discover reachable Ox Hosts" },
+  chat: { fn: chat, desc: "Inspect and watch chats through an Ox Host", subs: chatSubs },
+  agent: { fn: agent, desc: "List, run, or replay Host-provided agents", subs: agentSubs },
+  logs: { fn: logs, desc: "Read or follow structured Host logs" },
   profiles: { fn: profiles, desc: "List Profiles in iCloud Drive (--json)" },
   memory: { fn: memory, desc: "Print MEMORY.md from a Profile" },
   soul: { fn: soul, desc: "Print SOUL.md from a Profile" },
@@ -22,4 +30,4 @@ const groups: Record<string, CommandGroup> = {
   vm: { fn: vm, desc: "Connect to an Ox Host and use its agent VM", subs: vmSubs },
 };
 
-await runCli("ox", packageMetadata.version, "Use Ox Hosts, Profiles, VMs, and services", groups, process.argv.slice(2));
+await runCli("ox", packageMetadata.version, "Use Ox Hosts, chats, VMs, Profiles, and services", groups, process.argv.slice(2));

@@ -17,13 +17,8 @@ export type DebugPayload =
   | { kind: "get-chat"; sessionId?: string }
   | { kind: "list-models" }
   | { kind: "get-logs" }
-  | { kind: "get-transcript" }
-  | { kind: "get-performance" }
   | { kind: "get-latest-response" }
-  | { kind: "get-transcript-performance" }
   | { kind: "get-composer-formatting" }
-  | { kind: "open-transcript-fixture"; turns: 200 | 400 }
-  | { kind: "retain-baseline-sessions"; count: number }
   | { kind: "repository-gate"; domain: "save"; action: "hold" | "release" | "status" }
   | { kind: "replay-reducer"; fixtures: Array<{ name: string; turns: unknown[] }> }
   | { kind: "run-agent"; clientId: string; modelId: string; sessionId?: string; prompt?: string; historyOverride?: Array<{ user: string; assistant: Record<string, unknown> }> }
@@ -57,7 +52,7 @@ function validPort(value: number): number {
 }
 
 export function debugEndpoint(): string {
-  const value = process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
+  const value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
   try {
     const url = new URL(value);
     return (url.protocol === "ws:" || url.protocol === "wss:") && url.port ? url.toString() : DEFAULT_ENDPOINT;

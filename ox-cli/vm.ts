@@ -11,34 +11,17 @@ type VMResult = DebugResult & {
 };
 
 export const SUBS: Record<string, SubCommand> = {
-  sessions: { desc: "List chat-bound VM sessions on the selected Host", fn: sessions },
-  inspect: { desc: "Inspect the selected Host, VM, session, and VFS roots (--json)", fn: inspect },
+  inspect: { desc: "Inspect the selected Host, chat-bound VM, and VFS roots (--json)", fn: inspect },
   functions: { desc: "List the ox.* functions exposed by the VM (--json)", fn: functions },
   help: { desc: "Print the complete contract for one ox.* function", fn: help },
   call: { desc: "Call one ox.* function with structured JSON arguments", fn: call },
-  eval: { desc: "Run arbitrary JavaScript in the selected VM session", fn: evaluate },
-  skills: { desc: "List the skills visible to the selected VM session", fn: skills },
-  skill: { desc: "Read one skill through the selected VM session", fn: skill },
+  eval: { desc: "Run arbitrary JavaScript in the selected chat-bound VM", fn: evaluate },
+  skills: { desc: "List the skills visible to the selected chat-bound VM", fn: skills },
+  skill: { desc: "Read one skill through the selected chat-bound VM", fn: skill },
 };
 
 export async function vm(args: string[], context: CliContext): Promise<void> {
   return dispatch("vm", "Connect to an Ox Host and use its agent VM contract.", SUBS, args, context);
-}
-
-async function sessions(args: string[], context: CliContext): Promise<void> {
-  const options = parseOutputOptions(args, 30000);
-  const result = await request("vm-list-sessions", context, options.timeoutMs);
-  const rows = valueObject(result).sessions;
-  if (!Array.isArray(rows)) fail("VM Host returned an invalid session list");
-  if (options.json) {
-    console.log(JSON.stringify(rows, null, 2));
-    return;
-  }
-  for (const row of rows) {
-    const session = object(row);
-    const marker = session.active === true ? "*" : " ";
-    console.log(`${marker} ${String(session.id ?? "")}  ${String(session.title ?? "")}`);
-  }
 }
 
 async function inspect(args: string[], context: CliContext): Promise<void> {
@@ -51,11 +34,11 @@ async function inspect(args: string[], context: CliContext): Promise<void> {
   const value = valueObject(result);
   const host = object(value.host);
   const runtime = object(value.vm);
-  const session = value.session === null ? undefined : object(value.session);
+  const chat = value.session === null ? undefined : object(value.session);
   console.log(`${terminalText("Host", [C.sky])}       ${host.kind ?? "unknown"} ${host.mode ?? ""} via ${host.transport ?? "unknown"}`.trimEnd());
   console.log(`${terminalText("VM", [C.sky])}         ${runtime.contract ?? "unknown"} on ${runtime.engine ?? "unknown"}`);
-  console.log(`${terminalText("Lifetime", [C.sky])}   ${runtime.lifetime ?? "unknown"}; ${runtime.sessionBinding ?? "unknown"}-bound sessions`);
-  console.log(`${terminalText("Session", [C.sky])}    ${session?.id ?? "none"}${session?.temporary === true ? " (temporary)" : ""}`);
+  console.log(`${terminalText("Lifetime", [C.sky])}   ${runtime.lifetime ?? "unknown"}; ${runtime.sessionBinding ?? "unknown"}-bound execution`);
+  console.log(`${terminalText("Chat", [C.sky])}       ${chat?.id ?? "none"}${chat?.temporary === true ? " (temporary)" : ""}`);
   console.log(`${terminalText("Functions", [C.sky])}  ${runtime.functionCount ?? 0}`);
   console.log(`${terminalText("VFS", [C.sky])}        ${Array.isArray(value.vfsRoots) ? value.vfsRoots.join(", ") : "unavailable"}`);
 }

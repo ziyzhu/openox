@@ -195,63 +195,6 @@ extension OxHostAPI {
     }
 
     @MainActor
-    static func handleGetPerformance(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
-        Task { @MainActor in
-            let snapshot = await DebugPerformance.snapshot()
-            reply(encode(GetPerformanceResult(id: command.id, data: snapshot)))
-        }
-    }
-
-    @MainActor
-    static func handleGetTranscriptPerformance(
-        _ command: IDRequest,
-        reply: @escaping @MainActor (Data) -> Void
-    ) {
-        reply(encode(TranscriptPerformanceResult(
-            kind: "get-transcript-performance-result",
-            id: command.id,
-            ok: true,
-            data: DebugTranscriptPerformance.snapshot(),
-            error: nil
-        )))
-    }
-
-    @MainActor
-    static func handleOpenTranscriptFixture(
-        _ command: TurnsRequest,
-        chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
-    ) {
-        guard let snapshot = chatManager.debugOpenTranscriptFixture(turns: command.turns) else {
-            reply(encode(TranscriptPerformanceResult(
-                kind: "open-transcript-fixture-result",
-                id: command.id,
-                ok: false,
-                data: nil,
-                error: "expected 200 or 400 turns"
-            )))
-            return
-        }
-        reply(encode(TranscriptPerformanceResult(
-            kind: "open-transcript-fixture-result",
-            id: command.id,
-            ok: true,
-            data: snapshot,
-            error: nil
-        )))
-    }
-
-    @MainActor
-    static func handleRetainBaselineSessions(
-        _ command: CountRequest,
-        chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
-    ) {
-        let count = chatManager.debugRetainBaselineSessions(count: max(0, command.count))
-        reply(encode(RetainBaselineSessionsResult(id: command.id, count: count)))
-    }
-
-    @MainActor
     static func handleRepositorySaveGate(
         _ command: RepositoryGateRequest,
         chatManager: ChatManager,

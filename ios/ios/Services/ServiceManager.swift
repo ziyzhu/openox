@@ -29,9 +29,25 @@ final class ServiceManager {
         let services: [Service]
         let byDomain: [String: Service]
 
-        init(_ services: [Service] = []) {
+        init(_ candidates: [Service] = []) {
+            var services: [Service] = []
+            var indexByDomain: [String: Int] = [:]
+            var replacedDomains: [String] = []
+            for candidate in candidates {
+                if let index = indexByDomain[candidate.domain] {
+                    services[index] = candidate
+                    replacedDomains.append(candidate.domain)
+                } else {
+                    indexByDomain[candidate.domain] = services.count
+                    services.append(candidate)
+                }
+            }
             self.services = services
-            byDomain = Dictionary(services.map { ($0.domain, $0) }, uniquingKeysWith: { first, _ in first })
+            byDomain = Dictionary(uniqueKeysWithValues: services.map { ($0.domain, $0) })
+            assert(byDomain.count == services.count)
+            if !replacedDomains.isEmpty {
+                Log.service.warning("ServiceManager.resolvedServices deduplicated=\(Set(replacedDomains).sorted().joined(separator: ","))")
+            }
         }
     }
 
@@ -689,6 +705,18 @@ final class ServiceManager {
             skills: source.skills,
             manager: self
         )
+    }
+
+    func selectServiceForAttachment(_ service: Service) {
+        guard byDomain[service.domain] !== service else { return }
+        let previous = byDomain[service.domain]
+        let next = services.contains(where: { $0.domain == service.domain })
+            ? services.map { $0.domain == service.domain ? service : $0 }
+            : services + [service]
+        resolvedServices = ResolvedServices(next)
+        monoRepositoryRevision &+= 1
+        reindexMonoRepository()
+        Log.service.info("ServiceManager.selectServiceForAttachment domain=\(service.domain) from=\(previous?.definition.repositoryID ?? "none") to=\(service.definition.repositoryID ?? "none")")
     }
 
     private func mutateRepositories(

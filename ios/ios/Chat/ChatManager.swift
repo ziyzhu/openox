@@ -576,10 +576,6 @@ final class ChatManager {
         }
     }
 
-    func debugSessions() -> [Chat] {
-        records.values.compactMap { $0.hydration.chat }
-    }
-
     #if targetEnvironment(simulator)
     func debugControlRepositorySaveGate(_ action: String) -> Bool? {
         switch action {
@@ -596,56 +592,6 @@ final class ChatManager {
         }
     }
 
-    @ObservationIgnored private var debugBaselineChats: [Chat] = []
-
-    func debugRetainBaselineSessions(count: Int) -> Int {
-        debugBaselineChats = DebugPerformance.chats(count: count).map { fixture in
-            let client = llmRegistry.client(forSnapshot: fixture.meta.clientID)
-            let model = llmRegistry.model(forSnapshot: fixture.meta.modelID, client: client)
-            return Chat(
-                meta: fixture.meta,
-                turns: fixture.turns,
-                client: client,
-                model: model,
-                repository: repository,
-                scope: repositoryScope,
-                virtualMachine: virtualMachine,
-                presentations: presentations,
-                serviceManager: serviceManager
-            )
-        }
-        return debugBaselineChats.count
-    }
-
-    func debugOpenTranscriptFixture(turns: Int) -> DebugTranscriptPerformance.Snapshot? {
-        guard let fixture = DebugPerformance.renderedTranscript(turns: turns) else { return nil }
-        let client = llmRegistry.client(forSnapshot: fixture.meta.clientID)
-        let model = llmRegistry.model(forSnapshot: fixture.meta.modelID, client: client)
-        let chat = Chat(
-            meta: fixture.meta,
-            turns: fixture.turns,
-            client: client,
-            model: model,
-            repository: repository,
-            scope: repositoryScope,
-            virtualMachine: virtualMachine,
-            presentations: presentations,
-            serviceManager: serviceManager,
-            retention: .persisted
-        )
-        attachPersistence(chat)
-        hydrationOrdinal &+= 1
-        records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
-        DebugTranscriptPerformance.begin(
-            chatID: chat.id,
-            requestedTurns: turns,
-            totalTurns: fixture.turns.count,
-            totalBlocks: chat.transcript.count
-        )
-        setCurrent(chat)
-        Log.ui.info("ChatManager.debugTranscriptFixture chat=\(chat.id) turns=\(fixture.turns.count) blocks=\(chat.transcript.count)")
-        return DebugTranscriptPerformance.snapshot()
-    }
     #endif
 
     private func makeChat(retention: ChatRetention = .persisted) -> Chat {
@@ -807,7 +753,6 @@ final class ChatManager {
         selection = .active(chat)
         outgoing?.deselect()
         chat.select()
-        DebugPublisher.shared.observe(chat)
         Task {
             await chat.attach()
             if let outgoing, self.current !== outgoing { outgoing.detach() }

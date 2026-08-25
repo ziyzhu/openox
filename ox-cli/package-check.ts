@@ -48,13 +48,18 @@ try {
   const version = (await run([executable, "--version"], resolve(import.meta.dir, ".."))).trim();
   if (version !== packageMetadata.version) throw new Error(`installed ox reported version ${JSON.stringify(version)}`);
   const help = await run([executable, "--help"], resolve(import.meta.dir, ".."));
-  if (!help.includes("Use Ox Hosts, Profiles, VMs, and services")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("Use Ox Hosts, chats, VMs, Profiles, and services")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("chat watch")) throw new Error("installed ox help omitted chat commands");
+  if (!help.includes("agent replay")) throw new Error("installed ox help omitted agent commands");
+  if (help.includes("diagnostics")) throw new Error("installed ox help exposed removed diagnostic commands");
+  if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");
   if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
   if (!help.includes("--chat <chat-id>")) throw new Error("installed ox help omitted chat targeting");
   if (!help.includes("--profile <path>")) throw new Error("installed ox help omitted Profile targeting");
   if (help.includes("--runtime") || help.includes("--session <id>") || help.includes("--vm-session") || help.includes("--root")) {
     throw new Error("installed ox help exposed removed targeting flags");
   }
+  if (help.includes("vm sessions")) throw new Error("installed ox help exposed the replaced VM session command");
   const services = JSON.parse(await run([
     executable,
     "--repository",

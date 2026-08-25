@@ -7,9 +7,10 @@
 □ ■ ■ □
 ```
 
-Ox CLI is an Ox Client for the terminal. It can connect to an Ox Host, use a
-chat-bound Ox VM, administer Profile content directly, inspect service
-repositories, and ask a Host to exercise live services.
+Ox CLI is an Ox Client for the terminal. It can discover and connect to an Ox
+Host, inspect chats, logs, agents, and VMs, administer Profile
+content directly, inspect service repositories, and ask a Host to exercise
+live services.
 
 The CLI never selects a web-page runtime. The Host owns service adapters and
 decides how each service page is implemented and managed.
@@ -55,11 +56,11 @@ ox
 └── --repository <path-or-url>   Service repository for offline inspection
 ```
 
-- `--host` applies to live VM and service commands. It defaults to
+- `--host` applies to live chat, log, agent, VM, and service commands. It defaults to
   `OX_HOST_ENDPOINT`, then the compatibility `OX_DEBUG_ENDPOINT`, then
   `ws://127.0.0.1:9876`.
-- `--chat` applies only to `ox vm`. Obtain IDs with
-  `ox vm sessions`.
+- `--chat` applies to `ox chat`, `ox agent`, and `ox vm`. Obtain IDs with
+  `ox chat list`.
 - `--profile` bypasses a Host and operates directly on a Profile directory
   containing `profile.json`.
 - `--repository` selects source data for repository and offline service
@@ -73,7 +74,9 @@ A running DEBUG iOS Simulator app exposes the reference Host on a loopback
 WebSocket:
 
 ```sh
-ox vm sessions
+ox discover
+ox chat list
+ox chat inspect
 ox vm inspect
 ox vm functions
 ox vm help ox.fs.read
@@ -85,6 +88,7 @@ Select a specific chat-bound VM when the active chat is not the intended
 target:
 
 ```sh
+ox --chat <chat-id> chat inspect
 ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read \
   --args '{"path":"skills/system:manage-skills/SKILL.md","purpose":"Read skill"}'
@@ -105,6 +109,27 @@ ox vm call ox.fs.list --args-file - < vm-args.json
 ox vm eval --script 'return await ox.app.inspect({ purpose: "Inspect Host" });'
 ```
 
+## Inspect a running Host
+
+The CLI replaces the former development website with scriptable commands:
+
+```sh
+ox chat list
+ox --chat <chat-id> chat inspect --messages --blocks
+ox --chat <chat-id> chat watch --json
+ox logs --level warning
+ox logs --follow
+ox agent list
+ox --chat <chat-id> agent replay --client <provider> --model <model>
+ox --chat <chat-id> agent run --prompt "Diagnose this failure"
+```
+
+One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
+`logs --follow --json` emit one JSON object per line. Watch commands use
+request-based snapshots, tolerate Host restarts, and retry until interrupted.
+Repository history remains available through ordinary `git log` and `git show`;
+the CLI does not duplicate generic Git visualization.
+
 ## Use live services through a Host
 
 Live service commands address the selected Host. The domain identifies the
@@ -112,6 +137,7 @@ service; there is no tab ID, service session ID, or client-selected runtime.
 
 ```sh
 ox service status
+ox service status --json
 ox service invoke <domain>:<action> --args '<json>'
 ox service eval <domain> --script 'return document.title;'
 ox service reload <domain>
@@ -171,6 +197,7 @@ Repository inspection is offline and does not contact a Host:
 ```sh
 ox repository inspect /path/to/repository
 ox repository validate /path/to/repository
+ox repository verify https://example.com/services.git
 ox repository serve /path/to/repository --port 8101
 ox --repository /path/to/repository service list
 ox --repository /path/to/repository service inspect -s mail.google.com
@@ -226,7 +253,15 @@ ox --profile <path> skill create <name> --description <text> (--instructions <te
 
 ox herdr [--port 8787] [--herdr-session <name>] [--local-only]
 
-ox [--host <ws-url>] vm sessions [--json] [--timeout 30000]
+ox discover [--json] [--timeout 3000]
+ox [--host <ws-url>] chat list [--json] [--timeout 30000]
+ox [--host <ws-url>] [--chat <chat-id>] chat inspect [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000]
+ox [--host <ws-url>] [--chat <chat-id>] chat watch [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000] [--interval 1000]
+ox [--host <ws-url>] logs [--level debug|info|warning|error] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]
+ox [--host <ws-url>] agent list [--json] [--timeout 30000]
+ox [--host <ws-url>] [--chat <chat-id>] agent run --prompt <text> [--client <id>] [--model <id>] [--json] [--timeout 120000]
+ox [--host <ws-url>] [--chat <chat-id>] agent replay [--client <id>] [--model <id>] [--json] [--timeout 120000]
+
 ox [--host <ws-url>] [--chat <chat-id>] vm inspect [--json] [--timeout 30000]
 ox [--host <ws-url>] vm functions [--json] [--timeout 30000]
 ox [--host <ws-url>] vm help <ox.function> [--json] [--timeout 30000]
@@ -237,20 +272,21 @@ ox [--host <ws-url>] [--chat <chat-id>] vm skill read <name> [--json] [--timeout
 
 ox repository inspect <path-or-url>
 ox repository validate <path-or-url>
+ox repository verify <git-url>
 ox repository serve <path-or-url> [--port 8100]
 ox --repository <path-or-url> service list [--json]
 ox --repository <path-or-url> service inspect -s <domain>
 ox --repository <path-or-url> service actions -s <domain> [--json]
 ox --repository <path-or-url> service skills -s <domain> [--json]
 ox [--host <ws-url>] service test [<domain>[:<action>[:<case>]]] --source <directory> --proxy-port <port> [--timeout 30000] [--allow-partial]
-ox [--host <ws-url>] service status [--timeout 30000]
+ox [--host <ws-url>] service status [--json] [--timeout 30000]
 ox [--host <ws-url>] service invoke <domain>:<action> [--args '{}'] [--approve] [--timeout 30000]
 ox [--host <ws-url>] service eval <domain> --script '<javascript>' [--timeout 30000]
 ox [--host <ws-url>] service reload <domain> [--timeout 30000]
 ox [--host <ws-url>] service sync [--timeout 60000]
 ```
 
-Use `ox --help`, `ox vm --help`, or `ox service --help` for the installed
+Use `ox --help`, `ox chat --help`, `ox vm --help`, or `ox service --help` for the installed
 CLI's current syntax.
 
 ## Troubleshooting

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Ox Debug"
-  short_description: "Introspect the running Ox app: chats, logs, agents, spec"
-  default_prompt: "Use $ox-debug to inspect chats, logs, and the agent virtual machine in the running Ox app."

@@ -12,10 +12,6 @@
         "typescript": "^5",
       },
     },
-    "dev": {
-      "name": "@ox/dev",
-      "version": "0.0.1",
-    },
     "ox-cli": {
       "name": "@openox/cli",
       "version": "0.1.0",
@@ -54,8 +50,6 @@
     "@openox/service-sdk": ["@openox/service-sdk@workspace:service-sdk"],
 
     "@openox/services": ["@openox/services@workspace:services"],
-
-    "@ox/dev": ["@ox/dev@workspace:dev"],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.50", "", {}, "sha512-ydBWw0G6WFwWHzh9RK4B5c690UkreOG0llq0r+DaI7LgKgxigf8mhHzIPI3S0850g1BPkq/zpuCfrq4QFgUlTQ=="],
 

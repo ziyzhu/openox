@@ -1031,7 +1031,10 @@ final class Chat: Identifiable {
         document = ChatDocument(turns: turns)
         document.apply(.sealAllTurns)
         let recovered = document.turns != turns
-        attachedServiceDomains = meta.attachedServiceDomains
+        attachedServiceDomains = Self.uniqueServiceDomains(meta.attachedServiceDomains)
+        if attachedServiceDomains.count != meta.attachedServiceDomains.count {
+            Log.session.warning("Chat.restore deduplicated-services id=\(meta.id) stored=\(meta.attachedServiceDomains.count) unique=\(attachedServiceDomains.count)")
+        }
         hasUnreadResponse = meta.hasUnreadResponse
         resolveAttachedServices()
         contextCheckpoint = context
@@ -2502,13 +2505,18 @@ final class Chat: Identifiable {
     // MARK: - Manifest + actions
 
     func setAttachedServices(_ services: [Service]) {
-        let domains = services.map(\.domain)
+        let canonical = services.map { serviceManager.service(domain: $0.domain) ?? $0 }
+        let normalized = Self.uniqueServices(canonical)
+        if normalized.count != services.count {
+            Log.session.warning("Chat.setAttachedServices deduplicated id=\(id) supplied=\(services.count) unique=\(normalized.count)")
+        }
+        let domains = normalized.map(\.domain)
         guard domains != attachedServiceDomains else {
-            replaceAttachedServices(services)
+            replaceAttachedServices(normalized)
             return
         }
         attachedServiceDomains = domains
-        replaceAttachedServices(services)
+        replaceAttachedServices(normalized)
         onPersistableChange?()
     }
 
@@ -2518,7 +2526,7 @@ final class Chat: Identifiable {
 
     @discardableResult
     func attachService(_ service: Service) -> Bool {
-        guard !attachedServices.contains(service) else { return false }
+        guard !attachedServices.contains(where: { $0.domain == service.domain }) else { return false }
         setAttachedServices(attachedServices + [service])
         return true
     }
@@ -2553,10 +2561,36 @@ final class Chat: Identifiable {
     }
 
     private func resolveAttachedServices() {
+        let normalizedDomains = Self.uniqueServiceDomains(attachedServiceDomains)
+        if normalizedDomains.count != attachedServiceDomains.count {
+            Log.session.warning("Chat.resolveAttachedServices deduplicated id=\(id) stored=\(attachedServiceDomains.count) unique=\(normalizedDomains.count)")
+            attachedServiceDomains = normalizedDomains
+        }
         replaceAttachedServices(attachedServiceDomains.compactMap { serviceManager.service(domain: $0) })
     }
 
+    private static func uniqueServiceDomains(_ domains: [String]) -> [String] {
+        var seen: Set<String> = []
+        return domains.filter { seen.insert($0).inserted }
+    }
+
+    private static func uniqueServices(_ services: [Service]) -> [Service] {
+        var normalized: [Service] = []
+        var indexByDomain: [String: Int] = [:]
+        for service in services {
+            if let index = indexByDomain[service.domain] {
+                normalized[index] = service
+            } else {
+                indexByDomain[service.domain] = normalized.count
+                normalized.append(service)
+            }
+        }
+        return normalized
+    }
+
     private func replaceAttachedServices(_ services: [Service]) {
+        assert(Set(services.map(\.domain)).count == services.count)
+        assert(services.allSatisfy { serviceManager.service(domain: $0.domain) === $0 })
         let unchanged = services.count == attachedServices.count
             && zip(services, attachedServices).allSatisfy { pair in pair.0 === pair.1 }
         guard !unchanged else { return }

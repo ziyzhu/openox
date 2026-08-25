@@ -1,28 +1,20 @@
 ---
 name: ox-debug
-description: Debug the running Ox iOS app through its debug WebSocket. Use when inspecting chats or structured logs, running or replaying LLM agents in isolation, replaying projection fixtures, or verifying that a git URL conforms to the Ox Server IR. Use the ox-cli skill for Host and VM inspection, structured `ox.*` calls, VM-visible skills, and VM JavaScript evaluation.
+description: Replay committed Ox conversation fixtures through the running app's projection reducer and compare golden snapshots. Use only for reducer fixture verification or intentional golden updates. Use the ox-cli skill for Host, chat, log, agent, VM, service, Profile, and repository operations.
 ---
 
 # Ox Debug
 
-Live introspection of the running DEBUG iOS app over its debug WebSocket, plus Server IR conformance checks. Run from the Ox repository root with `bun run debug`; consult `bun run debug --help` and the relevant subcommand help before guessing flags.
+Repository-owned projection reducer verification through the running DEBUG iOS app. Run from the Ox repository root with `bun run debug`; consult command help before guessing flags.
 
-Keep adjacent surfaces on their intended tools:
+Use the Ox CLI for every general Host-client operation:
 
-- Use `ox vm` for Host and VM inspection, structured `ox.*` calls, VM-visible skills, and VM JavaScript evaluation.
-- Use `ox` for Profile administration, service manifests, actions, skills, and live service invocation.
+- Use `ox chat` for live chat discovery, inspection, and watching.
+- Use `ox logs` and `ox agent` for runtime introspection.
+- Use `ox vm` for structured `ox.*` calls, VM-visible skills, and VM JavaScript evaluation.
+- Use `ox repository verify` for Server IR conformance.
 - Use `sim` for every iOS Simulator interaction.
-- Use `bun run debug` for chat, log, agent, reducer, and Server IR operations.
-
-## Inspect the running app
-
-```sh
-bun run debug dev list-chats [--json] [--timeout 30000]
-bun run debug dev chat [<id>] [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000]
-bun run debug dev logs [--level debug|info|warning|error] [--grep <substring>] [--json] [--timeout 30000]
-bun run debug dev transcript [--json] [--timeout 30000]
-bun run debug dev performance [--json] [--timeout 30000]
-```
+- Use `bun run debug` only for projection reducer fixture replay.
 
 Replay the committed conversation corpus through Ox's projection reducer:
 
@@ -30,38 +22,15 @@ Replay the committed conversation corpus through Ox's projection reducer:
 bun run debug reducer replay [--fixtures ios/fixtures/chatlogs] [--update] [--json] [--timeout 30000]
 ```
 
-Start with the compact human output. Add `--json` for machine processing and `--full` only when complete tool schemas, messages, or blocks are needed. `dev logs` reads Ox's structured in-memory buffer; use `sim logs` only for device-level logs.
-Use `dev transcript` for the active scroller's frame, ownership, hold, position, and recent geometry history.
-
-The legacy `dev virtual-machine-eval` command remains available for compatibility. Use `ox vm eval` for current VM work so Host selection, protocol checks, and session targeting follow the public CLI surface.
-
 `reducer replay` loads `*.input.json` ChatDocument turns from the host, runs the app's typed projection, and compares `*.golden.json`. Use `--update` only when intentionally accepting a reviewed projection change.
-
-## Run agents headlessly
-
-```sh
-bun run debug agent list [--json] [--timeout 30000]
-bun run debug agent run [<chat>] --prompt '<prompt>' [--client <id>] [--model <id>] [--json] [--timeout 120000]
-bun run debug agent replay [<chat>] [--client <id>] [--model <id>] [--json] [--timeout 120000]
-```
-
-Use `run` for a new prompt. Without a chat it is a fresh turn; with a chat it seeds that chat's system prompt, history, and tools without mutating the session. Use `replay` to reproduce the existing chat exactly without appending a prompt. List agents first when provider or model selection matters.
-
-## Verify a server
-
-```sh
-bun run debug spec verify <git-url>
-```
-
-Use this for Server IR conformance (WHITE_PAPER §6), not for validating editable service sources alone. It clones the target and checks its `main` ref, generated service layout, manifests, actions, skills, and receive-pack capability.
 
 ## Live connection workflow
 
-The `dev` and `agent` commands require a running DEBUG app and its debug WebSocket. On connection failure:
+Reducer replay requires a running DEBUG app and its Host WebSocket. On connection failure:
 
 1. Confirm the app is running with `sim`, without touching the human-reserved `ox-qa` device.
-2. Run `bun run debug dev list-chats` as the smallest connectivity probe.
-3. Check `OX_DEBUG_ENDPOINT` when the app uses a non-default endpoint.
-4. Inspect `bun run debug dev logs --level warning` before widening to device logs.
+2. Run `ox chat list` as the smallest connectivity probe.
+3. Check `OX_HOST_ENDPOINT`, then the compatibility `OX_DEBUG_ENDPOINT`.
+4. Inspect `ox logs --level warning` before widening to device logs.
 
-Prefer command output over assumptions. Report the exact command, target chat, and relevant failure text when blocked.
+Report the fixture directory, exact command, Host endpoint selection method, and relevant failure text when blocked.

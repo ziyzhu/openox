@@ -19,19 +19,13 @@ extension OxHostAPI {
         case getChat = "get-chat"
         case listModels = "list-models"
         case getLogs = "get-logs"
-        case getTranscript = "get-transcript"
-        case getPerformance = "get-performance"
         case getLatestResponse = "get-latest-response"
-        case getTranscriptPerformance = "get-transcript-performance"
         case getComposerFormatting = "get-composer-formatting"
-        case openTranscriptFixture = "open-transcript-fixture"
-        case retainBaselineSessions = "retain-baseline-sessions"
         case repositoryGate = "repository-gate"
         case replayReducer = "replay-reducer"
         case runAgent = "run-agent"
         case virtualMachineEval = "virtual-machine-eval"
         case vmInspect = "vm-inspect"
-        case vmListSessions = "vm-list-sessions"
         case vmFunctions = "vm-functions"
         case vmCall = "vm-call"
         case vmEval = "vm-eval"
@@ -191,16 +185,6 @@ extension OxHostAPI {
         let script: String
     }
 
-    struct CountRequest: Decodable {
-        let id: String
-        let count: Int
-    }
-
-    struct TurnsRequest: Decodable {
-        let id: String
-        let turns: Int
-    }
-
     struct ReplayReducerRequest: Decodable {
         let id: String
         let fixtures: [ReducerFixtureInput]
@@ -217,19 +201,13 @@ extension OxHostAPI {
         case getChat(SessionRequest)
         case listModels(IDRequest)
         case getLogs(IDRequest)
-        case getTranscript(IDRequest)
-        case getPerformance(IDRequest)
         case getLatestResponse(IDRequest)
-        case getTranscriptPerformance(IDRequest)
         case getComposerFormatting(IDRequest)
-        case openTranscriptFixture(TurnsRequest)
-        case retainBaselineSessions(CountRequest)
         case repositoryGate(RepositoryGateRequest)
         case replayReducer(ReplayReducerRequest)
         case runAgent(RunAgentRequest)
         case virtualMachineEval(VirtualMachineEvalRequest)
         case vmInspect(VMRequest)
-        case vmListSessions(VMRequest)
         case vmFunctions(VMFunctionsRequest)
         case vmCall(VMCallRequest)
         case vmEval(VMEvalRequest)
@@ -260,19 +238,13 @@ extension OxHostAPI {
             case .getChat: self = .getChat(try SessionRequest(from: decoder))
             case .listModels: self = .listModels(try IDRequest(from: decoder))
             case .getLogs: self = .getLogs(try IDRequest(from: decoder))
-            case .getTranscript: self = .getTranscript(try IDRequest(from: decoder))
-            case .getPerformance: self = .getPerformance(try IDRequest(from: decoder))
             case .getLatestResponse: self = .getLatestResponse(try IDRequest(from: decoder))
-            case .getTranscriptPerformance: self = .getTranscriptPerformance(try IDRequest(from: decoder))
             case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
-            case .openTranscriptFixture: self = .openTranscriptFixture(try TurnsRequest(from: decoder))
-            case .retainBaselineSessions: self = .retainBaselineSessions(try CountRequest(from: decoder))
             case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
             case .replayReducer: self = .replayReducer(try ReplayReducerRequest(from: decoder))
             case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
             case .virtualMachineEval: self = .virtualMachineEval(try VirtualMachineEvalRequest(from: decoder))
             case .vmInspect: self = .vmInspect(try VMRequest(from: decoder))
-            case .vmListSessions: self = .vmListSessions(try VMRequest(from: decoder))
             case .vmFunctions: self = .vmFunctions(try VMFunctionsRequest(from: decoder))
             case .vmCall: self = .vmCall(try VMCallRequest(from: decoder))
             case .vmEval: self = .vmEval(try VMEvalRequest(from: decoder))
@@ -451,36 +423,6 @@ extension OxHostAPI {
         let id: String
         let ok = true
         let logs: [DebugLogRow]
-    }
-
-    struct GetTranscriptResult: Encodable {
-        let kind = "get-transcript-result"
-        let id: String
-        let ok: Bool
-        let transcript: ChatViewportController.DebugSnapshot?
-        let error: String?
-    }
-
-    struct GetPerformanceResult: Encodable {
-        let kind = "get-performance-result"
-        let id: String
-        let ok = true
-        let data: DebugPerformance.Snapshot
-    }
-
-    struct TranscriptPerformanceResult: Encodable {
-        let kind: String
-        let id: String
-        let ok: Bool
-        let data: DebugTranscriptPerformance.Snapshot?
-        let error: String?
-    }
-
-    struct RetainBaselineSessionsResult: Encodable {
-        let kind = "retain-baseline-sessions-result"
-        let id: String
-        let ok = true
-        let count: Int
     }
 
     struct RepositorySaveGateResult: Encodable {

@@ -93,7 +93,7 @@ try {
     "--disable-icloud",
   ]);
   console.log(`READY ${config.device}`);
-  console.log(`OX_DEBUG_ENDPOINT=ws://127.0.0.1:${config.debugPort} bun run debug dev logs --level error`);
+  console.log(`ox --host ws://127.0.0.1:${config.debugPort} logs --level error`);
   console.log("Press Ctrl-C to stop and release the slot");
   await Promise.race([waitForSignal(() => { stopping = true; }), repositoryServerExit]);
 } finally {

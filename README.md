@@ -1,6 +1,23 @@
-## OpenOx
+<div align="center">
 
-OpenOx is a protocol for self-evolving agents that live on mobile devices.
+<img alt="Ox app icon" src="/ios/ios/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="160" height="160">
+
+<h1>OpenOx</h1>
+
+OpenOx: A protocol for self-evolving agents that live on mobile devices.
+
+<h3>
+
+[Homepage](https://openox.ai) · [TestFlight](https://testflight.apple.com/join/Y3x7nxj9) · [Discord](https://discord.gg/7baSAHZTA)
+
+</h3>
+
+[![GitHub Repo stars](https://img.shields.io/github/stars/ziyzhu/openox)](https://github.com/ziyzhu/openox/stargazers)
+[![CI](https://github.com/ziyzhu/openox/actions/workflows/ci.yml/badge.svg)](https://github.com/ziyzhu/openox/actions/workflows/ci.yml)
+
+</div>
+
+---
 
 Each such agent is called an Ox and follows three principles:
 
@@ -16,7 +33,7 @@ The first implementation of Ox is an iOS Client and Host whose source code is in
 flowchart LR
     Client[Ox Client] -->|Host protocol| Host[Ox Host]
     Host --> Profile[Ox Profile]
-    Host --> Model[Model provider]
+    Host --> Model[Ox Model Provider]
     Host --> VM[Ox VM]
     VM --> Capabilities[ox.* capabilities]
     VM --> Skills[Skills and VFS]
@@ -25,7 +42,7 @@ flowchart LR
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
-- **Model** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
+- **Ox Model Provider** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
 - **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code.
   - **`ox.*`** — Explicit Host capabilities for interacting with the Profile, services, web, user, and device.
@@ -34,13 +51,7 @@ flowchart LR
   - **Actions** — Typed operations the agent can invoke.
   - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
 
-## Execution and Self-Evolution
-
-A Client selects a Host and a VM session. The session binds execution to the relevant conversation, permissions, attached services, and virtual filesystem view. Skills depend only on this VM contract, not on the Host platform or implementation language.
-
-The VM has no direct access to the network, Host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
-
-The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in [`docs/VM.md`](docs/VM.md).
+## Self-Evolution
 
 The VM is also how Ox evolves. Ox can invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
 
@@ -52,7 +63,31 @@ The VM is also how Ox evolves. Ox can invoke an existing service while creating 
 
 Ox can therefore gain and apply a capability without rebuilding or updating the client.
 
-## Services and Distribution
+## Ox Client
+
+A Client selects an Ox Host and, when needed, a chat. The Host binds VM execution to that conversation, its permissions, attached services, and virtual filesystem view. The Client can embed its Host or connect to a compatible Host elsewhere.
+
+## Ox Host
+
+The Host opens an Ox Profile, runs the Ox VM, and supplies the adapters that connect the VM to models, services, and platform capabilities.
+
+## Ox Model Provider
+
+The user selects the language model. The Host adapts provider-specific APIs to the provider-neutral agent loop, so neither the OpenOx protocol nor an Ox Profile is tied to one provider.
+
+## Ox Profile
+
+The Profile is the portable home of an Ox. It keeps the agent's identity, memory, skills, artifacts, and conversation history together so the agent's persistent state can move independently of a particular Client or model.
+
+## Ox VM
+
+The VM is the platform-neutral contract between skills and the Host. Skills depend on this contract rather than the Host platform or implementation language.
+
+The VM has no direct access to the network, Host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
+
+The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in [`docs/VM.md`](docs/VM.md).
+
+## Ox Service Repository
 
 OpenOx supports three kinds of services:
 
@@ -100,10 +135,13 @@ To use a different service repository while developing, serve it explicitly:
 ox repository serve /path/to/service-repository --port 8101
 ```
 
-The Ox CLI is another Client. During development it can target the Host in a running iOS Simulator and exercise the same VM contract the agent sees:
+The Ox CLI is another Client. During development it can discover and target the Host in a running iOS Simulator, inspect chats and logs, run agents, and exercise the same VM contract the agent sees:
 
 ```sh
-ox vm sessions
+ox discover
+ox chat list
+ox chat inspect
+ox logs --follow
 ox vm inspect
 ox vm functions
 ox vm call ox.fs.list --args '{"path":"skills","purpose":"List VM skills"}'
@@ -117,7 +155,7 @@ Use `--host <ws-url>` or `OX_HOST_ENDPOINT` when the Host does not use the defau
 
 [Discord](https://discord.gg/7baSAHZTA)
 
-## Acknowledgements
+## Acknowledgement
 
 [Pi](https://github.com/earendil-works/pi): Ox's main Swift agent loop referenced Pi.
 

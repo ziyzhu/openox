@@ -2,7 +2,7 @@
   "private": true,
   "author": "Ziyuan Zhu",
   "license": "MIT",
-  "workspaces": ["ox-cli", "dev", "service-sdk", "services"],
+  "workspaces": ["ox-cli", "service-sdk", "services"],
   "scripts": {
     "setup:ios": "bun scripts/ios-config.ts",
     "test:llm": "bun ios/tests/llm/run.ts",
@@ -12,7 +12,6 @@
     "build:services": "bun scripts/ios-services-build.ts",
     "build:ios-services": "bun run build:services",
     "build:web-worker": "bun scripts/build-public-web-worker.ts",
-    "debug-ui": "bun scripts/debug-ui.ts",
     "debug": "bun .agents/skills/ox-debug/ox-debug.ts",
     "check:localizations": "bun scripts/localization-check.ts",
     "check:system-skills": "bun scripts/system-skills-check.ts",

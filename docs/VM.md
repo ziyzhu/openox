@@ -36,7 +36,7 @@ VM implementation while preserving the observable VM contract.
 
 The CLI expresses those resources as `--host <ws-url>` and
 `--chat <chat-id>`. Direct Profile administration instead uses
-`--profile <path>` and does not imply a VM session.
+`--profile <path>` and does not imply a Host connection or chat-backed VM.
 
 The iOS Client calls the `OxHost` contract in process and preserves the
 observable Swift models used by the native interface. It does not serialize
@@ -47,7 +47,7 @@ Simulator-only view and composer automation remains behind `DebugUIAPI`.
 
 The iOS Host currently exposes version 1 of the control protocol from DEBUG
 Simulator builds over its loopback WebSocket. It supports Host and VM
-inspection, session discovery, function discovery, structured `ox.*` calls,
+inspection, chat discovery, function discovery, structured `ox.*` calls,
 and arbitrary development evaluation. `ox vm call` is the stable operation
 surface; `ox vm eval` is a development escape hatch.
 
@@ -62,7 +62,6 @@ request envelope
 └── operation fields
 
 operations
-├── vm-list-sessions            targetable hydrated sessions
 ├── vm-inspect                  Host, VM, session, and visible VFS roots
 ├── vm-functions                complete catalog or one function contract
 ├── vm-call                     catalogued function + JSON object arguments

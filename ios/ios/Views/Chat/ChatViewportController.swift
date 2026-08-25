@@ -102,35 +102,6 @@ final class ChatViewportController {
         }
     }
 
-    private enum Recorded {
-        case geometry(Frame, Motion)
-        case phase(ScrollPhase, ScrollPhase)
-        case gesture
-        case focus(Bool, String)
-        case programmatic(Target)
-        case page(UUID)
-    }
-
-    private struct Entry {
-        let at: Date
-        let recorded: Recorded
-    }
-
-    #if targetEnvironment(simulator)
-    struct DebugSnapshot: Encodable {
-        let chatID: String
-        let frame: String?
-        let position: String
-        let owner: String
-        let restingFromEnd: Int
-        let jumpDistance: Int
-        let jumpThreshold: Int
-        let insetsSettling: Bool
-        let showsJumpButton: Bool
-        let history: [String]
-    }
-    #endif
-
     private static let jumpThreshold: CGFloat = 32
 
     private(set) var showsJumpButton = false
@@ -153,14 +124,9 @@ final class ChatViewportController {
     @ObservationIgnored private lazy var geometryFrameDriver = ChatViewportFrameDriver { [weak self] in
         self?.commitPendingGeometry()
     }
-    @ObservationIgnored private var entries = [Entry?](repeating: nil, count: 64)
-    @ObservationIgnored private var entryIndex = 0
 
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
         self.chatID = chatID
-        #if targetEnvironment(simulator)
-        DebugUIAPI.viewportController = self
-        #endif
         frame = nil
         pendingFrame = nil
         geometryFrameDriver.cancel()
@@ -200,7 +166,6 @@ final class ChatViewportController {
     }
 
     func preservePageAnchor(_ id: UUID) {
-        record(.page(id))
         position.scrollTo(id: id, anchor: .top)
         Log.ui.info("Transcript.pageAnchor chat=\(chatID) block=\(id)")
     }
@@ -211,7 +176,6 @@ final class ChatViewportController {
         if focused {
             guard let frame else {
                 viewportHold = nil
-                record(.focus(true, "none"))
                 Log.ui.info("Transcript.focus chat=\(chatID) focused=true hold=none")
                 return
             }
@@ -225,7 +189,6 @@ final class ChatViewportController {
             }
         }
         let label = viewportHold?.label ?? "none"
-        record(.focus(focused, label))
         applyViewportHold()
         Log.ui.info("Transcript.focus chat=\(chatID) focused=\(focused) hold=\(label)")
     }
@@ -236,7 +199,6 @@ final class ChatViewportController {
     }
 
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
-        record(.phase(old, new))
         if new.isUserDriven {
             motion = .user(new)
         } else if new == .idle {
@@ -249,7 +211,6 @@ final class ChatViewportController {
         viewportHold = nil
         guard !isUserScrolling else { return }
         motion = .user(.tracking)
-        record(.gesture)
         Log.ui.info("Transcript.gestureStart chat=\(chatID)")
     }
 
@@ -266,7 +227,6 @@ final class ChatViewportController {
 
     private func commitGeometry(_ new: Frame) {
         frame = new
-        record(.geometry(new, motion))
         updateJumpButton(new)
         applyViewportHold()
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
@@ -299,7 +259,6 @@ final class ChatViewportController {
             viewportHold = nil
         }
         motion = .programmatic(target)
-        record(.programmatic(target))
     }
 
     private func updateJumpButton(_ frame: Frame) {
@@ -309,56 +268,6 @@ final class ChatViewportController {
         Log.ui.info("Transcript.jumpButton chat=\(chatID) shows=\(shows) fromEnd=\(Int(frame.distanceFromEnd)) inset=\(Int(frame.insetBottom))")
     }
 
-    private func describePosition() -> String {
-        if let edge = position.edge { return "edge(\(edge))" }
-        if let id = position.viewID(type: UUID.self) { return "id(\(id.uuidString.prefix(8)))" }
-        if let point = position.point { return "point(\(Int(point.y)))" }
-        return "none"
-    }
-
-    private func record(_ recorded: Recorded) {
-        entries[entryIndex] = Entry(at: .now, recorded: recorded)
-        entryIndex = (entryIndex + 1) % entries.count
-    }
-
-    private func recentHistory(limit: Int) -> [String] {
-        let now = Date.now
-        var lines: [String] = []
-        for offset in 0..<entries.count {
-            guard let entry = entries[(entryIndex + offset) % entries.count] else { continue }
-            let age = String(format: "%.2f", now.timeIntervalSince(entry.at))
-            lines.append("-\(age)s \(describe(entry.recorded))")
-        }
-        return Array(lines.suffix(limit))
-    }
-
-    private func describe(_ recorded: Recorded) -> String {
-        switch recorded {
-        case let .geometry(frame, motion): "geo \(motion.label) \(frame.summary)"
-        case let .phase(old, new): "phase \(String(describing: old)) -> \(String(describing: new))"
-        case .gesture: "gesture"
-        case let .focus(focused, hold): "focus focused=\(focused) hold=\(hold)"
-        case .programmatic(let target): "programmatic \(target.label)"
-        case .page(let id): "page anchor \(id.uuidString.prefix(8))"
-        }
-    }
-
-    #if targetEnvironment(simulator)
-    func debugSnapshot() -> DebugSnapshot {
-        DebugSnapshot(
-            chatID: chatID,
-            frame: frame?.summary,
-            position: describePosition(),
-            owner: motion.label,
-            restingFromEnd: Int(max(0, frame?.distanceFromEnd ?? 0)),
-            jumpDistance: Int(frame?.jumpDistance ?? 0),
-            jumpThreshold: Int(Self.jumpThreshold),
-            insetsSettling: false,
-            showsJumpButton: showsJumpButton,
-            history: recentHistory(limit: 24)
-        )
-    }
-    #endif
 }
 
 @MainActor

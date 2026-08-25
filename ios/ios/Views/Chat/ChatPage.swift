@@ -469,8 +469,7 @@ struct ChatPage: View {
         )
         return transcript(
             blocks: blocks,
-            renderedBlocks: Array(blocks[range]),
-            selectedRange: range
+            renderedBlocks: Array(blocks[range])
         )
     }
 
@@ -858,23 +857,8 @@ struct ChatPage: View {
 
     private func transcript(
         blocks: [ChatBlock],
-        renderedBlocks: [ChatBlock],
-        selectedRange: Range<Int>
+        renderedBlocks: [ChatBlock]
     ) -> some View {
-        #if targetEnvironment(simulator)
-        DebugTranscriptPerformance.recordTranscript(
-            chatID: chat.id,
-            totalBlocks: blocks.count,
-            selectedRange: selectedRange,
-            renderedBlocks: renderedBlocks.count,
-            loadedEarlierBlocks: transcriptWindow.loadedEarlierBlocks,
-            windowShiftCount: transcriptWindow.shiftCount,
-            windowShiftDirection: transcriptWindow.lastShiftDirection,
-            windowMode: transcriptWindow.mode.label,
-            anchor: transcriptWindow.mode.anchor,
-            pendingWindowOwner: nil
-        )
-        #endif
         let lastBlockID = renderedBlocks.last?.id
         let anchoredViewportHeight = max(
             0,

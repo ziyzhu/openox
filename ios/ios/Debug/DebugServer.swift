@@ -11,7 +11,6 @@ final class DebugServer {
     typealias CommandHandler = @MainActor (Data, @escaping @MainActor (Data) -> Void) -> Void
 
     var onCommand: CommandHandler?
-    var onConnect: (@MainActor () -> [Data])?
 
     private var listener: NWListener?
     private var connections: [ObjectIdentifier: NWConnection] = [:]
@@ -46,10 +45,6 @@ final class DebugServer {
         }
     }
 
-    func broadcast(_ data: Data) {
-        for conn in connections.values { send(data, on: conn) }
-    }
-
     private func handleListenerState(_ state: NWListener.State) {
         switch state {
         case .ready:  Log.app.info("DebugServer ready port=\(Self.port)")
@@ -66,9 +61,6 @@ final class DebugServer {
             guard let self, let conn else { return }
             Task { @MainActor in
                 self.handleConnectionState(conn, state: state, key: key)
-                if case .ready = state, let frames = self.onConnect?() {
-                    for frame in frames { self.send(frame, on: conn) }
-                }
             }
         }
         conn.start(queue: queue)

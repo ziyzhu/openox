@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { C, dispatch, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
+import { verifyRepository } from "./repository-verify.ts";
 
 type RepositoryPackage = {
   version: 1;
@@ -31,11 +32,12 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 export const SUBS: Record<string, SubCommand> = {
   inspect: { desc: "Inspect a local, localhost, or HTTPS service repository", fn: inspectRepository },
   validate: { desc: "Validate a local, localhost, or HTTPS service repository", fn: validateRepository },
+  verify: { desc: "Verify that a Git URL conforms to the Ox Server IR", fn: verifyRepository },
   serve: { desc: "Serve a local or remote service repository on localhost", fn: serveRepository },
 };
 
 export async function repository(args: string[], context: CliContext): Promise<void> {
-  return dispatch("repository", "Inspect, validate, or locally serve a service repository.", SUBS, args, context);
+  return dispatch("repository", "Inspect, validate, verify, or locally serve a service repository.", SUBS, args, context);
 }
 
 function servicePath(id: string): string {

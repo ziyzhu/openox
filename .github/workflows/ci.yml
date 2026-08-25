@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - "ox-cli/**"
-      - "dev/**"
       - "tooling/**"
       - "scripts/**"
       - "service-sdk/**"
@@ -25,7 +24,6 @@ on:
     branches: [main]
     paths:
       - "ox-cli/**"
-      - "dev/**"
       - "tooling/**"
       - "scripts/**"
       - "service-sdk/**"

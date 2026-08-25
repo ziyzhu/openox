@@ -1086,9 +1086,6 @@ struct BlockView: View, Equatable {
 
     @ViewBuilder
     var body: some View {
-        #if targetEnvironment(simulator)
-        let _ = DebugTranscriptPerformance.recordBlockViewBody(chatID: chatID)
-        #endif
         switch block.kind {
         case .userText(let s, let atts):
             userTextBubble(s, attachments: atts, createdAt: block.createdAt)
