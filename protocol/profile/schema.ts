@@ -10,7 +10,7 @@ export const ProfileConfigSchema = Type.Object({
   version: Type.String({ minLength: 1 }),
 }, {
   additionalProperties: false,
-  $id: "https://oxcraft.ai/schemas/profile-config-v1.json",
+  $id: "https://openox.ai/schemas/profile-config-v1.json",
 });
 
 export const ChatMetadataSchema = Type.Object({
@@ -28,7 +28,7 @@ export const ChatMetadataSchema = Type.Object({
   hasUnreadResponse: Type.Optional(Type.Boolean()),
 }, {
   additionalProperties: false,
-  $id: "https://oxcraft.ai/schemas/chat-metadata-v1.json",
+  $id: "https://openox.ai/schemas/chat-metadata-v1.json",
 });
 
 export type ProfileConfig = Static<typeof ProfileConfigSchema>;

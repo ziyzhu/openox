@@ -16,7 +16,7 @@ export const RepositoryPackageSchema = Type.Object({
   services: Type.Array(RepositoryServiceSchema, { maxItems: 256 }),
 }, {
   additionalProperties: false,
-  $id: "https://oxcraft.ai/schemas/repository-v1.json",
+  $id: "https://openox.ai/schemas/repository-v1.json",
 });
 
 export type RepositoryPackage = Static<typeof RepositoryPackageSchema>;

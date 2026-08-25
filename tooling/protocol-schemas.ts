@@ -12,34 +12,34 @@ const schemas: Array<{ path: string; schema: TSchema; id: string; jsonValue?: bo
   {
     path: "protocol/host/vm-control-request.schema.json",
     schema: VMControlRequestSchema,
-    id: "https://oxcraft.ai/schemas/vm-control-request-v1.json",
+    id: "https://openox.ai/schemas/vm-control-request-v1.json",
     jsonValue: true,
   },
   {
     path: "protocol/host/vm-control-response.schema.json",
     schema: VMControlResponseSchema,
-    id: "https://oxcraft.ai/schemas/vm-control-response-v1.json",
+    id: "https://openox.ai/schemas/vm-control-response-v1.json",
     jsonValue: true,
   },
   {
     path: "protocol/profile/profile.schema.json",
     schema: ProfileConfigSchema,
-    id: "https://oxcraft.ai/schemas/profile-config-v1.json",
+    id: "https://openox.ai/schemas/profile-config-v1.json",
   },
   {
     path: "protocol/profile/chat.schema.json",
     schema: ChatMetadataSchema,
-    id: "https://oxcraft.ai/schemas/chat-metadata-v1.json",
+    id: "https://openox.ai/schemas/chat-metadata-v1.json",
   },
   {
     path: "protocol/services/repository.schema.json",
     schema: RepositoryPackageSchema,
-    id: "https://oxcraft.ai/schemas/repository-v1.json",
+    id: "https://openox.ai/schemas/repository-v1.json",
   },
   {
     path: "protocol/services/service.schema.json",
     schema: ServiceManifestSchema,
-    id: "https://oxcraft.ai/schemas/service-v1.json",
+    id: "https://openox.ai/schemas/service-v1.json",
   },
 ];
 

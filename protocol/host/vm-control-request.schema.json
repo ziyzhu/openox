@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://oxcraft.ai/schemas/vm-control-request-v1.json",
+  "$id": "https://openox.ai/schemas/vm-control-request-v1.json",
   "anyOf": [
     {
       "additionalProperties": false,

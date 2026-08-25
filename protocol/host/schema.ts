@@ -42,7 +42,7 @@ export const VMControlRequestSchema = Type.Union([
   VMFunctionsRequestSchema,
   VMCallRequestSchema,
   VMEvalRequestSchema,
-], { $id: "https://oxcraft.ai/schemas/vm-control-request-v1.json" });
+], { $id: "https://openox.ai/schemas/vm-control-request-v1.json" });
 
 export const VMLogSchema = Type.Object({
   level: Type.String(),
@@ -78,7 +78,7 @@ export const VMControlResponseSchema = Type.Union([
   VMFunctionsResponseSchema,
   VMCallResponseSchema,
   VMEvalResponseSchema,
-], { $id: "https://oxcraft.ai/schemas/vm-control-response-v1.json" });
+], { $id: "https://openox.ai/schemas/vm-control-response-v1.json" });
 
 export type VMControlRequest = Static<typeof VMControlRequestSchema>;
 export type VMControlResponse = Static<typeof VMControlResponseSchema>;

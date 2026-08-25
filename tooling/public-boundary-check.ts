@@ -20,8 +20,8 @@ const forbiddenPaths = [
 const forbiddenText = [
   "XK47F7V3VM",
   "540088482516",
-  "group.ai.oxcraft.bot",
-  "iCloud.ai.oxcraft.bot",
+  "group.ai.openox.bot",
+  "iCloud.ai.openox.bot",
   "github.com/ziyzhu/openox-dev",
 ];
 const failures = files.filter((file) => forbiddenPaths.some((pattern) => pattern.test(file)));

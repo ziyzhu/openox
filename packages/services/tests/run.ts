@@ -6,7 +6,7 @@ import { runOnce } from "../../../apps/cli/src/debug-ws.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../tooling/qa-config.ts";
 import { ROOT } from "../../../tooling/lib.ts";
 
-const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.oxcraft.bot";
+const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
 const PROJECT = join(ROOT, "apps/ios/OpenOx.xcodeproj");
 const SCHEME = "ios";
 
