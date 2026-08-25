@@ -8,19 +8,18 @@ services/web/<domain>/
 └── actions.js
 ```
 
-## 1. Establish the service
+## 1. Discover the service
 
-1. Attach `ios:browser` and inspect its action contracts.
+1. Attach `ios:browser`, inspect its compact action index, then inspect the exact contracts for every Browser action the exploration expects to use, including interaction, capture, page JavaScript, document-start injection, and cleanup actions.
 2. Navigate to the requested URL and wait for the top-level URL to settle.
 3. Identify the coherent product surface and the hosts needed by its actions.
 4. Search with `ox.service.find` for the requested host, final host, and plausible parent-domain candidates.
 5. Choose a bare lowercase service domain that equals or is a parent suffix of every base URL host. Keep distinct products or account surfaces as separate services.
-6. Inspect Local Git status.
-7. Create a new Local service with `ox.service.create`, or copy an existing non-Local service with `ox.service.copy`. Obtain the required approval.
-8. Use the returned domain as the directory, manifest, and runtime identity.
-9. Read the generated Local files before planning edits.
+6. When the service already exists, inspect its manifest and source read-only. Do not copy or edit it yet.
 
-Choose the lightest stable top-level `baseUrl` on the service domain or a subdomain that preserves the cookies, storage, page globals, and runtime behavior the actions need. For example, `xiaohongshu.com` can use a page on `www.xiaohongshu.com`, while a distinct creator surface can remain its own service.
+For a new service, defer `ox.service.create` until the action plan is confirmed. For an existing non-Local service, defer `ox.service.copy` until confirmation. Discovery and planning must not leave an abandoned Local draft.
+
+Choose the lightest stable top-level `baseUrl` on the service domain or a subdomain that preserves the cookies, storage, page globals, and runtime behavior the actions need. Prefer an inert same-origin resource that returns a displayable `200` without authentication-dependent redirects when the actions need only cookies, storage, and same-origin requests. Stable HTML, text, `robots.txt`, or favicon resources are candidates only after Browser verifies the final URL, dispatcher injection, and required same-origin requests while signed in and signed out. Never use a cross-origin CDN asset as an execution base. Keep actions that depend on application DOM or page globals on the actual application route through an action-specific `baseUrl`. For example, `xiaohongshu.com` can use a page on `www.xiaohongshu.com`, while a distinct creator surface can remain its own service.
 
 Inspect nearby service contracts through their manifests and `ox.service.inspect`:
 
@@ -53,9 +52,13 @@ Cover applicable success, empty, terminal pagination, safe missing-resource, sig
 
 Keep evidence compact: return field names, types, counts, pagination facts, and a small safe sample. Keep cookies, authorization values, CSRF values, reusable tokens, private bodies, and raw signatures out of chat.
 
+On an authenticated page, never return broad `body.innerText`, `textContent`, HTML, private record contents, or similarly unbounded user content to the chat. Probe structural facts such as element presence, selectors, field names, counts, route identity, and bounded non-sensitive values. When private content is necessary to verify extraction, inspect only the minimum value needed and do not echo it in the result.
+
 Preserve a resource-scoped URL only when it is the observed opaque identifier required to revisit that returned item and does not act as a reusable account credential. Pass it intact between actions and keep its token components out of logs and descriptions.
 
 Use `ios:browser:interact` for credentials, challenges, account choices, and other human-only steps.
+
+When proposed actions require authentication, let the user complete the website's sign-in flow through Browser and collect signed-in evidence before presenting a confirmable action plan. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
 
 ### Choose a favicon
 
@@ -79,9 +82,13 @@ Present:
 - The observed behavior supporting each action.
 - Useful observed capabilities excluded from this version.
 
+Include only actions with an observed extraction path in every authentication state needed for their implementation. Mark hypotheses and inaccessible capabilities as provisional or exclude them from the confirmed surface.
+
 End the response after presenting the plan. Continue authoring only after a later user message explicitly confirms this action surface. Creation approval, plan confirmation, live mutation approval, and Local Git commit approval are separate checkpoints.
 
 ## 4. Author manifest.json
+
+After the plan is confirmed, inspect complete Local Git status. Create the new service with `ox.service.create`, or copy the existing non-Local candidate with `ox.service.copy`, and obtain the required approval. Use the returned domain as the directory, manifest, and runtime identity, then read the generated or copied files before editing.
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. Each accepted mutation validates the Local source while leaving running attachments unchanged. Finish a coherent set of edits before reloading it for verification.
 
@@ -124,11 +131,13 @@ Add authentication when useful actions depend on a signed-in browser session:
 
 1. Mark those useful actions `requireAuth: true`.
 2. Add `getSignInUrl({}): {url}` and `getSignInState({}): {signedIn}` with exact empty inputs.
-3. Return a stable allowed sign-in URL and make `getSignInState` a fresh, session-authoritative, read-only probe. Prefer an observed cookie-authenticated identity response or a lightweight protected `HEAD` or `GET` whose status or redirect distinguishes signed-in and signed-out sessions.
-4. Use readable cookies only when their lifetime and logout behavior are verified. Use hydrated stores, page globals, and DOM markers only as a last resort because the handoff page and hidden action page are separate web pages that share credentials but not in-memory JavaScript state.
-5. Return `signedIn: false` only for an observed unauthenticated response. Let unexpected status, redirect, parsing, CORS, signature, verification, and network failures throw. If a site-generated API cannot be fetched directly with the page session, choose another observed signal instead of recreating its signatures.
-6. Verify the probe on the hidden action page while signed out, immediately after sign-in completes on the handoff page, after an action-page reload, and after sign-out. Keep it cheap because iOS polls it during the handoff.
-7. Inspect current state. When signed out, call `await ox.service.signIn({ domain, purpose })`, let the user complete the handoff, confirm signed-in state, then invoke an authenticated action.
+3. When the application shell redirects signed-out users, make the top-level `baseUrl` an inert, same-origin, displayable `200` resource that remains on the trusted service host in both authentication states, and let both authentication actions inherit it. Give actions that require application DOM or page globals their own route-specific `baseUrl`. Only when a stable top-level execution base is unsuitable should both authentication actions declare the same stable action `baseUrl`. A `robots.txt` or favicon resource is valid only after Browser proves document-start dispatcher injection on that exact response. Keep the sign-in handoff URL separate and never add identity-provider hosts to the trusted execution domain merely to follow SSO.
+4. Return a stable allowed sign-in URL and make `getSignInState` a fresh, session-authoritative, read-only probe. From an inert execution page, use an observed same-origin network signal rather than application DOM. Prefer a cookie-authenticated identity response or a lightweight protected `HEAD` or `GET` whose status or redirect distinguishes signed-in and signed-out sessions.
+5. Before authoring the probe, write its decision table from live evidence: the exact observed signed-out status, redirect, or content shape maps to `false`; the exact observed signed-in shape maps to `true`; and every unclassified redirect, unexpected status or content, parsing failure, CORS failure, and network failure throws.
+6. When a network signal is sufficient, do not add cookie, storage, page-global, or DOM corroboration that can lag or outlive the server session. Use those signals only as a disclosed fallback after verifying their creation, reload, expiry, and logout lifecycle. The handoff page and hidden action page are separate pages that share credentials but not in-memory JavaScript state.
+7. Audit the final source so every `false` branch corresponds only to an observed unauthenticated response. If a site-generated API cannot be fetched directly with the page session, choose another observed signal instead of recreating its signatures.
+8. Verify the probe on the hidden action page while signed out, immediately after sign-in completes on the handoff page, and after an action-page reload. Verify sign-out behavior only when the user explicitly authorizes signing out; otherwise report that transition as unverified. Confirm that the execution page's final URL remains on the trusted service host and that its dispatcher is ready throughout. Keep the probe cheap because iOS polls it during the handoff.
+9. Inspect current state. When signed out, call `await ox.service.signIn({ domain, purpose })`, let the user complete the handoff, confirm signed-in state, then invoke an authenticated action.
 
 ### Bot control
 
@@ -184,13 +193,14 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and dispatcher parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke every new or changed action with a small success case.
-6. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries.
-7. Request separate approval before invoking a live mutation.
-8. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
-9. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
-10. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
-11. Verify the favicon URL structurally and report whether its avatar was visually observed.
-12. Stop capture and clear installed document-start scripts.
+6. For every detail action, pass an opaque identifier returned by its corresponding list or search action in the same verified state. Empty ranges, calendar time slots, placeholders, and synthetic identifiers do not count as successful detail verification.
+7. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
+8. Request separate approval before invoking a live mutation.
+9. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
+10. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
+11. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
+12. Verify the favicon URL structurally and report whether its avatar was visually observed.
+13. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting commit approval, committing, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
 
