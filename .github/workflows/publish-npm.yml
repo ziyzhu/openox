@@ -46,7 +46,7 @@ jobs:
         id: release
         run: |
           case "$GITHUB_REF_NAME" in
-            ox-cli-v*) package_directory="ox-cli"; tag_prefix="ox-cli-v" ;;
+            ox-cli-v*) package_directory="cli"; tag_prefix="ox-cli-v" ;;
             service-sdk-v*) package_directory="service-sdk"; tag_prefix="service-sdk-v" ;;
             services-v*) package_directory="services"; tag_prefix="services-v" ;;
             *) exit 1 ;;

@@ -19,7 +19,7 @@ const catalog = await validateBundledModelsDevCatalog();
 console.log(`PASS models.dev catalog selected=${catalog.selectedModels}`);
 
 const projects = [
-  "ox-cli/tsconfig.json",
+  "cli/tsconfig.json",
   "service-sdk/tsconfig.json",
   "services/tsconfig.json",
   ".agents/skills/ox-debug/tsconfig.json",

@@ -2,7 +2,7 @@
   "private": true,
   "author": "Ziyuan Zhu",
   "license": "MIT",
-  "workspaces": ["ox-cli", "service-sdk", "services"],
+  "workspaces": ["cli", "service-sdk", "services"],
   "scripts": {
     "setup:ios": "bun scripts/ios-config.ts",
     "test:llm": "bun ios/tests/llm/run.ts",

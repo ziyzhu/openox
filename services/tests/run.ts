@@ -2,7 +2,7 @@ import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, stat
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { runOnce } from "../../ox-cli/debug-ws.ts";
+import { runOnce } from "../../cli/debug-ws.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../scripts/qa-config.ts";
 import { ROOT } from "../../scripts/lib.ts";
 
@@ -198,7 +198,7 @@ try {
   console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, repository ${config.registryPort}, debug ${config.debugPort}`);
   await command(["bun", "run", "export", "--output", generatedRepository], { cwd: options.repository });
   registry = Bun.spawn({
-    cmd: ["bun", "ox-cli/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
+    cmd: ["bun", "cli/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
     cwd: ROOT,
     env: Bun.env,
     stdout: "inherit",
@@ -235,7 +235,7 @@ try {
     OX_SERVER_SOURCE: join(options.repository, "src", "services", "web"),
   };
   await command([
-    "bun", "ox-cli/ox.ts",
+    "bun", "cli/ox.ts",
     "service", "test",
     ...(options.selector ? [options.selector] : []),
     "--proxy-port", String(config.serviceProxyPort),

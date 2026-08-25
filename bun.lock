@@ -12,7 +12,7 @@
         "typescript": "^5",
       },
     },
-    "ox-cli": {
+    "cli": {
       "name": "@openox/cli",
       "version": "0.1.0",
       "bin": {
@@ -45,7 +45,7 @@
   "packages": {
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
 
-    "@openox/cli": ["@openox/cli@workspace:ox-cli"],
+    "@openox/cli": ["@openox/cli@workspace:cli"],
 
     "@openox/service-sdk": ["@openox/service-sdk@workspace:service-sdk"],
 

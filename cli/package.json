@@ -31,9 +31,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ziyzhu/openox.git",
-    "directory": "ox-cli"
+    "directory": "cli"
   },
-  "homepage": "https://github.com/ziyzhu/openox/tree/main/ox-cli",
+  "homepage": "https://github.com/ziyzhu/openox/tree/main/cli",
   "bugs": {
     "url": "https://github.com/ziyzhu/openox/issues"
   },

@@ -61,7 +61,7 @@ await requireFreePort(config.debugPort);
 
 console.log(`Environment ${config.device}: repository ${config.registryPort}, debug ${config.debugPort}`);
 const repositoryServer = Bun.spawn({
-  cmd: ["bun", "ox-cli/ox.ts", "repository", "serve", repository, "--port", String(config.registryPort)],
+  cmd: ["bun", "cli/ox.ts", "repository", "serve", repository, "--port", String(config.registryPort)],
   cwd: ROOT,
   env: Bun.env,
   stdout: "inherit",

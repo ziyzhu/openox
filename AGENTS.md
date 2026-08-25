@@ -31,7 +31,7 @@
 ## Layout
 
 1. `ios/` contains the iOS app and Share Extension.
-1. `ox-cli/` contains the Bun service CLI.
+1. `cli/` contains the Bun service CLI.
 1. `service-sdk/` contains reusable service contracts, validation, helpers, and replay tooling published as `@openox/service-sdk`.
 1. `services/` contains official built-in service sources and the generated repository package published as `@openox/services`.
 1. `examples/service-repository/` is a standalone remote service repository example.

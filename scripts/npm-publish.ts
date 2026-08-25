@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { ROOT } from "./lib.ts";
 
 const packageNames = {
-  "ox-cli": "@openox/cli",
+  cli: "@openox/cli",
   "service-sdk": "@openox/service-sdk",
   services: "@openox/services",
 } as const;
@@ -20,7 +20,7 @@ const { values } = parseArgs({
 
 const directory = values.directory;
 const tarball = values.tarball ? resolve(values.tarball) : null;
-if (!directory || !(directory in packageNames)) throw new Error("Pass --directory <ox-cli|service-sdk|services>");
+if (!directory || !(directory in packageNames)) throw new Error("Pass --directory <cli|service-sdk|services>");
 if (!tarball || !await Bun.file(tarball).exists()) throw new Error("Pass --tarball <package.tgz>");
 
 const expectedName = packageNames[directory as keyof typeof packageNames];

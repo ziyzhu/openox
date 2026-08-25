@@ -38,7 +38,7 @@ Run it without a global installation with `bunx @openox/cli --help`.
 git clone https://github.com/ziyzhu/openox.git
 cd openox
 bun install
-cd ox-cli
+cd cli
 bun run build
 bun link
 ox --help
@@ -305,7 +305,7 @@ From the repository root:
 
 ```sh
 bun run typecheck
-cd ox-cli
+cd cli
 bun run build
 bun run package:check
 ```
@@ -321,7 +321,7 @@ run the package check, then create a matching `ox-cli-v<version>` tag.
 The first npm release must be published interactively:
 
 ```sh
-cd ox-cli
+cd cli
 bun package-check.ts --output /tmp/ox-cli-release
 npm publish /tmp/ox-cli-release/openox-cli-0.1.0.tgz --access public
 ```

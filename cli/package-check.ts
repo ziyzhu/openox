@@ -24,7 +24,7 @@ try {
     readFile(join(import.meta.dir, "LICENSE"), "utf8"),
     readFile(resolve(import.meta.dir, "../LICENSE"), "utf8"),
   ]);
-  if (packageLicense !== repositoryLicense) throw new Error("ox-cli/LICENSE differs from the repository LICENSE");
+  if (packageLicense !== repositoryLicense) throw new Error("cli/LICENSE differs from the repository LICENSE");
   await mkdir(packageDirectory, { recursive: true });
   await run(["bun", "build.ts"], import.meta.dir);
   const bundle = await readFile(join(import.meta.dir, "dist", "ox.js"), "utf8");

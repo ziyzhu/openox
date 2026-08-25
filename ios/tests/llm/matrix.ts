@@ -399,7 +399,7 @@ async function runMatrix(options: Options): Promise<void> {
   try {
     await Promise.all([requireFreePort(config.registryPort), requireFreePort(config.debugPort)]);
     registry = Bun.spawn({
-      cmd: ["bun", "ox-cli/ox.ts", "repository", "serve", options.repository, "--port", String(config.registryPort)],
+      cmd: ["bun", "cli/ox.ts", "repository", "serve", options.repository, "--port", String(config.registryPort)],
       cwd: ROOT,
       env: Bun.env,
       stdout: "inherit",
