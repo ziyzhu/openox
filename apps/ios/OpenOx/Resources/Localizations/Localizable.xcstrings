@@ -7029,12 +7029,12 @@
         }
       }
     },
-    "Read a service commit" : {
+    "Read a saved service version" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "读取服务提交"
+            "value" : "读取已保存的服务版本"
           }
         }
       }
@@ -7888,12 +7888,12 @@
         }
       }
     },
-    "Revert a Local commit" : {
+    "Undo a saved Local version" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "还原本地提交"
+            "value" : "撤销已保存的本地版本"
           }
         }
       }
@@ -10193,12 +10193,12 @@
         }
       }
     },
-    "Visit a service commit" : {
+    "View a saved service version" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "访问服务提交"
+            "value" : "查看已保存的服务版本"
           }
         }
       }

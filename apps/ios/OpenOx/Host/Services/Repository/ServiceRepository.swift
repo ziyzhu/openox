@@ -866,7 +866,7 @@ actor ServiceRepository {
         let loaded = try gitRepository(repositoryID)
         let repository = try SwiftGitX.Repository.open(at: loaded.root)
         guard try repository.status().isEmpty else {
-            throw Failure(message: "Restore or commit uncommitted changes before checking out history")
+            throw Failure(message: "Restore or save current changes before viewing service history")
         }
         guard let previous = try repository.HEAD.target as? Commit else {
             throw Failure(message: "Repository HEAD is not a commit")
@@ -903,7 +903,7 @@ actor ServiceRepository {
     func gitCommitLocal(message: String) throws -> GitCommit {
         let repository = try editableLocalRepository()
         let before = try repository.status()
-        guard !before.isEmpty else { throw Failure(message: "Local has no changes to commit") }
+        guard !before.isEmpty else { throw Failure(message: "Local has no changes to save") }
         try Self.stageAllChanges(in: repository)
         let commit = try repository.commit(message: message)
         Log.service.info("ServiceRepository.git commit repository=local commit=\(commit.id.abbreviated) files=\(before.count)")
@@ -913,15 +913,15 @@ actor ServiceRepository {
     func prepareLocalRevert(commitHash: String) throws {
         let repository = try editableLocalRepository()
         guard try repository.status().isEmpty else {
-            throw Failure(message: "Restore or commit Local changes before reverting a commit")
+            throw Failure(message: "Restore or save Local changes before undoing a saved version")
         }
         let commit = try Self.historyCommit(commitHash, in: repository)
-        guard !(try commit.parents).isEmpty else { throw Failure(message: "The initial Local commit cannot be reverted") }
+        guard !(try commit.parents).isEmpty else { throw Failure(message: "The initial Local version cannot be undone") }
         do {
             try repository.revert(commit)
             let status = try repository.status()
             guard !status.contains(where: { $0.status.contains(.conflicted) }) else {
-                throw Failure(message: "Reverting this commit conflicts with later Local changes")
+                throw Failure(message: "Undoing this version conflicts with later Local changes")
             }
             _ = try Self.loadPackage(at: localRoot, provenance: .local)
         } catch {
@@ -970,7 +970,7 @@ actor ServiceRepository {
         try materializeLocalRepository()
         let repository = try SwiftGitX.Repository.open(at: localRoot)
         guard !repository.isHEADDetached else {
-            throw Failure(message: "Local is viewing historical commit; check out latest before editing history")
+            throw Failure(message: "Local is viewing a saved version; return to latest before editing history")
         }
         return repository
     }
