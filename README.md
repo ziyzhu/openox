@@ -47,7 +47,7 @@ flowchart LR
 - **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code.
   - **`ox.*`** — Explicit Host capabilities for interacting with the Profile, services, web, user, and device.
   - **`ox.fs`** — A virtual filesystem that mounts Profile content, system and service skills, service definitions, persisted chats, and user-granted files while enforcing the read and write permissions of each source.
-- **Ox Service Repository** — A versioned collection of services described by an `ox.json` manifest. Each Ox Client has an editable Local repository and can install compatible remote repositories. Each service may provide:
+- **Ox Service Repository** — A versioned collection of services described by an `ox.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service may provide:
   - **Actions** — Typed operations the agent can invoke.
   - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
 
@@ -57,11 +57,11 @@ The VM is also how Ox evolves. Ox can invoke an existing service while creating 
 
 1. The agent invokes Browser or another attached service from the VM to gather evidence for the required capability.
 2. The agent uses `ox.fs` to write or revise the service manifest, actions, and optional skills in its Local Service Repository.
-3. The client validates and reloads the service.
+3. The Host validates each source mutation, and the agent uses `ox.service.attach` to load or reload the service for the chat.
 4. The agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
 5. Local Git can record the changes for inspection, reversal, and publication.
 
-Ox can therefore gain and apply a capability without rebuilding or updating the client.
+Ox can therefore gain and apply a capability without rebuilding or updating the Host or Client.
 
 ## Ox Client
 
@@ -91,19 +91,20 @@ The execution model, JavaScript capability bridge, limits, and virtual filesyste
 
 OpenOx supports three kinds of services:
 
-1. **Device services** are supplied by the mobile client and expose device capabilities such as Browser.
+1. **Device services** are supplied by the Host's platform adapters and expose capabilities such as Browser.
 2. **Web services** expose actions backed by websites and the user’s browser session.
 3. **MCP services** expose actions provided by an MCP server.
 
-Anyone can publish compatible web and MCP services in a public Git repository containing an `ox.json` manifest. Any compatible mobile client can install that repository and make its services available to the agent. Device services remain part of the client implementation.
+Anyone can publish compatible web and MCP services in a public Git repository containing an `ox.json` manifest. Any compatible Host can install that repository and make its services available to the agent. Device services remain part of the Host implementation.
 
 ## The first Ox
 
 **Ox for iOS** is the reference implementation of both an Ox Client and an Ox Host. Its agent runtime and VM run on the user’s iOS device, while the embedded Client supplies the native interface.
 
 The native Client reaches the `OxHost` contract in process, while the development
-CLI reaches that same Host through `OxHostAPI` over loopback WebSocket. Both paths
-share the Host-owned chat, service, Profile, model, and VM runtime.
+CLI reaches that same Host through `OxHostProtocol` over
+`WebSocketOxHostTransport`. Both paths share the Host-owned chat, service,
+Profile, model, and VM runtime.
 
 Install Xcode 26 or later and Bun on a Mac, then clone the repository:
 
@@ -161,7 +162,7 @@ Use `--host <ws-url>` or `OX_HOST_ENDPOINT` when the Host does not use the defau
 
 [Cloudflare](https://blog.cloudflare.com/code-mode/): Ox's architecture was influenced by Code Mode and agent sandboxing.
 
-[OpenClaw](https://github.com/openclaw/openclaw): Ox's system propmts referenced some of OpenClaw's.
+[OpenClaw](https://github.com/openclaw/openclaw): Ox's system prompts referenced some of OpenClaw's.
 
 [zappa: an AI powered mitmproxy](https://geohot.github.io/blog/jekyll/update/2026/04/15/zappa-mitmproxy.html): Ox adopts a similar idea but applied to mobile.
 
