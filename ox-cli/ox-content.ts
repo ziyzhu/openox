@@ -52,13 +52,13 @@ function profileConfig(root: string): ProfileConfig {
     value = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      fail(`--root is not a Profile: profile.json not found at ${path}`);
+      fail(`--profile is not a Profile: profile.json not found at ${path}`);
     }
     fail(`could not read ${path}: ${(error as Error).message}`);
   }
   const config = parseProfileConfig(value);
   if (!config) {
-    return fail(`--root is not a Profile: invalid profile.json at ${path}`);
+    return fail(`--profile is not a Profile: invalid profile.json at ${path}`);
   }
   return config;
 }
@@ -99,7 +99,7 @@ export function iCloudProfileReadError(documents: string, error: unknown): strin
 }
 
 export function profileRoot(context: CliContext): string {
-  const requested = context.root ?? fail("--root <path> is required for commands that inspect a Profile");
+  const requested = context.profile ?? fail("--profile <path> is required for commands that inspect a Profile");
   const root = resolve(requested);
   profileConfig(root);
   return root;
@@ -107,7 +107,7 @@ export function profileRoot(context: CliContext): string {
 
 function ensureNoArgs(command: string, args: string[]): void {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log(`Usage: ox --root <path> ${command}`);
+    console.log(`Usage: ox --profile <path> ${command}`);
     return;
   }
   if (args.length) fail(`${command} does not accept arguments`);
@@ -115,7 +115,7 @@ function ensureNoArgs(command: string, args: string[]): void {
 
 function printTextFile(command: string, fileName: string, args: string[], context: CliContext): void {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log(`Usage: ox --root <path> ${command}`);
+    console.log(`Usage: ox --profile <path> ${command}`);
     return;
   }
   ensureNoArgs(command, args);
@@ -238,7 +238,7 @@ export async function soul(args: string[], context: CliContext): Promise<void> {
 export async function skills(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --root <path> skills [name] [--json]");
+    console.log("Usage: ox --profile <path> skills [name] [--json]");
     return;
   }
   const root = profileRoot(context);
@@ -264,7 +264,7 @@ export async function skills(args: string[], context: CliContext): Promise<void>
 export async function artifacts(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --root <path> artifacts [filename] [--json]");
+    console.log("Usage: ox --profile <path> artifacts [filename] [--json]");
     return;
   }
   const root = profileRoot(context);
@@ -292,7 +292,7 @@ export async function artifacts(args: string[], context: CliContext): Promise<vo
 export async function chats(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --root <path> chats [id] [--json]");
+    console.log("Usage: ox --profile <path> chats [id] [--json]");
     return;
   }
   const root = profileRoot(context);

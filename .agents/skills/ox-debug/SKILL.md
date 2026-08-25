@@ -1,6 +1,6 @@
 ---
 name: ox-debug
-description: Debug the running Ox iOS app through its debug WebSocket. Use when inspecting chats or structured logs; evaluating agent virtual-machine JavaScript; running or replaying LLM agents in isolation; or verifying that a git URL conforms to the Ox Server IR.
+description: Debug the running Ox iOS app through its debug WebSocket. Use when inspecting chats or structured logs, running or replaying LLM agents in isolation, replaying projection fixtures, or verifying that a git URL conforms to the Ox Server IR. Use the ox-cli skill for Host and VM inspection, structured `ox.*` calls, VM-visible skills, and VM JavaScript evaluation.
 ---
 
 # Ox Debug
@@ -9,9 +9,10 @@ Live introspection of the running DEBUG iOS app over its debug WebSocket, plus S
 
 Keep adjacent surfaces on their intended tools:
 
-- Use `ox` for service manifests, actions, skills, and live service invocation.
+- Use `ox vm` for Host and VM inspection, structured `ox.*` calls, VM-visible skills, and VM JavaScript evaluation.
+- Use `ox` for Profile administration, service manifests, actions, skills, and live service invocation.
 - Use `sim` for every iOS Simulator interaction.
-- Use `bun run debug` for chat, log, agent, virtual-machine, and Server IR operations.
+- Use `bun run debug` for chat, log, agent, reducer, and Server IR operations.
 
 ## Inspect the running app
 
@@ -21,7 +22,6 @@ bun run debug dev chat [<id>] [--system|--tools|--messages|--blocks] [--full] [-
 bun run debug dev logs [--level debug|info|warning|error] [--grep <substring>] [--json] [--timeout 30000]
 bun run debug dev transcript [--json] [--timeout 30000]
 bun run debug dev performance [--json] [--timeout 30000]
-bun run debug dev virtual-machine-eval [--chat <id>] --script '<javascript>' [--timeout 60000]
 ```
 
 Replay the committed conversation corpus through Ox's projection reducer:
@@ -33,7 +33,7 @@ bun run debug reducer replay [--fixtures ios/fixtures/chatlogs] [--update] [--js
 Start with the compact human output. Add `--json` for machine processing and `--full` only when complete tool schemas, messages, or blocks are needed. `dev logs` reads Ox's structured in-memory buffer; use `sim logs` only for device-level logs.
 Use `dev transcript` for the active scroller's frame, ownership, hold, position, and recent geometry history.
 
-Treat `virtual-machine-eval` as arbitrary code in the chat's agent JavaScript context. Use it only when the task needs the bound `ox` namespace and keep the script minimal.
+The legacy `dev virtual-machine-eval` command remains available for compatibility. Use `ox vm eval` for current VM work so Host selection, protocol checks, and session targeting follow the public CLI surface.
 
 `reducer replay` loads `*.input.json` ChatDocument turns from the host, runs the app's typed projection, and compares `*.golden.json`. Use `--update` only when intentionally accepting a reviewed projection change.
 

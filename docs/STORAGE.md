@@ -361,7 +361,7 @@ Simulator builds may also load the launch-configured Ox Server `HEAD` snapshot a
 `Application Support/service-repositories/development/` as a separate development
 repository.
 
-## Website and Chrome state
+## Website state
 
 The iOS service page pool uses one persistent app-wide `WKWebsiteDataStore`.
 WebKit's same-origin policy separates origin storage, while cookies follow
@@ -381,23 +381,6 @@ become part of Ox and test artifacts.
 
 WebKit 26.0 and 26.2 reject IndexedDB as unsupported by this serialization API;
 bootstrap therefore leaves target IndexedDB data unchanged.
-
-The CLI's headed Chrome runtime uses a persistent Ox-owned profile, separate
-from the user's normal profile:
-
-```text
-macOS:   ~/Library/Application Support/Ox/Chrome/
-Windows: %LOCALAPPDATA%\Ox\Chrome\
-Linux:   $XDG_DATA_HOME/ox/chrome/
-```
-
-Chrome owns website data and credential encryption. Ox metadata stores only
-the DevTools port, browser instance, service target IDs, bundle hashes, format
-version, and short-lived lock files. These live in `DevToolsPort`, `runtime.json`,
-and `locks/`. It does not store action arguments,
-headers, authentication URLs, cookies, or page content. `OX_CHROME_PROFILE`
-may override the location. The profile is never synced or included in test
-artifacts.
 
 ## Provider configuration and credentials
 
@@ -446,4 +429,3 @@ secrets.
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
 | App logs | Application Support | Excluded from backup | Retention compaction |
-| Ox Chrome profile | Platform app-data directory | Outside Ox | Manual profile removal |

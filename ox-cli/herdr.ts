@@ -1,4 +1,4 @@
-import { fail, terminalText, C, type CliContext } from "./lib.ts";
+import { fail, terminalText, C } from "./lib.ts";
 import { startTailscaleServe, type ManagedTailscaleServe } from "./herdr-tailscale.ts";
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
@@ -1047,24 +1047,31 @@ async function verifyHerdr(session: string | undefined): Promise<string> {
   return result.stdout;
 }
 
-type HerdrOptions = { port: number; localOnly: boolean };
+type HerdrOptions = { port: number; localOnly: boolean; herdrSession?: string };
 
 function parseOptions(args: string[]): HerdrOptions | undefined {
   let port = 8787;
   let localOnly = false;
+  let herdrSession: string | undefined;
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--port") port = Number(args[++index]);
     else if (argument.startsWith("--port=")) port = Number(argument.slice("--port=".length));
+    else if (argument === "--herdr-session") {
+      herdrSession = args[++index];
+      if (!herdrSession) fail("--herdr-session requires a name");
+    }
+    else if (argument.startsWith("--herdr-session=")) herdrSession = argument.slice("--herdr-session=".length);
     else if (argument === "--local-only") localOnly = true;
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox herdr [--port 8787] [--session <name>] [--local-only]");
+      console.log("Usage: ox herdr [--port 8787] [--herdr-session <name>] [--local-only]");
       console.log("       Connect Ox to local Herdr agents through Tailscale Serve.");
       return undefined;
     } else fail(`unknown herdr option: ${argument}`);
   }
   if (!Number.isInteger(port) || port < 1 || port > 65_535) fail("--port must be an integer from 1 through 65535");
-  return { port, localOnly };
+  if (herdrSession === "") fail("--herdr-session requires a name");
+  return { port, localOnly, ...(herdrSession ? { herdrSession } : {}) };
 }
 
 async function waitForShutdown(server: ReturnType<typeof Bun.serve>, tailscale?: ManagedTailscaleServe): Promise<void> {
@@ -1099,12 +1106,12 @@ async function waitForShutdown(server: ReturnType<typeof Bun.serve>, tailscale?:
   }
 }
 
-export async function herdr(args: string[], context: CliContext): Promise<void> {
+export async function herdr(args: string[]): Promise<void> {
   const options = parseOptions(args);
   if (!options) return;
-  const version = await verifyHerdr(context.session).catch((error) => fail((error as Error).message));
+  const version = await verifyHerdr(options.herdrSession).catch((error) => fail((error as Error).message));
   const hostname = "127.0.0.1";
-  const server = Bun.serve({ hostname, port: options.port, fetch: createHerdrMCPHandler(createHerdrRunner(context.session)) });
+  const server = Bun.serve({ hostname, port: options.port, fetch: createHerdrMCPHandler(createHerdrRunner(options.herdrSession)) });
   console.log(`${terminalText("Ox Herdr MCP", [C.bold, C.harvest])} · ${version}`);
   if (options.localOnly) {
     console.log(`MCP endpoint: ${terminalText(`http://${hostname}:${server.port}/mcp`, [C.sky])}`);

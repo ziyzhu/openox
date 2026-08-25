@@ -1,7 +1,7 @@
 {
   "name": "@openox/cli",
   "version": "0.1.0",
-  "description": "Inspect Ox Profiles and exercise Ox services",
+  "description": "Connect to Ox Hosts and manage Ox Profiles, VMs, and services",
   "author": "Ziyuan Zhu",
   "license": "MIT",
   "type": "module",

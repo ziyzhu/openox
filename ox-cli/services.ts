@@ -1,5 +1,5 @@
 import { C, dispatch, fail, failResult, printResult, takeFlag, terminalText, type CliContext, type SubCommand } from "./lib.ts";
-import { createServiceRuntime } from "./service-runtime.ts";
+import { createHostServiceRuntime } from "./service-runtime.ts";
 import { requireRepository, withRepository } from "./repositories.ts";
 import { readWebService } from "./service-manifest.ts";
 
@@ -8,19 +8,16 @@ export const SUBS: Record<string, SubCommand> = {
   "inspect": { desc: "Print a service's full manifest as JSON", fn: inspectService },
   "actions": { desc: "List actions declared by a service (--json)", fn: listActions },
   "skills": { desc: "List skills declared by a service (--json)", fn: listSkills },
-  "test": { desc: "Run fail-closed service action tests from committed cases and HARs", fn: testService },
-  "status": { desc: "Show services and their live page state in the selected runtime", fn: status },
-  "invoke": { desc: "Invoke a service action in the selected runtime", fn: invoke },
-  "eval": { desc: "Run a JS script on a service page in the selected runtime", fn: evaluate },
+  "test": { desc: "Replay committed service cases through the selected Host", fn: testService },
+  "status": { desc: "Show services and their live page state on the selected Host", fn: status },
+  "invoke": { desc: "Invoke a service action through the selected Host", fn: invoke },
+  "eval": { desc: "Run a JS script on a Host-managed service page", fn: evaluate },
   "reload": { desc: "Reload a service page after active actions finish", fn: reload },
-  "open": { desc: "Open a managed service page in headed Chrome", fn: openService },
-  "auth": { desc: "Open a headed sign-in handoff for a service", fn: authenticate },
-  "bot-control": { desc: "Open a headed human-verification handoff for a service", fn: botControl },
   "sync": { desc: "Refresh service definitions and invalidate changed live services", fn: syncMonoRepository },
 };
 
 export async function service(args: string[], context: CliContext): Promise<void> {
-  return dispatch("service", "Inspect services on disk and exercise them in the selected runtime.", SUBS, args, context);
+  return dispatch("service", "Inspect services on disk and exercise them through the selected Host.", SUBS, args, context);
 }
 
 async function testService(args: string[], context: CliContext): Promise<void> {
@@ -52,8 +49,8 @@ async function invoke(args: string[], context: CliContext): Promise<void> {
   try { parsedArgs = JSON.parse(argsJson); }
   catch (e) { fail(`--args is not valid JSON: ${(e as Error).message}`); }
 
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.invoke({ domain, action, args: parsedArgs, approved, timeoutMs, sessionId: context.session }), "invoke");
+  const host = createHostServiceRuntime(context.host);
+  printResult(await host.invoke({ domain, action, args: parsedArgs, approved, timeoutMs }), "invoke");
 }
 
 async function evaluate(args: string[], context: CliContext): Promise<void> {
@@ -75,8 +72,8 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
   if (!domain) fail("expected <domain> (e.g. news.ycombinator.com)");
   if (!script) fail("expected a script (via --script or a positional arg)");
 
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.evaluate({ domain, script, timeoutMs, sessionId: context.session }), "eval");
+  const host = createHostServiceRuntime(context.host);
+  printResult(await host.evaluate({ domain, script, timeoutMs }), "eval");
 }
 
 async function reload(args: string[], context: CliContext): Promise<void> {
@@ -93,74 +90,8 @@ async function reload(args: string[], context: CliContext): Promise<void> {
   }
   if (!domain) fail("expected <domain> (e.g. news.ycombinator.com)");
 
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.reload({ domain, timeoutMs, sessionId: context.session }), "reload");
-}
-
-async function openService(args: string[], context: CliContext): Promise<void> {
-  let domain = "";
-  let timeoutMs = 30000;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === "-s" || a === "--service") { domain = args[++i] ?? ""; }
-    else if (a === "--timeout") { timeoutMs = Number(args[++i]) || 30000; }
-    else if (a === "-h" || a === "--help") {
-      console.log("Usage: ox service open <domain> [--timeout 30000]");
-      console.log("       ox service open -s <domain> [--timeout 30000]");
-      return;
-    }
-    else if (!domain) { domain = a; }
-  }
-  if (!domain) fail("expected <domain> (e.g. news.ycombinator.com)");
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.open({ domain, timeoutMs, sessionId: context.session }), "open");
-}
-
-async function authenticate(args: string[], context: CliContext): Promise<void> {
-  let domain = "";
-  let timeoutMs = 300000;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === "--timeout") { timeoutMs = Number(args[++i]) || 300000; }
-    else if (a === "-h" || a === "--help") {
-      console.log("Usage: ox service auth <domain> [--timeout 300000]");
-      return;
-    }
-    else if (!domain) { domain = a; }
-  }
-  if (!domain) fail("expected <domain> (e.g. news.ycombinator.com)");
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.authenticate({ domain, timeoutMs, sessionId: context.session }), "auth");
-}
-
-async function botControl(args: string[], context: CliContext): Promise<void> {
-  let domain = "";
-  let argsJson = "{}";
-  let timeoutMs = 300000;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === "--args") { argsJson = args[++i] ?? "{}"; }
-    else if (a === "--timeout") { timeoutMs = Number(args[++i]) || 300000; }
-    else if (a === "-h" || a === "--help") {
-      console.log("Usage: ox service bot-control <domain> --args '{}' [--timeout 300000]");
-      return;
-    }
-    else if (!domain) { domain = a; }
-  }
-  if (!domain) fail("expected <domain> (e.g. archive.ph)");
-  let parsedArgs: unknown;
-  try { parsedArgs = JSON.parse(argsJson); }
-  catch (error) { fail(`--args is not valid JSON: ${(error as Error).message}`); }
-  if (typeof parsedArgs !== "object" || parsedArgs === null || Array.isArray(parsedArgs)) {
-    fail("--args must be a JSON object");
-  }
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  printResult(await runtime.botControl({
-    domain,
-    args: parsedArgs as Record<string, unknown>,
-    timeoutMs,
-    sessionId: context.session,
-  }), "bot-control");
+  const host = createHostServiceRuntime(context.host);
+  printResult(await host.reload({ domain, timeoutMs }), "reload");
 }
 
 async function status(args: string[], context: CliContext): Promise<void> {
@@ -173,8 +104,8 @@ async function status(args: string[], context: CliContext): Promise<void> {
       return;
     }
   }
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  const result = await runtime.status(timeoutMs);
+  const host = createHostServiceRuntime(context.host);
+  const result = await host.status(timeoutMs);
   if (result.ok) {
     console.log(JSON.stringify(result.services ?? [], null, 2));
   } else {
@@ -189,12 +120,12 @@ async function syncMonoRepository(args: string[], context: CliContext): Promise<
     if (a === "--timeout") { timeoutMs = Number(args[++i]) || 60000; }
     else if (a === "-h" || a === "--help") {
       console.log(`Usage: ox service sync [--timeout 60000]`);
-      console.log(`       ${terminalText("Refreshes the selected runtime and drops cached actions for changed services.", [C.dim])}`);
+      console.log(`       ${terminalText("Refreshes the selected Host and drops cached actions for changed services.", [C.dim])}`);
       return;
     }
   }
-  const runtime = createServiceRuntime(context.runtime, context.repository);
-  const result = await runtime.sync(timeoutMs);
+  const host = createHostServiceRuntime(context.host);
+  const result = await host.sync(timeoutMs);
   if (!result.ok) failResult("sync", result.error);
   const changed = (result.changed as string[] | undefined) ?? [];
   console.log(`${terminalText("synced", [C.bold, C.sky])} head=${String(result.head).slice(0, 12)} services=${result.services}`);

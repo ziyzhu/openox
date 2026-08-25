@@ -2,12 +2,12 @@ const DEFAULT_ENDPOINT = "ws://127.0.0.1:9876";
 
 export type DebugResult =
   | ({ ok: true } & Record<string, unknown>)
-  | { ok: false; error: string };
+  | ({ ok: false; error: string } & Record<string, unknown>);
 
 export type Result = DebugResult;
 
 export function debugEndpoint(): string {
-  const value = process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
+  const value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT;
   try {
     const url = new URL(value);
     return (url.protocol === "ws:" || url.protocol === "wss:") && url.port ? url.toString() : DEFAULT_ENDPOINT;
@@ -36,7 +36,7 @@ export function runOnce(
     ws.onopen = () => ws.send(JSON.stringify(envelope));
     ws.onerror = (event: Event) => {
       const message = String((event as ErrorEvent).message ?? event);
-      finish({ ok: false, error: `ws error (is the iOS app running on the sim?): ${message}` });
+      finish({ ok: false, error: `ws error (is the Ox Host running?): ${message}` });
     };
     ws.onclose = () => finish({ ok: false, error: "ws closed before result" });
     ws.onmessage = (event: MessageEvent) => {
@@ -49,7 +49,7 @@ export function runOnce(
         return;
       }
       if (message?.id !== envelope.id) return;
-      finish(message.ok ? message : { ok: false, error: String(message.error ?? "unknown") });
+      finish(message.ok ? message : { ...message, ok: false, error: String(message.error ?? "unknown") });
     };
   });
 }

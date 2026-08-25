@@ -48,7 +48,13 @@ try {
   const version = (await run([executable, "--version"], resolve(import.meta.dir, ".."))).trim();
   if (version !== packageMetadata.version) throw new Error(`installed ox reported version ${JSON.stringify(version)}`);
   const help = await run([executable, "--help"], resolve(import.meta.dir, ".."));
-  if (!help.includes("Inspect a Profile, create skills, and exercise services")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("Use Ox Hosts, Profiles, VMs, and services")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
+  if (!help.includes("--chat <chat-id>")) throw new Error("installed ox help omitted chat targeting");
+  if (!help.includes("--profile <path>")) throw new Error("installed ox help omitted Profile targeting");
+  if (help.includes("--runtime") || help.includes("--session <id>") || help.includes("--vm-session") || help.includes("--root")) {
+    throw new Error("installed ox help exposed removed targeting flags");
+  }
   const services = JSON.parse(await run([
     executable,
     "--repository",

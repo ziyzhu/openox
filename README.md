@@ -8,17 +8,27 @@ Each such agent is called an Ox and follows three principles:
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
 
-The first implementation of Ox is an iOS app whose source code is included in this repository. You can download it through TestFlight: https://testflight.apple.com/join/Y3x7nxj9.
+The first implementation of Ox is an iOS Client and Host whose source code is included in this repository. You can download it through TestFlight: https://testflight.apple.com/join/Y3x7nxj9.
 
 ## Components
 
-![OpenOx components](docs/openox-components.png)
+```mermaid
+flowchart LR
+    Client[Ox Client] -->|Host protocol| Host[Ox Host]
+    Host --> Profile[Ox Profile]
+    Host --> Model[Model provider]
+    Host --> VM[Ox VM]
+    VM --> Capabilities[ox.* capabilities]
+    VM --> Skills[Skills and VFS]
+    Capabilities --> Services[Device, web, and MCP services]
+```
 
-- **Ox Client** - A mobile application that implements the OpenOx protocol. It hosts the Ox VM, opens an Ox Profile, and connects the agent to services.
-- **Model** — The language model selected by the user. OpenOx does not prescribe a model or provider; the client adapts provider-specific APIs to the provider-neutral agent loop.
+- **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
+- **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
+- **Model** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
-- **Ox VM** — A sandboxed JavaScript runtime where the local agent writes and executes code.
-  - **`ox.*`** — Explicit client capabilities for interacting with the Profile, services, web, user, and mobile device.
+- **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code.
+  - **`ox.*`** — Explicit Host capabilities for interacting with the Profile, services, web, user, and device.
   - **`ox.fs`** — A virtual filesystem that mounts Profile content, system and service skills, service definitions, persisted chats, and user-granted files while enforcing the read and write permissions of each source.
 - **Ox Service Repository** — A versioned collection of services described by an `ox.json` manifest. Each Ox Client has an editable Local repository and can install compatible remote repositories. Each service may provide:
   - **Actions** — Typed operations the agent can invoke.
@@ -26,7 +36,9 @@ The first implementation of Ox is an iOS app whose source code is included in th
 
 ## Execution and Self-Evolution
 
-The VM has no direct access to the network, host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
+A Client selects a Host and a VM session. The session binds execution to the relevant conversation, permissions, attached services, and virtual filesystem view. Skills depend only on this VM contract, not on the Host platform or implementation language.
+
+The VM has no direct access to the network, Host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
 
 The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in [`docs/VM.md`](docs/VM.md).
 
@@ -52,7 +64,7 @@ Anyone can publish compatible web and MCP services in a public Git repository co
 
 ## The first Ox
 
-**Ox for iOS** is the reference implementation of an OpenOx client. Its agent runtime and VM run on the user’s iOS device.
+**Ox for iOS** is the reference implementation of both an Ox Client and an Ox Host. Its agent runtime and VM run on the user’s iOS device, while the embedded Client supplies the native interface.
 
 Install Xcode 26 or later and Bun on a Mac, then clone the repository:
 
@@ -83,6 +95,17 @@ To use a different service repository while developing, serve it explicitly:
 ```sh
 ox repository serve /path/to/service-repository --port 8101
 ```
+
+The Ox CLI is another Client. During development it can target the Host in a running iOS Simulator and exercise the same VM contract the agent sees:
+
+```sh
+ox vm sessions
+ox vm inspect
+ox vm functions
+ox vm call ox.fs.list --args '{"path":"skills","purpose":"List VM skills"}'
+```
+
+Use `--host <ws-url>` or `OX_HOST_ENDPOINT` when the Host does not use the default loopback endpoint. The iOS Host control endpoint is currently available only in DEBUG Simulator builds.
 
 [`examples/service-repository`](examples/service-repository) is a standalone repository users can copy when creating their own remote services.
 

@@ -129,5 +129,5 @@ function normalizedServices(values: string[]): string[] {
 }
 
 function printCreateUsage(): void {
-  console.log("Usage: ox --root <path> skill create <name> --description <text> (--instructions <text> | --instructions-file <path|->) [--service <domain>]... [--json]");
+  console.log("Usage: ox --profile <path> skill create <name> --description <text> (--instructions <text> | --instructions-file <path|->) [--service <domain>]... [--json]");
 }

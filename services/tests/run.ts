@@ -236,7 +236,6 @@ try {
   };
   await command([
     "bun", "ox-cli/ox.ts",
-    "--repository", generatedRepository,
     "service", "test",
     ...(options.selector ? [options.selector] : []),
     "--proxy-port", String(config.serviceProxyPort),

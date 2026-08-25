@@ -1,12 +1,10 @@
 import { type DebugResult } from "./debug-ws.ts";
-import { type RuntimeName } from "./service-runtime.ts";
 
 export const C = {
   bold: "\x1b[1m",
   harvest: "\x1b[38;2;242;148;26m",
   sky: "\x1b[38;2;126;157;156m",
   moon: "\x1b[38;2;196;211;214m",
-  paleBlue: "\x1b[38;2;147;176;188m",
   dim: "\x1b[2m",
   reset: "\x1b[0m",
 };
@@ -26,14 +24,6 @@ export function terminalText(
   return `${C.reset}${styles.join("")}${text}${C.reset}`;
 }
 
-export function chromeDiagnostic(message: string): void {
-  process.stderr.write(`${terminalText(`[ox:chrome] ${message}`, [C.moon, C.dim], process.stderr)}\n`);
-}
-
-export function chromeAttention(message: string): void {
-  process.stderr.write(`${terminalText(`[ox:chrome] ${message}`, [C.bold, C.paleBlue], process.stderr)}\n`);
-}
-
 function writeError(message: string): void {
   process.stderr.write(`${terminalText(message, [C.bold, C.moon], process.stderr)}\n`);
 }
@@ -43,7 +33,7 @@ export const fail = (message: string): never => {
   process.exit(1);
 };
 
-export type CliContext = { runtime: RuntimeName; root?: string; session?: string; repository?: string };
+export type CliContext = { host?: string; profile?: string; chat?: string; repository?: string };
 export type SubCommand = { fn: (args: string[], context: CliContext) => Promise<void>; desc: string };
 export type CommandGroup = {
   fn: (args: string[], context: CliContext) => Promise<void> | void;
@@ -54,7 +44,7 @@ export type CommandGroup = {
 function printUsage(program: string, description: string, groups: Record<string, CommandGroup>): void {
   console.log(terminalText(CLI_LOGO, [C.bold, C.harvest]));
   console.log(`${description}\n`);
-  console.log(`Usage: ${program} [--root <path>] [--repository <path-or-url>] [--runtime <ios|chrome>] [--session <id>] <command> [...flags] [...args]\n`);
+  console.log(`Usage: ${program} [--host <ws-url>] [--chat <chat-id>] [--profile <path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
   console.log("Commands:");
   const rows = Object.entries(groups).flatMap(([name, group]) => {
     const subs = Object.entries(group.subs ?? {});
@@ -68,34 +58,54 @@ function printUsage(program: string, description: string, groups: Record<string,
     console.log(`  ${terminalText(row.command, [C.sky])}${padding}${terminalText(row.description, [C.dim])}`);
   }
   console.log("\nFlags:");
-  console.log(`  ${terminalText("--root <path>", [C.sky])}           ${terminalText("Profile containing profile.json", [C.dim])}`);
-  console.log(`  ${terminalText("--repository <origin>", [C.sky])}  ${terminalText("Service repository path or Git URL", [C.dim])}`);
-  console.log(`  ${terminalText("--runtime <ios|chrome>", [C.sky])}  ${terminalText("Service execution runtime (default: ios)", [C.dim])}`);
-  console.log(`  ${terminalText("--session <id>", [C.sky])}          ${terminalText("Target runtime service/tab or named Herdr session", [C.dim])}`);
-  console.log(`  ${terminalText("-v, --version", [C.sky])}          ${terminalText("Display the installed version and exit", [C.dim])}`);
-  console.log(`  ${terminalText("-h, --help", [C.sky])}             ${terminalText("Display this menu and exit", [C.dim])}`);
+  const flags = [
+    ["--host <ws-url>", "Ox Host WebSocket endpoint"],
+    ["--chat <chat-id>", "Chat-bound VM on the Host"],
+    ["--profile <path>", "Profile directory for direct administration"],
+    ["--repository <origin>", "Service repository path or Git URL"],
+    ["-v, --version", "Display the installed version and exit"],
+    ["-h, --help", "Display this menu and exit"],
+  ];
+  const flagWidth = Math.max(...flags.map(([flag]) => flag!.length));
+  for (const [flag, detail] of flags) {
+    console.log(`  ${terminalText(flag!, [C.sky])}${" ".repeat(flagWidth + 4 - flag!.length)}${terminalText(detail!, [C.dim])}`);
+  }
   console.log("");
 }
 
 export function parseGlobalOptions(args: string[]): { context: CliContext; rest: string[] } {
-  let runtime: RuntimeName = "ios";
-  let runtimeSeen = false;
-  let root: string | undefined;
-  let rootSeen = false;
-  let session: string | undefined;
-  let sessionSeen = false;
+  let host: string | undefined;
+  let hostSeen = false;
+  let profile: string | undefined;
+  let profileSeen = false;
+  let chat: string | undefined;
+  let chatSeen = false;
   let repository: string | undefined = process.env.OX_REPOSITORY;
   let repositorySeen = false;
   const rest: string[] = [];
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     let value: string | undefined;
-    if (argument === "--root") {
+    if (argument === "--host") {
       value = args[++index];
-      if (rootSeen) throw new Error("--root may only be specified once");
-      rootSeen = true;
-      if (!value) throw new Error("--root requires a path");
-      root = value;
+      if (hostSeen) throw new Error("--host may only be specified once");
+      hostSeen = true;
+      if (!value) throw new Error("--host requires a WebSocket URL");
+      host = value;
+      continue;
+    } else if (argument.startsWith("--host=")) {
+      value = argument.slice("--host=".length);
+      if (hostSeen) throw new Error("--host may only be specified once");
+      hostSeen = true;
+      if (!value) throw new Error("--host requires a WebSocket URL");
+      host = value;
+      continue;
+    } else if (argument === "--profile") {
+      value = args[++index];
+      if (profileSeen) throw new Error("--profile may only be specified once");
+      profileSeen = true;
+      if (!value) throw new Error("--profile requires a path");
+      profile = value;
       continue;
     } else if (argument === "--repository") {
       value = args[++index];
@@ -111,42 +121,41 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
       if (!value) throw new Error("--repository requires a path or URL");
       repository = value;
       continue;
-    } else if (argument.startsWith("--root=")) {
-      value = argument.slice("--root=".length);
-      if (rootSeen) throw new Error("--root may only be specified once");
-      rootSeen = true;
-      if (!value) throw new Error("--root requires a path");
-      root = value;
+    } else if (argument.startsWith("--profile=")) {
+      value = argument.slice("--profile=".length);
+      if (profileSeen) throw new Error("--profile may only be specified once");
+      profileSeen = true;
+      if (!value) throw new Error("--profile requires a path");
+      profile = value;
       continue;
-    } else if (argument === "--session") {
+    } else if (argument === "--chat") {
       value = args[++index];
-      if (sessionSeen) throw new Error("--session may only be specified once");
-      sessionSeen = true;
-      if (!value) throw new Error("--session requires an id");
-      session = value;
+      if (chatSeen) throw new Error("--chat may only be specified once");
+      chatSeen = true;
+      if (!value) throw new Error("--chat requires a chat id");
+      chat = value;
       continue;
-    } else if (argument.startsWith("--session=")) {
-      value = argument.slice("--session=".length);
-      if (sessionSeen) throw new Error("--session may only be specified once");
-      sessionSeen = true;
-      if (!value) throw new Error("--session requires an id");
-      session = value;
+    } else if (argument.startsWith("--chat=")) {
+      value = argument.slice("--chat=".length);
+      if (chatSeen) throw new Error("--chat may only be specified once");
+      chatSeen = true;
+      if (!value) throw new Error("--chat requires a chat id");
+      chat = value;
       continue;
-    } else if (argument === "--runtime") {
-      value = args[++index];
-    } else if (argument.startsWith("--runtime=")) {
-      value = argument.slice("--runtime=".length);
+    } else if (argument === "--runtime" || argument.startsWith("--runtime=")) {
+      throw new Error("--runtime was removed; the selected Host owns service page implementation");
+    } else if (argument === "--session" || argument.startsWith("--session=")) {
+      throw new Error("--session was removed; use --chat for ox vm or --herdr-session for ox herdr");
+    } else if (argument === "--vm-session" || argument.startsWith("--vm-session=")) {
+      throw new Error("--vm-session was renamed to --chat");
+    } else if (argument === "--root" || argument.startsWith("--root=")) {
+      throw new Error("--root was renamed to --profile");
     } else {
       rest.push(argument);
       continue;
     }
-    if (runtimeSeen) throw new Error("--runtime may only be specified once");
-    runtimeSeen = true;
-    if (!value) throw new Error("--runtime requires ios or chrome");
-    if (value !== "ios" && value !== "chrome") throw new Error(`unsupported runtime: ${value}`);
-    runtime = value;
   }
-  return { context: { runtime, ...(root ? { root } : {}), ...(session ? { session } : {}), ...(repository ? { repository } : {}) }, rest };
+  return { context: { ...(host ? { host } : {}), ...(profile ? { profile } : {}), ...(chat ? { chat } : {}), ...(repository ? { repository } : {}) }, rest };
 }
 
 export async function runCli(
@@ -181,7 +190,28 @@ export async function runCli(
     process.exitCode = 1;
     return;
   }
+  try {
+    validateContext(name, rest[0], parsed.context);
+  } catch (error) {
+    writeError(`error: ${(error as Error).message}`);
+    process.exitCode = 1;
+    return;
+  }
   await group.fn(rest, parsed.context);
+}
+
+function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
+  const profileCommands = new Set(["memory", "soul", "skills", "artifacts", "chats", "skill"]);
+  const liveServiceCommands = new Set(["status", "invoke", "eval", "reload", "sync", "test"]);
+  const repositoryServiceCommands = new Set(["list", "inspect", "actions", "skills"]);
+  if (context.chat && command !== "vm") throw new Error("--chat applies only to ox vm");
+  if (context.profile && !profileCommands.has(command)) throw new Error("--profile applies only to direct Profile administration commands");
+  if (context.host && command !== "vm" && !(command === "service" && (!subcommand || liveServiceCommands.has(subcommand)))) {
+    throw new Error("--host applies only to ox vm and live ox service commands");
+  }
+  if (context.repository && command !== "repository" && !(command === "service" && (!subcommand || repositoryServiceCommands.has(subcommand)))) {
+    throw new Error("--repository applies only to ox repository and offline ox service commands");
+  }
 }
 
 export async function dispatch(

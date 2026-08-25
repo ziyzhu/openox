@@ -1,6 +1,77 @@
 # Virtual Machine + Virtual File System
 
 ```text
+OX DEPLOYMENT MODEL
+
+Ox Client
+└── versioned Host protocol
+    └── Ox Host
+        ├── Profile
+        ├── model provider adapter
+        ├── platform and service adapters
+        └── Ox VM
+            ├── session binding
+            ├── skills
+            ├── virtual filesystem
+            └── ox.* capabilities
+
+current iOS app
+├── embedded iOS Client
+└── iOS Host
+    └── JavaScriptCore Ox VM
+
+Ox CLI
+└── targets an Ox Host endpoint
+```
+
+Clients target Hosts rather than depending on a VM engine. A Host owns VM
+lifecycle, Profile access, capability implementations, and session selection.
+The same Client can target another compatible Host, and a Host can replace its
+VM implementation while preserving the observable VM contract.
+
+The CLI expresses those resources as `--host <ws-url>` and
+`--chat <chat-id>`. Direct Profile administration instead uses
+`--profile <path>` and does not imply a VM session.
+
+The iOS Host currently exposes version 1 of the control protocol from DEBUG
+Simulator builds over its loopback WebSocket. It supports Host and VM
+inspection, session discovery, function discovery, structured `ox.*` calls,
+and arbitrary development evaluation. `ox vm call` is the stable operation
+surface; `ox vm eval` is a development escape hatch.
+
+```text
+HOST CONTROL PROTOCOL V1
+
+request envelope
+├── kind
+├── id
+├── protocolVersion: 1
+├── sessionId?                  chat-bound execution context
+└── operation fields
+
+operations
+├── vm-list-sessions            targetable hydrated sessions
+├── vm-inspect                  Host, VM, session, and visible VFS roots
+├── vm-functions                complete catalog or one function contract
+├── vm-call                     catalogued function + JSON object arguments
+└── vm-eval                     arbitrary JavaScript development escape hatch
+
+response envelope
+├── kind
+├── id
+├── ok
+├── protocolVersion: 1
+├── value?
+├── logs?
+└── error?
+```
+
+`vm-call` accepts only exact names advertised by `vm-functions`. The Host
+serializes arguments, runs the function through the selected chat bridge, and
+therefore preserves the same schema validation, authorization, approval, and
+service attachment behavior as agent execution.
+
+```text
 MODEL-TO-NATIVE EXECUTION
 
 LLM
@@ -43,7 +114,7 @@ LLM
 ```text
 RUNTIME OWNERSHIP + LIFETIME
 
-App process
+Ox Host process
 ├── VirtualMachineThread.shared
 │   └── one long-lived CFRunLoop thread for JavaScriptCore work
 └── ChatManager

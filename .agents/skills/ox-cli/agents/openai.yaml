@@ -1,4 +1,4 @@
 interface:
   display_name: "Ox CLI"
   short_description: "Discover Profiles and exercise services"
-  default_prompt: "Use $ox-cli to discover or inspect a Profile and exercise services through iOS or headed Chrome."
+  default_prompt: "Use $ox-cli to connect to an Ox Host, inspect a Profile, or work with service repositories."

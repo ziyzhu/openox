@@ -299,29 +299,6 @@ malicious process running as the same macOS user. IndexedDB is not copied becaus
 WebKit 26.0 and 26.2 reject it for this serialization API, and the target copy is
 a replacement rather than a merge or continuous synchronization mechanism.
 
-### Chrome CLI harness boundary
-
-The headed Chrome runtime is a developer and local-automation harness, not the
-shipped iOS credential firewall. Codex, Claude, shell processes, and the person
-running the CLI are trusted local principals. A process running as the same OS
-user may inspect the Ox Chrome profile, discover the `DevToolsPort` file, and
-connect to CDP; the harness does not claim to protect credentials from that
-principal.
-
-The harness uses a dedicated Chrome profile rather than the user's normal
-profile and binds a random debugging port to loopback. Service action targets
-share that one profile and rely on Chrome's normal origin isolation. Action
-bundles run in the page world for compatibility with existing service DOM and
-page-SDK integrations. Authentication and bot-control handoffs reuse one clean
-foreground target sharing the profile, leave it open between commands, and
-receive no action injection.
-
-Approval-gated Chrome actions require the explicit `--approve` CLI flag. This
-records caller intent but is not a sandbox boundary: a trusted local principal
-can supply the flag or use the deliberately dangerous `service eval` command.
-The Chrome profile must therefore never be presented as equivalent to iOS's
-model-facing virtual machine and native approval UI.
-
 ### T6 — Repository transport tampering / MITM
 An attacker intercepts a repository update to inject malicious service code.
 **Mitigation:** the default repository is inside the code-signed app. Additional

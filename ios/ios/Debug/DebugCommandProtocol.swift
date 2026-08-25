@@ -30,6 +30,11 @@ extension DebugCommandRouter {
         case replayReducer = "replay-reducer"
         case runAgent = "run-agent"
         case virtualMachineEval = "virtual-machine-eval"
+        case vmInspect = "vm-inspect"
+        case vmListSessions = "vm-list-sessions"
+        case vmFunctions = "vm-functions"
+        case vmCall = "vm-call"
+        case vmEval = "vm-eval"
         case runDeadlineChat = "run-deadline-chat"
         case bootstrapArtifacts = "bootstrap-artifacts"
         case writeArtifact = "write-artifact"
@@ -159,6 +164,33 @@ extension DebugCommandRouter {
         let script: String
     }
 
+    struct VMRequest: Decodable {
+        let id: String
+        let protocolVersion: Int
+        let sessionId: String?
+    }
+
+    struct VMFunctionsRequest: Decodable {
+        let id: String
+        let protocolVersion: Int
+        let function: String?
+    }
+
+    struct VMCallRequest: Decodable {
+        let id: String
+        let protocolVersion: Int
+        let sessionId: String?
+        let function: String
+        let arguments: JSONValue
+    }
+
+    struct VMEvalRequest: Decodable {
+        let id: String
+        let protocolVersion: Int
+        let sessionId: String?
+        let script: String
+    }
+
     struct CountRequest: Decodable {
         let id: String
         let count: Int
@@ -196,6 +228,11 @@ extension DebugCommandRouter {
         case replayReducer(ReplayReducerRequest)
         case runAgent(RunAgentRequest)
         case virtualMachineEval(VirtualMachineEvalRequest)
+        case vmInspect(VMRequest)
+        case vmListSessions(VMRequest)
+        case vmFunctions(VMFunctionsRequest)
+        case vmCall(VMCallRequest)
+        case vmEval(VMEvalRequest)
         case runDeadlineChat(RunDeadlineChatRequest)
         case bootstrapArtifacts(BootstrapArtifactsRequest)
         case writeArtifact(WriteArtifactRequest)
@@ -234,6 +271,11 @@ extension DebugCommandRouter {
             case .replayReducer: self = .replayReducer(try ReplayReducerRequest(from: decoder))
             case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
             case .virtualMachineEval: self = .virtualMachineEval(try VirtualMachineEvalRequest(from: decoder))
+            case .vmInspect: self = .vmInspect(try VMRequest(from: decoder))
+            case .vmListSessions: self = .vmListSessions(try VMRequest(from: decoder))
+            case .vmFunctions: self = .vmFunctions(try VMFunctionsRequest(from: decoder))
+            case .vmCall: self = .vmCall(try VMCallRequest(from: decoder))
+            case .vmEval: self = .vmEval(try VMEvalRequest(from: decoder))
             case .runDeadlineChat: self = .runDeadlineChat(try RunDeadlineChatRequest(from: decoder))
             case .bootstrapArtifacts: self = .bootstrapArtifacts(try BootstrapArtifactsRequest(from: decoder))
             case .writeArtifact: self = .writeArtifact(try WriteArtifactRequest(from: decoder))

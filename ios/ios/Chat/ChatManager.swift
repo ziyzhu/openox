@@ -576,6 +576,10 @@ final class ChatManager {
         }
     }
 
+    func debugSessions() -> [Chat] {
+        records.values.compactMap { $0.hydration.chat }
+    }
+
     #if targetEnvironment(simulator)
     func debugControlRepositorySaveGate(_ action: String) -> Bool? {
         switch action {

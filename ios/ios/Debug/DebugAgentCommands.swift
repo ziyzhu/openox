@@ -35,6 +35,16 @@ extension DebugCommandRouter {
         let error: String?
     }
 
+    struct VMControlResult: Encodable {
+        let kind: String
+        let id: String
+        let ok: Bool
+        let protocolVersion: Int
+        let value: JSONValue?
+        let logs: [VirtualMachineLogRow]?
+        let error: String?
+    }
+
 
     @MainActor
     static func handleRunAgent(_ command: RunAgentRequest, reply: @escaping @MainActor (Data) -> Void) {
@@ -201,6 +211,235 @@ extension DebugCommandRouter {
                 )))
             }
         }
+    }
+
+    static let vmProtocolVersion = 1
+
+    @MainActor
+    static func handleVMInspect(_ command: VMRequest, reply: @escaping @MainActor (Data) -> Void) {
+        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-inspect-result", reply: reply) else { return }
+        guard let manager = chatManager else {
+            reply(vmFailure(id: command.id, kind: "vm-inspect-result", error: "session manager unavailable"))
+            return
+        }
+        let session: Chat?
+        switch resolveSession(manager, command.sessionId) {
+        case .error(let error):
+            reply(vmFailure(id: command.id, kind: "vm-inspect-result", error: error))
+            return
+        case .found(let resolved): session = resolved
+        }
+        let functionCount = OxFunctionCatalog.build().objectValue?.count ?? 0
+        let sessionValue: JSONValue = session.map {
+            .object([
+                "id": .string($0.id.uuidString),
+                "temporary": .bool($0.isTemporary),
+            ])
+        } ?? .null
+        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "chats"]
+        if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
+            roots.append("files")
+        }
+        let value = JSONValue.object([
+            "host": .object([
+                "kind": .string("ios"),
+                "mode": .string("simulator"),
+                "transport": .string("websocket"),
+            ]),
+            "vm": .object([
+                "contract": .string("ox"),
+                "engine": .string("javascriptcore"),
+                "lifetime": .string("profile"),
+                "sessionBinding": .string("chat"),
+                "functionCount": .int(functionCount),
+            ]),
+            "session": sessionValue,
+            "vfsRoots": .array(roots.map(JSONValue.string)),
+        ])
+        reply(encode(VMControlResult(
+            kind: "vm-inspect-result",
+            id: command.id,
+            ok: true,
+            protocolVersion: vmProtocolVersion,
+            value: value,
+            logs: nil,
+            error: nil
+        )))
+    }
+
+    @MainActor
+    static func handleVMListSessions(_ command: VMRequest, reply: @escaping @MainActor (Data) -> Void) {
+        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-list-sessions-result", reply: reply) else { return }
+        guard let manager = chatManager else {
+            reply(vmFailure(id: command.id, kind: "vm-list-sessions-result", error: "session manager unavailable"))
+            return
+        }
+        let currentID = manager.currentId
+        let sessions = manager.debugSessions().sorted { left, right in
+            if left.id == currentID { return true }
+            if right.id == currentID { return false }
+            return left.createdAt > right.createdAt
+        }.map { session in
+            JSONValue.object([
+                "id": .string(session.id.uuidString),
+                "title": .string(session.title),
+                "active": .bool(session.id == currentID),
+                "temporary": .bool(session.isTemporary),
+                "model": .string(session.model.id),
+                "createdAt": .string(iso(session.createdAt)),
+            ])
+        }
+        reply(encode(VMControlResult(
+            kind: "vm-list-sessions-result",
+            id: command.id,
+            ok: true,
+            protocolVersion: vmProtocolVersion,
+            value: .object(["sessions": .array(sessions)]),
+            logs: nil,
+            error: nil
+        )))
+    }
+
+    @MainActor
+    static func handleVMFunctions(_ command: VMFunctionsRequest, reply: @escaping @MainActor (Data) -> Void) {
+        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-functions-result", reply: reply) else { return }
+        let catalog = OxFunctionCatalog.build()
+        let help = OxFunctionCatalog.buildHelpText()
+        let value: JSONValue
+        if let name = command.function {
+            guard let schema = catalog.objectValue?[name], let text = help.objectValue?[name] else {
+                reply(vmFailure(id: command.id, kind: "vm-functions-result", error: "unknown VM function: \(name)"))
+                return
+            }
+            value = .object(["name": .string(name), "schema": schema, "help": text])
+        } else {
+            value = .object(["functions": catalog])
+        }
+        reply(encode(VMControlResult(
+            kind: "vm-functions-result",
+            id: command.id,
+            ok: true,
+            protocolVersion: vmProtocolVersion,
+            value: value,
+            logs: nil,
+            error: nil
+        )))
+    }
+
+    @MainActor
+    static func handleVMCall(_ command: VMCallRequest, reply: @escaping @MainActor (Data) -> Void) {
+        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-call-result", reply: reply) else { return }
+        guard command.arguments.objectValue != nil else {
+            reply(vmFailure(id: command.id, kind: "vm-call-result", error: "VM function arguments must be an object"))
+            return
+        }
+        guard OxFunctionCatalog.build().objectValue?[command.function] != nil else {
+            reply(vmFailure(id: command.id, kind: "vm-call-result", error: "unknown VM function: \(command.function)"))
+            return
+        }
+        let source = "return await \(command.function)(\(command.arguments.jsonString()));"
+        executeVM(
+            id: command.id,
+            kind: "vm-call-result",
+            sessionID: command.sessionId,
+            source: source,
+            logLabel: "call function=\(command.function)",
+            reply: reply
+        )
+    }
+
+    @MainActor
+    static func handleVMEval(_ command: VMEvalRequest, reply: @escaping @MainActor (Data) -> Void) {
+        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-eval-result", reply: reply) else { return }
+        guard !command.script.isEmpty else {
+            reply(vmFailure(id: command.id, kind: "vm-eval-result", error: "missing script"))
+            return
+        }
+        executeVM(
+            id: command.id,
+            kind: "vm-eval-result",
+            sessionID: command.sessionId,
+            source: command.script,
+            logLabel: "eval bytes=\(command.script.utf8.count)",
+            reply: reply
+        )
+    }
+
+    @MainActor
+    static func executeVM(
+        id: String,
+        kind: String,
+        sessionID: String?,
+        source: String,
+        logLabel: String,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
+        guard let manager = chatManager else {
+            reply(vmFailure(id: id, kind: kind, error: "session manager unavailable"))
+            return
+        }
+        let session: Chat
+        switch resolveSession(manager, sessionID) {
+        case .error(let error):
+            reply(vmFailure(id: id, kind: kind, error: error))
+            return
+        case .found(nil):
+            reply(vmFailure(id: id, kind: kind, error: "no active VM session"))
+            return
+        case .found(let resolved?): session = resolved
+        }
+        Log.agent.debug("DebugCommandRouter.\(logLabel) id=\(id) session=\(session.id.uuidString)")
+        Task { @MainActor in
+            do {
+                let result = try await session.runDebugSnippet(source)
+                reply(encode(VMControlResult(
+                    kind: kind,
+                    id: id,
+                    ok: true,
+                    protocolVersion: vmProtocolVersion,
+                    value: result.value,
+                    logs: result.logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) },
+                    error: nil
+                )))
+            } catch {
+                let logs = (error as? VirtualMachine.Error)?.logs ?? []
+                reply(encode(VMControlResult(
+                    kind: kind,
+                    id: id,
+                    ok: false,
+                    protocolVersion: vmProtocolVersion,
+                    value: nil,
+                    logs: logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) },
+                    error: error.localizedDescription
+                )))
+            }
+        }
+    }
+
+    @MainActor
+    static func validateVMProtocol(
+        _ version: Int,
+        id: String,
+        kind: String,
+        reply: @escaping @MainActor (Data) -> Void
+    ) -> Bool {
+        guard version == vmProtocolVersion else {
+            reply(vmFailure(id: id, kind: kind, error: "unsupported VM protocol version \(version); expected \(vmProtocolVersion)"))
+            return false
+        }
+        return true
+    }
+
+    static func vmFailure(id: String, kind: String, error: String) -> Data {
+        encode(VMControlResult(
+            kind: kind,
+            id: id,
+            ok: false,
+            protocolVersion: vmProtocolVersion,
+            value: nil,
+            logs: nil,
+            error: error
+        ))
     }
 
     static func jsonSafe(_ value: Any?) -> JSONValue {
