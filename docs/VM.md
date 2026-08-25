@@ -28,6 +28,25 @@ Ox CLI
             └── IOSHost
 ```
 
+## Client and Host availability
+
+| Client | Host | Status | Transport | Remaining work |
+| --- | --- | --- | --- | --- |
+| Native iOS app | Embedded iOS Host in the same app | Available today | Direct Swift calls through `OxHost` | None for the embedded topology |
+| macOS Ox CLI | iOS Simulator Host on the same Mac | Available today | Loopback WebSocket through `WebSocketOxHostTransport` | Limited to DEBUG Simulator builds |
+| macOS Ox CLI | Remote compatible Host | Client-ready | WebSocket selected with `--host <ws-url>` | A Host must expose a reachable, authenticated endpoint; the current iOS listener is loopback-only |
+| Native iOS app | Remote iOS, macOS, or Android Host | Pending | WebSocket or another `OxHostProtocol` transport | Client-side transport, projected state, event synchronization, reconnection, and authentication |
+| Native macOS app | Embedded or remote Host | Pending | In-process or remote transport | No native macOS Client or Host implementation exists yet |
+| Native Android app | Embedded Android Host | Pending | In-process transport | Android Client, Host, VM, platform adapters, and projected state |
+| Native Android app | Remote iOS, macOS, or Android Host | Pending | Remote `OxHostProtocol` transport | Android Client transport, projected state, synchronization, and authentication |
+| Any compatible Client | Native macOS Host | Pending | In-process or remote transport | macOS Host runtime and platform adapters |
+| Any compatible Client | Native Android Host | Pending | In-process or remote transport | Android Host runtime, VM, and platform adapters |
+
+The protocol boundary makes the pending topologies possible without changing
+who owns chats, Profiles, services, models, or VMs. It does not make an
+unimplemented Client or Host available. The embedded iOS path remains direct
+and does not pay remote transport or serialization costs.
+
 Clients target Hosts rather than depending on a VM engine. A Host owns VM
 lifecycle, Profile access, capability implementations, and session selection.
 The same Client can target another compatible Host, and a Host can replace its
