@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "Built-in",
-  "contentHash": "545b07cd192104ea3dbad21ec000c4658c88334d805e06e378ade49a9085b0c3",
+  "contentHash": "48983724a9f6d41f9a0d8c09e21007b92a53045b905292e8929cd9c1faa91d57",
   "services": [
     "ios:browser",
     "ios:calendar",
@@ -39,6 +39,7 @@
     "web:news.ycombinator.com",
     "web:oftendining.com",
     "web:ourworldindata.org",
+    "web:outlook.live.com",
     "web:secure.bankofamerica.com",
     "web:secure.chase.com",
     "web:taobao.com",

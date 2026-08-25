@@ -1,0 +1,559 @@
+{
+  "domain": "outlook.live.com",
+  "name": "Outlook",
+  "description": "Read signed-in Outlook.com mail and calendar data.",
+  "baseUrl": "https://outlook.live.com/owa/favicon.ico",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Open Outlook sign-in",
+      "description": "Open the Outlook.com mail sign-in flow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Outlook sign-in",
+      "description": "Check whether the current Outlook.com browser session is signed in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "listFolders",
+      "label": "List mail folders",
+      "description": "List visible Outlook mail folders and unread counts.",
+      "baseUrl": "https://outlook.live.com/mail/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "unreadCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "unreadCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listMessages",
+      "label": "List messages",
+      "description": "List visible Outlook message summaries from a mail folder.",
+      "baseUrl": "https://outlook.live.com/mail/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "default": "inbox"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 25
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "conversationId": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "receivedText": {
+                  "type": "string"
+                },
+                "isUnread": {
+                  "type": "boolean"
+                },
+                "preview": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "conversationId",
+                "subject",
+                "sender",
+                "receivedText",
+                "isUnread",
+                "preview"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "searchMessages",
+      "label": "Search messages",
+      "description": "Search Outlook mail and return visible matching message summaries.",
+      "baseUrl": "https://outlook.live.com/mail/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 25
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "conversationId": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "receivedText": {
+                  "type": "string"
+                },
+                "isUnread": {
+                  "type": "boolean"
+                },
+                "preview": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "conversationId",
+                "subject",
+                "sender",
+                "receivedText",
+                "isUnread",
+                "preview"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getMessage",
+      "label": "Read message",
+      "description": "Read a visible Outlook conversation or message from its opaque identifier.",
+      "baseUrl": "https://outlook.live.com/mail/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "receivedText": {
+            "type": "string"
+          },
+          "bodyText": {
+            "type": "string"
+          },
+          "attachmentNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "sender",
+          "recipients",
+          "receivedText",
+          "bodyText",
+          "attachmentNames"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listCalendars",
+      "label": "List calendars",
+      "description": "List visible calendars in Outlook.",
+      "baseUrl": "https://outlook.live.com/calendar/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "selected"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listEvents",
+      "label": "List calendar events",
+      "description": "List visible Outlook calendar events in a date range.",
+      "baseUrl": "https://outlook.live.com/calendar/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "minLength": 10
+          },
+          "end": {
+            "type": "string",
+            "minLength": 10
+          },
+          "calendarId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "startText": {
+                  "type": "string"
+                },
+                "endText": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                },
+                "allDay": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "subject",
+                "startText",
+                "endText",
+                "location",
+                "allDay"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getEvent",
+      "label": "Read calendar event",
+      "description": "Read a visible Outlook calendar event from its opaque identifier.",
+      "baseUrl": "https://outlook.live.com/calendar/",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "timeText": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "organizer": {
+            "type": "string"
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bodyText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "timeText",
+          "location",
+          "organizer",
+          "attendees",
+          "bodyText"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    }
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/outlook.live.com/favicon.png"
+}

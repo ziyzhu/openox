@@ -9,10 +9,10 @@ export const replayCases = [
   },
   {
     "action": "getSignInState",
-    "name": "signed-out",
+    "name": "authenticated",
     "args": {},
     "output": {
-      "signedIn": false
+      "signedIn": true
     }
   },
   {

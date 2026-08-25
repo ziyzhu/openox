@@ -97,13 +97,18 @@ async function waitForHttp(port: number): Promise<void> {
   throw new Error(`Registry health check timed out on port ${port}`);
 }
 
-async function waitForRegistry(endpoint: string): Promise<void> {
+async function waitForRegistry(endpoint: string, expectedDomain?: string): Promise<void> {
   const deadline = performance.now() + 60_000;
   let detail = "registry is not ready";
   while (performance.now() < deadline) {
     if (interrupted) throw new Error(`Interrupted by ${interrupted}`);
     const result = await runOnce({ kind: "sync-mono-repository", id: crypto.randomUUID() }, 5_000, endpoint);
-    if (result.ok && typeof result.head === "string" && result.head && Number(result.services) > 0) return;
+    if (result.ok && typeof result.head === "string" && result.head && Number(result.services) > 0) {
+      if (!expectedDomain) return;
+      const status = await runOnce({ kind: "list-services", id: crypto.randomUUID() }, 5_000, endpoint);
+      const services = status.ok && Array.isArray(status.services) ? status.services : [];
+      if (services.some((service) => service?.domain === expectedDomain)) return;
+    }
     detail = result.ok ? `head=${String(result.head)} services=${String(result.services)}` : result.error;
     await Bun.sleep(100);
   }
@@ -234,7 +239,7 @@ try {
     "--disable-icloud",
   ]);
   const debugEndpoint = `ws://127.0.0.1:${config.debugPort}`;
-  await waitForRegistry(debugEndpoint);
+  await waitForRegistry(debugEndpoint, options.selector?.split(":")[0]);
   const environment = {
     OX_QA_DEVICE: config.device,
     OX_DEBUG_ENDPOINT: debugEndpoint,
