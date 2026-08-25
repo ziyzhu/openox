@@ -356,7 +356,7 @@ struct SkillEditorView: View {
 
     private var serviceSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Picking this skill auto-attaches these services to the chat.")
+            Text("Picking this skill auto-attaches these plugins to the chat.")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
 
@@ -392,7 +392,7 @@ struct SkillEditorView: View {
             Chip(fill: Theme.Colors.chipOnBackground) {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .semibold))
-                Text("Add service")
+                Text("Add plugin")
                     .font(Theme.Fonts.labelMd)
             }
         }
@@ -452,7 +452,7 @@ private struct SkillServicePicker: View {
             .scrollIndicators(.hidden)
             .background(Theme.Colors.surface)
             .searchable(text: $query)
-            .navigationTitle("Services")
+            .navigationTitle("Plugins")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

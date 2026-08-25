@@ -1,7 +1,7 @@
 {
   "domain": "ios:browser",
   "name": "Browser",
-  "description": "Inspect and interact with attached web-service pages, including their signed-in sessions.",
+  "description": "Inspect and interact with attached web plugin pages, including their signed-in sessions.",
   "icon": {
     "system": "safari"
   },
@@ -68,7 +68,7 @@
       "requireAuth": false
     },
     {
-      "description": "Execute arbitrary JavaScript in an attached web service's page. This can read or change signed-in website data and send information over the network.",
+      "description": "Execute arbitrary JavaScript in an attached web plugin's page. This can read or change signed-in website data and send information over the network.",
       "id": "executeJavaScript",
       "inputSchema": {
         "additionalProperties": false,

@@ -28,12 +28,12 @@ struct SkillImportView: View {
                 .accessibilityIdentifier(A11yID.SkillImport.preview)
 
                 if proposal.skill.services.isEmpty {
-                    Label("No services requested", systemImage: "checkmark.shield")
+                    Label("No plugins requested", systemImage: "checkmark.shield")
                         .font(Theme.Fonts.bodySm)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 } else {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("Requested services")
+                        Text("Requested plugins")
                             .font(Theme.Fonts.labelMd)
                             .foregroundStyle(Theme.Colors.onSurface)
                         ForEach(proposal.skill.services, id: \.self) { domain in

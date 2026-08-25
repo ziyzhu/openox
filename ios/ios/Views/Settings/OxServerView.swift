@@ -38,7 +38,7 @@ struct OxServerView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
-        .navigationTitle("Service Repositories")
+        .navigationTitle("Plugin Repositories")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -87,7 +87,7 @@ struct OxServerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingsSurface()
 
-            Text("Repositories are collections of services that let Ox work with websites, apps, and other tools. Add your own repository to extend Ox with more services. Local is always available. Other enabled repositories are read-only.")
+            Text("Repositories are collections of plugins that let Ox work with websites, apps, and other tools. Add your own repository to extend Ox with more plugins. Local is always available. Other enabled repositories are read-only.")
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .settingsContentInset()
@@ -159,13 +159,13 @@ struct OxServerView: View {
         case .development: String(localized: "Development Server")
         case .remote: repository.origin?.host ?? String(localized: "Repository")
         }
-        return "\(repository.serviceCount) services · \(source)"
+        return "\(repository.serviceCount) plugins · \(source)"
     }
 
     private var conflictsSection: some View {
         SettingsSection(
             "Conflicts",
-            footer: "Choose which repository provides each service. Ox never combines implementations.",
+            footer: "Choose which repository provides each plugin. Ox never combines implementations.",
             insetContent: false
         ) {
             VStack(spacing: 0) {
@@ -265,7 +265,7 @@ private struct AddServiceRepositoryView: View {
                         "Git Repository",
                         footer: "The repository must be public, use HTTPS, and contain ox.json at its root."
                     ) {
-                        TextField("https://github.com/example/services.git", text: $draft)
+                        TextField("https://github.com/example/plugins.git", text: $draft)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
@@ -378,7 +378,7 @@ struct ServiceRepositoryDetailView: View {
                         .settingsSurface()
                     }
                     if !repository.services.isEmpty {
-                        SettingsSection("Services", insetContent: false) {
+                        SettingsSection("Plugins", insetContent: false) {
                             VStack(spacing: 0) {
                                 ForEach(Array(repository.services.enumerated()), id: \.element.id) { index, service in
                                     if index > 0 { Divider().settingsContentInset() }

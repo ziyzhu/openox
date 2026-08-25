@@ -326,7 +326,7 @@ enum A11yLabel {
     static var renameChat: String { L10n.string("Rename chat", comment: "") }
     static var pin: String { L10n.string("Pin", comment: "") }
     static var unpin: String { L10n.string("Unpin", comment: "") }
-    static var services: String { L10n.string("Services", comment: "") }
+    static var services: String { L10n.string("Plugins", comment: "") }
     static var artifacts: String { L10n.string("Artifacts", comment: "") }
     static var skills: String { L10n.string("Skills", comment: "") }
     static var openSidebar: String { L10n.string("Open chat history", comment: "") }

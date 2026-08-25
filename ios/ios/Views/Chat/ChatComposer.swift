@@ -737,17 +737,17 @@ struct ChatComposer: View, Equatable {
     private func promptFields(_ template: PromptTemplate) -> some View {
         switch template {
         case .actions:
-            TextField("Service or domain", text: $promptPrimaryInput)
+            TextField("Plugin or domain", text: $promptPrimaryInput)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .accessibilityLabel("Service or domain")
+                .accessibilityLabel("Plugin or domain")
                 .accessibilityIdentifier(A11yID.Chat.newActionsService)
             TextField("Features", text: $promptSecondaryInput)
                 .accessibilityLabel("Features")
                 .accessibilityIdentifier(A11yID.Chat.newActionsFeatures)
         case .workflows:
-            TextField("Services needed", text: $promptPrimaryInput)
-                .accessibilityLabel("Services needed")
+            TextField("Plugins needed", text: $promptPrimaryInput)
+                .accessibilityLabel("Plugins needed")
                 .accessibilityIdentifier(A11yID.Chat.newWorkflowServices)
             TextField("What should it achieve?", text: $promptSecondaryInput)
                 .accessibilityLabel("What should it achieve?")
@@ -759,9 +759,9 @@ struct ChatComposer: View, Equatable {
     private func promptMessage(_ template: PromptTemplate) -> some View {
         switch template {
         case .actions:
-            Text("Describe the service and the actions you want Ox to add.")
+            Text("Describe the plugin and the actions you want Ox to add.")
         case .workflows:
-            Text("Describe the services the skill needs and its goal.")
+            Text("Describe the plugins the skill needs and its goal.")
         }
     }
 
@@ -771,9 +771,9 @@ struct ChatComposer: View, Equatable {
         let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
         composer.draft = switch promptTemplate {
         case .actions:
-            String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nFeatures: \(secondary)")
+            String(localized: "Create a new plugin for \(primary), or add actions to the existing plugin if one is already available.\n\nFeatures: \(secondary)")
         case .workflows:
-            String(localized: "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
+            String(localized: "Create a new workflow as a skill.\n\nPlugins needed: \(primary)\n\nGoal: \(secondary)")
         }
         Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
         resetPromptTemplate()
@@ -1236,7 +1236,7 @@ private struct AttachMenuCard: View {
             row("Photos", icon: .system("photo.on.rectangle"), a11yID: A11yID.Chat.Attach.photos) { onChoice(.photos) }
             row("Files", icon: .system("paperclip"), a11yID: A11yID.Chat.Attach.files) { onChoice(.files) }
             row("Artifacts", icon: .action(.artifacts), a11yID: A11yID.Chat.Attach.artifacts) { onChoice(.artifacts) }
-            row("Services", icon: .action(.services), a11yID: A11yID.Chat.Attach.services, action: onServices)
+            row("Plugins", icon: .action(.services), a11yID: A11yID.Chat.Attach.services, action: onServices)
         }
         .padding(.vertical, Theme.Spacing.sm)
         .frame(width: 270, alignment: .leading)
@@ -1331,7 +1331,7 @@ private struct ServicePickerPanel: View {
 
     private var header: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Text("Services")
+            Text("Plugins")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Spacer(minLength: 0)
@@ -1349,7 +1349,7 @@ private struct ServicePickerPanel: View {
                 .minimumTouchTarget()
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Services")
+        .accessibilityLabel("Plugins")
         .accessibilityIdentifier(A11yID.Chat.Attach.explore)
     }
 
@@ -1365,7 +1365,7 @@ private struct ServicePickerPanel: View {
             } else {
                 VStack(spacing: Theme.Spacing.sm) {
                     LibraryDestinationIcon(.services, size: 28)
-                    Text("No services found")
+                    Text("No plugins found")
                         .font(Theme.Fonts.bodySm)
                 }
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)

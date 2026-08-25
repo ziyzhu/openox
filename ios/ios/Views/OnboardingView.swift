@@ -35,7 +35,7 @@ struct OnboardingView: View {
             ) {
                 VStack(spacing: Theme.Spacing.md) {
                     WebsitesDemo(height: welcomeIllustrationHeight)
-                    Text("“Hey Ox, add LinkedIn as a service”")
+                    Text("“Hey Ox, add the LinkedIn plugin”")
                         .font(Theme.Fonts.bodySm)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)

@@ -38,13 +38,13 @@ struct MonoRepositoryLoadingStatus: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
             CellularAutomatonLoader.mini
-            Text("Loading services…")
+            Text("Loading plugins…")
                 .font(Theme.Fonts.bodySm)
         }
         .foregroundStyle(Theme.Colors.onSurfaceMuted)
         .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .center)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Loading services…"))
+        .accessibilityLabel(Text("Loading plugins…"))
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
