@@ -50,6 +50,9 @@
 ## Build and Test
 
 1. Use `bun run` scripts for repository operations and `ox` for service operations.
+1. Create, explore, repair, and verify web services by driving an Ox chat on the user-selected simulator through the built-in `manage-services` workflow.
+1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
+1. Use `.agents/skills/promote-web-service` only after Ox has committed a verified Local service and the user explicitly requests promotion into the built-in repository.
 1. Build iOS only with `sim`, never `xcodebuild`.
 1. Before simulator testing, start one repository server and verify its `/health` endpoint.
 1. Each concurrent process must use its own numbered simulator and matching service, repository, and debug ports.

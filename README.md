@@ -121,7 +121,8 @@ Use `--host <ws-url>` or `OX_HOST_ENDPOINT` when the Host does not use the defau
 
 [OpenClaw](https://github.com/openclaw/openclaw): Ox's system propmts referenced some of OpenClaw's.
 
+[zappa: an AI powered mitmproxy](https://geohot.github.io/blog/jekyll/update/2026/04/15/zappa-mitmproxy.html): Ox adopts a similar idea but applied to mobile.
+
 [OpenCLI](https://github.com/jackwener/opencli): Ox's web service integration referenced some crawling techniques from OpenCLI.
 
 [Defuddle](https://github.com/kepano/defuddle): Ox's HTML to Markdown parser uses Defuddle.
-

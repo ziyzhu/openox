@@ -1,0 +1,4 @@
+interface:
+  display_name: "Promote Web Service"
+  short_description: "Package an Ox-authored Local service"
+  default_prompt: "Use $promote-web-service to promote this verified Ox Local web service into the built-in repository and run release checks."
