@@ -7,6 +7,7 @@ enum InvocationName: String, CaseIterable {
     case webFetch = "ox.web.fetch"
     case fsList = "ox.fs.list"
     case fsRead = "ox.fs.read"
+    case outputRead = "ox.output.read"
     case fsWrite = "ox.fs.write"
     case fsEdit = "ox.fs.edit"
     case fsDelete = "ox.fs.delete"
@@ -57,7 +58,7 @@ enum InvocationName: String, CaseIterable {
         case .webSearch: L10n.string("Search the web")
         case .webFetch: L10n.string("Fetch a web resource")
         case .fsList: L10n.string("List files")
-        case .fsRead: L10n.string("Read a file")
+        case .fsRead, .outputRead: L10n.string("Read a file")
         case .fsWrite: L10n.string("Write a file")
         case .fsEdit: L10n.string("Edit a file")
         case .fsDelete: L10n.string("Delete a file")
@@ -107,7 +108,7 @@ enum InvocationName: String, CaseIterable {
         case .appInspect: .device
         case .appRenameChat: .chats
         case .webSearch, .webFetch: .web
-        case .fsList, .fsRead, .fsWrite, .fsEdit, .fsDelete, .fsGlob, .fsGrep: .files
+        case .fsList, .fsRead, .outputRead, .fsWrite, .fsEdit, .fsDelete, .fsGlob, .fsGrep: .files
         case .artifactAttach, .artifactList, .artifactImport, .artifactWrite,
              .artifactReplaceText, .artifactRename, .artifactDelete, .artifactPresent: .artifacts
         case .serviceFind, .serviceListAttached, .serviceInspect, .serviceCreate, .serviceCopy, .serviceDelete,

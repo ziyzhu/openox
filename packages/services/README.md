@@ -5,15 +5,13 @@
 The authored source lives in `repositories/builtin/`. Its `repository.json`
 inventories services whose individual metadata is stored in `service.json`.
 
-The package requires Bun 1.3 or newer.
-
 ```sh
 bun add @openox/services
 ```
 
 Resolve the installed repository root:
 
-```ts
+```js
 import { repositoryRoot } from "@openox/services";
 ```
 

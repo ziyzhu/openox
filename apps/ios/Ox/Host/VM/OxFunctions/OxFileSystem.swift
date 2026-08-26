@@ -34,12 +34,12 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.read",
-                    "Read bounded text from one file in the active Profile: `await ox.fs.read({ path, options?, purpose })`. Persisted chat metadata and transcripts are available as read-only `chats/<chat-id>/chat.json` and `turns.jsonl`; runtime `context.json` is not exposed. Text and PDF artifacts are bounded by `maxBytes`; PDFs also support `maxPages`. Images and unsupported binary files return an explanation instead of content.",
+                    "Read a file's complete text into JavaScript: `await ox.fs.read({ path, options?, purpose })`. There is no default text or PDF page cutoff. Filter or slice the result in JavaScript before printing; execution output has fixed line and byte limits. Optional `maxBytes` and `maxPages` request a shorter read and set `truncated` when content remains. A 32 MiB file safety limit applies. Persisted chat metadata and transcripts are read-only under `chats/<chat-id>/{chat.json,turns.jsonl}`; runtime `context.json` is private. Images and unsupported binary files return an explanation instead of text.",
                     input: object([
                         "path": path("File path to read."),
                         "options": object([
-                            "maxBytes": integer("Maximum text bytes to return.", minimum: 1, maximum: VirtualFileSystem.maximumReadBytes),
-                            "maxPages": integer("Maximum PDF pages to read, clamped to 1-100.", minimum: 1, maximum: 100),
+                            "maxBytes": integer("Optional text byte limit; omitted reads the full text.", minimum: 1, maximum: ArtifactLimits.fileBytes),
+                            "maxPages": integer("Optional PDF page limit; omitted reads every page.", minimum: 1, maximum: Int.max),
                         ]),
                         "purpose": purpose,
                     ], required: ["path", "purpose"]),

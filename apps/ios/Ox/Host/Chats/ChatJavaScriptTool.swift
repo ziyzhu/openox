@@ -1,9 +1,6 @@
 import Foundation
 
 nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
-    private static let maximumModelOutputCharacters = 16_000
-    private static let retainedModelOutputTailCharacters = 4_000
-
     private struct ModelOutput {
         let text: String
         let truncated: Bool
@@ -49,15 +46,15 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
         JavaScript has 60 seconds of active execution time. Waiting for a service action, sign-in, verification, payment, or user choice does not consume that time. Each execution may call `ox.web.fetch` at most eight times and add at most four transient attachments to model context; presented artifacts do not count toward that attachment limit. Every execution is self-contained: never store state on `globalThis`. Batch larger work across executions and print concise progress, cursors, or partial results so the next execution can continue, or persist continuation state through an authorized virtual file.
 
         Combine dependent operations in one snippet when they fit these budgets; parallelize independent operations within the same limits. Keep intermediate results in JavaScript; filter, aggregate, project fields, and limit rows before printing only what the next reasoning step needs. For web research, avoid fetching the same URL twice in one run and stop gathering when authoritative evidence answers the request. Surface thrown errors instead of retrying blindly.
+
+        File reads return complete text into JavaScript by default. Combined console output is limited to the last \(JavaScriptOutputLimits.maxLines) lines or \(JavaScriptOutputLimits.maxBytes / 1024) KiB, whichever is reached first, independent of the model. Oversized output includes a reference for `ox.output.read`; retrieve the complete string, then print the relevant slice or filtered result. Do not treat a truncated preview as the complete record. Output references are chat-local and expire when the chat is unloaded.
         """
     }
 
     func execute(toolCallId: String, args: JSONValue) async throws -> ToolResult {
         guard let source = args.objectValue?["source"]?.stringValue else {
             Log.session.warning("tool.execute rejected: missing 'source' (id=\(toolCallId))")
-            let output = logOutput(logs: [], error: "missing 'source'")
-            let modelOutput = modelOutput(logs: [], error: "missing 'source'")
-            return ToolResult(text: modelOutput.text, diagnosticContent: output, isError: true, truncated: modelOutput.truncated)
+            return ToolResult(text: "missing 'source'", isError: true)
         }
         Log.session.info("tool.execute id=\(toolCallId) source=\(LogPrivacy.text(source, limit: 4_096))")
         return await execute(source: source)
@@ -69,20 +66,26 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
         session.beginExecution(source: source)
         let output: ModelOutput
         let diagnosticContent: JSONValue?
-        let failed: Bool
+        let logs: [VirtualMachineLog]
+        var failure: String?
         do {
             let out = try await session.virtualMachine.run(source: source, bridge: session)
-            diagnosticContent = logOutput(logs: out.logs, error: nil)
-            output = modelOutput(logs: out.logs, error: nil)
-            failed = false
+            logs = out.logs
         } catch {
-            let logs: [VirtualMachineLog] = (error as? VirtualMachine.Error)?.logs ?? []
-            diagnosticContent = logOutput(logs: logs, error: error.localizedDescription)
-            output = modelOutput(logs: logs, error: error.localizedDescription)
-            failed = true
+            logs = (error as? VirtualMachine.Error)?.logs ?? []
+            failure = error.localizedDescription
         }
         let attachments = session.executionAttachments()
         let activatedSkills = session.executionActivatedSkills()
+        do {
+            output = try modelOutput(logs: logs, error: failure, store: session.javaScriptOutputs)
+        } catch {
+            failure = error.localizedDescription
+            output = ModelOutput(text: "[error] \(error.localizedDescription)", truncated: true)
+        }
+        diagnosticContent = output.truncated ? nil : logOutput(logs: logs, error: failure)
+        let failed = failure != nil
+        Log.session.info("tool.output maxBytes=\(JavaScriptOutputLimits.maxBytes) maxLines=\(JavaScriptOutputLimits.maxLines) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
         session.finishExecution(output: output.text, isError: failed)
         return ToolResult(
             content: [.text(TextContent(output.text))] + attachments.artifacts.map(ContentBlock.attachment),
@@ -94,22 +97,21 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
         )
     }
 
-    private func modelOutput(logs: [VirtualMachineLog], error: String?) -> ModelOutput {
+    @MainActor
+    private func modelOutput(logs: [VirtualMachineLog], error: String?, store: JavaScriptOutputStore) throws -> ModelOutput {
         var lines = logs.map { log in
             log.level == "log" ? log.message : "[\(log.level)] \(log.message)"
         }
         if let error { lines.append("[error] \(error)") }
         let output = lines.joined(separator: "\n")
         guard !output.isEmpty else { return ModelOutput(text: "(no output)", truncated: false) }
-        guard output.count > Self.maximumModelOutputCharacters else {
+        let preview = JavaScriptOutputLimits.preview(output)
+        guard preview != output else {
             return ModelOutput(text: output, truncated: false)
         }
-        let omittedCharacters = output.count - Self.maximumModelOutputCharacters
-        let marker = "\n[Tool output truncated: omitted \(omittedCharacters) characters]\n"
-        let tailCount = min(Self.retainedModelOutputTailCharacters, Self.maximumModelOutputCharacters - marker.count)
-        let headCount = Self.maximumModelOutputCharacters - marker.count - tailCount
-        let text = String(output.prefix(headCount)) + marker + String(output.suffix(tailCount))
-        return ModelOutput(text: text, truncated: true)
+        let id = try store.save(output)
+        let marker = "\n[Tool output truncated: showing the tail (\(JavaScriptOutputLimits.maxLines) lines or \(JavaScriptOutputLimits.maxBytes / 1024) KiB limit). Full output id: \(id). Read with ox.output.read({ id: '\(id)', purpose: 'Read remaining output' }), then filter or slice before printing. Reference expires when this chat is unloaded.]"
+        return ModelOutput(text: preview + marker, truncated: true)
     }
 
     private func logOutput(logs: [VirtualMachineLog], error: String?) -> JSONValue {

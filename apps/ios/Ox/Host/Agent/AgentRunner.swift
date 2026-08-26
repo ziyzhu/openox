@@ -262,7 +262,9 @@ nonisolated enum AgentRunner {
             options: snapshot.streamOptions,
             reason: reason,
             force: force,
-            transformContext: config.transformContext
+            transformContext: config.transformContext,
+            systemPrompt: snapshot.context.systemPrompt,
+            tools: snapshot.context.tools
         )
         guard case .compacted(let compaction) = outcome else {
             let cancelled: Bool

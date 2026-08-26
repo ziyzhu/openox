@@ -18,6 +18,7 @@ const expectedFiles = [
   "package.json",
   "src/action-lib.ts",
   "src/action.ts",
+  "src/catalog.ts",
   "src/manifest.ts",
   "src/repository.ts",
   "src/skills.ts",
@@ -54,6 +55,7 @@ try {
   await Bun.write(checkPath, [
     'await import("@openox/service-sdk/action");',
     'await import("@openox/service-sdk/action-lib");',
+    'await import("@openox/service-sdk/catalog");',
     'await import("@openox/service-sdk/skills");',
     'await import("@openox/service-sdk/testing/replay/fixtures");',
     'await import("@openox/service-sdk/testing/replay/proxy");',

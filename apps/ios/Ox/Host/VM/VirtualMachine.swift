@@ -436,6 +436,7 @@ nonisolated private final class RunHandle: @unchecked Sendable {
         var settled = false
         var bridgeTasks: [Task<Void, Never>] = []
         var logs: [VirtualMachineLog] = []
+        var logBytes = 0
         var continuation: CheckedContinuation<VirtualMachineOutput, any Swift.Error>?
         var timeoutTask: Task<Void, Never>?
         var timeoutSuspensions = 0
@@ -445,8 +446,16 @@ nonisolated private final class RunHandle: @unchecked Sendable {
     private let state = Mutex(State())
 
     func appendLog(level: String, message: String) {
-        state.withLock { state in
-            if !state.settled { state.logs.append(VirtualMachineLog(level: level, message: message)) }
+        let exceeded = state.withLock { state in
+            guard !state.settled else { return false }
+            let bytes = message.utf8.count + level.utf8.count + 4
+            guard state.logBytes + bytes <= ArtifactLimits.fileBytes else { return true }
+            state.logBytes += bytes
+            state.logs.append(VirtualMachineLog(level: level, message: message))
+            return false
+        }
+        if exceeded {
+            settle(.failure(VirtualMachine.Error.js("JavaScript console output exceeds the 32 MiB memory safety limit. Filter results before printing.", logs: snapshotLogs())))
         }
     }
 

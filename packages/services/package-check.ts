@@ -41,7 +41,7 @@ try {
     throw new Error(`packed ${report.name}@${report.version}, expected ${packageMetadata.name}@${packageMetadata.version}`);
   }
   const files = report.files.map(({ path }) => path);
-  const unexpected = files.filter((path) => !["LICENSE", "README.md", "package.json", "src/repository.ts"].includes(path)
+  const unexpected = files.filter((path) => !["LICENSE", "README.md", "package.json", "repository.js"].includes(path)
     && !path.startsWith("dist/repository/"));
   if (unexpected.length) throw new Error(`unexpected package files: ${unexpected.join(", ")}`);
   if (!files.includes("dist/repository/repository.json")) throw new Error("package does not contain dist/repository/repository.json");

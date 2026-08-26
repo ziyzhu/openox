@@ -169,40 +169,6 @@ nonisolated public struct AssistantMessage: Sendable, Codable, Equatable {
     }
 }
 
-nonisolated enum ToolResultLimits {
-    static let maximumTextCharacters = 100_000
-    private static let retainedTailCharacters = 20_000
-
-    static func text(_ value: String) -> (value: String, truncated: Bool) {
-        let overflow = max(0, value.count - maximumTextCharacters)
-        guard overflow > 0 else { return (value, false) }
-        let marker = "\n\n[Tool output truncated: omitted \(overflow) characters]\n\n"
-        let headCount = maximumTextCharacters - retainedTailCharacters - marker.count
-        return (
-            String(value.prefix(headCount))
-                + marker
-                + String(value.suffix(retainedTailCharacters)),
-            true
-        )
-    }
-
-    static func content(_ blocks: [ContentBlock]) -> (value: [ContentBlock], truncated: Bool) {
-        let fullText = blocks.reduce(into: "") { value, block in
-            if case .text(let text) = block { value += text.text }
-        }
-        let bounded = text(fullText)
-        guard bounded.truncated else { return (blocks, false) }
-        var insertedText = false
-        let value = blocks.compactMap { block -> ContentBlock? in
-            guard case .text = block else { return block }
-            guard !insertedText else { return nil }
-            insertedText = true
-            return .text(TextContent(bounded.value))
-        }
-        return (value, true)
-    }
-}
-
 nonisolated public struct ToolResultDiagnostics: Sendable, Codable, Equatable {
     public var structuredContent: JSONValue
 
@@ -246,15 +212,13 @@ nonisolated public struct ToolResultMessage: Sendable, Codable, Equatable {
         transientAttachments: [TransientAttachment] = [],
         activatedSkills: [ActivatedSkillContext] = []
     ) {
-        let boundedContent = ToolResultLimits.content(content)
-        let diagnosticsTooLarge = diagnostics?.structuredContent.jsonString(fallback: "null").count ?? 0 > ToolResultLimits.maximumTextCharacters
         self.toolCallId = toolCallId
         self.providerCallID = providerCallID
         self.toolName = toolName
-        self.content = boundedContent.value
-        self.diagnostics = diagnosticsTooLarge ? nil : diagnostics
+        self.content = content
+        self.diagnostics = diagnostics
         self.isError = isError
-        self.truncated = truncated || boundedContent.truncated || diagnosticsTooLarge ? true : nil
+        self.truncated = truncated ? true : nil
         self.timestamp = timestamp
         self.transientAttachments = transientAttachments
         self.activatedSkills = activatedSkills

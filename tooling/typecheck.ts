@@ -24,7 +24,6 @@ const projects = [
   "packages/services/tsconfig.json",
   "tooling/tsconfig.json",
   "apps/ios/tests/llm/tsconfig.json",
-  "packages/services/tests/tsconfig.json",
 ];
 
 const results = await Promise.all(projects.map(async (project) => {

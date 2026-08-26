@@ -9,7 +9,7 @@ import {
   validateStandardActions,
   type JSONSchema,
 } from "../../../packages/service-sdk/src/manifest.ts";
-import { validateIOSManifest, validateMCPManifest, type CatalogKind } from "../../../packages/services/src/catalog.ts";
+import { validateIOSManifest, validateMCPManifest, type CatalogKind } from "@openox/service-sdk/catalog";
 import { C, fail, terminalText, type CliContext } from "./lib.ts";
 
 type Verification = {

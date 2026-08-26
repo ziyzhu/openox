@@ -498,9 +498,8 @@ nonisolated struct ToolResultParts {
         let sourceText = [result.content.concatenatedText, artifactReferences.joined(separator: "\n\n")]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
-        let boundedText = ToolResultLimits.text(sourceText)
-        text = boundedText.value
-        truncated = result.truncated == true || boundedText.truncated
+        text = sourceText
+        truncated = result.truncated == true
         var attachments = result.content.reduce(into: [TransientAttachment]()) { media, block in
             guard case .attachment(let attachment) = block,
                   attachment.kind == .image || attachment.kind == .pdf,

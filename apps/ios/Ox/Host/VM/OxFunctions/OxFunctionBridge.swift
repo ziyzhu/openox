@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 public protocol OxFunctionBridge: AnyObject {
+    func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue?
     func inspectApp(purpose: String) async throws -> JSONValue?
     func renameChat(title: String, purpose: String) async throws -> JSONValue?
     func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue?

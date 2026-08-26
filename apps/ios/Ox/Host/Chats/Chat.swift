@@ -155,6 +155,7 @@ final class Chat: Identifiable {
     let id: UUID
     let createdAt: Date
     let agent: Agent
+    let javaScriptOutputs = JavaScriptOutputStore()
     @ObservationIgnored private(set) var agentSnapshot: AgentSnapshot?
     @ObservationIgnored private var agentControlTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?

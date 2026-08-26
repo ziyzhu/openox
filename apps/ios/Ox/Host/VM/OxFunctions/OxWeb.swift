@@ -84,7 +84,7 @@ nonisolated enum OxWeb {
                                     "maxBytes": .object([
                                         "type": .string("integer"),
                                         "minimum": .int(1),
-                                        "maximum": .int(ArtifactLimits.textBytes),
+                                        "maximum": .int(ArtifactLimits.fileBytes),
                                         "description": .string("Maximum text bytes to return."),
                                     ]),
                                 ]),

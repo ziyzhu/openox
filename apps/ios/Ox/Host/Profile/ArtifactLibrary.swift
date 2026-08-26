@@ -8,8 +8,8 @@ nonisolated enum ArtifactLibrary {
     }
 
     struct ReadOptions {
-        var maxBytes = 20_000
-        var maxPages = 20
+        var maxBytes: Int?
+        var maxPages: Int?
     }
 
     struct Item: Encodable, Sendable {
@@ -68,6 +68,9 @@ nonisolated enum ArtifactLibrary {
         guard artifact.exists else {
             return Read(text: nil, truncated: false, unsupported: "Missing artifact.")
         }
+        if let size = artifact.size, size > ArtifactLimits.fileBytes {
+            throw ArtifactError.fileTooLarge(bytes: size, limit: ArtifactLimits.fileBytes)
+        }
         return try read(
             data: Data(contentsOf: artifact.fileURL),
             kind: artifact.kind,
@@ -76,28 +79,37 @@ nonisolated enum ArtifactLibrary {
     }
 
     static func read(data: Data, kind: Artifact.Kind, options: ReadOptions) throws -> Read {
-        let maxBytes = clamp(options.maxBytes, min: 1, max: ArtifactLimits.textBytes)
+        guard data.count <= ArtifactLimits.fileBytes else {
+            throw ArtifactError.fileTooLarge(bytes: data.count, limit: ArtifactLimits.fileBytes)
+        }
+        let maxBytes = options.maxBytes.map { clamp($0, min: 1, max: ArtifactLimits.fileBytes) } ?? ArtifactLimits.fileBytes
         switch kind {
         case .text, .html:
+            guard let fullText = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
             let truncated = data.count > maxBytes
-            let slice = truncated ? Data(data.prefix(maxBytes)) : data
-            guard let text = String(data: slice, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
+            guard truncated else { return Read(text: fullText, truncated: false, unsupported: nil) }
+            var end = data.index(data.startIndex, offsetBy: min(maxBytes, data.count))
+            while end != data.endIndex && data[end] & 0xC0 == 0x80 {
+                end = data.index(before: end)
+            }
+            guard let text = String(data: data[..<end], encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
             return Read(text: text, truncated: truncated, unsupported: nil)
         case .pdf:
             guard let document = PDFDocument(data: data) else {
                 return Read(text: nil, truncated: false, unsupported: "The PDF couldn't be read.")
             }
-            let pageLimit = min(document.pageCount, clamp(options.maxPages, min: 1, max: 100))
+            let pageLimit = options.maxPages.map { min(document.pageCount, max(1, $0)) } ?? document.pageCount
             var text = ""
-            var truncated = pageLimit < document.pageCount
+            let truncated = pageLimit < document.pageCount
             for index in 0..<pageLimit {
                 guard let pageText = document.page(at: index)?.string else { continue }
                 let section = "Page \(index + 1)\n\(pageText)"
                 let candidate = text.isEmpty ? section : text + "\n\n" + section
                 if candidate.utf8.count > maxBytes {
-                    text = String(decoding: candidate.utf8.prefix(maxBytes), as: UTF8.self)
-                    truncated = true
-                    break
+                    guard options.maxBytes != nil else {
+                        throw ArtifactError.textTooLarge(bytes: candidate.utf8.count, limit: ArtifactLimits.fileBytes)
+                    }
+                    return try read(data: Data(candidate.utf8), kind: .text, options: options)
                 }
                 text = candidate
             }
@@ -117,8 +129,8 @@ nonisolated enum ArtifactLibrary {
     static func readOptions(from value: JSONValue?) -> ReadOptions {
         let values = value?.objectValue ?? [:]
         return ReadOptions(
-            maxBytes: int(values["maxBytes"], default: 20_000),
-            maxPages: int(values["maxPages"], default: 20)
+            maxBytes: values["maxBytes"].map { int($0, default: ArtifactLimits.fileBytes) },
+            maxPages: values["maxPages"].map { int($0, default: Int.max) }
         )
     }
 

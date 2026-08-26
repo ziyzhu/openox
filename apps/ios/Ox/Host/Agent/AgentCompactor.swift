@@ -22,7 +22,6 @@ nonisolated enum AgentCompactionOutcome: Sendable {
 }
 
 nonisolated enum AgentCompactor {
-    private static let maximumReserveTokens = 16_384
     private static let maximumRetainedTokens = 20_000
 
     static func compact(
@@ -34,20 +33,30 @@ nonisolated enum AgentCompactor {
         options: StreamOptions,
         reason: AgentCompactionReason,
         force: Bool = false,
-        transformContext: TransformContextHook? = nil
+        transformContext: TransformContextHook? = nil,
+        systemPrompt: String = "",
+        tools: [any AgentTool] = []
     ) async -> AgentCompactionOutcome {
-        let estimatedTokens = estimateContextTokens(messages: messages, fallbackUsage: lastTurnTokens)
-        let reserveTokens = min(maximumReserveTokens, max(1_024, model.maxContext / 4))
-        let thresholdBudget = Int(Double(model.maxContext) * threshold)
-        let budget = min(thresholdBudget, model.maxContext - reserveTokens)
+        let contextBudget = AgentContextBudget(
+            context: AgentContext(systemPrompt: systemPrompt, messages: messages, tools: tools),
+            model: model,
+            options: options,
+            threshold: threshold,
+            fallbackUsage: lastTurnTokens
+        )
+        let estimatedTokens = contextBudget.usedTokens
+        let reserveTokens = contextBudget.reserveTokens
+        let budget = contextBudget.inputLimit
         guard force || estimatedTokens > budget else { return .notNeeded }
         let retainedTokens = min(maximumRetainedTokens, max(4_000, budget - reserveTokens / 2))
         guard let cutIdx = cutIndex(messages: messages, retainedTokens: retainedTokens), cutIdx > 0 else {
-            Log.agent.info("Agent.compact skipped reason=\(reason.rawValue): no prior user message to cut at (msgs=\(messages.count))")
+            Log.agent.info("Agent.compact skipped reason=\(reason.rawValue): no earlier context to summarize (msgs=\(messages.count))")
             return .notNeeded
         }
         let before = messages.count
-        Log.agent.info("Agent.compact start reason=\(reason.rawValue) estimatedTokens=\(estimatedTokens) budget=\(budget) reserve=\(reserveTokens) retained=\(retainedTokens) cutIdx=\(cutIdx) before=\(before)")
+        let splitTurn: Bool
+        if case .assistant = messages[cutIdx] { splitTurn = true } else { splitTurn = false }
+        Log.agent.info("Agent.compact start reason=\(reason.rawValue) estimatedTokens=\(estimatedTokens) budget=\(budget) reserve=\(reserveTokens) retained=\(retainedTokens) cutIdx=\(cutIdx) splitTurn=\(splitTurn) before=\(before)")
         let toSummarize = Array(messages[0..<cutIdx])
         let tail = Array(messages[cutIdx...]).map { message -> Message in
             guard case .assistant(var assistant) = message else { return message }
@@ -61,6 +70,7 @@ nonisolated enum AgentCompactor {
             model: model,
             options: options,
             reserveTokens: reserveTokens,
+            splitTurn: splitTurn,
             transformContext: transformContext
         )
         let summary: String
@@ -98,7 +108,8 @@ nonisolated enum AgentCompactor {
                 activatedSkills: activatedSkills
             )))
         }
-        let compactedMessages = [Message.user(summaryUser), .assistant(summaryAssistant)] + preservedMessages + tail
+        let restoredContext = splitTurn && activatedSkills.isEmpty ? [] : [Message.assistant(summaryAssistant)] + preservedMessages
+        let compactedMessages = [Message.user(summaryUser)] + restoredContext + tail
         Log.agent.info("Agent.compact done reason=\(reason.rawValue) before=\(before) after=\(compactedMessages.count) summaryChars=\(summary.count) activatedSkills=\(activatedSkills.count) tokensBefore=\(estimatedTokens)")
         return .compacted(AgentCompaction(
             messages: compactedMessages,
@@ -143,58 +154,18 @@ nonisolated enum AgentCompactor {
         """
     }
 
-    private static func estimateContextTokens(messages: [Message], fallbackUsage: Int) -> Int {
-        for index in messages.indices.reversed() {
-            guard case .assistant(let assistant) = messages[index],
-                  assistant.stopReason != .error,
-                  assistant.stopReason != .aborted,
-                  assistant.stopReason != .pending
-            else { continue }
-            let usage = assistant.usage.totalTokens > 0
-                ? assistant.usage.totalTokens
-                : assistant.usage.input + assistant.usage.output
-            guard usage > 0 else { continue }
-            let trailing = messages[(index + 1)...].reduce(0) { $0 + estimateTokens($1) }
-            return usage + trailing
-        }
-        let estimate = messages.reduce(0) { $0 + estimateTokens($1) }
-        return max(estimate, fallbackUsage)
-    }
-
-    private static func estimateTokens(_ message: Message) -> Int {
-        var characters = 0
-        switch message {
-        case .user(let user):
-            characters = contentCharacters(user.content) + (user.transientContext?.count ?? 0)
-        case .assistant(let assistant):
-            characters = contentCharacters(assistant.content)
-        case .toolResult(let result):
-            characters = contentCharacters(result.content) + result.transientAttachments.count * 4_800
-        }
-        return max(4, Int(ceil(Double(characters) / 4.0)))
-    }
-
-    private static func contentCharacters(_ content: [ContentBlock]) -> Int {
-        content.reduce(0) { count, block in
-            switch block {
-            case .text(let text): count + text.text.count
-            case .thinking(let thinking): count + thinking.thinking.count
-            case .toolCall(let toolCall): count + toolCall.name.count + toolCall.arguments.jsonString(fallback: "").count
-            case .attachment: count + 4_800
-            }
-        }
-    }
-
-    private static func cutIndex(messages: [Message], retainedTokens: Int) -> Int? {
+    static func cutIndex(messages: [Message], retainedTokens: Int) -> Int? {
         var retained = 0
-        var latestUserIndex: Int?
+        var boundary: Int?
         for index in messages.indices.reversed() {
-            retained += estimateTokens(messages[index])
-            guard case .user = messages[index], index > 0 else { continue }
-            latestUserIndex = latestUserIndex ?? index
-            if retained >= retainedTokens { return index }
+            retained += AgentContextBudget.messageTokens(messages[index])
+            switch messages[index] {
+            case .user, .assistant: boundary = index
+            case .toolResult: break
+            }
+            if retained >= retainedTokens, let boundary { return boundary > 0 ? boundary : nil }
         }
-        return latestUserIndex
+        return nil
     }
 
     private enum SummaryOutcome {
@@ -209,13 +180,15 @@ nonisolated enum AgentCompactor {
         model: ProviderModel,
         options: StreamOptions,
         reserveTokens: Int,
+        splitTurn: Bool,
         transformContext: TransformContextHook?
     ) async -> SummaryOutcome {
+        let continuation = splitTurn ? " The history ends partway through an ongoing turn. Its recent steps are retained separately. Preserve the original user request, progress so far, and the information needed to continue those retained steps; do not answer the request or repeat completed actions." : ""
         let instruction = UserMessage(text: """
         Summarize the conversation above so future turns can continue without it. \
         Capture: facts learned via tool calls, user preferences, decisions made, \
         and any unresolved tasks. Be exhaustive on facts but concise in prose. \
-        Output only the summary; no preamble.
+        Output only the summary; no preamble.\(continuation)
         """)
         let sourceMessages = history + [.user(instruction)]
         let llmMessages = await transformContext?(

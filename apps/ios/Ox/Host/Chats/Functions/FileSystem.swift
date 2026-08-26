@@ -440,15 +440,15 @@ extension Chat {
         let maxBytes = fileSystemInt(
             options,
             key: "maxBytes",
-            default: 20_000,
+            default: ArtifactLimits.fileBytes,
             minimum: 1,
-            maximum: VirtualFileSystem.maximumReadBytes
+            maximum: ArtifactLimits.fileBytes
         )
         switch location {
         case .memory:
-            return fileSystemBoundedRead(UserMemory.shared.text, maxBytes: maxBytes)
+            return try fileSystemTextRead(UserMemory.shared.text, maxBytes: maxBytes)
         case .soul:
-            return fileSystemBoundedRead(Soul.shared.text, maxBytes: maxBytes)
+            return try fileSystemTextRead(Soul.shared.text, maxBytes: maxBytes)
         case .artifact(let name):
             let artifact = try await repository.artifact(named: name, in: scope)
             let readOptions = ArtifactLibrary.readOptions(from: options)
@@ -458,25 +458,25 @@ extension Chat {
             return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
         case .skillFile(let name):
             let skill = try await skillsMount.entry(named: name)
-            let result = fileSystemBoundedRead(skill.content, maxBytes: maxBytes)
+            let result = try fileSystemTextRead(skill.content, maxBytes: maxBytes)
             if let content = result.text {
                 activateSkill(name: skill.name, path: skill.filePath, content: content)
             }
             return result
         case .skillReference(let name, let referenceName):
             let reference = try await skillsMount.reference(skill: name, named: referenceName)
-            return fileSystemBoundedRead(reference.content, maxBytes: maxBytes)
+            return try fileSystemTextRead(reference.content, maxBytes: maxBytes)
         case .serviceItem(let kind, let domain, let path):
-            return fileSystemBoundedRead(
+            return try fileSystemTextRead(
                 try await servicesMount.sourceText(kind: kind, domain: domain, path: path),
                 maxBytes: maxBytes
             )
         case .chatMetadata(let id):
             let data = try await repository.virtualChatMetadata(id, in: scope)
-            return fileSystemBoundedRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
+            return try fileSystemTextRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
         case .chatTurns(let id):
             let data = try await repository.virtualChatTranscript(id, in: scope)
-            return fileSystemBoundedRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
+            return try fileSystemTextRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
         case .deviceItem:
             let readOptions = ArtifactLibrary.readOptions(from: options)
             let result = try await withDeviceFile(location, mode: .read) { url in
@@ -491,16 +491,9 @@ extension Chat {
         }
     }
 
-    private func fileSystemBoundedRead(_ text: String, maxBytes: Int) -> FileSystemRead {
-        let data = Data(text.utf8)
-        guard data.count > maxBytes else {
-            return FileSystemRead(text: text, truncated: false, unsupported: nil)
-        }
-        return FileSystemRead(
-            text: String(decoding: data.prefix(maxBytes), as: UTF8.self),
-            truncated: true,
-            unsupported: nil
-        )
+    private func fileSystemTextRead(_ text: String, maxBytes: Int) throws -> FileSystemRead {
+        let result = try ArtifactLibrary.read(data: Data(text.utf8), kind: .text, options: .init(maxBytes: maxBytes))
+        return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
     }
 
     private func fileSystemUTF8Text(_ location: VirtualFileSystem.Location) async throws -> String {

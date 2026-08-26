@@ -2,9 +2,9 @@ import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, stat
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { runOnce } from "../../../apps/cli/src/debug-ws.ts";
-import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../tooling/qa-config.ts";
-import { ROOT } from "../../../tooling/lib.ts";
+import { runOnce } from "../apps/cli/src/debug-ws.ts";
+import { ROOT } from "./lib.ts";
+import { qaConfig, qaNumberedDevice, targetedQaDevice } from "./qa-config.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
 const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");

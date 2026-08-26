@@ -1,30 +1,28 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   validateServiceManifest,
   type Manifest,
   type ServiceManifest,
-  HOST_PATTERN,
 } from "@openox/service-sdk/manifest";
-import { logInfo } from "./log.ts";
 import { readSkills } from "@openox/service-sdk/skills";
 
 export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
-export const SOURCE_ROOT = join(BUILTIN_REPOSITORY_ROOT, "web");
+const SOURCE_ROOT = join(BUILTIN_REPOSITORY_ROOT, "web");
 export const SERVICE_ASSET_BASE_URL = "https://openox.ai/assets/services";
 
 export function sourceDirFor(domain: string): string {
   return join(SOURCE_ROOT, domain);
 }
 
-async function loadServiceActions(
+async function loadActions(
   domain: string,
-): Promise<{ actions: string; actionsPath: string } | { error: string }> {
+): Promise<string | { error: string }> {
   const dir = sourceDirFor(domain);
   const actionsPath = join(dir, "actions.js");
   if (!existsSync(actionsPath)) return { error: `service ${domain}: actions.js not found` };
   try {
-    return { actions: await Bun.file(actionsPath).text(), actionsPath };
+    return await Bun.file(actionsPath).text();
   } catch (error) {
     return { error: `service ${domain} actions failed to load: ${(error as Error).message}` };
   }
@@ -86,7 +84,7 @@ function inspectActions(
   return { ok: true };
 }
 
-async function getServiceManifestRaw(
+async function loadManifest(
   domain: string,
 ): Promise<ServiceManifest | { error: string }> {
   const manifestPath = join(sourceDirFor(domain), "service.json");
@@ -105,18 +103,16 @@ async function getServiceManifestRaw(
   return result.manifest;
 }
 
-// Returns the full manifest, locale overlays included; the device localizes
-// offline from the published `locales` blob.
-async function loadService(domain: string): Promise<
-  { manifest: Manifest; actionsPath: string } | { error: string }
+export async function buildService(domain: string): Promise<
+  { manifest: Manifest; actions: string } | { error: string }
 > {
-  const svc = await getServiceManifestRaw(domain);
+  const svc = await loadManifest(domain);
   if ("error" in svc) return svc;
 
-  const loaded = await loadServiceActions(domain);
-  if ("error" in loaded) return loaded;
+  const loaded = await loadActions(domain);
+  if (typeof loaded !== "string") return loaded;
 
-  const inspected = inspectActions(domain, svc, loaded.actions);
+  const inspected = inspectActions(domain, svc, loaded);
   if ("error" in inspected) return inspected;
 
   const dir = sourceDirFor(domain);
@@ -131,32 +127,5 @@ async function loadService(domain: string): Promise<
     ...(faviconUrl ? { faviconUrl } : {}),
     ...(skillResult.skills.length ? { skills: skillResult.skills } : {}),
   };
-  return { manifest, actionsPath: loaded.actionsPath };
-}
-
-export async function buildService(
-  domain: string,
-): Promise<{ manifest: Manifest; actions: string } | { error: string }> {
-  const service = await loadService(domain);
-  if ("error" in service) return service;
-  const actions = await Bun.file(service.actionsPath).text();
-  logInfo(`build actions ${domain} bytes=${actions.length}`);
-  return {
-    manifest: service.manifest,
-    actions,
-  };
-}
-
-export async function getManifest(domain: string): Promise<Manifest | { error: string }> {
-  const service = await loadService(domain);
-  return "error" in service ? service : service.manifest;
-}
-
-export function listServiceDomains(): string[] {
-  if (!existsSync(SOURCE_ROOT)) return [];
-  return readdirSync(SOURCE_ROOT, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && HOST_PATTERN.test(e.name)
-      && existsSync(join(SOURCE_ROOT, e.name, "service.json")))
-    .map((e) => e.name)
-    .sort();
+  return { manifest, actions: loaded };
 }

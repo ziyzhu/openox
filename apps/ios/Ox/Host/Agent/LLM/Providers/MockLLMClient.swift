@@ -776,19 +776,136 @@ extension Scenario {
         ]
     }
 
+    private static func contextBudgetRegressionFailure() -> String? {
+        var model = MockLLMClient().models[0]
+        let empty = AgentContext(systemPrompt: "", messages: [], tools: [])
+        var options = StreamOptions()
+        options.maxTokens = 4096
+        model.maxContext = 32768
+        let small = AgentContextBudget(context: empty, model: model, options: options, threshold: 0.75)
+        model.maxContext = 1_000_000
+        let large = AgentContextBudget(context: empty, model: model, options: options, threshold: 0.75)
+        guard large.inputLimit > small.inputLimit,
+              large.reserveTokens == 4096 else { return "Model context sizing failed." }
+        let occupied = AgentContext(systemPrompt: String(repeating: "药", count: 1000), messages: [], tools: [])
+        let remaining = AgentContextBudget(context: occupied, model: model, options: options, threshold: 0.75)
+        guard remaining.usedTokens == 3000 else { return "Multilingual context accounting failed." }
+        var assistant = AssistantMessage(model: model.id)
+        assistant.stopReason = .toolUse
+        assistant.usage.input = 20000
+        assistant.usage.output = 1000
+        let history = AgentContext(systemPrompt: "Already counted", messages: [.assistant(assistant), .user(UserMessage(text: "药"))], tools: [])
+        let measured = AgentContextBudget(context: history, model: model, options: options, threshold: 0.75)
+        guard measured.usedTokens == 21015 else { return "Provider usage accounting failed." }
+        var changedPrompt = history
+        changedPrompt.systemPrompt = String(repeating: "A", count: 100000)
+        let changed = AgentContextBudget(context: changedPrompt, model: model, options: options, threshold: 0.75)
+        guard changed.usedTokens >= 25000 else { return "Changed prompt was omitted from the budget." }
+        let full = String(repeating: "a", count: 120104)
+        let message = ToolResultMessage(toolCallId: "budget-check", toolName: "execute", content: [.text(TextContent(full))], isError: false)
+        guard message.content.concatenatedText == full,
+              ToolResultParts(message, label: "budget-regression").text == full else {
+            return "A downstream output cutoff remains."
+        }
+        let calls = ["a", "b", "c"].map { ToolCall(id: $0, name: "execute", arguments: .object([:])) }
+        let results = calls.map { Message.toolResult(ToolResultMessage(toolCallId: $0.id, toolName: "execute", content: [.text(TextContent(String(repeating: "A", count: 40000)))], isError: false)) }
+        let sequence: [Message] = [
+            .user(UserMessage(text: "Original request")),
+            .assistant(AssistantMessage(model: model.id, content: calls.prefix(2).map(ContentBlock.toolCall))),
+            results[0], results[1],
+            .assistant(AssistantMessage(model: model.id, content: [.toolCall(calls[2])])),
+            results[2],
+        ]
+        guard AgentCompactor.cutIndex(messages: sequence, retainedTokens: 20000) == 4,
+              AgentCompactor.cutIndex(messages: sequence, retainedTokens: 1) == 4,
+              AgentCompactor.cutIndex(messages: Array(sequence.prefix(4)), retainedTokens: 1) == 1,
+              AgentCompactor.cutIndex(messages: sequence, retainedTokens: 100000) == nil,
+              AgentCompactor.cutIndex(messages: sequence + [.user(UserMessage(text: "Next request"))], retainedTokens: 1) == 6 else {
+            return "Split-turn compaction boundary failed."
+        }
+        return nil
+    }
+
+    private static func outputLimitRegressionFailure() -> String? {
+        let exactBytes = String(repeating: "A", count: 51200)
+        let exactLines = String(repeating: "line\n", count: 2000)
+        for value in ["", "\n", exactBytes, exactLines, "é药💊", "e\u{301}👨‍👩‍👧‍👦"] {
+            guard JavaScriptOutputLimits.preview(value) == value else { return "A fitting output changed." }
+        }
+        guard JavaScriptOutputLimits.preview("X" + exactBytes) == exactBytes,
+              JavaScriptOutputLimits.preview("old\n" + exactLines) == String(exactLines.dropLast()),
+              JavaScriptOutputLimits.preview("old\r\n" + String(repeating: "line\r\n", count: 2000)) == String(decoding: String(repeating: "line\r\n", count: 2000).utf8.dropLast(), as: UTF8.self),
+              JavaScriptOutputLimits.preview(exactBytes + "\nTAIL") == "TAIL" else {
+            return "Fixed byte or line tail limit failed."
+        }
+        for value in ["é", "药", "💊", "e\u{301}👨‍👩‍👧‍👦"] {
+            let output = String(repeating: value, count: 30000) + "TAIL"
+            let preview = JavaScriptOutputLimits.preview(output)
+            guard Array(output.utf8).suffix(preview.utf8.count).elementsEqual(preview.utf8),
+                  preview.utf8.count <= 51200, preview.hasSuffix("TAIL"), !preview.contains("�") else {
+                return "Unicode output boundary failed."
+            }
+        }
+        return nil
+    }
+
     static let toolResultBudget = Scenario(name: "budget") { ctx in
         if ctx.turn == 0 {
-            return [execute("console.log(\"A\".repeat(100100) + \"TAIL\");")]
+            if let failure = outputLimitRegressionFailure() {
+                return [.say(failure), .stop(.stop)]
+            }
+            return [execute("console.log(\"A\".repeat(51196) + \"TAIL\");")]
         }
-        guard let result = ctx.toolResults.last,
-              result.truncated == true,
-              let text = ctx.resultText("execute"),
-              text.count <= 16_000,
-              text.contains("[Tool output truncated: omitted "),
-              text.contains("TAIL") else {
-            return [.say("Oversized tool output was not bounded."), .stop(.stop)]
+        if ctx.turn == 1 {
+            guard let result = ctx.toolResults.last,
+                  result.truncated != true,
+                  ctx.resultText("execute") == String(repeating: "A", count: 51196) + "TAIL",
+                  ToolResultParts(result, label: "budget-regression").text.count == 51200 else {
+                return [.say("A fitting output was incorrectly truncated."), .stop(.stop)]
+            }
+            return [execute("console.log(\"药\".repeat(350000) + \"TAIL\");")]
         }
-        return [.say("Oversized tool output was truncated with explicit metadata."), .stop(.stop)]
+        if ctx.turn == 2 {
+            guard let result = ctx.toolResults.last,
+                  result.truncated == true,
+                  let text = ctx.resultText("execute"),
+                  text.hasPrefix(String(repeating: "药", count: 17065) + "TAIL\n[Tool output truncated:"),
+                  let marker = text.range(of: "Full output id: "),
+                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
+                return [.say("Oversized output did not provide a recovery reference."), .stop(.stop)]
+            }
+            return [execute("""
+            const text = await ox.output.read({ id: "\(id.uuidString)", purpose: "Recover full tool output" });
+            if (text.length !== 350004 || text.slice(150000, 150003) !== "药药药" || text.slice(-4) !== "TAIL") throw new Error("Captured output was incomplete");
+            for (let i = 0; i < 2001; i++) console.log("line " + i);
+            """)]
+        }
+        if ctx.turn == 3 {
+            guard let result = ctx.toolResults.last, result.isError == false, result.truncated == true,
+                  let text = ctx.resultText("execute"), text.hasPrefix("line 1\nline 2\n"),
+                  text.contains("line 2000\n[Tool output truncated:"),
+                  let marker = text.range(of: "Full output id: "),
+                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
+                return [.say("Combined console line limit or byte-output recovery failed."), .stop(.stop)]
+            }
+            return [execute("""
+            const text = await ox.output.read({ id: "\(id.uuidString)", purpose: "Recover every console line" });
+            if (text.split("\\n").length !== 2001 || !text.startsWith("line 0\\n") || !text.endsWith("line 2000")) throw new Error("Captured lines were incomplete");
+            console.log("Recovered complete oversized output, including its middle and tail.");
+            """)]
+        }
+        let text = ctx.resultText("execute") ?? ""
+        if ctx.turn == 4 {
+            guard text.contains("Recovered complete oversized output"), ctx.toolResults.last?.isError == false else {
+                return [.say("Output recovery failed: \(text)"), .stop(.stop)]
+            }
+            return [execute("console.log(\"A\".repeat(60000)); throw new Error(\"EXPECTED_OUTPUT_ERROR\");")]
+        }
+        guard ctx.toolResults.last?.isError == true, ctx.toolResults.last?.truncated == true,
+              text.contains("EXPECTED_OUTPUT_ERROR"), text.contains("Full output id:") else {
+            return [.say("Truncation lost the execution error."), .stop(.stop)]
+        }
+        return [.say("Fixed byte and line caps, Unicode boundaries, and full-output recovery passed."), .stop(.stop)]
     }
 
     static let artifactWorkflow = Scenario(name: "artifact") { ctx in
@@ -801,6 +918,23 @@ extension Scenario {
                 const result = await ox.fs.read({ path: "artifacts/agent-note.md", purpose: "Read agent note" });
                 await ox.artifact.rename({ filename: "agent-note.md", newFilename: "agent-image.svg", purpose: "Rename agent note" });
                 await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" });
+                for (const extension of ["md", "html"]) {
+                    const path = "artifacts/utf8-read-check." + extension;
+                    await ox.fs.write({ path, content: "Aé药💊Z", purpose: "Create UTF-8 read fixture" });
+                    for (const [maxBytes, expected] of [[1, "A"], [2, "A"], [3, "Aé"], [4, "Aé"], [5, "Aé"], [6, "Aé药"], [7, "Aé药"], [8, "Aé药"], [9, "Aé药"], [10, "Aé药💊"], [11, "Aé药💊Z"], [12, "Aé药💊Z"]]) {
+                        const read = await ox.fs.read({ path, options: { maxBytes }, purpose: "Verify UTF-8 byte boundary" });
+                        if (read.text !== expected || read.truncated !== (maxBytes < 11)) throw new Error("UTF-8 boundary mismatch at " + maxBytes);
+                    }
+                    await ox.fs.write({ path, content: "药".repeat(50000), purpose: "Create complete read fixture" });
+                    const read = await ox.fs.read({ path, purpose: "Verify complete default read" });
+                    if (read.text !== "药".repeat(50000) || read.truncated) throw new Error("Default read was incomplete");
+                    await ox.fs.write({ path, content: String.fromCharCode(0xFEFF) + "药", purpose: "Create UTF-8 BOM fixture" });
+                    for (const maxBytes of [1, 2, 3, 4, 5, 6]) {
+                        const read = await ox.fs.read({ path, options: { maxBytes }, purpose: "Verify UTF-8 BOM boundary" });
+                        if (read.text !== (maxBytes < 6 ? "" : "药") || read.truncated !== (maxBytes < 6)) throw new Error("UTF-8 BOM boundary mismatch");
+                    }
+                    await ox.fs.delete({ path, purpose: "Remove UTF-8 read fixture" });
+                }
                 console.log(result.text.includes("Hello, Ox!") ? "Hello, Ox!" : result.text);
                 """),
             ]
@@ -1435,20 +1569,64 @@ extension Scenario {
 
     static let compaction = Scenario(name: "compaction") { ctx in
         if ctx.turn == 0 {
+            if let failure = contextBudgetRegressionFailure() { return [.say(failure), .stop(.stop)] }
             return [
-                .say("Creating a large synthetic context estimate…\n"),
-                execute("console.log({ compaction: \"ready\" });"),
+                execute("""
+                await ox.fs.read({ path: "skills/system:manage-artifacts/SKILL.md", purpose: "Activate skill before compaction" });
+                console.log("EARLY_STEP_" + "A".repeat(50000));
+                """),
+            ]
+        }
+        if ctx.userSaid("SPLIT_TURN_CHECKPOINT") || ctx.userSaid("SPLIT_TURN_REPEATED") {
+            var pending: Set<String> = []
+            var skillRestored = false
+            for message in ctx.messages {
+                switch message {
+                case .user:
+                    if !pending.isEmpty { return [.say("Compaction orphaned tool calls."), .stop(.stop)] }
+                case .assistant(let assistant):
+                    if !pending.isEmpty { return [.say("Compaction separated tool calls and results."), .stop(.stop)] }
+                    pending = Set(assistant.content.compactMap { if case .toolCall(let call) = $0 { call.id } else { nil } })
+                case .toolResult(let result):
+                    guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
+                    if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
+                    skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/system:manage-artifacts/SKILL.md" }
+                }
+            }
+            guard pending.isEmpty, skillRestored, ctx.resultText("execute")?.contains("RECENT_STEP_") == true else {
+                return [.say("Compaction lost recent work or activated skills."), .stop(.stop)]
+            }
+            if ctx.userSaid("SPLIT_TURN_REPEATED") {
+                return [.say("Repeated split-turn compaction preserved recent work, tool pairs, and activated skills."), .stop(.stop)]
+            }
+            return [
+                execute("console.log(\"SECOND_RECENT_STEP_\" + \"C\".repeat(50000));"),
                 .usage(input: 900_000, output: 32),
                 .stop(.toolUse),
             ]
         }
-        return [.say("Compaction completed and the retained turn continued."), .stop(.stop)]
+        if ctx.turn == 1 {
+            return [
+                execute("console.log(\"RECENT_STEP_\" + \"B\".repeat(50000));"),
+                .usage(input: 900_000, output: 32),
+                .stop(.toolUse),
+            ]
+        }
+        return [.say("The long ongoing turn was not compacted."), .stop(.stop)]
     }
 
-    static let compactionSummary = Scenario(name: "compaction-summary", steps: [
-        .say("Earlier conversation state was summarized for the retained turn."),
-        .stop(.stop),
-    ])
+    static let compactionSummary = Scenario(name: "compaction-summary") { ctx in
+        if ctx.userSaid("SPLIT_TURN_CHECKPOINT") {
+            return [.say("<intent>29</intent> SPLIT_TURN_REPEATED: Earlier progress was summarized again; verify the retained recent step and activated skill."), .stop(.stop)]
+        }
+        if ctx.messages.contains(where: { if case .toolResult(let result) = $0 { result.content.concatenatedText.hasPrefix("EARLY_STEP_") } else { false } }) {
+            guard ctx.latestUserSaid("partway through an ongoing turn") else {
+                return [.say("Missing split-turn summarization instructions."), .stop(.stop)]
+            }
+            return [.say("<intent>29</intent> SPLIT_TURN_CHECKPOINT: The original request is to verify split-turn compaction. The early step completed; recent work is retained separately."), .stop(.stop)]
+        }
+        return [.say("Earlier conversation state was summarized for the retained turn."), .stop(.stop)]
+    }
 
     static let settledCompaction = Scenario(name: "settled-compaction", steps: [
         .say("The final response settled after compacting its context."),
