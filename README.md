@@ -8,7 +8,7 @@ OpenOx: A protocol for self-evolving agents that live on mobile devices.
 
 <h3>
 
-[Homepage](https://openox.ai) · [TestFlight](https://testflight.apple.com/join/Y3x7nxj9) · [Discord](https://discord.gg/7baSAHZTA)
+[Website](https://openox.ai) · [Discord](https://discord.gg/7baSAHZTA)
 
 </h3>
 
@@ -25,13 +25,11 @@ Each such agent is called an Ox that implements the following three principles:
 2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
 3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
 
-The first implementation of Ox is an iOS Client and Host whose source code is included in this repository. You can download it through TestFlight: https://testflight.apple.com/join/Y3x7nxj9.
+The first implementation of Ox is an iOS Client and Host whose source code is included in this repository. You can download it via TestFlight [here](https://testflight.apple.com/join/Y3x7nxj9).
 
 ## Components
 
 ![OpenOx components](docs/openox-components.svg)
-
-Edit the [Graphviz source](docs/openox-components.dot) and run `bun run build:diagram` with Graphviz installed to regenerate the diagram.
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
@@ -92,21 +90,6 @@ OpenOx supports three kinds of services:
 3. **MCP services** expose actions provided by an MCP server.
 
 Anyone can publish compatible web and MCP services in a public Git repository containing a `repository.json` manifest. Any compatible Host can install that repository and make its services available to the agent. Device services remain part of the Host implementation.
-
-## Repository Layout
-
-```text
-apps/          runnable iOS and command-line Clients; iOS also contains the reference Host
-packages/      reusable npm packages and service build tooling
-repositories/  authored service repositories, including the built-in collection
-examples/      standalone projects users can copy
-docs/          architecture, security, storage, and operational documentation
-tooling/       repository build, test, release, and simulator automation
-```
-
-`repositories/builtin/` is the source of truth for services shipped with Ox.
-`packages/services/dist/` and the committed iOS `OxServices.bundle` are generated
-from that repository.
 
 ## The first Ox
 
