@@ -8,6 +8,7 @@ final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizer
     private(set) var speakingBlockID: UUID?
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
     @ObservationIgnored private let audioSession = AVAudioSession.sharedInstance()
+    @ObservationIgnored private let audioSessionID = UUID()
     @ObservationIgnored private var activeUtterance: AVSpeechUtterance?
 
     override init() {
@@ -63,12 +64,7 @@ final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizer
 
     private func activateAudioSession() -> Bool {
         do {
-            try audioSession.setCategory(
-                .playback,
-                mode: .voicePrompt,
-                options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
-            )
-            try audioSession.setActive(true)
+            try AppAudioSession.activatePlayback(owner: audioSessionID)
             let route = audioSession.currentRoute.outputs
                 .map { "\($0.portType.rawValue):\($0.portName)" }
                 .joined(separator: ",")
@@ -81,12 +77,7 @@ final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizer
     }
 
     private func deactivateAudioSession(reason: String) {
-        do {
-            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-            Log.ui.info("MessageSpeech.audioSession deactivated reason=\(reason)")
-        } catch {
-            Log.ui.error("MessageSpeech.audioSession deactivation failed reason=\(reason) error=\(error.localizedDescription)")
-        }
+        AppAudioSession.deactivate(owner: audioSessionID, reason: "messageSpeech.\(reason)")
     }
 
 }

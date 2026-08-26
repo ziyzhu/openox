@@ -14,6 +14,7 @@ protocol SpeechRecording: AnyObject {
 
 @MainActor
 final class OnDeviceSpeechRecording: SpeechRecording {
+    private let audioSessionID = UUID()
     private var analyzer: SpeechAnalyzer?
     private var module: (any SpeechModule)?
     private var engine: AVAudioEngine?
@@ -71,10 +72,9 @@ final class OnDeviceSpeechRecording: SpeechRecording {
         }
         try await analyzer.prepareToAnalyze(in: format)
         try Task.checkCancellation()
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
-        try session.setActive(true)
+        try await AppAudioSession.activateRecording(owner: audioSessionID)
         audioSessionActive = true
+        try Task.checkCancellation()
         let engine = AVAudioEngine()
         let inputFormat = engine.inputNode.outputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
@@ -104,19 +104,17 @@ final class OnDeviceSpeechRecording: SpeechRecording {
 
     func stopCapture() {
         if let engine {
+            let started = ContinuousClock.now
             engine.stop()
             engine.inputNode.removeTap(onBus: 0)
             self.engine = nil
+            Log.ui.info("SpeechInput.capture stopped duration=\(started.duration(to: .now))")
         }
         audioInput?.finish()
         audioInput = nil
         if audioSessionActive {
             audioSessionActive = false
-            do {
-                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            } catch {
-                Log.ui.error("SpeechInput.audioSession deactivate error=\(error.localizedDescription)")
-            }
+            AppAudioSession.deactivate(owner: audioSessionID, reason: "speechCaptureStopped")
         }
     }
 

@@ -99,9 +99,9 @@ final class ChatSpeechInput {
         guard isRecording else { return }
         let action: ReleaseAction = if distance < 32 {
             .send
-        } else if cancelFrame.insetBy(dx: 0, dy: -16).contains(point) {
+        } else if isInActionArea(point, for: cancelFrame) {
             .cancel
-        } else if editFrame.insetBy(dx: 0, dy: -16).contains(point) {
+        } else if isInActionArea(point, for: editFrame) {
             .edit
         } else {
             .send
@@ -113,7 +113,16 @@ final class ChatSpeechInput {
         }
     }
 
+    private func isInActionArea(_ point: CGPoint, for frame: CGRect) -> Bool {
+        !frame.isEmpty
+            && point.x >= frame.minX
+            && point.x < frame.maxX
+            && point.y < frame.maxY + 16
+    }
+
     func release(action: ReleaseAction? = nil) {
+        let released = ContinuousClock.now
+        defer { Log.ui.info("SpeechInput.release handled duration=\(released.duration(to: .now))") }
         if state == .starting {
             cancel(reason: "releasedDuringStartup")
             return
@@ -129,9 +138,9 @@ final class ChatSpeechInput {
             Haptics.impact(.stop)
             return
         }
-        recording.stopCapture()
         state = .finalizing(action)
         level = 0
+        recording.stopCapture()
         Haptics.impact(.speechStopped)
         Log.ui.info("SpeechInput.release session=\(id) action=\(action.rawValue) duration=\(Date().timeIntervalSince(startedAt))")
         setDeadline(seconds: 15, message: L10n.string("Transcription took too long. Nothing was sent. Please try again.", comment: ""))
