@@ -475,6 +475,12 @@ final class Chat: Identifiable {
             showBrowser: { [unowned self] service, _ in
                 embedServiceInspector(ServiceInspectorLink(domain: service.domain, serviceName: service.title))
             },
+            attachTransient: { [unowned self] attachment in
+                guard document.hasOpenExecution else {
+                    throw RuntimeError.bridge("Browser screenshots require an active agent execution.")
+                }
+                try appendTransientAttachment(attachment)
+            },
             choose: { [unowned self] prompt in
                 if let purpose = prompt.purpose {
                     return try await chooseUser(body: prompt.body, options: prompt.options, purpose: purpose)?.stringValue

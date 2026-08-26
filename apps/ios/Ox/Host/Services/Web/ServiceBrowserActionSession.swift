@@ -4,6 +4,13 @@ import WebKit
 
 @MainActor
 final class ServiceBrowserActionSession {
+    struct Screenshot {
+        let url: URL?
+        let attachment: TransientAttachment
+        let width: Int
+        let height: Int
+    }
+
     private final class CaptureSink: NSObject, WKScriptMessageHandler {
         weak var session: ServiceBrowserActionSession?
 
@@ -73,6 +80,69 @@ final class ServiceBrowserActionSession {
         }
         let page = try await page(for: action)
         return try await service.executeBrowserJavaScript(script, action: action, in: page)
+    }
+
+    func screenshot() async throws -> Screenshot {
+        let name = "ios:browser:screenshot"
+        try await service.awaitAuthenticationAvailability(name: name)
+        guard let action = await service.resolvedAction("screenshot", role: .dangerousBrowserControl) else {
+            throw Service.EvalError.notActive
+        }
+        let page = try await page(for: action)
+        return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
+            let generation = page.navigationGeneration
+            let rawMetrics = try await self.service.evalAsync(
+                page,
+                "return [window.scrollX, window.scrollY, window.innerWidth, window.innerHeight];",
+                context: "browser-screenshot"
+            )
+            guard let metrics = rawMetrics.map(JSONValue.from)?.arrayValue,
+                  metrics.count == 4,
+                  let rawX = metrics[0].doubleValue,
+                  let rawY = metrics[1].doubleValue,
+                  let rawWidth = metrics[2].doubleValue,
+                  let rawHeight = metrics[3].doubleValue,
+                  rawX.isFinite,
+                  rawY.isFinite,
+                  rawWidth.isFinite,
+                  rawHeight.isFinite,
+                  rawWidth > 0,
+                  rawHeight > 0,
+                  rawWidth <= 8_192,
+                  rawHeight <= 8_192 else {
+                throw RuntimeError.bridge("ios:browser:screenshot couldn't determine Browser's viewport.")
+            }
+            let rect = CGRect(
+                x: CGFloat(max(0, rawX)),
+                y: CGFloat(max(0, rawY)),
+                width: CGFloat(rawWidth),
+                height: CGFloat(rawHeight)
+            )
+            let data = try await page.page.exported(as: .image(region: .rect(rect)))
+            guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
+            let prepared: PreparedImage
+            let inspection: ImagePreparer.Inspection
+            do {
+                prepared = try ImagePreparer.prepare(data)
+                inspection = try ImagePreparer.inspect(prepared.data)
+            } catch {
+                throw RuntimeError.bridge("ios:browser:screenshot couldn't prepare Browser's viewport image.")
+            }
+            let attachment = TransientAttachment(
+                kind: .image,
+                mimeType: prepared.mimeType,
+                displayName: prepared.filename(from: "Browser Screenshot"),
+                data: prepared.data
+            )
+            let host = page.page.url?.host?.lowercased() ?? "?"
+            Log.webView.info("Browser.screenshot host=\(host) points=\(Int(rawWidth))x\(Int(rawHeight)) pixels=\(inspection.width)x\(inspection.height) bytes=\(prepared.data.count)")
+            return Screenshot(
+                url: page.page.url,
+                attachment: attachment,
+                width: inspection.width,
+                height: inspection.height
+            )
+        }
     }
 
     func injectScript(_ source: String, domains: [String]) async throws -> URL? {

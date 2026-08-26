@@ -37,7 +37,11 @@ struct ServiceApproval {
         let display = approvalLabel(for: action)
         let details = Self.approvalDetails(args)
         var prompt = override ?? (details.isEmpty ? display : "\(display)\n\(details)")
-        if override == nil, ["ios:browser:executeJavaScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
+        if override == nil, action == "ios:browser:screenshot" {
+            let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
+            let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
+            prompt = "\(display) - \(destination)\n\(L10n.string("The screenshot may include signed-in or sensitive information and becomes available to the current model. Always approve applies to every page Browser visits."))"
+        } else if override == nil, ["ios:browser:executeJavaScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
             prompt = "\(display) - \(destination)\n\(L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always approve applies to every page Web visits."))"

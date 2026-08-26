@@ -14,6 +14,7 @@ final class NativeServiceOperations {
     let presentations: AppPresentations
     let requireActive: () throws -> Void
     let showBrowser: (Service, UUID) -> Void
+    let attachTransient: (TransientAttachment) throws -> Void
     let choose: (Prompt) async throws -> String?
 
     init(
@@ -22,6 +23,7 @@ final class NativeServiceOperations {
         presentations: AppPresentations,
         requireActive: @escaping () throws -> Void,
         showBrowser: @escaping (Service, UUID) -> Void,
+        attachTransient: @escaping (TransientAttachment) throws -> Void,
         choose: @escaping (Prompt) async throws -> String?
     ) {
         self.id = id
@@ -29,6 +31,7 @@ final class NativeServiceOperations {
         self.presentations = presentations
         self.requireActive = requireActive
         self.showBrowser = showBrowser
+        self.attachTransient = attachTransient
         self.choose = choose
     }
 
@@ -74,6 +77,19 @@ final class NativeServiceOperations {
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .executeJavaScript(script)
+        case ("ios:browser", "screenshot"):
+            let screenshot = try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .screenshot()
+            try attachTransient(screenshot.attachment)
+            return .object([
+                "url": screenshot.url.map { .string($0.absoluteString) } ?? .null,
+                "contentType": .string(screenshot.attachment.mimeType),
+                "width": .int(screenshot.width),
+                "height": .int(screenshot.height),
+                "bytes": .int(screenshot.attachment.data.count),
+                "attached": .bool(true),
+            ])
         case ("ios:browser", "interact"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
             session.stopCapture()

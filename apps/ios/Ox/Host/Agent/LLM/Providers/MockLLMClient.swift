@@ -328,6 +328,7 @@ extension Scenario {
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
+            Entry("89", "browser screenshot — navigate and attach viewport image", .browserScreenshot),
         ]),
     ]
 
@@ -348,6 +349,33 @@ extension Scenario {
     }
 
     public static var echo: Scenario { Scenario(name: "echo", steps: [.say(menuText), .stop(.stop)]) }
+
+    static let browserScreenshot = Scenario(name: "browserScreenshot") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            const matches = await ox.service.find({ query: "browser screenshot", purpose: "Find Browser" });
+            const browser = matches.find((service) => service.domain === "ios:browser");
+            if (!browser) throw new Error("Browser service not found");
+            await ox.fs.read({ path: browser.manifestPath, purpose: "Read Browser manifest" });
+            await ox.service.attach({ domain: browser.domain, purpose: "Attach Browser" });
+            console.log(await ox.service.inspect({ domain: browser.domain, actions: ["navigate", "screenshot"], purpose: "Inspect Browser actions" }));
+            """)]
+        }
+        guard let output = ctx.resultText("execute") else {
+            return [.say("Browser setup did not return an action contract."), .stop(.stop)]
+        }
+        if ctx.turn == 1 {
+            return [execute("""
+            await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open screenshot fixture" });
+            console.log(await ox.service.invoke({ name: "ios:browser:screenshot", input: {}, purpose: "Capture browser viewport" }));
+            """)]
+        }
+        let attachments = ctx.toolResults.last?.transientAttachments ?? []
+        guard attachments.count == 1, attachments[0].kind == .image else {
+            return [.say("Browser screenshot was not attached to model context."), .stop(.stop)]
+        }
+        return [.say("Browser screenshot attached to model context: \(attachments[0].mimeType), \(attachments[0].data.count) bytes. Result: \(output)"), .stop(.stop)]
+    }
 
     static let markdown = Scenario(name: "markdown", steps: [
         .say("""

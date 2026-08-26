@@ -199,6 +199,9 @@ final class OxCanvas {
                 ),
                 requireActive: { [unowned self] in try requireRunning() },
                 showBrowser: { [unowned self] service, owner in browser = Browser(id: owner, service: service) },
+                attachTransient: { _ in
+                    throw RuntimeError.bridge("Browser screenshots are available only to chat agents.")
+                },
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue
                 }

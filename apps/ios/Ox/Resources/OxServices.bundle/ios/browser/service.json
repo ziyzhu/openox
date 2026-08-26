@@ -91,6 +91,60 @@
       "requireAuth": false
     },
     {
+      "description": "Capture Browser's current viewport and attach the image to the model's context.",
+      "id": "screenshot",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Take Screenshot",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contentType": {
+            "enum": [
+              "image/png",
+              "image/jpeg"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "height": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "bytes": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "attached": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "contentType",
+          "width",
+          "height",
+          "bytes",
+          "attached"
+        ],
+        "type": "object"
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
       "description": "Pause automation and let the user sign in or complete a human-only step in Browser. Active network capture and injected scripts are cleared before the page is shown.",
       "id": "interact",
       "inputSchema": {
