@@ -222,6 +222,60 @@ nonisolated enum ProfileMigrator {
         }
     }
 
+    static func migrateLegacyLocalServiceManifests(at root: URL) throws {
+        let repository = try SwiftGitX.Repository.open(at: root)
+        guard !repository.isHEADDetached else { return }
+        let status = try repository.status()
+        let changedPaths = Set(status.flatMap {
+            [
+                $0.workingTree?.newFile.path,
+                $0.workingTree?.oldFile.path,
+                $0.index?.newFile.path,
+                $0.index?.oldFile.path,
+            ].compactMap { $0 }
+        })
+        let hasStagedChanges = status.contains {
+            $0.status.contains(where: {
+                [.indexNew, .indexModified, .indexDeleted, .indexRenamed, .indexTypeChange, .conflicted].contains($0)
+            })
+        }
+        let manager = FileManager.default
+        let webRoot = root.appendingPathComponent("web", isDirectory: true)
+        guard manager.fileExists(atPath: webRoot.path) else { return }
+        var cleanPaths: [String] = []
+        var pendingCount = 0
+        for directory in try manager.contentsOfDirectory(
+            at: webRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            let legacyURL = directory.appendingPathComponent("manifest.json", isDirectory: false)
+            let currentURL = directory.appendingPathComponent("service.json", isDirectory: false)
+            guard manager.fileExists(atPath: legacyURL.path),
+                  !manager.fileExists(atPath: currentURL.path) else { continue }
+            let rootPath = "web/\(directory.lastPathComponent)"
+            let legacyPath = "\(rootPath)/manifest.json"
+            let currentPath = "\(rootPath)/service.json"
+            try manager.moveItem(at: legacyURL, to: currentURL)
+            if changedPaths.contains(legacyPath) || changedPaths.contains(currentPath) {
+                pendingCount += 1
+            } else {
+                cleanPaths.append(contentsOf: [legacyPath, currentPath])
+            }
+        }
+        if !cleanPaths.isEmpty, !hasStagedChanges {
+            try repository.add(paths: cleanPaths.sorted())
+            let commit = try repository.commit(message: "Rename Local service manifests to service.json")
+            Log.service.info("ProfileMigrator.localServiceManifests saved=\(cleanPaths.count / 2) commit=\(commit.id.abbreviated)")
+        } else if hasStagedChanges {
+            pendingCount += cleanPaths.count / 2
+        }
+        if pendingCount > 0 {
+            Log.service.info("ProfileMigrator.localServiceManifests pending=\(pendingCount)")
+        }
+    }
+
     static func migrateLegacyLocalServiceActions(at root: URL) throws {
         let repository = try SwiftGitX.Repository.open(at: root)
         guard !repository.isHEADDetached else { return }

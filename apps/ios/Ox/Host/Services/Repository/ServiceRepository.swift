@@ -367,7 +367,13 @@ actor ServiceRepository {
             let repository = candidate.repository
             let service = candidate.service
             let serviceRoot = repository.root.appendingPathComponent(service.id.path, isDirectory: true)
-            guard let data = try? Data(contentsOf: serviceRoot.appendingPathComponent("service.json")) else { continue }
+            let data: Data
+            do {
+                data = try Data(contentsOf: Self.serviceManifestURL(at: serviceRoot))
+            } catch {
+                Log.service.error("ServiceRepository.manifest unavailable id=\(service.id.rawValue) repository=\(repository.descriptor.id) error=\(Self.errorMessage(error))")
+                continue
+            }
             activeSources[service.id.runtimeID] = ActiveSource(
                 kind: service.id.kind,
                 root: serviceRoot,
@@ -997,6 +1003,7 @@ actor ServiceRepository {
         }
         try ProfileMigrator.migrateLegacyLocalServiceRepository(at: localRoot, seed: localRepositorySeed)
         try installLocalRepositoryMetadata()
+        try ProfileMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
         try ProfileMigrator.migrateLegacyLocalServiceActions(at: localRoot)
     }
 
