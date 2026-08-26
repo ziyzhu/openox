@@ -28,6 +28,38 @@ Ox CLI
             └── IOSHost
 ```
 
+## Canvas service callers
+
+Chat and canvas are peer callers of shared Host service operations. The chat agent
+runs in the Host VM and resolves services through its attached-service view. Canvas
+JavaScript runs in WebKit and resolves services lazily from the Host catalog. It
+needs no chat, model turn, attachment list, or Profile execution binding. The HTML
+file can still be stored as a Profile artifact.
+
+`ServiceOperations` implements discovery, inspection, invocation, service management,
+and handoff operations for both callers. `ServiceApproval` supplies the same
+sensitive-action policy and saved approvals; there is no separate canvas permission
+model. Native device operations and browser resources belong to the caller rather
+than requiring an active chat. Chat retains its transcript and attachment behavior.
+
+The injected `window.ox.service` SDK and synchronous `.help()` are generated from
+`OxFunctionCatalog`. Canvas excludes `attach`, `detach`, and `listAttached`, and does
+not expose other namespaces. Discovery and inspection return `attached: false`.
+The WebKit bridge accepts structured function calls, validates them natively, and
+returns JSON results or rejected promises; it does not evaluate canvas-supplied
+code in the agent VM.
+
+Each canvas owns its service resources, pending work, native interaction, and
+temporary outputs directly. Calls are serialized with 16 pending calls maximum,
+120 admissions per minute, 1 MiB argument and 8 MiB result limits, and a 60-second
+active-time budget paused during canvas prompts and handoffs. The shared service scheduler
+coordinates underlying resources across callers. Closing or replacing a page
+invalidates its pending work. Stateful
+browser pages are caller-owned. Temporary file results are limited to 32 files and
+20 MiB and are deleted on close.
+Cancellation is cooperative: dismissal and timeout cannot undo requests already sent
+to a service or dismiss operating-system permission alerts. Late results are discarded.
+
 ## Client and Host availability
 
 | Client | Host | Status | Transport | Remaining work |

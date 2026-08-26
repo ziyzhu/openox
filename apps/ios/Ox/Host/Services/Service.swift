@@ -196,6 +196,7 @@ final class Service: NSObject, Identifiable {
 
     enum AuthSignInSource: String {
         case chatCard
+        case canvas
         case chatChip
         case serviceDetail
     }

@@ -1,0 +1,25 @@
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font:17px system-ui;padding:16px;color:#111;background:#fafafa}
+button{display:block;padding:14px;margin:12px 0;min-height:44px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+<h1>Canvas integration</h1>
+<button id="signin">Test sign-in</button>
+<button id="pay">Test checkout</button>
+<button id="export">Export test file</button>
+<button id="missing">Missing file error</button>
+<pre id="result" aria-live="polite">Ready</pre>
+<script>
+const result = document.getElementById("result");
+const run = async operation => {
+  result.textContent = "Waiting";
+  try { result.textContent = JSON.stringify(await operation(), null, 2); }
+  catch (error) { result.textContent = "ERROR: " + error.message; }
+};
+document.getElementById("signin").onclick = () => run(() => ox.service.signIn({domain:"github.com", purpose:"Test canvas sign-in"}));
+document.getElementById("pay").onclick = () => run(() => ox.service.pay({domain:"my.pacificsciencecenter.org", args:{}, purpose:"Test canvas checkout"}));
+const exportFile = path => ox.service.invoke({name:"mcp:__MCP_DOMAIN__:agent_artifact_get", input:{target:"canvas-fixture", path}, purpose:"Export canvas test file"});
+document.getElementById("export").onclick = () => run(() => exportFile("artifacts/canvas-export.txt"));
+document.getElementById("missing").onclick = () => run(() => exportFile("artifacts/missing.txt"));
+</script>

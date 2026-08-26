@@ -154,7 +154,7 @@ final class ServiceBrowserActionSession {
         captureRecords = []
         injectedScripts = []
         captureActive = false
-        Log.webView.info("Service.browserSession event=close chat=\(id) domain=\(service.domain)")
+        Log.webView.info("Service.browserSession event=close owner=\(id) domain=\(service.domain)")
     }
 
     private func configureAuthoringScripts(on page: Service.ServiceWebPage) {
@@ -192,13 +192,13 @@ final class ServiceBrowserActionSession {
         page.additionalUserScripts = scripts
         page.scriptMode = nil
         service.configureScripts(for: page.page.url, in: page)
-        Log.webView.info("Service.browserSession event=scripts chat=\(id) capture=\(captureActive) injected=\(injectedScripts.count)")
+        Log.webView.info("Service.browserSession event=scripts owner=\(id) capture=\(captureActive) injected=\(injectedScripts.count)")
     }
 
     private func receiveCapture(_ body: Any) {
         guard captureActive else { return }
         guard let data = try? JSONSerialization.data(withJSONObject: body), data.count <= 100_000 else {
-            Log.webView.warning("Service.browserSession event=capture-dropped chat=\(id)")
+            Log.webView.warning("Service.browserSession event=capture-dropped owner=\(id)")
             return
         }
         var fields = JSONValue.from(body).objectValue ?? [:]
@@ -355,7 +355,7 @@ final class ServiceBrowserActionSession {
             opening = nil
             loadedBaseURL = action.baseURL
             self.page = page
-            Log.webView.info("Service.browserSession event=open chat=\(id) domain=\(service.domain) session=\(page.logLabel)")
+            Log.webView.info("Service.browserSession event=open owner=\(id) domain=\(service.domain) session=\(page.logLabel)")
             return page
         } catch {
             if opening?.id == openingID { opening = nil }
@@ -369,24 +369,24 @@ final class ServiceBrowserActionSession {
 final class ServiceBrowserActionSessionCoordinator {
     private var sessions: [UUID: ServiceBrowserActionSession] = [:]
 
-    func session(for service: Service, chatID: UUID) -> ServiceBrowserActionSession {
-        if let session = sessions[chatID], session.service === service { return session }
-        sessions.removeValue(forKey: chatID)?.close()
-        let session = ServiceBrowserActionSession(id: chatID, service: service)
-        sessions[chatID] = session
-        Log.webView.info("Service.browserSession event=create chat=\(chatID) domain=\(service.domain) resident=\(sessions.count)")
+    func session(for service: Service, ownerID: UUID) -> ServiceBrowserActionSession {
+        if let session = sessions[ownerID], session.service === service { return session }
+        sessions.removeValue(forKey: ownerID)?.close()
+        let session = ServiceBrowserActionSession(id: ownerID, service: service)
+        sessions[ownerID] = session
+        Log.webView.info("Service.browserSession event=create owner=\(ownerID) domain=\(service.domain) resident=\(sessions.count)")
         return session
     }
 
-    func existingSession(for chatID: UUID, service: Service? = nil) -> ServiceBrowserActionSession? {
-        guard let session = sessions[chatID] else { return nil }
+    func existingSession(for ownerID: UUID, service: Service? = nil) -> ServiceBrowserActionSession? {
+        guard let session = sessions[ownerID] else { return nil }
         guard service == nil || session.service === service else { return nil }
         return session
     }
 
-    func closeSession(for chatID: UUID) {
-        guard let session = sessions.removeValue(forKey: chatID) else { return }
+    func closeSession(for ownerID: UUID) {
+        guard let session = sessions.removeValue(forKey: ownerID) else { return }
         session.close()
-        Log.webView.info("Service.browserSession event=remove chat=\(chatID) resident=\(sessions.count)")
+        Log.webView.info("Service.browserSession event=remove owner=\(ownerID) resident=\(sessions.count)")
     }
 }

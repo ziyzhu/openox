@@ -362,19 +362,36 @@ Profile-owned artifact without a separate confirmation, matching the product
 decision that artifact content generation is part of the requested response.
 
 ### T10 — Active content in an HTML artifact
-The model writes JavaScript that attempts credential theft, persistence,
-tracking, network exfiltration, navigation without user intent, filesystem
-discovery, or device access. **Mitigation:** HTML artifacts use a new
-non-persistent website data store for every presentation and receive no Ox
-bridge. The renderer injects a restrictive content-security policy, blocks all
-non-user navigation, denies media capture and file input, suppresses dialogs,
-and shadows browser sensor surfaces. Its private resource scheme resolves one
-validated sibling basename and serves only bounded image, audio, or video data.
-The only native bridge accepts bounded map coordinates and returns a raster map
-snapshot. External HTTP, HTTPS, mail, and telephone links open only from a user
-link activation. **Residual risk:** WebKit still parses and executes adversarial
-active content, so WebKit process isolation and current OS security updates
-remain part of the boundary.
+An HTML canvas is executable code with Host service authority. Every presentation
+uses a non-persistent WebKit data store and receives only the catalogued
+`ox.service` SDK, excluding chat attachment lifecycle methods. Calls use the same
+service implementations, authentication, sensitive-action approvals, and saved
+approval settings as chat. There is no canvas-specific service allowlist or grant
+store. Actions without an approval requirement may execute silently, including
+signed-in reads; the action approval policy is not a complete data-exfiltration
+boundary. Treat imported HTML as executable content when opening it in Ox.
+
+The native bridge accepts only messages from the current main document, validates
+exact function names and input schemas, and bounds request, response, queue, and
+rate budgets. Canvas cannot call other `ox.*` namespaces or arbitrary VM evaluation.
+Closing or replacing the document cancels its work and invalidates late
+replies; it cannot roll back a completed external action. Native prompts and
+logs identify the canvas caller. Credentials stay in Host service runtimes.
+
+The renderer retains a restrictive content-security policy: direct network
+requests, remote scripts, frames, forms, and browser device access remain blocked.
+Its private resource scheme serves only bounded sibling media. Only the initial
+artifact document and its fragment links may navigate inside the view. External
+HTTP, HTTPS, mail, and telephone links open only from a user link activation.
+The map bridge accepts bounded coordinates and returns a raster snapshot.
+Service-produced files use bounded temporary storage. They are not silently
+imported into a Profile and are removed when the canvas closes.
+
+**Residual risk:** model-generated or imported canvas code can misuse any service
+operation allowed by the user's existing policy. WebKit process isolation and OS
+security updates remain part of the boundary. Service results inserted into the
+DOM as HTML can introduce script execution; authoring guidance requires rendering
+untrusted text as text.
 
 ### T11 — Agent-written persistent skill instructions
 The model writes misleading instructions into a user skill or tries to use a

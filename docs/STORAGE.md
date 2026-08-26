@@ -271,7 +271,10 @@ not require approval; artifact import, rename, and delete do.
 HTML artifacts remain ordinary UTF-8 files. Presentation creates a fresh
 non-persistent WebKit store and reads the current artifact plus bounded sibling
 media through `ox-artifact:` URLs. Maps use `<ox-map>` and `<ox-marker>`. The
-renderer itself does not add durable website state.
+renderer itself does not add durable website state. Canvas service calls use the
+Host's existing service accounts. Canvas owns no chat, attachment list, or permission
+store. Service-produced files live in a presentation-owned temporary directory,
+are bounded by the Host, and are deleted on close.
 
 Shoveler cards persist an optional artifact filename in the chat transcript.
 Opening a card resolves that reference in the active Profile and uses the same

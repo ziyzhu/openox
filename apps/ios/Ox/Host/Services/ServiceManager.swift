@@ -741,12 +741,12 @@ final class ServiceManager {
         }
     }
 
-    func serviceForAttachment(domain: String) async throws -> Service {
+    func serviceForCaller(domain: String, reason: Service.CapabilityReason) async throws -> Service {
         guard let service = service(domain: domain) else {
             throw ServiceRepository.Failure(message: "Service not found")
         }
         guard service.isWebService else {
-            _ = await service.loadManifest(reason: .attach)
+            _ = await service.loadManifest(reason: reason)
             return service
         }
 

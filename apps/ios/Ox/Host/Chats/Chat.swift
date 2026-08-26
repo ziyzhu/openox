@@ -412,232 +412,87 @@ final class Chat: Identifiable {
         return ThinkingActivity(turnID: turnID, startedAt: document.currentAgentTurnAt)
     }
 
+    @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
+
+    var serviceOperations: ServiceOperations {
+        ServiceOperations(
+            serviceManager: serviceManager,
+            resolveService: { [unowned self] domain in
+                guard let service = attachedService(domain: domain) else {
+                    throw RuntimeError.bridge("Service '\(domain)' isn't attached to this chat.")
+                }
+                return service
+            },
+            resolveAction: { [unowned self] name in try resolveTarget(name, label: "ox.service.invoke") },
+            attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
+            approve: { [unowned self] action, args, prompt in
+                try await requireApproval(action: action, args: args, prompt: prompt)
+            },
+            presentControl: { [unowned self] control, _ in
+                let pending = embedServiceControl(control)
+                return await waitForServiceControl(pending)
+            },
+            receiveArtifacts: { [unowned self] in try await importRemoteMCPArtifacts($0) },
+            serviceChanged: { [unowned self] domain in
+                let replacement = serviceManager.service(domain: domain)
+                setAttachedServices(attachedServices.compactMap { $0.domain == domain ? replacement : $0 })
+            },
+            begin: { [unowned self] name, args, purpose in
+                let standalone = ensureExecutionContext()
+                let invocation = appendInvocation(name: name, purpose: purpose, args: args)
+                if standalone { standaloneServiceInvocations.insert(invocation) }
+                return invocation
+            },
+            finish: { [unowned self] invocation, result in
+                switch result {
+                case .success(let value):
+                    resolveInvocation(invocationID: invocation, outcome: .succeeded(value))
+                    if standaloneServiceInvocations.remove(invocation) != nil { finishStandaloneExecution() }
+                case .failure(let error):
+                    resolveInvocation(invocationID: invocation, outcome: .failed(error.localizedDescription))
+                    if standaloneServiceInvocations.remove(invocation) != nil {
+                        finishStandaloneExecution(output: error.localizedDescription, isError: true)
+                    }
+                }
+            },
+            native: nativeServiceOperations
+        )
+    }
+
     func callService(name: String, args: JSONValue, purpose: String) async -> Result<JSONValue, Error> {
-        let svc: Service
-        let actionId: String
-        do {
-            (svc, actionId) = try resolveTarget(name, label: "ox.service.invoke")
-        } catch {
-            return .failure(error)
-        }
-        let invocationID = appendInvocation(name: "ox.service.invoke(\(svc.definition.qualifiedActionName(actionId)))", purpose: purpose, args: args)
-        if let iOSService = svc.iOSService {
-            let result = await iOSService.invoke(
-                service: svc,
-                actionID: actionId,
-                args: args,
-                purpose: purpose,
-                approve: { [weak self] action, args in
-                    await self?.requestServiceActionApproval(action: action, args: args).isApproved ?? false
-                },
-                nativeInvocation: { [weak self] serviceID, actionID, args, purpose in
-                    guard let self else { throw CancellationError() }
-                    return try await self.invokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
-                }
-            )
-            resolveServiceInvocation(invocationID, result)
-            return result
-        }
-        if let mcpService = svc.remoteMCPService {
-            let result = await mcpService.invoke(
-                service: svc,
-                actionID: actionId,
-                args: args,
-                approve: { [weak self] action, args in
-                    await self?.requestApproval(action: action, args: args).isApproved ?? false
-                },
-                receiveArtifacts: { [weak self] artifacts in
-                    guard let self else { throw CancellationError() }
-                    try await self.importRemoteMCPArtifacts(artifacts)
-                }
-            )
-            resolveServiceInvocation(invocationID, result)
-            return result
-        }
-        let result = await svc.invokeAction(actionId, args: args, approve: { [weak self] action, args in
-            await self?.requestApproval(action: action, args: args).isApproved ?? false
-        })
-        resolveServiceInvocation(invocationID, result)
-        return result
+        do { return .success(try await serviceOperations.invokeAction(name: name, args: args, purpose: purpose) ?? .null) }
+        catch { return .failure(error) }
     }
 
-    private func resolveServiceInvocation(_ id: UUID, _ result: Result<JSONValue, Error>) {
-        switch result {
-        case .success(let value): resolveInvocation(invocationID: id, outcome: .succeeded(value))
-        case .failure(let error): resolveInvocation(invocationID: id, outcome: .failed(error.localizedDescription))
-        }
+    var nativeServiceOperations: NativeServiceOperations {
+        NativeServiceOperations(
+            id: id,
+            serviceManager: serviceManager,
+            presentations: presentations,
+            requireActive: { [unowned self] in
+                guard isSelected else { throw RuntimeError.bridge("Browser requires the active chat.") }
+            },
+            showBrowser: { [unowned self] service, _ in
+                embedServiceInspector(ServiceInspectorLink(domain: service.domain, serviceName: service.title))
+            },
+            choose: { [unowned self] prompt in
+                if let purpose = prompt.purpose {
+                    return try await chooseUser(body: prompt.body, options: prompt.options, purpose: purpose)?.stringValue
+                }
+                let answer = await awaitPrompt(
+                    prompt: prompt.body, options: prompt.options,
+                    presentation: .application, resolution: prompt.resolution
+                )
+                return answer == Self.abortedAnswer ? nil : answer
+            }
+        )
     }
 
-    private func invokeIOSService(
-        _ serviceID: String,
-        actionID: String,
-        args: JSONValue,
-        purpose: String?
-    ) async throws -> JSONValue? {
-        let fields = args.objectValue ?? [:]
-        switch (serviceID, actionID) {
-        case ("ios:browser", "navigate"):
-            guard isSelected else {
-                throw RuntimeError.bridge("ios:browser:navigate requires Browser to be attached to the active chat.")
-            }
-            guard let rawURL = fields["url"]?.stringValue,
-                  let url = URL(string: rawURL),
-                  let scheme = url.scheme?.lowercased(),
-                  (scheme == "http" || scheme == "https"),
-                  url.host?.isEmpty == false,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }),
-                  let landed = await serviceManager.browserActionSessions
-                    .session(for: browser, chatID: id)
-                    .navigate(url) else {
-                throw RuntimeError.bridge("ios:browser:navigate requires an absolute HTTP or HTTPS URL that Browser can load.")
-            }
-            return .object(["url": .string(landed.absoluteString)])
-        case ("ios:browser", "inspect"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:inspect requires Browser to be attached to the active chat.")
-            }
-            _ = try await serviceManager.browserActionSessions
-                .session(for: browser, chatID: id)
-                .inspectionPage()
-            embedServiceInspector(ServiceInspectorLink(domain: browser.domain, serviceName: browser.title))
-            return .object(["shown": .bool(true)])
-        case ("ios:browser", "executeJavaScript"):
-            guard isSelected,
-                  let script = fields["script"]?.stringValue,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:executeJavaScript requires Browser to be attached to the active chat.")
-            }
-            return try await serviceManager.browserActionSessions
-                .session(for: browser, chatID: id)
-                .executeJavaScript(script)
-        case ("ios:browser", "interact"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:interact requires Browser to be attached to the active chat.")
-            }
-            let session = serviceManager.browserActionSessions.session(for: browser, chatID: id)
-            session.stopCapture()
-            _ = try await session.clearInjectedScripts()
-            embedServiceInspector(ServiceInspectorLink(domain: browser.domain, serviceName: browser.title))
-            let done = L10n.string("Done")
-            let answer = try await chooseUser(
-                body: fields["instructions"]?.stringValue
-                    ?? L10n.string("Complete the requested step in Browser, then confirm when finished."),
-                options: [done, L10n.string("Cancel")],
-                purpose: purpose ?? L10n.string("Wait for browser interaction")
-            )?.stringValue
-            guard answer == done else { throw RuntimeError.bridge("ios:browser:interact: the user cancelled.") }
-            return .object(["completed": .bool(true)])
-        case ("ios:browser", "injectScript"):
-            guard isSelected,
-                  let source = fields["script"]?.stringValue,
-                  let domains = fields["domains"]?.arrayValue?.compactMap(\.stringValue),
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:injectScript requires a script, target domains, and attached Browser.")
-            }
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, chatID: id)
-                .injectScript(source, domains: domains)
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "clearInjectedScripts"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:clearInjectedScripts requires Browser to be attached.")
-            }
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, chatID: id)
-                .clearInjectedScripts()
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "startCapture"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:startCapture requires Browser to be attached.")
-            }
-            let landed = try await serviceManager.browserActionSessions
-                .session(for: browser, chatID: id)
-                .startCapture()
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "markCapture"):
-            guard isSelected,
-                  let label = fields["label"]?.stringValue,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:markCapture requires a label and attached Browser.")
-            }
-            serviceManager.browserActionSessions.session(for: browser, chatID: id).markCapture(label)
-            return .object(["marked": .bool(true)])
-        case ("ios:browser", "listCapturedExchanges"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:listCapturedExchanges requires Browser to be attached.")
-            }
-            let records = serviceManager.browserActionSessions.session(for: browser, chatID: id).listCapture()
-            return .object(["exchanges": .array(records)])
-        case ("ios:browser", "readCapturedExchange"):
-            guard isSelected,
-                  let captureID = fields["id"]?.stringValue,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }),
-                  let record = serviceManager.browserActionSessions
-                    .session(for: browser, chatID: id)
-                    .readCapture(id: captureID) else {
-                throw RuntimeError.bridge("ios:browser:readCapturedExchange requires a valid capture id.")
-            }
-            return record
-        case ("ios:browser", "stopCapture"):
-            guard isSelected,
-                  let browser = attachedServices.first(where: { $0.domain == "ios:browser" }) else {
-                throw RuntimeError.bridge("ios:browser:stopCapture requires Browser to be attached.")
-            }
-            serviceManager.browserActionSessions.session(for: browser, chatID: id).stopCapture()
-            return .object(["stopped": .bool(true)])
-        case ("ios:location", "current"):
-            return try await currentLocation(purpose: purpose)
-        case ("ios:location", "searchNearby"):
-            return try await searchNearby(
-                query: fields["query"]?.stringValue,
-                radiusMeters: fields["radiusMeters"]?.doubleValue,
-                limit: fields["limit"]?.intValue,
-                purpose: purpose
-            )
-        case ("ios:location", "resolve"):
-            return try await resolveLocation(
-                query: fields["query"]?.stringValue,
-                limit: fields["limit"]?.intValue,
-                purpose: purpose
-            )
-        case ("ios:location", "route"):
-            return try await routeLocation(
-                destination: fields["destination"]?.stringValue,
-                transport: fields["transport"]?.stringValue,
-                purpose: purpose
-            )
-        case ("ios:location", "openInMaps"):
-            return try await openLocationInMaps(
-                placeID: fields["placeID"]?.stringValue,
-                directionsMode: fields["directionsMode"]?.stringValue,
-                purpose: purpose
-            )
-        case ("ios:notifications", "schedule"):
-            let schedule = fields["schedule"]?.objectValue ?? [:]
-            return try await scheduleNotification(options: .object([
-                "title": fields["title"] ?? .null,
-                "body": fields["body"] ?? .null,
-                "inSeconds": schedule["type"]?.stringValue == "relative" ? schedule["seconds"] ?? .null : .null,
-                "fireAt": schedule["type"]?.stringValue == "absolute" ? schedule["dateTime"] ?? .null : .null,
-            ]), purpose: purpose)
-        case ("ios:notifications", "cancel"):
-            return try await cancelNotification(id: fields["id"]?.stringValue)
-        case ("ios:calendar", "addEvent"):
-            return try await addCalendarEvent(options: fields["options"], purpose: purpose)
-        case ("ios:reminders", "add"):
-            return try await addReminder(options: fields["options"], purpose: purpose)
-        case ("ios:messages", "compose"):
-            return try await composeMessage(options: fields["options"], purpose: purpose)
-        case ("ios:contacts", "search"):
-            return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
-        default:
-            throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
+    private func invokeIOSService(_ serviceID: String, actionID: String, args: JSONValue, purpose: String?) async throws -> JSONValue? {
+        guard let service = attachedService(domain: serviceID) else {
+            throw Service.InvokeError.unknown(serviceID)
         }
+        return try await nativeServiceOperations.invoke(service: service, actionID: actionID, args: args, purpose: purpose)
     }
 
 #if targetEnvironment(simulator)
@@ -1607,20 +1462,7 @@ final class Chat: Identifiable {
         }
     }
 
-    private enum ApprovalOutcome {
-        case approved, denied, stopped
-        var isApproved: Bool { self == .approved }
-    }
-
-    private func requestServiceActionApproval(action: String, args: Any?) async -> ApprovalOutcome {
-        guard ["ios:browser:executeJavaScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) else {
-            return await requestApproval(action: action, args: args)
-        }
-        let page = serviceManager.browserActionSessions.existingSession(for: id)?.webPage
-        let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-        let prompt = "\(approvalLabel(for: action)) - \(destination)\n\(L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always approve applies to every page Web visits."))"
-        return await requestApproval(action: action, prompt: prompt)
-    }
+    private typealias ApprovalOutcome = ServiceApproval.Outcome
 
     func requireApproval(action: String, args: Any? = nil, prompt: String? = nil) async throws {
         switch await requestApproval(action: action, args: args, prompt: prompt) {
@@ -1637,86 +1479,22 @@ final class Chat: Identifiable {
         }
     }
 
-    private func requestApproval(action: String, args: Any? = nil, prompt promptOverride: String? = nil) async -> ApprovalOutcome {
-        if serviceManager.shouldAutoApprove(action) {
-            Log.session.info("Chat.requestApproval auto action=\(action) global=\(serviceManager.autoApproveAll)")
-            return .approved
-        }
-        let display = approvalLabel(for: action)
-        let details = Self.approvalDetails(args)
-        let prompt = promptOverride ?? (details.isEmpty ? display : "\(display)\n\(details)")
-        Log.session.info("Chat.requestApproval action=\(action) details=\(details)")
-        let approve = L10n.string( "Approve")
-        let always = L10n.string( "Always approve")
-        let deny = L10n.string( "Deny")
-        runState.backgroundExecution?.updatePhase(.permissionNeeded)
-        let choice = await awaitPrompt(
-            prompt: prompt,
-            options: [approve, always, deny],
-            kind: .permission,
-            presentation: .application,
-            autoApproval: PendingPrompt.AutoApproval(
-                action: action,
-                approve: approve,
-                alwaysApprove: always
+    private func requestApproval(action: String, args: Any? = nil, prompt: String? = nil) async -> ApprovalOutcome {
+        await ServiceApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, args: args, prompt: prompt) { request in
+            runState.backgroundExecution?.updatePhase(.permissionNeeded)
+            let answer = await awaitPrompt(
+                prompt: request.prompt,
+                options: request.options,
+                kind: .permission,
+                presentation: .application,
+                autoApproval: PendingPrompt.AutoApproval(
+                    action: request.action,
+                    approve: request.approve,
+                    alwaysApprove: request.alwaysApprove
+                )
             )
-        )
-        Log.session.info("Chat.requestApproval answer action=\(action) -> \(choice)")
-        if choice == Self.abortedAnswer { return .stopped }
-        if choice == always { return .approved }
-        return choice == approve ? .approved : .denied
-    }
-
-    private static func approvalDetails(_ args: Any?) -> String {
-        guard let args, !(args is NSNull) else { return "" }
-        guard let dict = args as? [String: Any] else { return approvalValue(args) }
-        return dict.keys.sorted()
-            .compactMap { key -> String? in
-                guard let value = dict[key] else { return nil }
-                let text = approvalValue(value)
-                return text.isEmpty ? nil : "\(key): \(text)"
-            }
-            .joined(separator: "\n")
-    }
-
-    private static func approvalValue(_ value: Any) -> String {
-        switch value {
-        case is NSNull: return ""
-        case let s as String: return clip(s)
-        case let n as NSNumber: return n.stringValue
-        case let arr as [Any]: return clip(arr.map { approvalValue($0) }.joined(separator: ", "))
-        case let dict as [String: Any]:
-            return clip(dict.keys.sorted().compactMap { key in
-                guard let v = dict[key] else { return nil }
-                let text = approvalValue(v)
-                return text.isEmpty ? nil : "\(key): \(text)"
-            }.joined(separator: ", "))
-        default: return clip(String(describing: value))
+            return answer == Self.abortedAnswer ? nil : answer
         }
-    }
-
-    private static func clip(_ value: String, _ max: Int = 140) -> String {
-        value.count > max ? String(value.prefix(max)) + "…" : value
-    }
-
-    private func approvalLabel(for action: String) -> String {
-        if let invocation = InvocationName(rawValue: action) {
-            return Self.approvalTitle(invocation.approvalLabel)
-        }
-        guard let separator = action.lastIndex(of: ":") else { return action }
-        let domain = String(action[..<separator])
-        let actionID = String(action[action.index(after: separator)...])
-        guard let service = attachedService(domain: domain) ?? serviceManager.service(domain: domain) else {
-            return action
-        }
-        return "\(service.title) - \(service.actionLabel(for: actionID) ?? actionID)"
-    }
-
-    private static func approvalTitle(_ label: String) -> String {
-        guard let separator = label.firstIndex(of: ":") else { return label }
-        let service = label[..<separator].trimmingCharacters(in: .whitespaces)
-        let action = label[label.index(after: separator)...].trimmingCharacters(in: .whitespaces)
-        return "\(service) - \(action)"
     }
 
     // MARK: - Branch / retry

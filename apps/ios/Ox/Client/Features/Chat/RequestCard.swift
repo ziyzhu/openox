@@ -27,6 +27,16 @@ struct PermissionRequest: Identifiable, Equatable {
             : Self.actionIconKind(for: title)
     }
 
+    @MainActor init(_ request: ServiceApproval.Request) {
+        id = request.id
+        prompt = request.prompt
+        approve = request.approve
+        alwaysApprove = request.alwaysApprove
+        deny = request.deny
+        let title = RequestCardCopy(request.prompt).title
+        actionIconKind = title.contains(" - ") ? nil : Self.actionIconKind(for: title)
+    }
+
     @MainActor private static func actionIconKind(for title: String) -> OxActionIconKind? {
         if let cached = actionIconKindsByTitle[title] { return cached }
         guard let kind = InvocationName.allCases.first(where: { $0.approvalLabel == title })?.actionIconKind else {

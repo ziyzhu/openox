@@ -54,6 +54,7 @@ struct HTMLArtifactView: View {
         }
     }
 
+    @Environment(ServiceManager.self) private var serviceManager
     @State private var phase: Phase = .loadingFile
 
     var body: some View {
@@ -64,10 +65,13 @@ struct HTMLArtifactView: View {
             case .loadingHTML(let document), .ready(let document):
                 HTMLArtifactWebView(
                     document: document,
+                    title: artifact.userFacingName,
+                    serviceManager: serviceManager,
                     safeAreaInsets: safeAreaInsets,
                     isReady: phase.isReady,
                     onNavigation: { handleNavigation($0, document: document) }
                 )
+                .id(document)
             case .failed(let message):
                 ContentUnavailableView(
                     "Artifact unavailable",
@@ -139,7 +143,7 @@ private struct HTMLArtifactLoadingView: View {
     }
 }
 
-nonisolated struct HTMLArtifactDocument: Equatable, Sendable {
+nonisolated struct HTMLArtifactDocument: Hashable, Sendable {
     private static let contentSecurityPolicy = "default-src 'none'; img-src data: blob: ox-artifact:; media-src data: blob: ox-artifact:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'"
 
     let html: String
@@ -170,9 +174,13 @@ private struct HTMLArtifactWebView: View {
     let isReady: Bool
     let onNavigation: (HTMLArtifactNavigation) -> Void
     @State private var page: WebPage
+    @State private var canvas: OxCanvas
+    @State private var presentations: AppPresentationCoordinator
 
     init(
         document: HTMLArtifactDocument,
+        title: String,
+        serviceManager: ServiceManager,
         safeAreaInsets: EdgeInsets,
         isReady: Bool,
         onNavigation: @escaping (HTMLArtifactNavigation) -> Void
@@ -181,7 +189,11 @@ private struct HTMLArtifactWebView: View {
         self.safeAreaInsets = safeAreaInsets
         self.isReady = isReady
         self.onNavigation = onNavigation
-        _page = State(initialValue: HTMLArtifactPage.make(directory: document.directory))
+        let presentations = AppPresentationCoordinator()
+        let canvas = OxCanvas(title: title, serviceManager: serviceManager, presentations: presentations)
+        _presentations = State(initialValue: presentations)
+        _canvas = State(initialValue: canvas)
+        _page = State(initialValue: HTMLArtifactPage.make(directory: document.directory, canvas: canvas))
     }
 
     var body: some View {
@@ -192,6 +204,17 @@ private struct HTMLArtifactWebView: View {
             .allowsHitTesting(isReady)
             .accessibilityHidden(!isReady)
             .task(id: document) { await load() }
+            .onDisappear { canvas.close() }
+            .safeAreaInset(edge: .bottom) {
+                CanvasInteractionView(canvas: canvas)
+            }
+            .sheet(item: $canvas.browser) { browser in
+                NavigationStack {
+                    ServicePageInspector(service: browser.service, browserSessionID: browser.id)
+                        .safeAreaInset(edge: .bottom) { CanvasInteractionView(canvas: canvas) }
+                }
+            }
+            .appPresentations(presentations)
     }
 
     private func load() async {
@@ -221,7 +244,7 @@ private enum HTMLArtifactNavigation {
 private enum HTMLArtifactPage {
     static let resourceScheme = "ox-artifact"
     static let mapHandler = "oxMap"
-    static let baseURL = URL(string: "\(resourceScheme):///")!
+    static let baseURL = CanvasWebBridge.documentURL
     static let hostScript = #"""
         (() => {
           const denied = () => Promise.reject(new DOMException("Unavailable in an artifact", "NotAllowedError"));
@@ -262,9 +285,20 @@ private enum HTMLArtifactPage {
         })();
         """#
 
-    static func make(directory: URL) -> WebPage {
+    static func make(directory: URL, canvas: OxCanvas) -> WebPage {
         let mapHandler = ArtifactMapHandler()
         let contentController = WKUserContentController()
+        contentController.addScriptMessageHandler(CanvasWebBridge(canvas: canvas), contentWorld: .page, name: "oxCanvas")
+        do {
+            contentController.addUserScript(WKUserScript(
+                source: try CanvasServiceCatalog.script(documentID: canvas.id),
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true,
+                in: .page
+            ))
+        } catch {
+            Log.ui.error("Canvas.sdk unavailable error=\(error.localizedDescription)")
+        }
         contentController.addScriptMessageHandler(mapHandler, contentWorld: .page, name: Self.mapHandler)
         contentController.addUserScript(WKUserScript(
             source: hostScript,
@@ -292,12 +326,19 @@ private enum HTMLArtifactPage {
 private struct RejectingArtifactDialogs: WebPage.DialogPresenting {}
 
 private struct ArtifactNavigationDecider: WebPage.NavigationDeciding {
+    private var admittedDocument = false
     mutating func decidePolicy(
         for action: WebPage.NavigationAction,
         preferences: inout WebPage.NavigationPreferences
     ) async -> WKNavigationActionPolicy {
         guard let url = action.request.url else { return .cancel }
-        if url.scheme == HTMLArtifactPage.resourceScheme || url.scheme == "about" { return .allow }
+        if !admittedDocument, CanvasWebBridge.isDocumentURL(url) {
+            admittedDocument = true
+            return .allow
+        }
+        if action.navigationType == .linkActivated, CanvasWebBridge.isDocumentURL(url), url.fragment != nil {
+            return .allow
+        }
         if action.navigationType == .linkActivated,
            let scheme = url.scheme?.lowercased(),
            scheme == "https" || scheme == "http" || scheme == "mailto" || scheme == "tel" {

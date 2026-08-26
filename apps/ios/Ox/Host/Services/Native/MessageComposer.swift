@@ -5,6 +5,7 @@ import UIKit
 final class MessageComposer: NSObject, MFMessageComposeViewControllerDelegate {
     private var continuation: CheckedContinuation<MessageDisposition, Error>?
     private var retain: MessageComposer?
+    private weak var controller: MFMessageComposeViewController?
 
     static var canSend: Bool { MFMessageComposeViewController.canSendText() }
 
@@ -14,16 +15,23 @@ final class MessageComposer: NSObject, MFMessageComposeViewControllerDelegate {
     }
 
     private func run(recipients: [String], body: String?) async throws -> MessageDisposition {
+        try Task.checkCancellation()
         guard let presenter = Self.topViewController() else { throw MessageComposeError.noPresenter }
         retain = self
-        return try await withCheckedThrowingContinuation { cont in
-            self.continuation = cont
-            let vc = MFMessageComposeViewController()
-            vc.messageComposeDelegate = self
-            if !recipients.isEmpty { vc.recipients = recipients }
-            if let body, !body.isEmpty { vc.body = body }
-            Log.ui.info("MessageComposer.present recipients=\(recipients.count) hasBody=\(body?.isEmpty == false)")
-            presenter.present(vc, animated: true)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                self.continuation = cont
+                guard !Task.isCancelled else { finish(.failure(CancellationError())); return }
+                let vc = MFMessageComposeViewController()
+                controller = vc
+                vc.messageComposeDelegate = self
+                if !recipients.isEmpty { vc.recipients = recipients }
+                if let body, !body.isEmpty { vc.body = body }
+                Log.ui.info("MessageComposer.present recipients=\(recipients.count) hasBody=\(body?.isEmpty == false)")
+                presenter.present(vc, animated: true)
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finish(.failure(CancellationError())) }
         }
     }
 
@@ -37,11 +45,19 @@ final class MessageComposer: NSObject, MFMessageComposeViewControllerDelegate {
             }
         }()
         Log.ui.info("MessageComposer.finished result=\(disposition.rawValue)")
-        controller.dismiss(animated: true) { [weak self] in
-            self?.continuation?.resume(returning: disposition)
-            self?.continuation = nil
-            self?.retain = nil
+        finish(.success(disposition))
+    }
+
+    private func finish(_ result: Result<MessageDisposition, Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        let complete = {
+            continuation.resume(with: result)
+            self.retain = nil
         }
+        if let controller { controller.dismiss(animated: true, completion: complete) }
+        else { complete() }
+        controller = nil
     }
 
     private static func topViewController() -> UIViewController? {

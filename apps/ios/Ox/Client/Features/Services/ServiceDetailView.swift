@@ -709,7 +709,7 @@ struct ServiceDetailView: View {
 
     private func inspectPage() {
         if service.domain == "ios:browser", let browserSessionID {
-            _ = serviceManager.browserActionSessions.session(for: service, chatID: browserSessionID)
+            _ = serviceManager.browserActionSessions.session(for: service, ownerID: browserSessionID)
         }
         showPageInspector = true
     }
