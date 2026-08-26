@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated enum OxFunctionCatalog {
     private static let namespaceDescriptions: [(String, String)] = [
-        ("app", "Inspect Ox's identity and current setup, and keep the current chat named."),
+        ("app", "Read Ox's identity, profile, notification permission, settings, and diagnostic logs, and keep the current chat named."),
         ("service", "Discover, attach, detach, and invoke services."),
         ("user", "Keep the user informed and ask them to choose."),
         ("web", "Search and fetch the public web."),

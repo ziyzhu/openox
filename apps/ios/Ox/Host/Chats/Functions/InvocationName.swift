@@ -2,6 +2,14 @@ import Foundation
 
 enum InvocationName: String, CaseIterable {
     case appInspect = "ox.app.inspect"
+    case appInfo = "ox.app.info"
+    case appProfile = "ox.app.profile"
+    case appNotifications = "ox.app.notifications"
+    case appLanguage = "ox.app.language"
+    case appTheme = "ox.app.theme"
+    case appVoice = "ox.app.voice"
+    case appModel = "ox.app.model"
+    case appLogs = "ox.app.logs"
     case appRenameChat = "ox.app.renameChat"
     case webSearch = "ox.web.search"
     case webFetch = "ox.web.fetch"
@@ -55,6 +63,14 @@ enum InvocationName: String, CaseIterable {
     var approvalLabel: String {
         switch self {
         case .appInspect: L10n.string("Settings")
+        case .appInfo: L10n.string("App info")
+        case .appProfile: L10n.string("Profiles")
+        case .appNotifications: L10n.string("Notifications")
+        case .appLanguage: L10n.string("Language")
+        case .appTheme: L10n.string("Theme")
+        case .appVoice: L10n.string("Voice")
+        case .appModel: L10n.string("Model")
+        case .appLogs: L10n.string("Logs")
         case .appRenameChat: L10n.string("Rename chat")
         case .webSearch: L10n.string("Search the web")
         case .webFetch: L10n.string("Fetch a web resource")
@@ -107,7 +123,7 @@ enum InvocationName: String, CaseIterable {
 
     var actionIconKind: OxActionIconKind {
         switch self {
-        case .appInspect: .device
+        case .appInspect, .appInfo, .appProfile, .appNotifications, .appLanguage, .appTheme, .appVoice, .appModel, .appLogs: .device
         case .appRenameChat: .chats
         case .webSearch, .webFetch: .web
         case .fsList, .fsRead, .outputRead, .fsWrite, .fsEdit, .fsDelete, .fsGlob, .fsGrep: .files

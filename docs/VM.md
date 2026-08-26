@@ -60,6 +60,40 @@ browser pages are caller-owned. Temporary file results are limited to 32 files a
 Cancellation is cooperative: dismissal and timeout cannot undo requests already sent
 to a service or dismiss operating-system permission alerts. Late results are discarded.
 
+## App information
+
+`ox.app.info` returns only `{ name, version, build, region }`.
+`ox.app.profile` returns the active Profile's `{ name, storage }`, or null when
+none is active, without exposing Profile identifiers or filesystem paths.
+`ox.app.notifications` returns `{ status }` with `granted`, `denied`, or
+`notDetermined`; it does not request permission or schedule notifications.
+
+`ox.app.language`, `ox.app.theme`, `ox.app.voice`, and `ox.app.model` read
+the current language selection and locale, theme selection and appearance,
+selected and effective speech voice, and chat model and authentication status.
+Each takes `{ purpose }` and has a typed result documented by `.help()`.
+They do not change settings or expose credentials. The aggregate
+`ox.app.inspect` API has been removed; saved skills and scripts should call
+the specific readers. Historical inspect invocations remain readable in saved
+chats without rewriting them. There is no aggregate setup or Siri inspection
+response. `ox.app.renameChat` retains its existing behavior.
+
+`ox.app.logs({ level?, category?, query?, since?, limit?, purpose })` reads
+recent app-wide in-memory diagnostics through the normal approval gate.
+Approval explains that logs can include data from other chats and Profiles
+and become available to the current model. Existing user-granted automatic
+approvals apply. Log text is untrusted data and receives credential redaction
+before message filtering and return.
+
+Results contain newest-first `entries`, a result `truncated` flag, and the
+`oldestAvailable` timestamp in the retained snapshot. Entries contain
+`timestamp`, `level`, `category`, `message`, and their own `truncated` flag.
+`level` is a minimum severity, `category` matches exactly, `query` is a
+case-insensitive message substring, and `since` is an inclusive ISO 8601
+timestamp with a time zone. The default limit is 50, the maximum is 100,
+messages are capped at 2,048 characters, and entries share a 64 KiB budget.
+These results do not include historical log files or logs evicted from memory.
+
 ## Client and Host availability
 
 | Client | Host | Status | Transport | Remaining work |

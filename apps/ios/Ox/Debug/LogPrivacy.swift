@@ -21,7 +21,8 @@ nonisolated enum LogPrivacy {
     static func text(_ raw: String, limit: Int = 512) -> String {
         let replacements = [
             (regex("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]+"), "Bearer <redacted>"),
-            (regex("(?i)(authorization|cookie|set-cookie|access[_-]?token|refresh[_-]?token|api[_-]?key|password|secret)(\\s*[:=]\\s*)[\\\"']?[^\\s,\\\"'};]+"), "$1$2<redacted>"),
+            (regex(#"(?i)(["']?\b(?:authorization|cookie|set-cookie|(?:access|refresh|id|session)[_-]?token|token|api[_-]?key|client[_-]?secret|password|secret)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\r\n,}]+)"#), "$1<redacted>"),
+            (regex(#"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"#), "<redacted>"),
             (regex("\\bsk-[A-Za-z0-9_-]{12,}"), "sk-<redacted>"),
             (regex("\\b(?:gh[pousr]_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,})"), "github_<redacted>"),
             (regex("\\bAIza[A-Za-z0-9_-]{12,}"), "AIza<redacted>")

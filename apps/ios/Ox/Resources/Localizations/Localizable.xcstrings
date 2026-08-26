@@ -1071,6 +1071,17 @@
         }
       }
     },
+    "App info" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用信息"
+          }
+        }
+      }
+    },
     "Apple Health" : {
       "comment" : "Name of the data source for Apple Health.",
       "extractionState" : "stale",
@@ -5197,6 +5208,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日志"
+          }
+        }
+      }
+    },
+    "Logs may include private data from other chats and Profiles and become available to the current model. Always approve applies to all app logs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日志可能包含其他聊天和配置文件中的私人数据，并会提供给当前模型。“始终允许”适用于所有应用日志。"
           }
         }
       }

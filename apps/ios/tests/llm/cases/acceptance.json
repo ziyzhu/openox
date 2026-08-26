@@ -1,12 +1,30 @@
 {
   "execute": [
     {
-      "id": "javascript-app-setup-inspection",
-      "prompt": "Help me check whether Ox is set up correctly on this device. Inspect the current app setup before answering.",
+      "id": "javascript-app-info",
+      "prompt": "Read and print Ox's app name, version, build, and region on this device.",
       "expect": {
-        "javascriptCalls": ["ox.app.inspect", "console.log"],
-        "javascriptCallCounts": { "ox.app.inspect": 1 },
-        "forbiddenJavascriptCalls": ["ox.help", "ox.service.find", "ox.web.search"]
+        "javascriptCalls": ["ox.app.info", "console.log"],
+        "javascriptCallCounts": { "ox.app.info": 1 },
+        "forbiddenJavascriptCalls": ["ox.app.inspect", "ox.help", "ox.service.find", "ox.web.search"]
+      }
+    },
+    {
+      "id": "javascript-app-profile",
+      "prompt": "Read and print the name and storage type of my active Ox Profile without changing it.",
+      "expect": {
+        "javascriptCalls": ["ox.app.profile", "console.log"],
+        "javascriptCallCounts": { "ox.app.profile": 1 },
+        "forbiddenJavascriptCalls": ["ox.app.inspect", "ox.help", "ox.fs.read"]
+      }
+    },
+    {
+      "id": "javascript-app-notifications",
+      "prompt": "Read and print Ox's current notification permission status. Do not request permission or change settings.",
+      "expect": {
+        "javascriptCalls": ["ox.app.notifications", "console.log"],
+        "javascriptCallCounts": { "ox.app.notifications": 1 },
+        "forbiddenJavascriptCalls": ["ox.app.inspect", "ox.help", "ox.service.invoke"]
       }
     },
     {

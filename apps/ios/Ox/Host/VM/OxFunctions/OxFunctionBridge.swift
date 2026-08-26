@@ -3,7 +3,14 @@ import Foundation
 @MainActor
 public protocol OxFunctionBridge: AnyObject {
     func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue?
-    func inspectApp(purpose: String) async throws -> JSONValue?
+    func appInfo(purpose: String) async throws -> JSONValue?
+    func appProfile(purpose: String) async throws -> JSONValue?
+    func appNotifications(purpose: String) async throws -> JSONValue?
+    func appLanguage(purpose: String) async throws -> JSONValue?
+    func appTheme(purpose: String) async throws -> JSONValue?
+    func appVoice(purpose: String) async throws -> JSONValue?
+    func appModel(purpose: String) async throws -> JSONValue?
+    func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func renameChat(title: String, purpose: String) async throws -> JSONValue?
     func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue?
     func searchWeb(query: String, purpose: String) async throws -> JSONValue?

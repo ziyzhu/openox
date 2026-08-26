@@ -106,7 +106,7 @@ ox vm call ox.fs.list --args-file - < vm-args.json
 `vm eval` runs arbitrary JavaScript and is intended only for development:
 
 ```sh
-ox vm eval --script 'return await ox.app.inspect({ purpose: "Inspect Host" });'
+ox vm eval --script 'return await ox.app.info({ purpose: "Read app identity" });'
 ```
 
 ## Inspect a running Host

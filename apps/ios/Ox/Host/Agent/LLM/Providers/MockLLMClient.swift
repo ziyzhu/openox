@@ -319,7 +319,7 @@ extension Scenario {
             Entry("76", "video — display inline artifact video", .video),
             Entry("77", "payment — user-controlled checkout", .payment),
             Entry("78", "URL context — annotate user and tool URLs with related services", .urlServiceContext),
-            Entry("80", "app information — inspect setup without secrets", .appInformation),
+            Entry("80", "app information — read settings and filter logs without secrets", .appInformation),
             Entry("81", "chat title — update agent titles", .chatTitle),
             Entry("82", "local service — create and edit Local source", .localServiceWorkflow),
             Entry("83", "local copy — copy and validate Local source", .localCopyWorkflow),
@@ -329,6 +329,7 @@ extension Scenario {
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
             Entry("89", "browser screenshot — navigate and attach viewport image", .browserScreenshot),
+            Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
         ]),
     ]
 
@@ -1482,24 +1483,118 @@ extension Scenario {
 
     static let appInformation = Scenario(name: "app-information") { ctx in
         guard let output = ctx.resultText("execute") else {
-            return [execute(#"console.log(await ox.app.inspect({ purpose: "Check Ox setup" }));"#)]
+            do {
+                try checkAppLogQuery()
+            } catch {
+                return [.say("App log checks failed: \(error.localizedDescription)"), .stop(.stop)]
+            }
+            return [execute("""
+            const info = await ox.app.info({ purpose: "Read app identity" });
+            const profile = await ox.app.profile({ purpose: "Read active Profile" });
+            const notifications = await ox.app.notifications({ purpose: "Read notification permission" });
+            const language = await ox.app.language({ purpose: "Read language" });
+            const theme = await ox.app.theme({ purpose: "Read theme" });
+            const voice = await ox.app.voice({ purpose: "Read voice" });
+            const model = await ox.app.model({ purpose: "Read model" });
+            const assert = (ok, message) => { if (!ok) throw new Error(message); };
+            assert(typeof ox.app.inspect === "undefined", "Aggregate inspection must not be callable");
+            assert(Object.keys(info).sort().join(",") === "build,name,region,version" && info.name === "Ox" && info.version.length > 0 && info.build.length > 0, "App info must contain identity only");
+            assert(profile === null || (Object.keys(profile).sort().join(",") === "name,storage" && profile.name.length > 0 && ["local", "iCloud", "external"].includes(profile.storage)), "Invalid Profile information");
+            assert(Object.keys(notifications).join(",") === "status" && ["granted", "denied", "notDetermined"].includes(notifications.status), "Invalid notification permission");
+            assert(typeof language.locale === "string" && language.locale.length > 0, "Missing language locale");
+            assert(["system", "en", "zh-Hans"].includes(language.selection), "Invalid language selection");
+            assert(["creatorPick", "light", "dark"].includes(theme.selection), "Invalid theme selection");
+            assert(theme.appearance === (theme.selection === "dark" ? "dark" : "light"), "Incorrect theme appearance");
+            assert(voice.selection === null || typeof voice.selection === "string", "Invalid voice selection");
+            assert(voice.effective === null || ["id", "name", "language"].every(key => typeof voice.effective[key] === "string" && voice.effective[key].length > 0), "Invalid effective voice");
+            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["model", { modelId: "test" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
+              let rejected = false;
+              try { await ox.app[name]({ ...options, purpose: "Reject invalid input" }); }
+              catch { rejected = true; }
+              assert(rejected, name + " must reject invalid input");
+            }
+            console.log(JSON.stringify({ info, profile, notifications, model }));
+            """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["app"]?.objectValue?["name"]?.stringValue == "Ox",
+              result["info"]?.objectValue?["name"]?.stringValue == "Ox",
               let model = result["model"]?.objectValue,
               model["provider"]?.objectValue?["name"]?.stringValue?.isEmpty == false,
               model["model"]?.objectValue?["name"]?.stringValue?.isEmpty == false,
               let authentication = model["authentication"]?.objectValue,
               authentication["status"]?.stringValue != nil,
               authentication["method"]?.stringValue != nil,
-              let setup = result["setup"]?.objectValue,
-              setup["notifications"]?.objectValue?["status"]?.stringValue != nil,
+              result["notifications"]?.objectValue?["status"]?.stringValue != nil,
               !output.contains("credential"),
               !output.contains("accountLabel"),
               !output.contains("filesystem") else {
             return [.say("App information was incomplete or exposed private configuration."), .stop(.stop)]
         }
-        return [.say("Ox inspected its current setup without exposing credentials."), .stop(.stop)]
+        return [.say("Ox read its identity, Profile, notification permission, language, theme, voice, and model without changing settings. Aggregate inspection is removed. Log filtering, limits, and credential redaction passed."), .stop(.stop)]
+    }
+
+    private static func checkAppLogQuery() throws {
+        func expect(_ condition: Bool, _ message: String) throws {
+            if !condition { throw RuntimeError.bridge(message) }
+        }
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        func entry(_ id: Int, _ level: Logger.Level, _ category: String, _ message: String) -> LogEntry {
+            LogEntry(id: id, date: date.addingTimeInterval(Double(id)), level: level, category: category, thread: "test", location: "test", message: message)
+        }
+        let fixture = [
+            entry(0, .info, "Agent", "ordinary event"),
+            entry(1, .warning, "Service", "Retry request"),
+            entry(2, .error, "Service", "RETRY failed"),
+            entry(3, .error, "Network", #"{"api_key":"fixture-private-value","authorization":"Basic fixture-auth","Cookie":"session=fixture-session; csrf=fixture-csrf","client_secret":"fixture-client-secret","token":"fixture-token"}"#),
+        ]
+        func read(_ options: [String: JSONValue], _ entries: [LogEntry]? = nil) throws -> [String: JSONValue] {
+            try AppLogQuery(options: .object(options)).read(entries ?? fixture).objectValue ?? [:]
+        }
+        let filtered = try read(["level": .string("warning"), "category": .string("Service"), "query": .string("retry"), "since": .string("2023-11-14T22:13:22.000Z")])
+        try expect(filtered["entries"]?.arrayValue?.count == 1 && filtered["entries"]?.arrayValue?.first?.objectValue?["message"]?.stringValue == "RETRY failed", "Combined log filters failed")
+        let seconds = try read(["since": .string("2023-11-14T22:13:22Z")])
+        try expect(seconds["entries"]?.arrayValue?.count == 2, "Whole-second timestamp failed")
+        let limited = try read(["limit": .int(1)])
+        try expect(limited["entries"]?.arrayValue?.count == 1 && limited["truncated"] == .bool(true), "Log limit failed")
+        let clean = try read([:])["entries"]?.jsonString() ?? ""
+        try expect(!["fixture-private-value", "fixture-auth", "fixture-session", "fixture-csrf", "fixture-client-secret", "fixture-token"].contains(where: clean.contains), "Credentials escaped log redaction")
+        let secretSearch = try read(["query": .string("fixture-private-value")])
+        try expect(secretSearch["entries"]?.arrayValue?.isEmpty == true, "Log query searched unredacted credentials")
+        let empty = try read([:], [])
+        try expect(empty["entries"] == .array([]) && empty["truncated"] == .bool(false) && empty["oldestAvailable"] == .null, "Empty logs failed")
+        let large = try read(["limit": .int(100)], (0..<100).map { entry($0, .info, "Agent", String(repeating: "界", count: 3_000)) })
+        let largeEntries = large["entries"]?.arrayValue ?? []
+        try expect(large["truncated"] == .bool(true) && !largeEntries.isEmpty && largeEntries.count < 100 && largeEntries.allSatisfy { $0.objectValue?["truncated"] == .bool(true) }, "Log byte or message budget failed")
+        let invalidOptions: [[String: JSONValue]] = [["limit": .int(0)], ["limit": .int(101)], ["limit": .double(1.5)], ["level": .string("fatal")], ["since": .string("yesterday")], ["since": .string("2023-11-14T22:13:22")], ["query": .null], ["unknown": .bool(true)]]
+        for options in invalidOptions {
+            var rejected = false
+            do { _ = try AppLogQuery(options: .object(options)) } catch { rejected = true }
+            try expect(rejected, "Invalid log filter accepted")
+        }
+    }
+
+    static let appLogs = Scenario(name: "app-logs") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            return [execute("""
+            try {
+              const result = await ox.app.logs({ level: "info", category: "Session", query: "Chat.", limit: 3, purpose: "Read diagnostic logs" });
+              const valid = result.entries.length > 0 && result.entries.length <= 3 && result.entries.every((entry, index, entries) => entry.category === "Session" && ["info", "warning", "error"].includes(entry.level) && entry.message.toLowerCase().includes("chat.") && (index === 0 || entry.timestamp <= entries[index - 1].timestamp));
+              console.log(JSON.stringify({ valid, count: result.entries.length, truncated: result.truncated }));
+            } catch (error) {
+              console.log(JSON.stringify({ error: String(error) }));
+            }
+            """)]
+        }
+        guard let result = JSONValue.parse(jsonString: output)?.objectValue else {
+            return [.say("App logs returned an invalid result."), .stop(.stop)]
+        }
+        if result["error"]?.stringValue?.contains("the user declined") == true {
+            return [.say("Log access was denied. No logs were returned."), .stop(.stop)]
+        }
+        guard result["valid"] == .bool(true) else {
+            return [.say("App log approval or filtering failed."), .stop(.stop)]
+        }
+        return [.say("Approved log access returned bounded, filtered diagnostics in newest-first order."), .stop(.stop)]
     }
 
     static let chatTitle = Scenario(name: "chat-title") { ctx in
