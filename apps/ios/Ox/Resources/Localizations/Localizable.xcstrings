@@ -1,6 +1,36 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Always approve all actions?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终批准所有操作？"
+          }
+        }
+      }
+    },
+    "Give agents permission to use all available actions without asking in any chat. Mistakes may cause data loss or unwanted charges." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许智能体在所有聊天中执行任何可用操作，无需再次询问。操作失误可能导致数据丢失或意外扣费。"
+          }
+        }
+      }
+    },
+    "Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending and future actions in all chats and profiles until turned off. System permissions and private-data consent still apply." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体无需询问即可访问已登录账号的数据、发送消息、删除数据和花钱。操作失误可能导致数据永久丢失或意外扣费。启用后会批准所有聊天和档案中正在等待批准及之后发起的操作，直到你关闭此设置。系统权限和私密数据授权仍需确认。"
+          }
+        }
+      }
+    },
     "" : {
       "shouldTranslate" : false
     },

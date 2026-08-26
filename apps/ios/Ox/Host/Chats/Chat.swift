@@ -1229,6 +1229,23 @@ final class Chat: Identifiable {
         runState.backgroundExecution?.finish(success: true)
         runState.setBackgroundExecution(nil)
         Log.session.info("Chat.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
+        observeAutoApproval()
+    }
+
+    private func observeAutoApproval() {
+        guard case .prompt(let prompt, _) = interactionWaiter,
+              let approval = prompt.autoApproval else { return }
+        let approved = withObservationTracking {
+            serviceManager.shouldAutoApprove(approval.action)
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.interactionWaiter?.id == prompt.id else { return }
+                self.observeAutoApproval()
+            }
+        }
+        guard approved else { return }
+        Log.session.info("Chat.interaction autoApproved id=\(prompt.id) action=\(approval.action) global=\(serviceManager.autoApproveAll)")
+        resolvePrompt(blockId: prompt.id, answer: approval.approve)
     }
 
     private func advanceInteraction() {
@@ -1236,8 +1253,8 @@ final class Chat: Identifiable {
             let waiter = interactionQueue.removeFirst()
             if case .prompt(let prompt, let continuation) = waiter,
                let approval = prompt.autoApproval,
-               serviceManager.isAutoApproved(approval.action) {
-                Log.session.info("Chat.interaction autoApproved id=\(prompt.id) action=\(approval.action)")
+               serviceManager.shouldAutoApprove(approval.action) {
+                Log.session.info("Chat.interaction autoApproved id=\(prompt.id) action=\(approval.action) global=\(serviceManager.autoApproveAll)")
                 continuation.resume(returning: .answered(approval.approve))
                 continue
             }
@@ -1620,8 +1637,8 @@ final class Chat: Identifiable {
     }
 
     private func requestApproval(action: String, args: Any? = nil, prompt promptOverride: String? = nil) async -> ApprovalOutcome {
-        if serviceManager.isAutoApproved(action) {
-            Log.session.info("Chat.requestApproval auto action=\(action)")
+        if serviceManager.shouldAutoApprove(action) {
+            Log.session.info("Chat.requestApproval auto action=\(action) global=\(serviceManager.autoApproveAll)")
             return .approved
         }
         let display = approvalLabel(for: action)

@@ -768,7 +768,7 @@ struct ServiceDetailView: View {
     private func approvalControl(isOn: Binding<Bool>, actionID: String) -> some View {
         Divider().padding(.vertical, 4)
         Toggle(isOn: isOn) {
-            Text("Auto-approve")
+            Text("Always approve")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }

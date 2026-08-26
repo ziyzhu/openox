@@ -13,6 +13,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── savedServices                    attached service domains
 │   │   ├── autoApproveActions               standing per-action approvals
+│   │   ├── autoApproveAll                   global Always approve setting, off by default
 │   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
 │   │   ├── api.url                          Ox service API override
 │   │   ├── llm.selectedModels               client → new-chat model default

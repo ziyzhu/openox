@@ -104,10 +104,18 @@ final class ServiceManager {
         didSet { UserDefaults.standard.set(autoApproveActions.sorted(), forKey: Self.autoApproveKey) }
     }
 
+    var autoApproveAll: Bool {
+        didSet {
+            UserDefaults.standard.set(autoApproveAll, forKey: Self.autoApproveAllKey)
+            Log.service.info("ServiceManager.autoApproveAll enabled=\(autoApproveAll)")
+        }
+    }
+
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
 
     private static let savedKey = "savedServices"
     private static let autoApproveKey = "autoApproveActions"
+    private static let autoApproveAllKey = "autoApproveAll"
     private static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
         websiteData.makePageConfiguration()
@@ -164,6 +172,7 @@ final class ServiceManager {
         repository = ServiceRepository(developmentRemote: Self.launchServerURL)
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         autoApproveActions = Set(UserDefaults.standard.stringArray(forKey: Self.autoApproveKey) ?? [])
+        autoApproveAll = UserDefaults.standard.bool(forKey: Self.autoApproveAllKey)
         persistedRemoteMCPServers = ProfileMigrator.migrateRemoteMCPServers(
             defaults: .standard,
             currentKey: Self.remoteMCPKey
@@ -205,6 +214,8 @@ final class ServiceManager {
     }
 
     func isAutoApproved(_ actionName: String) -> Bool { autoApproveActions.contains(actionName) }
+
+    func shouldAutoApprove(_ actionName: String) -> Bool { autoApproveAll || isAutoApproved(actionName) }
 
     func setAutoApprove(_ actionName: String, _ on: Bool) {
         guard isAutoApproved(actionName) != on else { return }

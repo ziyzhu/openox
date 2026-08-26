@@ -94,6 +94,8 @@ nonisolated enum A11yID {
         static func voiceOption(_ identifier: String) -> String { "settings.voice.option.\(identifier)" }
         static func voicePreview(_ identifier: String) -> String { "settings.voice.preview.\(identifier)" }
         static let theme = "settings.theme"
+        static let autoApproveAll = "settings.autoApproveAll"
+        static let autoApproveConfirm = "settings.autoApproveConfirm"
         static let memory = "settings.memory"
         static let memoryEditor = "settings.memoryEditor"
         static let memorySave = "settings.memorySave"

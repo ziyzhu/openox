@@ -101,6 +101,16 @@ and mutations performed by that script. Persisting Always approve is standing
 consent to that control across pages Web visits, not merely consent to one
 kind of website mutation.
 
+Settings offers an explicit, off-by-default **Always approve** switch for
+all chats and Profiles on the device. Settings and the enable confirmation warn
+about data loss and unwanted charges. Enabling it requires confirmation and
+approves both pending and future ordinary action prompts, including service
+attachment and Browser control. It persists across launches until disabled.
+Per-action standing approvals remain separate and take effect again when the
+global switch is off. Auto-approved actions and changes to the switch are logged.
+This does not bypass authentication, iOS permissions, selected-folder boundaries,
+private-data storage and disclosure consent, or ordinary questions to the user.
+
 Device capabilities follow the same attachment boundary as registry services but
 execute locally. A device service must be attached to the chat before its actions
 are disclosed or callable; the applicable iOS permission remains an independent

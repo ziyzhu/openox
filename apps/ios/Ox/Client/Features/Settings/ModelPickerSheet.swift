@@ -24,6 +24,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serverManager
     @State private var showOnboarding = false
+    @State private var confirmingAlwaysApprove = false
     @State private var creatingProfile = false
     @State private var openingProfile = false
     @State private var profileNameDraft = ""
@@ -42,6 +43,16 @@ struct SettingsSheet: View {
 
     private var themeBinding: Binding<AppTheme> {
         Binding(get: { theme.theme }, set: { theme.theme = $0 })
+    }
+
+    private var alwaysApproveBinding: Binding<Bool> {
+        Binding(get: { serverManager.autoApproveAll }, set: { enabled in
+            if enabled {
+                confirmingAlwaysApprove = true
+            } else {
+                serverManager.autoApproveAll = false
+            }
+        })
     }
 
     private var logsSummary: Text {
@@ -138,6 +149,17 @@ struct SettingsSheet: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
+                    }
+
+                    SettingsSection(
+                        "Permissions",
+                        footer: "Give agents permission to use all available actions without asking in any chat. Mistakes may cause data loss or unwanted charges."
+                    ) {
+                        Toggle("Always approve", isOn: alwaysApproveBinding)
+                            .font(Theme.Fonts.bodyMd)
+                            .foregroundStyle(Theme.Colors.onSurface)
+                            .tint(Theme.Colors.primary)
+                            .accessibilityIdentifier(A11yID.Settings.autoApproveAll)
                     }
 
                     SettingsSection("Language") {
@@ -287,6 +309,15 @@ struct SettingsSheet: View {
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
+        }
+        .alert("Always approve all actions?", isPresented: $confirmingAlwaysApprove) {
+            Button("Cancel", role: .cancel) {}
+            Button("Always approve", role: .destructive) {
+                serverManager.autoApproveAll = true
+            }
+            .accessibilityIdentifier(A11yID.Settings.autoApproveConfirm)
+        } message: {
+            Text("Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending and future actions in all chats and profiles until turned off. System permissions and private-data consent still apply.")
         }
         .task {
             await storage.refreshAvailability()
