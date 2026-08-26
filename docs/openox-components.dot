@@ -1,0 +1,78 @@
+digraph OpenOx {
+  graph [
+    bgcolor="white"
+    fontname="Arial"
+    fontsize=16
+    labeljust=l
+    newrank=true
+    nodesep=0.45
+    pad=0.25
+    ranksep=0.8
+  ];
+  node [
+    color="#222222"
+    fillcolor="white"
+    fontcolor="#171717"
+    fontname="Arial"
+    fontsize=12
+    margin="0.18,0.14"
+    shape=box
+    style=filled
+  ];
+  edge [
+    arrowsize=0.65
+    color="#111111"
+    fontname="Arial"
+    fontsize=10
+  ];
+
+  client [label="Ox Client\nMobile · Desktop · Web · CLI"];
+
+  subgraph cluster_host {
+    label="Ox Host";
+    color="#222222";
+    margin=20;
+
+    host_api [label="Ox Host API\nChats · Services · Lifecycle"];
+    agent [label="Ox Agent\nReasoning · Tool use"];
+    model_adapter [label="Model adapter\nProvider-neutral agent loop"];
+    profile [label="Ox Profile\nIdentity · Memory · Skills\nArtifacts · Conversations"];
+    vm [label="Ox VM\nSandboxed JavaScript · ox.*\nSkills · Virtual filesystem"];
+    local_repository [label="Local Service Repository\nEditable Git + repository.json"];
+    services [label="Installed services\nAvailable to Host\nActions · Skills"];
+  }
+
+  model [label="Ox Model Provider\nAny model · Any provider"];
+  remote_repositories [label="Remote Service Repositories\nPublic Git + repository.json"];
+
+  subgraph cluster_interfaces {
+    label="Service interfaces";
+    color="#222222";
+    margin=20;
+
+    device [label="Device-native interface\n(Device Service)"];
+    web [label="Web page\n(Web Service)"];
+    mcp [label="MCP server\n(MCP Service)"];
+
+    { rank=same; device; web; mcp; }
+    device -> web -> mcp [style=invis];
+  }
+
+  { rank=same; client; host_api; agent; model_adapter; model; }
+  { rank=same; profile; vm; }
+  { rank=same; local_repository; services; remote_repositories; }
+
+  client -> host_api [dir=both, label="in-process\nor remote", weight=100, minlen=2];
+  host_api -> agent [dir=both, weight=100];
+  agent -> model_adapter [dir=both, label="provider-neutral", weight=100];
+  model_adapter -> model [dir=both, label="provider API", weight=100, minlen=2];
+  agent -> vm [label="writes and executes code"];
+  profile -> vm [dir=both, label="mounted through ox.fs"];
+  vm -> local_repository [label="creates or revises\nvia ox.fs"];
+  vm -> services [dir=both, label="invokes actions\nreads skills"];
+  local_repository -> services [label="validates and reloads", weight=100];
+  services -> remote_repositories [dir=back, label="installs", weight=100, minlen=2];
+  services -> device;
+  services -> web;
+  services -> mcp;
+}

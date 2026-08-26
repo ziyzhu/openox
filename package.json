@@ -9,6 +9,7 @@
     "test:services": "bun packages/services/tests/run.ts",
     "test:unit": "bun test tooling packages/services packages/service-sdk",
     "build:services": "bun tooling/ios-services-build.ts",
+    "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
     "build:web-worker": "bun tooling/build-public-web-worker.ts",
     "test:chat-projection": "bun tooling/chat-projection-replay.ts",
     "check:localizations": "bun tooling/localization-check.ts",

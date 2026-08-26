@@ -29,7 +29,9 @@ The first implementation of Ox is an iOS Client and Host whose source code is in
 
 ## Components
 
-![OpenOx components](docs/openox-components.png)
+![OpenOx components](docs/openox-components.svg)
+
+Edit the [Graphviz source](docs/openox-components.dot) and run `bun run build:diagram` with Graphviz installed to regenerate the diagram.
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.
