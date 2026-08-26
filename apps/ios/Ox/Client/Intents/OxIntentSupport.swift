@@ -86,7 +86,7 @@ enum OxIntentSupport {
             throw OxIntentError.onboardingRequired
         }
         let client = OxClient.shared
-        await client.prepare()
+        try await client.prepare()
         return client
     }
 

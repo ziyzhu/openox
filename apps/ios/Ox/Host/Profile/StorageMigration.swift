@@ -23,44 +23,52 @@ nonisolated enum ProfileSchema {
     static let steps: [@Sendable (URL) throws -> Void] = [
         { _ in },
         { _ in },
-        { try ProfileMigrator.moveAttachmentsToArtifacts(at: $0) },
-        { try ProfileMigrator.migrateLegacySkills(at: $0) },
+        { try StorageMigrator.moveAttachmentsToArtifacts(at: $0) },
+        { try StorageMigrator.migrateLegacySkills(at: $0) },
         { _ in },
-        { try ProfileMigrator.renameLibraryToArtifacts(at: $0) },
-        { try ProfileMigrator.moveChatsIntoDirectories(at: $0) },
-        { try ProfileMigrator.repairStorage(at: $0) },
-        { try ProfileMigrator.migrateAgentContexts(at: $0) },
-        { try ProfileMigrator.namespaceUserSkills(at: $0) },
-        { try ProfileMigrator.removeUserSkillNamespace(at: $0) },
+        { try StorageMigrator.renameLibraryToArtifacts(at: $0) },
+        { try StorageMigrator.moveChatsIntoDirectories(at: $0) },
+        { try StorageMigrator.repairStorage(at: $0) },
+        { try StorageMigrator.migrateAgentContexts(at: $0) },
+        { try StorageMigrator.namespaceUserSkills(at: $0) },
+        { try StorageMigrator.removeUserSkillNamespace(at: $0) },
         { _ in },
     ]
 }
 
-nonisolated enum ProfileMigrationError: LocalizedError {
+nonisolated enum StorageMigrationError: LocalizedError {
+    case activeProfileUnavailable
     case collision(String)
     case invalidAttachment(String)
+    case invalidApplicationStorage(String)
     case invalidArtifact(String)
     case invalidLocalServiceRepositorySeed
     case invalidRepairedLocalServiceRepository
     case missingArtifact(String)
     case missingConfig
     case localServiceRepositoryRollbackFailed(String)
+    case profileMigrationFailed(String)
 
     var errorDescription: String? {
         switch self {
+        case .activeProfileUnavailable: "No Profile is available to open."
         case .collision(let path): "Migration destination conflicts with existing data: \(path)"
         case .invalidAttachment(let path): "Legacy attachment metadata is invalid: \(path)"
+        case .invalidApplicationStorage(let component): "Stored \(component) data is not compatible with this version of Ox."
         case .invalidArtifact(let path): "Legacy artifact metadata is invalid: \(path)"
         case .invalidLocalServiceRepositorySeed: "The Local service repository repair seed is invalid."
         case .invalidRepairedLocalServiceRepository: "The repaired Local service repository is invalid."
         case .missingArtifact(let path): "Legacy artifact content is missing: \(path)"
         case .missingConfig: "The Profile configuration could not be read."
         case .localServiceRepositoryRollbackFailed(let detail): "The Local service repository repair and rollback failed: \(detail)"
+        case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
         }
     }
 }
 
-nonisolated enum ProfileMigrator {
+nonisolated enum StorageMigrator {
+    private static let legacyChatSchemaVersion = 6
+
     private enum LegacyLocalServiceRepositoryState {
         case main(String)
         case empty
@@ -71,6 +79,127 @@ nonisolated enum ProfileMigrator {
         let id: UUID
         let location: Profile.Location
         let bookmark: Data?
+    }
+
+    @MainActor
+    static func migrateApplicationStorage() {
+        Log.app.info("StorageMigrator.application start")
+        _ = migrateExternalProfiles(
+            in: AppStoragePaths.applicationSupport,
+            destination: AppStoragePaths.externalProfiles
+        )
+        _ = migrateDeviceFolderGrants(
+            in: AppStoragePaths.applicationSupport,
+            destination: AppStoragePaths.deviceFolderGrants
+        )
+        _ = migrateRemoteMCPServers(
+            defaults: .standard,
+            currentKey: ServiceManager.remoteMCPKey
+        )
+        _ = migrateCustomLLMProviders(
+            defaults: .standard,
+            key: LLMRegistry.customProvidersKey
+        )
+        migrateTheme()
+        Log.app.info("StorageMigrator.application done")
+    }
+
+    @MainActor
+    static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
+        Log.app.info("StorageMigrator.prepare start")
+        try validateApplicationStorage()
+        try await storage.resolve()
+        try await services.prepareStorage()
+        Log.app.info("StorageMigrator.prepare done profile=\(storage.activeId?.uuidString ?? "nil")")
+    }
+
+    static func migrate(_ profile: Profile) async throws -> Profile {
+        guard await migrateProfile(profile) else {
+            throw StorageMigrationError.profileMigrationFailed(profile.name)
+        }
+        var migrated = profile
+        migrated.version = ProfileSchema.current
+        return migrated
+    }
+
+    private static func migrateTheme(
+        defaults: UserDefaults = .standard,
+        sharedDefaults: UserDefaults? = UserDefaults(suiteName: AppStoragePaths.appGroupIdentifier)
+    ) {
+        let key = "app.theme"
+        guard let legacyValue = defaults.string(forKey: key) else { return }
+        guard let sharedDefaults else {
+            Log.app.error("StorageMigrator.theme app-group unavailable")
+            return
+        }
+        if sharedDefaults.string(forKey: key) == nil {
+            sharedDefaults.set(legacyValue, forKey: key)
+        }
+        let saved = sharedDefaults.synchronize()
+        if saved {
+            defaults.removeObject(forKey: key)
+            defaults.synchronize()
+        }
+        Log.app.info("StorageMigrator.theme migrated saved=\(saved)")
+    }
+
+    private static func validateApplicationStorage() throws {
+        let manager = FileManager.default
+        let support = AppStoragePaths.applicationSupport
+        let legacyProfiles = support
+            .appendingPathComponent("profiles", isDirectory: true)
+            .appendingPathComponent("profiles.json", isDirectory: false)
+        if manager.fileExists(atPath: legacyProfiles.path),
+           !manager.fileExists(atPath: AppStoragePaths.externalProfiles.path) {
+            throw StorageMigrationError.invalidApplicationStorage("Profile catalog")
+        }
+        try validateFile(
+            AppStoragePaths.externalProfiles,
+            as: [ProfileStore.ExternalRecord].self,
+            component: "Profile catalog"
+        )
+
+        let legacyGrants = support
+            .appendingPathComponent("device-folders", isDirectory: true)
+            .appendingPathComponent("grants.json", isDirectory: false)
+        if manager.fileExists(atPath: legacyGrants.path),
+           !manager.fileExists(atPath: AppStoragePaths.deviceFolderGrants.path) {
+            throw StorageMigrationError.invalidApplicationStorage("folder grants")
+        }
+        try validateFile(
+            AppStoragePaths.deviceFolderGrants,
+            as: [DeviceFolderStore.Grant].self,
+            component: "folder grants"
+        )
+
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: ServiceManager.remoteMCPKey) != nil {
+            guard let data = defaults.data(forKey: ServiceManager.remoteMCPKey),
+                  (try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data)) != nil else {
+                throw StorageMigrationError.invalidApplicationStorage("remote MCP server")
+            }
+        }
+        if defaults.object(forKey: LLMRegistry.customProvidersKey) != nil {
+            guard let data = defaults.data(forKey: LLMRegistry.customProvidersKey),
+                  (try? JSONDecoder().decode([CustomLLMProvider].self, from: data)) != nil else {
+                throw StorageMigrationError.invalidApplicationStorage("custom provider")
+            }
+        }
+    }
+
+    private static func validateFile<Value: Decodable>(
+        _ url: URL,
+        as type: Value.Type,
+        component: String
+    ) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            _ = try JSONDecoder().decode(type, from: data)
+        } catch {
+            Log.app.error("StorageMigrator.validate component=\(component) failed=\(error.localizedDescription)")
+            throw StorageMigrationError.invalidApplicationStorage(component)
+        }
     }
 
     static func migrateExternalProfiles(
@@ -85,7 +214,7 @@ nonisolated enum ProfileMigrator {
             do {
                 try removeLegacyFile(legacyURL, directory: legacyDirectory)
             } catch {
-                Log.app.error("ProfileMigrator.externalProfiles cleanup failed: \(error.localizedDescription)")
+                Log.app.error("StorageMigrator.externalProfiles cleanup failed: \(error.localizedDescription)")
             }
             return (destination, stored)
         }
@@ -106,9 +235,9 @@ nonisolated enum ProfileMigrator {
                 try encoded.write(to: destination, options: Data.WritingOptions.atomic)
             }
             try removeLegacyFile(legacyURL, directory: legacyDirectory)
-            Log.app.info("ProfileMigrator.externalProfiles migrated=\(records.count) discardedManaged=\(legacy.count - records.count)")
+            Log.app.info("StorageMigrator.externalProfiles migrated=\(records.count) discardedManaged=\(legacy.count - records.count)")
         } catch {
-            Log.app.error("ProfileMigrator.externalProfiles failed: \(error.localizedDescription)")
+            Log.app.error("StorageMigrator.externalProfiles failed: \(error.localizedDescription)")
         }
         return (destination, records)
     }
@@ -123,7 +252,7 @@ nonisolated enum ProfileMigrator {
             do {
                 try removeLegacyFile(legacyURL, directory: legacyDirectory)
             } catch {
-                Log.app.error("ProfileMigrator.deviceFolderGrants cleanup failed: \(error.localizedDescription)")
+                Log.app.error("StorageMigrator.deviceFolderGrants cleanup failed: \(error.localizedDescription)")
             }
             return destination
         }
@@ -135,9 +264,9 @@ nonisolated enum ProfileMigrator {
             try data.write(to: destination, options: .atomic)
             try? AppStoragePaths.excludeFromBackup(destination)
             try removeLegacyFile(legacyURL, directory: legacyDirectory)
-            Log.app.info("ProfileMigrator.deviceFolderGrants migrated=\(grants.count)")
+            Log.app.info("StorageMigrator.deviceFolderGrants migrated=\(grants.count)")
         } catch {
-            Log.app.error("ProfileMigrator.deviceFolderGrants failed: \(error.localizedDescription)")
+            Log.app.error("StorageMigrator.deviceFolderGrants failed: \(error.localizedDescription)")
         }
         return destination
     }
@@ -159,9 +288,9 @@ nonisolated enum ProfileMigrator {
         do {
             defaults.set(try JSONEncoder().encode(migrated), forKey: currentKey)
             defaults.removeObject(forKey: legacyKey)
-            Log.app.info("ProfileMigrator.remoteMCPServers migrated=\(migrated.count)")
+            Log.app.info("StorageMigrator.remoteMCPServers migrated=\(migrated.count)")
         } catch {
-            Log.app.error("ProfileMigrator.remoteMCPServers failed: \(error.localizedDescription)")
+            Log.app.error("StorageMigrator.remoteMCPServers failed: \(error.localizedDescription)")
         }
         return migrated
     }
@@ -176,11 +305,11 @@ nonisolated enum ProfileMigrator {
             let legacyModelsStored = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
             if legacyModelsStored?.contains(where: { $0["models"] != nil }) == true {
                 defaults.set(try JSONEncoder().encode(providers), forKey: key)
-                Log.app.info("ProfileMigrator.customLLMProviders removed legacy models providers=\(providers.count)")
+                Log.app.info("StorageMigrator.customLLMProviders removed legacy models providers=\(providers.count)")
             }
             return providers
         } catch {
-            Log.app.error("ProfileMigrator.customLLMProviders failed error=\(error.localizedDescription)")
+            Log.app.error("StorageMigrator.customLLMProviders failed error=\(error.localizedDescription)")
             return []
         }
     }
@@ -200,25 +329,25 @@ nonisolated enum ProfileMigrator {
             do {
                 try Data("ref: refs/heads/main\n".utf8).write(to: headURL, options: .atomic)
                 guard try localServiceRepositoryCommit(at: root) == expectedCommit else {
-                    throw ProfileMigrationError.invalidRepairedLocalServiceRepository
+                    throw StorageMigrationError.invalidRepairedLocalServiceRepository
                 }
             } catch {
                 do {
                     try headData.write(to: headURL, options: .atomic)
                 } catch let rollbackError {
-                    throw ProfileMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
+                    throw StorageMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
                 }
                 throw error
             }
-            Log.service.info("ProfileMigrator.localServiceRepository repaired=head commit=\(expectedCommit.prefix(12))")
+            Log.service.info("StorageMigrator.localServiceRepository repaired=head commit=\(expectedCommit.prefix(12))")
         case .empty:
             guard let seed, manager.fileExists(atPath: seed.path) else {
-                throw ProfileMigrationError.invalidLocalServiceRepositorySeed
+                throw StorageMigrationError.invalidLocalServiceRepositorySeed
             }
             try replaceLegacyLocalServiceRepositoryMetadata(at: root, metadata: metadata, seed: seed)
-            Log.service.info("ProfileMigrator.localServiceRepository repaired=seed preservedWorkingTree=true")
+            Log.service.info("StorageMigrator.localServiceRepository repaired=seed preservedWorkingTree=true")
         case .unsupported(let references):
-            Log.service.warning("ProfileMigrator.localServiceRepository skipped references=\(references.joined(separator: ","))")
+            Log.service.warning("StorageMigrator.localServiceRepository skipped references=\(references.joined(separator: ","))")
         }
     }
 
@@ -267,12 +396,12 @@ nonisolated enum ProfileMigrator {
         if !cleanPaths.isEmpty, !hasStagedChanges {
             try repository.add(paths: cleanPaths.sorted())
             let commit = try repository.commit(message: "Rename Local service manifests to service.json")
-            Log.service.info("ProfileMigrator.localServiceManifests saved=\(cleanPaths.count / 2) commit=\(commit.id.abbreviated)")
+            Log.service.info("StorageMigrator.localServiceManifests saved=\(cleanPaths.count / 2) commit=\(commit.id.abbreviated)")
         } else if hasStagedChanges {
             pendingCount += cleanPaths.count / 2
         }
         if pendingCount > 0 {
-            Log.service.info("ProfileMigrator.localServiceManifests pending=\(pendingCount)")
+            Log.service.info("StorageMigrator.localServiceManifests pending=\(pendingCount)")
         }
     }
 
@@ -324,17 +453,17 @@ nonisolated enum ProfileMigrator {
         if !cleanPaths.isEmpty, !hasStagedChanges {
             try repository.add(paths: cleanPaths.sorted())
             let commit = try repository.commit(message: "Migrate Local service actions to ABI v1")
-            Log.service.info("ProfileMigrator.localServiceActions saved=\(cleanPaths.count) commit=\(commit.id.abbreviated)")
+            Log.service.info("StorageMigrator.localServiceActions saved=\(cleanPaths.count) commit=\(commit.id.abbreviated)")
         }
         if dirtyCount > 0 || (!cleanPaths.isEmpty && hasStagedChanges) {
-            Log.service.info("ProfileMigrator.localServiceActions pending=\(dirtyCount + (hasStagedChanges ? cleanPaths.count : 0))")
+            Log.service.info("StorageMigrator.localServiceActions pending=\(dirtyCount + (hasStagedChanges ? cleanPaths.count : 0))")
         }
     }
 
-    static func migrate(_ profile: Profile) async -> Bool {
+    private static func migrateProfile(_ profile: Profile) async -> Bool {
         let sourceVersion = ["2026-07-12", "2026-07-12-ids"].contains(profile.version) ? "2026-07-11" : profile.version
         guard let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else {
-            Log.app.info("ProfileMigrator.skip unknown version=\(profile.version) id=\(profile.id)")
+            Log.app.info("StorageMigrator.skip unknown version=\(profile.version) id=\(profile.id)")
             return false
         }
         let target = ProfileSchema.versions.count - 1
@@ -345,21 +474,21 @@ nonisolated enum ProfileMigrator {
         return await Task.detached(priority: .userInitiated) {
             let complete = await materialize(at: url)
             guard complete else {
-                Log.app.warning("ProfileMigrator.deferred id=\(id) version=\(was) awaiting downloads")
+                Log.app.warning("StorageMigrator.deferred id=\(id) version=\(was) awaiting downloads")
                 return false
             }
-            Log.app.info("ProfileMigrator.start id=\(id) from=\(was) to=\(ProfileSchema.current)")
+            Log.app.info("StorageMigrator.start id=\(id) from=\(was) to=\(ProfileSchema.current)")
             for step in from..<target {
                 let version = ProfileSchema.versions[step + 1]
                 do {
                     try ProfileSchema.steps[step](url)
                     try stamp(version, at: url)
                 } catch {
-                    Log.app.error("ProfileMigrator.failed id=\(id) step=\(version) error=\(error.localizedDescription)")
+                    Log.app.error("StorageMigrator.failed id=\(id) step=\(version) error=\(error.localizedDescription)")
                     return false
                 }
             }
-            Log.app.info("ProfileMigrator.done id=\(id) version=\(ProfileSchema.current)")
+            Log.app.info("StorageMigrator.done id=\(id) version=\(ProfileSchema.current)")
             return true
         }.value
     }
@@ -367,14 +496,14 @@ nonisolated enum ProfileMigrator {
     nonisolated private static func materialize(at root: URL, timeout: TimeInterval = 60) async -> Bool {
         var evicted = requestDownloads(at: root)
         guard evicted > 0 else { return true }
-        Log.app.info("ProfileMigrator.materialize waiting evicted=\(evicted) root=\(root.lastPathComponent)")
+        Log.app.info("StorageMigrator.materialize waiting evicted=\(evicted) root=\(root.lastPathComponent)")
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             try? await Task.sleep(nanoseconds: 500_000_000)
             evicted = requestDownloads(at: root)
             if evicted == 0 { return true }
         }
-        Log.app.warning("ProfileMigrator.materialize timeout evicted=\(evicted) root=\(root.lastPathComponent)")
+        Log.app.warning("StorageMigrator.materialize timeout evicted=\(evicted) root=\(root.lastPathComponent)")
         return false
     }
 
@@ -420,7 +549,7 @@ nonisolated enum ProfileMigrator {
     }
 
     nonisolated private static func stamp(_ version: String, at url: URL) throws {
-        guard var config = ProfileIO.readConfig(at: url) else { throw ProfileMigrationError.missingConfig }
+        guard var config = ProfileIO.readConfig(at: url) else { throw StorageMigrationError.missingConfig }
         config.version = version
         try ProfileIO.writeConfig(config, to: url)
     }
@@ -465,14 +594,14 @@ nonisolated enum ProfileMigrator {
                     }
                     try manager.moveItem(at: backup, to: metadata)
                 } catch let rollbackError {
-                    throw ProfileMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
+                    throw StorageMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
                 }
                 throw error
             }
             do {
                 try manager.removeItem(at: backup)
             } catch {
-                Log.service.warning("ProfileMigrator.localServiceRepository backup cleanup failed error=\(error.localizedDescription)")
+                Log.service.warning("StorageMigrator.localServiceRepository backup cleanup failed error=\(error.localizedDescription)")
             }
         } catch {
             try? manager.removeItem(at: staging)
@@ -486,7 +615,7 @@ nonisolated enum ProfileMigrator {
               let main = repository.reference["refs/heads/main"],
               let tip = main.target as? Commit,
               head.id == tip.id else {
-            throw ProfileMigrationError.invalidRepairedLocalServiceRepository
+            throw StorageMigrationError.invalidRepairedLocalServiceRepository
         }
         return head.id.hex
     }
@@ -527,7 +656,7 @@ nonisolated enum ProfileMigrator {
                           let mimeType = legacy["mimeType"] as? String,
                           let kindString = legacy["kind"] as? String,
                           let kind = Artifact.Kind(rawValue: kindString) else {
-                        throw ProfileMigrationError.invalidAttachment(transcript.path)
+                        throw StorageMigrationError.invalidAttachment(transcript.path)
                     }
                     let ext = URL(fileURLWithPath: oldFileName).pathExtension
                     let metadata = ArtifactMetadata(
@@ -538,7 +667,7 @@ nonisolated enum ProfileMigrator {
                         kind: kind
                     )
                     let source = attachments.appendingPathComponent(oldFileName, isDirectory: false)
-                    try ArtifactStore.importLegacy(metadata, source: source, into: artifacts)
+                    try importLegacyArtifact(metadata, source: source, into: artifacts)
                     try finishLegacyImport(metadata, source: source, artifacts: artifacts)
                     converted.append(id.uuidString)
                     lineChanged = true
@@ -557,7 +686,7 @@ nonisolated enum ProfileMigrator {
         var recovered = 0
         for source in leftovers {
             guard try source.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
-                throw ProfileMigrationError.invalidAttachment(source.path)
+                throw StorageMigrationError.invalidAttachment(source.path)
             }
             let ext = source.pathExtension
             let type = UTType(filenameExtension: ext) ?? .data
@@ -570,15 +699,15 @@ nonisolated enum ProfileMigrator {
                 mimeType: type.preferredMIMEType ?? "application/octet-stream",
                 kind: kind
             )
-            try ArtifactStore.importLegacy(metadata, source: source, into: artifacts)
+            try importLegacyArtifact(metadata, source: source, into: artifacts)
             try finishLegacyImport(metadata, source: source, artifacts: artifacts)
             recovered += 1
         }
         guard try fm.contentsOfDirectory(atPath: attachments.path).isEmpty else {
-            throw ProfileMigrationError.invalidAttachment(attachments.path)
+            throw StorageMigrationError.invalidAttachment(attachments.path)
         }
         try fm.removeItem(at: attachments)
-        Log.app.info("ProfileMigrator.moveAttachmentsToArtifacts root=\(root.lastPathComponent) references=\(references) recovered=\(recovered)")
+        Log.app.info("StorageMigrator.moveAttachmentsToArtifacts root=\(root.lastPathComponent) references=\(references) recovered=\(recovered)")
     }
 
     static func renameLibraryToArtifacts(at root: URL) throws {
@@ -588,7 +717,7 @@ nonisolated enum ProfileMigrator {
         guard fm.fileExists(atPath: library.path) else { return }
         if !fm.fileExists(atPath: artifacts.path) {
             try fm.moveItem(at: library, to: artifacts)
-            Log.app.info("ProfileMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=directory")
+            Log.app.info("StorageMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=directory")
             return
         }
         let items = try fm.contentsOfDirectory(at: library, includingPropertiesForKeys: nil)
@@ -596,7 +725,7 @@ nonisolated enum ProfileMigrator {
             let destination = artifacts.appendingPathComponent(item.lastPathComponent, isDirectory: false)
             if fm.fileExists(atPath: destination.path) {
                 guard try equivalent(item, destination) else {
-                    throw ProfileMigrationError.collision(destination.path)
+                    throw StorageMigrationError.collision(destination.path)
                 }
                 try fm.removeItem(at: item)
             } else {
@@ -604,7 +733,7 @@ nonisolated enum ProfileMigrator {
             }
         }
         try fm.removeItem(at: library)
-        Log.app.info("ProfileMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=\(items.count)")
+        Log.app.info("StorageMigrator.renameLibraryToArtifacts root=\(root.lastPathComponent) moved=\(items.count)")
     }
 
     static func moveChatsIntoDirectories(at root: URL) throws {
@@ -629,7 +758,7 @@ nonisolated enum ProfileMigrator {
                 let destination = directory.appendingPathComponent(name, isDirectory: false)
                 if fm.fileExists(atPath: destination.path) {
                     guard try Data(contentsOf: source) == Data(contentsOf: destination) else {
-                        throw ProfileMigrationError.collision(destination.path)
+                        throw StorageMigrationError.collision(destination.path)
                     }
                     try fm.removeItem(at: source)
                 } else {
@@ -638,7 +767,7 @@ nonisolated enum ProfileMigrator {
                 moved += 1
             }
         }
-        Log.app.info("ProfileMigrator.moveChatsIntoDirectories root=\(root.lastPathComponent) chats=\(grouped.count) files=\(moved)")
+        Log.app.info("StorageMigrator.moveChatsIntoDirectories root=\(root.lastPathComponent) chats=\(grouped.count) files=\(moved)")
     }
 
     static func repairStorage(at root: URL) throws {
@@ -649,11 +778,87 @@ nonisolated enum ProfileMigrator {
         try moveChatsIntoDirectories(at: root)
     }
 
+    private static func legacyTurn(from data: Data, decoder: JSONDecoder) throws -> Turn {
+        guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        guard root["type"] as? String == "agent",
+              var agent = root["agent"] as? [String: Any] else {
+            return try decoder.decode(Turn.self, from: data)
+        }
+        var steps = (agent["steps"] ?? agent["content"]) as? [[String: Any]] ?? []
+        let generation = legacyGenerationID(agent: &agent, steps: steps)
+        steps = steps.map { canonicalLegacyStep($0, generation: generation) }
+        agent["steps"] = steps
+        agent.removeValue(forKey: "content")
+        agent.removeValue(forKey: "model")
+        root["agent"] = agent
+        return try decoder.decode(Turn.self, from: try JSONSerialization.data(withJSONObject: root))
+    }
+
+    private static func legacyGenerationID(
+        agent: inout [String: Any],
+        steps: [[String: Any]]
+    ) -> String? {
+        if let generations = agent["generations"] as? [[String: Any]],
+           let id = generations.first?["id"] as? String {
+            return id
+        }
+        guard let model = agent["model"] as? String,
+              let at = agent["at"],
+              let outcome = agent["outcome"] else { return nil }
+        let seed = (steps.first?["id"] as? String) ?? "\(at).\(model)"
+        let id = StableID.uuid("legacy-generation.\(seed)").uuidString
+        agent["generations"] = [[
+            "id": id,
+            "at": at,
+            "model": model,
+            "outcome": outcome,
+        ]]
+        return id
+    }
+
+    private static func canonicalLegacyStep(
+        _ value: [String: Any],
+        generation: String?
+    ) -> [String: Any] {
+        var step = value
+        if step["generation"] == nil {
+            step["generation"] = generation ?? step["id"]
+        }
+        guard step["type"] as? String == "action",
+              var action = step["action"] as? [String: Any],
+              action["type"] as? String == "execute",
+              var execution = action["execute"] as? [String: Any] else { return step }
+        let effects = (execution["effects"] ?? execution["trace"]) as? [[String: Any]] ?? []
+        execution["effects"] = effects.compactMap(canonicalLegacyEffect)
+        execution.removeValue(forKey: "trace")
+        action["execute"] = execution
+        step["action"] = action
+        return step
+    }
+
+    private static func canonicalLegacyEffect(_ value: [String: Any]) -> [String: Any]? {
+        var effect = value
+        switch effect["type"] as? String {
+        case "step":
+            effect["type"] = "invocation"
+            effect["invocation"] = effect.removeValue(forKey: "step")
+        case "widget":
+            return nil
+        case "media":
+            effect["media"] = effect.removeValue(forKey: "artifact")
+        default:
+            break
+        }
+        return effect
+    }
+
     static func migrateAgentContexts(at root: URL) throws {
         let fm = FileManager.default
         let chats = root.appendingPathComponent("chats", isDirectory: true)
         guard fm.fileExists(atPath: chats.path) else { return }
-        guard let config = ProfileIO.readConfig(at: root) else { throw ProfileMigrationError.missingConfig }
+        guard let config = ProfileIO.readConfig(at: root) else { throw StorageMigrationError.missingConfig }
         let scope = ProfileScope(profileID: config.id, root: root, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
@@ -670,16 +875,16 @@ nonisolated enum ProfileMigrator {
             let metadataURL = directory.appendingPathComponent("chat.json", isDirectory: false)
             guard fm.fileExists(atPath: metadataURL.path) else { continue }
             var metadata = try decoder.decode(ChatMeta.self, from: Data(contentsOf: metadataURL))
-            guard [ChatFormat.currentSchemaVersion, LegacyChatImport.schemaVersion].contains(metadata.schemaVersion) else {
-                Log.app.warning("ProfileMigrator.agentContext skipped=\(directory.lastPathComponent) schema=\(metadata.schemaVersion)")
+            guard [ChatFormat.currentSchemaVersion, legacyChatSchemaVersion].contains(metadata.schemaVersion) else {
+                Log.app.warning("StorageMigrator.agentContext skipped=\(directory.lastPathComponent) schema=\(metadata.schemaVersion)")
                 continue
             }
             let transcriptURL = directory.appendingPathComponent("turns.jsonl", isDirectory: false)
             let lines = fm.fileExists(atPath: transcriptURL.path) ? try transcriptLines(transcriptURL) : []
-            let legacy = metadata.schemaVersion == LegacyChatImport.schemaVersion
+            let legacy = metadata.schemaVersion == legacyChatSchemaVersion
             let decoded = try lines.map {
                 legacy
-                    ? try LegacyChatImport.turn(from: $0, decoder: decoder)
+                    ? try legacyTurn(from: $0, decoder: decoder)
                     : try decoder.decode(Turn.self, from: $0)
             }
             let turns = ChatFormat.normalize(decoded)
@@ -721,19 +926,160 @@ nonisolated enum ProfileMigrator {
             try encoder.encode(context).write(to: contextURL, options: .atomic)
             refreshed += 1
         }
-        Log.app.info("ProfileMigrator.agentContexts root=\(root.lastPathComponent) chats=\(directories.count) refreshed=\(refreshed) upgraded=\(upgraded)")
+        Log.app.info("StorageMigrator.agentContexts root=\(root.lastPathComponent) chats=\(directories.count) refreshed=\(refreshed) upgraded=\(upgraded)")
     }
 
     static func migrateLegacySkills(at root: URL) throws {
-        let count = try SkillFiles.migrateLegacy(at: root)
-        guard count > 0 else { return }
-        Log.app.info("ProfileMigrator.commandsToSkills root=\(root.lastPathComponent) count=\(count)")
+        let legacy = root.appendingPathComponent("COMMANDS.md")
+        guard FileManager.default.fileExists(atPath: legacy.path) else { return }
+        let text = try String(contentsOf: legacy, encoding: .utf8)
+        let skillsRoot = root.appendingPathComponent("skills", isDirectory: true)
+        let manager = FileManager.default
+        try manager.createDirectory(at: skillsRoot, withIntermediateDirectories: true)
+        var existing = Set(try manager.contentsOfDirectory(atPath: skillsRoot.path))
+        var claimed: Set<String> = []
+        var migrated = 0
+        for legacySkill in parseLegacySkills(text) {
+            let base = SkillFiles.slug(legacySkill.name)
+            guard !base.isEmpty else { continue }
+            var suffix = 1
+            while true {
+                let name = suffix == 1 ? base : "\(base)-\(suffix)"
+                suffix += 1
+                guard !claimed.contains(name) else { continue }
+                let description = legacySkill.instructions
+                    .split(whereSeparator: \.isNewline)
+                    .first
+                    .map(String.init) ?? name
+                let skill = Skill(
+                    name: name,
+                    description: description,
+                    instructions: legacySkill.instructions,
+                    services: legacySkill.services
+                )
+                let directory = skillsRoot.appendingPathComponent(name, isDirectory: true)
+                let file = directory.appendingPathComponent(SkillFiles.fileName)
+                if existing.contains(name) {
+                    guard let current = try? String(contentsOf: file, encoding: .utf8),
+                          SkillFiles.parse(current, directoryName: name) == skill else { continue }
+                } else {
+                    let staging = try FileStaging.createDirectory(in: skillsRoot, prefix: "migration")
+                    defer { FileStaging.cleanup(staging, operation: "legacy-skill-migration") }
+                    try SkillFiles.serialize(skill).write(
+                        to: staging.appendingPathComponent(SkillFiles.fileName),
+                        atomically: true,
+                        encoding: .utf8
+                    )
+                    try manager.moveItem(at: staging, to: directory)
+                    existing.insert(name)
+                }
+                claimed.insert(name)
+                migrated += 1
+                break
+            }
+        }
+        try manager.removeItem(at: legacy)
+        guard migrated > 0 else { return }
+        Log.app.info("StorageMigrator.commandsToSkills root=\(root.lastPathComponent) count=\(migrated)")
     }
 
     static func namespaceUserSkills(at root: URL) throws {
-        let count = try SkillFiles.migrateUserNamespace(at: root)
-        guard count > 0 else { return }
-        Log.app.info("ProfileMigrator.namespaceUserSkills root=\(root.lastPathComponent) count=\(count)")
+        let namespace = "profile"
+        let skillsRoot = root.appendingPathComponent("skills", isDirectory: true)
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: skillsRoot.path) else { return }
+        let directories = try manager.contentsOfDirectory(
+            at: skillsRoot,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        )
+        var migrated = 0
+        for source in directories {
+            guard (try source.resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true,
+                  !source.lastPathComponent.hasPrefix("."),
+                  !source.lastPathComponent.hasPrefix("\(namespace):"),
+                  let localName = legacySkillLocalName(source.lastPathComponent, namespace: namespace),
+                  let text = try? String(
+                    contentsOf: source.appendingPathComponent(SkillFiles.fileName),
+                    encoding: .utf8
+                  ),
+                  let skill = SkillFiles.parse(text, directoryName: source.lastPathComponent) else { continue }
+            let destinationName = "\(namespace):\(localName)"
+            let migratedSkill = Skill(
+                name: destinationName,
+                description: skill.description,
+                instructions: skill.instructions,
+                services: skill.services
+            )
+            let destination = skillsRoot.appendingPathComponent(destinationName, isDirectory: true)
+            let destinationFile = destination.appendingPathComponent(SkillFiles.fileName)
+            if manager.fileExists(atPath: destination.path) {
+                guard let existing = try? String(contentsOf: destinationFile, encoding: .utf8),
+                      SkillFiles.parse(existing, directoryName: destinationName) == migratedSkill else {
+                    throw StorageMigrationError.collision(destination.path)
+                }
+            } else {
+                let staging = try FileStaging.createDirectory(in: skillsRoot, prefix: "migration")
+                defer { FileStaging.cleanup(staging, operation: "skill-namespace-migration") }
+                try SkillFiles.serialize(migratedSkill).write(
+                    to: staging.appendingPathComponent(SkillFiles.fileName),
+                    atomically: true,
+                    encoding: .utf8
+                )
+                try manager.moveItem(at: staging, to: destination)
+            }
+            try manager.removeItem(at: source)
+            migrated += 1
+        }
+        guard migrated > 0 else { return }
+        Log.app.info("StorageMigrator.namespaceUserSkills root=\(root.lastPathComponent) count=\(migrated)")
+    }
+
+    private static func legacySkillLocalName(_ name: String, namespace: String) -> String? {
+        if SkillFiles.isLocalName(name) { return name }
+        let parts = name
+            .split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            .map(String.init)
+        guard parts.count == 2,
+              !["system", "service", namespace].contains(parts[0]),
+              SkillFiles.isLocalName(parts[0]),
+              SkillFiles.isLocalName(parts[1]) else { return nil }
+        return "\(parts[0])-\(parts[1])"
+    }
+
+    private static func parseLegacySkills(_ text: String) -> [Skill] {
+        var skills: [Skill] = []
+        var name: String?
+        var services: [String] = []
+        var body: [Substring] = []
+        func flush() {
+            guard let name, !name.isEmpty else { return }
+            let instructions = body.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            skills.append(Skill(
+                name: name,
+                description: instructions,
+                instructions: instructions,
+                services: services
+            ))
+        }
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("## ") {
+                flush()
+                name = String(line.dropFirst(3))
+                services = []
+                body = []
+            } else if name != nil {
+                if body.isEmpty, services.isEmpty, line.hasPrefix("services:") {
+                    services = line.dropFirst("services:".count)
+                        .split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                } else {
+                    body.append(line)
+                }
+            }
+        }
+        flush()
+        return skills
     }
 
     static func removeUserSkillNamespace(at root: URL) throws {
@@ -768,7 +1114,7 @@ nonisolated enum ProfileMigrator {
             if manager.fileExists(atPath: destination.path) {
                 guard let existing = try? String(contentsOf: destinationFile, encoding: .utf8),
                       SkillFiles.parse(existing, directoryName: destinationName) == migratedSkill else {
-                    throw ProfileMigrationError.collision(destination.path)
+                    throw StorageMigrationError.collision(destination.path)
                 }
             } else {
                 let staging = try FileStaging.createDirectory(in: skillsRoot, prefix: "migration")
@@ -784,7 +1130,7 @@ nonisolated enum ProfileMigrator {
             migrated += 1
         }
         guard migrated > 0 else { return }
-        Log.app.info("ProfileMigrator.removeUserSkillNamespace root=\(root.lastPathComponent) count=\(migrated)")
+        Log.app.info("StorageMigrator.removeUserSkillNamespace root=\(root.lastPathComponent) count=\(migrated)")
     }
 
     private static func finishLegacyImport(_ metadata: ArtifactMetadata, source: URL, artifacts: URL) throws {
@@ -792,13 +1138,30 @@ nonisolated enum ProfileMigrator {
             .appendingPathComponent(metadata.id.uuidString, isDirectory: true)
             .appendingPathComponent(metadata.fileName, isDirectory: false)
         guard FileManager.default.fileExists(atPath: destination.path) else {
-            throw ProfileMigrationError.missingArtifact(destination.path)
+            throw StorageMigrationError.missingArtifact(destination.path)
         }
         guard FileManager.default.fileExists(atPath: source.path) else { return }
         guard try Data(contentsOf: source) == Data(contentsOf: destination) else {
-            throw ProfileMigrationError.collision(destination.path)
+            throw StorageMigrationError.collision(destination.path)
         }
         try FileManager.default.removeItem(at: source)
+    }
+
+    private static func importLegacyArtifact(
+        _ metadata: ArtifactMetadata,
+        source: URL,
+        into directory: URL
+    ) throws {
+        let folder = directory.appendingPathComponent(metadata.id.uuidString, isDirectory: true)
+        let metadataURL = folder.appendingPathComponent(ArtifactStore.metadataName, isDirectory: false)
+        if FileManager.default.fileExists(atPath: metadataURL.path) { return }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destination = folder.appendingPathComponent(metadata.fileName, isDirectory: false)
+        if FileManager.default.fileExists(atPath: source.path),
+           !FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.moveItem(at: source, to: destination)
+        }
+        try JSONEncoder().encode(metadata).write(to: metadataURL, options: .atomic)
     }
 
     private static func flattenLegacyArtifacts(at root: URL) throws {
@@ -817,15 +1180,15 @@ nonisolated enum ProfileMigrator {
             do {
                 metadata = try JSONDecoder().decode(ArtifactMetadata.self, from: Data(contentsOf: metadataURL))
             } catch {
-                throw ProfileMigrationError.invalidArtifact(folder.path)
+                throw StorageMigrationError.invalidArtifact(folder.path)
             }
             guard metadata.id.uuidString.caseInsensitiveCompare(folder.lastPathComponent) == .orderedSame,
                   URL(fileURLWithPath: metadata.fileName).lastPathComponent == metadata.fileName else {
-                throw ProfileMigrationError.invalidArtifact(folder.path)
+                throw StorageMigrationError.invalidArtifact(folder.path)
             }
             let source = folder.appendingPathComponent(metadata.fileName, isDirectory: false)
             guard fm.fileExists(atPath: source.path) else {
-                throw ProfileMigrationError.missingArtifact(source.path)
+                throw StorageMigrationError.missingArtifact(source.path)
             }
             let data = try Data(contentsOf: source)
             let fileName = reusableFilename(
@@ -845,7 +1208,7 @@ nonisolated enum ProfileMigrator {
         }
         for folder in folders { try fm.removeItem(at: folder) }
         if !folders.isEmpty {
-            Log.app.info("ProfileMigrator.flattenLegacyArtifacts root=\(root.lastPathComponent) artifacts=\(folders.count)")
+            Log.app.info("StorageMigrator.flattenLegacyArtifacts root=\(root.lastPathComponent) artifacts=\(folders.count)")
         }
     }
 

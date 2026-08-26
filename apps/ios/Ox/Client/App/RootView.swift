@@ -484,6 +484,7 @@ struct RootView: View {
     @State private var loaded: Bool = false
     @State private var startupPhase: StartupPhase = .opening
     @State private var startupPresentation: StartupPresentation = .loading
+    @State private var startupError: String?
     @State private var visibleStartupPhase: StartupPhase?
     @State private var startupLabelTask: Task<Void, Never>?
     @State private var activeProfileMonitor = ActiveProfileMonitor()
@@ -849,14 +850,29 @@ struct RootView: View {
 
     private var startupLoadingView: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            CellularAutomatonLoader()
-            Text(startupPhase.label)
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .opacity(visibleStartupPhase == startupPhase ? 1 : 0)
-                .accessibilityHidden(visibleStartupPhase != startupPhase)
-                .accessibilityIdentifier(A11yID.Startup.status)
+            if let startupError {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                Text("Ox couldn’t update your data")
+                    .font(Theme.Fonts.headline)
+                Text(startupError)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .multilineTextAlignment(.center)
+                Button("Try Again") { bootstrap() }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                CellularAutomatonLoader()
+                Text(startupPhase.label)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .opacity(visibleStartupPhase == startupPhase ? 1 : 0)
+                    .accessibilityHidden(visibleStartupPhase != startupPhase)
+                    .accessibilityIdentifier(A11yID.Startup.status)
+            }
         }
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.surface)
     }
@@ -1042,13 +1058,9 @@ struct RootView: View {
     private func bootstrap() {
         guard !loaded else { return }
         loaded = true
+        startupError = nil
         transitionStartup(to: .opening)
-        loadServices()
         loadProfile()
-    }
-
-    private func loadServices() {
-        Task { await manager.refreshServices(locale: serviceLocale) }
     }
 
     private var serviceLocale: String? {
@@ -1062,23 +1074,30 @@ struct RootView: View {
 
     private func loadProfile() {
         Task {
-            await client.prepare { phase in
-                switch phase {
-                case .opening: transitionStartup(to: .opening)
-                case .updating: transitionStartup(to: .updating)
-                case .loadingChats: transitionStartup(to: .loadingChats)
+            do {
+                try await client.prepare { phase in
+                    switch phase {
+                    case .opening: transitionStartup(to: .opening)
+                    case .updating: transitionStartup(to: .updating)
+                    case .loadingChats: transitionStartup(to: .loadingChats)
+                    }
                 }
+                await manager.refreshServices(locale: serviceLocale)
+                let chat = chats.current ?? chats.startNewChat()
+                refreshCompactSidebar()
+                transitionStartup(to: .ready)
+                withAnimation(.easeOut(duration: reduceMotion ? 0.1 : 0.18), completionCriteria: .logicallyComplete) {
+                    startupPresentation = .content
+                } completion: {
+                    requestComposerFocus(for: chat, reason: "appEntry")
+                }
+                monitorActiveProfile()
+                importSharedNotes()
+            } catch {
+                loaded = false
+                startupError = error.localizedDescription
+                Log.app.error("RootView.startup failed: \(error.localizedDescription)")
             }
-            let chat = chats.current ?? chats.startNewChat()
-            refreshCompactSidebar()
-            transitionStartup(to: .ready)
-            withAnimation(.easeOut(duration: reduceMotion ? 0.1 : 0.18), completionCriteria: .logicallyComplete) {
-                startupPresentation = .content
-            } completion: {
-                requestComposerFocus(for: chat, reason: "appEntry")
-            }
-            monitorActiveProfile()
-            importSharedNotes()
         }
     }
 

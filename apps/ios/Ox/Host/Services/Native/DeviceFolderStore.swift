@@ -46,11 +46,9 @@ final class DeviceFolderStore {
     private let mutationCoordinator = FileMutationCoordinator()
 
     private init() {
-        fileURL = ProfileMigrator.migrateDeviceFolderGrants(
-            in: AppStoragePaths.applicationSupport,
-            destination: AppStoragePaths.deviceFolderGrants
-        )
-        grants = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([Grant].self, from: $0) } ?? []
+        let url = AppStoragePaths.deviceFolderGrants
+        fileURL = url
+        grants = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([Grant].self, from: $0) } ?? []
     }
 
     @discardableResult

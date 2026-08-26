@@ -185,10 +185,6 @@ actor ProfileRepository {
         Log.app.info("ProfileRepository.delete id=\(profile.id) name=\(profile.name)")
     }
 
-    func migrate(_ profile: Profile) async -> Bool {
-        await ProfileMigrator.migrate(profile)
-    }
-
     func ensureLayout(in scope: ProfileScope) {
         _ = try? directory(named: "chats", in: scope)
         _ = try? artifactsDirectory(in: scope)

@@ -27,7 +27,7 @@ final class LLMRegistry {
 
     private static let selectedKey = "llm.selectedModels"
     private static let defaultClientKey = "llm.defaultClient"
-    private static let customProvidersKey = "llm.customProviders"
+    static let customProvidersKey = "llm.customProviders"
 
     private init() {
         let region = AppRegion.shared.region
@@ -179,10 +179,9 @@ final class LLMRegistry {
     }
 
     private static func loadCustomProviders() -> [CustomLLMProvider] {
-        ProfileMigrator.migrateCustomLLMProviders(
-            defaults: .standard,
-            key: customProvidersKey
-        )
+        UserDefaults.standard.data(forKey: customProvidersKey).flatMap {
+            try? JSONDecoder().decode([CustomLLMProvider].self, from: $0)
+        } ?? []
     }
 
     private static func persist(_ providers: [CustomLLMProvider]) {

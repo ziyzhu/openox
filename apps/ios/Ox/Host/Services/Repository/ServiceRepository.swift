@@ -301,6 +301,10 @@ actor ServiceRepository {
         configuration = Self.loadConfiguration(from: configurationURL)
     }
 
+    func prepareStorage() throws {
+        try materializeLocalRepository()
+    }
+
     func monoRepository() async throws -> MonoRepository {
         var localMaterializationFailure: String?
         do {
@@ -1001,10 +1005,10 @@ actor ServiceRepository {
             )
             Log.service.info("ServiceRepository.local materialized")
         }
-        try ProfileMigrator.migrateLegacyLocalServiceRepository(at: localRoot, seed: localRepositorySeed)
+        try StorageMigrator.migrateLegacyLocalServiceRepository(at: localRoot, seed: localRepositorySeed)
         try installLocalRepositoryMetadata()
-        try ProfileMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
-        try ProfileMigrator.migrateLegacyLocalServiceActions(at: localRoot)
+        try StorageMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
+        try StorageMigrator.migrateLegacyLocalServiceActions(at: localRoot)
     }
 
     private func loadLocalRepository() -> LoadedRepository {

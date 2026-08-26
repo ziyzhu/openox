@@ -51,7 +51,13 @@ struct ProfileSettingsView: View {
                 Button(isSelected ? "✓" : String(localized: "Use")) {
                     guard !isSelected, let profile else { return }
                     Log.ui.info("ProfileSettings.select id=\(profile.id) name=\(profile.name)")
-                    storage.switchTo(profile)
+                    Task {
+                        do {
+                            try await storage.switchTo(profile)
+                        } catch {
+                            Log.ui.error("ProfileSettings.select id=\(profile.id) failed: \(error.localizedDescription)")
+                        }
+                    }
                 }
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.primary)

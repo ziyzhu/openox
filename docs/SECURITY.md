@@ -4,7 +4,8 @@ Ox's product *is* a security boundary. The agent acts on real websites with
 the user's live credentials, with no API keys and no cooperation from the sites
 themselves — so the value proposition and the threat model are the same thing.
 This document records what Ox defends, who it defends against, and where the
-sharp edges are. Persisted state belongs in `STORAGE.md`.
+sharp edges are. Persisted state belongs in
+`.agents/skills/storage-migrations/references/storage.md`.
 
 ## Trust boundaries
 

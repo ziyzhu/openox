@@ -294,21 +294,12 @@ nonisolated enum AppTheme: String, CaseIterable, Identifiable {
     }
 
     private init() {
-        let legacyDefaults = UserDefaults.standard
         let sharedValue = Self.sharedDefaults?.string(forKey: Self.key)
-        let legacyValue = legacyDefaults.string(forKey: Self.key)
-        let storedValue = sharedValue ?? legacyValue
-        let stored = storedValue.flatMap(AppTheme.init(rawValue:)) ?? .creatorPick
+        let stored = sharedValue.flatMap(AppTheme.init(rawValue:)) ?? .creatorPick
         theme = stored
         Self.currentTheme.withLock { $0 = stored }
-        if let sharedDefaults = Self.sharedDefaults {
-            sharedDefaults.set(stored.rawValue, forKey: Self.key)
-            let saved = sharedDefaults.synchronize()
-            if saved {
-                legacyDefaults.removeObject(forKey: Self.key)
-                legacyDefaults.synchronize()
-            }
-            Log.app.info("Theme.restore theme=\(stored.rawValue) source=\(sharedValue == nil && legacyValue != nil ? "legacy" : "shared") saved=\(saved)")
+        if Self.sharedDefaults != nil {
+            Log.app.info("Theme.restore theme=\(stored.rawValue) source=shared")
         } else {
             Log.app.error("Theme.restore app-group unavailable")
         }

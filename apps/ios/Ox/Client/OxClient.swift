@@ -11,8 +11,8 @@ final class OxClient {
         self.host = host
     }
 
-    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async {
-        await host.prepare(onPhase: onPhase)
+    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async throws {
+        try await host.prepare(onPhase: onPhase)
     }
 
     static func preview(serviceManager: ServiceManager) -> OxClient {

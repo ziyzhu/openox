@@ -116,7 +116,7 @@ final class ServiceManager {
     private static let savedKey = "savedServices"
     private static let autoApproveKey = "autoApproveActions"
     private static let autoApproveAllKey = "autoApproveAll"
-    private static let remoteMCPKey = "remoteMCPServers"
+    static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
         websiteData.makePageConfiguration()
     }
@@ -173,10 +173,7 @@ final class ServiceManager {
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         autoApproveActions = Set(UserDefaults.standard.stringArray(forKey: Self.autoApproveKey) ?? [])
         autoApproveAll = UserDefaults.standard.bool(forKey: Self.autoApproveAllKey)
-        persistedRemoteMCPServers = ProfileMigrator.migrateRemoteMCPServers(
-            defaults: .standard,
-            currentKey: Self.remoteMCPKey
-        )
+        persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
@@ -189,10 +186,24 @@ final class ServiceManager {
         }
     }
 
+    func prepareStorage() async throws {
+        try await repository.prepareStorage()
+    }
+
+    func reloadPersistedStorage() {
+        persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
+    }
+
     deinit {
         if let memoryWarningObserver {
             NotificationCenter.default.removeObserver(memoryWarningObserver)
         }
+    }
+
+    private static func loadPersistedRemoteMCPServers() -> [PersistedRemoteMCP] {
+        UserDefaults.standard.data(forKey: remoteMCPKey).flatMap {
+            try? JSONDecoder().decode([PersistedRemoteMCP].self, from: $0)
+        } ?? []
     }
 
     // MARK: - Saved services

@@ -6545,6 +6545,16 @@
         }
       }
     },
+    "Ox couldn’t update your data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 无法更新你的数据"
+          }
+        }
+      }
+    },
     "Ox doesn't have a completed response yet." : {
       "localizations" : {
         "zh-Hans" : {

@@ -6,19 +6,32 @@ enum HostPreparationPhase {
 
 @MainActor
 final class IOSHost: OxHost {
+    private struct PreparedStorage {}
+
     static let shared = IOSHost()
 
     let services: ServiceManager
     let chats: ChatManager
 
-    private var preparationTask: Task<Void, Never>?
+    private var preparationTask: Task<Void, Error>?
     private var isPrepared = false
 
     convenience init() {
-        self.init(serviceManager: ServiceManager(), presentations: .live)
+        StorageMigrator.migrateApplicationStorage()
+        self.init(serviceManager: ServiceManager(), presentations: .live, storage: PreparedStorage())
     }
 
-    init(serviceManager: ServiceManager, presentations: AppPresentations) {
+    convenience init(serviceManager: ServiceManager, presentations: AppPresentations) {
+        StorageMigrator.migrateApplicationStorage()
+        serviceManager.reloadPersistedStorage()
+        self.init(serviceManager: serviceManager, presentations: presentations, storage: PreparedStorage())
+    }
+
+    private init(
+        serviceManager: ServiceManager,
+        presentations: AppPresentations,
+        storage _: PreparedStorage
+    ) {
         services = serviceManager
         chats = ChatManager(
             repository: .shared,
@@ -29,18 +42,17 @@ final class IOSHost: OxHost {
         )
     }
 
-    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async {
+    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async throws {
         if isPrepared { return }
         if let preparationTask {
-            await preparationTask.value
+            try await preparationTask.value
             return
         }
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             onPhase?(.opening)
-            await StorageRoot.shared.resolve()
             onPhase?(.updating)
-            await StorageRoot.shared.migrateActive()
+            try await StorageMigrator.prepare(storage: .shared, services: services)
             onPhase?(.loadingChats)
             await chats.loadSummariesNow()
             _ = Soul.shared
@@ -50,7 +62,7 @@ final class IOSHost: OxHost {
             Log.app.info("IOSHost prepared")
         }
         preparationTask = task
-        await task.value
-        preparationTask = nil
+        defer { preparationTask = nil }
+        try await task.value
     }
 }

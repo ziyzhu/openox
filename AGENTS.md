@@ -5,7 +5,8 @@
 1. User data is allowed in logs; credentials and reusable secrets are not.
 1. Keep enough structured logs to diagnose production issues.
 1. Prefer composition, explicit state, and small changes.
-1. Keep persisted-storage migration and legacy-format handling in `apps/ios/Ox/Host/Profile/ProfileMigration.swift`.
+1. Use `.agents/skills/storage-migrations` for changes that affect persisted data or storage layout.
+1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.
 1. Reference Apple development documentation for iOS changes.

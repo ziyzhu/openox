@@ -75,20 +75,37 @@ Primary owners:
 - UserDefaults onboarding state — owner: App.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: LLMConfiguration/LLMRegistry.swift
-- Keychain credentials — owner: Storage/Credentials.swift
+- Keychain credentials — owner: Host/Profile/Credentials.swift
 - UserDefaults read-aloud voice — owner: Models/SpeechVoiceSettings.swift
-- App-group theme — owner: Theme.swift and ShareExtension
-- Fixed app-storage paths and backup policy — owner: Storage/AppStoragePaths.swift
-- Active and saved profiles — owners: Storage/StorageRoot.swift and Storage/ProfileStore.swift
-- Profile content — owner: Storage/ProfileRepository.swift
-- Profile and app-storage migrations — owner: Storage/ProfileMigration.swift
-- Artifact metadata — owner: Storage/Artifact.swift
+- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
+- Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
+- Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
+- Profile content — owner: Host/Profile/ProfileRepository.swift
+- All compatibility detection, orchestration, and migration steps — owner: Host/Profile/StorageMigration.swift
+- Artifact metadata — owner: Host/Profile/Artifact.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
 - Service repositories — owner: Services/Repository/ServiceRepository.swift
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Debug/LogFile.swift
-- Shared note inbox — owner: Storage/SharedNoteInbox.swift and ShareExtension
+- Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Developer bootstrap credentials — owner: tooling/sim-bootstrap.ts
+
+## Compatibility gate
+
+`StorageMigrator` is the single compatibility entry point. App-wide structural
+migrations run before the Host and its storage consumers are constructed. Host
+preparation then validates application storage, migrates the selected Profile,
+and prepares the Local service repository before chats, service discovery, or
+search indexing load persisted state. Selecting or opening another Profile also
+migrates it before publishing its `ProfileScope`.
+
+The same `StorageMigrator` owns ordered Profile milestones and the scoped
+transforms used by the gate. All of that code stays in the single
+`Host/Profile/StorageMigration.swift` file. Service-repository repair remains
+structurally detected because the old Local layouts predate a shared application
+schema marker. Unknown Profile versions and unsuccessful migrations fail closed
+at the loading screen rather than allowing consumers to interpret incompatible
+data.
 
 ## Shared preferences
 

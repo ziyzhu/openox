@@ -1,0 +1,4 @@
+interface:
+  display_name: "Storage Migrations"
+  short_description: "Preserve persisted Ox data across upgrades"
+  default_prompt: "Use $storage-migrations to review or implement this persisted-storage change and verify upgrade compatibility."

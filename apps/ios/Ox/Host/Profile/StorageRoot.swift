@@ -52,19 +52,17 @@ final class StorageRoot {
         return profiles.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(stem) == .orderedSame }
     }
 
-    func resolve() async {
+    func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
         if profiles.isEmpty, let seeded = await seedDefaultProfile() { profiles = [seeded] }
-        if let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first {
-            activate(chosen)
+        guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
+            throw StorageMigrationError.activeProfileUnavailable
         }
+        let migrated = try await StorageMigrator.migrate(chosen)
+        update(migrated.id) { $0 = migrated }
+        activate(migrated)
         Log.app.info("StorageRoot.resolve profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable) root=\(self.root.path)")
-    }
-
-    func migrateActive() async {
-        guard let active else { return }
-        if await repository.migrate(active) { markMigrated(active.id) }
     }
 
     func refreshAvailability() async {
@@ -84,9 +82,14 @@ final class StorageRoot {
         await reconcileActive()
     }
 
-    func switchTo(_ profile: Profile) {
+    func switchTo(_ profile: Profile) async throws {
         guard profile.id != activeId else { return }
-        switchActive(to: profile)
+        isBusy = true
+        defer { isBusy = false }
+        let migrated = try await StorageMigrator.migrate(profile)
+        update(migrated.id) { $0 = migrated }
+        activate(migrated)
+        switchEpoch += 1
     }
 
     func createProfile(name: String, location: Profile.Location) async throws {
@@ -108,15 +111,17 @@ final class StorageRoot {
         defer { isBusy = false }
         do {
             let opened = try profileStore.open(url, local: localDocs, cloud: cloudDocs)
-            if let index = profiles.firstIndex(where: { $0.id == opened.id }) {
-                profiles[index] = opened
+            let migrated = try await StorageMigrator.migrate(opened)
+            if let index = profiles.firstIndex(where: { $0.id == migrated.id }) {
+                profiles[index] = migrated
             } else {
-                profiles.append(opened)
+                profiles.append(migrated)
             }
             sortProfiles()
-            switchActive(to: opened)
-            Log.app.info("StorageRoot.open id=\(opened.id) name=\(opened.name)")
-            return opened
+            activate(migrated)
+            switchEpoch += 1
+            Log.app.info("StorageRoot.open id=\(migrated.id) name=\(migrated.name)")
+            return migrated
         } catch {
             Log.app.error("StorageRoot.open name=\(url.lastPathComponent) failed: \(error.localizedDescription)")
             throw error
@@ -190,7 +195,16 @@ final class StorageRoot {
     private func reconcileActive() async {
         guard let activeId else { return }
         if let current = profiles.first(where: { $0.id == activeId }) {
-            if !isActive(current) { switchActive(to: current) }
+            if !isActive(current) || current.version != ProfileSchema.current {
+                do {
+                    let migrated = try await StorageMigrator.migrate(current)
+                    update(migrated.id) { $0 = migrated }
+                    activate(migrated)
+                    switchEpoch += 1
+                } catch {
+                    Log.app.error("StorageRoot.reconcile id=\(current.id) failed: \(error.localizedDescription)")
+                }
+            }
             return
         }
         Log.app.info("StorageRoot.activeUnavailable id=\(activeId)")
@@ -199,10 +213,18 @@ final class StorageRoot {
 
     private func fallbackToAnyProfile() async {
         if let next = profiles.first {
-            switchActive(to: next)
+            do {
+                let migrated = try await StorageMigrator.migrate(next)
+                update(migrated.id) { $0 = migrated }
+                activate(migrated)
+                switchEpoch += 1
+            } catch {
+                Log.app.error("StorageRoot.fallback id=\(next.id) failed: \(error.localizedDescription)")
+            }
         } else if let seeded = await seedDefaultProfile() {
             profiles = [seeded]
-            switchActive(to: seeded)
+            activate(seeded)
+            switchEpoch += 1
         }
     }
 
@@ -228,18 +250,6 @@ final class StorageRoot {
             if profile.location == .iCloud { await repository.startDownloads(in: scope) }
         }
         Log.app.info("StorageRoot.activate id=\(profile.id) name=\(profile.name) location=\(profile.location.rawValue) root=\(self.root.path)")
-    }
-
-    private func switchActive(to profile: Profile) {
-        activate(profile)
-        Task {
-            if await repository.migrate(profile) { markMigrated(profile.id) }
-            switchEpoch += 1
-        }
-    }
-
-    private func markMigrated(_ id: UUID) {
-        update(id) { $0.version = ProfileSchema.current }
     }
 
     private func baseDir(for location: Profile.Location) -> URL? {

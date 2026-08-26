@@ -287,18 +287,6 @@ nonisolated enum ArtifactStore {
         return Artifact(fileName: resolved, directory: directory)
     }
 
-    static func importLegacy(_ metadata: ArtifactMetadata, source: URL, into directory: URL) throws {
-        let folder = directory.appendingPathComponent(metadata.id.uuidString, isDirectory: true)
-        let metadataURL = folder.appendingPathComponent(metadataName, isDirectory: false)
-        if FileManager.default.fileExists(atPath: metadataURL.path) { return }
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let destination = folder.appendingPathComponent(metadata.fileName, isDirectory: false)
-        if FileManager.default.fileExists(atPath: source.path), !FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.moveItem(at: source, to: destination)
-        }
-        try JSONEncoder().encode(metadata).write(to: metadataURL, options: .atomic)
-    }
-
     static func list(in directory: URL) -> [Artifact] {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: directory,

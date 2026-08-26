@@ -38,6 +38,9 @@ const host = await readFile(join(ROOT, "apps/ios/Ox/Host/IOSHost.swift"), "utf8"
 if (!host.includes("final class IOSHost: OxHost")) {
   failures.push("apps/ios/Ox/Host/IOSHost.swift: IOSHost must implement OxHost");
 }
+if (!host.includes("StorageMigrator.prepare")) {
+  failures.push("apps/ios/Ox/Host/IOSHost.swift: Host preparation must pass through StorageMigrator");
+}
 
 const client = await readFile(join(ROOT, "apps/ios/Ox/Client/OxClient.swift"), "utf8");
 if (!client.includes("private let host: any OxHost")) {
@@ -70,9 +73,26 @@ if (webSocketTransport.includes("onCommand")) {
   failures.push("apps/ios/Ox/Host/WebSocketOxHostTransport.swift: transport must bind directly to its Host");
 }
 
-const allSource = await Promise.all((await swiftFiles(join(ROOT, "apps/ios/Ox"))).map((file) => readFile(file, "utf8")));
+const allSwiftFiles = await swiftFiles(join(ROOT, "apps/ios/Ox"));
+const allSource = await Promise.all(allSwiftFiles.map((file) => readFile(file, "utf8")));
 if (allSource.some((source) => source.includes("DebugServer") || source.includes("OxHostAPI"))) {
   failures.push("apps/ios/Ox: legacy DebugServer or OxHostAPI reference remains");
+}
+
+const storageMigrationCallers = new Set([
+  "apps/ios/Ox/Host/IOSHost.swift",
+  "apps/ios/Ox/Host/Profile/StorageMigration.swift",
+  "apps/ios/Ox/Host/Profile/StorageRoot.swift",
+  "apps/ios/Ox/Host/Services/Repository/ServiceRepository.swift",
+]);
+for (const [index, source] of allSource.entries()) {
+  const path = relative(ROOT, allSwiftFiles[index]);
+  if (source.includes("ProfileMigrator") || source.includes("ProfileMigrationError")) {
+    failures.push(`${path}: StorageMigrator must be the only persisted-storage migrator`);
+  }
+  if (source.includes("StorageMigrator.") && !storageMigrationCallers.has(path)) {
+    failures.push(`${path}: persisted compatibility must enter through an approved StorageMigrator caller`);
+  }
 }
 
 if (failures.length > 0) throw new Error(`iOS Host contract failed:\n${failures.join("\n")}`);

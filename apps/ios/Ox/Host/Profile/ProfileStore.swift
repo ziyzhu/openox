@@ -34,10 +34,11 @@ final class ProfileStore {
     private let fileURL: URL
 
     private init() {
-        (fileURL, records) = ProfileMigrator.migrateExternalProfiles(
-            in: AppStoragePaths.applicationSupport,
-            destination: AppStoragePaths.externalProfiles
-        )
+        let url = AppStoragePaths.externalProfiles
+        fileURL = url
+        records = (try? Data(contentsOf: url)).flatMap {
+            try? JSONDecoder().decode([ExternalRecord].self, from: $0)
+        } ?? []
     }
 
     func profiles(local: URL, cloud: URL?) -> [Profile] {
