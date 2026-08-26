@@ -46,7 +46,9 @@ struct HoldToTalkArea: UIViewRepresentable {
         override func didMoveToWindow() {
             super.didMoveToWindow()
             detach()
-            window?.addGestureRecognizer(hold)
+            guard let window else { return }
+            window.addGestureRecognizer(hold)
+            Log.ui.info("HoldToTalk.gesture attached")
         }
 
         func detach() {
@@ -54,13 +56,7 @@ struct HoldToTalkArea: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard canBegin, window != nil, bounds.contains(touch.location(in: self)) else { return false }
-            var view = touch.view
-            while let candidate = view {
-                if candidate.accessibilityIdentifier == A11yID.Chat.input { return true }
-                view = candidate.superview
-            }
-            return false
+            canBegin && window != nil && bounds.contains(touch.location(in: self))
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {

@@ -124,7 +124,7 @@
 				AE00000A000000000000000A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				ACA969352FA332BC00D0412F /* ios */,
+				ACA969352FA332BC00D0412F /* Ox */,
 			);
 			name = ios;
 			packageProductDependencies = (
@@ -175,7 +175,7 @@
 					};
 				};
 			};
-			buildConfigurationList = ACA9692E2FA332BC00D0412F /* Build configuration list for PBXProject "ios" */;
+			buildConfigurationList = ACA9692E2FA332BC00D0412F /* Build configuration list for PBXProject "Ox" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -506,7 +506,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		ACA9692E2FA332BC00D0412F /* Build configuration list for PBXProject "ios" */ = {
+		ACA9692E2FA332BC00D0412F /* Build configuration list for PBXProject "Ox" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				ACA9693C2FA332BD00D0412F /* Debug */,

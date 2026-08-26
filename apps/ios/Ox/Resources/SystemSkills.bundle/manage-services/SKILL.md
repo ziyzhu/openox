@@ -9,7 +9,7 @@ Manage service definitions and source, not ordinary service use. For a user's ta
 
 Respect repository ownership:
 
-- Bundled, Development, and Remote services expose read-only manifests. Inspect them directly or copy an eligible service into Local with `ox.service.copy` before editing.
+- Bundled services expose read-only source files. Development and Remote services expose read-only manifests. Inspect them directly or copy an eligible service into Local with `ox.service.copy` before editing.
 - Local web services expose editable source under `services/web/<domain>/` and support create, read, update, delete, verification, and Git history.
 - iOS and MCP services may be discovered and inspected but are not authorable through the Local web-service workflow.
 

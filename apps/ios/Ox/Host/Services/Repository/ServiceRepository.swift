@@ -46,6 +46,13 @@ actor ServiceRepository {
             case development
             case remote
 
+            var exposesFullSource: Bool {
+                switch self {
+                case .bundled, .local: true
+                case .development, .remote: false
+                }
+            }
+
             var selectionPriority: Int {
                 switch self {
                 case .bundled: 0
@@ -638,8 +645,8 @@ actor ServiceRepository {
 
     func listSource(kind: ServiceKind, id: String, path: [String]) throws -> [Entry] {
         let source = try activeSource(kind: kind, id: id)
-        if source.provenance != .local {
-            guard path.isEmpty else { throw Failure(message: "Only Local service source is available beyond service.json.") }
+        if !source.provenance.exposesFullSource {
+            guard path.isEmpty else { throw Failure(message: "Full service source is available only for Bundled and Local services.") }
             let manifest = Self.serviceManifestURL(at: source.root)
             let size = try manifest.resourceValues(forKeys: [.fileSizeKey]).fileSize
             return [Entry(name: "service.json", isDirectory: false, size: size)]
@@ -670,14 +677,14 @@ actor ServiceRepository {
 
     func sourceIsDirectory(kind: ServiceKind, id: String, path: [String]) throws -> Bool {
         let source = try activeSource(kind: kind, id: id)
-        guard source.provenance == .local || path.isEmpty else { return false }
+        guard source.provenance.exposesFullSource || path.isEmpty else { return false }
         return try sourceURL(source, path: path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
     }
 
     func readSource(kind: ServiceKind, id: String, path: [String]) throws -> Data {
         let source = try activeSource(kind: kind, id: id)
-        guard source.provenance == .local || path == ["service.json"] else {
-            throw Failure(message: "Only Local service source is available beyond service.json.")
+        guard source.provenance.exposesFullSource || path == ["service.json"] else {
+            throw Failure(message: "Full service source is available only for Bundled and Local services.")
         }
         let url = try sourceURL(source, path: path, legacyFallback: true)
         guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
@@ -727,7 +734,7 @@ actor ServiceRepository {
 
     func sourcePaths(kind: ServiceKind, id: String) throws -> [String] {
         let source = try activeSource(kind: kind, id: id)
-        if source.provenance != .local { return ["services/\(kind.rawValue)/\(id)/service.json"] }
+        if !source.provenance.exposesFullSource { return ["services/\(kind.rawValue)/\(id)/service.json"] }
         guard let enumerator = FileManager.default.enumerator(
             at: source.root,
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],

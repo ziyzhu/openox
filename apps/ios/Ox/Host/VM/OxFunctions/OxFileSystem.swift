@@ -156,7 +156,7 @@ nonisolated enum OxFileSystem {
     private static let nullableString = JSONValue.object(["type": .array([.string("string"), .string("null")])])
 
     private static let writeGuide = """
-    Atomically create or replace one UTF-8 file: `await ox.fs.write({ path, content, purpose })`. The writable virtual layout is `MEMORY.md`, `SOUL.md`, `artifacts/<filename>`, user `skills/<name>/SKILL.md`, Local service source under `services/<kind>/<id>/...`, and files inside an attached chosen folder at `files/<folder-id>/...`. Bundled, Development, and Remote services expose only read-only manifests. Persisted chats and skills under `system:*` and `service:*` are read-only.
+    Atomically create or replace one UTF-8 file: `await ox.fs.write({ path, content, purpose })`. The writable virtual layout is `MEMORY.md`, `SOUL.md`, `artifacts/<filename>`, user `skills/<name>/SKILL.md`, Local service source under `services/<kind>/<id>/...`, and files inside an attached chosen folder at `files/<folder-id>/...`. Bundled service source is read-only, while Development and Remote services expose only read-only manifests. Persisted chats and skills under `system:*` and `service:*` are read-only.
 
     Read before overwriting an existing file and prefer `ox.fs.edit` for targeted changes. Writing or editing inside a chosen Files folder requires approval unless the user has allowed that action without asking. Profile-owned memory, soul, artifact, and skill writes do not require approval. Persist concise durable memories when they are worth keeping, without waiting for an explicit request; do not register redundant memories. Persist soul or skills only when the user explicitly asks for a durable change.
     """
