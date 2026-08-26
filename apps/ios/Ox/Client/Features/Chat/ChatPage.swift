@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFAudio
 import UIKit
 import WebKit
 import PhotosUI
@@ -55,6 +56,8 @@ struct ChatPage: View {
     @Environment(\.appTheme) private var appTheme
 
     @State private var composer = ChatComposerModel()
+    @State private var speechInput = ChatSpeechInput()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmission: Chat.SubmissionReceipt?
     @FocusState private var composerFocused: Bool
     @State private var editDraft: String = ""
@@ -292,7 +295,7 @@ struct ChatPage: View {
                     }
         }
         .background(Theme.Colors.chatSurface)
-        .accessibilityHidden(composer.surface == .attachments)
+        .accessibilityHidden(composer.surface == .attachments || speechInput.isPresented)
         .overlay(alignment: .bottom) {
             servicePickerOverlay
         }
@@ -308,6 +311,34 @@ struct ChatPage: View {
                 onServices: startServiceMention
             )
         }
+        .overlay {
+            if speechInput.isPresented {
+                HoldToTalkOverlay(speech: speechInput)
+            }
+        }
+        .onChange(of: speechInput.notice) { _, message in
+            guard let message else { return }
+            toast = Toast(message: message, duration: 5)
+            speechInput.notice = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { speechInput.interrupt() }
+        }
+        .onChange(of: chat.id) { _, _ in
+            speechInput.cancel(reason: "chatChanged")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
+            speechInput.interrupt()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)) { _ in
+            speechInput.interrupt()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { notification in
+            guard let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: raw),
+                  reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else { return }
+            speechInput.interrupt()
+        }
         .quickLookPreview(previewAttachmentURL)
         .onAppear {
             Log.ui.info("ChatPage.onAppear chat=\(chat.id) title=\(chat.title)")
@@ -317,6 +348,7 @@ struct ChatPage: View {
         }
         .onDisappear {
             messageSpeech.stop(reason: "pageDisappear")
+            speechInput.cancel(reason: "pageDisappear")
         }
         .task(id: chat.monoRepositoryRevision) {
             let updated = await chat.syncToMonoRepository()
@@ -1172,6 +1204,7 @@ struct ChatPage: View {
     private func inputBar(isChatEmpty: Bool) -> some View {
         ChatComposer(
             composer: composer,
+            speech: speechInput,
             attachedServices: chat.attachedServices,
             chatArtifacts: chatArtifacts,
             fieldFocused: $composerFocused,
@@ -1192,7 +1225,8 @@ struct ChatPage: View {
             onStop: {
                 Log.ui.info("ChatPage.stop chat=\(chat.id)")
                 chat.stopCurrentTurn()
-            }
+            },
+            onSpeechBegin: beginSpeech
         )
         .equatable()
         .task(id: composerFocusRequestID) {
@@ -1316,6 +1350,33 @@ struct ChatPage: View {
         prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
         enqueue(message)
+    }
+
+    private func beginSpeech(accessible: Bool) {
+        guard !composer.isImporting, !speechInput.isPresented else { return }
+        prepareComposerSubmission()
+        let draftID = composer.draftID
+        let draft = composer.attributedDraft
+        messageSpeech.stop(reason: "speechInput")
+        composer.setAttachmentMenuPresented(false)
+        speechInput.begin(accessible: accessible) { text, action in
+            guard composer.draftID == draftID, composer.attributedDraft == draft else {
+                speechInput.notice = L10n.string("The draft changed while recording. Nothing was sent.", comment: "")
+                return
+            }
+            composer.appendDictation(text)
+            if action == .edit {
+                composerFocused = true
+            } else {
+                Haptics.impact(.send)
+                if let invocation = composer.slashInvocation {
+                    submitSkill(invocation.skill, argument: invocation.argument)
+                } else {
+                    composer.delayStopControl()
+                    send()
+                }
+            }
+        }
     }
 
     private func prepareComposerSubmission() {

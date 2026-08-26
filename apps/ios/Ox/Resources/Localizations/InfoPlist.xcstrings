@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "NSMicrophoneUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your chat."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 在此设备上将语音转为文字。按住输入区域说话，松开后将文字发送到聊天。"
+          }
+        }
+      }
+    },
     "Agent Skill" : {
       "localizations" : {
         "zh-Hans" : {

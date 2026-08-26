@@ -1,6 +1,226 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Hold to talk" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住说话"
+          }
+        }
+      }
+    },
+    "Type or hold to talk" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入或按住说话"
+          }
+        }
+      }
+    },
+    "Tap to type, or hold to talk and release to send." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点输入，或按住说话、松开发送。"
+          }
+        }
+      }
+    },
+    "Preparing speech…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备语音识别…"
+          }
+        }
+      }
+    },
+    "Transcribing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在转文字…"
+          }
+        }
+      }
+    },
+    "Transcribing and sending…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在转文字并发送…"
+          }
+        }
+      }
+    },
+    "Release to cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "松开取消"
+          }
+        }
+      }
+    },
+    "Release to edit text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "松开编辑文字"
+          }
+        }
+      }
+    },
+    "Release to send" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "松开发送"
+          }
+        }
+      }
+    },
+    "Edit text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑文字"
+          }
+        }
+      }
+    },
+    "Stop and send" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束并发送"
+          }
+        }
+      }
+    },
+    "Slide to cancel or edit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滑动取消或编辑文字"
+          }
+        }
+      }
+    },
+    "Your audio stays on this device" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频仅在此设备上处理"
+          }
+        }
+      }
+    },
+    "Ready. Hold the input area to talk, then release to send." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备好了。按住输入区域说话，松开发送。"
+          }
+        }
+      }
+    },
+    "Speech setup took too long. Please try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音准备超时，请重试。"
+          }
+        }
+      }
+    },
+    "Transcription took too long. Nothing was sent. Please try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转文字超时，未发送任何内容。请重试。"
+          }
+        }
+      }
+    },
+    "No speech detected. Nothing was sent." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到语音，未发送任何内容。"
+          }
+        }
+      }
+    },
+    "Recording interrupted. Nothing was sent." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音已中断，未发送任何内容。"
+          }
+        }
+      }
+    },
+    "The draft changed while recording. Nothing was sent." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音期间草稿已更改，未发送任何内容。"
+          }
+        }
+      }
+    },
+    "Allow microphone access in Settings to use Hold to Talk." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在设置中允许访问麦克风，以使用按住说话。"
+          }
+        }
+      }
+    },
+    "On-device speech recognition is unavailable for this language." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此语言暂不支持设备端语音识别。"
+          }
+        }
+      }
+    },
+    "Speech recognition is unavailable. Please try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音识别暂不可用，请重试。"
+          }
+        }
+      }
+    },
     "Always approve all actions?" : {
       "localizations" : {
         "zh-Hans" : {

@@ -11,6 +11,7 @@ struct PastedComposerImage {
 
 private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
     let textViewReference: ComposerTextViewReference
+    let allowsSelection: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(textViewReference: textViewReference)
@@ -26,6 +27,9 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
     }
 
     func updateUIView(_ view: ProbeView, context: Context) {
+        context.coordinator.allowsSelection = allowsSelection
+        context.coordinator.installedTextView?.isSelectable = allowsSelection
+        context.coordinator.installedTextView?.isEditable = allowsSelection
         view.scheduleInstallation()
     }
 
@@ -51,6 +55,7 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
     final class Coordinator: NSObject, UITextPasteDelegate {
         private let textViewReference: ComposerTextViewReference
         weak var installedTextView: UITextView?
+        var allowsSelection = true
 
         init(textViewReference: ComposerTextViewReference) {
             self.textViewReference = textViewReference
@@ -71,6 +76,8 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
                 textViewReference.textView = textView
             }
             textView.pasteDelegate = self
+            textView.isSelectable = allowsSelection
+            textView.isEditable = allowsSelection
         }
 
         func textPasteConfigurationSupporting(
@@ -229,6 +236,12 @@ final class ChatComposerModel {
         if activeMention == nil {
             draft += draft.isEmpty || draft.last?.isWhitespace == true ? "@" : " @"
         }
+        caretEndRequest += 1
+    }
+
+    func appendDictation(_ text: String) {
+        let separator = draft.isEmpty || draft.last?.isWhitespace == true ? "" : " "
+        attributedDraft.append(AttributedString(separator + text))
         caretEndRequest += 1
     }
 
@@ -407,6 +420,7 @@ struct ChatComposer: View, Equatable {
     }
 
     @Bindable var composer: ChatComposerModel
+    let speech: ChatSpeechInput
     let attachedServices: [Service]
     let chatArtifacts: [Artifact]
     let fieldFocused: FocusState<Bool>.Binding
@@ -425,6 +439,7 @@ struct ChatComposer: View, Equatable {
     let onPreparationIntent: (Bool) -> Void
     let onSend: () -> Void
     let onStop: () -> Void
+    let onSpeechBegin: (Bool) -> Void
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -442,6 +457,7 @@ struct ChatComposer: View, Equatable {
 
     static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
         lhs.composer === rhs.composer
+            && lhs.speech === rhs.speech
             && lhs.attachedServices.map(\.domain) == rhs.attachedServices.map(\.domain)
             && lhs.chatArtifacts == rhs.chatArtifacts
             && lhs.isFieldFocused == rhs.isFieldFocused
@@ -456,12 +472,12 @@ struct ChatComposer: View, Equatable {
         composer.isEmpty
     }
 
-    private var reservesTrailingControl: Bool {
-        !isResting || isBusy
-    }
-
     private var trailingControlSize: CGFloat {
         max(composerButtonSize + 10, Theme.Size.minimumTouchTarget)
+    }
+
+    private var trailingControlsWidth: CGFloat {
+        composer.canSubmit || composer.isImporting || isBusy ? trailingControlSize + 2 : Theme.Spacing.lg
     }
 
     var body: some View {
@@ -854,7 +870,7 @@ struct ChatComposer: View, Equatable {
     private var composerRow: some View {
         ZStack(alignment: .leading) {
             if composer.draft.isEmpty {
-                Text("Ask Ox")
+                Text("Type or hold to talk")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.leading, textLineFragmentPadding)
@@ -871,11 +887,13 @@ struct ChatComposer: View, Equatable {
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
                 .accessibilityIdentifier(A11yID.Chat.input)
-                .accessibilityValue(composer.draft.isEmpty ? Text("Ask Ox") : Text(verbatim: composer.draft))
+                .accessibilityValue(composer.draft.isEmpty ? Text("Type or hold to talk") : Text(verbatim: composer.draft))
+                .accessibilityHint("Tap to type, or hold to talk and release to send.")
+                .accessibilityAction(named: Text("Hold to talk")) { onSpeechBegin(true) }
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .tint(Theme.Colors.primary.dynamic)
-                .background(ComposerPasteDelegateInstaller(textViewReference: textViewReference))
+                .background(ComposerPasteDelegateInstaller(textViewReference: textViewReference, allowsSelection: !speech.isPresented))
                 .onChange(of: composerSelection) { _, selection in
                     selectionChanged(selection)
                 }
@@ -898,9 +916,20 @@ struct ChatComposer: View, Equatable {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
-        .padding(.leading, iconButtonSize - textLineFragmentPadding)
-        .padding(.trailing, reservesTrailingControl ? trailingControlSize + 2 : Theme.Spacing.lg)
         .padding(.vertical, 12)
+        .overlay {
+            HoldToTalkArea(
+                canBegin: !composer.isImporting && !speech.isPresented,
+                onBegin: { onSpeechBegin(false) },
+                onMove: { speech.move(to: $0, distance: $1) },
+                onRelease: { speech.release() },
+                onCancel: { speech.interrupt() }
+            )
+            .accessibilityHidden(true)
+        }
+        .excludesCompactPageSwitch()
+        .padding(.leading, iconButtonSize - textLineFragmentPadding)
+        .padding(.trailing, trailingControlsWidth)
         .overlay(alignment: .bottomLeading) {
             attachButton
                 .padding(.bottom, 1)

@@ -13,6 +13,8 @@ enum Haptics {
         case queuedMessageCancelled
         case selectionConfirmed
         case send
+        case speechStarted
+        case speechStopped
         case serviceAttached
         case settingsSaved
         case sidebarSettled
