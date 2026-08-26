@@ -323,6 +323,7 @@ extension Scenario {
             Entry("81", "chat title — update agent titles", .chatTitle),
             Entry("82", "local service — create and edit Local source", .localServiceWorkflow),
             Entry("83", "local copy — copy and validate Local source", .localCopyWorkflow),
+            Entry("91", "local validation recovery — repair a draft after restart", .localServiceRecovery),
             Entry("84", "local history — commit, time travel, restore, and revert", .localHistoryWorkflow),
             Entry("85", "local history recovery — restore and revert pending test state", .localHistoryRecovery),
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
@@ -1134,106 +1135,132 @@ extension Scenario {
 
     static let localServiceWorkflow = Scenario(name: "local-service") { ctx in
         guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const created = await ox.service.create({ kind: "web", domain: "example.test", purpose: "Create test service" });
-            const before = await ox.fs.read({ path: "services/web/example.test/actions.js", purpose: "Read Local actions" });
-            let invalid;
-            try {
-              await ox.fs.write({ path: "services/web/example.test/actions.js", content: ")", purpose: "Test invalid actions" });
-            } catch (error) {
-              invalid = String(error);
-            }
-            const after = await ox.fs.read({ path: "services/web/example.test/actions.js", purpose: "Verify Local rollback" });
-            await ox.fs.write({ path: "services/web/example.test/NOTES.md", content: "Local authoring fixture", purpose: "Write Local note" });
-            const manifestPath = "services/web/example.test/service.json";
-            const manifest = await ox.fs.read({ path: manifestPath, purpose: "Read Local manifest" });
-            const firstManifest = JSON.parse(manifest.text);
-            firstManifest.actions = [{
-              id: "version",
-              label: "Version",
-              description: "Draft one",
+            return [execute(#"""
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service management workflow" });
+            const checks = [];
+            const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
+            const rejected = async (call, fragment) => {
+              let error;
+              try { await call(); } catch (failure) { error = String(failure); }
+              check(Boolean(error && error.includes(fragment)), "Rejected: " + fragment);
+            };
+            const domain = "example.test";
+            const path = "services/web/" + domain + "/";
+            await ox.service.create({ kind: "web", domain, purpose: "Create validation fixture" });
+            const manifest = JSON.parse((await ox.fs.read({ path: path + "service.json", purpose: "Read generated manifest" })).text);
+            const skeleton = (await ox.fs.read({ path: path + "actions.js", purpose: "Read generated installer" })).text;
+            check((await ox.service.validate({ domain, purpose: "Validate generated service" })).valid, "Valid skeleton");
+            await ox.fs.write({ path: path + "actions.js", content: ")", purpose: "Stage invalid JavaScript" });
+            check((await ox.fs.read({ path: path + "actions.js", purpose: "Read invalid draft" })).text === ")", "Invalid draft retained");
+            await rejected(() => ox.service.validate({ domain, purpose: "Reject invalid JavaScript" }), "actions.js syntax");
+            await rejected(() => ox.service.attach({ domain, purpose: "Reject invalid attachment" }), "actions.js syntax");
+            await rejected(() => ox.service.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }), "actions.js syntax");
+            await ox.fs.write({ path: path + "actions.js", content: skeleton, purpose: "Restore generated installer" });
+            manifest.actions = [{
+              id: "version", label: "Version", description: "Draft one",
               inputSchema: { type: "object", properties: {}, additionalProperties: false },
-              outputSchema: {
-                type: "object",
-                properties: { value: { type: "string" } },
-                required: ["value"],
-                additionalProperties: false
-              },
-              requireApproval: false,
-              requireAuth: false
+              outputSchema: { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false },
+              requireApproval: false, requireAuth: false
             }];
-            const firstSource = JSON.stringify(firstManifest, null, 2);
-            await ox.fs.write({ path: manifestPath, content: firstSource, purpose: "Write first test draft" });
-            const firstAttach = await ox.service.attach({ domain: "example.test", purpose: "Load first test draft" });
-            const first = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect first test draft" });
-            await ox.fs.edit({
-              path: manifestPath,
-              edits: [{ oldText: '"description": "Draft one"', newText: '"description": "Draft two"' }],
-              purpose: "Write second test draft"
-            });
-            const stale = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect loaded test draft" });
-            const secondAttach = await ox.service.attach({ domain: "example.test", purpose: "Load second test draft" });
-            const second = await ox.service.inspect({ domain: "example.test", actions: ["version"], purpose: "Inspect second test draft" });
-            const listed = await ox.fs.list({ path: "services/web/example.test", purpose: "List Local source" });
-            console.log(JSON.stringify({
-              created,
-              before: before.text,
-              after: after.text,
-              invalid,
-              firstAttach,
-              first: first.actions.version.description,
-              stale: stale.actions.version.description,
-              secondAttach,
-              second: second.actions.version.description,
-              paths: listed.items.map(item => item.path)
-            }));
-            """)]
+            await ox.fs.write({ path: path + "service.json", content: JSON.stringify(manifest), purpose: "Stage manifest first" });
+            await rejected(() => ox.service.validate({ domain, purpose: "Reject missing implementation" }), "missing implementations: version");
+            const actions = 'window.ox.install(1, ({ action }) => { action("version", { invoke: () => ({ value: "one" }) }); });';
+            await ox.fs.write({ path: path + "actions.js", content: actions, purpose: "Complete first service draft" });
+            check((await ox.service.validate({ domain, purpose: "Validate manifest-first draft" })).valid, "Manifest-first edits");
+            check(!(await ox.service.attach({ domain, purpose: "Attach first valid draft" })).reloaded, "First attach");
+            const nextActions = actions.replace('action("version"', 'action("revision"');
+            await ox.fs.write({ path: path + "actions.js", content: nextActions, purpose: "Stage implementation first" });
+            await rejected(() => ox.service.validate({ domain, purpose: "Reject mismatched draft" }), "registration mismatch");
+            await rejected(() => ox.service.attach({ domain, purpose: "Keep prior valid attachment" }), "registration mismatch");
+            const stale = await ox.service.inspect({ domain, actions: ["version"], purpose: "Inspect unchanged attachment" });
+            check(stale.actions.version.description === "Draft one", "Failed attach preserves snapshot");
+            manifest.actions[0].id = "revision";
+            manifest.actions[0].description = "Draft two";
+            const nextManifest = JSON.stringify(manifest);
+            await ox.fs.write({ path: path + "service.json", content: nextManifest, purpose: "Complete second service draft" });
+            check((await ox.service.validate({ domain, purpose: "Validate implementation-first draft" })).valid, "Implementation-first edits");
+            check((await ox.service.attach({ domain, purpose: "Reload second valid draft" })).reloaded, "Explicit reload");
+            const current = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect reloaded attachment" });
+            check(current.actions.revision.description === "Draft two", "Reloaded snapshot");
+            await ox.service.git.commit({ message: "Save validation fixture", purpose: "Save valid test service" });
+            check(!(await ox.service.git.status({ purpose: "Check successful Save" })).dirty, "Valid Save");
+            await ox.fs.write({ path: "artifacts/local-validation-recovery.json", content: JSON.stringify({ manifest: nextManifest, actions: nextActions }), purpose: "Preserve restart test fixture" });
+            await ox.fs.delete({ path: path + "service.json", purpose: "Stage missing manifest" });
+            await ox.fs.write({ path: path + "actions.js", content: ")", purpose: "Stage interrupted service edit" });
+            await rejected(() => ox.service.validate({ domain, purpose: "Reject incomplete restart draft" }), "");
+            check((await ox.service.git.status({ purpose: "Check recoverable draft" })).dirty, "Incomplete draft remains editable");
+            console.log(JSON.stringify({ checks, readyForRestart: true }));
+            """#)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["created"]?.objectValue?["source"]?.stringValue == "local",
-              result["before"]?.stringValue == result["after"]?.stringValue,
-              result["invalid"]?.stringValue?.contains("actions.js syntax") == true,
-              result["firstAttach"]?.objectValue?["reloaded"]?.boolValue == false,
-              result["first"]?.stringValue == "Draft one",
-              result["stale"]?.stringValue == "Draft one",
-              result["secondAttach"]?.objectValue?["reloaded"]?.boolValue == true,
-              result["second"]?.stringValue == "Draft two",
-              result["paths"]?.arrayValue?.contains(.string("services/web/example.test/service.json")) == true,
-              result["paths"]?.arrayValue?.contains(.string("services/web/example.test/actions.js")) == true,
-              result["paths"]?.arrayValue?.contains(.string("services/web/example.test/NOTES.md")) == true else {
-            return [.say("Local service authoring did not preserve its validation boundary."), .stop(.stop)]
+              result["checks"]?.arrayValue?.count == 17,
+              result["readyForRestart"]?.boolValue == true else {
+            return [.say("Local service validation failed: \(output)"), .stop(.stop)]
         }
-        return [.say("Created Local source, preserved the loaded draft across edits, and explicitly reloaded the next coherent draft."), .stop(.stop)]
+        return [.say("PASS: 17 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
+    }
+
+    static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            return [execute(#"""
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service recovery workflow" });
+            const check = (value, name) => { if (!value) throw new Error(name); };
+            const domain = "example.test";
+            const path = "services/web/" + domain + "/";
+            const before = await ox.service.git.status({ purpose: "Inspect interrupted draft" });
+            check(before.dirty, "Draft must survive restart");
+            check((await ox.fs.read({ path: path + "actions.js", purpose: "Read interrupted installer" })).text === ")", "Invalid source must survive restart");
+            let rejected = false;
+            try { await ox.service.validate({ domain, purpose: "Reject restarted incomplete draft" }); }
+            catch { rejected = true; }
+            check(rejected, "Incomplete draft must fail validation");
+            const fixture = JSON.parse((await ox.fs.read({ path: "artifacts/local-validation-recovery.json", purpose: "Read recovery fixture" })).text);
+            await ox.fs.write({ path: path + "service.json", content: fixture.manifest, purpose: "Recover missing manifest" });
+            await ox.fs.write({ path: path + "actions.js", content: fixture.actions, purpose: "Recover interrupted installer" });
+            check((await ox.service.validate({ domain, purpose: "Validate recovered service" })).valid, "Recovered draft must validate");
+            await ox.service.attach({ domain, purpose: "Attach recovered service" });
+            const inspected = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect recovered attachment" });
+            check(inspected.actions.revision.description === "Draft two", "Recovered attachment must match saved source");
+            const clean = await ox.service.git.status({ purpose: "Verify preserved saved version" });
+            check(!clean.dirty && before.commitHash === clean.commitHash, "Recovery must preserve history and restore exact source");
+            console.log(JSON.stringify({ recovered: true, clean: !clean.dirty, commitHash: clean.commitHash }));
+            """#)]
+        }
+        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
+              result["recovered"]?.boolValue == true,
+              result["clean"]?.boolValue == true else {
+            return [.say("Local service restart recovery failed: \(output)"), .stop(.stop)]
+        }
+        return [.say("PASS: incomplete draft survived restart, remained editable, validated after repair, and attached with unchanged saved history."), .stop(.stop)]
     }
 
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in
         guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy test service" });
-            const before = await ox.fs.read({ path: "services/web/archive.ph/service.json", purpose: "Read copied manifest" });
-            let invalid;
-            try {
-              await ox.fs.edit({
-                path: "services/web/archive.ph/service.json",
-                edits: [{ oldText: '"domain": "archive.ph"', newText: '"domain": "wrong.example"' }],
-                purpose: "Test invalid manifest"
-              });
-            } catch (error) {
-              invalid = String(error);
-            }
-            const after = await ox.fs.read({ path: "services/web/archive.ph/service.json", purpose: "Verify manifest rollback" });
-            const listed = await ox.fs.list({ path: "services/web/archive.ph", purpose: "List copied source" });
-            console.log(JSON.stringify({ copied, restored: before.text === after.text, invalid, count: listed.items.length }));
-            """)]
+            return [execute(#"""
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service copy workflow" });
+            const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy validation fixture" });
+            const path = "services/web/archive.ph/service.json";
+            const before = (await ox.fs.read({ path, purpose: "Read copied manifest" })).text;
+            const invalid = JSON.parse(before);
+            invalid.domain = "wrong.example";
+            await ox.fs.write({ path, content: JSON.stringify(invalid), purpose: "Stage invalid manifest identity" });
+            let rejected;
+            try { await ox.service.validate({ domain: "archive.ph", purpose: "Reject invalid manifest identity" }); }
+            catch (error) { rejected = String(error); }
+            const retained = JSON.parse((await ox.fs.read({ path, purpose: "Read retained invalid draft" })).text).domain === "wrong.example";
+            await ox.fs.write({ path, content: before, purpose: "Restore copied manifest" });
+            const valid = await ox.service.validate({ domain: "archive.ph", purpose: "Validate restored copy" });
+            console.log(JSON.stringify({ copied, retained, rejected, valid }));
+            """#)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
               result["copied"]?.objectValue?["source"]?.stringValue == "local",
-              result["restored"]?.boolValue == true,
-              result["invalid"]?.stringValue?.contains("identity mismatch") == true,
-              (result["count"]?.intValue ?? 0) > 1 else {
-            return [.say("Copied Local source did not preserve its validation boundary."), .stop(.stop)]
+              result["retained"]?.boolValue == true,
+              result["rejected"]?.stringValue?.contains("identity mismatch") == true,
+              result["valid"]?.objectValue?["valid"]?.boolValue == true else {
+            return [.say("Copied Local service validation failed: \(output)"), .stop(.stop)]
         }
-        return [.say("Copied the selected service to Local and restored its manifest after a rejected invalid edit."), .stop(.stop)]
+        return [.say("PASS: copied service retained an invalid draft, rejected whole-service validation, and validated after repair."), .stop(.stop)]
     }
 
     static let localHistoryWorkflow = Scenario(name: "local-history") { ctx in
