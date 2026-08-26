@@ -45,6 +45,8 @@ Edit the [Graphviz source](docs/openox-components.dot) and run `bun run build:di
   - **Actions** — Typed operations the agent can invoke.
   - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
 
+[`docs/PROTOCOL.md`](docs/PROTOCOL.md) maps the contracts between these components to their authoritative code.
+
 ## Self-Evolution
 
 The VM is also how Ox evolves. Ox can invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
