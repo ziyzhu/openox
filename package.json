@@ -4,7 +4,6 @@
   "license": "MIT",
   "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
   "scripts": {
-    "setup:ios": "bun tooling/ios-config.ts",
     "test:llm": "bun apps/ios/tests/llm/run.ts",
     "test:services": "bun tooling/service-replay.ts",
     "test:unit": "bun test tooling packages/services packages/service-sdk",

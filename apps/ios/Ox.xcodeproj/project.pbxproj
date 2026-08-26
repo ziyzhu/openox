@@ -38,7 +38,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		AA0000010000000000000001 /* Ox.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Ox.xcconfig; sourceTree = "<group>"; };
+		AA0000010000000000000001 /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
 		ACA969332FA332BC00D0412F /* Ox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE0000020000000000000002 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE1000020000000000000002 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
@@ -81,7 +81,7 @@
 		ACA9692A2FA332BC00D0412F = {
 			isa = PBXGroup;
 			children = (
-				AA0000010000000000000001 /* Ox.xcconfig */,
+				AA0000010000000000000001 /* Local.xcconfig */,
 				ACA969352FA332BC00D0412F /* Ox */,
 				AE0000030000000000000003 /* ShareExtension */,
 				AE1000030000000000000003 /* Frameworks */,
@@ -245,7 +245,7 @@
 /* Begin XCBuildConfiguration section */
 		ACA9693C2FA332BD00D0412F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -310,7 +310,7 @@
 		};
 		ACA9693D2FA332BD00D0412F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -368,7 +368,7 @@
 		};
 		ACA9693F2FA332BD00D0412F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -405,7 +405,7 @@
 		};
 		ACA969402FA332BD00D0412F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -441,7 +441,7 @@
 		};
 		AE00000B000000000000000B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension.entitlements;
@@ -473,7 +473,7 @@
 		};
 		AE00000C000000000000000C /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AA0000010000000000000001 /* Ox.xcconfig */;
+			baseConfigurationReference = AA0000010000000000000001 /* Local.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension.entitlements;

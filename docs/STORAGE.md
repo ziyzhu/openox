@@ -68,7 +68,7 @@ types remain authoritative in their `Codable` implementations.
 
 The application bundle identifier, Share Extension bundle identifier, app group,
 iCloud container, Keychain service, and website-data namespace come from
-`apps/ios/Ox.xcconfig` plus the optional ignored `apps/ios/Local.xcconfig` override.
+the ignored `apps/ios/Local.xcconfig` created from `apps/ios/Local.xcconfig.example`.
 
 Primary owners:
 

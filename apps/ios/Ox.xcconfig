@@ -1,9 +1,0 @@
-OX_DEVELOPMENT_TEAM =
-OX_BUNDLE_IDENTIFIER = ai.openox.local
-OX_APP_GROUP_IDENTIFIER = group.ai.openox.local
-OX_ICLOUD_CONTAINER_IDENTIFIER = iCloud.ai.openox.local
-OX_KEYCHAIN_SERVICE = ai.openox.local.llm
-OX_WEBSITE_DATA_NAMESPACE = ai.openox.local.web-profile
-OX_AGENT_SKILL_TYPE_IDENTIFIER = ai.openox.agent-skill
-OX_CHAT_TYPE_IDENTIFIER = ai.openox.chat
-#include? "Local.xcconfig"
