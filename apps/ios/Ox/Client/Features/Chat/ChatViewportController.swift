@@ -179,7 +179,7 @@ final class ChatViewportController {
                 Log.ui.info("Transcript.focus chat=\(chatID) focused=true hold=none")
                 return
             }
-            viewportHold = if frame.jumpDistance <= Self.jumpThreshold {
+            viewportHold = if frame.jumpDistance - slack <= Self.jumpThreshold {
                 .tail(TailHold(
                     floorTop: frame.visualTop,
                     fromEnd: slack
@@ -190,7 +190,7 @@ final class ChatViewportController {
         }
         let label = viewportHold?.label ?? "none"
         applyViewportHold()
-        Log.ui.info("Transcript.focus chat=\(chatID) focused=\(focused) hold=\(label)")
+        Log.ui.info("Transcript.focus chat=\(chatID) focused=\(focused) slack=\(Int(slack)) hold=\(label) frame=\(frame?.summary ?? "none")")
     }
 
     func viewportResized() {
