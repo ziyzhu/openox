@@ -378,19 +378,22 @@ actor ServiceRepository {
             let repository = candidate.repository
             let service = candidate.service
             let serviceRoot = repository.root.appendingPathComponent(service.id.path, isDirectory: true)
-            let data: Data
-            do {
-                data = try Data(contentsOf: Self.serviceManifestURL(at: serviceRoot))
-            } catch {
-                Log.service.error("ServiceRepository.manifest unavailable id=\(service.id.rawValue) repository=\(repository.descriptor.id) error=\(Self.errorMessage(error))")
-                continue
-            }
-            activeSources[service.id.runtimeID] = ActiveSource(
+            let source = ActiveSource(
                 kind: service.id.kind,
                 root: serviceRoot,
                 repositoryID: repository.descriptor.id,
                 provenance: repository.descriptor.provenance
             )
+            activeSources[service.id.runtimeID] = source
+            let data: Data
+            do {
+                let manifestURL = try sourceURL(source, path: ["service.json"], legacyFallback: true)
+                try Self.validateRegularFile(manifestURL, maximumSize: 512_000)
+                data = try Data(contentsOf: manifestURL)
+            } catch {
+                Log.service.error("ServiceRepository.manifest unavailable id=\(service.id.rawValue) repository=\(repository.descriptor.id) error=\(Self.errorMessage(error))")
+                continue
+            }
             switch service.id.kind {
             case .web:
                 web.append(ManifestFile(
@@ -686,6 +689,14 @@ actor ServiceRepository {
         guard source.provenance.exposesFullSource || path == ["service.json"] else {
             throw Failure(message: "Full service source is available only for Bundled and Local services.")
         }
+        return try readSource(source, path: path)
+    }
+
+    func readLocalSource(kind: ServiceKind, id: String, path: [String]) throws -> Data {
+        try readSource(localSource(kind: kind, id: id), path: path)
+    }
+
+    private func readSource(_ source: ActiveSource, path: [String]) throws -> Data {
         let url = try sourceURL(source, path: path, legacyFallback: true)
         guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
             throw Failure(message: "Not a service file.")
@@ -701,17 +712,8 @@ actor ServiceRepository {
         let source = try editableSource(kind: kind, id: id)
         guard data.count <= VirtualFileSystem.maximumReadBytes else { throw Failure(message: "Service file is too large.") }
         let url = try sourceURL(source, path: path)
-        let existed = FileManager.default.fileExists(atPath: url.path)
-        let previous = existed ? try Data(contentsOf: url) : nil
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        do {
-            try data.write(to: url, options: .atomic)
-            _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        } catch {
-            if let previous { try? previous.write(to: url, options: .atomic) }
-            else { try? FileManager.default.removeItem(at: url) }
-            throw error
-        }
+        try data.write(to: url, options: .atomic)
         Log.service.info("ServiceRepository.local write id=\(id) path=\(path.joined(separator: "/")) bytes=\(data.count)")
     }
 
@@ -721,15 +723,21 @@ actor ServiceRepository {
         guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
             throw Failure(message: "Only Local service files can be deleted.")
         }
-        let previous = try Data(contentsOf: url)
-        do {
-            try FileManager.default.removeItem(at: url)
-            _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        } catch {
-            try? previous.write(to: url, options: .atomic)
-            throw error
-        }
+        try FileManager.default.removeItem(at: url)
         Log.service.info("ServiceRepository.local delete id=\(id) path=\(path.joined(separator: "/"))")
+    }
+
+    func validateLocalSource(kind: ServiceKind, id: String) throws {
+        _ = try localSource(kind: kind, id: id)
+        try Self.validateService(Package.Service(id: ServiceID(kind: kind, runtimeID: id)), root: localRoot)
+    }
+
+    private func localSource(kind: ServiceKind, id: String) throws -> ActiveSource {
+        let package = try Self.loadPackage(at: localRoot, provenance: .local)
+        guard let service = package.services.first(where: { $0.id.kind == kind && $0.id.runtimeID == id }) else {
+            throw Failure(message: "No Local service exists for \(id).")
+        }
+        return ActiveSource(kind: kind, root: localRoot.appendingPathComponent(service.id.path), repositoryID: Self.localID, provenance: .local)
     }
 
     func sourcePaths(kind: ServiceKind, id: String) throws -> [String] {
@@ -1112,6 +1120,18 @@ actor ServiceRepository {
                 || url.path.hasPrefix(source.root.standardizedFileURL.path + "/") else {
             throw Failure(message: "Service path escapes its repository")
         }
+        let repositoryRoot = source.root.deletingLastPathComponent().deletingLastPathComponent().resolvingSymlinksInPath()
+        let expectedRoot = repositoryRoot.appendingPathComponent(source.kind.rawValue).appendingPathComponent(source.root.lastPathComponent)
+        guard source.root.resolvingSymlinksInPath().standardizedFileURL.path == expectedRoot.standardizedFileURL.path else {
+            throw Failure(message: "Symbolic links are not supported")
+        }
+        var ancestor = url
+        while ancestor.path != source.root.standardizedFileURL.path {
+            if (try? ancestor.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+                throw Failure(message: "Symbolic links are not supported")
+            }
+            ancestor.deleteLastPathComponent()
+        }
         return url
     }
 
@@ -1317,7 +1337,7 @@ actor ServiceRepository {
             guard identities.insert(service.id.runtimeID).inserted else {
                 throw Failure(message: "Invalid or duplicate service \(service.id.rawValue)")
             }
-            try validateService(service, root: root)
+            if provenance != .local { try validateService(service, root: root) }
         }
         return package
     }

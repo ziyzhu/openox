@@ -40,6 +40,8 @@ extension ServiceOperations {
             return try await findServices(query: fields["query"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.inspect":
             return try await inspectService(domain: fields["domain"]?.stringValue ?? "", actions: fields["actions"]?.arrayValue?.compactMap(\.stringValue), purpose: purpose)
+        case "ox.service.validate":
+            return try await validateService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.invoke":
             return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], purpose: purpose)
         case "ox.service.create":

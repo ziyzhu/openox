@@ -97,6 +97,14 @@ final class ServiceOperations {
         }
     }
 
+    func validateService(domain: String, purpose: String) async throws -> JSONValue? {
+        let domain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return try await tracked(.serviceValidate, .object(["domain": .string(domain)]), purpose: purpose) {
+            try await self.serviceManager.validateService(domain: domain)
+            return .object(["domain": .string(domain), "valid": .bool(true)])
+        }
+    }
+
     func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue? {
         guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), serviceKind == .web else {
             throw RuntimeError.bridge("ox.service.create: kind must be 'web'")

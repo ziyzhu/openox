@@ -17,6 +17,7 @@ enum InvocationName: String, CaseIterable {
     case serviceFind = "ox.service.find"
     case serviceListAttached = "ox.service.listAttached"
     case serviceInspect = "ox.service.inspect"
+    case serviceValidate = "ox.service.validate"
     case serviceCreate = "ox.service.create"
     case serviceCopy = "ox.service.copy"
     case serviceDelete = "ox.service.delete"
@@ -68,6 +69,7 @@ enum InvocationName: String, CaseIterable {
         case .serviceFind: L10n.string("Search services")
         case .serviceListAttached: L10n.string("List attached services")
         case .serviceInspect: L10n.string("Inspect a service")
+        case .serviceValidate: L10n.string("Validate a service")
         case .serviceCreate: L10n.string("Create a service")
         case .serviceCopy: L10n.string("Copy a service to Local")
         case .serviceDelete: L10n.string("Delete a Local service")
@@ -111,7 +113,7 @@ enum InvocationName: String, CaseIterable {
         case .fsList, .fsRead, .outputRead, .fsWrite, .fsEdit, .fsDelete, .fsGlob, .fsGrep: .files
         case .artifactAttach, .artifactList, .artifactImport, .artifactWrite,
              .artifactReplaceText, .artifactRename, .artifactDelete, .artifactPresent: .artifacts
-        case .serviceFind, .serviceListAttached, .serviceInspect, .serviceCreate, .serviceCopy, .serviceDelete,
+        case .serviceFind, .serviceListAttached, .serviceInspect, .serviceValidate, .serviceCreate, .serviceCopy, .serviceDelete,
              .serviceGitStatus, .serviceGitLog, .serviceGitShow, .serviceGitDiff, .serviceGitCheckout, .serviceGitCommit,
              .serviceGitRevert, .serviceGitRestore,
              .serviceAttach, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach: .services

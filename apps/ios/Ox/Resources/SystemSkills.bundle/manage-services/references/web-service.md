@@ -92,7 +92,7 @@ End the response after presenting the plan. Continue authoring only after a late
 
 After the plan is confirmed, inspect complete Local Git status. Create the new service with `ox.service.create`, or copy the existing non-Local candidate with `ox.service.copy`, and obtain the required approval. Use the returned domain as the directory, manifest, and runtime identity, then read the generated or copied files before editing.
 
-Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. Each accepted mutation validates the Local source while leaving running attachments unchanged. Finish a coherent set of edits before reloading it for verification.
+Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
 Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
 
@@ -200,7 +200,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 ## 7. Verify in iOS
 
 1. Read every changed file back.
-2. Call `ox.service.attach` with the Local service's bare domain. This attaches it when missing or reloads this chat's existing attachment from the current source. Repeat only after another coherent set of edits is ready to test.
+2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this chat's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke every new or changed action with a small success case.

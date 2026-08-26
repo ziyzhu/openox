@@ -1,6 +1,10 @@
 import Foundation
 
 extension Chat: OxFunctionBridge {
+    public func validateService(domain: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.validateService(domain: domain, purpose: purpose)
+    }
+
     public func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.createService(kind: kind, domain: domain, purpose: purpose)
     }
@@ -120,9 +124,6 @@ extension Chat {
     public func attachService(domain: String, purpose: String) async throws -> JSONValue? {
         guard !domain.isEmpty else {
             throw RuntimeError.bridge("ox.service.attach: requires a non-empty domain")
-        }
-        guard serviceManager.service(domain: domain) != nil else {
-            throw RuntimeError.bridge("ox.service.attach: no service with domain '\(domain)'. Inspect services/<kind>/<id>/service.json to get a valid domain.")
         }
         let existing = attachedService(domain: domain)
         let service = try await serviceManager.serviceForCaller(domain: domain, reason: .attach)

@@ -13,7 +13,7 @@ Respect repository ownership:
 - Local web services expose editable source under `services/web/<domain>/` and support create, read, update, delete, verification, and Git history.
 - iOS and MCP services may be discovered and inspected but are not authorable through the Local web-service workflow.
 
-Use `ox.service.find`, `ox.service.listAttached`, `ox.service.inspect`, and `ox.fs.read` for discovery and inspection. Use `ox.service.create` for a new Local web service, `ox.service.copy` for an editable Local candidate, `ox.fs.write`, `ox.fs.edit`, and `ox.fs.delete` for source changes, and `ox.service.delete` for a whole Local service. Inspect Local status and diff before saving, reverting, restoring, or deleting.
+Use `ox.service.find`, `ox.service.listAttached`, `ox.service.inspect`, and `ox.fs.read` for discovery and inspection. Use `ox.service.create` for a new Local web service, `ox.service.copy` for an editable Local candidate, `ox.fs.write`, `ox.fs.edit`, and `ox.fs.delete` for source changes, `ox.service.validate` to check the whole draft, and `ox.service.delete` for a whole Local service. Inspect Local status and diff before saving, reverting, restoring, or deleting.
 
 For creating, extending, repairing, or substantively verifying a Local web service, read `skills/system:manage-services/references/web-service.md`. For inspection, copying, attachment changes, history reads, or a straightforward user-requested deletion, proceed without loading the web authoring reference.
 

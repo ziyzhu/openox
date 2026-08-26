@@ -752,7 +752,7 @@ private enum InvocationFormat {
         case .serviceFind:
             let query = args?["query"]?.stringValue ?? ""
             return query.isEmpty ? nil : Source(label: query, service: nil)
-        case .serviceAttach, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach:
+        case .serviceAttach, .serviceValidate, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach:
             guard let domain = args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
             let service = serviceManager.service(domain: domain)
             return Source(label: service?.title ?? domain, service: service)

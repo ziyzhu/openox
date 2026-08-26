@@ -81,6 +81,33 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.validate",
+                    .object([
+                        "description": .string("Validate a complete Local web-service draft: `await ox.service.validate({ domain, purpose })`. Checks the manifest, action installer and matching action IDs, declared skills, required files, and service size limits together. Returns `{ domain, valid: true }` or throws with the validation error. Does not edit, attach, reload, Save, or invoke service actions. Finish related source edits before calling; individual file writes do not validate service contents."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "domain": .object([
+                                    "type": .string("string"),
+                                    "minLength": .int(1),
+                                    "maxLength": .int(253),
+                                ]),
+                            ]),
+                            "required": .array([.string("domain")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "domain": .object(["type": .string("string")]),
+                                "valid": .object(["type": .string("boolean"), "const": .bool(true)]),
+                            ]),
+                            "required": .array([.string("domain"), .string("valid")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.service.create",
                     .object([
                         "description": .string("Create a service in the always-available editable Local repository and select it under `services/<kind>/<domain>/`: `await ox.service.create({ kind: \"web\", domain, purpose })`. The user approves service creation. The valid skeleton can then be changed with `ox.fs` tools."),
@@ -411,6 +438,11 @@ nonisolated enum OxServices {
             }
             ctx.setObject(inspectBlock as AnyObject, forKeyedSubscript: "__nativeServiceInspect" as NSString)
 
+            let validateBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
+                env.call { try await $0.validateService(domain: domain, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(validateBlock as AnyObject, forKeyedSubscript: "__nativeServiceValidate" as NSString)
+
             let createBlock: @convention(block) (String, String, JSValue) -> JSValue = { kind, domain, purposeValue in
                 env.call { try await $0.createService(kind: kind, domain: domain, purpose: purposeValue.toString()!) }
             }
@@ -549,6 +581,7 @@ nonisolated enum OxServices {
           find: (value) => { const options = __oxOptions(value, 'ox.service.find'); return __nativeServiceFind(String(options.query), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
+          validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },
           create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(String(options.kind), String(options.domain), String(options.purpose)); },
           copy: (value) => { const options = __oxOptions(value, 'ox.service.copy'); return __nativeServiceCopy(String(options.domain), String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },

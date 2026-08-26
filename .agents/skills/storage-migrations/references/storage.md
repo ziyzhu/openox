@@ -365,12 +365,20 @@ when it has no references, replacing only its metadata with the empty seed.
 Local source files remain untouched as working-tree changes against that seed.
 Legacy Local source without Git metadata follows the same working-tree path. The
 repository never introduces another virtual directory: its selected services
-resolve directly into `services/<kind>/<id>/`. Local mutations are atomic,
-reject traversal and symbolic links, validate the
-repository package, then validate the affected service before returning. A failed
-semantic validation restores the prior file. Accepted working-tree changes remain
-drafts for running chats; `ox.service.attach` explicitly replaces that chat's
-existing attachment from the current source when the draft is ready to test.
+resolve directly into `services/<kind>/<id>/`. Local file writes are atomic and
+enforce write permissions, path containment, symbolic-link rejection, and the
+general file size limit without validating service contents. Working-tree drafts
+may contain incomplete, missing, or inconsistent service files across app restarts.
+Their paths and encoding are unchanged. Local discovery validates repository
+metadata separately from draft contents and retains source access for repairing
+invalid drafts; incomplete services do not make the entire Local repository
+unavailable. Read-only repositories still require valid service file structure.
+`ox.service.validate` checks a complete Local draft, including file structure,
+manifest, action registration, declared skills, and service size limits. The same
+validator runs before Save and before loading Local source for a caller. Failed
+validation leaves the draft untouched and cannot replace a chat's running
+attachment. `ox.service.attach` validates and replaces that chat's attachment when
+the draft is ready to test. No validation result is persisted.
 
 Only Local exposes Git status, history, diff, checkout, commit, revert, and
 restore operations. Checkout detaches its working view without moving `main`;
