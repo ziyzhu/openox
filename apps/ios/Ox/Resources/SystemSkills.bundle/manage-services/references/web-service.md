@@ -186,11 +186,12 @@ Use observed same-origin `fetch` shapes with `credentials: "include"`, stable HT
 For page-owned actions:
 
 1. Start from the action's base page.
-2. Serialize any shared SPA navigation not already isolated by iOS.
-3. Navigate within the same document to the target state.
-4. Clear or mark stale store values when they can be mistaken for the target.
-5. Wait with a bounded timeout for target-specific route, id, and fresh data signals.
-6. Collect bounded results and leave errors with safe page context.
+2. Treat top-level navigation completion and settling as document availability, not application readiness. Never use a fixed delay as the sole readiness condition.
+3. Serialize any shared SPA navigation not already isolated by iOS.
+4. Navigate within the same document to the target state.
+5. Clear or mark stale store values when they can be mistaken for the target.
+6. Wait with a bounded timeout for target-specific route, id, visible control, and fresh data signals.
+7. Collect bounded results and leave errors with safe page context.
 
 Emit concise diagnostics with action ID, phase, safe route, status, and result count. Keep credentials, private bodies, and opaque resource tokens out of logs.
 
@@ -203,14 +204,15 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
 5. Invoke every new or changed action with a small success case.
-6. For every detail action, pass an opaque identifier returned by its corresponding list or search action in the same verified state. Empty ranges, calendar time slots, placeholders, and synthetic identifiers do not count as successful detail verification.
-7. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
-8. Request separate approval before invoking a live mutation.
-9. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
-10. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
-11. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
-12. Verify the favicon URL structurally, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying official icon exists.
-13. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting Save approval, saving, or ending an abandoned or blocked run.
+6. Invoke each page-owned action as the first action on a fresh action page. Do not prime it with a sibling action, a manually opened panel, or state left by Browser exploration.
+7. For every detail action, pass an opaque identifier returned by its corresponding list or search action in the same verified state. Empty ranges, calendar time slots, placeholders, and synthetic identifiers do not count as successful detail verification.
+8. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
+9. Request separate approval before invoking a live mutation.
+10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
+11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
+12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
+13. Verify the favicon URL structurally, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying official icon exists.
+14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting Save approval, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
 
