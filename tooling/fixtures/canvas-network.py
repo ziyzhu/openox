@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from mitmproxy import http
 
 
 class CanvasNetwork:
     signed_in = False
+    completed_at = None
 
     def request(self, flow):
         host = flow.request.host
@@ -31,6 +32,21 @@ class CanvasNetwork:
                     <div class="tn-cart-item"><span class="tn-cart-line-item-name">Fixture ticket</span></div>
                     <span class="tn-cart-totals__value--total">$0.00</span>
                     <script>localStorage.setItem("ox.pacificsciencecenter.latestReceipt", "424242|{date}")</script>'''
+        if host == "oftendining.com":
+            if path == "/canvas-test/reset":
+                self.completed_at = None
+                body = '<h1>Fixture checkout reset</h1>'
+            elif path == "/":
+                body = '<h1>Fixture checkout</h1><p>No order or charge will be created.</p><a href="/canvas-test/complete">Complete fixture checkout</a>'
+            elif path == "/canvas-test/complete":
+                self.completed_at = datetime.now().astimezone() + timedelta(minutes=1)
+                body = '<h1>Fixture receipt 424242</h1>'
+            elif path == "/account_profile.php":
+                body = '<h1>Fixture signed-out account</h1>'
+            elif path == "/account_orders.php":
+                body = '<a href="/order_receipt.php?invoice_id=424242">Fixture receipt</a>' if self.completed_at else '<h1>No fixture orders</h1>'
+            elif path == "/order_receipt.php" and self.completed_at:
+                body = 'Ordered On: ' + self.completed_at.strftime("%b %d, %Y %I:%M %p")
         if body is None:
             flow.response = http.Response.make(503, b"Unmatched canvas test request")
         else:

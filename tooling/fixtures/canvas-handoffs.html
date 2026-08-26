@@ -9,6 +9,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 <button id="pay">Test checkout</button>
 <button id="export">Export test file</button>
 <button id="missing">Missing file error</button>
+<button id="receipt-error">Reproduce PSC receipt error</button>
 <pre id="result" aria-live="polite">Ready</pre>
 <script>
 const result = document.getElementById("result");
@@ -18,7 +19,8 @@ const run = async operation => {
   catch (error) { result.textContent = "ERROR: " + error.message; }
 };
 document.getElementById("signin").onclick = () => run(() => ox.service.signIn({domain:"github.com", purpose:"Test canvas sign-in"}));
-document.getElementById("pay").onclick = () => run(() => ox.service.pay({domain:"my.pacificsciencecenter.org", args:{}, purpose:"Test canvas checkout"}));
+document.getElementById("pay").onclick = () => run(() => ox.service.pay({domain:"oftendining.com", args:{storeId:"canvas-fixture"}, purpose:"Test canvas checkout"}));
+document.getElementById("receipt-error").onclick = () => run(() => ox.service.pay({domain:"my.pacificsciencecenter.org", args:{}, purpose:"Reproduce service receipt error"}));
 const exportFile = path => ox.service.invoke({name:"mcp:__MCP_DOMAIN__:agent_artifact_get", input:{target:"canvas-fixture", path}, purpose:"Export canvas test file"});
 document.getElementById("export").onclick = () => run(() => exportFile("artifacts/canvas-export.txt"));
 document.getElementById("missing").onclick = () => run(() => exportFile("artifacts/missing.txt"));
