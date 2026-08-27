@@ -1555,7 +1555,7 @@ private struct ComposerAttachmentChip<Preview: View>: View {
     @ViewBuilder let preview: () -> Preview
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .trailing) {
             if let onOpen {
                 Button(action: onOpen) { label }
                     .buttonStyle(OxPressedSurfaceButtonStyle())
@@ -1568,16 +1568,13 @@ private struct ComposerAttachmentChip<Preview: View>: View {
                     .font(.system(size: 16, weight: .semibold))
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted, Theme.Colors.surface)
-                    .offset(x: -2, y: 4)
                     .frame(
                         width: Theme.Size.minimumTouchTarget,
-                        height: Theme.Size.minimumTouchTarget,
-                        alignment: .top
+                        height: Theme.Size.minimumTouchTarget
                     )
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .offset(x: Theme.Size.minimumTouchTarget / 2, y: -10)
             .accessibilityLabel(A11yLabel.remove(name))
             .accessibilityIdentifier("\(accessibilityIdentifier).remove")
         }
@@ -1594,8 +1591,13 @@ private struct ComposerAttachmentChip<Preview: View>: View {
                 .layoutPriority(1)
         }
         .padding(.leading, 6)
-        .padding(.trailing, 32)
-        .frame(minWidth: 120, maxWidth: 240, minHeight: 40, alignment: .leading)
+        .padding(.trailing, Theme.Size.minimumTouchTarget)
+        .frame(
+            minWidth: 120,
+            maxWidth: 240,
+            minHeight: Theme.Size.minimumTouchTarget,
+            alignment: .leading
+        )
         .background(
             Theme.Colors.surfaceSunken,
             in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
