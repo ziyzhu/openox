@@ -329,7 +329,7 @@ extension Scenario {
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
-            Entry("89", "browser screenshot — import viewport image as artifact", .browserScreenshot),
+            Entry("89", "browser screenshot — import full-page image as artifact", .browserScreenshot),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
         ]),
     ]
@@ -369,17 +369,32 @@ extension Scenario {
         if ctx.turn == 1 {
             return [execute("""
             await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open screenshot fixture" });
-            console.log(await ox.service.invoke({ name: "ios:browser:screenshot", input: { filename: "Example Screenshot.png" }, purpose: "Capture browser viewport" }));
+            const dimensions = await ox.service.invoke({
+              name: "ios:browser:executeJavaScript",
+              input: { script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };" },
+              purpose: "Create tall screenshot fixture"
+            });
+            const screenshot = await ox.service.invoke({ name: "ios:browser:screenshot", input: { filename: "Example Screenshot.png" }, purpose: "Capture full browser page" });
+            console.log({ dimensions, screenshot });
             """)]
         }
+        let result = JSONValue.parse(jsonString: output)?.objectValue
+        let dimensions = result?["dimensions"]?.objectValue
+        let screenshot = result?["screenshot"]?.objectValue
         let artifacts = ctx.toolResults.last?.content.compactMap { block -> Artifact? in
             guard case .attachment(let artifact) = block else { return nil }
             return artifact
         } ?? []
-        guard artifacts.count == 1,
+        guard let viewportHeight = dimensions?["viewportHeight"]?.doubleValue,
+              let documentHeight = dimensions?["documentHeight"]?.doubleValue,
+              let width = screenshot?["width"]?.doubleValue,
+              let height = screenshot?["height"]?.doubleValue,
+              documentHeight > viewportHeight,
+              height > width,
+              artifacts.count == 1,
               artifacts[0].kind == .image,
               artifacts[0].fileName.hasPrefix("Example Screenshot") else {
-            return [.say("Browser screenshot was not imported as an artifact."), .stop(.stop)]
+            return [.say("Browser screenshot did not include the complete tall page."), .stop(.stop)]
         }
         return [.say("Browser screenshot imported as artifact: \(artifacts[0].fileName). Result: \(output)"), .stop(.stop)]
     }

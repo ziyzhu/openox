@@ -91,7 +91,7 @@
       "requireAuth": false
     },
     {
-      "description": "Capture Browser's current viewport. Omit filename to attach the image transiently to model context, or provide an artifact basename to import and present it in the current Profile.",
+      "description": "Capture Browser's complete page. Omit filename to attach the full-page image transiently to model context, or provide an artifact basename to import and present it in the current Profile.",
       "id": "screenshot",
       "inputSchema": {
         "additionalProperties": false,
@@ -105,7 +105,7 @@
         },
         "type": "object"
       },
-      "label": "Take Screenshot",
+      "label": "Take Full Page Screenshot",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {

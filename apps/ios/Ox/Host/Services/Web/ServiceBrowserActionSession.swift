@@ -93,32 +93,26 @@ final class ServiceBrowserActionSession {
             let generation = page.navigationGeneration
             let rawMetrics = try await self.service.evalAsync(
                 page,
-                "return [window.scrollX, window.scrollY, window.innerWidth, window.innerHeight];",
-                context: "browser-screenshot"
+                "return [Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0), Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)];",
+                context: "browser-full-page-screenshot"
             )
             guard let metrics = rawMetrics.map(JSONValue.from)?.arrayValue,
-                  metrics.count == 4,
-                  let rawX = metrics[0].doubleValue,
-                  let rawY = metrics[1].doubleValue,
-                  let rawWidth = metrics[2].doubleValue,
-                  let rawHeight = metrics[3].doubleValue,
-                  rawX.isFinite,
-                  rawY.isFinite,
+                  metrics.count == 2,
+                  let rawWidth = metrics[0].doubleValue,
+                  let rawHeight = metrics[1].doubleValue,
                   rawWidth.isFinite,
                   rawHeight.isFinite,
                   rawWidth > 0,
                   rawHeight > 0,
-                  rawWidth <= 8_192,
-                  rawHeight <= 8_192 else {
-                throw RuntimeError.bridge("ios:browser:screenshot couldn't determine Browser's viewport.")
+                  rawWidth <= 65_536,
+                  rawHeight <= 65_536 else {
+                throw RuntimeError.bridge("ios:browser:screenshot couldn't determine Browser's full-page dimensions.")
             }
-            let rect = CGRect(
-                x: CGFloat(max(0, rawX)),
-                y: CGFloat(max(0, rawY)),
-                width: CGFloat(rawWidth),
-                height: CGFloat(rawHeight)
-            )
-            let data = try await page.page.exported(as: .image(region: .rect(rect)))
+            let rect = CGRect(x: 0, y: 0, width: CGFloat(rawWidth), height: CGFloat(rawHeight))
+            let longest = max(rawWidth, rawHeight)
+            let exportScale = min(1, Double(ArtifactLimits.imageMaxDimension) / longest)
+            let snapshotWidth = CGFloat(rawWidth * exportScale)
+            let data = try await page.page.exported(as: .image(region: .rect(rect), snapshotWidth: snapshotWidth))
             guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
             let prepared: PreparedImage
             let inspection: ImagePreparer.Inspection
@@ -126,16 +120,16 @@ final class ServiceBrowserActionSession {
                 prepared = try ImagePreparer.prepare(data)
                 inspection = try ImagePreparer.inspect(prepared.data)
             } catch {
-                throw RuntimeError.bridge("ios:browser:screenshot couldn't prepare Browser's viewport image.")
+                throw RuntimeError.bridge("ios:browser:screenshot couldn't prepare Browser's full-page image.")
             }
             let attachment = TransientAttachment(
                 kind: .image,
                 mimeType: prepared.mimeType,
-                displayName: prepared.filename(from: "Browser Screenshot"),
+                displayName: prepared.filename(from: "Browser Full Page Screenshot"),
                 data: prepared.data
             )
             let host = page.page.url?.host?.lowercased() ?? "?"
-            Log.webView.info("Browser.screenshot host=\(host) points=\(Int(rawWidth))x\(Int(rawHeight)) pixels=\(inspection.width)x\(inspection.height) bytes=\(prepared.data.count)")
+            Log.webView.info("Browser.screenshot mode=fullPage host=\(host) points=\(Int(rawWidth))x\(Int(rawHeight)) pixels=\(inspection.width)x\(inspection.height) bytes=\(prepared.data.count)")
             return Screenshot(
                 url: page.page.url,
                 attachment: attachment,
