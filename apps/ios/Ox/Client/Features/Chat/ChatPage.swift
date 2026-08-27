@@ -14,6 +14,10 @@ private struct SidebarScrollLockModifier: ViewModifier {
     }
 }
 
+private enum ChatScrollTarget {
+    case bottom
+}
+
 private struct EmptyChatMark: View {
     private let strongCells: Set<Int> = [0, 3, 4, 5, 6, 7, 9, 10, 13, 14]
 
@@ -290,8 +294,7 @@ struct ChatPage: View {
                     .frame(maxWidth: Theme.ContainerWidth.readable)
                     .frame(maxWidth: .infinity)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-                        guard viewportLayout.measureDock(bounds) else { return }
-                        scroller.viewportResized()
+                        viewportLayout.measureDock(bounds)
                     }
         }
         .background(Theme.Colors.chatSurface)
@@ -642,10 +645,6 @@ struct ChatPage: View {
         return chat.queuedMessages.first { $0.id == id }
     }
 
-    private var anchorSlack: CGFloat {
-        viewportLayout.slack(hasAnchor: anchoredTurnID != nil)
-    }
-
     private var dockClearance: CGFloat {
         ChatViewportLayout.responseComposerSpacing
     }
@@ -746,8 +745,7 @@ struct ChatPage: View {
     private func composerBlock(isChatEmpty: Bool) -> some View {
         inputBar(isChatEmpty: isChatEmpty)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-                guard viewportLayout.measureComposer(bounds) else { return }
-                scroller.viewportResized()
+                viewportLayout.measureComposer(bounds)
             }
     }
 
@@ -858,12 +856,16 @@ struct ChatPage: View {
 
     @State private var scroller = ChatViewportController()
     @State private var earlierPageCoordinator = ChatEarlierPageCoordinator()
+    @State private var bottomScrollRequest = 0
 
     private func transcript(
         blocks: [ChatBlock],
         renderedBlocks: [ChatBlock]
     ) -> some View {
         let lastBlockID = renderedBlocks.last?.id
+        let lastAgentBlockID = renderedBlocks.last { block in
+            if case .agentContent = block.kind { true } else { false }
+        }?.id
         let anchoredViewportHeight = max(
             0,
             max(viewportLayout.anchorFloor, viewportLayout.contentFloorHeight)
@@ -882,14 +884,26 @@ struct ChatPage: View {
                             }
                         }
                     )
+                    Color.clear
+                        .frame(height: 1)
+                        .id(ChatScrollTarget.bottom)
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(nil, for: .sizeChanges)
+                .defaultScrollAnchor(.top, for: .alignment)
                 .onScrollGeometryChange(for: ChatViewportController.Frame?.self) { geo in
                     let frame = ChatViewportController.Frame(geo)
                     return frame.insetTop == 0 && frame.insetBottom == 0 ? nil : frame
                 } action: { _, new in
                     guard let new else { return }
                     scroller.geometryChanged(new)
+                }
+                .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 1) { ids in
+                    guard let target = scroller.visibleBlocksChanged(ids) else { return }
+                    scroller.revealAboveKeyboard(target) {
+                        proxy.scrollTo(ChatScrollTarget.bottom, anchor: .bottom)
+                    }
                 }
                 .onScrollPhaseChange { old, new in
                     scroller.phaseChanged(from: old, to: new)
@@ -901,10 +915,9 @@ struct ChatPage: View {
                         requestEarlierReveal(blocks: blocks)
                     }
                     if new == .idle {
-                        applyEarlierReveal(blocks: blocks)
+                        applyEarlierReveal(blocks: blocks, proxy: proxy)
                     }
                 }
-                .scrollPosition($scroller.position)
                 .modifier(SidebarScrollLockModifier())
                 .scrollEdgeEffectStyle(.soft, for: .top)
                 .scrollEdgeEffectStyle(.soft, for: .bottom)
@@ -921,17 +934,12 @@ struct ChatPage: View {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
                 })
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            scroller.gestureStarted()
-                        }
-                )
                 .onChange(of: blocks.count) { _, n in
                     transcriptWindow.reconcile(total: n)
                     logTranscriptWindow(reason: "blocks", total: n)
                 }
                 .onChange(of: chat.isBusy) { _, busy in
+                    scroller.busyChanged(busy)
                     logTranscriptWindow(reason: busy ? "busy" : "settled", total: blocks.count)
                 }
                 .onChange(of: submissionAnchor) { old, new in
@@ -942,17 +950,24 @@ struct ChatPage: View {
                 }
                 .onChange(of: composerFocused) { _, focused in
                     Log.ui.info("ChatComposer.focusChange chat=\(chat.id) focused=\(focused)")
-                    scroller.focusChanged(
-                        anyInputFocused,
-                        slack: anchorSlack
-                    )
                 }
                 .onChange(of: choiceInputFocused) { _, focused in
                     Log.ui.info("ChatChoice.focusChange chat=\(chat.id) focused=\(focused)")
+                }
+                .onChange(of: anyInputFocused) { _, focused in
                     scroller.focusChanged(
-                        anyInputFocused,
-                        slack: anchorSlack
+                        focused,
+                        lastAgentBlockID: lastAgentBlockID,
+                        isBusy: chat.isBusy
                     )
+                }
+                .task(id: bottomScrollRequest) {
+                    guard bottomScrollRequest > 0 else { return }
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    scroller.rideToBottom {
+                        proxy.scrollTo(ChatScrollTarget.bottom, anchor: .bottom)
+                    }
                 }
                 .onChange(of: outer.size.height, initial: true) { _, height in
                     viewportLayout.measureViewport(
@@ -987,7 +1002,8 @@ struct ChatPage: View {
         anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) -> Void
     ) -> some View {
-        VStack(spacing: 0) {
+        let topPadding: CGFloat = 6
+        return VStack(spacing: 0) {
             if chat.canChangeRetention {
                 emptyChatState
             }
@@ -1002,11 +1018,9 @@ struct ChatPage: View {
                 }
                 VStack(spacing: 0) {
                     queuedRow(anchor, identified: false)
-                        .id(anchor.id)
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                    viewportLayout.measureAnchorContent($0)
-                }
+                .padding(.top, topPadding)
+                .id(anchor.id)
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
                 .task(id: anchor.id) {
                     await Task.yield()
@@ -1024,16 +1038,14 @@ struct ChatPage: View {
                         identified: false,
                         isLast: renderedBlocks[anchorIndex].id == lastBlockID
                     )
-                    .id(anchorID)
                     ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
                         blockRow(block, identified: false, isLast: block.id == lastBlockID)
                     }
                     activityRow
                     queuedRows
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                    viewportLayout.measureAnchorContent($0)
-                }
+                .padding(.top, topPadding)
+                .id(anchorID)
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
                 .task(id: anchorID) {
                     await Task.yield()
@@ -1050,10 +1062,10 @@ struct ChatPage: View {
         }
         .scrollTargetLayout()
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.top, 6)
+        .padding(.top, submissionAnchor == nil ? topPadding : 0)
         .frame(maxWidth: .infinity)
         .frame(maxWidth: Theme.ContainerWidth.readable)
-        .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
     }
@@ -1112,12 +1124,14 @@ struct ChatPage: View {
         )
     }
 
-    private func applyEarlierReveal(blocks: [ChatBlock]) {
+    private func applyEarlierReveal(blocks: [ChatBlock], proxy: ScrollViewProxy) {
         guard let pendingEarlierAnchor = earlierPageCoordinator.takePendingAnchor() else { return }
         guard let anchor = transcriptWindow.loadEarlier(
             visibleAnchor: pendingEarlierAnchor
         ) else { return }
-        scroller.preservePageAnchor(anchor)
+        scroller.preservePageAnchor(anchor) {
+            proxy.scrollTo(anchor, anchor: .top)
+        }
         logTranscriptWindow(reason: "earlier", total: blocks.count)
     }
 
@@ -1135,7 +1149,7 @@ struct ChatPage: View {
         Button {
             earlierPageCoordinator.cancel()
             transcriptWindow.showLatest(total: blocks.count)
-            DispatchQueue.main.async { scroller.rideToBottom() }
+            bottomScrollRequest += 1
         } label: {
             Image(systemName: "arrow.down")
                 .font(.system(.subheadline, weight: .medium))

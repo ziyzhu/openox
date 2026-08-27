@@ -1,4 +1,3 @@
-import QuartzCore
 import SwiftUI
 
 @MainActor
@@ -7,53 +6,11 @@ final class ChatViewportController {
     enum Target: Equatable {
         case turnTop(UUID)
         case bottom
-        case viewportClearance
 
         var label: String {
             switch self {
             case .turnTop(let id): "turnTop(\(id.uuidString.prefix(8)))"
             case .bottom: "bottom"
-            case .viewportClearance: "viewportClearance"
-            }
-        }
-    }
-
-    private struct TailHold: Equatable {
-        let floorTop: CGFloat
-        let fromEnd: CGFloat
-
-        func expectedTop(in frame: Frame) -> CGFloat {
-            let endTop = max(0, frame.visualTop + frame.distanceFromEnd)
-            return min(max(floorTop, endTop - fromEnd), endTop)
-        }
-
-        var label: String {
-            "floor=\(Int(floorTop)) fromEnd=\(Int(fromEnd))"
-        }
-    }
-
-    private enum ViewportHold: Equatable {
-        case tail(TailHold)
-        case reader(top: CGFloat)
-
-        func expectedTop(in frame: Frame) -> CGFloat {
-            switch self {
-            case .tail(let hold): hold.expectedTop(in: frame)
-            case .reader(let top): min(top, frame.endTop)
-            }
-        }
-
-        var floorTop: CGFloat {
-            switch self {
-            case .tail(let hold): hold.floorTop
-            case .reader(let top): top
-            }
-        }
-
-        var label: String {
-            switch self {
-            case .tail(let hold): "tail \(hold.label)"
-            case .reader(let top): "reader top=\(Int(top))"
             }
         }
     }
@@ -82,10 +39,6 @@ final class ChatViewportController {
         var jumpDistance: CGFloat {
             max(0, distanceFromEnd - insetBottom)
         }
-
-        var endTop: CGFloat {
-            max(0, visualTop + distanceFromEnd)
-        }
     }
 
     private enum Motion: Equatable {
@@ -105,37 +58,29 @@ final class ChatViewportController {
     private static let jumpThreshold: CGFloat = 32
 
     private(set) var showsJumpButton = false
-    var position = ScrollPosition(edge: .bottom)
+    private(set) var visibleBlockID: UUID?
 
     var isUserScrolling: Bool {
         if case .user = motion { return true }
         return false
     }
 
-    var visibleBlockID: UUID? { position.viewID(type: UUID.self) }
-
     @ObservationIgnored private var chatID = ""
     @ObservationIgnored private var frame: Frame?
     @ObservationIgnored private var motion = Motion.stationary
-    @ObservationIgnored private var viewportHold: ViewportHold?
-    @ObservationIgnored private var inputFocused = false
-    @ObservationIgnored private var pendingFrame: Frame?
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
-    @ObservationIgnored private lazy var geometryFrameDriver = ChatViewportFrameDriver { [weak self] in
-        self?.commitPendingGeometry()
-    }
+    @ObservationIgnored private var visibleBlockIDs: Set<UUID> = []
+    @ObservationIgnored private var keyboardClearanceTarget: UUID?
 
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
         self.chatID = chatID
         frame = nil
-        pendingFrame = nil
-        geometryFrameDriver.cancel()
-        viewportHold = nil
-        inputFocused = false
         pendingOpenCompletion = onSettled
         showsJumpButton = false
+        visibleBlockID = nil
+        visibleBlockIDs = []
+        keyboardClearanceTarget = nil
         move(to: .bottom)
-        position.scrollTo(edge: .bottom)
         Log.ui.info("Transcript.open chat=\(chatID) target=bottom")
     }
 
@@ -152,54 +97,55 @@ final class ChatViewportController {
         }
     }
 
-    func rideToBottom() {
+    func rideToBottom(scroll: () -> Void) {
         Log.ui.info("Transcript.anchor chat=\(chatID) target=bottom")
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
-            position.scrollTo(edge: .bottom)
+            scroll()
             return
         }
         move(to: .bottom)
         withAnimation(.easeOut(duration: Theme.Animation.drop)) {
-            position.scrollTo(edge: .bottom)
+            scroll()
         }
     }
 
-    func preservePageAnchor(_ id: UUID) {
-        position.scrollTo(id: id, anchor: .top)
+    func preservePageAnchor(_ id: UUID, scroll: () -> Void) {
+        scroll()
         Log.ui.info("Transcript.pageAnchor chat=\(chatID) block=\(id)")
     }
 
-    func focusChanged(_ focused: Bool, slack: CGFloat) {
-        guard inputFocused != focused else { return }
-        inputFocused = focused
-        if focused {
-            guard let frame else {
-                viewportHold = nil
-                Log.ui.info("Transcript.focus chat=\(chatID) focused=true hold=none")
-                return
-            }
-            viewportHold = if frame.jumpDistance - slack <= Self.jumpThreshold {
-                .tail(TailHold(
-                    floorTop: frame.visualTop,
-                    fromEnd: slack
-                ))
-            } else {
-                .reader(top: frame.visualTop)
-            }
-        }
-        let label = viewportHold?.label ?? "none"
-        applyViewportHold()
-        Log.ui.info("Transcript.focus chat=\(chatID) focused=\(focused) slack=\(Int(slack)) hold=\(label) frame=\(frame?.summary ?? "none")")
+    func visibleBlocksChanged(_ ids: [UUID]) -> UUID? {
+        visibleBlockID = ids.first
+        visibleBlockIDs = Set(ids)
+        guard let target = keyboardClearanceTarget,
+              !visibleBlockIDs.contains(target) else { return nil }
+        keyboardClearanceTarget = nil
+        return target
     }
 
-    func viewportResized() {
-        guard let viewportHold else { return }
-        applyViewportHold()
+    func focusChanged(_ focused: Bool, lastAgentBlockID: UUID?, isBusy: Bool) {
+        guard focused, !isBusy,
+              let lastAgentBlockID,
+              visibleBlockIDs.contains(lastAgentBlockID) else {
+            keyboardClearanceTarget = nil
+            return
+        }
+        keyboardClearanceTarget = lastAgentBlockID
+    }
+
+    func revealAboveKeyboard(_ id: UUID, scroll: () -> Void) {
+        scroll()
+        Log.ui.info("Transcript.keyboardClearance chat=\(chatID) block=\(id)")
+    }
+
+    func busyChanged(_ busy: Bool) {
+        if busy { keyboardClearanceTarget = nil }
     }
 
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         if new.isUserDriven {
+            keyboardClearanceTarget = nil
             motion = .user(new)
         } else if new == .idle {
             motion = .stationary
@@ -207,57 +153,19 @@ final class ChatViewportController {
         Log.ui.info("Transcript.phase chat=\(chatID) \(String(describing: old)) -> \(String(describing: new)) owner=\(motion.label)")
     }
 
-    func gestureStarted() {
-        viewportHold = nil
-        guard !isUserScrolling else { return }
-        motion = .user(.tracking)
-        Log.ui.info("Transcript.gestureStart chat=\(chatID)")
-    }
-
     func geometryChanged(_ new: Frame) {
-        pendingFrame = new
-        geometryFrameDriver.schedule()
-    }
-
-    private func commitPendingGeometry() {
-        guard let pendingFrame else { return }
-        self.pendingFrame = nil
-        commitGeometry(pendingFrame)
-    }
-
-    private func commitGeometry(_ new: Frame) {
         frame = new
         updateJumpButton(new)
-        applyViewportHold()
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
             motion = .stationary
             let completion = pendingOpenCompletion
             pendingOpenCompletion = nil
             completion?()
             Log.ui.info("Transcript.openSettled chat=\(chatID) \(new.summary)")
-        } else if case .programmatic(.viewportClearance) = motion {
-            motion = .stationary
         }
-        if !inputFocused,
-           let viewportHold,
-           abs(new.visualTop - viewportHold.floorTop) <= 1 {
-            self.viewportHold = nil
-        }
-    }
-
-    private func applyViewportHold() {
-        guard let frame, let viewportHold else { return }
-        let top = viewportHold.expectedTop(in: frame)
-        guard abs(top - frame.visualTop) > 0.5 else { return }
-        move(to: .viewportClearance)
-        position.scrollTo(y: top)
-        Log.ui.info("Transcript.viewportClearance chat=\(chatID) top=\(Int(top)) hold=\(viewportHold.label)")
     }
 
     private func move(to target: Target) {
-        if target != .viewportClearance {
-            viewportHold = nil
-        }
         motion = .programmatic(target)
     }
 
@@ -266,50 +174,6 @@ final class ChatViewportController {
         guard shows != showsJumpButton else { return }
         showsJumpButton = shows
         Log.ui.info("Transcript.jumpButton chat=\(chatID) shows=\(shows) fromEnd=\(Int(frame.distanceFromEnd)) inset=\(Int(frame.insetBottom))")
-    }
-
-}
-
-@MainActor
-private final class ChatViewportFrameDriver {
-    private var link: CADisplayLink?
-    private let handler: @MainActor () -> Void
-
-    init(handler: @escaping @MainActor () -> Void) {
-        self.handler = handler
-    }
-
-    func schedule() {
-        guard link == nil else { return }
-        let proxy = ChatViewportFrameProxy { [weak self] in
-            self?.fire()
-        }
-        let link = CADisplayLink(target: proxy, selector: #selector(ChatViewportFrameProxy.fire))
-        link.add(to: .main, forMode: .common)
-        self.link = link
-    }
-
-    func cancel() {
-        link?.invalidate()
-        link = nil
-    }
-
-    private func fire() {
-        cancel()
-        handler()
-    }
-}
-
-@MainActor
-private final class ChatViewportFrameProxy: NSObject {
-    private let handler: @MainActor () -> Void
-
-    init(handler: @escaping @MainActor () -> Void) {
-        self.handler = handler
-    }
-
-    @objc func fire() {
-        handler()
     }
 }
 
