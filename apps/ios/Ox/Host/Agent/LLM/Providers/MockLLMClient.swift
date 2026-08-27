@@ -312,7 +312,7 @@ extension Scenario {
             Entry("69", "solve — human-verification handoff", .botControl),
             Entry("70", "helper schemas — callable help and service inspection", .help),
             Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
-            Entry("72", "prompt context — stable system skills and transient service state", .skillCatalog),
+            Entry("72", "prompt context — stable system skills and transient service and artifact state", .skillCatalog),
             Entry("73", "memory — read durable context on demand", .memoryOnDemand),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "shoveler — display non-interactive cards", .shoveler),
@@ -1442,6 +1442,20 @@ extension Scenario {
         let retainedServiceState = ctx.priorUserContext(containing: "attached")
             .map { $0.contains("Attached-service skills:") && $0.contains("skills/service:") }
             == true
+        let artifactPaths = ctx.messages.flatMap { message -> [String] in
+            let content = switch message {
+            case .user(let value): value.content
+            case .assistant(let value): value.content
+            case .toolResult(let value): value.content
+            }
+            return content.compactMap { block in
+                guard case .attachment(let artifact) = block else { return nil }
+                return "artifacts/\(artifact.fileName)"
+            }
+        }
+        let hasArtifactState = artifactPaths.isEmpty
+            || ctx.transientContext.contains("## Chat Artifacts")
+                && artifactPaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
         let languageDirective = AppLocale.resolvedResponseDirective
         guard ctx.systemPrompt.contains(userSkill) == expectsUserSkill,
               !ctx.systemPrompt.contains("## Language"),
@@ -1453,9 +1467,10 @@ extension Scenario {
               !ctx.transientContext.contains("127.0.0.1:delayedEcho"),
               hasStableSystemSkills,
               hasTimestamp,
-              hasTurnStateAfterTimestamp == (expectsService || !languageDirective.isEmpty),
+              hasTurnStateAfterTimestamp == (expectsService || !artifactPaths.isEmpty || !languageDirective.isEmpty),
               !verifiesStablePrefix || retainedServiceState,
               hasFixtureServiceSkill,
+              hasArtifactState,
               hasServiceSkill == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
         }

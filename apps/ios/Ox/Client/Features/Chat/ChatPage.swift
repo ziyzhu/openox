@@ -626,35 +626,7 @@ struct ChatPage: View {
     }
 
     private var chatArtifacts: [Artifact] {
-        var seen = Set<String>()
-        var result: [Artifact] = []
-        for block in chat.transcript.reversed() {
-            let artifacts: [Artifact]
-            switch block.kind {
-            case .userText(_, let attachments):
-                artifacts = attachments
-            case .userSkill(_, let attachments):
-                artifacts = attachments
-            case .agentContent(let items):
-                artifacts = items.flatMap { item in
-                    switch item {
-                    case .artifact(let artifact): return [artifact]
-                    case .shoveler(let shoveler): return shoveler.cards.compactMap(\.artifact)
-                    case .video(let video): return video.source.artifact.map { [$0] } ?? []
-                    case .text, .progress, .serviceControl, .serviceInspector, .skill: return []
-                    }
-                }
-            case .prompt, .thinking, .contextCompaction:
-                artifacts = []
-            }
-            for artifact in artifacts {
-                guard artifact.exists else { continue }
-                if seen.insert(artifact.fileName.lowercased()).inserted {
-                    result.append(artifact)
-                }
-            }
-        }
-        return result
+        chat.referencedArtifacts
     }
 
     private var submissionAnchor: Chat.SubmissionAnchor? {
@@ -1183,13 +1155,15 @@ struct ChatPage: View {
         switch dock.kind {
         case .composer:
             let isResting = !composerFocused && composer.isEmpty
-            firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
-                isResting: isResting,
-                showsPromptTemplates: isChatEmpty
+            let showsTopStrip = !chatArtifacts.isEmpty
+                || !chat.attachedServices.isEmpty
+                || isChatEmpty
+                    && !chat.isBusy
                     && composer.draft.isEmpty
                     && composer.draftAttachments.isEmpty
-                    && chat.attachedServices.isEmpty,
-                showsArtifactButton: isResting && !chatArtifacts.isEmpty
+            firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
+                isResting: isResting,
+                showsTopStrip: showsTopStrip
             )
         case .permission,
              .choice,

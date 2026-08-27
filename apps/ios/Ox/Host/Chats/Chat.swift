@@ -536,6 +536,7 @@ final class Chat: Identifiable {
     var currentExecutionFetchCount = 0
     var currentExecutionFetchBytes = 0
     var transcript: [Block] { document.projection }
+    var referencedArtifacts: [Artifact] { document.referencedArtifacts }
     var blocksWithTurnID: [(block: Block, turnID: TurnID)] { document.blocksWithTurnID() }
 
     func pendingPrompt(excluding handled: Set<UUID> = []) -> ChatPendingPrompt? {
@@ -2105,6 +2106,7 @@ final class Chat: Identifiable {
                 attachedServices: attached,
                 definitions: definitions,
                 fileMountPaths: fileMountPaths,
+                artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
                 storageMode: retention == .persisted ? .persisted : .temporary,
                 languageDirective: AppLocale.shared.responseDirective,
                 replyStyle: submission.replyStyle

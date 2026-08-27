@@ -179,6 +179,7 @@ struct ServiceChip: View {
     var onRemove: (() -> Void)? = nil
     var removeAccessibilityIdentifier: String? = nil
     var fill = Theme.Colors.surfaceSunken
+    var surfaceOpacity = 1.0
 
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
@@ -212,7 +213,7 @@ struct ServiceChip: View {
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
-        .chipSurface(fill)
+        .chipSurface(fill.opacity(surfaceOpacity))
     }
 
     private var chip: some View {
@@ -247,7 +248,7 @@ struct ServiceChip: View {
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
-        .chipSurface(fill)
+        .chipSurface(fill.opacity(surfaceOpacity))
     }
 
     private var label: some View {

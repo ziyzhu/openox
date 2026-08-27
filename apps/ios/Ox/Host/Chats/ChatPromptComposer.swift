@@ -5,6 +5,7 @@ enum ChatPromptComposer {
         var attachedServices: [Service.Snapshot] = []
         var definitions: [String: ServiceDefinition] = [:]
         var fileMountPaths: [String] = []
+        var artifactPaths: [String] = []
         var storageMode: StorageMode = .persisted
         var languageDirective: String = ""
         var replyStyle: ReplyStyle = .standard
@@ -115,6 +116,7 @@ enum ChatPromptComposer {
         [
             skillContextSection(state, includeServiceSkills: toolsAvailable),
             toolsAvailable ? serviceContextSection(state) : "",
+            toolsAvailable ? artifactContextSection(state) : "",
             toolsAvailable ? state.storageMode.directive : "",
             state.languageDirective,
             state.replyStyle.directive,
@@ -225,6 +227,11 @@ enum ChatPromptComposer {
             }
         }
         return lines.joined(separator: "\n")
+    }
+
+    private static func artifactContextSection(_ state: TurnContext) -> String {
+        guard !state.artifactPaths.isEmpty else { return "" }
+        return (["## Chat Artifacts"] + state.artifactPaths.map { "- `\($0)`" }).joined(separator: "\n")
     }
 
     private static func skillContextSection(_ state: TurnContext, includeServiceSkills: Bool) -> String {

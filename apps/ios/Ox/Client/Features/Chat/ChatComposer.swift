@@ -385,24 +385,16 @@ enum AttachmentChoice {
 
 struct ChatComposer: View, Equatable {
     static let restingVerticalOffset = Theme.Spacing.md
-    static let artifactButtonHeight: CGFloat = 28
-    static let promptTemplateOverlayOffset = Theme.Size.minimumTouchTarget + Theme.Spacing.xs
 
     static func firstSurfaceTopOffset(
         isResting: Bool,
-        showsPromptTemplates: Bool,
-        showsArtifactButton: Bool
+        showsTopStrip: Bool
     ) -> CGFloat {
         let restingOffset = isResting ? restingVerticalOffset : 0
-        let surfaceTouchInset: CGFloat = if showsPromptTemplates {
-            max(0, (Theme.Size.minimumTouchTarget - Theme.Size.chipHeight) / 2)
-        } else if showsArtifactButton {
-            max(0, (Theme.Size.minimumTouchTarget - artifactButtonHeight) / 2)
-        } else {
-            0
-        }
-        let promptTemplateOffset = showsPromptTemplates ? -promptTemplateOverlayOffset : 0
-        return Theme.Spacing.sm + restingOffset + promptTemplateOffset + surfaceTouchInset
+        let surfaceTouchInset = showsTopStrip
+            ? max(0, (Theme.Size.minimumTouchTarget - Theme.Size.chipHeight) / 2)
+            : 0
+        return Theme.Spacing.sm + restingOffset + surfaceTouchInset
     }
 
     private enum PromptTemplate: String, Identifiable {
@@ -543,7 +535,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var draftAttachmentBottomPadding: CGFloat {
-        attachedServices.isEmpty ? 6 : Theme.Spacing.xs
+        6
     }
 
     private var chipRowEdgeGlow: some View {
@@ -572,12 +564,9 @@ struct ChatComposer: View, Equatable {
     }
 
     @ViewBuilder
-    private var composerAccessoryStrips: some View {
-        if !composer.draftAttachments.isEmpty || !attachedServices.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                draftAttachmentStrip
-                attachedServiceStrip
-            }
+    private var composerDraftStrip: some View {
+        if !composer.draftAttachments.isEmpty {
+            draftAttachmentStrip
         }
     }
 
@@ -641,14 +630,14 @@ struct ChatComposer: View, Equatable {
     }
 
     private var composerCluster: some View {
-        VStack(alignment: .center, spacing: Theme.Spacing.xs) {
-            if showsArtifactButton {
-                artifactButton
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            if showsTopStrip {
+                composerTopStrip
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                composerAccessoryStrips
+                composerDraftStrip
                 composerRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -659,21 +648,14 @@ struct ChatComposer: View, Equatable {
                     .id(appTheme)
             }
         }
-        .overlay(alignment: .top) {
-            if showsPromptTemplates {
-                promptTemplateStrip
-                    .offset(y: -Self.promptTemplateOverlayOffset)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-            }
-        }
     }
 
     private var composerShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
     }
 
-    private var showsArtifactButton: Bool {
-        isResting && !chatArtifacts.isEmpty
+    private var showsTopStrip: Bool {
+        showsPromptTemplates || !chatArtifacts.isEmpty || !attachedServices.isEmpty
     }
 
     private var showsPromptTemplates: Bool {
@@ -682,6 +664,7 @@ struct ChatComposer: View, Equatable {
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
             && attachedServices.isEmpty
+            && chatArtifacts.isEmpty
     }
 
     private var promptTemplatePresented: Binding<Bool> {
@@ -716,13 +699,9 @@ struct ChatComposer: View, Equatable {
                     )
                 }
             }
-            .frame(minWidth: promptTemplateStripWidth)
         }
         .scrollClipDisabled()
-    }
-
-    private var promptTemplateStripWidth: CGFloat {
-        isResting ? restingWidth : max(0, containerWidth - horizontalSpacing * 2)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
     }
 
     private func promptTemplateButton(
@@ -802,7 +781,7 @@ struct ChatComposer: View, Equatable {
         promptSecondaryInput = ""
     }
 
-    private var artifactCountLabel: String {
+    private var artifactAccessibilityLabel: String {
         chatArtifacts.count == 1 ? "1 artifact" : "\(chatArtifacts.count) artifacts"
     }
 
@@ -822,17 +801,22 @@ struct ChatComposer: View, Equatable {
                 .accessibilityIdentifier(A11yID.Chat.Artifact.item(artifact.id))
             }
         } label: {
-            Text(verbatim: artifactCountLabel)
-                .font(Theme.Fonts.captionMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .padding(.horizontal, Theme.Spacing.sm)
-                .frame(height: Self.artifactButtonHeight)
-                .contentShape(Capsule())
+            HStack(spacing: 6) {
+                Image(systemName: OxActionIconKind.artifacts.systemImage)
+                Text("Artifacts")
+                Text(verbatim: "· \(chatArtifacts.count)")
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+            .font(Theme.Fonts.labelMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: Theme.Size.chipHeight)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Capsule())
         .minimumTouchTarget()
-        .accessibilityLabel(Text(verbatim: artifactCountLabel))
+        .accessibilityLabel(Text(verbatim: artifactAccessibilityLabel))
         .accessibilityIdentifier(A11yID.Chat.Artifact.open)
     }
 
@@ -847,24 +831,24 @@ struct ChatComposer: View, Equatable {
     }
 
     @ViewBuilder
-    private var attachedServiceStrip: some View {
-        if !attachedServices.isEmpty {
+    private var composerTopStrip: some View {
+        if showsPromptTemplates {
+            promptTemplateStrip
+        } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(attachedServices) { picked in
-                        attachedServicePill(picked)
+                GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if !chatArtifacts.isEmpty {
+                            artifactButton
+                        }
+                        ForEach(attachedServices) { attachedServicePill($0) }
                     }
                 }
-                .padding(.leading, Theme.Spacing.sm)
-                .padding(.top, attachedServiceTopPadding)
             }
+            .scrollClipDisabled()
+            .frame(minHeight: Theme.Size.minimumTouchTarget)
             .excludesCompactPageSwitch()
-            .overlay { chipRowEdgeGlow }
         }
-    }
-
-    private var attachedServiceTopPadding: CGFloat {
-        composer.draftAttachments.isEmpty ? Theme.Spacing.sm : 0
     }
 
     private var composerRow: some View {
@@ -987,8 +971,12 @@ struct ChatComposer: View, Equatable {
             onRemove: {
                 Log.ui.info("ChatComposer.detachService domain=\(picked.domain)")
                 onRemoveService(picked)
-            }
+            },
+            fill: Theme.Colors.chipOnBackground,
+            surfaceOpacity: 0
         )
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .minimumTouchTarget()
     }
 
     private func composerButton(

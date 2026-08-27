@@ -176,11 +176,42 @@ nonisolated struct ChatDocument {
         }
     }
 
+    var referencedArtifacts: [Artifact] {
+        var seen = Set<String>()
+        var result: [Artifact] = []
+        for block in projection.reversed() {
+            for artifact in Self.artifacts(in: block) where artifact.exists {
+                if seen.insert(artifact.fileName.lowercased()).inserted {
+                    result.append(artifact)
+                }
+            }
+        }
+        return result
+    }
+
     mutating func renameArtifactReferences(from oldName: String, to newName: String, directory: URL) {
         let updated = turns.map { $0.replacingArtifact(named: oldName, with: newName, directory: directory) }
         guard updated != turns else { return }
         turns = updated
         reproject()
+    }
+
+    private static func artifacts(in block: Block) -> [Artifact] {
+        switch block.kind {
+        case .userText(_, let attachments), .userSkill(_, let attachments):
+            attachments
+        case .agentContent(let items):
+            items.flatMap { item in
+                switch item {
+                case .artifact(let artifact): return [artifact]
+                case .shoveler(let shoveler): return shoveler.cards.compactMap(\.artifact)
+                case .video(let video): return video.source.artifact.map { [$0] } ?? []
+                case .text, .progress, .serviceControl, .serviceInspector, .skill: return []
+                }
+            }
+        case .prompt, .thinking, .contextCompaction:
+            []
+        }
     }
 
     mutating func apply(_ event: ChatDocumentEvent) {
