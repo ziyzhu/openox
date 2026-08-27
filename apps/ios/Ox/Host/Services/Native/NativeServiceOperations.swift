@@ -15,6 +15,7 @@ final class NativeServiceOperations {
     let requireActive: () throws -> Void
     let showBrowser: (Service, UUID) -> Void
     let attachTransient: (TransientAttachment) throws -> Void
+    let importArtifact: (TransientAttachment, String) async throws -> Artifact
     let choose: (Prompt) async throws -> String?
 
     init(
@@ -24,6 +25,7 @@ final class NativeServiceOperations {
         requireActive: @escaping () throws -> Void,
         showBrowser: @escaping (Service, UUID) -> Void,
         attachTransient: @escaping (TransientAttachment) throws -> Void,
+        importArtifact: @escaping (TransientAttachment, String) async throws -> Artifact,
         choose: @escaping (Prompt) async throws -> String?
     ) {
         self.id = id
@@ -32,6 +34,7 @@ final class NativeServiceOperations {
         self.requireActive = requireActive
         self.showBrowser = showBrowser
         self.attachTransient = attachTransient
+        self.importArtifact = importArtifact
         self.choose = choose
     }
 
@@ -81,7 +84,13 @@ final class NativeServiceOperations {
             let screenshot = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .screenshot()
-            try attachTransient(screenshot.attachment)
+            let artifact: Artifact?
+            if let filename = fields["filename"]?.stringValue {
+                artifact = try await importArtifact(screenshot.attachment, filename)
+            } else {
+                try attachTransient(screenshot.attachment)
+                artifact = nil
+            }
             return .object([
                 "url": screenshot.url.map { .string($0.absoluteString) } ?? .null,
                 "contentType": .string(screenshot.attachment.mimeType),
@@ -89,6 +98,7 @@ final class NativeServiceOperations {
                 "height": .int(screenshot.height),
                 "bytes": .int(screenshot.attachment.data.count),
                 "attached": .bool(true),
+                "artifact": artifact.map { .string($0.fileName) } ?? .null,
             ])
         case ("ios:browser", "interact"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)

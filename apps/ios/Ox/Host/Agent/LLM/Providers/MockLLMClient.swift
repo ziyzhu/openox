@@ -329,7 +329,7 @@ extension Scenario {
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
-            Entry("89", "browser screenshot — navigate and attach viewport image", .browserScreenshot),
+            Entry("89", "browser screenshot — import viewport image as artifact", .browserScreenshot),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
         ]),
     ]
@@ -369,14 +369,19 @@ extension Scenario {
         if ctx.turn == 1 {
             return [execute("""
             await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open screenshot fixture" });
-            console.log(await ox.service.invoke({ name: "ios:browser:screenshot", input: {}, purpose: "Capture browser viewport" }));
+            console.log(await ox.service.invoke({ name: "ios:browser:screenshot", input: { filename: "Example Screenshot.png" }, purpose: "Capture browser viewport" }));
             """)]
         }
-        let attachments = ctx.toolResults.last?.transientAttachments ?? []
-        guard attachments.count == 1, attachments[0].kind == .image else {
-            return [.say("Browser screenshot was not attached to model context."), .stop(.stop)]
+        let artifacts = ctx.toolResults.last?.content.compactMap { block -> Artifact? in
+            guard case .attachment(let artifact) = block else { return nil }
+            return artifact
+        } ?? []
+        guard artifacts.count == 1,
+              artifacts[0].kind == .image,
+              artifacts[0].fileName.hasPrefix("Example Screenshot") else {
+            return [.say("Browser screenshot was not imported as an artifact."), .stop(.stop)]
         }
-        return [.say("Browser screenshot attached to model context: \(attachments[0].mimeType), \(attachments[0].data.count) bytes. Result: \(output)"), .stop(.stop)]
+        return [.say("Browser screenshot imported as artifact: \(artifacts[0].fileName). Result: \(output)"), .stop(.stop)]
     }
 
     static let markdown = Scenario(name: "markdown", steps: [

@@ -481,6 +481,21 @@ final class Chat: Identifiable {
                 }
                 try appendTransientAttachment(attachment)
             },
+            importArtifact: { [unowned self] attachment, filename in
+                try requireProfileMutation(.artifactImport)
+                let fileExtension = URL(fileURLWithPath: attachment.displayName).pathExtension
+                let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
+                    ? "\(filename).\(fileExtension)"
+                    : filename
+                let artifact = try await ArtifactImporter.importDataAsync(
+                    attachment.data,
+                    suggestedName: suggestedName,
+                    in: scope
+                )
+                embedArtifact(artifact)
+                Log.session.info("Chat.importBrowserScreenshot filename=\(artifact.fileName) bytes=\(attachment.data.count)")
+                return artifact
+            },
             choose: { [unowned self] prompt in
                 if let purpose = prompt.purpose {
                     return try await chooseUser(body: prompt.body, options: prompt.options, purpose: purpose)?.stringValue

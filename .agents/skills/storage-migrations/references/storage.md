@@ -243,6 +243,11 @@ filename reference used by locally created artifacts. Local, iCloud, and
 external Profile locations therefore keep their existing artifact persistence
 and synchronization behavior.
 
+Browser viewport screenshots remain transient unless the action supplies an
+artifact filename. Named screenshots use the same collision-safe import path,
+Profile ownership, live chat reference, and synchronization behavior as other
+artifact imports.
+
 The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 `artifacts/<filename>`, persisted chat history, and source-aware skill and service
 mounts:

@@ -40,7 +40,11 @@ struct ServiceApproval {
         if override == nil, action == "ios:browser:screenshot" {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-            prompt = "\(display) - \(destination)\n\(L10n.string("The screenshot may include signed-in or sensitive information and becomes available to the current model. Always approve applies to every page Browser visits."))"
+            let savesArtifact = (args as? [String: Any])?["filename"] is String
+            let disclosure = savesArtifact
+                ? L10n.string("The screenshot may include signed-in or sensitive information, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits.")
+                : L10n.string("The screenshot may include signed-in or sensitive information and becomes available to the current model. Always approve applies to every page Browser visits.")
+            prompt = "\(display) - \(destination)\n\(disclosure)"
         } else if override == nil, ["ios:browser:executeJavaScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")

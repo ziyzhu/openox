@@ -91,11 +91,18 @@
       "requireAuth": false
     },
     {
-      "description": "Capture Browser's current viewport and attach the image to the model's context.",
+      "description": "Capture Browser's current viewport. Omit filename to attach the image transiently to model context, or provide an artifact basename to import and present it in the current Profile.",
       "id": "screenshot",
       "inputSchema": {
         "additionalProperties": false,
-        "properties": {},
+        "properties": {
+          "filename": {
+            "description": "Optional artifact basename, never a path. When provided, the screenshot is imported and presented as a Profile artifact.",
+            "minLength": 1,
+            "maxLength": 255,
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "label": "Take Screenshot",
@@ -107,9 +114,10 @@
           "width": { "minimum": 1, "type": "integer" },
           "height": { "minimum": 1, "type": "integer" },
           "bytes": { "minimum": 1, "type": "integer" },
-          "attached": { "type": "boolean" }
+          "attached": { "type": "boolean" },
+          "artifact": { "type": ["string", "null"] }
         },
-        "required": ["url", "contentType", "width", "height", "bytes", "attached"],
+        "required": ["url", "contentType", "width", "height", "bytes", "attached", "artifact"],
         "type": "object"
       },
       "requireApproval": true,

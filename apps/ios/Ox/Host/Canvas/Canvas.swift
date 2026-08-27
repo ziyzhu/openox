@@ -202,6 +202,9 @@ final class OxCanvas {
                 attachTransient: { _ in
                     throw RuntimeError.bridge("Browser screenshots are available only to chat agents.")
                 },
+                importArtifact: { _, _ in
+                    throw RuntimeError.bridge("Browser screenshot artifacts are available only to chat agents.")
+                },
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue
                 }
