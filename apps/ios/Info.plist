@@ -37,6 +37,11 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).chat.*</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).scheduled-skills</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

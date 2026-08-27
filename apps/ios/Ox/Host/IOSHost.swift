@@ -58,6 +58,7 @@ final class IOSHost: OxHost {
             _ = Soul.shared
             _ = UserMemory.shared
             await UserMemory.shared.waitUntilCurrent()
+            try ScheduledSkillScheduler.shared.activate()
             isPrepared = true
             Log.app.info("IOSHost prepared")
         }

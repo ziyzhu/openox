@@ -31,6 +31,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
 │   │   ├── external-profiles.json           external profile folder bookmarks
 │   │   ├── device-folder-grants.json         security-scoped folder bookmarks
+│   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
@@ -88,6 +89,7 @@ Primary owners:
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Debug/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
+- Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: tooling/sim-bootstrap.ts
 
 ## Compatibility gate
@@ -334,6 +336,23 @@ directory and `SKILL.md`. Incoming archives remain external until the user
 confirms import; Ox then validates and writes the skill through the same
 active Profile repository path. The archive itself is not retained.
 
+`Application Support/scheduled-skills.json` is a versioned device-owned document
+containing at most 100 scheduled invocations. Each record binds to one Profile UUID
+and stores a frozen user-skill snapshot, optional argument, one-time/daily/weekly
+recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
+with its result chat UUID. The file is validated by `StorageMigrator` before the
+scheduler reads it; unknown versions and malformed or duplicate records fail closed.
+It follows Application Support's normal device-backup policy and never syncs through
+the Profile, preventing one iCloud Profile from executing on several devices.
+
+Only schedules bound to the active Profile execute. A due record for another
+Profile advances once as a failed occurrence and notifies when authorized. Each run
+uses the saved skill snapshot, creates an unselected persisted chat in the bound
+Profile, and advances to the next future occurrence after completion, failure, or
+cancellation. Missed recurring occurrences coalesce into one run rather than being
+replayed. One-time schedules disable after their occurrence. iOS background
+processing is best-effort and may begin after the stored next-occurrence date.
+
 Opening a Profile uses the Files folder picker. Ox validates the selected
 directory's `profile.json`, saves a security-scoped bookmark, and activates the
 directory in place. The profile retains its UUID and is not copied, packaged, or
@@ -457,6 +476,7 @@ secrets.
 | Provider credentials | Keychain | System policy | Sign out or clear credential |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | UserDefaults | Device backup policy | Disconnect the MCP server |
+| Scheduled skill definitions | Application Support | Device backup policy | Delete the schedule or app |
 | Remote MCP OAuth registration and tokens | Keychain | System policy | Disconnect the MCP server |
 | Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |
 | Local repository and service snapshots | Application Support | Excluded from backup | Remove repository or replace snapshot |

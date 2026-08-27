@@ -13,6 +13,7 @@ struct OxApp: App {
     #endif
 
     init() {
+        ScheduledSkillScheduler.shared.register()
         let host = IOSHost.shared
         client = OxClient(host: host)
         #if targetEnvironment(simulator)
@@ -55,7 +56,10 @@ struct OxApp: App {
             .task { await AppRegion.shared.refresh() }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
-                Task { await AppRegion.shared.refresh() }
+                Task {
+                    await AppRegion.shared.refresh()
+                    ScheduledSkillScheduler.shared.refresh()
+                }
             }
         }
     }

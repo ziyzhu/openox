@@ -45,6 +45,11 @@ enum InvocationName: String, CaseIterable {
     case skillCreate = "ox.skill.create"
     case skillCopy = "ox.skill.copy"
     case skillDelete = "ox.skill.delete"
+    case scheduleCreate = "ox.schedule.create"
+    case scheduleList = "ox.schedule.list"
+    case scheduleDelete = "ox.schedule.delete"
+    case scheduleEnable = "ox.schedule.enable"
+    case scheduleRun = "ox.schedule.run"
     case memoryRead = "ox.memory.read"
     case memoryWrite = "ox.memory.write"
     case memoryReplaceText = "ox.memory.replaceText"
@@ -105,6 +110,11 @@ enum InvocationName: String, CaseIterable {
         case .skillCreate: L10n.string("Create a skill")
         case .skillCopy: L10n.string("Copy a skill")
         case .skillDelete: L10n.string("Delete a skill")
+        case .scheduleCreate: L10n.string("Schedule a skill")
+        case .scheduleList: L10n.string("List scheduled skills")
+        case .scheduleDelete: L10n.string("Delete a scheduled skill")
+        case .scheduleEnable: L10n.string("Change a scheduled skill")
+        case .scheduleRun: L10n.string("Run a scheduled skill")
         case .memoryRead: L10n.string("Read memory")
         case .memoryWrite, .memoryReplaceText: L10n.string("Update memory")
         case .artifactList: L10n.string("List artifacts")
@@ -133,7 +143,8 @@ enum InvocationName: String, CaseIterable {
              .serviceGitStatus, .serviceGitLog, .serviceGitShow, .serviceGitDiff, .serviceGitCheckout, .serviceGitCommit,
              .serviceGitRevert, .serviceGitRestore,
              .serviceAttach, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach: .services
-        case .skillCreate, .skillCopy, .skillDelete: .skills
+        case .skillCreate, .skillCopy, .skillDelete,
+             .scheduleCreate, .scheduleList, .scheduleDelete, .scheduleEnable, .scheduleRun: .skills
         case .memoryRead, .memoryWrite, .memoryReplaceText: .memory
         case .widgetShoveler, .widgetVideo: .widgets
         case .userChoose, .userReportProgress: .chats

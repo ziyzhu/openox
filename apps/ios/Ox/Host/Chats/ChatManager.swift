@@ -237,6 +237,26 @@ final class ChatManager {
         await startNewChat().submitAndWait(prompt, attachments: attachments)
     }
 
+    func runScheduledSkill(
+        _ schedule: ScheduledSkill,
+        executionLease: Chat.ExecutionLease
+    ) async -> (ChatSubmissionOutcome, UUID?) {
+        ensureRepositoryScope()
+        guard repositoryScope.profileID == schedule.profileID else {
+            return (.failed("The scheduled skill's Profile is not active."), nil)
+        }
+        let chat = makeChat(executionLease: executionLease)
+        chat.rename(to: "Scheduled /\(schedule.skill.displayName)")
+        chat.attachServiceDomains(schedule.skill.services)
+        hydrationOrdinal &+= 1
+        records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
+        let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)
+        let outcome = await scheduledOutcome(chat: chat, invocation: invocation)
+        _ = await flushAllNow()
+        Log.session.info("ChatManager.scheduled finished schedule=\(schedule.id) chat=\(chat.id) outcome=\(outcome.logLabel)")
+        return (outcome, chat.id)
+    }
+
     func continueAndWait(
         _ rawID: UUID,
         prompt: String,
@@ -594,7 +614,10 @@ final class ChatManager {
 
     #endif
 
-    private func makeChat(retention: ChatRetention = .persisted) -> Chat {
+    private func makeChat(
+        retention: ChatRetention = .persisted,
+        executionLease: Chat.ExecutionLease = .userInitiated
+    ) -> Chat {
         let client = llmRegistry.newSessionClient
         let chat = Chat(
             client: client,
@@ -604,11 +627,41 @@ final class ChatManager {
             virtualMachine: virtualMachine,
             presentations: presentations,
             serviceManager: serviceManager,
-            retention: retention
+            retention: retention,
+            executionLease: executionLease
         )
         attachPersistence(chat)
         Log.session.info("ChatManager created chat=\(chat.id) retention=\(String(describing: retention))")
         return chat
+    }
+
+    private func scheduledOutcome(
+        chat: Chat,
+        invocation: UserSkillInvocation
+    ) async -> ChatSubmissionOutcome {
+        await withTaskGroup(of: ChatSubmissionOutcome.self) { group in
+            group.addTask { @MainActor in
+                await chat.submitAndWait(
+                    invocation.expandedIntent,
+                    skillInvocation: invocation
+                )
+            }
+            group.addTask { @MainActor in
+                while !Task.isCancelled {
+                    if chat.hasPendingInteraction {
+                        return .failed("The scheduled skill needs attention in Ox.")
+                    }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                return .cancelled
+            }
+            let outcome = await group.next() ?? .cancelled
+            group.cancelAll()
+            if case .failed = outcome, chat.hasPendingInteraction {
+                chat.cancelAll()
+            }
+            return outcome
+        }
     }
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {

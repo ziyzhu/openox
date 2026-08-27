@@ -407,6 +407,19 @@ risk:** an adversarial model can alter or remove user-authored skill text withou
 a separate confirmation, matching the product decision that skill edits are
 content changes rather than actions.
 
+### T12 — Scheduled skill executes changed or unapproved future work
+The model schedules persistent instructions or later edits a skill so future
+execution differs from what the user authorized. **Mitigation:** schedules are
+device-owned records bound to one Profile and store a frozen user-skill snapshot,
+argument, and recurrence. Creating, enabling, disabling, deleting, or manually
+running a schedule through the agent requires a native one-time confirmation that
+cannot become a standing approval. Editing the source skill never changes the
+snapshot. A scheduled run retains every normal service, Files, private-data,
+authentication, and payment boundary; work that needs an interactive answer stops
+and notifies the user. **Residual risk:** iOS controls background launch timing and
+may delay or terminate an occurrence; previously granted standing action approvals
+remain effective during scheduled runs until the user revokes them.
+
 ## Out of scope
 
 - **A user attacking their own device.** Ox is local-first; a person who

@@ -9,6 +9,7 @@ nonisolated enum OxFunctionCatalog {
         ("fs", "List, read, write, edit, delete, and search Ox files."),
         ("output", "Retrieve complete captured JavaScript output."),
         ("skill", "Create, copy, and delete Profile-owned skills."),
+        ("schedule", "Create, inspect, pause, resume, run, and delete scheduled skill invocations."),
         ("artifact", "Attach content, import files, rename artifacts, and show existing artifacts."),
         ("widget", "Display structured content in the conversation."),
     ]
@@ -22,6 +23,7 @@ nonisolated enum OxFunctionCatalog {
         OxFileSystem.function,
         OxOutput.function,
         OxSkills.function,
+        OxSchedules.function,
         OxArtifacts.function,
         OxWidgets.function,
     ]

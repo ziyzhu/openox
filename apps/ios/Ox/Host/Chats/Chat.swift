@@ -39,6 +39,11 @@ nonisolated private struct ChatContextRestoration: Sendable {
 @MainActor
 @Observable
 final class Chat: Identifiable {
+    enum ExecutionLease {
+        case userInitiated
+        case externallyManaged
+    }
+
     private enum AgentHapticPhase {
         case waitingForDelta
         case deltaReceived
@@ -736,6 +741,7 @@ final class Chat: Identifiable {
     private var runState: RunState = .idle
     private var submissions: [Submission] = []
     var isBusy: Bool { runState.isRunning }
+    var hasPendingInteraction: Bool { interaction != nil }
     @ObservationIgnored private var eventConsumer: Task<Void, Never>?
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
@@ -749,6 +755,7 @@ final class Chat: Identifiable {
     @ObservationIgnored private var agentRunCancelled = false
     @ObservationIgnored private var backgroundExecutionExpired = false
     @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ChatSubmissionOutcome, Never>] = [:]
+    @ObservationIgnored private let executionLease: ExecutionLease
 
     private let outputDelivery = OutputDelivery()
     @ObservationIgnored private var streamingDeliveryContinuation: CheckedContinuation<Void, Never>?
@@ -775,7 +782,8 @@ final class Chat: Identifiable {
          virtualMachine: VirtualMachine,
          presentations: AppPresentations,
          serviceManager: ServiceManager,
-         retention: ChatRetention = .persisted) {
+         retention: ChatRetention = .persisted,
+         executionLease: ExecutionLease = .userInitiated) {
         self.id = id
         self.createdAt = createdAt
         self.client = client
@@ -785,6 +793,7 @@ final class Chat: Identifiable {
         self.presentations = presentations
         self.serviceManager = serviceManager
         self.retention = retention
+        self.executionLease = executionLease
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
         Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) server=\(serviceManager.serverURL.absoluteString)")
@@ -889,7 +898,8 @@ final class Chat: Identifiable {
         virtualMachine: VirtualMachine,
         presentations: AppPresentations,
         serviceManager: ServiceManager,
-        retention: ChatRetention = .persisted
+        retention: ChatRetention = .persisted,
+        executionLease: ExecutionLease = .userInitiated
     ) {
         self.init(
             id: meta.id,
@@ -901,7 +911,8 @@ final class Chat: Identifiable {
             virtualMachine: virtualMachine,
             presentations: presentations,
             serviceManager: serviceManager,
-            retention: retention
+            retention: retention,
+            executionLease: executionLease
         )
         monoRepositoryHash = meta.monoRepositoryHash
         customTitle = meta.title
@@ -1501,6 +1512,21 @@ final class Chat: Identifiable {
         }
     }
 
+    func confirmScheduledSkillChange(action: String, prompt: String) async throws {
+        runState.backgroundExecution?.updatePhase(.permissionNeeded)
+        let cancel = L10n.string("Cancel")
+        let answer = await awaitPrompt(
+            prompt: prompt,
+            options: [action, cancel],
+            kind: .permission,
+            presentation: .application,
+            autoApproval: nil
+        )
+        guard answer == action else {
+            throw RuntimeError.bridge("The scheduled skill change was cancelled.")
+        }
+    }
+
     private func requestApproval(action: String, args: Any? = nil, prompt: String? = nil) async -> ApprovalOutcome {
         await ServiceApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, args: args, prompt: prompt) { request in
             runState.backgroundExecution?.updatePhase(.permissionNeeded)
@@ -1654,6 +1680,7 @@ final class Chat: Identifiable {
     func submitAndWait(
         _ intent: String,
         attachments: [Artifact] = [],
+        skillInvocation: UserSkillInvocation? = nil,
         replyStyle: ReplyStyle = .standard
     ) async -> ChatSubmissionOutcome {
         let submissionID = SubmissionID()
@@ -1667,7 +1694,7 @@ final class Chat: Identifiable {
                 enqueue(
                     intent,
                     attachments: attachments,
-                    skillInvocation: nil,
+                    skillInvocation: skillInvocation,
                     replyStyle: replyStyle,
                     submissionID: submissionID
                 )
@@ -2041,7 +2068,9 @@ final class Chat: Identifiable {
     }
 
     private func startBackgroundExecution() {
-        guard let runID = runState.id, runState.backgroundExecution == nil else { return }
+        guard executionLease == .userInitiated,
+              let runID = runState.id,
+              runState.backgroundExecution == nil else { return }
         let execution = ChatBackgroundExecution(chatID: id, runID: runID) { [weak self] in
             self?.expireBackgroundExecution(runID: runID)
         }

@@ -171,6 +171,20 @@ nonisolated enum StorageMigrator {
             as: [DeviceFolderStore.Grant].self,
             component: "folder grants"
         )
+        if FileManager.default.fileExists(atPath: AppStoragePaths.scheduledSkills.path) {
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let document = try decoder.decode(
+                    ScheduledSkillsDocument.self,
+                    from: Data(contentsOf: AppStoragePaths.scheduledSkills)
+                )
+                _ = try document.validated()
+            } catch {
+                Log.app.error("StorageMigrator.validate component=scheduled skills failed=\(error.localizedDescription)")
+                throw StorageMigrationError.invalidApplicationStorage("scheduled skills")
+            }
+        }
 
         let defaults = UserDefaults.standard
         if defaults.object(forKey: ServiceManager.remoteMCPKey) != nil {
