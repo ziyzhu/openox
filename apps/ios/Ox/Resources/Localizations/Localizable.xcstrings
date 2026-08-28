@@ -6576,13 +6576,13 @@
         }
       }
     },
-    "Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you." : {
+    "Ox turns websites into reusable actions, then runs them much faster than you could by hand." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 把网站变成可重复使用的操作。你可以直接使用已有的操作，也可以让 Ox 为你创建新的操作。"
+            "value" : "Ox 把网站变成可重复使用的操作，再以远快于手动点击的速度执行它们。"
           }
         }
       }

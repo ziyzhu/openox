@@ -4,11 +4,11 @@
 
 <h1>OpenOx</h1>
 
-OpenOx: A protocol for self-evolving agents that live on mobile devices.
+OpenOx: A protocol for an open ecosystem of self-evolving agents.
 
 <h3>
 
-[Website](https://openox.ai) · [Discord](https://discord.gg/7baSAHZTA)
+[Website](https://openox.ai) · [TestFlight](https://testflight.apple.com/join/Y3x7nxj9) · [Discord](https://discord.gg/7baSAHZTA)
 
 </h3>
 
@@ -19,13 +19,13 @@ OpenOx: A protocol for self-evolving agents that live on mobile devices.
 
 ---
 
-Each such agent is called an Ox that implements the following three principles:
+Each self-evolving agent is called an Ox. Every Ox follows three principles:
 
-1. Acts everywhere. Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you.
-2. Yours, by design. Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
-3. Peace of mind. Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
+1. **Acts everywhere** — Ox turns websites into reusable actions, then runs them much faster than you could by hand.
+2. **Distributed evolution** — Each Ox self-evolves by creating new actions and skills locally. It can also co-evolve with other Ox by sharing and adopting capabilities through repositories.
+3. **Stays yours** — Ox runs on your device, keeps your data there, and works with any model provider including self-hosted. It asks before sensitive actions and isolates account credentials in the web page.
 
-The first implementation of Ox is an iOS Client and Host whose source code is included in this repository. You can download it via TestFlight [here](https://testflight.apple.com/join/Y3x7nxj9).
+The first implementation of Ox is an iOS app whose source code is included in this repository. Download it via TestFlight [here](https://testflight.apple.com/join/Y3x7nxj9).
 
 ## Components
 
@@ -43,11 +43,9 @@ The first implementation of Ox is an iOS Client and Host whose source code is in
   - **Actions** — Typed operations the agent can invoke.
   - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
 
-[`docs/PROTOCOL.md`](docs/PROTOCOL.md) maps the contracts between these components to their authoritative code.
+## Distributed Evolution
 
-## Self-Evolution
-
-The VM is also how Ox evolves. Ox can invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
+Each Ox can self-evolve locally and, optionally, co-evolve with others. An Ox self-evolves through the VM, which lets it invoke an existing service while creating another one. On iOS, the built-in Browser device service can navigate and inspect a target website, perform approved interactions, and capture the relevant network exchanges. Ox can use that evidence to create a reusable web service:
 
 1. The agent invokes Browser or another attached service from the VM to gather evidence for the required capability.
 2. The agent uses `ox.fs` to write or revise the service manifest, actions, and optional skills in its Local Service Repository.
@@ -55,7 +53,7 @@ The VM is also how Ox evolves. Ox can invoke an existing service while creating 
 4. The agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
 5. Local Git can record the changes for inspection, reversal, and publication.
 
-Ox can therefore gain and apply a capability without rebuilding or updating the Host or Client.
+An Ox can therefore gain and apply a capability independently, without rebuilding or updating the Host or Client. Co-evolution is optional: an Ox can publish capabilities to shared repositories and install capabilities created by other Ox.
 
 ## Ox Client
 

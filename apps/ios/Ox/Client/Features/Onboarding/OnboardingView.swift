@@ -31,7 +31,7 @@ struct OnboardingView: View {
 
             slide(
                 title: "Acts everywhere",
-                description: "Ox turns websites into reusable actions. You can use one that already exists or ask Ox to build a new one for you."
+                description: "Ox turns websites into reusable actions, then runs them much faster than you could by hand."
             ) {
                 VStack(spacing: Theme.Spacing.md) {
                     WebsitesDemo(height: welcomeIllustrationHeight)
