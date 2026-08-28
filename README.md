@@ -36,12 +36,8 @@ The first implementation of Ox is an iOS app whose source code is included in th
 - **Ox Agent** — The reasoning and tool-using process that pursues the user's goals using the selected model, the state in an Ox Profile, and the capabilities exposed through the Ox VM.
 - **Ox Model Provider** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the agent’s persistent state: its identity, memory, skills, artifacts, and conversation history.
-- **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code.
-  - **`ox.*`** — Explicit Host capabilities for interacting with the Profile, services, web, user, and device.
-  - **`ox.fs`** — A virtual filesystem that mounts Profile content, system and service skills, service definitions, persisted chats, and user-granted files while enforcing the read and write permissions of each source.
-- **Ox Service Repository** — A versioned collection of services described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service may provide:
-  - **Actions** — Typed operations the agent can invoke.
-  - **Skills** — Reusable instructions that teach the agent when and how to use those actions.
+- **Ox VM** — The platform-neutral agent execution contract supplied by an Ox Host. The iOS Host implements it with a sandboxed JavaScript runtime where the agent writes and executes code. Through `ox.*`, the VM exposes explicit Host capabilities for interacting with the Profile, services, web, user, and device. Its `ox.fs` virtual filesystem mounts Profile content, skills, service definitions, persisted chats, and user-granted files while enforcing each source’s permissions.
+- **Ox Service Repository** — A versioned collection of services described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service exposes typed actions the agent can invoke and may include reusable skills that teach the agent when and how to use them.
 
 ## Distributed Evolution
 

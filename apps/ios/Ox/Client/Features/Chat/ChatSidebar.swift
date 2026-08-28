@@ -151,7 +151,8 @@ struct ChatSidebar: View {
             : summaries.filter { $0.displayTitle.localizedStandardContains(query) }
         let sorted = matching.sorted { $0.activityDate > $1.activityDate }
         let pinned = sorted.filter(\.isFavorite)
-        let recents = sorted.filter { !$0.isFavorite }
+        let scheduled = sorted.filter { !$0.isFavorite && $0.scheduledSkillID != nil }
+        let recents = sorted.filter { !$0.isFavorite && $0.scheduledSkillID == nil }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 servicesRow
@@ -162,15 +163,21 @@ struct ChatSidebar: View {
                     sectionHeader("Pinned")
                     ForEach(pinned) { row($0) }
                 }
-                sectionHeader("Recents")
-                if recents.isEmpty {
-                    Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .padding(.horizontal, edgeInset)
-                        .padding(.vertical, 11)
-                } else {
-                    ForEach(recents) { row($0) }
+                if !scheduled.isEmpty {
+                    sectionHeader("Scheduled")
+                    ForEach(scheduled) { row($0) }
+                }
+                if !recents.isEmpty || (pinned.isEmpty && scheduled.isEmpty) {
+                    sectionHeader("Recents")
+                    if recents.isEmpty {
+                        Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
+                            .font(Theme.Fonts.bodyMd)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .padding(.horizontal, edgeInset)
+                            .padding(.vertical, 11)
+                    } else {
+                        ForEach(recents) { row($0) }
+                    }
                 }
                 Color.clear.frame(height: Theme.Spacing.md)
             }
@@ -263,7 +270,13 @@ struct ChatSidebar: View {
             } preview: {
                 ChatContextMenuPreview(meta: meta)
             }
-            .id(meta.id.uuidString + (meta.isFavorite ? ".pinned" : ".recent"))
+            .id(meta.id.uuidString + rowSectionSuffix(meta))
+    }
+
+    private func rowSectionSuffix(_ meta: ChatMeta) -> String {
+        if meta.isFavorite { return ".pinned" }
+        if meta.scheduledSkillID != nil { return ".scheduled" }
+        return ".recent"
     }
 
 }

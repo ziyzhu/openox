@@ -208,6 +208,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
     var attachedServiceDomains: [String]
     var preview: String?
     var hasUnreadResponse: Bool
+    var scheduledSkillID: UUID?
 
     init(
         schemaVersion: Int = ChatFormat.currentSchemaVersion,
@@ -221,7 +222,8 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         monoRepositoryHash: String?,
         attachedServiceDomains: [String],
         preview: String?,
-        hasUnreadResponse: Bool = false
+        hasUnreadResponse: Bool = false,
+        scheduledSkillID: UUID? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.id = id
@@ -235,6 +237,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         self.attachedServiceDomains = attachedServiceDomains
         self.preview = preview
         self.hasUnreadResponse = hasUnreadResponse
+        self.scheduledSkillID = scheduledSkillID
     }
 
     var displayTitle: String {
@@ -258,6 +261,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         case attachedServiceDomains
         case preview
         case hasUnreadResponse
+        case scheduledSkillID
     }
 
     init(from decoder: Decoder) throws {
@@ -274,6 +278,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         attachedServiceDomains = try values.decode([String].self, forKey: .attachedServiceDomains)
         preview = try values.decodeIfPresent(String.self, forKey: .preview)
         hasUnreadResponse = try values.decodeIfPresent(Bool.self, forKey: .hasUnreadResponse) ?? false
+        scheduledSkillID = try values.decodeIfPresent(UUID.self, forKey: .scheduledSkillID)
     }
 }
 

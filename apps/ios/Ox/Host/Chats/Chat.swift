@@ -159,6 +159,7 @@ final class Chat: Identifiable {
 
     let id: UUID
     let createdAt: Date
+    let scheduledSkillID: UUID?
     let agent: Agent
     let javaScriptOutputs = JavaScriptOutputStore()
     @ObservationIgnored private(set) var agentSnapshot: AgentSnapshot?
@@ -492,7 +493,7 @@ final class Chat: Identifiable {
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
                     : filename
-                let artifact = try await ArtifactImporter.importDataAsync(
+                let artifact = try await ArtifactImporter.importPreparedImageDataAsync(
                     attachment.data,
                     suggestedName: suggestedName,
                     in: scope
@@ -783,9 +784,11 @@ final class Chat: Identifiable {
          presentations: AppPresentations,
          serviceManager: ServiceManager,
          retention: ChatRetention = .persisted,
-         executionLease: ExecutionLease = .userInitiated) {
+         executionLease: ExecutionLease = .userInitiated,
+         scheduledSkillID: UUID? = nil) {
         self.id = id
         self.createdAt = createdAt
+        self.scheduledSkillID = scheduledSkillID
         self.client = client
         self.repository = repository
         self.scope = scope
@@ -912,7 +915,8 @@ final class Chat: Identifiable {
             presentations: presentations,
             serviceManager: serviceManager,
             retention: retention,
-            executionLease: executionLease
+            executionLease: executionLease,
+            scheduledSkillID: meta.scheduledSkillID
         )
         monoRepositoryHash = meta.monoRepositoryHash
         customTitle = meta.title
@@ -948,7 +952,8 @@ final class Chat: Identifiable {
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
             preview: document.preview,
-            hasUnreadResponse: hasUnreadResponse
+            hasUnreadResponse: hasUnreadResponse,
+            scheduledSkillID: scheduledSkillID
         )
     }
 

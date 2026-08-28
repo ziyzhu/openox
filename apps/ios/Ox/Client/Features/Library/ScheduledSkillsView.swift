@@ -1,5 +1,156 @@
 import SwiftUI
 
+struct SkillSchedulesSection: View {
+    let skill: Skill
+
+    @State private var scheduledSkills = ScheduledSkills.shared
+    @State private var editor: ScheduledSkillEditorTarget?
+    @State private var pendingDelete: ScheduledSkill?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("Schedules")
+                .font(Theme.Fonts.labelMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .padding(.horizontal, Theme.Spacing.sm)
+
+            if schedules.isEmpty {
+                Text("Run this skill once or on a repeating schedule.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(.horizontal, Theme.Spacing.sm)
+            } else {
+                ForEach(schedules) { schedule in
+                    scheduleRow(schedule)
+                }
+            }
+
+            Button {
+                editor = ScheduledSkillEditorTarget(skill: skill)
+            } label: {
+                Chip(fill: Theme.Colors.chipOnBackground) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Add schedule")
+                        .font(Theme.Fonts.labelMd)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .minimumTouchTarget(alignment: .leading)
+            .accessibilityIdentifier(A11yID.Settings.skillSchedule(skill.name))
+        }
+        .sheet(item: $editor) { target in
+            NavigationStack {
+                ScheduledSkillEditorView(target: target)
+            }
+            .presentationBackground(Theme.Colors.background)
+        }
+        .alert(
+            "Delete this schedule?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let schedule = pendingDelete {
+                    do {
+                        try scheduledSkills.delete(id: schedule.id)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
+        .alert("Couldn't Update Schedule", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private var schedules: [ScheduledSkill] {
+        scheduledSkills.schedules(profileID: StorageRoot.shared.activeId).filter {
+            $0.skill.name == skill.name
+        }
+    }
+
+    private func scheduleRow(_ schedule: ScheduledSkill) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Button {
+                editor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(schedule.recurrence.displaySummary)
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                    if !schedule.isEnabled {
+                        Text("Paused")
+                            .font(Theme.Fonts.captionSm)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    } else if schedule.recurrence.isRepeating,
+                              let next = schedule.nextFireAt {
+                        Text("Next \(next.formatted(date: .abbreviated, time: .shortened))")
+                            .font(Theme.Fonts.captionSm)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(A11yID.Settings.scheduleRow(schedule.id.uuidString))
+
+            Toggle("Enabled", isOn: scheduleEnabledBinding(schedule))
+                .labelsHidden()
+                .tint(Theme.Colors.primary)
+                .accessibilityIdentifier(A11yID.Settings.scheduleEnabled(schedule.id.uuidString))
+        }
+        .padding(Theme.Spacing.sm)
+        .background(
+            Theme.Colors.surface,
+            in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+        )
+        .contextMenu {
+            Button {
+                ScheduledSkillScheduler.shared.runNow(id: schedule.id)
+            } label: {
+                Label("Run Now", systemImage: "play")
+            }
+            Button {
+                editor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                pendingDelete = schedule
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func scheduleEnabledBinding(_ schedule: ScheduledSkill) -> Binding<Bool> {
+        Binding(
+            get: { scheduledSkills.schedule(id: schedule.id)?.isEnabled ?? false },
+            set: { enabled in
+                do {
+                    try scheduledSkills.setEnabled(enabled, id: schedule.id)
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        )
+    }
+}
+
 struct ScheduledSkillEditorTarget: Identifiable {
     let id = UUID()
     let skill: Skill
@@ -21,7 +172,6 @@ private enum ScheduledSkillEditorFrequency: String, CaseIterable, Identifiable {
 
 struct ScheduledSkillEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var argument: String
     @State private var frequency: ScheduledSkillEditorFrequency
     @State private var date: Date
     @State private var weekday: Int
@@ -33,7 +183,6 @@ struct ScheduledSkillEditorView: View {
     init(target: ScheduledSkillEditorTarget) {
         self.target = target
         let initial = Self.initialValues(target.schedule)
-        _argument = State(initialValue: target.schedule?.argument ?? "")
         _frequency = State(initialValue: initial.frequency)
         _date = State(initialValue: initial.date)
         _weekday = State(initialValue: initial.weekday)
@@ -41,19 +190,6 @@ struct ScheduledSkillEditorView: View {
 
     var body: some View {
         Form {
-            Section {
-                Text(verbatim: "/\(target.skill.displayName)")
-                Text(target.skill.description)
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                TextField("Optional instructions for this run", text: $argument, axis: .vertical)
-                    .lineLimit(2...5)
-            } header: {
-                Text("Skill Snapshot")
-            } footer: {
-                Text("This schedule keeps a frozen copy of the skill. Later skill edits won't change it.")
-            }
-
             Section {
                 Picker("Repeat", selection: $frequency) {
                     ForEach(ScheduledSkillEditorFrequency.allCases) { value in
@@ -64,19 +200,15 @@ struct ScheduledSkillEditorView: View {
                 case .once:
                     DatePicker("Run At", selection: $date, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                 case .daily:
-                    DatePicker("Time", selection: $date, displayedComponents: .hourAndMinute)
+                    DatePicker("Run At", selection: $date, displayedComponents: .hourAndMinute)
                 case .weekly:
                     Picker("Day", selection: $weekday) {
                         ForEach(Array(Calendar.autoupdatingCurrent.weekdaySymbols.enumerated()), id: \.offset) { index, name in
                             Text(name).tag(index + 1)
                         }
                     }
-                    DatePicker("Time", selection: $date, displayedComponents: .hourAndMinute)
+                    DatePicker("Run At", selection: $date, displayedComponents: .hourAndMinute)
                 }
-            } header: {
-                Text("Schedule")
-            } footer: {
-                Text("iOS chooses the actual background start time, so scheduled runs may begin later than shown. Actions that need approval stop and notify you.")
             }
         }
         .scrollContentBackground(.hidden)
@@ -119,13 +251,13 @@ struct ScheduledSkillEditorView: View {
                 try ScheduledSkills.shared.update(
                     id: schedule.id,
                     skill: schedule.skill,
-                    argument: argument,
+                    argument: schedule.argument,
                     recurrence: recurrence
                 )
             } else {
                 try ScheduledSkills.shared.create(
                     skill: target.skill,
-                    argument: argument,
+                    argument: "",
                     recurrence: recurrence,
                     profileID: StorageRoot.shared.activeId
                 )

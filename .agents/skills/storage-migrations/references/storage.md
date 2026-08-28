@@ -172,7 +172,8 @@ Each persisted chat owns one directory:
 - `chat.json` contains `ChatMeta`: schema version, identity, dates, title,
   favorite state, provider/model choice, MonoRepository hash, attached
   services, sidebar preview, and whether the latest completed response is
-  unread.
+  unread. Chats created by a scheduled skill execution also retain that
+  schedule's identifier so clients can group them separately from recent chats.
 - `turns.jsonl` contains one semantic `Turn` per line. Stable IDs and tagged
   outcomes represent user turns, agent generations, reasoning, text, executions,
   prompts, tool calls, and effects. UI blocks and provider wire messages are
@@ -245,10 +246,12 @@ filename reference used by locally created artifacts. Local, iCloud, and
 external Profile locations therefore keep their existing artifact persistence
 and synchronization behavior.
 
-Browser viewport screenshots remain transient unless the action supplies an
-artifact filename. Named screenshots use the same collision-safe import path,
-Profile ownership, live chat reference, and synchronization behavior as other
-artifact imports.
+Browser full-page screenshots remain transient unless the action supplies an
+artifact filename. Captures preserve native display resolution where possible,
+constrain taller pages by the image pixel and dimension budgets, and remain PNG
+or JPEG. Named screenshots use the same collision-safe import path, Profile
+ownership, live chat reference, and synchronization behavior as other artifact
+imports.
 
 The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 `artifacts/<filename>`, persisted chat history, and source-aware skill and service

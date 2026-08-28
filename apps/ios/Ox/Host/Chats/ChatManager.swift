@@ -245,7 +245,10 @@ final class ChatManager {
         guard repositoryScope.profileID == schedule.profileID else {
             return (.failed("The scheduled skill's Profile is not active."), nil)
         }
-        let chat = makeChat(executionLease: executionLease)
+        let chat = makeChat(
+            executionLease: executionLease,
+            scheduledSkillID: schedule.id
+        )
         chat.rename(to: "Scheduled /\(schedule.skill.displayName)")
         chat.attachServiceDomains(schedule.skill.services)
         hydrationOrdinal &+= 1
@@ -616,7 +619,8 @@ final class ChatManager {
 
     private func makeChat(
         retention: ChatRetention = .persisted,
-        executionLease: Chat.ExecutionLease = .userInitiated
+        executionLease: Chat.ExecutionLease = .userInitiated,
+        scheduledSkillID: UUID? = nil
     ) -> Chat {
         let client = llmRegistry.newSessionClient
         let chat = Chat(
@@ -628,7 +632,8 @@ final class ChatManager {
             presentations: presentations,
             serviceManager: serviceManager,
             retention: retention,
-            executionLease: executionLease
+            executionLease: executionLease,
+            scheduledSkillID: scheduledSkillID
         )
         attachPersistence(chat)
         Log.session.info("ChatManager created chat=\(chat.id) retention=\(String(describing: retention))")

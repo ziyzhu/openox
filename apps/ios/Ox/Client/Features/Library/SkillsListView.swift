@@ -68,9 +68,6 @@ struct SkillsListView: View {
     @Binding private var editing: SkillDraft?
     @State private var pendingDelete: Skill?
     @State private var scheduledSkills = ScheduledSkills.shared
-    @State private var scheduleEditor: ScheduledSkillEditorTarget?
-    @State private var pendingScheduleDelete: ScheduledSkill?
-    @State private var scheduleErrorMessage: String?
     @State private var query = ""
 
     init(
@@ -117,12 +114,6 @@ struct SkillsListView: View {
             SkillEditorView(draft: draft, skills: skills)
                 .id(draft.id)
         }
-        .sheet(item: $scheduleEditor) { target in
-            NavigationStack {
-                ScheduledSkillEditorView(target: target)
-            }
-            .presentationBackground(Theme.Colors.background)
-        }
         .alert(
             "Delete /\(pendingDelete?.displayName ?? "")?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
@@ -133,53 +124,19 @@ struct SkillsListView: View {
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
-        .alert(
-            "Delete this schedule?",
-            isPresented: Binding(
-                get: { pendingScheduleDelete != nil },
-                set: { if !$0 { pendingScheduleDelete = nil } }
-            )
-        ) {
-            Button("Delete", role: .destructive) {
-                if let schedule = pendingScheduleDelete {
-                    do {
-                        try scheduledSkills.delete(id: schedule.id)
-                    } catch {
-                        scheduleErrorMessage = error.localizedDescription
-                    }
-                }
-                pendingScheduleDelete = nil
-            }
-            Button("Cancel", role: .cancel) { pendingScheduleDelete = nil }
-        }
-        .alert("Couldn't Update Schedule", isPresented: Binding(
-            get: { scheduleErrorMessage != nil },
-            set: { if !$0 { scheduleErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { scheduleErrorMessage = nil }
-        } message: {
-            Text(scheduleErrorMessage ?? "")
-        }
     }
 
     private var skillList: some View {
         ScrollView {
             LazyVStack(spacing: Theme.Spacing.sm) {
-                let displayedSkills = displayedSkills
-                let displayedSchedules = displayedSchedules
-                if skills.all.isEmpty && activeSchedules.isEmpty {
+                let displayed = displayedSkills
+                if skills.all.isEmpty {
                     emptyNote
-                } else if displayedSkills.isEmpty && displayedSchedules.isEmpty {
+                } else if displayed.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
-                    ForEach(displayedSkills) { skill in
+                    ForEach(displayed) { skill in
                         row(skill)
-                    }
-                    if !displayedSchedules.isEmpty {
-                        scheduleSectionHeader(hasSkills: !displayedSkills.isEmpty)
-                        ForEach(displayedSchedules) { schedule in
-                            scheduleRow(schedule)
-                        }
                     }
                 }
             }
@@ -208,31 +165,20 @@ struct SkillsListView: View {
         scheduledSkills.schedules(profileID: StorageRoot.shared.activeId)
     }
 
-    private var displayedSchedules: [ScheduledSkill] {
-        guard !query.isEmpty else { return activeSchedules }
-        return activeSchedules.filter {
-            $0.skill.name.localizedCaseInsensitiveContains(query)
-                || $0.skill.description.localizedCaseInsensitiveContains(query)
-                || $0.recurrence.displaySummary.localizedCaseInsensitiveContains(query)
-        }
+    private var scheduledSkillNames: Set<String> {
+        Set(activeSchedules.map(\.skill.name))
     }
 
     private func row(_ skill: Skill) -> some View {
         SidebarSafeSkillButton(skill: skill) {
             editing = SkillDraft(skill)
         } label: {
-            SkillLibraryRow(skill: skill)
+            SkillLibraryRow(skill: skill, hasSchedules: scheduledSkillNames.contains(skill.name))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(A11yID.Settings.skillRow(skill.name))
         .contextMenuPreviewShape()
         .contextMenu {
-            Button {
-                scheduleEditor = ScheduledSkillEditorTarget(skill: skill)
-            } label: {
-                Label("Schedule", systemImage: "clock.badge.plus")
-            }
-            .accessibilityIdentifier(A11yID.Settings.skillSchedule(skill.name))
             ShareLink(
                 item: SkillPackageDocument(skill: skill),
                 preview: SharePreview(Text(verbatim: "/\(skill.displayName)"))
@@ -250,81 +196,16 @@ struct SkillsListView: View {
             SkillContextMenuPreview(skill: skill)
         }
     }
-
-    private func scheduleSectionHeader(hasSkills: Bool) -> some View {
-        Text("Scheduled")
-            .font(Theme.Fonts.labelMd)
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, hasSkills ? Theme.Spacing.lg : 0)
-    }
-
-    private func scheduleRow(_ schedule: ScheduledSkill) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Button {
-                scheduleEditor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
-            } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: "/\(schedule.skill.displayName)")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    Text(schedule.recurrence.displaySummary)
-                        .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    if schedule.recurrence.isRepeating,
-                       let next = schedule.nextFireAt,
-                       schedule.isEnabled {
-                        Text("Next \(next.formatted(date: .abbreviated, time: .shortened))")
-                            .font(Theme.Fonts.captionSm)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(A11yID.Settings.scheduleRow(schedule.id.uuidString))
-            Toggle("Enabled", isOn: scheduleEnabledBinding(schedule))
-                .labelsHidden()
-                .tint(Theme.Colors.primary)
-                .accessibilityIdentifier(A11yID.Settings.scheduleEnabled(schedule.id.uuidString))
-        }
-        .padding(.vertical, Theme.Spacing.xs)
-        .contextMenu {
-            Button {
-                ScheduledSkillScheduler.shared.runNow(id: schedule.id)
-            } label: {
-                Label("Run Now", systemImage: "play")
-            }
-            Button {
-                scheduleEditor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            Button(role: .destructive) {
-                pendingScheduleDelete = schedule
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-    }
-
-    private func scheduleEnabledBinding(_ schedule: ScheduledSkill) -> Binding<Bool> {
-        Binding(
-            get: { scheduledSkills.schedule(id: schedule.id)?.isEnabled ?? false },
-            set: { enabled in
-                do {
-                    try scheduledSkills.setEnabled(enabled, id: schedule.id)
-                } catch {
-                    scheduleErrorMessage = error.localizedDescription
-                }
-            }
-        )
-    }
 }
 
 struct SkillLibraryRow: View {
     let skill: Skill
+    let hasSchedules: Bool
+
+    init(skill: Skill, hasSchedules: Bool = false) {
+        self.skill = skill
+        self.hasSchedules = hasSchedules
+    }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -338,6 +219,12 @@ struct SkillLibraryRow: View {
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
+            if hasSchedules {
+                Image(systemName: "clock")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .accessibilityLabel("Scheduled")
+            }
         }
         .padding(.vertical, Theme.Spacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -430,11 +317,13 @@ struct SkillEditorView: View {
                     Text("A skill named /\(SkillFiles.displayName(slug)) already exists.")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.error)
+                        .padding(.horizontal, Theme.Spacing.sm)
                 }
 
                 Text("Describe when this skill is useful.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(.horizontal, Theme.Spacing.sm)
 
                 TextField("Description", text: $description, axis: .vertical)
                     .font(Theme.Fonts.bodyMd)
@@ -450,6 +339,7 @@ struct SkillEditorView: View {
                 Text("These instructions drop into the message box when you pick the skill in a chat.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(.horizontal, Theme.Spacing.sm)
 
                 TextEditor(text: $instructions)
                     .focused($instructionsFocused)
@@ -457,7 +347,7 @@ struct SkillEditorView: View {
                     .foregroundStyle(Theme.Colors.onSurface)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 220, alignment: .topLeading)
-                    .padding(Theme.Spacing.sm)
+                    .padding(.horizontal, 3)
                     .background(
                         Theme.Colors.surface,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -465,6 +355,10 @@ struct SkillEditorView: View {
                     .accessibilityIdentifier(A11yID.Settings.skillInstructions)
 
                 serviceSection
+
+                if let skill = persistedSkill {
+                    SkillSchedulesSection(skill: skill)
+                }
             }
             .padding(Theme.Spacing.lg)
         }
@@ -492,6 +386,7 @@ struct SkillEditorView: View {
             Text("Picking this skill auto-attaches these services to the chat.")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .padding(.horizontal, Theme.Spacing.sm)
 
             ChipFlowLayout(spacing: 6) {
                 ForEach(services, id: \.self) { domain in
@@ -502,6 +397,11 @@ struct SkillEditorView: View {
             .padding(.vertical, 5)
             .padding(.horizontal, 2)
         }
+    }
+
+    private var persistedSkill: Skill? {
+        guard let originalName else { return nil }
+        return skills.skill(named: originalName)
     }
 
     private func servicePill(_ domain: String) -> some View {

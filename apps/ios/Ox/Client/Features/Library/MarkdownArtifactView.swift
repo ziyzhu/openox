@@ -82,6 +82,7 @@ struct MarkdownArtifactView: View {
                 )
             }
         }
+        .interactiveDismissDisabled(mode == .editing)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.chatSurface)
         .toolbar {

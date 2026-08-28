@@ -805,6 +805,17 @@ nonisolated enum ImagePreparer {
         return try encode(UIImage(cgImage: image), lossless: lossless)
     }
 
+    static func preparePreservingResolution(_ data: Data) throws -> PreparedImage {
+        let inspection = try inspect(data)
+        if inspection.type.conforms(to: .png) {
+            return PreparedImage(data: data, mimeType: "image/png", fileExtension: "png")
+        }
+        if inspection.type.conforms(to: .jpeg) {
+            return PreparedImage(data: data, mimeType: "image/jpeg", fileExtension: "jpg")
+        }
+        throw ImagePreparationError.invalid
+    }
+
     static func prepare(_ image: UIImage, suggestedName: String?) throws -> PreparedImage {
         let width = Int(image.size.width * image.scale)
         let height = Int(image.size.height * image.scale)
@@ -880,6 +891,17 @@ nonisolated public enum ArtifactImporter {
         return try await write(draft, in: scope)
     }
 
+    static func importPreparedImageDataAsync(
+        _ data: Data,
+        suggestedName: String,
+        in scope: ProfileScope
+    ) async throws -> Artifact {
+        let draft = try await Task.detached(priority: .userInitiated) {
+            try preparedImageDataDraft(data, suggestedName: suggestedName)
+        }.value
+        return try await write(draft, in: scope)
+    }
+
     private static func imageDraft(_ image: UIImage, suggestedName: String?) throws -> Draft {
         do {
             let prepared = try ImagePreparer.prepare(image, suggestedName: suggestedName)
@@ -897,6 +919,18 @@ nonisolated public enum ArtifactImporter {
             return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
         } catch ImagePreparationError.encode {
             throw ArtifactError.imageEncodeFailed
+        } catch {
+            throw ArtifactError.imageDecodeFailed
+        }
+    }
+
+    private static func preparedImageDataDraft(_ data: Data, suggestedName: String?) throws -> Draft {
+        guard data.count <= ArtifactLimits.fileBytes else {
+            throw ArtifactError.fileTooLarge(bytes: data.count, limit: ArtifactLimits.fileBytes)
+        }
+        do {
+            let prepared = try ImagePreparer.preparePreservingResolution(data)
+            return Draft(data: prepared.data, fileName: prepared.filename(from: suggestedName))
         } catch {
             throw ArtifactError.imageDecodeFailed
         }

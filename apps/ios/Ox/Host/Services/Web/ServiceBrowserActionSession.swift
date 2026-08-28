@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 import WebKit
 
 @MainActor
@@ -44,6 +45,8 @@ final class ServiceBrowserActionSession {
     private var captureRecords: [JSONValue] = []
     private var injectedScripts: [(domains: [String], source: String)] = []
     private var captureActive = false
+
+    private static let maximumScreenshotPixelDimension = 65_536.0
 
     init(id: UUID, service: Service) {
         self.id = id
@@ -109,15 +112,26 @@ final class ServiceBrowserActionSession {
                 throw RuntimeError.bridge("ios:browser:screenshot couldn't determine Browser's full-page dimensions.")
             }
             let rect = CGRect(x: 0, y: 0, width: CGFloat(rawWidth), height: CGFloat(rawHeight))
-            let longest = max(rawWidth, rawHeight)
-            let exportScale = min(1, Double(ArtifactLimits.imageMaxDimension) / longest)
-            let snapshotWidth = CGFloat(rawWidth * exportScale)
+            let displayScale = Double(UIScreen.main.scale)
+            let aspectRatio = rawHeight / rawWidth
+            let nativePixelWidth = rawWidth * displayScale
+            let pixelBudgetWidth = sqrt(
+                (Double(ArtifactLimits.imagePixels) - Self.maximumScreenshotPixelDimension) / aspectRatio
+            )
+            let dimensionBudgetWidth = Self.maximumScreenshotPixelDimension / aspectRatio
+            let targetPixelWidth = floor(max(1, min(
+                nativePixelWidth,
+                Double(ArtifactLimits.imageMaxDimension),
+                pixelBudgetWidth,
+                dimensionBudgetWidth
+            )))
+            let snapshotWidth = CGFloat(targetPixelWidth / displayScale)
             let data = try await page.page.exported(as: .image(region: .rect(rect), snapshotWidth: snapshotWidth))
             guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
             let prepared: PreparedImage
             let inspection: ImagePreparer.Inspection
             do {
-                prepared = try ImagePreparer.prepare(data)
+                prepared = try ImagePreparer.preparePreservingResolution(data)
                 inspection = try ImagePreparer.inspect(prepared.data)
             } catch {
                 throw RuntimeError.bridge("ios:browser:screenshot couldn't prepare Browser's full-page image.")
