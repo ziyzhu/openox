@@ -863,8 +863,8 @@ struct ChatPage: View {
         renderedBlocks: [ChatBlock]
     ) -> some View {
         let lastBlockID = renderedBlocks.last?.id
-        let lastAgentBlockID = renderedBlocks.last { block in
-            if case .agentContent = block.kind { true } else { false }
+        let lastResponseFooterID = renderedBlocks.last { block in
+            if case .responseFooter(_, .settled) = block.kind { true } else { false }
         }?.id
         let anchoredViewportHeight = max(
             0,
@@ -900,10 +900,7 @@ struct ChatPage: View {
                     scroller.geometryChanged(new)
                 }
                 .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 1) { ids in
-                    guard let target = scroller.visibleBlocksChanged(ids) else { return }
-                    scroller.revealAboveKeyboard(target) {
-                        proxy.scrollTo(ChatScrollTarget.bottom, anchor: .bottom)
-                    }
+                    scroller.visibleBlocksChanged(ids)
                 }
                 .onScrollPhaseChange { old, new in
                     scroller.phaseChanged(from: old, to: new)
@@ -957,9 +954,17 @@ struct ChatPage: View {
                 .onChange(of: anyInputFocused) { _, focused in
                     scroller.focusChanged(
                         focused,
-                        lastAgentBlockID: lastAgentBlockID,
+                        lastResponseFooterID: lastResponseFooterID,
                         isBusy: chat.isBusy
                     )
+                }
+                .task(id: scroller.keyboardClearanceRequest) {
+                    guard let target = scroller.keyboardClearanceRequest else { return }
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    scroller.revealAboveKeyboard(target) {
+                        proxy.scrollTo(target)
+                    }
                 }
                 .task(id: bottomScrollRequest) {
                     guard bottomScrollRequest > 0 else { return }

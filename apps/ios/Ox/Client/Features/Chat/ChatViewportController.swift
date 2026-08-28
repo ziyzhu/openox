@@ -55,10 +55,24 @@ final class ChatViewportController {
         }
     }
 
+    private enum KeyboardClearance: Equatable {
+        case idle
+        case watching(UUID)
+        case requested(UUID)
+
+        var request: UUID? {
+            guard case .requested(let id) = self else { return nil }
+            return id
+        }
+    }
+
     private static let jumpThreshold: CGFloat = 32
 
     private(set) var showsJumpButton = false
     private(set) var visibleBlockID: UUID?
+    private var keyboardClearance = KeyboardClearance.idle
+
+    var keyboardClearanceRequest: UUID? { keyboardClearance.request }
 
     var isUserScrolling: Bool {
         if case .user = motion { return true }
@@ -70,7 +84,6 @@ final class ChatViewportController {
     @ObservationIgnored private var motion = Motion.stationary
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
     @ObservationIgnored private var visibleBlockIDs: Set<UUID> = []
-    @ObservationIgnored private var keyboardClearanceTarget: UUID?
 
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
         self.chatID = chatID
@@ -79,7 +92,7 @@ final class ChatViewportController {
         showsJumpButton = false
         visibleBlockID = nil
         visibleBlockIDs = []
-        keyboardClearanceTarget = nil
+        keyboardClearance = .idle
         move(to: .bottom)
         Log.ui.info("Transcript.open chat=\(chatID) target=bottom")
     }
@@ -115,37 +128,40 @@ final class ChatViewportController {
         Log.ui.info("Transcript.pageAnchor chat=\(chatID) block=\(id)")
     }
 
-    func visibleBlocksChanged(_ ids: [UUID]) -> UUID? {
+    func visibleBlocksChanged(_ ids: [UUID]) {
         visibleBlockID = ids.first
         visibleBlockIDs = Set(ids)
-        guard let target = keyboardClearanceTarget,
-              !visibleBlockIDs.contains(target) else { return nil }
-        keyboardClearanceTarget = nil
-        return target
+        guard case .watching(let target) = keyboardClearance,
+              !visibleBlockIDs.contains(target) else { return }
+        keyboardClearance = .requested(target)
     }
 
-    func focusChanged(_ focused: Bool, lastAgentBlockID: UUID?, isBusy: Bool) {
+    func focusChanged(_ focused: Bool, lastResponseFooterID: UUID?, isBusy: Bool) {
         guard focused, !isBusy,
-              let lastAgentBlockID,
-              visibleBlockIDs.contains(lastAgentBlockID) else {
-            keyboardClearanceTarget = nil
+              let lastResponseFooterID,
+              visibleBlockIDs.contains(lastResponseFooterID) else {
+            keyboardClearance = .idle
             return
         }
-        keyboardClearanceTarget = lastAgentBlockID
+        keyboardClearance = .watching(lastResponseFooterID)
     }
 
     func revealAboveKeyboard(_ id: UUID, scroll: () -> Void) {
-        scroll()
+        guard case .requested(id) = keyboardClearance else { return }
+        withAnimation(.easeOut(duration: Theme.Animation.standard)) {
+            scroll()
+        }
+        keyboardClearance = .idle
         Log.ui.info("Transcript.keyboardClearance chat=\(chatID) block=\(id)")
     }
 
     func busyChanged(_ busy: Bool) {
-        if busy { keyboardClearanceTarget = nil }
+        if busy { keyboardClearance = .idle }
     }
 
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         if new.isUserDriven {
-            keyboardClearanceTarget = nil
+            keyboardClearance = .idle
             motion = .user(new)
         } else if new == .idle {
             motion = .stationary
