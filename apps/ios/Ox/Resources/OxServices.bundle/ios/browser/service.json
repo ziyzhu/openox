@@ -44,6 +44,321 @@
       "requireAuth": false
     },
     {
+      "description": "Reload Browser's current page, optionally revalidating all resources from their origin.",
+      "id": "reload",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fromOrigin": {
+            "description": "When true, revalidate the page and its resources from their origin.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "label": "Reload",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Stop Browser's current page load.",
+      "id": "stopLoading",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Stop Loading",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "stopped": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "stopped",
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Navigate Browser to the previous item in its history.",
+      "id": "goBack",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Go Back",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "navigated": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "navigated",
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Navigate Browser to the next item in its history.",
+      "id": "goForward",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Go Forward",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "navigated": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "navigated",
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read Browser's back, current, and forward navigation history.",
+      "id": "getNavigationHistory",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Get Navigation History",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "back": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "initialUrl": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "initialUrl",
+                "title",
+                "url"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "current": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "initialUrl": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "initialUrl",
+                  "title",
+                  "url"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "forward": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "initialUrl": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "initialUrl",
+                "title",
+                "url"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "back",
+          "current",
+          "forward"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Read Browser's current page URL, title, loading state, progress, security state, Screen Time blocking state, and fullscreen state.",
+      "id": "getPageInfo",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "label": "Get Page Info",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "estimatedProgress": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "fullscreenState": {
+            "enum": [
+              "enteringFullscreen",
+              "exitingFullscreen",
+              "inFullscreen",
+              "notInFullscreen",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "hasOnlySecureContent": {
+            "type": "boolean"
+          },
+          "isBlockedByScreenTime": {
+            "type": "boolean"
+          },
+          "isLoading": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "estimatedProgress",
+          "isLoading",
+          "hasOnlySecureContent",
+          "isBlockedByScreenTime",
+          "fullscreenState"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "description": "Wait until Browser finishes its next navigation.",
+      "id": "waitForNavigation",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "timeoutMs": {
+            "description": "Maximum wait in milliseconds. Defaults to 15000.",
+            "maximum": 120000,
+            "minimum": 100,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "label": "Wait for Navigation",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
       "description": "Add a chat row the user can tap to view Browser's live page.",
       "id": "inspect",
       "inputSchema": {
@@ -91,13 +406,13 @@
       "requireAuth": false
     },
     {
-      "description": "Capture Browser's complete page. Omit filename to attach the full-page image transiently to model context, or provide an artifact basename to import and present it in the current Profile.",
-      "id": "screenshot",
+      "description": "Export Browser's complete page as a PDF. Omit filename to attach the PDF transiently to model context, or provide an artifact basename to import and present it in the current Profile.",
+      "id": "exportPdf",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
           "filename": {
-            "description": "Optional artifact basename, never a path. When provided, the screenshot is imported and presented as a Profile artifact.",
+            "description": "Optional artifact basename, never a path. When provided, the PDF is imported and presented as a Profile artifact.",
             "minLength": 1,
             "maxLength": 255,
             "type": "string"
@@ -105,7 +420,7 @@
         },
         "type": "object"
       },
-      "label": "Take Full Page Screenshot",
+      "label": "Export PDF",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -117,16 +432,11 @@
           },
           "contentType": {
             "enum": [
-              "image/png",
-              "image/jpeg"
+              "application/pdf"
             ],
             "type": "string"
           },
-          "width": {
-            "minimum": 1,
-            "type": "integer"
-          },
-          "height": {
+          "pages": {
             "minimum": 1,
             "type": "integer"
           },
@@ -147,8 +457,7 @@
         "required": [
           "url",
           "contentType",
-          "width",
-          "height",
+          "pages",
           "bytes",
           "attached",
           "artifact"

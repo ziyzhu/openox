@@ -329,7 +329,7 @@ extension Scenario {
             Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
             Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
-            Entry("89", "browser screenshot — import full-page image as artifact", .browserScreenshot),
+            Entry("89", "browser PDF — export full page as artifact", .browserPDF),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
         ]),
     ]
@@ -352,15 +352,15 @@ extension Scenario {
 
     public static var echo: Scenario { Scenario(name: "echo", steps: [.say(menuText), .stop(.stop)]) }
 
-    static let browserScreenshot = Scenario(name: "browserScreenshot") { ctx in
+    static let browserPDF = Scenario(name: "browserPDF") { ctx in
         if ctx.turn == 0 {
             return [execute("""
-            const matches = await ox.service.find({ query: "browser screenshot", purpose: "Find Browser" });
+            const matches = await ox.service.find({ query: "browser PDF", purpose: "Find Browser" });
             const browser = matches.find((service) => service.domain === "ios:browser");
             if (!browser) throw new Error("Browser service not found");
             await ox.fs.read({ path: browser.manifestPath, purpose: "Read Browser manifest" });
             await ox.service.attach({ domain: browser.domain, purpose: "Attach Browser" });
-            console.log(await ox.service.inspect({ domain: browser.domain, actions: ["navigate", "screenshot"], purpose: "Inspect Browser actions" }));
+            console.log(await ox.service.inspect({ domain: browser.domain, actions: ["navigate", "exportPdf"], purpose: "Inspect Browser actions" }));
             """)]
         }
         guard let output = ctx.resultText("execute") else {
@@ -368,35 +368,30 @@ extension Scenario {
         }
         if ctx.turn == 1 {
             return [execute("""
-            await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open screenshot fixture" });
-            const dimensions = await ox.service.invoke({
+            await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open PDF fixture" });
+            await ox.service.invoke({
               name: "ios:browser:executeScript",
               input: { script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };" },
-              purpose: "Create tall screenshot fixture"
+              purpose: "Create tall PDF fixture"
             });
-            const screenshot = await ox.service.invoke({ name: "ios:browser:screenshot", input: { filename: "Example Screenshot.png" }, purpose: "Capture full browser page" });
-            console.log({ dimensions, screenshot });
+            const pdf = await ox.service.invoke({ name: "ios:browser:exportPdf", input: { filename: "Example Page.pdf" }, purpose: "Export full browser page" });
+            console.log({ pdf });
             """)]
         }
         let result = JSONValue.parse(jsonString: output)?.objectValue
-        let dimensions = result?["dimensions"]?.objectValue
-        let screenshot = result?["screenshot"]?.objectValue
+        let pdf = result?["pdf"]?.objectValue
         let artifacts = ctx.toolResults.last?.content.compactMap { block -> Artifact? in
             guard case .attachment(let artifact) = block else { return nil }
             return artifact
         } ?? []
-        guard let viewportHeight = dimensions?["viewportHeight"]?.doubleValue,
-              let documentHeight = dimensions?["documentHeight"]?.doubleValue,
-              let width = screenshot?["width"]?.doubleValue,
-              let height = screenshot?["height"]?.doubleValue,
-              documentHeight > viewportHeight,
-              height > width,
+        guard let pages = pdf?["pages"]?.doubleValue,
+              pages >= 1,
               artifacts.count == 1,
-              artifacts[0].kind == .image,
-              artifacts[0].fileName.hasPrefix("Example Screenshot") else {
-            return [.say("Browser screenshot did not include the complete tall page."), .stop(.stop)]
+              artifacts[0].kind == .pdf,
+              artifacts[0].fileName.hasPrefix("Example Page") else {
+            return [.say("Browser did not export the page as a PDF."), .stop(.stop)]
         }
-        return [.say("Browser screenshot imported as artifact: \(artifacts[0].fileName). Result: \(output)"), .stop(.stop)]
+        return [.say("Browser PDF imported as artifact: \(artifacts[0].fileName). Result: \(output)"), .stop(.stop)]
     }
 
     static let markdown = Scenario(name: "markdown", steps: [

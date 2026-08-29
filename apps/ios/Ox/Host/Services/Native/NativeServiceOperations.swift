@@ -67,6 +67,48 @@ final class NativeServiceOperations {
                 throw RuntimeError.bridge("ios:browser:navigate requires an absolute HTTP or HTTPS URL that Browser can load.")
             }
             return .object(["url": .string(landed.absoluteString)])
+        case ("ios:browser", "reload"):
+            let landed = await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .reload(fromOrigin: fields["fromOrigin"]?.boolValue ?? false)
+            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
+        case ("ios:browser", "stopLoading"):
+            let url = try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .stopLoading()
+            return .object([
+                "stopped": .bool(true),
+                "url": url.map { .string($0.absoluteString) } ?? .null,
+            ])
+        case ("ios:browser", "goBack"):
+            let landed = await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .goBack()
+            return .object([
+                "navigated": .bool(landed != nil),
+                "url": landed.map { .string($0.absoluteString) } ?? .null,
+            ])
+        case ("ios:browser", "goForward"):
+            let landed = await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .goForward()
+            return .object([
+                "navigated": .bool(landed != nil),
+                "url": landed.map { .string($0.absoluteString) } ?? .null,
+            ])
+        case ("ios:browser", "getNavigationHistory"):
+            return try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .navigationHistory()
+        case ("ios:browser", "getPageInfo"):
+            return try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .pageInfo()
+        case ("ios:browser", "waitForNavigation"):
+            let landed = try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
+            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "inspect"):
             _ = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
@@ -80,23 +122,22 @@ final class NativeServiceOperations {
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .executeScript(script)
-        case ("ios:browser", "screenshot"):
-            let screenshot = try await serviceManager.browserActionSessions
+        case ("ios:browser", "exportPdf"):
+            let pdf = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .screenshot()
+                .exportPDF()
             let artifact: Artifact?
             if let filename = fields["filename"]?.stringValue {
-                artifact = try await importArtifact(screenshot.attachment, filename)
+                artifact = try await importArtifact(pdf.attachment, filename)
             } else {
-                try attachTransient(screenshot.attachment)
+                try attachTransient(pdf.attachment)
                 artifact = nil
             }
             return .object([
-                "url": screenshot.url.map { .string($0.absoluteString) } ?? .null,
-                "contentType": .string(screenshot.attachment.mimeType),
-                "width": .int(screenshot.width),
-                "height": .int(screenshot.height),
-                "bytes": .int(screenshot.attachment.data.count),
+                "url": pdf.url.map { .string($0.absoluteString) } ?? .null,
+                "contentType": .string(pdf.attachment.mimeType),
+                "pages": .int(pdf.pages),
+                "bytes": .int(pdf.attachment.data.count),
                 "attached": .bool(true),
                 "artifact": artifact.map { .string($0.fileName) } ?? .null,
             ])

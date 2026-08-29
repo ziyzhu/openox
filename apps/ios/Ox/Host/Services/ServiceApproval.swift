@@ -37,13 +37,13 @@ struct ServiceApproval {
         let display = approvalLabel(for: action)
         let details = Self.approvalDetails(args)
         var prompt = override ?? (details.isEmpty ? display : "\(display)\n\(details)")
-        if override == nil, action == "ios:browser:screenshot" {
+        if override == nil, action == "ios:browser:exportPdf" {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
             let savesArtifact = (args as? [String: Any])?["filename"] is String
             let disclosure = savesArtifact
-                ? L10n.string("The full-page screenshot may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits.")
-                : L10n.string("The full-page screenshot may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always approve applies to every page Browser visits.")
+                ? L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits.")
+                : L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always approve applies to every page Browser visits.")
             prompt = "\(display) - \(destination)\n\(disclosure)"
         } else if override == nil, ["ios:browser:executeScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage

@@ -114,6 +114,7 @@ nonisolated enum StorageMigrator {
             defaults: .standard,
             key: ProviderRegistry.customProvidersKey
         )
+        removeRetiredAutoApproveActions()
         migrateTheme()
         Log.app.info("StorageMigrator.application done")
     }
@@ -155,6 +156,18 @@ nonisolated enum StorageMigrator {
             defaults.synchronize()
         }
         Log.app.info("StorageMigrator.theme migrated saved=\(saved)")
+    }
+
+    private static func removeRetiredAutoApproveActions(
+        defaults: UserDefaults = .standard,
+        key: String = ServiceManager.autoApproveKey
+    ) {
+        let retired = Set(["ios:browser:screenshot"])
+        let stored = defaults.stringArray(forKey: key) ?? []
+        let retained = stored.filter { !retired.contains($0) }
+        guard retained.count != stored.count else { return }
+        defaults.set(retained, forKey: key)
+        Log.app.info("StorageMigrator.autoApproveActions retired=\(stored.count - retained.count)")
     }
 
     private static func validateApplicationStorage() throws {

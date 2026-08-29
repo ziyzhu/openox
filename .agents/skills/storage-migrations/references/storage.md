@@ -116,6 +116,10 @@ The app-group `app.theme` value is the single theme source shared by the app and
 ShareExtension. On first launch after upgrading, the app copies a legacy standard
 UserDefaults value into the app group and removes the legacy value.
 
+Application migration removes standing approvals for retired action identifiers.
+It does not transfer approval to replacement actions, so a replacement that can
+expose user data requires fresh consent.
+
 ## Profiles
 
 A profile is a directory whose `profile.json` contains its stable UUID, creation
@@ -251,12 +255,10 @@ filename reference used by locally created artifacts. Local, iCloud, and
 external Profile locations therefore keep their existing artifact persistence
 and synchronization behavior.
 
-Browser full-page screenshots remain transient unless the action supplies an
-artifact filename. Captures preserve native display resolution where possible,
-constrain taller pages by the image pixel and dimension budgets, and remain PNG
-or JPEG. Named screenshots use the same collision-safe import path, Profile
-ownership, live chat reference, and synchronization behavior as other artifact
-imports.
+Browser full-page PDF exports remain transient unless the action supplies an
+artifact filename. Named exports use the same validation, collision-safe import
+path, Profile ownership, live chat reference, and synchronization behavior as
+other PDF artifact imports.
 
 The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 `artifacts/<filename>`, persisted chat history, and source-aware skill and service

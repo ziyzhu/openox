@@ -9632,6 +9632,26 @@
         }
       }
     },
+    "The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always approve applies to every page Browser visits." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，并会提供给当前模型。“始终批准”适用于“浏览器”访问的每个页面。"
+          }
+        }
+      }
+    },
+    "The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，会作为资料保存到当前配置档案中，并会提供给当前模型。“始终批准”适用于“浏览器”访问的每个页面。"
+          }
+        }
+      }
+    },
     "The Ox API endpoint that serves the service catalog. Point it at any host running the Ox server protocol." : {
       "extractionState" : "manual",
       "localizations" : {

@@ -843,7 +843,7 @@ final class Service: NSObject, Identifiable {
 
     enum NavigationCommand {
         case load(URLRequest)
-        case reload
+        case reload(fromOrigin: Bool)
         case back
         case forward
     }

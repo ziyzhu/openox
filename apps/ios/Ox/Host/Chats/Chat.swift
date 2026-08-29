@@ -483,7 +483,7 @@ final class Chat: Identifiable {
             },
             attachTransient: { [unowned self] attachment in
                 guard document.hasOpenExecution else {
-                    throw RuntimeError.bridge("Browser screenshots require an active agent execution.")
+                    throw RuntimeError.bridge("Browser exports require an active agent execution.")
                 }
                 try appendTransientAttachment(attachment)
             },
@@ -493,13 +493,13 @@ final class Chat: Identifiable {
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
                     : filename
-                let artifact = try await ArtifactImporter.importPreparedImageDataAsync(
+                let artifact = try await ArtifactImporter.importDataAsync(
                     attachment.data,
                     suggestedName: suggestedName,
                     in: scope
                 )
                 embedArtifact(artifact)
-                Log.session.info("Chat.importBrowserScreenshot filename=\(artifact.fileName) bytes=\(attachment.data.count)")
+                Log.session.info("Chat.importBrowserExport filename=\(artifact.fileName) bytes=\(attachment.data.count)")
                 return artifact
             },
             choose: { [unowned self] prompt in

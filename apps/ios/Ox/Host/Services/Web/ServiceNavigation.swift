@@ -84,8 +84,8 @@ extension Service {
         await performNavigation(.load(URLRequest(url: url)), in: page, label: "load", timeout: timeout)
     }
 
-    func reload(_ page: ServiceWebPage, timeout: TimeInterval = 15) async -> URL? {
-        await performNavigation(.reload, in: page, label: "reload", timeout: timeout)
+    func reload(_ page: ServiceWebPage, fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {
+        await performNavigation(.reload(fromOrigin: fromOrigin), in: page, label: "reload", timeout: timeout)
     }
 
     func goBack(_ page: ServiceWebPage, timeout: TimeInterval = 15) async -> URL? {
@@ -185,8 +185,8 @@ extension Service {
             switch command {
             case .load(let request):
                 session.page.load(request)
-            case .reload:
-                session.page.reload()
+            case .reload(let fromOrigin):
+                session.page.reload(fromOrigin: fromOrigin)
             case .back:
                 guard let item = session.page.backForwardList.backList.last else {
                     transitionNavigation(.startFailed(lease), on: session)

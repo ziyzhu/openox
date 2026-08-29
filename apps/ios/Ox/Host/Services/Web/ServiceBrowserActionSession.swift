@@ -1,15 +1,13 @@
 import Foundation
 import Observation
-import UIKit
 import WebKit
 
 @MainActor
 final class ServiceBrowserActionSession {
-    struct Screenshot {
+    struct ExportedPDF {
         let url: URL?
         let attachment: TransientAttachment
-        let width: Int
-        let height: Int
+        let pages: Int
     }
 
     private final class CaptureSink: NSObject, WKScriptMessageHandler {
@@ -46,8 +44,6 @@ final class ServiceBrowserActionSession {
     private var injectedScripts: [(domains: [String], source: String)] = []
     private var captureActive = false
 
-    private static let maximumScreenshotPixelDimension = 65_536.0
-
     init(id: UUID, service: Service) {
         self.id = id
         self.service = service
@@ -69,10 +65,83 @@ final class ServiceBrowserActionSession {
         return await service.navigate(url, in: page, timeout: timeout)
     }
 
-    func reload(timeout: TimeInterval = 15) async -> URL? {
+    func reload(fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {
         guard let action = await service.inspectionAction(),
               let page = try? await page(for: action) else { return nil }
-        return await service.reload(page, timeout: timeout)
+        return await service.reload(page, fromOrigin: fromOrigin, timeout: timeout)
+    }
+
+    func stopLoading() async throws -> URL? {
+        let page = try await inspectionPage()
+        page.page.stopLoading()
+        Log.webView.info("Browser.stopLoading host=\(page.page.url?.host?.lowercased() ?? "?")")
+        return page.page.url
+    }
+
+    func goBack(timeout: TimeInterval = 15) async -> URL? {
+        guard let action = await service.inspectionAction(),
+              let page = try? await page(for: action) else { return nil }
+        return await service.goBack(page, timeout: timeout)
+    }
+
+    func goForward(timeout: TimeInterval = 15) async -> URL? {
+        guard let action = await service.inspectionAction(),
+              let page = try? await page(for: action) else { return nil }
+        return await service.goForward(page, timeout: timeout)
+    }
+
+    func navigationHistory() async throws -> JSONValue {
+        let page = try await inspectionPage()
+        let webPage = page.page
+        let history = webPage.backForwardList
+        return .object([
+            "back": .array(history.backList.map(Self.historyItem)),
+            "current": history.currentItem.map(Self.historyItem) ?? .null,
+            "forward": .array(history.forwardList.map(Self.historyItem)),
+        ])
+    }
+
+    func pageInfo() async throws -> JSONValue {
+        let page = try await inspectionPage()
+        let webPage = page.page
+        let fullscreenState: String = switch webPage.fullscreenState {
+        case .enteringFullscreen: "enteringFullscreen"
+        case .exitingFullscreen: "exitingFullscreen"
+        case .inFullscreen: "inFullscreen"
+        case .notInFullscreen: "notInFullscreen"
+        @unknown default: "unknown"
+        }
+        return .object([
+            "url": webPage.url.map { .string($0.absoluteString) } ?? .null,
+            "title": .string(webPage.title),
+            "estimatedProgress": .double(webPage.estimatedProgress),
+            "isLoading": .bool(webPage.isLoading),
+            "hasOnlySecureContent": .bool(webPage.hasOnlySecureContent),
+            "isBlockedByScreenTime": .bool(webPage.isBlockedByScreenTime),
+            "fullscreenState": .string(fullscreenState),
+        ])
+    }
+
+    func waitForNavigation(timeoutMilliseconds: Int) async throws -> URL? {
+        let page = try await inspectionPage()
+        let webPage = page.page
+        return try await withThrowingTaskGroup(of: URL?.self) { group in
+            group.addTask { @MainActor in
+                for try await event in webPage.navigations {
+                    if event == .finished { return webPage.url }
+                }
+                throw RuntimeError.bridge("ios:browser:waitForNavigation ended before navigation finished.")
+            }
+            group.addTask { @MainActor in
+                try await Task.sleep(for: .milliseconds(timeoutMilliseconds))
+                throw RuntimeError.bridge("ios:browser:waitForNavigation timed out.")
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else {
+                throw RuntimeError.bridge("ios:browser:waitForNavigation produced no result.")
+            }
+            return result
+        }
     }
 
     func executeScript(_ script: String) async throws -> JSONValue {
@@ -85,70 +154,30 @@ final class ServiceBrowserActionSession {
         return try await service.executeBrowserJavaScript(script, action: action, in: page)
     }
 
-    func screenshot() async throws -> Screenshot {
-        let name = "ios:browser:screenshot"
+    func exportPDF() async throws -> ExportedPDF {
+        let name = "ios:browser:exportPdf"
         try await service.awaitAuthenticationAvailability(name: name)
-        guard let action = await service.resolvedAction("screenshot", role: .dangerousBrowserControl) else {
+        guard let action = await service.resolvedAction("exportPdf", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
         return try await service.manager.actionScheduler.schedule(action, on: page, name: name) { page in
             let generation = page.navigationGeneration
-            let rawMetrics = try await self.service.evalAsync(
-                page,
-                "return [Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0), Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)];",
-                context: "browser-full-page-screenshot"
-            )
-            guard let metrics = rawMetrics.map(JSONValue.from)?.arrayValue,
-                  metrics.count == 2,
-                  let rawWidth = metrics[0].doubleValue,
-                  let rawHeight = metrics[1].doubleValue,
-                  rawWidth.isFinite,
-                  rawHeight.isFinite,
-                  rawWidth > 0,
-                  rawHeight > 0,
-                  rawWidth <= 65_536,
-                  rawHeight <= 65_536 else {
-                throw RuntimeError.bridge("ios:browser:screenshot couldn't determine Browser's full-page dimensions.")
-            }
-            let rect = CGRect(x: 0, y: 0, width: CGFloat(rawWidth), height: CGFloat(rawHeight))
-            let displayScale = Double(UIScreen.main.scale)
-            let aspectRatio = rawHeight / rawWidth
-            let nativePixelWidth = rawWidth * displayScale
-            let pixelBudgetWidth = sqrt(
-                (Double(ArtifactLimits.imagePixels) - Self.maximumScreenshotPixelDimension) / aspectRatio
-            )
-            let dimensionBudgetWidth = Self.maximumScreenshotPixelDimension / aspectRatio
-            let targetPixelWidth = floor(max(1, min(
-                nativePixelWidth,
-                Double(ArtifactLimits.imageMaxDimension),
-                pixelBudgetWidth,
-                dimensionBudgetWidth
-            )))
-            let snapshotWidth = CGFloat(targetPixelWidth / displayScale)
-            let data = try await page.page.exported(as: .image(region: .rect(rect), snapshotWidth: snapshotWidth))
+            let data = try await page.page.exported(as: .pdf())
             guard generation == page.navigationGeneration else { throw Service.EvalError.contextInvalidated }
-            let prepared: PreparedImage
-            let inspection: ImagePreparer.Inspection
-            do {
-                prepared = try ImagePreparer.preparePreservingResolution(data)
-                inspection = try ImagePreparer.inspect(prepared.data)
-            } catch {
-                throw RuntimeError.bridge("ios:browser:screenshot couldn't prepare Browser's full-page image.")
-            }
+            let prepared = try PDFPreparer.prepareArtifact(data)
             let attachment = TransientAttachment(
-                kind: .image,
+                kind: .pdf,
                 mimeType: prepared.mimeType,
-                displayName: prepared.filename(from: "Browser Full Page Screenshot"),
+                displayName: "Browser Page.pdf",
                 data: prepared.data
             )
             let host = page.page.url?.host?.lowercased() ?? "?"
-            Log.webView.info("Browser.screenshot mode=fullPage host=\(host) points=\(Int(rawWidth))x\(Int(rawHeight)) pixels=\(inspection.width)x\(inspection.height) bytes=\(prepared.data.count)")
-            return Screenshot(
+            Log.webView.info("Browser.exportPdf host=\(host) pages=\(prepared.pageCount) bytes=\(prepared.data.count)")
+            return ExportedPDF(
                 url: page.page.url,
                 attachment: attachment,
-                width: inspection.width,
-                height: inspection.height
+                pages: prepared.pageCount
             )
         }
     }
@@ -289,6 +318,14 @@ final class ServiceBrowserActionSession {
         if capturedEvents.count > 500 {
             capturedEvents.removeFirst(capturedEvents.count - 500)
         }
+    }
+
+    private static func historyItem(_ item: WebPage.BackForwardList.Item) -> JSONValue {
+        .object([
+            "title": item.title.map(JSONValue.string) ?? .null,
+            "url": .string(item.url.absoluteString),
+            "initialUrl": .string(item.initialURL.absoluteString),
+        ])
     }
 
     private static let captureScript = #"""
