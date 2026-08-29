@@ -34,9 +34,13 @@ nonisolated public struct ProviderModel: Sendable, Codable {
     public var supportsTools: Bool?
     public var reasoning: Bool
     public var reasoningEfforts: [String]
+    public var reasoningEffort: String?
     public var modalities: ProviderModelModalities
     public var wireID: String { providerModelID ?? id }
     public var lowestReasoningEffort: String? { reasoningEfforts.first }
+    public var selectedReasoningEffort: String? {
+        reasoningEffort.flatMap { reasoningEfforts.contains($0) ? $0 : nil } ?? lowestReasoningEffort
+    }
 
     public init(
         id: String,
@@ -48,6 +52,7 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         supportsTools: Bool? = nil,
         reasoning: Bool = false,
         reasoningEfforts: [String] = [],
+        reasoningEffort: String? = nil,
         modalities: ProviderModelModalities = .text
     ) {
         self.id = id
@@ -59,11 +64,12 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         self.supportsTools = supportsTools
         self.reasoning = reasoning
         self.reasoningEfforts = reasoningEfforts
+        self.reasoningEffort = reasoningEffort
         self.modalities = modalities
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, providerModelID, variant, displayName, maxTokens, maxContext, supportsTools, reasoning, reasoningEfforts, modalities
+        case id, providerModelID, variant, displayName, maxTokens, maxContext, supportsTools, reasoning, reasoningEfforts, reasoningEffort, modalities
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,6 +83,7 @@ nonisolated public struct ProviderModel: Sendable, Codable {
         supportsTools = try values.decodeIfPresent(Bool.self, forKey: .supportsTools)
         reasoning = try values.decodeIfPresent(Bool.self, forKey: .reasoning) ?? false
         reasoningEfforts = try values.decodeIfPresent([String].self, forKey: .reasoningEfforts) ?? []
+        reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
         modalities = try values.decodeIfPresent(ProviderModelModalities.self, forKey: .modalities) ?? .text
     }
 }

@@ -276,7 +276,7 @@ nonisolated struct AnthropicMessagesClient: LLMClient {
         }
         if adaptiveThinkingModelIDs.contains(model.id) {
             body["thinking"] = ["type": "adaptive"]
-            body["output_config"] = ["effort": model.lowestReasoningEffort ?? "low"]
+            body["output_config"] = ["effort": model.selectedReasoningEffort ?? "low"]
         }
         return try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
     }

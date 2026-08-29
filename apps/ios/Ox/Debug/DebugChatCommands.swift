@@ -143,7 +143,8 @@ extension OxHostProtocol {
 
     @MainActor
     static func handleListModels(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
-        let clients = LLMRegistry.shared.clients.map { client in
+        let registry = LLMRegistry.shared
+        let clients = registry.clients.map { client in
             let diagnostics = client.protocolDiagnostics
             return ClientRow(
                 id: client.id,
@@ -166,7 +167,7 @@ extension OxHostProtocol {
                         supportsTools: client.supportsTools(for: $0),
                         reasoning: $0.reasoning,
                         reasoningEfforts: $0.reasoningEfforts,
-                        selectedReasoningEffort: $0.lowestReasoningEffort,
+                        selectedReasoningEffort: registry.reasoningEffort(for: $0, in: client.id),
                         inputModalities: $0.modalities.input.map(\.rawValue).sorted(),
                         outputModalities: $0.modalities.output.map(\.rawValue).sorted(),
                         wireProtocol: client.wireProtocol(for: $0)?.rawValue

@@ -64,9 +64,9 @@ public struct OpenAIChatClient: LLMClient {
         func apply(to body: inout [String: Any], model: ProviderModel) {
             switch self {
             case .effort(let effort):
-                body["reasoning_effort"] = model.lowestReasoningEffort ?? effort.rawValue
+                body["reasoning_effort"] = model.selectedReasoningEffort ?? effort.rawValue
             case .reasoningObject:
-                if let effort = model.lowestReasoningEffort {
+                if let effort = model.selectedReasoningEffort {
                     body["reasoning"] = ["effort": effort]
                 }
             case .disabled(.reasoning):

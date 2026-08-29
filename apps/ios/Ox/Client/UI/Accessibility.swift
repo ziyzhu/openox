@@ -173,6 +173,7 @@ nonisolated enum A11yID {
         static let modelProvider = "chat.modelProvider"
         static func modelProviderOption(_ clientId: String) -> String { "chat.modelProviderOption.\(clientId)" }
         static let modelSelection = "chat.modelSelection"
+        static let modelThinkingLevel = "chat.modelThinkingLevel"
         static let modelAuthAPIKey = "chat.modelAuth.apiKey"
         static let modelAuthOAuth = "chat.modelAuth.oauth"
         static let modelAuthNone = "chat.modelAuth.none"
@@ -189,6 +190,7 @@ nonisolated enum A11yID {
         static let newWorkflowServices = "chat.newWorkflow.services"
         static let newWorkflowOutcome = "chat.newWorkflow.outcome"
         static func modelOption(_ modelId: String) -> String { "chat.modelOption.\(modelId)" }
+        static func modelThinkingLevelOption(_ effort: String) -> String { "chat.modelThinkingLevelOption.\(effort)" }
         static func modelKey(_ clientId: String) -> String { "chat.modelKey.\(clientId)" }
         static func modelKeySignIn(_ clientId: String) -> String { "chat.modelKeySignIn.\(clientId)" }
         static let modelKeySignInError = "chat.modelKeySignInError"

@@ -205,7 +205,7 @@ final class Chat: Identifiable {
             )
         }
         scheduleModelPreparation()
-        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id)")
+        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
         onPersistableChange?()
     }
 
@@ -799,7 +799,7 @@ final class Chat: Identifiable {
         self.executionLease = executionLease
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
-        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) server=\(serviceManager.serverURL.absoluteString)")
+        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") server=\(serviceManager.serverURL.absoluteString)")
         self.agent = Agent(
             client: client,
             model: model,
@@ -949,6 +949,7 @@ final class Chat: Identifiable {
             isFavorite: isFavorite,
             modelID: model.id,
             clientID: client.id,
+            reasoningEffort: model.selectedReasoningEffort,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
             preview: document.preview,
@@ -1652,6 +1653,7 @@ final class Chat: Identifiable {
             isFavorite: false,
             modelID: model.id,
             clientID: client.id,
+            reasoningEffort: model.selectedReasoningEffort,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
             preview: nil

@@ -411,7 +411,7 @@ public struct OpenAIResponsesClient: LLMClient {
             return ["type": "function", "name": $0.name, "description": $0.description, "strict": $0.strict, "parameters": parameters.toAny()]
         }
 
-        let selectedReasoningEffort = model.lowestReasoningEffort ?? reasoningEffort.rawValue
+        let selectedReasoningEffort = model.selectedReasoningEffort ?? reasoningEffort.rawValue
         var reasoning: [String: Any] = ["effort": selectedReasoningEffort]
         if selectedReasoningEffort != "none" { reasoning["summary"] = "auto" }
         var body: [String: Any] = [

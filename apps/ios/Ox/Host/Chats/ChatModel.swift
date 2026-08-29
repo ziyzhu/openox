@@ -204,6 +204,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
     var isFavorite: Bool
     var modelID: String?
     var clientID: String?
+    var reasoningEffort: String?
     var monoRepositoryHash: String?
     var attachedServiceDomains: [String]
     var preview: String?
@@ -219,6 +220,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         isFavorite: Bool,
         modelID: String?,
         clientID: String?,
+        reasoningEffort: String? = nil,
         monoRepositoryHash: String?,
         attachedServiceDomains: [String],
         preview: String?,
@@ -233,6 +235,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         self.isFavorite = isFavorite
         self.modelID = modelID
         self.clientID = clientID
+        self.reasoningEffort = reasoningEffort
         self.monoRepositoryHash = monoRepositoryHash
         self.attachedServiceDomains = attachedServiceDomains
         self.preview = preview
@@ -257,6 +260,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         case isFavorite
         case modelID
         case clientID
+        case reasoningEffort
         case monoRepositoryHash
         case attachedServiceDomains
         case preview
@@ -274,6 +278,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         isFavorite = try values.decode(Bool.self, forKey: .isFavorite)
         modelID = try values.decodeIfPresent(String.self, forKey: .modelID)
         clientID = try values.decodeIfPresent(String.self, forKey: .clientID)
+        reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
         monoRepositoryHash = try values.decodeIfPresent(String.self, forKey: .monoRepositoryHash)
         attachedServiceDomains = try values.decode([String].self, forKey: .attachedServiceDomains)
         preview = try values.decodeIfPresent(String.self, forKey: .preview)

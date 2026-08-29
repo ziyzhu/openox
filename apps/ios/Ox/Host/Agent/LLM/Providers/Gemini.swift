@@ -264,7 +264,7 @@ public struct GeminiClient: LLMClient {
         }
         generationConfig["thinkingConfig"] = [
             "includeThoughts": true,
-            "thinkingLevel": model.lowestReasoningEffort ?? "minimal",
+            "thinkingLevel": model.selectedReasoningEffort ?? "minimal",
         ]
 
         var body: [String: Any] = [

@@ -21,11 +21,16 @@ final class LLMRegistry {
         didSet { UserDefaults.standard.set(selectedModelIds, forKey: Self.selectedKey) }
     }
 
+    private var selectedReasoningEfforts: [String: String] {
+        didSet { UserDefaults.standard.set(selectedReasoningEfforts, forKey: Self.selectedReasoningEffortsKey) }
+    }
+
     private(set) var defaultClient: String {
         didSet { UserDefaults.standard.set(defaultClient, forKey: Self.defaultClientKey) }
     }
 
     private static let selectedKey = "llm.selectedModels"
+    private static let selectedReasoningEffortsKey = "llm.selectedReasoningEfforts"
     private static let defaultClientKey = "llm.defaultClient"
     static let customProvidersKey = "llm.customProviders"
 
@@ -59,6 +64,7 @@ final class LLMRegistry {
         self.builtInClients = builtInClients
         self.customProviders = customProviders
         self.selectedModelIds = UserDefaults.standard.dictionary(forKey: Self.selectedKey) as? [String: String] ?? [:]
+        self.selectedReasoningEfforts = UserDefaults.standard.dictionary(forKey: Self.selectedReasoningEffortsKey) as? [String: String] ?? [:]
         let configuredClientIDs = Set(availableClients.map(\.id) + customProviders.map(\.clientID))
         let storedDefault = UserDefaults.standard.string(forKey: Self.defaultClientKey)
         self.defaultClient = storedDefault.flatMap { configuredClientIDs.contains($0) ? $0 : nil } ?? availableClients[0].id
@@ -94,8 +100,11 @@ final class LLMRegistry {
         return newSessionClient
     }
 
-    func model(forSnapshot id: String?, client: any LLMClient) -> ProviderModel {
-        if let id, let model = client.models.first(where: { $0.id == id }) { return model }
+    func model(forSnapshot id: String?, reasoningEffort: String?, client: any LLMClient) -> ProviderModel {
+        if let id, var model = client.models.first(where: { $0.id == id }) {
+            model.reasoningEffort = reasoningEffort
+            return model
+        }
         if let id, customProviders.contains(where: { $0.clientID == client.id }) {
             return CustomLLMModel(id: id, supportsTools: true).modelInfo
         }
@@ -111,6 +120,10 @@ final class LLMRegistry {
         return inRegion.first(where: { !$0.models.isEmpty }) ?? clients.first(where: { !$0.models.isEmpty })!
     }
 
+    var defaultClientModel: ProviderModel {
+        selected(for: defaultClient)
+    }
+
     func selected(for clientID: String) -> ProviderModel {
         selected(for: clientID, in: AppRegion.shared.region)
     }
@@ -119,16 +132,30 @@ final class LLMRegistry {
         let regionalClients = clients(in: region)
         let client = regionalClients.first { $0.id == clientID } ?? regionalClients[0]
         if let modelId = selectedModelIds[client.id],
-           let model = client.models.first(where: { $0.id == modelId }) {
+           var model = client.models.first(where: { $0.id == modelId }) {
+            model.reasoningEffort = reasoningEffort(for: model, in: client.id)
             return model
         }
-        return client.models.first ?? newSessionClient.models[0]
+        var model = client.models.first ?? newSessionClient.models[0]
+        model.reasoningEffort = reasoningEffort(for: model, in: client.id)
+        return model
+    }
+
+    func reasoningEffort(for model: ProviderModel, in clientID: String) -> String? {
+        let stored = selectedReasoningEfforts[reasoningSelectionKey(clientID: clientID, modelID: model.id)]
+        return stored.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
     }
 
     func select(_ model: ProviderModel, in clientID: String) {
         selectedModelIds[clientID] = model.id
+        let reasoningKey = reasoningSelectionKey(clientID: clientID, modelID: model.id)
+        if let effort = model.selectedReasoningEffort {
+            selectedReasoningEfforts[reasoningKey] = effort
+        } else {
+            selectedReasoningEfforts.removeValue(forKey: reasoningKey)
+        }
         defaultClient = clientID
-        Log.agent.info("LLMRegistry.select client=\(clientID) model=\(model.id)")
+        Log.agent.info("LLMRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
     }
 
     func upsert(_ provider: CustomLLMProvider) {
@@ -171,6 +198,7 @@ final class LLMRegistry {
         customProviderLoading.remove(provider.id)
         customProviderErrors.removeValue(forKey: provider.id)
         selectedModelIds.removeValue(forKey: provider.clientID)
+        selectedReasoningEfforts = selectedReasoningEfforts.filter { !$0.key.hasPrefix("\(provider.clientID)\u{1F}") }
         Credentials.clear(for: provider.client.credentialID)
         if defaultClient == provider.clientID {
             defaultClient = builtInClients[AppRegion.shared.region]![0].id
@@ -197,5 +225,9 @@ final class LLMRegistry {
         return candidates.filter { client in
             client.models.contains { client.supportsTools(for: $0) }
         }
+    }
+
+    private func reasoningSelectionKey(clientID: String, modelID: String) -> String {
+        "\(clientID)\u{1F}\(modelID)"
     }
 }

@@ -791,7 +791,8 @@ private struct ProviderPickerButton: View {
                 ModelPickerContent(
                     title: L10n.string("Choose your model"),
                     activeClientID: registry.defaultClient,
-                    activeModelID: registry.selected(for: registry.defaultClient).id
+                    activeModelID: registry.defaultClientModel.id,
+                    activeReasoningEffort: registry.defaultClientModel.selectedReasoningEffort
                 ) { client, model in
                     Log.ui.info("Onboarding.pick client=\(client.id) model=\(model.id)")
                     registry.select(model, in: client.id)

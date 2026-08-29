@@ -11,6 +11,7 @@ struct ModelPickerSheet: View {
                 title: "Model",
                 activeClientID: chat.client.id,
                 activeModelID: chat.model.id,
+                activeReasoningEffort: chat.model.selectedReasoningEffort,
                 onClose: { dismiss() }
             ) { client, model in
                 Log.ui.info("ModelPicker.select chat=\(chat.id) client=\(client.id) model=\(model.id)")
@@ -136,7 +137,8 @@ struct SettingsSheet: View {
                             ModelPickerContent(
                                 title: "Model",
                                 activeClientID: registry.defaultClient,
-                                activeModelID: defaultModel.id
+                                activeModelID: defaultModel.id,
+                                activeReasoningEffort: defaultModel.selectedReasoningEffort
                             ) { client, model in
                                 Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id)")
                                 registry.select(model, in: client.id)
@@ -487,6 +489,7 @@ struct ModelPickerContent: View {
     @State private var selectedRegion: LLMRegion
     @State private var providerSelection: ProviderSelection
     @State private var selectedModelID: String
+    @State private var selectedReasoningEffort: String
     @State private var apiKeyDraft = ""
     @State private var customName = ""
     @State private var customURL = ""
@@ -502,6 +505,7 @@ struct ModelPickerContent: View {
         title: String,
         activeClientID: String,
         activeModelID: String,
+        activeReasoningEffort: String? = nil,
         onClose: (() -> Void)? = nil,
         onSelect: @escaping (any LLMClient, ProviderModel) -> Void
     ) {
@@ -513,6 +517,7 @@ struct ModelPickerContent: View {
         _selectedRegion = State(initialValue: AppRegion.shared.region)
         _providerSelection = State(initialValue: .client(activeClientID))
         _selectedModelID = State(initialValue: activeModelID)
+        _selectedReasoningEffort = State(initialValue: activeReasoningEffort ?? "")
     }
 
     private var selectedClientID: String? {
@@ -535,7 +540,13 @@ struct ModelPickerContent: View {
     }
 
     private var selectedModel: ProviderModel? {
-        selectedClient?.models.first { $0.id == selectedModelID }
+        guard var model = selectedClient?.models.first(where: { $0.id == selectedModelID }) else { return nil }
+        model.reasoningEffort = selectedReasoningEffort
+        return model
+    }
+
+    private var reasoningEfforts: [String] {
+        selectedModel?.reasoningEfforts ?? []
     }
 
     private var isAuthenticated: Bool {
@@ -563,12 +574,18 @@ struct ModelPickerContent: View {
         content
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear { selectAvailableClient() }
+            .onAppear {
+                selectAvailableClient()
+                if !reasoningEfforts.contains(selectedReasoningEffort) {
+                    selectDefaultReasoningEffort()
+                }
+            }
             .onChange(of: selectedRegion) { _, _ in
                 dismissKeyboard()
                 selectAvailableClient()
             }
             .onChange(of: providerSelection) { _, _ in providerDidChange() }
+            .onChange(of: selectedModelID) { _, _ in selectDefaultReasoningEffort() }
             .onChange(of: authRevision) { _, _ in selectAvailableModel() }
             .onChange(of: registry.customProviders) { _, _ in selectAvailableClient() }
             .toolbar {
@@ -600,6 +617,9 @@ struct ModelPickerContent: View {
                     } else if let selectedClient {
                         authenticationSection(selectedClient)
                         selectionSection("Model") { modelMenu }
+                        if !reasoningEfforts.isEmpty {
+                            selectionSection("Thinking level") { reasoningEffortMenu }
+                        }
                     }
                 }
                 .settingsPagePadding()
@@ -680,6 +700,29 @@ struct ModelPickerContent: View {
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelSelection)
+    }
+
+    private var reasoningEffortMenu: some View {
+        NavigationLink {
+            SettingsSelectionPickerView(
+                title: L10n.string("Thinking level"),
+                options: reasoningEfforts.map { effort in
+                    SettingsSelectionOption(
+                        id: effort,
+                        value: effort,
+                        title: reasoningEffortName(effort),
+                        accessibilityIdentifier: A11yID.Chat.modelThinkingLevelOption(effort)
+                    )
+                },
+                selection: $selectedReasoningEffort
+            )
+        } label: {
+            selectionRow(reasoningEffortName(selectedReasoningEffort), indicator: "chevron.right")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Thinking level")
+        .accessibilityValue(reasoningEffortName(selectedReasoningEffort))
+        .accessibilityIdentifier(A11yID.Chat.modelThinkingLevel)
     }
 
     private var customConnectionSection: some View {
@@ -857,6 +900,7 @@ struct ModelPickerContent: View {
         customError = nil
         loadCredentialDraft()
         selectAvailableModel()
+        selectDefaultReasoningEffort()
     }
 
     private func loadCredentialDraft() {
@@ -868,6 +912,28 @@ struct ModelPickerContent: View {
         guard let selectedClient else { return }
         if selectedClient.models.contains(where: { $0.id == selectedModelID }) { return }
         selectedModelID = registry.selected(for: selectedClient.id, in: selectedRegion).id
+    }
+
+    private func selectDefaultReasoningEffort() {
+        guard let selectedClient, let selectedModel else {
+            selectedReasoningEffort = ""
+            return
+        }
+        selectedReasoningEffort = registry.reasoningEffort(for: selectedModel, in: selectedClient.id) ?? ""
+    }
+
+    private func reasoningEffortName(_ effort: String) -> String {
+        switch effort {
+        case "none": L10n.string("None")
+        case "minimal": L10n.string("Minimal")
+        case "low": L10n.string("Low")
+        case "medium": L10n.string("Medium")
+        case "high": L10n.string("High")
+        case "xhigh": L10n.string("Extra high")
+        case "max": L10n.string("Maximum")
+        case "default": L10n.string("Provider default")
+        default: effort.replacingOccurrences(of: "_", with: " ").capitalized
+        }
     }
 
     private func discoverCustomModels() {
@@ -908,7 +974,7 @@ struct ModelPickerContent: View {
             let key = apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
             if !key.isEmpty { Credentials.set(key, for: selectedClient.credentialID) }
         }
-        Log.ui.info("ModelPicker.save client=\(selectedClient.id) model=\(selectedModel.id) region=\(selectedRegion.rawValue)")
+        Log.ui.info("ModelPicker.save client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
         onSelect(selectedClient, selectedModel)
         finishSaving()
     }

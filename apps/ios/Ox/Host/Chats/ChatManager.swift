@@ -343,7 +343,11 @@ final class ChatManager {
 
     private func startTemporaryChat(continuing continuation: ChatContinuation) {
         let client = llmRegistry.client(forSnapshot: continuation.meta.clientID)
-        let model = llmRegistry.model(forSnapshot: continuation.meta.modelID, client: client)
+        let model = llmRegistry.model(
+            forSnapshot: continuation.meta.modelID,
+            reasoningEffort: continuation.meta.reasoningEffort,
+            client: client
+        )
         let chat = Chat(
             meta: continuation.meta,
             turns: continuation.turns,
@@ -433,7 +437,11 @@ final class ChatManager {
             return nil
         }
         let client = llmRegistry.client(forSnapshot: result.meta.clientID)
-        let model = llmRegistry.model(forSnapshot: result.meta.modelID, client: client)
+        let model = llmRegistry.model(
+            forSnapshot: result.meta.modelID,
+            reasoningEffort: result.meta.reasoningEffort,
+            client: client
+        )
         let branched = Chat(
             meta: result.meta,
             turns: result.turns,
@@ -671,7 +679,11 @@ final class ChatManager {
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {
         let client = llmRegistry.client(forSnapshot: loaded.state.meta.clientID)
-        let model = llmRegistry.model(forSnapshot: loaded.state.meta.modelID, client: client)
+        let model = llmRegistry.model(
+            forSnapshot: loaded.state.meta.modelID,
+            reasoningEffort: loaded.state.meta.reasoningEffort,
+            client: client
+        )
         let chat = Chat(
             meta: loaded.state.meta,
             turns: loaded.state.turns,
