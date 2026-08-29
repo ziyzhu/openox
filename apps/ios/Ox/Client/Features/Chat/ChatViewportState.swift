@@ -38,7 +38,7 @@ struct ChatEarlierPageCoordinator {
 }
 
 struct ChatViewportLayout {
-    static let responseComposerSpacing: CGFloat = 48
+    static let responseComposerSpacing: CGFloat = 50
 
     var composerBounds = CGRect.zero
     var dockBounds = CGRect.zero
