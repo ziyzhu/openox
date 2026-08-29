@@ -96,7 +96,7 @@ nonisolated enum CustomLLMProviderError: LocalizedError {
         case .requestFailed(let status, let message):
             return message.isEmpty ? "The server returned HTTP \(status)." : "HTTP \(status): \(message)"
         case .noModels:
-            return "The server did not report any models. You can add one manually."
+            return "The server did not report any models whose supported_parameters include tools."
         }
     }
 }
@@ -105,17 +105,11 @@ nonisolated enum CustomLLMProviderDiscovery {
     private struct ModelsResponse: Decodable {
         struct Entry: Decodable {
             let id: String
-            let directToolSupport: Bool?
             let supportedParameters: [String]?
 
             enum CodingKeys: String, CodingKey {
                 case id
-                case directToolSupport = "supports_tools"
                 case supportedParameters = "supported_parameters"
-            }
-
-            var supportsTools: Bool {
-                directToolSupport ?? supportedParameters?.contains("tools") ?? false
             }
         }
 
@@ -160,8 +154,8 @@ nonisolated enum CustomLLMProviderDiscovery {
         }
         let discovered = try JSONDecoder().decode(ModelsResponse.self, from: data).data.compactMap { entry -> CustomLLMModel? in
             let id = entry.id.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !id.isEmpty else { return nil }
-            return CustomLLMModel(id: id, supportsTools: entry.supportsTools)
+            guard !id.isEmpty, entry.supportedParameters?.contains("tools") == true else { return nil }
+            return CustomLLMModel(id: id, supportsTools: true)
         }
         let unique = Dictionary(discovered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             .values.sorted { $0.id < $1.id }

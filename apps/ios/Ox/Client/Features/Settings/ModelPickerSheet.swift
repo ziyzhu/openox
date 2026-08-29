@@ -949,13 +949,8 @@ struct ModelPickerContent: View {
                     baseURL: baseURL,
                     apiKey: key.isEmpty ? nil : key
                 )
-                let compatible = discovered.filter(\.supportsTools)
-                guard !compatible.isEmpty else {
-                    customError = "The server did not report any models with agent tool support."
-                    return
-                }
-                customModels = compatible
-                customModelID = compatible[0].id
+                customModels = discovered
+                customModelID = discovered[0].id
             } catch {
                 customError = error.localizedDescription
             }
