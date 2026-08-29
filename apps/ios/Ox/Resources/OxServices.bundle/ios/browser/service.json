@@ -69,7 +69,7 @@
     },
     {
       "description": "Execute arbitrary JavaScript in an attached web service's page. This can read or change signed-in website data and send information over the network.",
-      "id": "executeJavaScript",
+      "id": "executeScript",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -323,24 +323,24 @@
       "requireAuth": false
     },
     {
-      "description": "List captured exchange metadata without request or response bodies.",
-      "id": "listCapturedExchanges",
+      "description": "List captured event metadata without request or response bodies.",
+      "id": "listCapturedEvents",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {},
         "type": "object"
       },
-      "label": "List Network Exchanges",
+      "label": "List Captured Events",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
-          "exchanges": {
+          "events": {
             "items": {},
             "type": "array"
           }
         },
         "required": [
-          "exchanges"
+          "events"
         ],
         "type": "object"
       },
@@ -348,8 +348,8 @@
       "requireAuth": false
     },
     {
-      "description": "Read one captured exchange, including bounded and redacted bodies when accessible to the page.",
-      "id": "readCapturedExchange",
+      "description": "Read one captured event, including bounded and redacted bodies when accessible to the page.",
+      "id": "readCapturedEvent",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -364,7 +364,7 @@
         ],
         "type": "object"
       },
-      "label": "Read Network Exchange",
+      "label": "Read Captured Event",
       "outputSchema": {
         "type": "object"
       },
@@ -409,7 +409,7 @@
           "label": "查看页面",
           "description": "在聊天中添加一行，用户可轻点查看“浏览器”的实时页面。"
         },
-        "executeJavaScript": {
+        "executeScript": {
           "label": "执行 JavaScript",
           "description": "在已附加的网页服务页面中执行任意 JavaScript。这可以读取或更改已登录的网站数据，并通过网络发送信息。"
         }

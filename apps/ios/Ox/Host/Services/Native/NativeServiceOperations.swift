@@ -73,13 +73,13 @@ final class NativeServiceOperations {
                 .inspectionPage()
             showBrowser(browser, id)
             return .object(["shown": .bool(true)])
-        case ("ios:browser", "executeJavaScript"):
+        case ("ios:browser", "executeScript"):
             guard let script = fields["script"]?.stringValue else {
-                throw RuntimeError.bridge("ios:browser:executeJavaScript requires Browser to be available to an active caller.")
+                throw RuntimeError.bridge("ios:browser:executeScript requires Browser to be available to an active caller.")
             }
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .executeJavaScript(script)
+                .executeScript(script)
         case ("ios:browser", "screenshot"):
             let screenshot = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
@@ -139,17 +139,17 @@ final class NativeServiceOperations {
             }
             serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
             return .object(["marked": .bool(true)])
-        case ("ios:browser", "listCapturedExchanges"):
-            let records = serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapture()
-            return .object(["exchanges": .array(records)])
-        case ("ios:browser", "readCapturedExchange"):
-            guard let captureID = fields["id"]?.stringValue,
-                  let record = serviceManager.browserActionSessions
+        case ("ios:browser", "listCapturedEvents"):
+            let events = serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents()
+            return .object(["events": .array(events)])
+        case ("ios:browser", "readCapturedEvent"):
+            guard let eventID = fields["id"]?.stringValue,
+                  let event = serviceManager.browserActionSessions
                     .session(for: browser, ownerID: id)
-                    .readCapture(id: captureID) else {
-                throw RuntimeError.bridge("ios:browser:readCapturedExchange requires a valid capture id.")
+                    .readCapturedEvent(id: eventID) else {
+                throw RuntimeError.bridge("ios:browser:readCapturedEvent requires a valid captured event id.")
             }
-            return record
+            return event
         case ("ios:browser", "stopCapture"):
             serviceManager.browserActionSessions.session(for: browser, ownerID: id).stopCapture()
             return .object(["stopped": .bool(true)])

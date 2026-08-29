@@ -370,7 +370,7 @@ extension Scenario {
             return [execute("""
             await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open screenshot fixture" });
             const dimensions = await ox.service.invoke({
-              name: "ios:browser:executeJavaScript",
+              name: "ios:browser:executeScript",
               input: { script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };" },
               purpose: "Create tall screenshot fixture"
             });

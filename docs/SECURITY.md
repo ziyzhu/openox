@@ -79,7 +79,7 @@ web contract expands. **Web exception:** after approval, the model may
 read page-visible credentials and authenticated data and use Web's current
 page to transmit them. Always approve makes that exception standing across every
 page Web visits until the user revokes the qualified
-`device.browser:executeJavaScript` approval.
+`device.browser:executeScript` approval.
 
 ### T2 — Adversarial model triggers a harmful state change
 The model invokes a money-moving, posting, or sending action the user didn't
@@ -239,11 +239,11 @@ message origins are validated.
 ### Web device-service boundary
 
 `device.browser` is a client-owned device service with `navigate`, `inspect`, and
-`executeJavaScript` actions and one persistent primary page. `navigate` accepts
+`executeScript` actions and one persistent primary page. `navigate` accepts
 only an absolute HTTP or HTTPS URL allowed by the web-navigation policy.
 `inspect` only materializes a persistent chat row; it does not execute page code
 or present UI. Web's live page appears in the existing inspector only after
-the user taps that row. `executeJavaScript` accepts a non-empty bounded script,
+the user taps that row. `executeScript` accepts a non-empty bounded script,
 obtains the ordinary native action approval, serializes execution against page
 navigation, and runs the script as an async function body in the page content
 world. No domain selector is exposed, and only a JSON-compatible result crosses
@@ -251,7 +251,7 @@ back to the agent. Web uses the shared website data store, so visiting an
 origin can use the same signed-in session as that origin's registry service.
 
 The approval UI intentionally offers Always approve and stores it under the
-qualified `device.browser:executeJavaScript` action name. While enabled, the model
+qualified `device.browser:executeScript` action name. While enabled, the model
 can inspect or mutate the current DOM, origin storage, page JavaScript state, and
 authenticated responses; initiate network requests; and leave timers, listeners,
 storage changes, or other origin-scoped state behind. Navigation changes the

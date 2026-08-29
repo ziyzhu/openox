@@ -45,7 +45,7 @@ struct ServiceApproval {
                 ? L10n.string("The full-page screenshot may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits.")
                 : L10n.string("The full-page screenshot may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always approve applies to every page Browser visits.")
             prompt = "\(display) - \(destination)\n\(disclosure)"
-        } else if override == nil, ["ios:browser:executeJavaScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
+        } else if override == nil, ["ios:browser:executeScript", "ios:browser:injectScript", "ios:browser:startCapture"].contains(action) {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
             prompt = "\(display) - \(destination)\n\(L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always approve applies to every page Web visits."))"

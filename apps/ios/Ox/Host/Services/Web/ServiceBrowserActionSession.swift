@@ -42,7 +42,7 @@ final class ServiceBrowserActionSession {
     private var opening: Opening?
     private(set) var page: Service.ServiceWebPage?
     private var captureSink: CaptureSink?
-    private var captureRecords: [JSONValue] = []
+    private var capturedEvents: [JSONValue] = []
     private var injectedScripts: [(domains: [String], source: String)] = []
     private var captureActive = false
 
@@ -75,10 +75,10 @@ final class ServiceBrowserActionSession {
         return await service.reload(page, timeout: timeout)
     }
 
-    func executeJavaScript(_ script: String) async throws -> JSONValue {
-        let name = "ios:browser:executeJavaScript"
+    func executeScript(_ script: String) async throws -> JSONValue {
+        let name = "ios:browser:executeScript"
         try await service.awaitAuthenticationAvailability(name: name)
-        guard let action = await service.resolvedAction("executeJavaScript", role: .dangerousBrowserControl) else {
+        guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
         }
         let page = try await page(for: action)
@@ -184,7 +184,7 @@ final class ServiceBrowserActionSession {
     }
 
     func startCapture() async throws -> URL? {
-        captureRecords = []
+        capturedEvents = []
         captureActive = true
         let page = try await inspectionPage()
         configureAuthoringScripts(on: page)
@@ -198,7 +198,7 @@ final class ServiceBrowserActionSession {
 
     func markCapture(_ label: String) {
         guard captureActive else { return }
-        appendCapture(.object([
+        appendCapturedEvent(.object([
             "id": .string(UUID().uuidString),
             "kind": .string("mark"),
             "label": .string(label),
@@ -206,17 +206,17 @@ final class ServiceBrowserActionSession {
         ]))
     }
 
-    func listCapture() -> [JSONValue] {
-        captureRecords.map { record in
-            guard var fields = record.objectValue else { return record }
+    func listCapturedEvents() -> [JSONValue] {
+        capturedEvents.map { event in
+            guard var fields = event.objectValue else { return event }
             fields.removeValue(forKey: "requestBody")
             fields.removeValue(forKey: "responseBody")
             return .object(fields)
         }
     }
 
-    func readCapture(id: String) -> JSONValue? {
-        captureRecords.first { $0.objectValue?["id"]?.stringValue == id }
+    func readCapturedEvent(id: String) -> JSONValue? {
+        capturedEvents.first { $0.objectValue?["id"]?.stringValue == id }
     }
 
     func close() {
@@ -229,7 +229,7 @@ final class ServiceBrowserActionSession {
             self.page = nil
         }
         captureSink = nil
-        captureRecords = []
+        capturedEvents = []
         injectedScripts = []
         captureActive = false
         Log.webView.info("Service.browserSession event=close owner=\(id) domain=\(service.domain)")
@@ -281,13 +281,13 @@ final class ServiceBrowserActionSession {
         }
         var fields = JSONValue.from(body).objectValue ?? [:]
         fields["id"] = .string(UUID().uuidString)
-        appendCapture(.object(fields))
+        appendCapturedEvent(.object(fields))
     }
 
-    private func appendCapture(_ record: JSONValue) {
-        captureRecords.append(record)
-        if captureRecords.count > 500 {
-            captureRecords.removeFirst(captureRecords.count - 500)
+    private func appendCapturedEvent(_ event: JSONValue) {
+        capturedEvents.append(event)
+        if capturedEvents.count > 500 {
+            capturedEvents.removeFirst(capturedEvents.count - 500)
         }
     }
 

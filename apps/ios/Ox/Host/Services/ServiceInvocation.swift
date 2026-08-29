@@ -157,7 +157,7 @@ extension Service {
         in page: ServiceWebPage
     ) async throws -> JSONValue {
         guard domain == "ios:browser" else { throw EvalError.notActive }
-        let name = "ios:browser:executeJavaScript"
+        let name = "ios:browser:executeScript"
         let invocationID = UUID()
         let invocation = String(invocationID.uuidString.prefix(8))
         let started = Date()
