@@ -31,7 +31,7 @@ struct SettingsSheet: View {
     @State private var profileNameDraft = ""
     @State private var profileCreationErrorMessage: String?
     @State private var profileOpenErrorMessage: String?
-    private var registry: LLMRegistry { LLMRegistry.shared }
+    private var registry: ProviderRegistry { ProviderRegistry.shared }
     private var appLocale: AppLocale { AppLocale.shared }
     private var speechVoice: SpeechVoiceSettings { .shared }
     private var storage: StorageRoot { .shared }
@@ -499,7 +499,7 @@ struct ModelPickerContent: View {
     @State private var customModelsLoading = false
     @State private var customError: String?
 
-    private var registry: LLMRegistry { LLMRegistry.shared }
+    private var registry: ProviderRegistry { ProviderRegistry.shared }
 
     init(
         title: String,

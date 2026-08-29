@@ -778,7 +778,7 @@ private struct ProviderPickerButton: View {
     let onPick: (String, String) -> Void
     @State private var showPicker = false
 
-    private var registry: LLMRegistry { .shared }
+    private var registry: ProviderRegistry { .shared }
 
     var body: some View {
         Button { showPicker = true } label: {

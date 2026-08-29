@@ -78,7 +78,7 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
         )
     }
 
-    var client: OpenAIChatClient { profile.client(for: .global) }
+    var client: OpenAIChatClient { profile.client(for: .global, models: []) }
 }
 
 nonisolated enum CustomLLMProviderError: LocalizedError {

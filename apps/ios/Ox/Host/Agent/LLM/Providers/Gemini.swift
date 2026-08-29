@@ -10,11 +10,14 @@ public struct GeminiConfig: Sendable {
 
 public struct GeminiClient: LLMClient {
     public let config: GeminiConfig
-    public init(config: GeminiConfig = GeminiConfig()) { self.config = config }
+    public let models: [ProviderModel]
+    public init(models: [ProviderModel], config: GeminiConfig = GeminiConfig()) {
+        self.models = models
+        self.config = config
+    }
 
     public let id = "gemini"
     public let displayName = "Gemini"
-    public let models = ModelsDevCatalog.models(for: "gemini")
     public let regions: Set<LLMRegion> = [.global]
     public let reasoningPolicy: LLMReasoningPolicy = .minimal
     public let website = URL(string: "https://aistudio.google.com/apikey")

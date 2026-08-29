@@ -23,8 +23,8 @@ nonisolated struct GitHubCopilotClient: LLMClient {
     private let client: OpenAIResponsesClient
     private let curatedModels: [ProviderModel]
 
-    init() {
-        curatedModels = ModelsDevCatalog.models(for: "github-copilot")
+    init(models: [ProviderModel]) {
+        curatedModels = models
         client = OpenAIResponsesClient(
             id: "github-copilot",
             displayName: "GitHub Copilot",

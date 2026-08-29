@@ -21,11 +21,11 @@ nonisolated struct XAIResponsesAuth: OpenAIResponsesAuth {
 }
 
 nonisolated enum XAIClient {
-    static func make() -> OpenAIResponsesClient {
+    static func make(models: [ProviderModel]) -> OpenAIResponsesClient {
         OpenAIResponsesClient(
             id: "xai",
             displayName: "xAI",
-            models: ModelsDevCatalog.models(for: "xai"),
+            models: models,
             website: URL(string: "https://console.x.ai/team/default/api-keys"),
             subscriptionAccount: XAISubscriptionAccount.shared,
             auth: XAIResponsesAuth(),

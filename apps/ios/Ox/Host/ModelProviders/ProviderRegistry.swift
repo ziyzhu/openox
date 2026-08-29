@@ -3,8 +3,39 @@ import Observation
 
 @MainActor
 @Observable
-final class LLMRegistry {
-    static let shared = LLMRegistry()
+final class ProviderRegistry {
+    static let shared = ProviderRegistry()
+
+    private struct ProviderModelsFile: Decodable {
+        struct Provider: Decodable {
+            let global: RegionalModels?
+            let china: RegionalModels?
+
+            func models(in region: LLMRegion) -> [ProviderModel]? {
+                switch region {
+                case .global: global?.models.map(\.model)
+                case .china: china?.models.map(\.model)
+                }
+            }
+        }
+
+        struct RegionalModels: Decodable {
+            struct Entry: Decodable {
+                let model: ProviderModel
+            }
+
+            let models: [Entry]
+        }
+
+        let providers: [String: Provider]
+
+        func models(for clientID: String, in region: LLMRegion) -> [ProviderModel] {
+            guard let models = providers[clientID]?.models(in: region) else {
+                fatalError("Missing provider models for \(clientID) in \(region.rawValue)")
+            }
+            return models
+        }
+    }
 
     private let builtInClients: [LLMRegion: [any LLMClient]]
     private(set) var customProviders: [CustomLLMProvider] {
@@ -36,24 +67,33 @@ final class LLMRegistry {
 
     private init() {
         let region = AppRegion.shared.region
+        let providerModels = Self.loadProviderModels()
+        let modelLookup = { (clientID: String, region: LLMRegion) in
+            providerModels.models(for: clientID, in: region)
+        }
         let leadingClients: [any LLMClient] = [
-            ChatGPTResponsesClient(),
-            GeminiClient(),
-            GitHubCopilotClient(),
+            ChatGPTResponsesClient(models: modelLookup("chatgpt", .global)),
+            GeminiClient(models: modelLookup("gemini", .global)),
+            GitHubCopilotClient(models: modelLookup("github-copilot", .global)),
         ]
-        let middleClients: [any LLMClient] = [OpenAIClient.make(), AnthropicClient.make(), BedrockClient(), XAIClient.make()]
+        let middleClients: [any LLMClient] = [
+            OpenAIClient.make(models: modelLookup("openai", .global)),
+            AnthropicClient.make(models: modelLookup("anthropic", .global)),
+            BedrockClient(models: modelLookup("amazon-bedrock", .global)),
+            XAIClient.make(models: modelLookup("xai", .global)),
+        ]
         var prefixClients: [any LLMClient] = []
         if MockLLMClient.isEnabled {
             prefixClients.append(MockLLMClient())
-            Log.agent.info("LLMRegistry added MockLLMClient")
+            Log.agent.info("ProviderRegistry added MockLLMClient")
         }
         var builtInClients: [LLMRegion: [any LLMClient]] = [:]
         for candidate in LLMRegion.allCases {
             var clients = prefixClients
             clients.append(contentsOf: leadingClients)
-            clients.append(contentsOf: ProviderCatalog.leadingClients(for: candidate))
+            clients.append(contentsOf: Self.leadingClients(for: candidate, modelLookup: modelLookup))
             clients.append(contentsOf: middleClients)
-            clients.append(contentsOf: ProviderCatalog.trailingClients(for: candidate))
+            clients.append(contentsOf: Self.trailingClients(for: candidate, modelLookup: modelLookup))
             builtInClients[candidate] = clients
         }
         let customProviders = Self.loadCustomProviders()
@@ -69,7 +109,7 @@ final class LLMRegistry {
         let storedDefault = UserDefaults.standard.string(forKey: Self.defaultClientKey)
         self.defaultClient = storedDefault.flatMap { configuredClientIDs.contains($0) ? $0 : nil } ?? availableClients[0].id
         UserDefaults.standard.set(self.defaultClient, forKey: Self.defaultClientKey)
-        Log.agent.info("LLMRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(self.defaultClient) region=\(region.rawValue)")
+        Log.agent.info("ProviderRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(self.defaultClient) region=\(region.rawValue)")
         for provider in customProviders {
             Task { [weak self] in
                 await self?.refresh(provider)
@@ -155,17 +195,17 @@ final class LLMRegistry {
             selectedReasoningEfforts.removeValue(forKey: reasoningKey)
         }
         defaultClient = clientID
-        Log.agent.info("LLMRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
+        Log.agent.info("ProviderRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
     }
 
     func upsert(_ provider: CustomLLMProvider) {
         customProviderErrors.removeValue(forKey: provider.id)
         if let index = customProviders.firstIndex(where: { $0.id == provider.id }) {
             customProviders[index] = provider
-            Log.agent.info("LLMRegistry.custom updated client=\(provider.clientID) models=\(provider.models.count)")
+            Log.agent.info("ProviderRegistry.custom updated client=\(provider.clientID) models=\(provider.models.count)")
         } else {
             customProviders.append(provider)
-            Log.agent.info("LLMRegistry.custom added client=\(provider.clientID) models=\(provider.models.count)")
+            Log.agent.info("ProviderRegistry.custom added client=\(provider.clientID) models=\(provider.models.count)")
         }
     }
 
@@ -183,13 +223,13 @@ final class LLMRegistry {
                 $0.id == provider.id && $0.baseURL == provider.baseURL
             }) else { return }
             customProviders[index].models = models
-            Log.agent.info("LLMRegistry.custom discovered client=\(provider.clientID) models=\(models.count)")
+            Log.agent.info("ProviderRegistry.custom discovered client=\(provider.clientID) models=\(models.count)")
         } catch {
             guard customProviders.contains(where: {
                 $0.id == provider.id && $0.baseURL == provider.baseURL
             }) else { return }
             customProviderErrors[provider.id] = error.localizedDescription
-            Log.agent.error("LLMRegistry.custom discovery failed client=\(provider.clientID) error=\(error.localizedDescription)")
+            Log.agent.error("ProviderRegistry.custom discovery failed client=\(provider.clientID) error=\(error.localizedDescription)")
         }
     }
 
@@ -203,7 +243,20 @@ final class LLMRegistry {
         if defaultClient == provider.clientID {
             defaultClient = builtInClients[AppRegion.shared.region]![0].id
         }
-        Log.agent.info("LLMRegistry.custom removed client=\(provider.clientID)")
+        Log.agent.info("ProviderRegistry.custom removed client=\(provider.clientID)")
+    }
+
+    private static func loadProviderModels() -> ProviderModelsFile {
+        guard let url = Bundle.main.url(forResource: "provider-models", withExtension: "json") else {
+            fatalError("Missing bundled provider-models.json")
+        }
+        do {
+            let value = try JSONDecoder().decode(ProviderModelsFile.self, from: Data(contentsOf: url))
+            Log.agent.info("ProviderRegistry loaded provider models providers=\(value.providers.count)")
+            return value
+        } catch {
+            fatalError("Invalid bundled provider-models.json: \(error.localizedDescription)")
+        }
     }
 
     private static func loadCustomProviders() -> [CustomLLMProvider] {
@@ -216,7 +269,7 @@ final class LLMRegistry {
         do {
             UserDefaults.standard.set(try JSONEncoder().encode(providers), forKey: customProvidersKey)
         } catch {
-            Log.agent.error("LLMRegistry.custom encode failed error=\(error.localizedDescription)")
+            Log.agent.error("ProviderRegistry.custom encode failed error=\(error.localizedDescription)")
         }
     }
 

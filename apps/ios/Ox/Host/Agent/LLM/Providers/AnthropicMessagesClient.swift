@@ -405,11 +405,11 @@ nonisolated struct AnthropicMessagesClient: LLMClient {
 }
 
 nonisolated enum AnthropicClient {
-    static func make() -> AnthropicMessagesClient {
+    static func make(models: [ProviderModel]) -> AnthropicMessagesClient {
         AnthropicMessagesClient(
             id: "anthropic",
             displayName: "Anthropic",
-            models: ModelsDevCatalog.models(for: "anthropic"),
+            models: models,
             endpoint: URL(string: "https://api.anthropic.com/v1/messages")!,
             website: URL(string: "https://console.anthropic.com/settings/keys"),
             adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]

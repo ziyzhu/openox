@@ -89,7 +89,7 @@ final class ChatManager {
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
     @ObservationIgnored private let repository: ProfileRepository
     @ObservationIgnored private let storage: StorageRoot
-    @ObservationIgnored private let llmRegistry: LLMRegistry
+    @ObservationIgnored private let providerRegistry: ProviderRegistry
     @ObservationIgnored private let serviceManager: ServiceManager
     @ObservationIgnored private var repositoryScope: ProfileScope
     @ObservationIgnored private var virtualMachine: VirtualMachine
@@ -103,7 +103,7 @@ final class ChatManager {
     init(
         repository: ProfileRepository,
         storage: StorageRoot,
-        llmRegistry: LLMRegistry,
+        providerRegistry: ProviderRegistry,
         serviceManager: ServiceManager,
         presentations: AppPresentations
     ) {
@@ -111,7 +111,7 @@ final class ChatManager {
         virtualMachine = VirtualMachine()
         self.repository = repository
         self.storage = storage
-        self.llmRegistry = llmRegistry
+        self.providerRegistry = providerRegistry
         self.serviceManager = serviceManager
         #if targetEnvironment(simulator)
         debugRepositorySaveGate = repository.debugSaveGate
@@ -342,8 +342,8 @@ final class ChatManager {
     }
 
     private func startTemporaryChat(continuing continuation: ChatContinuation) {
-        let client = llmRegistry.client(forSnapshot: continuation.meta.clientID)
-        let model = llmRegistry.model(
+        let client = providerRegistry.client(forSnapshot: continuation.meta.clientID)
+        let model = providerRegistry.model(
             forSnapshot: continuation.meta.modelID,
             reasoningEffort: continuation.meta.reasoningEffort,
             client: client
@@ -436,8 +436,8 @@ final class ChatManager {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
             return nil
         }
-        let client = llmRegistry.client(forSnapshot: result.meta.clientID)
-        let model = llmRegistry.model(
+        let client = providerRegistry.client(forSnapshot: result.meta.clientID)
+        let model = providerRegistry.model(
             forSnapshot: result.meta.modelID,
             reasoningEffort: result.meta.reasoningEffort,
             client: client
@@ -630,10 +630,10 @@ final class ChatManager {
         executionLease: Chat.ExecutionLease = .userInitiated,
         scheduledSkillID: UUID? = nil
     ) -> Chat {
-        let client = llmRegistry.newSessionClient
+        let client = providerRegistry.newSessionClient
         let chat = Chat(
             client: client,
-            model: llmRegistry.selected(for: client.id),
+            model: providerRegistry.selected(for: client.id),
             repository: repository,
             scope: repositoryScope,
             virtualMachine: virtualMachine,
@@ -678,8 +678,8 @@ final class ChatManager {
     }
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {
-        let client = llmRegistry.client(forSnapshot: loaded.state.meta.clientID)
-        let model = llmRegistry.model(
+        let client = providerRegistry.client(forSnapshot: loaded.state.meta.clientID)
+        let model = providerRegistry.model(
             forSnapshot: loaded.state.meta.modelID,
             reasoningEffort: loaded.state.meta.reasoningEffort,
             client: client

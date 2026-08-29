@@ -30,11 +30,11 @@ nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesAuth {
 struct ChatGPTResponsesClient: LLMClient {
     private let client: OpenAIResponsesClient
 
-    init() {
+    init(models: [ProviderModel]) {
         client = OpenAIResponsesClient(
             id: "chatgpt",
             displayName: "ChatGPT",
-            models: ModelsDevCatalog.models(for: "chatgpt"),
+            models: models,
             website: URL(string: "https://chatgpt.com/codex"),
             usesAPIKey: false,
             acceptsAPIKey: false,

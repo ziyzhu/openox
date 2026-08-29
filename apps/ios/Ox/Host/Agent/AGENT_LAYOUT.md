@@ -27,7 +27,7 @@ The application layer owns chat presentation, transcript persistence, services,
 artifacts, user handoffs, and app configuration. Dependencies point from `Chat`
 and app orchestration into `Agent`; the runtime must not depend on those layers.
 
-`LLMRegistry` stays outside this directory because selected defaults, regional
+`ProviderRegistry` stays outside this directory because selected defaults, regional
 policy, credentials, and concrete provider wiring are application configuration.
 
 ## Semantic reference map
@@ -94,7 +94,7 @@ provider contract, production failure, or regression test.
 - Model adapters transform ephemeral request copies for the current model snapshot while persisted messages retain their original attachments; native model modalities remain provider-owned facts.
 - Every artifact contributes the same canonical `Attached artifact` reference; adapters place derived analysis immediately after that reference when replacing media a model cannot consume.
 - `ProviderModel` retains reasoning support, provider-specific effort strings in lowest-to-highest order, and typed input and output modalities from the catalog; adapters choose the first supported effort while the agent runner rejects incompatible attachment history locally before compaction or provider streaming.
-- Built-in model metadata comes from a checked-in models.dev catalog snapshot filtered by Ox's curated global and China selections; transport, authentication, regional policy, and provider wiring remain app-owned.
+- Built-in model metadata comes from one checked-in provider-model manifest refreshed from models.dev and resolved to Ox's curated global and China selections; `ProviderRegistry` decodes its `ProviderModel` values directly while transport, authentication, regional policy, and provider wiring remain app-owned.
 - Built-in providers absent from models.dev keep the smallest official-documentation-backed model set in `CuratedProviderModels.swift` until upstream supplies compatible catalog metadata.
 - Provider adapters classify raw failures before the agent loop handles context overflow or chat presents user-facing errors.
 - Remote model execution uses one of four explicit wire protocols: OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, or Gemini GenerateContent.

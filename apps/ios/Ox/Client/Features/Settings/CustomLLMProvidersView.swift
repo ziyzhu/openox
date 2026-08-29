@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CustomLLMProvidersView: View {
     @State private var addingProvider = false
-    private var registry: LLMRegistry { .shared }
+    private var registry: ProviderRegistry { .shared }
 
     var body: some View {
         ScrollView {
@@ -312,7 +312,7 @@ struct CustomLLMProviderEditor: View {
                     models: refreshedModels
                 )
                 models = refreshedModels
-                LLMRegistry.shared.upsert(saved)
+                ProviderRegistry.shared.upsert(saved)
                 if !trimmedKey.isEmpty { Credentials.set(trimmedKey, for: saved.clientID) }
                 Haptics.success(.settingsSaved)
                 dismiss()
@@ -324,7 +324,7 @@ struct CustomLLMProviderEditor: View {
 
     private func remove() {
         guard let provider else { return }
-        LLMRegistry.shared.remove(provider)
+        ProviderRegistry.shared.remove(provider)
         dismiss()
     }
 }

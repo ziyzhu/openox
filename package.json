@@ -14,7 +14,7 @@
     "check:localizations": "bun tooling/localization-check.ts",
     "check:system-skills": "bun tooling/system-skills-check.ts",
     "sim:bootstrap": "bun tooling/sim-bootstrap.ts",
-    "update:llms": "bun tooling/models-dev-catalog.ts",
+    "update:llms": "bun tooling/provider-models.ts",
     "check:public-boundary": "bun tooling/public-boundary-check.ts",
     "typecheck": "bun tooling/typecheck.ts"
   },

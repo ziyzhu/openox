@@ -12,8 +12,8 @@ nonisolated struct BedrockClient: LLMClient {
     private let responses: OpenAIResponsesClient
     private let messages: AnthropicMessagesClient
 
-    init() {
-        models = ModelsDevCatalog.models(for: id)
+    init(models: [ProviderModel]) {
+        self.models = models
         let gptModels = models.filter { $0.wireID.hasPrefix("openai.") }
         let claudeModels = models.filter { $0.wireID.hasPrefix("anthropic.") }
         responses = OpenAIResponsesClient(

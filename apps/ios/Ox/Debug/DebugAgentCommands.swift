@@ -66,7 +66,7 @@ extension OxHostProtocol {
                                         message: nil, ttftMs: nil, toolReadyMs: nil, totalMs: nil, error: message)))
         }
 
-        let registry = LLMRegistry.shared
+        let registry = ProviderRegistry.shared
         guard let client = registry.client(id: clientId) else { return fail("unknown client: \(clientId)") }
         guard let model = client.models.first(where: { $0.id == modelId }) else {
             return fail("unknown model: \(modelId) for client \(clientId)")

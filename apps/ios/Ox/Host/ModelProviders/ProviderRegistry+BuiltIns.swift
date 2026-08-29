@@ -73,7 +73,7 @@ nonisolated struct OpenAICompatibleProviderProfile: Sendable {
         self.inferenceLocation = inferenceLocation
     }
 
-    func client(for region: LLMRegion) -> OpenAIChatClient {
+    func client(for region: LLMRegion, models fallbackModels: [ProviderModel]) -> OpenAIChatClient {
         let baseURL = endpoint.value(for: region)
         let credentialID = regionalCredentials && region != .global ? "\(id):\(region.rawValue)" : id
         let resolvedAuth: any OpenAIChatAuth
@@ -89,7 +89,7 @@ nonisolated struct OpenAICompatibleProviderProfile: Sendable {
         return OpenAIChatClient(
             id: id,
             displayName: displayName.value(for: region),
-            models: models?.value(for: region) ?? ModelsDevCatalog.models(for: id, in: region),
+            models: models?.value(for: region) ?? fallbackModels,
             regions: regions,
             auth: resolvedAuth,
             usesAPIKey: usesAPIKey,
@@ -109,16 +109,24 @@ nonisolated struct OpenAICompatibleProviderProfile: Sendable {
     }
 }
 
-nonisolated enum ProviderCatalog {
-    static func leadingClients(for region: LLMRegion) -> [any LLMClient] {
-        leadingProfiles.filter { $0.regions.contains(region) }.map { $0.client(for: region) }
+extension ProviderRegistry {
+    static func leadingClients(
+        for region: LLMRegion,
+        modelLookup: (String, LLMRegion) -> [ProviderModel]
+    ) -> [any LLMClient] {
+        leadingProfiles.filter { $0.regions.contains(region) }.map {
+            $0.client(for: region, models: $0.models?.value(for: region) ?? modelLookup($0.id, region))
+        }
     }
 
-    static func trailingClients(for region: LLMRegion) -> [any LLMClient] {
-        trailingProfiles.filter { $0.regions.contains(region) }.map { $0.client(for: region) }
+    static func trailingClients(
+        for region: LLMRegion,
+        modelLookup: (String, LLMRegion) -> [ProviderModel]
+    ) -> [any LLMClient] {
+        trailingProfiles.filter { $0.regions.contains(region) }.map {
+            $0.client(for: region, models: $0.models?.value(for: region) ?? modelLookup($0.id, region))
+        }
     }
-
-    static let profiles = leadingProfiles + trailingProfiles
 
     private static let leadingProfiles: [OpenAICompatibleProviderProfile] = [
         OpenAICompatibleProviderProfile(

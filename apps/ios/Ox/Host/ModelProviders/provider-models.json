@@ -1,0 +1,2167 @@
+{
+  "providers": {
+    "chatgpt": {
+      "global": {
+        "catalogProvider": "openai",
+        "models": [
+          {
+            "source": "gpt-5.6-sol",
+            "overrides": {
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-sol",
+              "displayName": "GPT-5.6 Sol",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-sol",
+            "overrides": {
+              "id": "gpt-5.6-sol@fast",
+              "variant": "fast",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-sol@fast",
+              "displayName": "GPT-5.6 Sol · Fast",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "gpt-5.6-sol",
+              "variant": "fast"
+            }
+          },
+          {
+            "source": "gpt-5.6-terra",
+            "overrides": {
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-terra",
+              "displayName": "GPT-5.6 Terra",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-terra",
+            "overrides": {
+              "id": "gpt-5.6-terra@fast",
+              "variant": "fast",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-terra@fast",
+              "displayName": "GPT-5.6 Terra · Fast",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "gpt-5.6-terra",
+              "variant": "fast"
+            }
+          },
+          {
+            "source": "gpt-5.6-luna",
+            "overrides": {
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-luna",
+              "displayName": "GPT-5.6 Luna",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-luna",
+            "overrides": {
+              "id": "gpt-5.6-luna@fast",
+              "variant": "fast",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-luna@fast",
+              "displayName": "GPT-5.6 Luna · Fast",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "gpt-5.6-luna",
+              "variant": "fast"
+            }
+          }
+        ]
+      }
+    },
+    "openai": {
+      "global": {
+        "catalogProvider": "openai",
+        "models": [
+          {
+            "source": "gpt-5.6-sol",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-sol",
+              "displayName": "GPT-5.6 Sol",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-terra",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-terra",
+              "displayName": "GPT-5.6 Terra",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-luna",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-luna",
+              "displayName": "GPT-5.6 Luna",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "anthropic": {
+      "global": {
+        "catalogProvider": "anthropic",
+        "models": [
+          {
+            "source": "claude-sonnet-5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-sonnet-5",
+              "displayName": "Claude Sonnet 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "claude-opus-5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-opus-5",
+              "displayName": "Claude Opus 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "claude-fable-5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-fable-5",
+              "displayName": "Claude Fable 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "claude-haiku-4-5",
+            "overrides": {
+              "id": "claude-haiku-4.5",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-haiku-4.5",
+              "displayName": "Claude Haiku 4.5 (latest)",
+              "maxTokens": 16384,
+              "maxContext": 200000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "claude-haiku-4-5"
+            }
+          }
+        ]
+      }
+    },
+    "gemini": {
+      "global": {
+        "catalogProvider": "google",
+        "models": [
+          {
+            "source": "gemini-3.7-flash",
+            "model": {
+              "id": "gemini-3.7-flash",
+              "displayName": "Gemini 3.7 Flash",
+              "maxTokens": 65536,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gemini-3.5-flash-lite",
+            "model": {
+              "id": "gemini-3.5-flash-lite",
+              "displayName": "Gemini 3.5 Flash Lite",
+              "maxTokens": 65536,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "minimal",
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "github-copilot": {
+      "global": {
+        "catalogProvider": "github-copilot",
+        "models": [
+          {
+            "source": "gpt-5.6-sol",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-sol",
+              "displayName": "GPT-5.6 Sol",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-terra",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-terra",
+              "displayName": "GPT-5.6 Terra",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-5.6-luna",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-5.6-luna",
+              "displayName": "GPT-5.6 Luna",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "grok-4.5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "grok-4.5",
+              "displayName": "Grok 4.5",
+              "maxTokens": 16384,
+              "maxContext": 500000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "xai": {
+      "global": {
+        "catalogProvider": "xai",
+        "models": [
+          {
+            "source": "grok-4.5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "grok-4.5",
+              "displayName": "Grok 4.5",
+              "maxTokens": 16384,
+              "maxContext": 500000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "opencode-go": {
+      "global": {
+        "catalogProvider": "opencode-go",
+        "models": [
+          {
+            "source": "deepseek-v4-flash",
+            "overrides": {
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-flash",
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "deepseek-v4-pro",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-pro",
+              "displayName": "DeepSeek V4 Pro (New)",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "kimi-k3",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "kimi-k3",
+              "displayName": "Kimi K3",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "ox-alpha-free",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "ox-alpha-free",
+              "displayName": "Ox Alpha Free (Unlimited)",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "qwen-coding-plan": {
+      "global": {
+        "catalogProvider": "alibaba-coding-plan",
+        "models": [
+          {
+            "source": "qwen3.7-plus",
+            "model": {
+              "id": "qwen3.7-plus",
+              "displayName": "Qwen3.7 Plus",
+              "maxTokens": 64000,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "qwen3.7-max",
+            "model": {
+              "id": "qwen3.7-max",
+              "displayName": "Qwen3.7 Max",
+              "maxTokens": 65536,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "alibaba-coding-plan-cn",
+        "models": [
+          {
+            "source": "qwen3.7-plus",
+            "model": {
+              "id": "qwen3.7-plus",
+              "displayName": "Qwen3.7 Plus",
+              "maxTokens": 64000,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "qwen3.7-max",
+            "model": {
+              "id": "qwen3.7-max",
+              "displayName": "Qwen3.7 Max",
+              "maxTokens": 65536,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "minimax-token-plan": {
+      "global": {
+        "catalogProvider": "minimax-coding-plan",
+        "models": [
+          {
+            "source": "MiniMax-M3",
+            "overrides": {
+              "displayName": "MiniMax M3"
+            },
+            "model": {
+              "id": "MiniMax-M3",
+              "displayName": "MiniMax M3",
+              "maxTokens": 128000,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "minimax-cn-coding-plan",
+        "models": [
+          {
+            "source": "MiniMax-M3",
+            "overrides": {
+              "displayName": "MiniMax M3"
+            },
+            "model": {
+              "id": "MiniMax-M3",
+              "displayName": "MiniMax M3",
+              "maxTokens": 128000,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "openrouter": {
+      "global": {
+        "catalogProvider": "openrouter",
+        "models": [
+          {
+            "source": "stealth/ox-alpha",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "stealth/ox-alpha",
+              "displayName": "Ox Alpha",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "anthropic/claude-sonnet-5",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "anthropic/claude-sonnet-5",
+              "displayName": "Claude Sonnet 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "openai/gpt-5.6-terra",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "openai/gpt-5.6-terra",
+              "displayName": "GPT-5.6 Terra",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "google/gemini-3.7-flash",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "google/gemini-3.7-flash",
+              "displayName": "Gemini 3.7 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "deepseek/deepseek-v4-flash-0731",
+            "overrides": {
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek/deepseek-v4-flash-0731",
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1310720,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "qwen/qwen3.8-max",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "qwen/qwen3.8-max",
+              "displayName": "Qwen3.8 Max",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "moonshotai/kimi-k3",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "moonshotai/kimi-k3",
+              "displayName": "Kimi K3",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "z-ai/glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "z-ai/glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "xhigh"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "amazon-bedrock": {
+      "global": {
+        "catalogProvider": "amazon-bedrock",
+        "models": [
+          {
+            "source": "openai.gpt-5.6-sol",
+            "overrides": {
+              "id": "gpt-5.6-sol",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-sol",
+              "displayName": "GPT-5.6 Sol",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "openai.gpt-5.6-sol"
+            }
+          },
+          {
+            "source": "openai.gpt-5.6-terra",
+            "overrides": {
+              "id": "gpt-5.6-terra",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-terra",
+              "displayName": "GPT-5.6 Terra",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "openai.gpt-5.6-terra"
+            }
+          },
+          {
+            "source": "openai.gpt-5.6-luna",
+            "overrides": {
+              "id": "gpt-5.6-luna",
+              "maxTokens": 16384,
+              "maxContext": 272000
+            },
+            "model": {
+              "id": "gpt-5.6-luna",
+              "displayName": "GPT-5.6 Luna",
+              "maxTokens": 16384,
+              "maxContext": 272000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "openai.gpt-5.6-luna"
+            }
+          },
+          {
+            "source": "anthropic.claude-sonnet-5",
+            "overrides": {
+              "id": "claude-sonnet-5",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-sonnet-5",
+              "displayName": "Claude Sonnet 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "anthropic.claude-sonnet-5"
+            }
+          },
+          {
+            "source": "anthropic.claude-opus-5",
+            "overrides": {
+              "id": "claude-opus-5",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-opus-5",
+              "displayName": "Claude Opus 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "anthropic.claude-opus-5"
+            }
+          },
+          {
+            "source": "anthropic.claude-fable-5",
+            "overrides": {
+              "id": "claude-fable-5",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-fable-5",
+              "displayName": "Claude Fable 5",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "anthropic.claude-fable-5"
+            }
+          },
+          {
+            "source": "anthropic.claude-haiku-4-5-20251001-v1:0",
+            "overrides": {
+              "id": "claude-haiku-4.5",
+              "providerModelID": "anthropic.claude-haiku-4-5-20251001-v1:0",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "claude-haiku-4.5",
+              "displayName": "Claude Haiku 4.5",
+              "maxTokens": 16384,
+              "maxContext": 200000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              },
+              "providerModelID": "anthropic.claude-haiku-4-5-20251001-v1:0"
+            }
+          }
+        ]
+      }
+    },
+    "mistral": {
+      "global": {
+        "catalogProvider": "mistral",
+        "models": [
+          {
+            "source": "mistral-medium-2604",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "mistral-medium-2604",
+              "displayName": "Mistral Medium 3.5",
+              "maxTokens": 16384,
+              "maxContext": 262144,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "mistral-small-2603",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "mistral-small-2603",
+              "displayName": "Mistral Small 4",
+              "maxTokens": 16384,
+              "maxContext": 256000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "none",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "kimi": {
+      "global": {
+        "catalogProvider": "moonshotai",
+        "models": [
+          {
+            "source": "kimi-k3",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "kimi-k3",
+              "displayName": "Kimi K3",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "moonshotai-cn",
+        "models": [
+          {
+            "source": "kimi-k3",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "kimi-k3",
+              "displayName": "Kimi K3",
+              "maxTokens": 16384,
+              "maxContext": 1048576,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "deepseek": {
+      "global": {
+        "catalogProvider": "deepseek",
+        "models": [
+          {
+            "source": "deepseek-v4-flash",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-flash",
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "deepseek-v4-pro",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-pro",
+              "displayName": "DeepSeek V4 Pro",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "deepseek",
+        "models": [
+          {
+            "source": "deepseek-v4-flash",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-flash",
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "deepseek-v4-pro",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-v4-pro",
+              "displayName": "DeepSeek V4 Pro",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "zai-coding-plan": {
+      "global": {
+        "catalogProvider": "zai-coding-plan",
+        "models": [
+          {
+            "source": "glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "glm-5.2-highspeed",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2-highspeed",
+              "displayName": "GLM-5.2 Highspeed",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "zhipuai-coding-plan",
+        "models": [
+          {
+            "source": "glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "glm-5.2-highspeed",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2-highspeed",
+              "displayName": "GLM-5.2 Highspeed",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "zai": {
+      "global": {
+        "catalogProvider": "zai",
+        "models": [
+          {
+            "source": "glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "zhipuai",
+        "models": [
+          {
+            "source": "glm-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "qwen": {
+      "global": {
+        "catalogProvider": "alibaba",
+        "models": [
+          {
+            "source": "qwen3.7-plus",
+            "overrides": {
+              "maxTokens": 8192
+            },
+            "model": {
+              "id": "qwen3.7-plus",
+              "displayName": "Qwen3.7 Plus",
+              "maxTokens": 8192,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "qwen3.8-max",
+            "overrides": {
+              "maxTokens": 8192
+            },
+            "model": {
+              "id": "qwen3.8-max",
+              "displayName": "Qwen3.8 Max",
+              "maxTokens": 8192,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "xhigh"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "china": {
+        "catalogProvider": "alibaba-cn",
+        "models": [
+          {
+            "source": "qwen3.7-plus",
+            "overrides": {
+              "maxTokens": 8192
+            },
+            "model": {
+              "id": "qwen3.7-plus",
+              "displayName": "Qwen3.7 Plus",
+              "maxTokens": 8192,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "qwen3.8-max",
+            "overrides": {
+              "maxTokens": 8192
+            },
+            "model": {
+              "id": "qwen3.8-max",
+              "displayName": "Qwen3.8 Max",
+              "maxTokens": 8192,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "xhigh"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "minimax": {
+      "china": {
+        "catalogProvider": "minimax-cn",
+        "models": [
+          {
+            "source": "MiniMax-M3",
+            "overrides": {
+              "displayName": "MiniMax M3",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "MiniMax-M3",
+              "displayName": "MiniMax M3",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "stepfun": {
+      "china": {
+        "catalogProvider": "stepfun",
+        "models": [
+          {
+            "source": "step-3.7-flash",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "step-3.7-flash",
+              "displayName": "Step 3.7 Flash",
+              "maxTokens": 16384,
+              "maxContext": 256000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "siliconflow": {
+      "china": {
+        "catalogProvider": "siliconflow-cn",
+        "models": [
+          {
+            "source": "deepseek-ai/DeepSeek-V4-Flash",
+            "overrides": {
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-ai/DeepSeek-V4-Flash",
+              "displayName": "DeepSeek V4 Flash",
+              "maxTokens": 16384,
+              "maxContext": 1000000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "deepseek-ai/DeepSeek-V4-Pro",
+            "overrides": {
+              "displayName": "DeepSeek V4 Pro",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "deepseek-ai/DeepSeek-V4-Pro",
+              "displayName": "DeepSeek V4 Pro",
+              "maxTokens": 16384,
+              "maxContext": 1049000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "zai-org/GLM-5.2",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "zai-org/GLM-5.2",
+              "displayName": "GLM-5.2",
+              "maxTokens": 16384,
+              "maxContext": 1049000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "high",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

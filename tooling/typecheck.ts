@@ -1,6 +1,6 @@
 import { ROOT } from "./lib.ts";
 import { validateLocalizations } from "./localization-check.ts";
-import { validateBundledModelsDevCatalog } from "./models-dev-catalog.ts";
+import { validateProviderModels } from "./provider-models.ts";
 import { validateSystemSkills } from "./system-skills-check.ts";
 
 const boundary = Bun.spawnSync(["bun", "tooling/public-boundary-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
@@ -15,8 +15,8 @@ console.log(`PASS system skills ${systemSkills} packages`);
 const localizationEntries = await validateLocalizations();
 console.log(`PASS localizations ${localizationEntries} entries`);
 
-const catalog = await validateBundledModelsDevCatalog();
-console.log(`PASS models.dev catalog selected=${catalog.selectedModels}`);
+const providerModels = await validateProviderModels();
+console.log(`PASS provider models providers=${providerModels.providers} selected=${providerModels.selectedModels}`);
 
 const projects = [
   "apps/cli/tsconfig.json",

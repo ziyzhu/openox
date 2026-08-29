@@ -36,7 +36,7 @@ final class IOSHost: OxHost {
         chats = ChatManager(
             repository: .shared,
             storage: .shared,
-            llmRegistry: .shared,
+            providerRegistry: .shared,
             serviceManager: serviceManager,
             presentations: presentations
         )

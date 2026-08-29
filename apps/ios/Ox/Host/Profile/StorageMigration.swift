@@ -98,7 +98,7 @@ nonisolated enum StorageMigrator {
         )
         _ = migrateCustomLLMProviders(
             defaults: .standard,
-            key: LLMRegistry.customProvidersKey
+            key: ProviderRegistry.customProvidersKey
         )
         migrateTheme()
         Log.app.info("StorageMigrator.application done")
@@ -193,8 +193,8 @@ nonisolated enum StorageMigrator {
                 throw StorageMigrationError.invalidApplicationStorage("remote MCP server")
             }
         }
-        if defaults.object(forKey: LLMRegistry.customProvidersKey) != nil {
-            guard let data = defaults.data(forKey: LLMRegistry.customProvidersKey),
+        if defaults.object(forKey: ProviderRegistry.customProvidersKey) != nil {
+            guard let data = defaults.data(forKey: ProviderRegistry.customProvidersKey),
                   (try? JSONDecoder().decode([CustomLLMProvider].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("custom provider")
             }

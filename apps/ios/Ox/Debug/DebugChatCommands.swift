@@ -143,7 +143,7 @@ extension OxHostProtocol {
 
     @MainActor
     static func handleListModels(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
-        let registry = LLMRegistry.shared
+        let registry = ProviderRegistry.shared
         let clients = registry.clients.map { client in
             let diagnostics = client.protocolDiagnostics
             return ClientRow(
