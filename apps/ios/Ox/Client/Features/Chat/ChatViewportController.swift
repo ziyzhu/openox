@@ -97,6 +97,7 @@ final class ChatViewportController {
     @ObservationIgnored private var motion = Motion.stationary
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
     @ObservationIgnored private var composerTop: CGFloat?
+    @ObservationIgnored private var restingComposerTop: CGFloat?
     @ObservationIgnored private var responseBottoms: [UUID: CGFloat] = [:]
 
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
@@ -153,11 +154,11 @@ final class ChatViewportController {
         guard !isBusy,
               let lastResponseFooterID,
               let responseBottom = responseBottoms[lastResponseFooterID],
-              let composerTop else {
+              let referenceComposerTop = restingComposerTop ?? composerTop else {
             composerReflow = .preservingScrollPosition
             return
         }
-        let gap = composerTop - responseBottom
+        let gap = referenceComposerTop - responseBottom
         guard gap >= -Self.spacingTolerance else {
             composerReflow = .preservingScrollPosition
             Log.ui.info("Transcript.composerReflow chat=\(chatID) mode=scrollPosition gap=\(Int(gap))")
@@ -179,8 +180,9 @@ final class ChatViewportController {
         Log.ui.info("Transcript.composerReflow chat=\(chatID) applied=\(request.id) block=\(request.responseID) targetY=\(Int(request.targetY))")
     }
 
-    func composerBoundsChanged(_ bounds: CGRect) {
+    func composerBoundsChanged(_ bounds: CGRect, focused: Bool) {
         composerTop = bounds.minY
+        if !focused { restingComposerTop = bounds.minY }
         updateComposerReflow()
     }
 

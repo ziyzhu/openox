@@ -746,7 +746,7 @@ struct ChatPage: View {
         inputBar(isChatEmpty: isChatEmpty)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
                 viewportLayout.measureComposer(bounds)
-                scroller.composerBoundsChanged(bounds)
+                scroller.composerBoundsChanged(bounds, focused: anyInputFocused)
             }
     }
 
