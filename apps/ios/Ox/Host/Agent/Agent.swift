@@ -269,7 +269,7 @@ public actor Agent {
             shouldStopAfterTurn: shouldStopAfterTurn,
             toolExecutionMode: toolExecutionMode,
             priorTurnTokens: lastTurnTokens,
-            prepareNextTurn: { [weak self] messages in
+            refreshSnapshot: { [weak self] messages in
                 await self?.makeTurnSnapshot(messages: messages)
             }
         )

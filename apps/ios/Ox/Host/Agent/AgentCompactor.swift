@@ -9,7 +9,6 @@ nonisolated public struct AgentCompaction: Sendable {
 
 nonisolated enum AgentCompactionReason: String, Sendable {
     case continuation
-    case settled
     case prePrompt
     case overflow
 }
@@ -86,7 +85,7 @@ nonisolated enum AgentCompactor {
         }
         if Task.isCancelled { return .cancelled }
 
-        let summaryUser = UserMessage(text: "<conversation_summary provenance=\"model-generated\">\n\(summary)\n</conversation_summary>")
+        let summaryUser = UserMessage(text: wrappedSummary(summary))
         var summaryAssistant = AssistantMessage(model: model.id, content: [.text(TextContent("Understood. Continuing from the summary."))])
         let activatedSkills = activatedSkills(in: toSummarize, excluding: tail)
         var preservedMessages: [Message] = []
@@ -159,19 +158,64 @@ nonisolated enum AgentCompactor {
         var boundary: Int?
         for index in messages.indices.reversed() {
             retained += AgentContextBudget.messageTokens(messages[index])
+            if retained >= retainedTokens, let boundary { return boundary > 0 ? boundary : nil }
             switch messages[index] {
             case .user, .assistant: boundary = index
             case .toolResult: break
             }
-            if retained >= retainedTokens, let boundary { return boundary > 0 ? boundary : nil }
         }
         return nil
+    }
+
+    enum SummaryValidation {
+        case completed(String)
+        case cancelled
+        case failed(reason: String, retryable: Bool)
     }
 
     private enum SummaryOutcome {
         case completed(String)
         case cancelled
-        case failed
+        case failed(reason: String)
+    }
+
+    private static let summaryPrefix = "<conversation_summary provenance=\"model-generated\">\n"
+    private static let summarySuffix = "\n</conversation_summary>"
+
+    static func wrappedSummary(_ summary: String) -> String {
+        "\(summaryPrefix)\(summary)\(summarySuffix)"
+    }
+
+    static func previousSummary(in messages: [Message]) -> String? {
+        for case .user(let user) in messages.reversed() {
+            let text = user.content.concatenatedText
+            guard text.hasPrefix(summaryPrefix), text.hasSuffix(summarySuffix) else { continue }
+            return String(text.dropFirst(summaryPrefix.count).dropLast(summarySuffix.count))
+        }
+        return nil
+    }
+
+    static func validateSummary(reason: StopReason, message: AssistantMessage) -> SummaryValidation {
+        if reason == .aborted || message.stopReason == .aborted { return .cancelled }
+        if reason == .error || message.stopReason == .error {
+            var failure = message
+            failure.stopReason = .error
+            return .failed(
+                reason: failure.errorMessage ?? "summary provider request failed",
+                retryable: isRetryableLLMFailure(failure)
+            )
+        }
+        guard reason == .stop, message.stopReason == .stop else {
+            return .failed(reason: "summary ended with \(reason.rawValue)", retryable: false)
+        }
+        guard message.content.toolCalls.isEmpty else {
+            return .failed(reason: "summary attempted to call a tool", retryable: false)
+        }
+        let text = message.content.concatenatedText
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .failed(reason: "summary was empty", retryable: false)
+        }
+        return .completed(text)
     }
 
     private static func streamSummary(
@@ -183,14 +227,12 @@ nonisolated enum AgentCompactor {
         splitTurn: Bool,
         transformContext: TransformContextHook?
     ) async -> SummaryOutcome {
-        let continuation = splitTurn ? " The history ends partway through an ongoing turn. Its recent steps are retained separately. Preserve the original user request, progress so far, and the information needed to continue those retained steps; do not answer the request or repeat completed actions." : ""
-        let instruction = UserMessage(text: """
-        Summarize the conversation above so future turns can continue without it. \
-        Capture: facts learned via tool calls, user preferences, decisions made, \
-        and any unresolved tasks. Be exhaustive on facts but concise in prose. \
-        Output only the summary; no preamble.\(continuation)
-        """)
-        let sourceMessages = history + [.user(instruction)]
+        let previousSummary = previousSummary(in: history)
+        let instruction = UserMessage(text: summaryInstruction(
+            previousSummary: previousSummary,
+            splitTurn: splitTurn
+        ))
+        let sourceMessages = summaryHistory(history, replacing: previousSummary) + [.user(instruction)]
         let llmMessages = await transformContext?(
             TransformContextRequest(messages: sourceMessages, model: model)
         ) ?? sourceMessages
@@ -201,7 +243,8 @@ nonisolated enum AgentCompactor {
         summaryOptions.maxTokens = min(options.maxTokens ?? model.maxTokens, max(1_024, Int(Double(reserveTokens) * 0.8)))
         summaryOptions.promptCachePolicy = .disabled
         summaryOptions.sessionID = UUID().uuidString
-        let maxAttempts = 3
+        let retryPolicy = LLMRetryPolicy.compaction
+        let maxAttempts = retryPolicy.maxRetries + 1
         for attempt in 1...maxAttempts {
             Log.agent.info("Agent.compact summary attempt=\(attempt)/\(maxAttempts) cache=disabled session=\(summaryOptions.sessionID ?? "nil")")
             let stream = client.stream(
@@ -211,31 +254,96 @@ nonisolated enum AgentCompactor {
                 tools: [],
                 options: summaryOptions
             )
+            var failure = (reason: "summary stream ended without a terminal event", retryable: true)
             do {
-                for try await ev in stream {
+                events: for try await ev in stream {
                     if Task.isCancelled { return .cancelled }
                     switch ev {
-                    case .done(_, let message):
-                        let text = message.content.compactMap { block -> String? in
-                            if case .text(let text) = block { return text.text }
-                            return nil
-                        }.joined()
-                        if !text.isEmpty { return .completed(text) }
+                    case .done(let reason, let message):
+                        switch validateSummary(reason: reason, message: message) {
+                        case .completed(let text):
+                            return .completed(text)
+                        case .cancelled:
+                            return .cancelled
+                        case .failed(let reason, let retryable):
+                            failure = (reason, retryable)
+                            break events
+                        }
                     case .failed(let reason, let message):
-                        Log.agent.error("Agent.compact summary failed attempt=\(attempt) reason=\(reason) failureKind=\(message.failureKind?.rawValue ?? "none") err=\(LogPrivacy.text(message.errorMessage ?? "nil", limit: 2_048))")
+                        if reason == .aborted || message.stopReason == .aborted { return .cancelled }
+                        var failed = message
+                        failed.stopReason = .error
+                        failure = (
+                            failed.errorMessage ?? "summary provider request failed",
+                            isRetryableLLMFailure(failed)
+                        )
+                        break events
                     default:
                         break
                     }
                 }
             } catch {
-                Log.agent.error("Agent.compact summary threw attempt=\(attempt): \(LogPrivacy.text(error.localizedDescription, limit: 2_048))")
+                if Task.isCancelled { return .cancelled }
+                failure = (error.localizedDescription, isRetryableLLMFailure(error))
             }
-            guard attempt < maxAttempts, !Task.isCancelled else {
-                return Task.isCancelled ? .cancelled : .failed
+            Log.agent.error("Agent.compact summary failed attempt=\(attempt)/\(maxAttempts) retryable=\(failure.retryable) err=\(LogPrivacy.text(failure.reason, limit: 2_048))")
+            guard failure.retryable, attempt < maxAttempts else {
+                return .failed(reason: failure.reason)
             }
-            try? await Task.sleep(for: .milliseconds(250 * (1 << (attempt - 1))))
-            if Task.isCancelled { return .cancelled }
+            do {
+                try await Task.sleep(for: retryPolicy.delay(forRetry: attempt))
+            } catch {
+                return .cancelled
+            }
         }
-        return .failed
+        return .failed(reason: "summary retry policy exhausted")
+    }
+
+    private static func summaryInstruction(previousSummary: String?, splitTurn: Bool) -> String {
+        let sections = """
+        Use this exact structure:
+
+        ## Goal
+        ## Constraints & Preferences
+        ## Progress
+        ### Done
+        ### In Progress
+        ### Blocked
+        ## Key Decisions
+        ## Next Steps
+        ## Critical Context
+        """
+        let splitTurnInstruction = splitTurn
+            ? "The history ends partway through an ongoing turn. Preserve the original request, early progress, and context needed to continue the retained suffix without repeating completed actions."
+            : ""
+        guard let previousSummary else {
+            return """
+            Summarize the conversation above into a context checkpoint for another model. Preserve user constraints, facts learned from tools, decisions, completed work, unresolved tasks, exact paths, function names, and errors. Do not answer the request or continue the work.
+
+            \(splitTurnInstruction)
+
+            \(sections)
+            """
+        }
+        return """
+        Update the existing context checkpoint with the new conversation above. Preserve all still-relevant information from the previous checkpoint, add new progress and decisions, move completed work to Done, and update Next Steps. Do not answer the request or continue the work.
+
+        <previous_summary provenance="model-generated">
+        \(previousSummary)
+        </previous_summary>
+
+        \(splitTurnInstruction)
+
+        \(sections)
+        """
+    }
+
+    private static func summaryHistory(_ history: [Message], replacing checkpoint: String?) -> [Message] {
+        guard checkpoint != nil else { return history }
+        return history.map { message in
+            guard case .user(let user) = message,
+                  previousSummary(in: [.user(user)]) != nil else { return message }
+            return .user(UserMessage(text: "The previous context checkpoint is supplied in the final instruction."))
+        }
     }
 }

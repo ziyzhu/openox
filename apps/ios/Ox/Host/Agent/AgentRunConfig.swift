@@ -21,7 +21,7 @@ nonisolated struct AgentRunConfig: Sendable {
     var shouldStopAfterTurn: ShouldStopAfterTurnHook?
     var toolExecutionMode: AgentToolExecutionMode
     var priorTurnTokens: Int
-    var prepareNextTurn: @Sendable ([Message]) async -> AgentTurnSnapshot?
+    var refreshSnapshot: @Sendable ([Message]) async -> AgentTurnSnapshot?
 }
 
 nonisolated struct AgentRunResult: Sendable {

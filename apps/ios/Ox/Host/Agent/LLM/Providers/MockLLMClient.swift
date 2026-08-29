@@ -306,7 +306,7 @@ extension Scenario {
             Entry("62", "web import — explicitly persist an HTTP response", .webImport),
             Entry("63", "html update — revise and redisplay", .htmlUpdate),
             Entry("65", "fail-fast — settle a late service invocation", .failFastInvocation),
-            Entry("66", "settled compaction — compact after the final response", .settledCompaction),
+            Entry("66", "final context — defer compaction until another request", .deferredCompaction),
             Entry("67", "overflow recovery — compact and retry once", .overflowRecovery),
             Entry("68", "overflow failure — stop after one retry", .overflowFailure),
             Entry("69", "solve — human-verification handoff", .botControl),
@@ -872,6 +872,44 @@ extension Scenario {
               AgentCompactor.cutIndex(messages: sequence, retainedTokens: 100000) == nil,
               AgentCompactor.cutIndex(messages: sequence + [.user(UserMessage(text: "Next request"))], retainedTokens: 1) == 6 else {
             return "Split-turn compaction boundary failed."
+        }
+        let oversizedUpload: [Message] = [
+            .user(UserMessage(text: String(repeating: "P", count: 100000))),
+            .assistant(AssistantMessage(model: model.id, content: [.text(TextContent("Document reviewed."))])),
+            .user(UserMessage(text: "Next request")),
+        ]
+        guard AgentCompactor.cutIndex(messages: oversizedUpload, retainedTokens: 20000) == 1 else {
+            return "Oversized message remained in compacted context."
+        }
+        let checkpoint = "## Goal\nPreserve the previous checkpoint."
+        let wrappedCheckpoint = AgentCompactor.wrappedSummary(checkpoint)
+        guard AgentCompactor.previousSummary(in: [.user(UserMessage(text: wrappedCheckpoint))]) == checkpoint else {
+            return "Previous compaction summary was not recovered."
+        }
+        var validSummary = AssistantMessage(model: model.id, content: [.text(TextContent("Updated checkpoint"))])
+        validSummary.stopReason = .stop
+        guard case .completed("Updated checkpoint") = AgentCompactor.validateSummary(reason: .stop, message: validSummary) else {
+            return "Valid compaction summary was rejected."
+        }
+        var truncatedSummary = validSummary
+        truncatedSummary.stopReason = .length
+        guard case .failed(_, false) = AgentCompactor.validateSummary(reason: .length, message: truncatedSummary) else {
+            return "Truncated compaction summary was accepted."
+        }
+        var toolSummary = validSummary
+        toolSummary.content.append(.toolCall(ToolCall(id: "summary-tool", name: "execute", arguments: .object([:]))))
+        guard case .failed(_, false) = AgentCompactor.validateSummary(reason: .stop, message: toolSummary) else {
+            return "Tool-calling compaction summary was accepted."
+        }
+        var transientFailure = AssistantMessage(model: model.id)
+        transientFailure.stopReason = .error
+        transientFailure.errorMessage = "503 service unavailable"
+        transientFailure.failureKind = .provider
+        var permanentFailure = transientFailure
+        permanentFailure.errorMessage = "insufficient_quota"
+        permanentFailure.failureKind = .rateLimited
+        guard isRetryableLLMFailure(transientFailure), !isRetryableLLMFailure(permanentFailure) else {
+            return "Compaction retry classification failed."
         }
         return nil
     }
@@ -1802,6 +1840,9 @@ extension Scenario {
 
     static let compactionSummary = Scenario(name: "compaction-summary") { ctx in
         if ctx.userSaid("SPLIT_TURN_CHECKPOINT") {
+            guard ctx.latestUserSaid("<previous_summary provenance=\"model-generated\">") else {
+                return [.say("Previous compaction summary was not supplied for incremental update."), .stop(.stop)]
+            }
             return [.say("<intent>29</intent> SPLIT_TURN_REPEATED: Earlier progress was summarized again; verify the retained recent step and activated skill."), .stop(.stop)]
         }
         if ctx.messages.contains(where: { if case .toolResult(let result) = $0 { result.content.concatenatedText.hasPrefix("EARLY_STEP_") } else { false } }) {
@@ -1813,8 +1854,8 @@ extension Scenario {
         return [.say("Earlier conversation state was summarized for the retained turn."), .stop(.stop)]
     }
 
-    static let settledCompaction = Scenario(name: "settled-compaction", steps: [
-        .say("The final response settled after compacting its context."),
+    static let deferredCompaction = Scenario(name: "deferred-compaction", steps: [
+        .say("The final response settled without starting another compaction."),
         .usage(input: 900_000, output: 12),
         .stop(.stop),
     ])

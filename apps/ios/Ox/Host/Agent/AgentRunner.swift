@@ -7,6 +7,8 @@ nonisolated enum AgentRunner {
         var snapshot = config.snapshot
         var messages = snapshot.context.messages
         var pendingMessages = newMessages
+        var runMessages: [Message] = []
+        var lastCompletedTurn: PrepareNextTurnContext?
         var lastTurnTokens = config.priorTurnTokens
         var errorMessage: String?
         var failureKind: LLMFailureKind?
@@ -50,6 +52,25 @@ nonisolated enum AgentRunner {
         var iter = 0
         loop: while true {
             iter += 1
+            if let lastCompletedTurn {
+                let preparation = await prepareNextTurn(
+                    lastCompletedTurn,
+                    lastTurnTokens: lastTurnTokens,
+                    snapshot: snapshot,
+                    config: config,
+                    emit: emit
+                )
+                messages = preparation.messages
+                lastTurnTokens = preparation.lastTurnTokens
+                snapshot = preparation.snapshot
+                if preparation.cancelled {
+                    Log.agent.info("Agent.run terminating: next-turn preparation cancelled")
+                    break loop
+                }
+                if pendingMessages.isEmpty {
+                    pendingMessages = await config.getSteeringMessages()
+                }
+            }
             snapshot.context.messages = messages
             Log.agent.info("Agent.run iter=\(iter) msgs=\(messages.count) streaming…")
             LogContext.latency?.mark(.modelStarted)
@@ -58,6 +79,7 @@ nonisolated enum AgentRunner {
             if !pendingMessages.isEmpty {
                 for message in pendingMessages {
                     messages.append(message)
+                    runMessages.append(message)
                     await emit(.messageStart(message))
                     await emit(.messageEnd(message))
                 }
@@ -76,6 +98,7 @@ nonisolated enum AgentRunner {
             let assistantText = text(of: assistant.content)
             Log.agent.info("Agent.run iter=\(iter) turn done stopReason=\(assistant.stopReason) rawReason=\(LogPrivacy.text(assistant.rawStopReason ?? "none", limit: 128)) failureKind=\(assistant.failureKind?.rawValue ?? "none") responseId=\(LogPrivacy.text(assistant.responseID ?? "none", limit: 128)) blocks=\(assistant.content.count) tokens(in/out)=\(assistant.usage.input)/\(assistant.usage.output) textChars=\(assistantText.count) err=\(LogPrivacy.text(assistant.errorMessage ?? "nil", limit: 2_048))")
             messages.append(.assistant(assistant))
+            runMessages.append(.assistant(assistant))
             if assistant.stopReason != .error, assistant.stopReason != .aborted {
                 lastTurnTokens = assistant.usage.totalTokens > 0
                     ? assistant.usage.totalTokens
@@ -147,39 +170,26 @@ nonisolated enum AgentRunner {
             for result in toolResults {
                 let message = Message.toolResult(result)
                 messages.append(message)
+                runMessages.append(message)
                 await emit(.messageStart(message))
                 await emit(.messageEnd(message))
             }
             await emit(.turnEnd(message: assistant, toolResults: toolResults))
 
-            snapshot = await config.prepareNextTurn(messages) ?? snapshot
-            snapshot.context.messages = messages
-
-            let shouldStopAfterTurn = await config.shouldStopAfterTurn?(ShouldStopAfterTurnContext(
+            let completedTurn = PrepareNextTurnContext(
                 message: assistant,
                 toolResults: toolResults,
-                context: AgentContext(systemPrompt: snapshot.context.systemPrompt, messages: messages, tools: snapshot.context.tools)
-            )) == true
+                context: AgentContext(
+                    systemPrompt: snapshot.context.systemPrompt,
+                    messages: messages,
+                    tools: snapshot.context.tools
+                ),
+                newMessages: runMessages
+            )
+            lastCompletedTurn = completedTurn
+            let shouldStopAfterTurn = await config.shouldStopAfterTurn?(completedTurn) == true
 
             if Task.isCancelled { Log.agent.info("Agent.run terminating: cancelled"); break loop }
-
-            let compaction = await compactIfNeeded(
-                messages: messages,
-                lastTurnTokens: lastTurnTokens,
-                snapshot: snapshot,
-                config: config,
-                reason: contextOverflow
-                    ? .overflow
-                    : (toolCalls.isEmpty || shouldTerminate || shouldStopAfterTurn ? .settled : .continuation),
-                emit: emit
-            )
-            messages = compaction.messages
-            lastTurnTokens = compaction.lastTurnTokens
-            snapshot = compaction.snapshot
-            if compaction.cancelled {
-                Log.agent.info("Agent.run terminating: compaction cancelled")
-                break loop
-            }
 
             if shouldStopAfterTurn {
                 Log.agent.info("Agent.run terminating: shouldStopAfterTurn")
@@ -227,6 +237,25 @@ nonisolated enum AgentRunner {
         var snapshot: AgentTurnSnapshot
         var cancelled: Bool
         var compacted: Bool
+    }
+
+    private static func prepareNextTurn(
+        _ turn: PrepareNextTurnContext,
+        lastTurnTokens: Int,
+        snapshot: AgentTurnSnapshot,
+        config: AgentRunConfig,
+        emit: EventSink
+    ) async -> CompactionApplication {
+        var refreshed = await config.refreshSnapshot(turn.context.messages) ?? snapshot
+        refreshed.context.messages = turn.context.messages
+        return await compactIfNeeded(
+            messages: turn.context.messages,
+            lastTurnTokens: lastTurnTokens,
+            snapshot: refreshed,
+            config: config,
+            reason: .continuation,
+            emit: emit
+        )
     }
 
     private static func compactIfNeeded(
@@ -282,7 +311,7 @@ nonisolated enum AgentRunner {
                 compacted: false
             )
         }
-        var refreshed = await config.prepareNextTurn(compaction.messages) ?? snapshot
+        var refreshed = await config.refreshSnapshot(compaction.messages) ?? snapshot
         refreshed.context.messages = compaction.messages
         await emit(.compacted(
             beforeMessages: compaction.beforeMessages,

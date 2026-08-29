@@ -16,12 +16,20 @@ nonisolated public struct ShouldStopAfterTurnContext: Sendable {
     public var message: AssistantMessage
     public var toolResults: [ToolResultMessage]
     public var context: AgentContext
+    public var newMessages: [Message]
 
-    public init(message: AssistantMessage, toolResults: [ToolResultMessage], context: AgentContext) {
+    public init(
+        message: AssistantMessage,
+        toolResults: [ToolResultMessage],
+        context: AgentContext,
+        newMessages: [Message] = []
+    ) {
         self.message = message
         self.toolResults = toolResults
         self.context = context
+        self.newMessages = newMessages
     }
 }
 
 public typealias ShouldStopAfterTurnHook = @Sendable (ShouldStopAfterTurnContext) async -> Bool
+public typealias PrepareNextTurnContext = ShouldStopAfterTurnContext
