@@ -43,7 +43,7 @@ types remain authoritative in their `Codable` implementations.
 │       ├── chats/<uuid>/
 │       │   ├── chat.json
 │       │   ├── turns.jsonl
-│       │   └── context.json
+│       │   └── context.json                 compacted chats only
 │       ├── artifacts/
 │       │   ├── .saved.json                  saved artifact basenames
 │       │   └── <filename>
@@ -181,15 +181,17 @@ Each persisted chat owns one directory:
   derived projections, not additional persisted stores. A skill-submitted user
   turn retains the expanded provider intent plus a skill snapshot and trailing
   user argument for compact transcript projection.
-- `context.json` contains the provider-neutral agent context checkpoint,
-  provider metadata required for continuation, transcript boundary and digests,
-  and compaction accounting. Hydration accepts it only when its schema and
-  digests match the transcript; otherwise transcript projection recovers context.
+- `context.json` exists only after compaction and contains the provider-neutral
+  agent context checkpoint, provider metadata required for continuation,
+  transcript boundary and digests, and compaction accounting. Before compaction,
+  the complete current context is projected from `turns.jsonl`. Hydration accepts
+  a compacted checkpoint only when its schema and digests match the transcript;
+  otherwise transcript projection recovers context.
 
 Completed generations and agent turns are persistence checkpoints. Streaming
-presentation does not write every token. A save writes transcript and context
-before atomically publishing metadata, so the sidebar never advances beyond the
-durable payload.
+presentation does not write every token. A save writes the transcript, writes or
+removes the optional compacted context, then atomically publishes metadata, so
+the sidebar never advances beyond the durable payload.
 
 `ChatManager` retains the selected chat and up to four inactive chats in memory.
 Each chat has one save pump: one immutable request may be in flight, and newer
@@ -209,8 +211,10 @@ cannot mutate Profile-owned content.
 Chat sharing creates a transient `.chat` ZIP package whose `chat.json` stores
 the package and transcript schema versions, source metadata, content counts,
 service-domain disclosure, and SHA-256 inventory. `turns.jsonl` retains the
-semantic transcript; `context.json` is included when present so compacted
-continuation state is not lost. The package also contains transcript- or
+semantic transcript; `context.json` is included only for compacted chats so
+continuation state is not lost. Legacy packages with redundant uncompacted
+context remain readable and normalize to transcript-only storage on import. The
+package also contains transcript- or
 checkpoint-referenced artifacts and supported sibling media dependencies.
 Import validates ZIP paths, compression, CRCs, declared hashes, transcript
 state, checkpoint digests, compaction completeness, and artifact references

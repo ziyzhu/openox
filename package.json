@@ -11,6 +11,7 @@
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
     "build:web-worker": "bun tooling/build-public-web-worker.ts",
     "test:chat-projection": "bun tooling/chat-projection-replay.ts",
+    "test:storage-migration": "bun tooling/storage-migration-replay.ts",
     "check:localizations": "bun tooling/localization-check.ts",
     "check:system-skills": "bun tooling/system-skills-check.ts",
     "sim:bootstrap": "bun tooling/sim-bootstrap.ts",

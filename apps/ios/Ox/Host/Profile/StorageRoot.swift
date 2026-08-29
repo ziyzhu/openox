@@ -286,3 +286,11 @@ final class StorageRoot {
         }
     }
 }
+
+#if targetEnvironment(simulator)
+nonisolated extension StorageRoot {
+    static func replayContextRetentionMigration(turns: [Turn]) async throws -> ContextRetentionMigrationReplay {
+        try await StorageMigrator.replayContextRetentionMigration(turns: turns)
+    }
+}
+#endif

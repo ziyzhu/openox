@@ -17,6 +17,7 @@ nonisolated enum ProfileSchema {
         "2026-08-03-skill-namespace",
         "2026-08-10-plain-skill-names",
         "2026-08-17-runtime",
+        "2026-08-29-compacted-context",
     ]
     static var current: String { versions.last! }
 
@@ -33,6 +34,7 @@ nonisolated enum ProfileSchema {
         { try StorageMigrator.namespaceUserSkills(at: $0) },
         { try StorageMigrator.removeUserSkillNamespace(at: $0) },
         { _ in },
+        { try StorageMigrator.removeRedundantAgentContexts(at: $0) },
     ]
 }
 
@@ -64,6 +66,18 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
         }
     }
+}
+
+nonisolated struct ContextRetentionMigrationReplay: Sendable {
+    let versionUpdated: Bool
+    let ordinaryContextRemoved: Bool
+    let compactedContextRetained: Bool
+    let compactedContextValid: Bool
+    let noContextPreserved: Bool
+    let transcriptsUnchanged: Bool
+    let secondRunNoOp: Bool
+    let ordinaryExportOmitsContext: Bool
+    let compactedExportRetainsContext: Bool
 }
 
 nonisolated enum StorageMigrator {
@@ -942,6 +956,165 @@ nonisolated enum StorageMigrator {
         }
         Log.app.info("StorageMigrator.agentContexts root=\(root.lastPathComponent) chats=\(directories.count) refreshed=\(refreshed) upgraded=\(upgraded)")
     }
+
+    static func removeRedundantAgentContexts(at root: URL) throws {
+        let fm = FileManager.default
+        let chats = root.appendingPathComponent("chats", isDirectory: true)
+        guard fm.fileExists(atPath: chats.path) else { return }
+        guard let config = ProfileIO.readConfig(at: root) else { throw StorageMigrationError.missingConfig }
+        let scope = ProfileScope(profileID: config.id, root: root, location: .local)
+        let decoder = JSONDecoder()
+        decoder.userInfo[.profileScope] = scope
+        let directories = try fm.contentsOfDirectory(
+            at: chats,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ).filter {
+            try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
+        }.sorted { $0.path < $1.path }
+        var scanned = 0
+        var removed = 0
+        var retained = 0
+        for directory in directories {
+            let contextURL = directory.appendingPathComponent("context.json", isDirectory: false)
+            guard fm.fileExists(atPath: contextURL.path) else { continue }
+            let transcriptURL = directory.appendingPathComponent("turns.jsonl", isDirectory: false)
+            let lines = fm.fileExists(atPath: transcriptURL.path) ? try transcriptLines(transcriptURL) : []
+            let turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
+            scanned += 1
+            if turns.requiresContextCheckpoint {
+                retained += 1
+            } else {
+                try fm.removeItem(at: contextURL)
+                removed += 1
+            }
+        }
+        Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained)")
+    }
+
+    #if targetEnvironment(simulator)
+    static func replayContextRetentionMigration(turns: [Turn]) async throws -> ContextRetentionMigrationReplay {
+        guard !turns.isEmpty,
+              let lastAgent = turns.lastIndex(where: { if case .agent = $0 { return true }; return false }),
+              case .agent(var compactedAgent, let compactedAgentID) = turns[lastAgent],
+              let generation = compactedAgent.generations.last else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        var compactedTurns = turns
+        compactedAgent.steps.append(Step(
+            generation: generation.id,
+            kind: .contextCompaction(ContextCompaction(at: Date(timeIntervalSinceReferenceDate: 700_100_003), tokensBefore: 1_024))
+        ))
+        compactedTurns[lastAgent] = .agent(compactedAgent, id: compactedAgentID)
+
+        let root = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "context-migration-replay")
+        defer { FileStaging.cleanup(root, operation: "context-migration-replay") }
+        let config = ProfileConfig(id: UUID(), createdAt: Date(timeIntervalSinceReferenceDate: 700_100_000), version: "2026-08-17-runtime")
+        try ProfileIO.writeConfig(config, to: root)
+        let chats = root.appendingPathComponent("chats", isDirectory: true)
+        try FileManager.default.createDirectory(at: chats, withIntermediateDirectories: true)
+        let ordinaryDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let compactedDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let noContextDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        for directory in [ordinaryDirectory, compactedDirectory, noContextDirectory] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        let encoder = JSONEncoder()
+        let ordinaryTranscript = try blob(turns, encoder: encoder)
+        let compactedTranscript = try blob(compactedTurns, encoder: encoder)
+        let ordinaryTranscriptURL = ordinaryDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
+        let compactedTranscriptURL = compactedDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
+        let noContextTranscriptURL = noContextDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
+        try ordinaryTranscript.write(to: ordinaryTranscriptURL, options: .atomic)
+        try compactedTranscript.write(to: compactedTranscriptURL, options: .atomic)
+        try ordinaryTranscript.write(to: noContextTranscriptURL, options: .atomic)
+
+        let ordinaryContext = AgentContextCheckpoint(
+            messages: ChatProjection.makeWireMessages(from: turns),
+            tokensBefore: 0,
+            turns: turns,
+            through: lastAgent
+        )
+        let compactedContext = AgentContextCheckpoint(
+            messages: ChatProjection.makeWireMessages(from: compactedTurns),
+            tokensBefore: 1_024,
+            turns: compactedTurns,
+            through: lastAgent
+        )
+        let ordinaryContextURL = ordinaryDirectory.appendingPathComponent("context.json", isDirectory: false)
+        let compactedContextURL = compactedDirectory.appendingPathComponent("context.json", isDirectory: false)
+        let compactedContextData = try encoder.encode(compactedContext)
+        try encoder.encode(ordinaryContext).write(to: ordinaryContextURL, options: .atomic)
+        try compactedContextData.write(to: compactedContextURL, options: .atomic)
+
+        let meta = ChatMeta(
+            id: UUID(),
+            createdAt: config.createdAt,
+            lastActivity: config.createdAt,
+            title: "Context migration replay",
+            isFavorite: false,
+            modelID: "mock",
+            clientID: "mock",
+            monoRepositoryHash: nil,
+            attachedServiceDomains: [],
+            preview: nil
+        )
+        let ordinaryPackage = try ChatPackageCodec.decode(
+            ChatPackageCodec.encode(ChatState(meta: meta, turns: turns, context: ordinaryContext)),
+            sourceName: "ordinary.chat"
+        )
+        let compactedPackage = try ChatPackageCodec.decode(
+            ChatPackageCodec.encode(ChatState(meta: meta, turns: compactedTurns, context: compactedContext)),
+            sourceName: "compacted.chat"
+        )
+
+        let profile = Profile(
+            id: config.id,
+            name: root.lastPathComponent,
+            location: .local,
+            url: root,
+            createdAt: config.createdAt,
+            version: config.version
+        )
+        let migrated = try await migrate(profile)
+        let firstConfigData = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false))
+        let firstOrdinaryTranscript = try Data(contentsOf: ordinaryTranscriptURL)
+        let firstCompactedTranscript = try Data(contentsOf: compactedTranscriptURL)
+        let firstNoContextTranscript = try Data(contentsOf: noContextTranscriptURL)
+        let firstCompactedContext = try Data(contentsOf: compactedContextURL)
+        let decoder = JSONDecoder()
+        let retainedContext = try decoder.decode(AgentContextCheckpoint.self, from: firstCompactedContext)
+        _ = try await migrate(migrated)
+
+        let versionUpdated = ProfileIO.readConfig(at: root)?.version == ProfileSchema.current
+        let ordinaryContextRemoved = !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
+        let compactedContextRetained = firstCompactedContext == compactedContextData
+        let compactedContextValid = retainedContext.boundary(in: compactedTurns) != nil
+        let noContextPreserved = !FileManager.default.fileExists(
+            atPath: noContextDirectory.appendingPathComponent("context.json", isDirectory: false).path
+        )
+        let transcriptsUnchanged = firstOrdinaryTranscript == ordinaryTranscript
+            && firstCompactedTranscript == compactedTranscript
+            && firstNoContextTranscript == ordinaryTranscript
+        let secondRunNoOp = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false)) == firstConfigData
+            && Data(contentsOf: ordinaryTranscriptURL) == firstOrdinaryTranscript
+            && Data(contentsOf: compactedTranscriptURL) == firstCompactedTranscript
+            && Data(contentsOf: noContextTranscriptURL) == firstNoContextTranscript
+            && Data(contentsOf: compactedContextURL) == firstCompactedContext
+            && !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
+        return ContextRetentionMigrationReplay(
+            versionUpdated: versionUpdated,
+            ordinaryContextRemoved: ordinaryContextRemoved,
+            compactedContextRetained: compactedContextRetained,
+            compactedContextValid: compactedContextValid,
+            noContextPreserved: noContextPreserved,
+            transcriptsUnchanged: transcriptsUnchanged,
+            secondRunNoOp: secondRunNoOp,
+            ordinaryExportOmitsContext: !ordinaryPackage.header.hasContext && ordinaryPackage.payload.context == nil,
+            compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil
+        )
+    }
+    #endif
 
     static func migrateLegacySkills(at root: URL) throws {
         let legacy = root.appendingPathComponent("COMMANDS.md")

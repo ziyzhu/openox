@@ -188,7 +188,7 @@ nonisolated enum ChatPackageCodec {
             turnCount: prepared.turns.count,
             artifactCount: artifacts.count,
             hasContext: context != nil,
-            hasCompactedContext: hasCompaction(prepared.turns),
+            hasCompactedContext: prepared.turns.requiresContextCheckpoint,
             serviceDomains: Array(Set(state.meta.attachedServiceDomains)).sorted(),
             files: records
         )
@@ -300,7 +300,7 @@ nonisolated enum ChatPackageCodec {
         }
         let prepared = try validate(turns: turns, context: context)
         guard prepared.turns.count == payload.header.turnCount,
-              hasCompaction(prepared.turns) == payload.header.hasCompactedContext else {
+              prepared.turns.requiresContextCheckpoint == payload.header.hasCompactedContext else {
             throw ChatPackageError.invalidHeader
         }
         let packaged = Set(payload.artifacts.keys.map { $0.lowercased() })
@@ -328,11 +328,12 @@ nonisolated enum ChatPackageCodec {
         var document = ChatDocument(turns: turns)
         document.apply(.sealAllTurns)
         guard document.turns == turns else { throw ChatPackageError.invalidTranscript }
-        let compacted = hasCompaction(turns)
+        let compacted = turns.requiresContextCheckpoint
         guard !compacted || context != nil else { throw ChatPackageError.incompleteCompaction }
-        let boundary = context?.boundary(in: turns)
-        guard context == nil || boundary != nil else { throw ChatPackageError.invalidContext }
-        return (turns, context, boundary)
+        let retainedContext = compacted ? context : nil
+        let boundary = retainedContext?.boundary(in: turns)
+        guard retainedContext == nil || boundary != nil else { throw ChatPackageError.invalidContext }
+        return (turns, retainedContext, boundary)
     }
 
     private static func encodeTurns(_ turns: [Turn]) throws -> Data {
@@ -410,16 +411,6 @@ nonisolated enum ChatPackageCodec {
         for message in context?.messages ?? [] { result += message.artifacts }
         var seen = Set<String>()
         return result.filter { seen.insert($0.fileName.lowercased()).inserted }
-    }
-
-    private static func hasCompaction(_ turns: [Turn]) -> Bool {
-        turns.contains { turn in
-            guard case .agent(let value, _) = turn else { return false }
-            return value.steps.contains { step in
-                if case .contextCompaction = step.kind { return true }
-                return false
-            }
-        }
     }
 
     private static func sha256(_ data: Data) -> String {

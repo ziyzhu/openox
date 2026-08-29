@@ -2293,7 +2293,9 @@ final class Chat: Identifiable {
         context: AgentContextCheckpoint?,
         turns: [Turn]
     ) -> ChatContextRestoration {
-        if let context, let boundary = context.boundary(in: turns) {
+        if turns.requiresContextCheckpoint,
+           let context,
+           let boundary = context.boundary(in: turns) {
             return ChatContextRestoration(
                 checkpoint: context,
                 messages: context.messages + ChatProjection.makeWireMessages(
@@ -2315,7 +2317,8 @@ final class Chat: Identifiable {
     }
 
     nonisolated private static func recoveredContext(turns: [Turn], messages: [Message]) -> AgentContextCheckpoint? {
-        guard let index = turns.lastIndex(where: { turn in
+        guard let compaction = turns.latestContextCompaction,
+              let index = turns.lastIndex(where: { turn in
             if case .agent = turn { return true }
             return false
         }) else { return nil }
@@ -2327,13 +2330,17 @@ final class Chat: Identifiable {
         }
         return AgentContextCheckpoint(
             messages: checkpointMessages,
-            tokensBefore: 0,
+            tokensBefore: compaction.tokensBefore,
             turns: turns,
             through: index
         )
     }
 
     private func installContextCheckpoint(messages: [Message], tokensBefore: Int?) {
+        guard let compaction = document.turns.latestContextCompaction else {
+            contextCheckpoint = nil
+            return
+        }
         guard let index = document.turns.lastIndex(where: { turn in
             if case .agent = turn { return true }
             return false
@@ -2341,7 +2348,7 @@ final class Chat: Identifiable {
             Log.session.warning("Chat.context not saved id=\(id) reason=no-agent-turn")
             return
         }
-        let compactionTokens = tokensBefore ?? contextCheckpoint?.tokensBefore ?? 0
+        let compactionTokens = tokensBefore ?? contextCheckpoint?.tokensBefore ?? compaction.tokensBefore
         contextCheckpoint = AgentContextCheckpoint(
             messages: messages,
             tokensBefore: compactionTokens,

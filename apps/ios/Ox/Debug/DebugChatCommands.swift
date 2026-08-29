@@ -245,5 +245,46 @@ extension OxHostProtocol {
         )))
     }
 
+    @MainActor
+    static func handleReplayStorageMigration(
+        _ command: ReplayStorageMigrationRequest,
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
+        Task {
+            do {
+                let replay = try await StorageRoot.replayContextRetentionMigration(turns: command.turns)
+                reply(encode(StorageMigrationReplayResult(
+                    id: command.id,
+                    ok: true,
+                    versionUpdated: replay.versionUpdated,
+                    ordinaryContextRemoved: replay.ordinaryContextRemoved,
+                    compactedContextRetained: replay.compactedContextRetained,
+                    compactedContextValid: replay.compactedContextValid,
+                    noContextPreserved: replay.noContextPreserved,
+                    transcriptsUnchanged: replay.transcriptsUnchanged,
+                    secondRunNoOp: replay.secondRunNoOp,
+                    ordinaryExportOmitsContext: replay.ordinaryExportOmitsContext,
+                    compactedExportRetainsContext: replay.compactedExportRetainsContext,
+                    error: nil
+                )))
+            } catch {
+                reply(encode(StorageMigrationReplayResult(
+                    id: command.id,
+                    ok: false,
+                    versionUpdated: nil,
+                    ordinaryContextRemoved: nil,
+                    compactedContextRetained: nil,
+                    compactedContextValid: nil,
+                    noContextPreserved: nil,
+                    transcriptsUnchanged: nil,
+                    secondRunNoOp: nil,
+                    ordinaryExportOmitsContext: nil,
+                    compactedExportRetainsContext: nil,
+                    error: error.localizedDescription
+                )))
+            }
+        }
+    }
+
 }
 #endif

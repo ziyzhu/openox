@@ -23,6 +23,7 @@ extension OxHostProtocol {
         case getComposerFormatting = "get-composer-formatting"
         case repositoryGate = "repository-gate"
         case replayReducer = "replay-reducer"
+        case replayStorageMigration = "replay-storage-migration"
         case runAgent = "run-agent"
         case virtualMachineEval = "virtual-machine-eval"
         case vmInspect = "vm-inspect"
@@ -190,6 +191,11 @@ extension OxHostProtocol {
         let fixtures: [ReducerFixtureInput]
     }
 
+    struct ReplayStorageMigrationRequest: Decodable {
+        let id: String
+        let turns: [Turn]
+    }
+
     enum Command: Decodable {
         case invokeAction(ActionRequest)
         case evaluate(EvaluateRequest)
@@ -205,6 +211,7 @@ extension OxHostProtocol {
         case getComposerFormatting(IDRequest)
         case repositoryGate(RepositoryGateRequest)
         case replayReducer(ReplayReducerRequest)
+        case replayStorageMigration(ReplayStorageMigrationRequest)
         case runAgent(RunAgentRequest)
         case virtualMachineEval(VirtualMachineEvalRequest)
         case vmInspect(VMRequest)
@@ -242,6 +249,7 @@ extension OxHostProtocol {
             case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
             case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
             case .replayReducer: self = .replayReducer(try ReplayReducerRequest(from: decoder))
+            case .replayStorageMigration: self = .replayStorageMigration(try ReplayStorageMigrationRequest(from: decoder))
             case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
             case .virtualMachineEval: self = .virtualMachineEval(try VirtualMachineEvalRequest(from: decoder))
             case .vmInspect: self = .vmInspect(try VMRequest(from: decoder))
@@ -456,6 +464,22 @@ extension OxHostProtocol {
         let id: String
         let ok: Bool
         let fixtures: [ReducerReplayFixture]?
+        let error: String?
+    }
+
+    struct StorageMigrationReplayResult: Encodable {
+        let kind = "replay-storage-migration-result"
+        let id: String
+        let ok: Bool
+        let versionUpdated: Bool?
+        let ordinaryContextRemoved: Bool?
+        let compactedContextRetained: Bool?
+        let compactedContextValid: Bool?
+        let noContextPreserved: Bool?
+        let transcriptsUnchanged: Bool?
+        let secondRunNoOp: Bool?
+        let ordinaryExportOmitsContext: Bool?
+        let compactedExportRetainsContext: Bool?
         let error: String?
     }
 

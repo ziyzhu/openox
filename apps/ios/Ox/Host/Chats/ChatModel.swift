@@ -83,6 +83,18 @@ nonisolated enum TurnOutcome: Equatable, Codable, Sendable {
 }
 
 nonisolated extension Collection where Element == Turn {
+    var latestContextCompaction: ContextCompaction? {
+        for turn in reversed() {
+            guard case let .agent(agent, _) = turn else { continue }
+            for step in agent.steps.reversed() {
+                if case let .contextCompaction(compaction) = step.kind { return compaction }
+            }
+        }
+        return nil
+    }
+
+    var requiresContextCheckpoint: Bool { latestContextCompaction != nil }
+
     var latestCompletedResponse: String? {
         for turn in reversed() {
             guard case let .agent(agent, _) = turn,
