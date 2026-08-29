@@ -41,6 +41,12 @@ final class ChatViewportController {
         }
     }
 
+    struct ComposerReflowRequest: Equatable, Identifiable {
+        let id = UUID()
+        let responseID: UUID
+        let targetY: CGFloat
+    }
+
     private enum Motion: Equatable {
         case stationary
         case user(ScrollPhase)
@@ -55,24 +61,31 @@ final class ChatViewportController {
         }
     }
 
-    private enum KeyboardClearance: Equatable {
-        case idle
-        case watching(UUID)
-        case requested(UUID)
+    private struct ResponseComposerAnchor: Equatable {
+        let responseID: UUID
+    }
 
-        var request: UUID? {
-            guard case .requested(let id) = self else { return nil }
-            return id
+    private enum ComposerReflow: Equatable {
+        case inactive
+        case preservingScrollPosition
+        case preservingSpacing(ResponseComposerAnchor)
+        case requested(ResponseComposerAnchor, ComposerReflowRequest)
+        case settling(ResponseComposerAnchor)
+
+        var request: ComposerReflowRequest? {
+            guard case .requested(_, let request) = self else { return nil }
+            return request
         }
     }
 
     private static let jumpThreshold: CGFloat = 32
+    private static let spacingTolerance: CGFloat = 0.5
 
     private(set) var showsJumpButton = false
     private(set) var visibleBlockID: UUID?
-    private var keyboardClearance = KeyboardClearance.idle
+    private var composerReflow = ComposerReflow.inactive
 
-    var keyboardClearanceRequest: UUID? { keyboardClearance.request }
+    var composerReflowRequest: ComposerReflowRequest? { composerReflow.request }
 
     var isUserScrolling: Bool {
         if case .user = motion { return true }
@@ -83,7 +96,8 @@ final class ChatViewportController {
     @ObservationIgnored private var frame: Frame?
     @ObservationIgnored private var motion = Motion.stationary
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
-    @ObservationIgnored private var visibleBlockIDs: Set<UUID> = []
+    @ObservationIgnored private var composerTop: CGFloat?
+    @ObservationIgnored private var responseBottoms: [UUID: CGFloat] = [:]
 
     func openAtBottom(chatID: String, onSettled: @escaping () -> Void) {
         self.chatID = chatID
@@ -91,8 +105,7 @@ final class ChatViewportController {
         pendingOpenCompletion = onSettled
         showsJumpButton = false
         visibleBlockID = nil
-        visibleBlockIDs = []
-        keyboardClearance = .idle
+        composerReflow = .inactive
         move(to: .bottom)
         Log.ui.info("Transcript.open chat=\(chatID) target=bottom")
     }
@@ -130,41 +143,66 @@ final class ChatViewportController {
 
     func visibleBlocksChanged(_ ids: [UUID]) {
         visibleBlockID = ids.first
-        visibleBlockIDs = Set(ids)
-        guard case .watching(let target) = keyboardClearance,
-              !visibleBlockIDs.contains(target) else { return }
-        keyboardClearance = .requested(target)
     }
 
     func focusChanged(_ focused: Bool, lastResponseFooterID: UUID?, isBusy: Bool) {
-        guard focused, !isBusy,
-              let lastResponseFooterID,
-              visibleBlockIDs.contains(lastResponseFooterID) else {
-            keyboardClearance = .idle
+        guard focused else {
+            composerReflow = .inactive
             return
         }
-        keyboardClearance = .watching(lastResponseFooterID)
+        guard !isBusy,
+              let lastResponseFooterID,
+              let responseBottom = responseBottoms[lastResponseFooterID],
+              let composerTop else {
+            composerReflow = .preservingScrollPosition
+            return
+        }
+        let gap = composerTop - responseBottom
+        guard gap >= -Self.spacingTolerance else {
+            composerReflow = .preservingScrollPosition
+            Log.ui.info("Transcript.composerReflow chat=\(chatID) mode=scrollPosition gap=\(Int(gap))")
+            return
+        }
+        let anchor = ResponseComposerAnchor(responseID: lastResponseFooterID)
+        composerReflow = .preservingSpacing(anchor)
+        Log.ui.info("Transcript.composerReflow chat=\(chatID) mode=responseSpacing block=\(lastResponseFooterID) gap=\(Int(gap)) target=\(Int(ChatViewportLayout.responseComposerSpacing))")
+        updateComposerReflow()
     }
 
-    func revealAboveKeyboard(_ id: UUID, scroll: () -> Void) {
-        guard case .requested(id) = keyboardClearance else { return }
+    func applyComposerReflow(_ request: ComposerReflowRequest, scroll: () -> Void) {
+        guard case .requested(let anchor, let pendingRequest) = composerReflow,
+              pendingRequest.id == request.id else { return }
         withAnimation(.easeOut(duration: Theme.Animation.standard)) {
             scroll()
         }
-        keyboardClearance = .idle
-        Log.ui.info("Transcript.keyboardClearance chat=\(chatID) block=\(id)")
+        composerReflow = .settling(anchor)
+        Log.ui.info("Transcript.composerReflow chat=\(chatID) applied=\(request.id) block=\(request.responseID) targetY=\(Int(request.targetY))")
+    }
+
+    func composerBoundsChanged(_ bounds: CGRect) {
+        composerTop = bounds.minY
+        updateComposerReflow()
+    }
+
+    func responseFooterBoundsChanged(id: UUID, bounds: CGRect) {
+        responseBottoms[id] = bounds.maxY
+        updateComposerReflow()
     }
 
     func busyChanged(_ busy: Bool) {
-        if busy { keyboardClearance = .idle }
+        if busy { composerReflow = .inactive }
     }
 
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         if new.isUserDriven {
-            keyboardClearance = .idle
+            composerReflow = .preservingScrollPosition
             motion = .user(new)
         } else if new == .idle {
             motion = .stationary
+            if case .settling(let anchor) = composerReflow {
+                composerReflow = .preservingSpacing(anchor)
+                updateComposerReflow()
+            }
         }
         Log.ui.info("Transcript.phase chat=\(chatID) \(String(describing: old)) -> \(String(describing: new)) owner=\(motion.label)")
     }
@@ -172,6 +210,7 @@ final class ChatViewportController {
     func geometryChanged(_ new: Frame) {
         frame = new
         updateJumpButton(new)
+        updateComposerReflow()
         if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
             motion = .stationary
             let completion = pendingOpenCompletion
@@ -183,6 +222,22 @@ final class ChatViewportController {
 
     private func move(to target: Target) {
         motion = .programmatic(target)
+    }
+
+    private func updateComposerReflow() {
+        guard case .preservingSpacing(let anchor) = composerReflow,
+              let composerTop,
+              let responseBottom = responseBottoms[anchor.responseID],
+              let frame else { return }
+        let gap = composerTop - responseBottom
+        let correction = ChatViewportLayout.responseComposerSpacing - gap
+        guard correction > Self.spacingTolerance else { return }
+        let request = ComposerReflowRequest(
+            responseID: anchor.responseID,
+            targetY: frame.visualTop + correction
+        )
+        composerReflow = .requested(anchor, request)
+        Log.ui.info("Transcript.composerReflow chat=\(chatID) request=\(request.id) block=\(anchor.responseID) gap=\(Int(gap)) correction=\(Int(correction))")
     }
 
     private func updateJumpButton(_ frame: Frame) {

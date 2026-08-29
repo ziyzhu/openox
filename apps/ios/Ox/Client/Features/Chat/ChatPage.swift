@@ -746,6 +746,7 @@ struct ChatPage: View {
         inputBar(isChatEmpty: isChatEmpty)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
                 viewportLayout.measureComposer(bounds)
+                scroller.composerBoundsChanged(bounds)
             }
     }
 
@@ -794,11 +795,23 @@ struct ChatPage: View {
         let row = view
         .padding(.top, block.spacingBefore)
         .modifier(RowEntrance(enabled: enters && !block.isPendingThinking))
+        let measuredRow = responseFooterGeometry(row, block: block)
 
         if identified {
-            row.id(block.id)
+            measuredRow.id(block.id)
         } else {
-            row
+            measuredRow
+        }
+    }
+
+    @ViewBuilder
+    private func responseFooterGeometry<Content: View>(_ content: Content, block: ChatBlock) -> some View {
+        if block.isResponseFooter {
+            content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
+                scroller.responseFooterBoundsChanged(id: block.id, bounds: bounds)
+            }
+        } else {
+            content
         }
     }
 
@@ -856,6 +869,7 @@ struct ChatPage: View {
 
     @State private var scroller = ChatViewportController()
     @State private var earlierPageCoordinator = ChatEarlierPageCoordinator()
+    @State private var transcriptScrollPosition = ScrollPosition()
     @State private var bottomScrollRequest = 0
 
     private func transcript(
@@ -889,6 +903,7 @@ struct ChatPage: View {
                         .id(ChatScrollTarget.bottom)
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)
+                .scrollPosition($transcriptScrollPosition)
                 .defaultScrollAnchor(.bottom, for: .initialOffset)
                 .defaultScrollAnchor(nil, for: .sizeChanges)
                 .defaultScrollAnchor(.top, for: .alignment)
@@ -958,12 +973,12 @@ struct ChatPage: View {
                         isBusy: chat.isBusy
                     )
                 }
-                .task(id: scroller.keyboardClearanceRequest) {
-                    guard let target = scroller.keyboardClearanceRequest else { return }
+                .task(id: scroller.composerReflowRequest?.id) {
+                    guard let request = scroller.composerReflowRequest else { return }
                     await Task.yield()
                     guard !Task.isCancelled else { return }
-                    scroller.revealAboveKeyboard(target) {
-                        proxy.scrollTo(target)
+                    scroller.applyComposerReflow(request) {
+                        transcriptScrollPosition.scrollTo(y: request.targetY)
                     }
                 }
                 .task(id: bottomScrollRequest) {
