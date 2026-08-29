@@ -132,7 +132,7 @@
               "additionalProperties": false,
               "properties": {
                 "initialUrl": { "type": "string" },
-                "title": { "type": "string" },
+                "title": { "type": ["string", "null"] },
                 "url": { "type": "string" }
               },
               "required": ["initialUrl", "title", "url"],
@@ -147,7 +147,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "initialUrl": { "type": "string" },
-                  "title": { "type": "string" },
+                  "title": { "type": ["string", "null"] },
                   "url": { "type": "string" }
                 },
                 "required": ["initialUrl", "title", "url"],
@@ -160,7 +160,7 @@
               "additionalProperties": false,
               "properties": {
                 "initialUrl": { "type": "string" },
-                "title": { "type": "string" },
+                "title": { "type": ["string", "null"] },
                 "url": { "type": "string" }
               },
               "required": ["initialUrl", "title", "url"],

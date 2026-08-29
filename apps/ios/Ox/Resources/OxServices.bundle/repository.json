@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "Built-in",
-  "contentHash": "94b0a350ea562784c898afea9dcc02c989ec3c90e6d0839f6eaf20c26628752e",
+  "contentHash": "0e8b59cf5a7560bf8abc406b6bc57a46cd93d4ece378ad409f0d00ed3d3f9071",
   "services": [
     "ios:browser",
     "ios:calendar",
