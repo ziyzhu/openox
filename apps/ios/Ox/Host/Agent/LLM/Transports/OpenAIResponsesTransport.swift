@@ -248,7 +248,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
             }
             await OpenAIResponsesWebSocketPool.shared.release(
                 lease,
-                keep: !Task.isCancelled,
+                keep: true,
                 continuation: next
             )
         } catch {
