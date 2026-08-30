@@ -473,6 +473,7 @@ extension OxHostProtocol {
         let ok: Bool
         let versionUpdated: Bool?
         let ordinaryContextRemoved: Bool?
+        let unreadableContextRetained: Bool?
         let compactedContextRetained: Bool?
         let compactedContextValid: Bool?
         let noContextPreserved: Bool?

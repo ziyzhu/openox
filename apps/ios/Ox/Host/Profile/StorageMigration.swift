@@ -71,6 +71,7 @@ nonisolated enum StorageMigrationError: LocalizedError {
 nonisolated struct ContextRetentionMigrationReplay: Sendable {
     let versionUpdated: Bool
     let ordinaryContextRemoved: Bool
+    let unreadableContextRetained: Bool
     let compactedContextRetained: Bool
     let compactedContextValid: Bool
     let noContextPreserved: Bool
@@ -987,13 +988,26 @@ nonisolated enum StorageMigrator {
         var scanned = 0
         var removed = 0
         var retained = 0
+        var unreadable = 0
         for directory in directories {
             let contextURL = directory.appendingPathComponent("context.json", isDirectory: false)
             guard fm.fileExists(atPath: contextURL.path) else { continue }
             let transcriptURL = directory.appendingPathComponent("turns.jsonl", isDirectory: false)
-            let lines = fm.fileExists(atPath: transcriptURL.path) ? try transcriptLines(transcriptURL) : []
-            let turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
             scanned += 1
+            guard fm.fileExists(atPath: transcriptURL.path) else {
+                unreadable += 1
+                Log.app.warning("StorageMigrator.redundantAgentContexts retained=missing-transcript chat=\(directory.lastPathComponent)")
+                continue
+            }
+            let turns: [Turn]
+            do {
+                let lines = try transcriptLines(transcriptURL)
+                turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
+            } catch {
+                unreadable += 1
+                Log.app.warning("StorageMigrator.redundantAgentContexts retained=unreadable chat=\(directory.lastPathComponent) error=\(error.localizedDescription)")
+                continue
+            }
             if turns.requiresContextCheckpoint {
                 retained += 1
             } else {
@@ -1001,7 +1015,7 @@ nonisolated enum StorageMigrator {
                 removed += 1
             }
         }
-        Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained)")
+        Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained) unreadable=\(unreadable)")
     }
 
     #if targetEnvironment(simulator)
@@ -1026,9 +1040,10 @@ nonisolated enum StorageMigrator {
         let chats = root.appendingPathComponent("chats", isDirectory: true)
         try FileManager.default.createDirectory(at: chats, withIntermediateDirectories: true)
         let ordinaryDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let unreadableDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let compactedDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let noContextDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        for directory in [ordinaryDirectory, compactedDirectory, noContextDirectory] {
+        for directory in [ordinaryDirectory, unreadableDirectory, compactedDirectory, noContextDirectory] {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
 
@@ -1036,9 +1051,13 @@ nonisolated enum StorageMigrator {
         let ordinaryTranscript = try blob(turns, encoder: encoder)
         let compactedTranscript = try blob(compactedTurns, encoder: encoder)
         let ordinaryTranscriptURL = ordinaryDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
+        let unreadableTranscriptURL = unreadableDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
         let compactedTranscriptURL = compactedDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
         let noContextTranscriptURL = noContextDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
         try ordinaryTranscript.write(to: ordinaryTranscriptURL, options: .atomic)
+        var unreadableTranscript = ordinaryTranscript
+        unreadableTranscript.append(Data("{\"type\":\"unsupported-legacy-turn\"}\n".utf8))
+        try unreadableTranscript.write(to: unreadableTranscriptURL, options: .atomic)
         try compactedTranscript.write(to: compactedTranscriptURL, options: .atomic)
         try ordinaryTranscript.write(to: noContextTranscriptURL, options: .atomic)
 
@@ -1055,9 +1074,12 @@ nonisolated enum StorageMigrator {
             through: lastAgent
         )
         let ordinaryContextURL = ordinaryDirectory.appendingPathComponent("context.json", isDirectory: false)
+        let unreadableContextURL = unreadableDirectory.appendingPathComponent("context.json", isDirectory: false)
         let compactedContextURL = compactedDirectory.appendingPathComponent("context.json", isDirectory: false)
         let compactedContextData = try encoder.encode(compactedContext)
-        try encoder.encode(ordinaryContext).write(to: ordinaryContextURL, options: .atomic)
+        let ordinaryContextData = try encoder.encode(ordinaryContext)
+        try ordinaryContextData.write(to: ordinaryContextURL, options: .atomic)
+        try ordinaryContextData.write(to: unreadableContextURL, options: .atomic)
         try compactedContextData.write(to: compactedContextURL, options: .atomic)
 
         let meta = ChatMeta(
@@ -1092,6 +1114,7 @@ nonisolated enum StorageMigrator {
         let migrated = try await migrate(profile)
         let firstConfigData = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false))
         let firstOrdinaryTranscript = try Data(contentsOf: ordinaryTranscriptURL)
+        let firstUnreadableTranscript = try Data(contentsOf: unreadableTranscriptURL)
         let firstCompactedTranscript = try Data(contentsOf: compactedTranscriptURL)
         let firstNoContextTranscript = try Data(contentsOf: noContextTranscriptURL)
         let firstCompactedContext = try Data(contentsOf: compactedContextURL)
@@ -1101,23 +1124,28 @@ nonisolated enum StorageMigrator {
 
         let versionUpdated = ProfileIO.readConfig(at: root)?.version == ProfileSchema.current
         let ordinaryContextRemoved = !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
+        let unreadableContextRetained = try Data(contentsOf: unreadableContextURL) == ordinaryContextData
         let compactedContextRetained = firstCompactedContext == compactedContextData
         let compactedContextValid = retainedContext.boundary(in: compactedTurns) != nil
         let noContextPreserved = !FileManager.default.fileExists(
             atPath: noContextDirectory.appendingPathComponent("context.json", isDirectory: false).path
         )
         let transcriptsUnchanged = firstOrdinaryTranscript == ordinaryTranscript
+            && firstUnreadableTranscript == unreadableTranscript
             && firstCompactedTranscript == compactedTranscript
             && firstNoContextTranscript == ordinaryTranscript
         let secondRunNoOp = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false)) == firstConfigData
             && Data(contentsOf: ordinaryTranscriptURL) == firstOrdinaryTranscript
+            && Data(contentsOf: unreadableTranscriptURL) == firstUnreadableTranscript
             && Data(contentsOf: compactedTranscriptURL) == firstCompactedTranscript
             && Data(contentsOf: noContextTranscriptURL) == firstNoContextTranscript
             && Data(contentsOf: compactedContextURL) == firstCompactedContext
             && !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
+            && Data(contentsOf: unreadableContextURL) == ordinaryContextData
         return ContextRetentionMigrationReplay(
             versionUpdated: versionUpdated,
             ordinaryContextRemoved: ordinaryContextRemoved,
+            unreadableContextRetained: unreadableContextRetained,
             compactedContextRetained: compactedContextRetained,
             compactedContextValid: compactedContextValid,
             noContextPreserved: noContextPreserved,

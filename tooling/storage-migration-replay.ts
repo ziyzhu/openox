@@ -8,6 +8,7 @@ type ReplayResult = {
   error?: string;
   versionUpdated?: boolean;
   ordinaryContextRemoved?: boolean;
+  unreadableContextRetained?: boolean;
   compactedContextRetained?: boolean;
   compactedContextValid?: boolean;
   noContextPreserved?: boolean;

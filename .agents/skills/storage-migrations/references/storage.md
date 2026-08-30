@@ -185,12 +185,15 @@ Each persisted chat owns one directory:
   derived projections, not additional persisted stores. A skill-submitted user
   turn retains the expanded provider intent plus a skill snapshot and trailing
   user argument for compact transcript projection.
-- `context.json` exists only after compaction and contains the provider-neutral
+- `context.json` normally exists only after compaction and contains the provider-neutral
   agent context checkpoint, provider metadata required for continuation,
   transcript boundary and digests, and compaction accounting. Before compaction,
   the complete current context is projected from `turns.jsonl`. Hydration accepts
   a compacted checkpoint only when its schema and digests match the transcript;
-  otherwise transcript projection recovers context.
+  otherwise transcript projection recovers context. Migration removes a redundant
+  legacy checkpoint only after its complete transcript decodes; if any historical
+  turn is unreadable, the checkpoint is retained and ignored rather than risking
+  destructive cleanup.
 
 Completed generations and agent turns are persistence checkpoints. Streaming
 presentation does not write every token. A save writes the transcript, writes or
