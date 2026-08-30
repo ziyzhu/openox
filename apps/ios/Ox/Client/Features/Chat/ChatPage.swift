@@ -632,7 +632,7 @@ struct ChatPage: View {
         latestSubmissionID.flatMap { chat.anchor(forSubmissionID: $0) }
     }
 
-    private var submissionAnchorID: UUID? {
+    private var anchoredTurnID: TurnID? {
         submissionAnchor?.id
     }
 
@@ -642,7 +642,7 @@ struct ChatPage: View {
     }
 
     private var anchorSlack: CGFloat {
-        viewportLayout.slack(hasAnchor: submissionAnchorID != nil)
+        viewportLayout.slack(hasAnchor: anchoredTurnID != nil)
     }
 
     private var dockClearance: CGFloat {
@@ -860,7 +860,10 @@ struct ChatPage: View {
         blocks: [ChatBlock],
         renderedBlocks: [ChatBlock]
     ) -> some View {
-        let anchoredViewportHeight = viewportLayout.anchoredContentMinimumHeight
+        let anchoredViewportHeight = max(
+            0,
+            max(viewportLayout.anchorFloor, viewportLayout.contentFloorHeight)
+        )
         return GeometryReader { outer in
             ScrollViewReader { proxy in
                 ScrollView {
@@ -1000,7 +1003,7 @@ struct ChatPage: View {
                     guard !Task.isCancelled else { return }
                     scrollToTurn(anchor.id)
                 }
-            } else if let anchorID = submissionAnchorID,
+            } else if let anchorID = anchoredTurnID,
                       let anchorIndex = renderedBlocks.firstIndex(where: { $0.id == anchorID }) {
                 ForEach(Array(renderedBlocks[..<anchorIndex])) { block in
                     blockRow(block)
@@ -1085,7 +1088,7 @@ struct ChatPage: View {
     private func earlierWindowBoundary(blocks: [ChatBlock]) -> some View {
         Color.clear
             .frame(height: transcriptWindow.hasEarlier ? 1 : 0)
-            .onScrollVisibilityChange(threshold: TranscriptWindow.earlierBoundaryVisibilityThreshold) { visible in
+            .onScrollVisibilityChange(threshold: 0.01) { visible in
                 transcriptWindow.setEarlierBoundaryVisible(visible)
                 if visible { requestEarlierReveal(blocks: blocks) }
             }
