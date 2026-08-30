@@ -194,7 +194,7 @@ final class ChatViewportController {
     }
 
     func viewportResized() {
-        guard let viewportHold else { return }
+        guard viewportHold != nil else { return }
         applyViewportHold()
     }
 

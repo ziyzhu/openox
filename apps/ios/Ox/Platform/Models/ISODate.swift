@@ -1,8 +1,6 @@
 import Foundation
 
-enum ISODate {
-    private static let formatter = ISO8601DateFormatter()
-
+nonisolated enum ISODate {
     static func parse(_ string: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -12,6 +10,6 @@ enum ISODate {
     }
 
     static func string(from date: Date) -> String {
-        formatter.string(from: date)
+        ISO8601DateFormatter().string(from: date)
     }
 }

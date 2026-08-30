@@ -69,6 +69,9 @@ private final class CellularAutomatonLoaderView: UIView {
         isOpaque = false
         isUserInteractionEnabled = false
         cells.forEach(layer.addSublayer)
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _: UITraitCollection) in
+            self.updateCellColors()
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -113,11 +116,6 @@ private final class CellularAutomatonLoaderView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         updateAnimations()
-    }
-
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        updateCellColors()
     }
 
     private func updateCellColors() {

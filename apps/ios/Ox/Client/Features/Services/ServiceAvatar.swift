@@ -127,6 +127,8 @@ private struct FaviconShimmer: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let clipShape = clipShape
+        let shimmerGradient = shimmerGradient
         clipShape
             .fill(Color(uiColor: .systemGray6))
             .keyframeAnimator(initialValue: -Self.travel, repeating: !reduceMotion) { content, position in

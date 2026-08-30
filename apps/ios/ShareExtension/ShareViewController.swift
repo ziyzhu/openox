@@ -435,7 +435,7 @@ private enum SharedItemReader {
         )
     }
 
-    private static func supportedFileType(_ type: UTType) -> Bool {
+    nonisolated private static func supportedFileType(_ type: UTType) -> Bool {
         type.conforms(to: .text)
             || type.conforms(to: .sourceCode)
             || type.conforms(to: .json)

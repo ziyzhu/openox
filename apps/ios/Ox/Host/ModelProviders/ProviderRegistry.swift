@@ -63,7 +63,7 @@ final class ProviderRegistry {
     private static let selectedKey = "llm.selectedModels"
     private static let selectedReasoningEffortsKey = "llm.selectedReasoningEfforts"
     private static let defaultClientKey = "llm.defaultClient"
-    static let customProvidersKey = "llm.customProviders"
+    nonisolated static let customProvidersKey = "llm.customProviders"
 
     private init() {
         let region = AppRegion.shared.region

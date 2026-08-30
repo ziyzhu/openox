@@ -114,9 +114,9 @@ final class ServiceManager {
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
 
     private static let savedKey = "savedServices"
-    static let autoApproveKey = "autoApproveActions"
+    nonisolated static let autoApproveKey = "autoApproveActions"
     private static let autoApproveAllKey = "autoApproveAll"
-    static let remoteMCPKey = "remoteMCPServers"
+    nonisolated static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
         websiteData.makePageConfiguration()
     }

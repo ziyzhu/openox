@@ -4,7 +4,7 @@ import Network
 
 @MainActor
 final class WebSocketOxHostTransport {
-    static let defaultPort = NWEndpoint.Port(
+    nonisolated static let defaultPort = NWEndpoint.Port(
         rawValue: UInt16(SimEnv.debugEndpoint?.port ?? 9876)
     ) ?? 9876
 
