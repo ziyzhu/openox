@@ -201,9 +201,9 @@ final class ServiceBrowserActionSession {
         return await service.reload(page)
     }
 
-    func clearInjectedScripts() async throws -> URL? {
+    func clearScripts() async throws -> URL? {
         guard !injectedScripts.isEmpty else {
-            Log.webView.info("Browser.authoring clearInjectedScripts skipped=empty session=\(id.uuidString.prefix(8))")
+            Log.webView.info("Browser.authoring clearScripts skipped=empty session=\(id.uuidString.prefix(8))")
             return page?.page.url
         }
         injectedScripts = []

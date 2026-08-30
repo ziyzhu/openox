@@ -58,7 +58,7 @@ On an authenticated page, never return broad `body.innerText`, `textContent`, HT
 
 Preserve a resource-scoped URL only when it is the observed opaque identifier required to revisit that returned item and does not act as a reusable account credential. Pass it intact between actions and keep its token components out of logs and descriptions.
 
-Use `ios:browser:interact` for credentials, challenges, account choices, and other human-only steps.
+Use `ios:browser:interactPage` for credentials, challenges, account choices, and other human-only steps.
 
 When proposed actions require authentication, let the user complete the website's sign-in flow through Browser and collect signed-in evidence before presenting a confirmable action plan. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
 

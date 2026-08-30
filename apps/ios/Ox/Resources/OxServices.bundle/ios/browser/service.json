@@ -369,7 +369,7 @@
     },
     {
       "description": "Add a chat row the user can tap to view Browser's live page.",
-      "id": "inspect",
+      "id": "displayPage",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {},
@@ -478,7 +478,7 @@
     },
     {
       "description": "Pause automation and let the user sign in or complete a human-only step in Browser. Active network capture and injected scripts are cleared before the page is shown.",
-      "id": "interact",
+      "id": "interactPage",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -555,13 +555,13 @@
     },
     {
       "description": "Remove every session-scoped injected script and reload Browser.",
-      "id": "clearInjectedScripts",
+      "id": "clearScripts",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {},
         "type": "object"
       },
-      "label": "Clear Injected Scripts",
+      "label": "Clear Scripts",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -723,7 +723,7 @@
           "label": "前往页面",
           "description": "将浏览器导航到网站。"
         },
-        "inspect": {
+        "displayPage": {
           "label": "查看页面",
           "description": "在聊天中添加一行，用户可轻点查看“浏览器”的实时页面。"
         },

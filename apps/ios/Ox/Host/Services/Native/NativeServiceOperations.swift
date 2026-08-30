@@ -109,7 +109,7 @@ final class NativeServiceOperations {
                 .session(for: browser, ownerID: id)
                 .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "inspect"):
+        case ("ios:browser", "displayPage"):
             _ = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .inspectionPage()
@@ -141,10 +141,10 @@ final class NativeServiceOperations {
                 "attached": .bool(true),
                 "artifact": artifact.map { .string($0.fileName) } ?? .null,
             ])
-        case ("ios:browser", "interact"):
+        case ("ios:browser", "interactPage"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
             session.stopCapture()
-            _ = try await session.clearInjectedScripts()
+            _ = try await session.clearScripts()
             showBrowser(browser, id)
             let done = L10n.string("Done")
             let answer = try await chooseUser(
@@ -153,7 +153,7 @@ final class NativeServiceOperations {
                 options: [done, L10n.string("Cancel")],
                 purpose: purpose ?? L10n.string("Wait for browser interaction")
             )?.stringValue
-            guard answer == done else { throw RuntimeError.bridge("ios:browser:interact: the user cancelled.") }
+            guard answer == done else { throw RuntimeError.bridge("ios:browser:interactPage: the user cancelled.") }
             return .object(["completed": .bool(true)])
         case ("ios:browser", "injectScript"):
             guard let source = fields["script"]?.stringValue,
@@ -164,10 +164,10 @@ final class NativeServiceOperations {
                 .session(for: browser, ownerID: id)
                 .injectScript(source, domains: domains)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "clearInjectedScripts"):
+        case ("ios:browser", "clearScripts"):
             let landed = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .clearInjectedScripts()
+                .clearScripts()
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "startCapture"):
             let landed = try await serviceManager.browserActionSessions

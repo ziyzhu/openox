@@ -495,7 +495,7 @@ final class Service: NSObject, Identifiable {
               let scripts = resolutionState.resolved?.actions,
               let definition = Manifest.Action(
                 .object([
-                    "id": .string("inspect"),
+                    "id": .string("displayPage"),
                     "blocking": .bool(true),
                     "inputSchema": .object([:]),
                     "outputSchema": .object([:]),
