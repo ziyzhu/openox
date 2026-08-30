@@ -6,8 +6,7 @@ struct TranscriptWindow: Equatable {
         case pending(UUID)
     }
 
-    static let batchSize = 32
-    static let openingBatchSize = 8
+    static let batchSize = 16
 
     private(set) var range = 0..<0
     private var earlierBoundaryVisible = false
@@ -15,15 +14,16 @@ struct TranscriptWindow: Equatable {
 
     var hasEarlier: Bool { range.lowerBound > 0 }
 
-    func resolvedRange(total: Int, initialBatchSize: Int = Self.batchSize) -> Range<Int> {
-        guard range.upperBound == total else {
-            return Self.tailRange(total: total, batchSize: initialBatchSize)
+    func resolvedRange(total: Int) -> Range<Int> {
+        guard !range.isEmpty, range.lowerBound < total else { return Self.tailRange(total: total) }
+        if range.count <= Self.batchSize, range.upperBound != total {
+            return Self.tailRange(total: total)
         }
-        return range
+        return range.lowerBound..<total
     }
 
-    mutating func open(total: Int, initialBatchSize: Int = Self.batchSize) {
-        range = Self.tailRange(total: total, batchSize: initialBatchSize)
+    mutating func open(total: Int) {
+        range = Self.tailRange(total: total)
         earlierBoundaryVisible = false
         earlierRequest = .idle
     }
@@ -31,6 +31,10 @@ struct TranscriptWindow: Equatable {
     mutating func reconcile(total: Int) {
         guard total > 0 else {
             range = 0..<0
+            return
+        }
+        if range.count <= Self.batchSize {
+            range = Self.tailRange(total: total)
             return
         }
         guard range.lowerBound < total else {
@@ -41,10 +45,10 @@ struct TranscriptWindow: Equatable {
     }
 
     @discardableResult
-    mutating func anchor(on id: UUID, in blockIDs: [UUID]) -> Bool {
+    mutating func anchor(on id: UUID, in blockIDs: [UUID], startingAt lowerBound: Int) -> Bool {
         earlierRequest = .idle
         guard let index = blockIDs.firstIndex(of: id) else { return false }
-        range = min(range.lowerBound, index)..<blockIDs.count
+        range = min(range.lowerBound, lowerBound + index)..<max(range.upperBound, lowerBound + blockIDs.count)
         return true
     }
 
@@ -75,10 +79,6 @@ struct TranscriptWindow: Equatable {
     }
 
     private static func tailRange(total: Int) -> Range<Int> {
-        tailRange(total: total, batchSize: Self.batchSize)
-    }
-
-    private static func tailRange(total: Int, batchSize: Int) -> Range<Int> {
-        max(0, total - max(0, batchSize))..<total
+        max(0, total - batchSize)..<total
     }
 }

@@ -176,6 +176,27 @@ nonisolated struct ChatDocument {
         }
     }
 
+    var blockCount: Int { projection.count }
+
+    func blocksWithTurnID(in requestedRange: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
+        let upperBound = min(max(0, requestedRange.upperBound), projection.count)
+        var lowerBound = min(max(0, requestedRange.lowerBound), upperBound)
+        guard lowerBound < upperBound else { return (lowerBound..<upperBound, []) }
+
+        if let boundaryTurnID = sourceTurnIDs[RenderBlockID(projection[lowerBound].id)] {
+            while lowerBound > 0,
+                  sourceTurnIDs[RenderBlockID(projection[lowerBound - 1].id)] == boundaryTurnID {
+                lowerBound -= 1
+            }
+        }
+
+        let range = lowerBound..<upperBound
+        let blocks = projection[range].compactMap { block in
+            sourceTurnIDs[RenderBlockID(block.id)].map { (block, $0) }
+        }
+        return (range, blocks)
+    }
+
     var referencedArtifacts: [Artifact] {
         var seen = Set<String>()
         var result: [Artifact] = []

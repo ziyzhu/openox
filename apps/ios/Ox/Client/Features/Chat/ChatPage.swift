@@ -40,7 +40,6 @@ private struct EmptyChatMark: View {
 
 struct ChatPage: View {
     let chat: Chat
-    let opensWithCompactTranscript: Bool
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -238,11 +237,25 @@ struct ChatPage: View {
     }
 
     private var page: some View {
-        let blocks = ChatBlock.project(
-            chat.blocksWithTurnID,
+        let totalBlockCount = chat.transcriptBlockCount
+        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
+        let sourceWindow = chat.blocksWithTurnID(
+            in: requestedSourceRange
+        )
+        let projectedBlocks = ChatBlock.project(
+            sourceWindow.blocks,
             thinkingActivity: chat.thinkingActivity,
             isBusy: chat.isBusy
         )
+        let requestedOffset = requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
+        let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
+        let blocks: [ChatBlock]
+        if requestedOffset > 0 {
+            let requestedSourceIDSet = Set(requestedSourceIDs)
+            blocks = projectedBlocks.filter { requestedSourceIDSet.contains($0.sourceBlockID) }
+        } else {
+            blocks = projectedBlocks
+        }
         let dockState = ChatDock.project(
             interaction: activeInteraction,
             acknowledgement: dockAcknowledgement
@@ -251,10 +264,15 @@ struct ChatPage: View {
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
         }
-        let transcript = pageContent(blocks)
+        let transcript = pageContent(
+            blocks,
+            totalBlockCount: totalBlockCount,
+            sourceRange: requestedSourceRange,
+            sourceBlockIDs: requestedSourceIDs
+        )
             .toast($toast)
             .safeAreaBar(edge: .top, spacing: 0) {
-                pageTopBar(blocks)
+                pageTopBar(blockCount: totalBlockCount)
             }
             .onChange(of: toast?.id) { _, _ in
                 if toast == nil {
@@ -286,7 +304,7 @@ struct ChatPage: View {
             }
         return transcript
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                dock(dockState, chatBlocks: blocks)
+                dock(dockState, chatBlocks: blocks, totalBlockCount: totalBlockCount)
                     .frame(maxWidth: Theme.ContainerWidth.readable)
                     .frame(maxWidth: .infinity)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
@@ -484,28 +502,31 @@ struct ChatPage: View {
         }
     }
 
-    private func pageContent(_ blocks: [ChatBlock]) -> some View {
-        let range = transcriptWindow.resolvedRange(
-            total: blocks.count,
-            initialBatchSize: initialTranscriptBatchSize
-        )
+    private func pageContent(
+        _ blocks: [ChatBlock],
+        totalBlockCount: Int,
+        sourceRange: Range<Int>,
+        sourceBlockIDs: [UUID]
+    ) -> some View {
         return transcript(
             blocks: blocks,
-            renderedBlocks: Array(blocks[range])
+            totalBlockCount: totalBlockCount,
+            sourceRange: sourceRange,
+            sourceBlockIDs: sourceBlockIDs
         )
     }
 
-    private func pageTopBar(_ blocks: [ChatBlock]) -> some View {
+    private func pageTopBar(blockCount: Int) -> some View {
         ChatPageTopBar(
             chat: chat,
-            blockCount: blocks.count,
+            blockCount: blockCount,
             hasArtifacts: !chatArtifacts.isEmpty,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onToggleTemporary: onToggleTemporary,
             onPickModel: { modalPresentation = .modelPicker },
             onShowArtifacts: { modalPresentation = .artifacts },
-            onCopyTranscript: { copyTranscript(blockCount: blocks.count) },
+            onCopyTranscript: { copyTranscript(blockCount: blockCount) },
             onDeleteChat: { alertPresentation = .deleteChat }
         )
     }
@@ -849,7 +870,9 @@ struct ChatPage: View {
 
     private func transcript(
         blocks: [ChatBlock],
-        renderedBlocks: [ChatBlock]
+        totalBlockCount: Int,
+        sourceRange: Range<Int>,
+        sourceBlockIDs: [UUID]
     ) -> some View {
         let anchoredViewportHeight = max(
             0,
@@ -860,7 +883,7 @@ struct ChatPage: View {
                 ScrollView {
                     transcriptRows(
                         blocks: blocks,
-                        renderedBlocks: renderedBlocks,
+                        renderedBlocks: blocks,
                         anchoredViewportHeight: anchoredViewportHeight,
                         scrollToTurn: { id in
                             scroller.rideToTurn(id, animated: true) {
@@ -885,7 +908,7 @@ struct ChatPage: View {
                     if new == .idle,
                        let anchor = transcriptWindow.applyPendingEarlier() {
                         scroller.preservePageAnchor(anchor)
-                        logTranscriptWindow(reason: "earlier", total: blocks.count)
+                        logTranscriptWindow(reason: "earlier", total: totalBlockCount)
                     }
                 }
                 .scrollPosition($scroller.position)
@@ -911,17 +934,21 @@ struct ChatPage: View {
                             scroller.gestureStarted()
                         }
                 )
-                .onChange(of: blocks.count) { _, n in
-                    transcriptWindow.reconcile(total: n)
-                    logTranscriptWindow(reason: "blocks", total: n)
+                .onChange(of: totalBlockCount) { _, total in
+                    transcriptWindow.reconcile(total: total)
+                    logTranscriptWindow(reason: "blocks", total: total)
                 }
                 .onChange(of: chat.isBusy) { _, busy in
-                    logTranscriptWindow(reason: busy ? "busy" : "settled", total: blocks.count)
+                    logTranscriptWindow(reason: busy ? "busy" : "settled", total: totalBlockCount)
                 }
                 .onChange(of: submissionAnchor) { old, new in
                     guard old != new, let new else { return }
                     Log.ui.info("ChatPage.submissionAnchor chat=\(chat.id) id=\(new.id)")
-                    transcriptWindow.anchor(on: new.id, in: blocks.map(\.id))
+                    transcriptWindow.anchor(
+                        on: new.id,
+                        in: sourceBlockIDs,
+                        startingAt: sourceRange.lowerBound
+                    )
                 }
                 .onChange(of: composerFocused) { _, focused in
                     Log.ui.info("ChatComposer.focusChange chat=\(chat.id) focused=\(focused)")
@@ -945,21 +972,14 @@ struct ChatPage: View {
                     )
                 }
                 .onAppear {
-                    transcriptWindow.open(
-                        total: blocks.count,
-                        initialBatchSize: initialTranscriptBatchSize
-                    )
+                    transcriptWindow.open(total: totalBlockCount)
                     Log.ui.info("RenderContext chat=\(chat.id) viewport=\(Int(outer.size.width))x\(Int(outer.size.height)) scale=\(displayScale) safeArea=\(Int(outer.safeAreaInsets.top))/\(Int(outer.safeAreaInsets.bottom)) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
                     Log.ui.info("ChatPage.open chat=\(chat.id) position=bottom")
-                    logTranscriptWindow(reason: "open", total: blocks.count)
+                    logTranscriptWindow(reason: "open", total: totalBlockCount)
                     scroller.openAtBottom(chatID: "\(chat.id)", onSettled: onInitialTranscriptPresented)
                 }
             }
         }
-    }
-
-    private var initialTranscriptBatchSize: Int {
-        opensWithCompactTranscript ? TranscriptWindow.openingBatchSize : TranscriptWindow.batchSize
     }
 
     private func transcriptRows(
@@ -1094,17 +1114,16 @@ struct ChatPage: View {
 
     private func readerAnchor(in blocks: [ChatBlock]) -> UUID? {
         if let visible = scroller.visibleBlockID { return visible }
-        guard blocks.indices.contains(transcriptWindow.range.lowerBound) else { return nil }
-        return blocks[transcriptWindow.range.lowerBound].id
+        return blocks.first?.id
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {
         Log.ui.info("Transcript.window chat=\(chat.id) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") reason=\(reason)")
     }
 
-    private func scrollToBottomButton(_ blocks: [ChatBlock]) -> some View {
+    private func scrollToBottomButton(totalBlockCount: Int) -> some View {
         Button {
-            transcriptWindow.showLatest(total: blocks.count)
+            transcriptWindow.showLatest(total: totalBlockCount)
             DispatchQueue.main.async { scroller.rideToBottom() }
         } label: {
             Image(systemName: "arrow.down")
@@ -1186,14 +1205,15 @@ struct ChatPage: View {
 
     private func dock(
         _ dock: ChatDock,
-        chatBlocks: [ChatBlock]
+        chatBlocks: [ChatBlock],
+        totalBlockCount: Int
     ) -> some View {
         let isChatEmpty = chat.canChangeRetention && chatBlocks.isEmpty
         return dockHost(dock, isChatEmpty: isChatEmpty)
             .transition(.opacity)
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
-                    scrollToBottomButton(chatBlocks)
+                    scrollToBottomButton(totalBlockCount: totalBlockCount)
                         .offset(y: scrollToBottomOffset(for: dock, isChatEmpty: isChatEmpty))
                         .transition(.opacity)
                 }
