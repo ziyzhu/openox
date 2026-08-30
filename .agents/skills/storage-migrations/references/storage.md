@@ -68,9 +68,12 @@ types remain authoritative in their `Codable` implementations.
     └── account api:<provider-id>             simulator bootstrap API key
 ```
 
-The application bundle identifier, Share Extension bundle identifier, app group,
-iCloud container, Keychain service, and website-data namespace come from
-the ignored `apps/ios/Local.xcconfig` created from `apps/ios/Local.xcconfig.example`.
+The ignored `apps/ios/Local.xcconfig` supplies the development team and application
+bundle identifier. Build settings, property lists, and entitlements derive the Share
+Extension bundle identifier, app group, iCloud container, Keychain service, and
+website-data namespace directly from that bundle identifier. Agent skill and chat
+packages use canonical OpenOx type identifiers; the app continues importing the
+legacy bundle-derived identifiers.
 
 Primary owners:
 
@@ -456,7 +459,7 @@ provider/model selection. Custom-provider models and capabilities are discovered
 at runtime and are not persisted. Custom-provider JSON excludes credentials.
 
 Provider API keys and subscription token bundles are generic-password Keychain
-items under the configured `OX_KEYCHAIN_SERVICE`. They use After First Unlock accessibility
+items under the bundle-derived `<application bundle identifier>.llm` service. They use After First Unlock accessibility
 so user-invoked background Siri and CarPlay requests can run after the device's
 first unlock following a restart. Custom endpoint bearer tokens attach only to
 their normalized configured endpoint. Providers with different global and China

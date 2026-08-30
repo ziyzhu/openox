@@ -21,17 +21,17 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>OXAppGroupIdentifier</key>
-	<string>$(OX_APP_GROUP_IDENTIFIER)</string>
+	<string>group.$(OX_BUNDLE_IDENTIFIER)</string>
 	<key>OXICloudContainerIdentifier</key>
-	<string>$(OX_ICLOUD_CONTAINER_IDENTIFIER)</string>
+	<string>iCloud.$(OX_BUNDLE_IDENTIFIER)</string>
 	<key>OXKeychainService</key>
-	<string>$(OX_KEYCHAIN_SERVICE)</string>
+	<string>$(OX_BUNDLE_IDENTIFIER).llm</string>
 	<key>OXWebsiteDataNamespace</key>
-	<string>$(OX_WEBSITE_DATA_NAMESPACE)</string>
+	<string>$(OX_BUNDLE_IDENTIFIER).web-profile</string>
 	<key>OXAgentSkillTypeIdentifier</key>
-	<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+	<string>ai.openox.agent-skill</string>
 	<key>OXChatTypeIdentifier</key>
-	<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+	<string>ai.openox.chat</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Ziyuan Zhu</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -97,7 +97,7 @@
 			<key>UTTypeDescription</key>
 			<string>Agent Skill</string>
 			<key>UTTypeIdentifier</key>
-			<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+			<string>ai.openox.agent-skill</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -116,7 +116,48 @@
 			<key>UTTypeDescription</key>
 			<string>Ox Chat</string>
 			<key>UTTypeIdentifier</key>
-			<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+			<string>ai.openox.chat</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>chat</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.ox.chat+zip</string>
+			</dict>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Agent Skill</string>
+			<key>UTTypeIdentifier</key>
+			<string>$(OX_BUNDLE_IDENTIFIER).agent-skill</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>skill</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.agent-skill+zip</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Ox Chat</string>
+			<key>UTTypeIdentifier</key>
+			<string>$(OX_BUNDLE_IDENTIFIER).chat</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -139,7 +180,8 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>$(OX_AGENT_SKILL_TYPE_IDENTIFIER)</string>
+				<string>ai.openox.agent-skill</string>
+				<string>$(OX_BUNDLE_IDENTIFIER).agent-skill</string>
 			</array>
 		</dict>
 		<dict>
@@ -151,13 +193,14 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>$(OX_CHAT_TYPE_IDENTIFIER)</string>
+				<string>ai.openox.chat</string>
+				<string>$(OX_BUNDLE_IDENTIFIER).chat</string>
 			</array>
 		</dict>
 	</array>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>$(OX_ICLOUD_CONTAINER_IDENTIFIER)</key>
+		<key>iCloud.$(OX_BUNDLE_IDENTIFIER)</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>

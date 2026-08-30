@@ -108,7 +108,7 @@ Create a local signing configuration:
 cp apps/ios/Local.xcconfig.example apps/ios/Local.xcconfig
 ```
 
-Edit the ignored `apps/ios/Local.xcconfig` with your Apple Developer Team ID and a reverse-DNS bundle identifier owned by your team. The remaining identifiers derive from the bundle identifier. Register the App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
+Edit the ignored `apps/ios/Local.xcconfig` with your Apple Developer Team ID and a reverse-DNS bundle identifier owned by your team. The app derives its storage identifiers from the bundle identifier and declares canonical OpenOx package types. Register the App Group and iCloud container with your Apple development team if Xcode does not create them automatically.
 
 Open `apps/ios/Ox.xcodeproj`, select a physical device, and run the `ios` scheme. The checked-in service bundle contains every built-in web, native iOS, and MCP service.
 

@@ -19,7 +19,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>OXAppGroupIdentifier</key>
-	<string>$(OX_APP_GROUP_IDENTIFIER)</string>
+	<string>group.$(OX_BUNDLE_IDENTIFIER)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Ziyuan Zhu</string>
 	<key>NSExtension</key>
