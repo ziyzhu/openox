@@ -691,10 +691,50 @@ final class Chat: Identifiable {
         }
     }
 
+    private enum AgentEventCycle {
+        case completed(cancelled: Bool)
+        case running(cancelled: Bool, continuation: CheckedContinuation<Void, Never>?)
+
+        var isCompleted: Bool {
+            if case .completed = self { true } else { false }
+        }
+
+        var isCancelled: Bool {
+            switch self {
+            case .completed(let cancelled), .running(let cancelled, _): cancelled
+            }
+        }
+
+        mutating func begin() {
+            self = .running(cancelled: false, continuation: nil)
+        }
+
+        mutating func cancel() {
+            guard case .running(_, let continuation) = self else { return }
+            self = .running(cancelled: true, continuation: continuation)
+        }
+
+        mutating func wait(_ continuation: CheckedContinuation<Void, Never>) {
+            guard case .running(let cancelled, nil) = self else {
+                continuation.resume()
+                return
+            }
+            self = .running(cancelled: cancelled, continuation: continuation)
+        }
+
+        mutating func finish() {
+            guard case .running(let cancelled, let continuation) = self else { return }
+            self = .completed(cancelled: cancelled)
+            continuation?.resume()
+        }
+    }
+
     private struct Run {
         let id: RunID
         let task: Task<Void, Never>
         var phase: RunPhase
+        var activeSubmission: Submission?
+        var backgroundExecutionExpired: Bool
         var backgroundExecution: ChatBackgroundExecution?
         var completionNotification: CompletionNotification?
     }
@@ -752,6 +792,20 @@ final class Chat: Identifiable {
             }
         }
 
+        var activeSubmission: Submission? {
+            switch self {
+            case .idle: nil
+            case .running(let run): run.activeSubmission
+            }
+        }
+
+        var backgroundExecutionExpired: Bool {
+            switch self {
+            case .idle: false
+            case .running(let run): run.backgroundExecutionExpired
+            }
+        }
+
         mutating func setBackgroundExecution(_ execution: ChatBackgroundExecution?) {
             switch self {
             case .idle:
@@ -767,6 +821,18 @@ final class Chat: Identifiable {
             run.completionNotification = notification
             self = .running(run)
         }
+
+        mutating func setActiveSubmission(_ submission: Submission?, runID: RunID) {
+            guard case .running(var run) = self, run.id == runID else { return }
+            run.activeSubmission = submission
+            self = .running(run)
+        }
+
+        mutating func expireBackgroundExecution() {
+            guard case .running(var run) = self else { return }
+            run.backgroundExecutionExpired = true
+            self = .running(run)
+        }
     }
     private var runState: RunState = .idle
     private var submissions: [Submission] = []
@@ -780,14 +846,8 @@ final class Chat: Identifiable {
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
     @ObservationIgnored private var agentHapticPhase = AgentHapticPhase.waitingForDelta
-    @ObservationIgnored private var activeTurnID: UUID?
-    @ObservationIgnored private var activeSubmissionKind: Submission.Kind?
-    @ObservationIgnored private var activeSubmission: Submission?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
-    @ObservationIgnored private var agentEventsCompleted = true
-    @ObservationIgnored private var agentEventsContinuation: CheckedContinuation<Void, Never>?
-    @ObservationIgnored private var agentRunCancelled = false
-    @ObservationIgnored private var backgroundExecutionExpired = false
+    @ObservationIgnored private var agentEventCycle = AgentEventCycle.completed(cancelled: false)
     @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ChatSubmissionOutcome, Never>] = [:]
     @ObservationIgnored private let executionLease: ExecutionLease
 
@@ -851,9 +911,9 @@ final class Chat: Identifiable {
             for await event in stream {
                 guard let self else { return }
                 switch event {
-                case .agentStart(let turnID):
+                case .agentStart:
                     self.pendingContextCompactions = []
-                    self.beginAgentTurn(turnID: turnID)
+                    self.beginAgentTurn()
                 case .turnStart(let model, _):
                     self.setRunPhase(.thinking)
                     self.resetStreamedText()
@@ -884,9 +944,7 @@ final class Chat: Identifiable {
                     self.agentSnapshot = snapshot
                     self.finishAgentTurnFromEvents(error: snapshot.errorMessage)
                     self.requestPersistence(.agentTurnFinished)
-                    self.agentEventsCompleted = true
-                    self.agentEventsContinuation?.resume()
-                    self.agentEventsContinuation = nil
+                    self.agentEventCycle.finish()
                 case .compacted(let before, let after, let chars, let tokensBefore):
                     self.pendingCompactionTokens = tokensBefore
                     let compaction = ContextCompaction(at: Date(), tokensBefore: tokensBefore)
@@ -1039,11 +1097,10 @@ final class Chat: Identifiable {
         onPersistableChange?()
     }
 
-    private func beginAgentTurn(turnID: UUID?) {
+    private func beginAgentTurn() {
         setRunPhase(.thinking)
         runState.backgroundExecution?.updatePhase(.thinking)
-        activeTurnID = turnID
-        switch activeSubmissionKind {
+        switch runState.activeSubmission?.kind {
         case let .system(.some(target)):
             document.apply(.resumeAgentTurn(id: target))
         case .user, .system, nil:
@@ -1635,7 +1692,7 @@ final class Chat: Identifiable {
     }
 
     func latestContinuation() -> ChatContinuation? {
-        if let activeSubmission, case .user = activeSubmission.kind {
+        if let activeSubmission = runState.activeSubmission, case .user = activeSubmission.kind {
             if let index = document.turns.lastIndex(where: { turn in
                 guard case let .user(user, _) = turn else { return false }
                 return user.submissionID == activeSubmission.id
@@ -1887,7 +1944,7 @@ final class Chat: Identifiable {
         submissionWaiters.removeAll()
         for continuation in waiters { continuation.resume(returning: .cancelled) }
         notice = .none
-        agentRunCancelled = true
+        agentEventCycle.cancel()
         enqueueAgentMutation { await $0.abort() }
         cancelInteractions()
         let task = runState.task
@@ -1903,7 +1960,7 @@ final class Chat: Identifiable {
     func stopCurrentTurn() {
         Log.session.info("Chat.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
         notice = .none
-        agentRunCancelled = true
+        agentEventCycle.cancel()
         enqueueAgentMutation { await $0.abort() }
         cancelInteractions()
         resetOutputDelivery()
@@ -1970,9 +2027,9 @@ final class Chat: Identifiable {
     private func finishAgentTurnFromEvents(error: String?) {
         let at = Date()
         let outcome: TurnOutcome
-        if backgroundExecutionExpired {
+        if runState.backgroundExecutionExpired {
             outcome = .failed(at: at, message: "Background execution ended.")
-        } else if agentRunCancelled || runState.task?.isCancelled == true || error == "aborted" {
+        } else if agentEventCycle.isCancelled || runState.task?.isCancelled == true || error == "aborted" {
             outcome = .cancelled(at: at)
         } else if let error {
             outcome = .failed(at: at, message: error)
@@ -1984,10 +2041,8 @@ final class Chat: Identifiable {
     }
 
     private func waitForAgentEvents() async {
-        guard !agentEventsCompleted else { return }
-        await withCheckedContinuation { continuation in
-            agentEventsContinuation = continuation
-        }
+        guard !agentEventCycle.isCompleted else { return }
+        await withCheckedContinuation { agentEventCycle.wait($0) }
     }
 
     private func endStreamingTurn(_ assistant: AssistantMessage) {
@@ -2026,7 +2081,6 @@ final class Chat: Identifiable {
     private func startWorker() {
         guard !isBusy else { return }
         let runID = RunID()
-        backgroundExecutionExpired = false
         let queueDepth = submissions.count
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -2054,7 +2108,7 @@ final class Chat: Identifiable {
                 submission.latency.mark(.consumed)
                 Log.session.info("Chat.worker consume id=\(id) submission=\(submission.id.rawValue)")
                 activeLatency = submission.latency
-                await runOne(submission)
+                await runOne(submission, runID: runID)
                 activeLatency = nil
                 runState.backgroundExecution?.advance()
             }
@@ -2063,6 +2117,8 @@ final class Chat: Identifiable {
             id: runID,
             task: task,
             phase: .thinking,
+            activeSubmission: nil,
+            backgroundExecutionExpired: false,
             backgroundExecution: nil,
             completionNotification: nil
         ))
@@ -2072,15 +2128,15 @@ final class Chat: Identifiable {
 
     private func finishWorker(_ runID: RunID) {
         guard runState.id == runID else { return }
+        let backgroundExecutionExpired = runState.backgroundExecutionExpired
         let chatFailed = !backgroundExecutionExpired && notice.errorMessage != nil
-        let chatSucceeded = !backgroundExecutionExpired && !agentRunCancelled && notice.errorMessage == nil
+        let chatSucceeded = !backgroundExecutionExpired && !agentEventCycle.isCancelled && notice.errorMessage == nil
         let hasUnreadResult = chatSucceeded || chatFailed || backgroundExecutionExpired
         let leaseSucceeded = !backgroundExecutionExpired
         if chatFailed { runState.backgroundExecution?.updatePhase(.failed) }
         let completionNotification = chatSucceeded ? runState.completionNotification : nil
         runState.backgroundExecution?.finish(success: leaseSucceeded)
         runState = .idle
-        backgroundExecutionExpired = false
         if hasUnreadResult, !isTranscriptVisible {
             hasUnreadResponse = true
             Log.session.info("Chat.unread id=\(id)")
@@ -2127,7 +2183,7 @@ final class Chat: Identifiable {
 
     private func expireBackgroundExecution(runID: RunID) {
         guard runState.id == runID else { return }
-        backgroundExecutionExpired = true
+        runState.expireBackgroundExecution()
         notice = .error("Run interrupted: background execution ended.")
         let cancelled = drainSubmissions()
         for submission in cancelled {
@@ -2144,16 +2200,12 @@ final class Chat: Identifiable {
         return drained
     }
 
-    private func runOne(_ submission: Submission) async {
+    private func runOne(_ submission: Submission, runID: RunID) async {
         submission.latency.mark(.runStarted)
         Log.session.info("Chat.runOne start id=\(id) client=\(client.id) model=\(model.id)")
         agentHapticPhase = .waitingForDelta
-        activeSubmissionKind = submission.kind
-        activeSubmission = submission
-        defer {
-            activeSubmissionKind = nil
-            activeSubmission = nil
-        }
+        runState.setActiveSubmission(submission, runID: runID)
+        defer { runState.setActiveSubmission(nil, runID: runID) }
         await Soul.shared.waitUntilCurrent()
         await UserMemory.shared.waitUntilCurrent()
         await Skills.shared.waitUntilCurrent()
@@ -2199,8 +2251,7 @@ final class Chat: Identifiable {
             Log.session.info("Chat.runOne service=\(definition.domain) actions=[\(actions)]")
         }
         let turnID = transcript.last(where: { $0.isUserInitiated })?.id
-        agentRunCancelled = false
-        agentEventsCompleted = false
+        agentEventCycle.begin()
         pendingCompactionTokens = nil
         submission.latency.mark(.agentSubmitted)
         await LogContext.$latency.withValue(submission.latency) {
