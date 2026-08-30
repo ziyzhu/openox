@@ -40,7 +40,7 @@ nonisolated enum CuratedProviderModels {
 
     static let arkChina = [
         seedModel(
-            id: "doubao-seed-2-1-pro",
+            id: "doubao-seed-2-1-pro-260628",
             displayName: "Doubao Seed 2.1 Pro",
             maxTokens: 256_000,
             maxContext: 256_000
