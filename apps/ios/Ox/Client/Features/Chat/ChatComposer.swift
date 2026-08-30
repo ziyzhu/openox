@@ -1347,23 +1347,28 @@ private struct ServicePickerPanel: View {
     }
 
     private var header: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             Text("Services")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .padding(.top, Theme.Spacing.sm)
             Spacer(minLength: 0)
             exploreButton
+                .padding(.top, Theme.Spacing.sm)
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.bottom, Theme.Spacing.sm)
     }
 
     private var exploreButton: some View {
         Button(action: onExplore) {
             OxActionIcon(.services, size: 20)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .frame(width: 32, height: 28)
-                .minimumTouchTarget()
+                .frame(
+                    width: Theme.Size.minimumTouchTarget,
+                    height: Theme.Size.minimumTouchTarget,
+                    alignment: .topTrailing
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Services")
