@@ -427,6 +427,8 @@ struct ChatComposer: View, Equatable {
     let onPasteImages: ([PastedComposerImage]) -> Void
     let onOpenService: (Service) -> Void
     let onRemoveService: (Service) -> Void
+    let onAttachmentChoice: (AttachmentChoice) -> Void
+    let onServices: () -> Void
     let onSubmitSkill: (Skill, String) -> Void
     let onPreparationIntent: (Bool) -> Void
     let onSend: () -> Void
@@ -943,7 +945,14 @@ struct ChatComposer: View, Equatable {
 
     private func setMenu(_ visible: Bool) {
         Log.ui.info("ChatComposer.attachMenu chat=\(sessionID) visible=\(visible)")
-        withAnimation(Theme.Animation.glassMorph) { composer.setAttachmentMenuPresented(visible) }
+        composer.setAttachmentMenuPresented(visible)
+    }
+
+    private var attachmentMenuPresented: Binding<Bool> {
+        Binding(
+            get: { composer.surface == .attachments },
+            set: setMenu
+        )
     }
 
     private var attachButton: some View {
@@ -960,6 +969,24 @@ struct ChatComposer: View, Equatable {
         .buttonStyle(.plain)
         .accessibilityLabel(A11yLabel.addAttachment)
         .accessibilityIdentifier(A11yID.Chat.attach)
+        .popover(
+            isPresented: attachmentMenuPresented,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .bottom
+        ) {
+            ComposerAttachMenu(
+                onChoice: { choice in
+                    setMenu(false)
+                    DispatchQueue.main.async { onAttachmentChoice(choice) }
+                },
+                onServices: {
+                    setMenu(false)
+                    DispatchQueue.main.async(execute: onServices)
+                }
+            )
+            .presentationCompactAdaptation(horizontal: .popover, vertical: .sheet)
+            .presentationSizing(.fitted)
+        }
     }
 
     private func attachedServicePill(_ picked: Service) -> some View {
@@ -1163,78 +1190,15 @@ struct ComposerSlashPicker: View {
 }
 
 struct ComposerAttachMenu: View {
-    let isPresented: Bool
-    let topClearance: CGFloat
-    let onDismiss: () -> Void
     let onChoice: (AttachmentChoice) -> Void
     let onServices: () -> Void
 
-    @ScaledMetric(relativeTo: .body) private var menuTextHeight: CGFloat = 20
-
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                if isPresented {
-                    Color.black.opacity(0.001)
-                        .ignoresSafeArea()
-                        .onTapGesture(perform: dismiss)
-                        .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismiss() })
-                        .accessibilityHidden(true)
-                    menuCard(maxHeight: availableCardHeight(in: geometry))
-                        .transition(.blurReplace.combined(with: ScaleTransition(0.05, anchor: UnitPoint(x: 0.1, y: 0.88))))
-                        .frame(maxWidth: Theme.ContainerWidth.readable, alignment: .leading)
-                        .padding(.leading, Theme.Spacing.sm + Theme.Spacing.xs)
-                        .padding(.trailing, Theme.Spacing.md)
-                        .padding(.bottom, Theme.Spacing.sm)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityAddTraits(.isModal)
-                }
-            }
-        }
-        .accessibilityHidden(!isPresented)
-    }
-
-    private func availableCardHeight(in geometry: GeometryProxy) -> CGFloat {
-        max(
-            Theme.Size.minimumTouchTarget,
-            geometry.size.height
-                - topClearance
-                - Theme.Spacing.sm * 2
-        )
-    }
-
-    private func menuCard(maxHeight: CGFloat) -> some View {
-        ScrollView {
-            card
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollIndicators(.hidden)
-        .frame(width: 270)
-        .frame(height: min(idealCardHeight, maxHeight), alignment: .bottom)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-    }
-
-    private var idealCardHeight: CGFloat {
-        let rowHeight = max(Theme.Size.minimumTouchTarget, menuTextHeight) + Theme.Spacing.sm * 2
-        return rowHeight * 5 + Theme.Spacing.sm * 2
-    }
-
-    private var card: some View {
         AttachMenuCard(
-            onChoice: { choice in
-                dismiss()
-                onChoice(choice)
-            },
-            onServices: {
-                dismiss()
-                DispatchQueue.main.async(execute: onServices)
-            }
+            onChoice: onChoice,
+            onServices: onServices
         )
-    }
-
-    private func dismiss() {
-        guard isPresented else { return }
-        withAnimation(Theme.Animation.glassMorph, onDismiss)
+        .accessibilityElement(children: .contain)
     }
 }
 

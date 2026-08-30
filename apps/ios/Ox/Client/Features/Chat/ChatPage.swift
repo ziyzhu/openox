@@ -294,21 +294,12 @@ struct ChatPage: View {
                     }
         }
         .background(Theme.Colors.chatSurface)
-        .accessibilityHidden(composer.surface == .attachments || speechInput.isPresented)
+        .accessibilityHidden(speechInput.isPresented)
         .overlay(alignment: .bottom) {
             servicePickerOverlay
         }
         .overlay(alignment: .bottom) {
             slashPickerOverlay
-        }
-        .overlay(alignment: .bottom) {
-            ComposerAttachMenu(
-                isPresented: composer.surface == .attachments,
-                topClearance: iconButtonSize + Theme.Spacing.sm,
-                onDismiss: { composer.setAttachmentMenuPresented(false) },
-                onChoice: handleAttachChoice,
-                onServices: startServiceMention
-            )
         }
         .overlay {
             if speechInput.isPresented {
@@ -1172,6 +1163,8 @@ struct ChatPage: View {
             onPasteImages: ingestPastedImages,
             onOpenService: { serviceDetailPresentation.wrappedValue = $0 },
             onRemoveService: removeService,
+            onAttachmentChoice: handleAttachChoice,
+            onServices: startServiceMention,
             onSubmitSkill: submitSkill,
             onPreparationIntent: chat.setModelPreparationIntent,
             onSend: { send() },
