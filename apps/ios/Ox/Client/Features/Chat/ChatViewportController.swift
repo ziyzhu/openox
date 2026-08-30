@@ -103,6 +103,8 @@ final class ChatViewportController {
     }
 
     private static let jumpThreshold: CGFloat = 32
+    private static let scrollPositionTolerance: CGFloat = 1
+    private static let viewportAdjustmentTolerance: CGFloat = 0.5
 
     private(set) var showsJumpButton = false
     var position = ScrollPosition(edge: .bottom)
@@ -154,7 +156,7 @@ final class ChatViewportController {
 
     func rideToBottom() {
         Log.ui.info("Transcript.anchor chat=\(chatID) target=bottom")
-        guard frame?.jumpDistance ?? .infinity > 1 else {
+        guard frame?.jumpDistance ?? .infinity > Self.scrollPositionTolerance else {
             motion = .stationary
             position.scrollTo(edge: .bottom)
             return
@@ -229,7 +231,8 @@ final class ChatViewportController {
         frame = new
         updateJumpButton(new)
         applyViewportHold()
-        if case .programmatic(.bottom) = motion, new.distanceFromEnd <= 1 {
+        if case .programmatic(.bottom) = motion,
+           new.distanceFromEnd <= Self.scrollPositionTolerance {
             motion = .stationary
             let completion = pendingOpenCompletion
             pendingOpenCompletion = nil
@@ -240,7 +243,7 @@ final class ChatViewportController {
         }
         if !inputFocused,
            let viewportHold,
-           abs(new.visualTop - viewportHold.floorTop) <= 1 {
+           abs(new.visualTop - viewportHold.floorTop) <= Self.scrollPositionTolerance {
             self.viewportHold = nil
         }
     }
@@ -248,7 +251,7 @@ final class ChatViewportController {
     private func applyViewportHold() {
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
-        guard abs(top - frame.visualTop) > 0.5 else { return }
+        guard abs(top - frame.visualTop) > Self.viewportAdjustmentTolerance else { return }
         move(to: .viewportClearance)
         position.scrollTo(y: top)
         Log.ui.info("Transcript.viewportClearance chat=\(chatID) top=\(Int(top)) hold=\(viewportHold.label)")

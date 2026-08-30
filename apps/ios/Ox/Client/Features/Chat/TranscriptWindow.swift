@@ -8,6 +8,7 @@ struct TranscriptWindow: Equatable {
 
     static let batchSize = 32
     static let openingBatchSize = 8
+    static let earlierBoundaryVisibilityThreshold: Double = 0.01
 
     private(set) var range = 0..<0
     private var earlierBoundaryVisible = false
