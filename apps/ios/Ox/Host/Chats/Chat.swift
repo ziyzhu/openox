@@ -803,6 +803,7 @@ final class Chat: Identifiable {
         self.agent = Agent(
             client: client,
             model: model,
+            sessionID: id.uuidString,
             transformContext: { request in
                 let messages = await ChatURLServiceContext.transform(
                     request.messages,

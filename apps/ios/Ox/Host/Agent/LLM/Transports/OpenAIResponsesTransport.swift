@@ -16,6 +16,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     public let extraBody: [String: JSONValue]
     public let reasoningEffort: LLMReasoningEffort
     public let serviceTier: @Sendable (ProviderModel) -> String?
+    public let streamingTransport: OpenAIResponsesStreamingTransport
     public var reasoningPolicy: LLMReasoningPolicy { reasoningEffort.policy }
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .openAIResponses }
     public init(
@@ -33,7 +34,8 @@ public struct OpenAIResponsesTransport: ProviderClient {
         sessionHeaderName: String = "x-session-id",
         extraBody: [String: JSONValue] = [:],
         reasoningEffort: LLMReasoningEffort = .none,
-        serviceTier: @escaping @Sendable (ProviderModel) -> String? = { _ in nil }
+        serviceTier: @escaping @Sendable (ProviderModel) -> String? = { _ in nil },
+        streamingTransport: OpenAIResponsesStreamingTransport = .serverSentEvents
     ) {
         self.id = id
         self.displayName = displayName
@@ -50,6 +52,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         self.extraBody = extraBody
         self.reasoningEffort = reasoningEffort
         self.serviceTier = serviceTier
+        self.streamingTransport = streamingTransport
     }
 
     public func stream(
@@ -91,20 +94,45 @@ public struct OpenAIResponsesTransport: ProviderClient {
             let endpoint = try await auth.resolve(forceRefresh: forceRefresh)
             LogContext.latency?.mark(.authReady)
 
-            var req = URLRequest(url: endpoint.url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            for (key, value) in endpoint.headers { req.setValue(value, forHTTPHeaderField: key) }
-            req.setValue(cacheKey, forHTTPHeaderField: sessionHeaderName)
-            req.httpBody = body
-
-            let toolNames = tools.map(\.name).joined(separator: ",")
-            Log.network.info("\(label) POST attempt=\(attempt) model=\(model.id) msgs=\(messages.count) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) tier=\(serviceTier ?? "standard") cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") session=\(cacheKey) bodyBytes=\(body.count)")
-
-            let response = try await StreamingHTTP.open(req, label: label) {
-                OpenAIClientError(message: "No HTTP response from \(displayName)")
+            if case .webSocketWithServerSentEventsFallback(let accountHeader) = streamingTransport,
+               let accountID = endpoint.headers.first(where: { $0.key.caseInsensitiveCompare(accountHeader) == .orderedSame })?.value {
+                let sessionID = options.promptCachePolicy == .standard ? options.sessionID : nil
+                if !(await OpenAIResponsesWebSocketPool.shared.fallbackActive(sessionID: sessionID)) {
+                    do {
+                        try await runWebSocket(
+                            endpoint: endpoint,
+                            body: body,
+                            model: model,
+                            cacheKey: cacheKey,
+                            sessionID: sessionID,
+                            accountID: accountID,
+                            label: label,
+                            continuation: continuation
+                        )
+                        return
+                    } catch let failure as OpenAIResponsesWebSocketFailure {
+                        await OpenAIResponsesWebSocketPool.shared.recordFailure(
+                            sessionID: sessionID,
+                            message: failure.underlying.localizedDescription
+                        )
+                        if failure.eventsReceived { throw failure.underlying }
+                        Log.network.warning("\(label) WebSocket failed before stream start; falling back to SSE error=\(LogPrivacy.text(failure.underlying.localizedDescription, limit: 2_048))")
+                    }
+                }
             }
+
+            let response = try await openServerSentEvents(
+                endpoint: endpoint,
+                body: body,
+                model: model,
+                messages: messages,
+                tools: tools,
+                options: options,
+                cacheKey: cacheKey,
+                serviceTier: serviceTier,
+                attempt: attempt,
+                label: label
+            )
 
             if response.statusCode == 401, attempt < maxAttempts {
                 Log.network.warning("\(label) 401; forcing token refresh and retrying")
@@ -118,21 +146,144 @@ public struct OpenAIResponsesTransport: ProviderClient {
                 )
             }
 
-            try await consume(bytes: response.bytes, model: model, label: label, continuation: continuation)
+            try await consumeServerSentEvents(bytes: response.bytes, model: model, label: label, continuation: continuation)
             return
         }
     }
 
-    private func consume(
+    private func openServerSentEvents(
+        endpoint: OpenAIResponsesEndpoint,
+        body: Data,
+        model: ProviderModel,
+        messages: [Message],
+        tools: [any AgentTool],
+        options: StreamOptions,
+        cacheKey: String,
+        serviceTier: String?,
+        attempt: Int,
+        label: String
+    ) async throws -> StreamingHTTP.Response {
+        var request = URLRequest(url: endpoint.url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        for (key, value) in endpoint.headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue(cacheKey, forHTTPHeaderField: sessionHeaderName)
+        request.httpBody = body
+
+        let toolNames = tools.map(\.name).joined(separator: ",")
+        Log.network.info("\(label) SSE POST attempt=\(attempt) model=\(model.id) msgs=\(messages.count) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) tier=\(serviceTier ?? "standard") cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") session=\(cacheKey) bodyBytes=\(body.count)")
+        return try await StreamingHTTP.open(request, label: label) {
+            OpenAIClientError(message: "No HTTP response from \(displayName)")
+        }
+    }
+
+    private func runWebSocket(
+        endpoint: OpenAIResponsesEndpoint,
+        body: Data,
+        model: ProviderModel,
+        cacheKey: String,
+        sessionID: String?,
+        accountID: String,
+        label: String,
+        continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
+    ) async throws {
+        guard var components = URLComponents(url: endpoint.url, resolvingAgainstBaseURL: false) else {
+            throw OpenAIResponsesWebSocketFailure(
+                underlying: OpenAIClientError(message: "Invalid ChatGPT Responses URL"),
+                eventsReceived: false
+            )
+        }
+        components.scheme = components.scheme == "http" ? "ws" : "wss"
+        guard let url = components.url else {
+            throw OpenAIResponsesWebSocketFailure(
+                underlying: OpenAIClientError(message: "Invalid ChatGPT WebSocket URL"),
+                eventsReceived: false
+            )
+        }
+
+        var request = URLRequest(url: url)
+        for (key, value) in endpoint.headers where
+            key.caseInsensitiveCompare("Accept") != .orderedSame
+                && key.caseInsensitiveCompare("Content-Type") != .orderedSame
+                && key.caseInsensitiveCompare("OpenAI-Beta") != .orderedSame {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        request.setValue(cacheKey, forHTTPHeaderField: sessionHeaderName)
+        request.setValue(cacheKey, forHTTPHeaderField: "x-client-request-id")
+
+        LogContext.latency?.mark(.httpStarted)
+        let lease = await OpenAIResponsesWebSocketPool.shared.acquire(
+            request: request,
+            sessionID: sessionID,
+            accountID: accountID
+        )
+        var eventsReceived = false
+        do {
+            let requestBody = try OpenAIResponsesWebSocketBody.request(body, continuing: lease.continuation)
+            guard let message = String(data: requestBody, encoding: .utf8) else {
+                throw OpenAIClientError(message: "Invalid ChatGPT WebSocket request encoding")
+            }
+            let continued = (try? JSONSerialization.jsonObject(with: requestBody) as? [String: Any])?["previous_response_id"] != nil
+            Log.network.info("\(label) WebSocket send connection=\(lease.reused ? "reused" : "new") continuation=\(continued ? "delta" : "full") session=\(cacheKey) bodyBytes=\(requestBody.count)")
+            try await lease.task.send(.string(message))
+            let completed = try await consume(
+                events: OpenAIResponsesWebSocketEvents(task: lease.task),
+                model: model,
+                label: label,
+                continuation: continuation,
+                onEvent: {
+                    if !eventsReceived {
+                        eventsReceived = true
+                        LogContext.latency?.mark(.responseHeaders)
+                    }
+                }
+            )
+            let next = completed.map {
+                OpenAIResponsesWebSocketContinuation(
+                    requestBody: body,
+                    responseID: $0.responseID,
+                    responseOutput: $0.responseOutput
+                )
+            }
+            await OpenAIResponsesWebSocketPool.shared.release(
+                lease,
+                keep: !Task.isCancelled,
+                continuation: next
+            )
+        } catch {
+            await OpenAIResponsesWebSocketPool.shared.release(lease, keep: false, continuation: nil)
+            throw OpenAIResponsesWebSocketFailure(underlying: error, eventsReceived: eventsReceived)
+        }
+    }
+
+    private func consumeServerSentEvents(
         bytes: URLSession.AsyncBytes,
         model: ProviderModel,
         label: String,
         continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
     ) async throws {
+        _ = try await consume(
+            events: SSE.events(bytes, label: label),
+            model: model,
+            label: label,
+            continuation: continuation
+        )
+    }
+
+    private func consume<Events: AsyncSequence>(
+        events: Events,
+        model: ProviderModel,
+        label: String,
+        continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation,
+        onEvent: () -> Void = {}
+    ) async throws -> OpenAIResponsesCompletion? where Events.Element == [String: Any] {
         var assembler = StreamAssembler(model: model, continuation: continuation)
         var stopReason: StopReason = .pending
         var sawTerminalResponse = false
         var failed = false
+        var terminalResponseID: String?
+        var terminalResponseOutput: Data?
         var textItems: [Int: Int] = [:]
         var reasoningItems: [Int: Int] = [:]
         var functionCallSlots: [Int: Int] = [:]
@@ -151,7 +302,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
             )
         }
 
-        let lines = try await SSE.forEachDataChunk(bytes, label: label) { evt in
+        let handleEvent: ([String: Any]) -> Bool = { evt in
             if let err = evt["error"] as? [String: Any] {
                 let message = (err["message"] as? String) ?? "stream error"
                 Log.network.error("\(label) mid-stream error: \(LogPrivacy.text(message, limit: 2_048))")
@@ -265,7 +416,11 @@ public struct OpenAIResponsesTransport: ProviderClient {
             case "response.completed", "response.incomplete":
                 guard let response = evt["response"] as? [String: Any] else { return true }
                 sawTerminalResponse = true
-                assembler.setResponseID(response["id"] as? String)
+                terminalResponseID = response["id"] as? String
+                assembler.setResponseID(terminalResponseID)
+                if let output = response["output"] as? [Any] {
+                    terminalResponseOutput = try? JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
+                }
                 let status = (response["status"] as? String) ?? (type == "response.incomplete" ? "incomplete" : "completed")
                 assembler.setRawStopReason(status)
                 stopReason = status == "incomplete" ? .length : (assembler.hasToolCalls ? .toolUse : .stop)
@@ -288,11 +443,22 @@ public struct OpenAIResponsesTransport: ProviderClient {
             }
             return true
         }
-        if failed { return }
+        var lines = 0
+        for try await event in events {
+            lines += 1
+            onEvent()
+            if !handleEvent(event) { break }
+        }
+        if failed { return nil }
         guard sawTerminalResponse else {
             throw OpenAIClientError(message: "\(displayName) Responses stream ended before a terminal response event")
         }
         assembler.finish(reason: stopReason, label: label, lines: lines)
+        guard let terminalResponseID, let terminalResponseOutput else { return nil }
+        return OpenAIResponsesCompletion(
+            responseID: terminalResponseID,
+            responseOutput: terminalResponseOutput
+        )
     }
 
     private func buildBody(

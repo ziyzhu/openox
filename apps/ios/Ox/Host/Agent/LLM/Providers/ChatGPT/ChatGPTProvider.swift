@@ -43,7 +43,8 @@ struct ChatGPTProvider: ProviderClient {
             sessionHeaderName: "session-id",
             serviceTier: { model in
                 model.variant == .fast ? "priority" : nil
-            }
+            },
+            streamingTransport: .webSocketWithServerSentEventsFallback(accountHeader: "ChatGPT-Account-Id")
         )
     }
 

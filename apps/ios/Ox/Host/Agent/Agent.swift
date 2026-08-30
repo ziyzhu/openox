@@ -32,7 +32,7 @@ public actor Agent {
     public private(set) var failureKind: LLMFailureKind?
     public private(set) var runState = RunState.idle
 
-    public var streamOptions = StreamOptions()
+    public var streamOptions: StreamOptions
     public var compactionThreshold = 0.75
     public var transformContext: TransformContextHook?
     public var beforeToolCall: BeforeToolCallHook?
@@ -66,10 +66,12 @@ public actor Agent {
     public init(
         client: any ProviderClient,
         model: ProviderModel,
+        sessionID: String? = nil,
         transformContext: TransformContextHook? = nil
     ) {
         self.client = client
         self.model = model
+        self.streamOptions = StreamOptions(sessionID: sessionID)
         self.transformContext = transformContext
         let pair = AsyncStream.makeStream(of: AgentEvent.self)
         events = pair.stream

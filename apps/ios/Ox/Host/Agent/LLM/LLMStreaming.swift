@@ -70,6 +70,26 @@ nonisolated enum StreamingHTTP {
 }
 
 nonisolated enum SSE {
+    static func events(
+        _ bytes: URLSession.AsyncBytes,
+        label: String
+    ) -> AsyncThrowingStream<[String: Any], Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    _ = try await forEachDataChunk(bytes, label: label) { event in
+                        continuation.yield(event)
+                        return true
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     // Iterates "data:" lines, parses each JSON payload, and hands it to body.
     // Handles the "[DONE]" sentinel and skips malformed chunks with a warning.
     // body returns false to stop early. Returns the number of lines consumed.
