@@ -248,9 +248,14 @@ final class Chat: Identifiable {
 
     private(set) var attachedServices: [Service] = []
     @ObservationIgnored private var attachedServiceDomains: [String] = []
-    private(set) var interaction: Interaction?
     @ObservationIgnored private var interactionWaiter: InteractionWaiter?
     @ObservationIgnored private var interactionQueue: [InteractionWaiter] = []
+
+    var interaction: Interaction? {
+        guard case .running(let run) = runState,
+              case .awaiting(let interaction) = run.phase else { return nil }
+        return interaction
+    }
 
     var pendingServiceControl: PendingServiceControl? {
         guard case .serviceControl(let control) = interaction else { return nil }
@@ -384,17 +389,26 @@ final class Chat: Identifiable {
     private(set) var notice = Notice.none
 
     var activity: Activity {
-        guard isBusy else { return .idle(hasUnreadResponse ? .unread : .read) }
-        if runState.phase == .streaming || runState.phase == .finishing { return .running(.streaming) }
-        guard let interaction else { return .running(.thinking) }
-        switch interaction {
-        case .prompt(let prompt):
-            return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
-        case .serviceControl(let pending):
-            switch pending.control {
-            case .signIn: return .running(.awaiting(.signIn))
-            case .botControl: return .running(.awaiting(.verification))
-            case .payment: return .running(.awaiting(.payment))
+        switch runState {
+        case .idle:
+            return .idle(hasUnreadResponse ? .unread : .read)
+        case .running(let run):
+            switch run.phase {
+            case .thinking:
+                return .running(.thinking)
+            case .streaming, .finishing:
+                return .running(.streaming)
+            case .awaiting(let interaction):
+                switch interaction {
+                case .prompt(let prompt):
+                    return .running(.awaiting(prompt.kind == .permission ? .approval : .reply))
+                case .serviceControl(let pending):
+                    switch pending.control {
+                    case .signIn: return .running(.awaiting(.signIn))
+                    case .botControl: return .running(.awaiting(.verification))
+                    case .payment: return .running(.awaiting(.payment))
+                    }
+                }
             }
         }
     }
@@ -659,7 +673,17 @@ final class Chat: Identifiable {
     private enum RunPhase: Equatable {
         case thinking
         case streaming
+        case awaiting(Interaction)
         case finishing
+
+        var logLabel: String {
+            switch self {
+            case .thinking: "thinking"
+            case .streaming: "streaming"
+            case .awaiting: "awaiting"
+            case .finishing: "finishing"
+            }
+        }
     }
 
     private struct Run {
@@ -742,7 +766,11 @@ final class Chat: Identifiable {
     private var runState: RunState = .idle
     private var submissions: [Submission] = []
     var isBusy: Bool { runState.isRunning }
-    var hasPendingInteraction: Bool { interaction != nil }
+    var hasPendingInteraction: Bool {
+        guard case .running(let run) = runState else { return false }
+        if case .awaiting = run.phase { return true }
+        return false
+    }
     @ObservationIgnored private var eventConsumer: Task<Void, Never>?
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
@@ -1094,7 +1122,6 @@ final class Chat: Identifiable {
             return
         }
         interactionWaiter = nil
-        interaction = nil
         advanceInteraction()
         continuation.resume(returning: result)
         Log.session.info("Chat.resolveServiceControl id=\(controlID) succeeded=\(result != nil)")
@@ -1121,7 +1148,7 @@ final class Chat: Identifiable {
 
     private func activateInteraction(_ waiter: InteractionWaiter) {
         interactionWaiter = waiter
-        interaction = waiter.interaction
+        replaceRunPhase(.awaiting(waiter.interaction))
         runState.backgroundExecution?.finish(success: true)
         runState.setBackgroundExecution(nil)
         Log.session.info("Chat.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
@@ -1157,6 +1184,7 @@ final class Chat: Identifiable {
             activateInteraction(waiter)
             return
         }
+        replaceRunPhase(.thinking)
         startBackgroundExecution()
     }
 
@@ -1165,7 +1193,7 @@ final class Chat: Identifiable {
         if let interactionWaiter { waiters.insert(interactionWaiter, at: 0) }
         interactionWaiter = nil
         interactionQueue.removeAll()
-        interaction = nil
+        if interaction != nil { replaceRunPhase(.thinking) }
         for waiter in waiters { waiter.cancel() }
         if !waiters.isEmpty {
             Log.session.info("Chat.interaction canceled count=\(waiters.count)")
@@ -1179,7 +1207,6 @@ final class Chat: Identifiable {
         if removedActive, let interactionWaiter {
             cancelled.append(interactionWaiter)
             self.interactionWaiter = nil
-            interaction = nil
         }
         interactionQueue.removeAll { waiter in
             guard waiter.serviceDomain.map(domains.contains) == true else { return false }
@@ -1344,7 +1371,6 @@ final class Chat: Identifiable {
             serviceManager.setAutoApprove(approval.action, true)
         }
         interactionWaiter = nil
-        interaction = nil
         advanceInteraction()
         continuation.resume(returning: .answered(answer))
     }
@@ -2065,6 +2091,14 @@ final class Chat: Identifiable {
     }
 
     private func setRunPhase(_ phase: RunPhase) {
+        guard interaction == nil else {
+            Log.session.warning("Chat.phase ignored id=\(id) phase=\(phase.logLabel) reason=awaitingInteraction")
+            return
+        }
+        replaceRunPhase(phase)
+    }
+
+    private func replaceRunPhase(_ phase: RunPhase) {
         guard runState.phase != phase else { return }
         switch runState {
         case .idle:
