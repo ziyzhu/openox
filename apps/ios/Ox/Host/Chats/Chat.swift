@@ -556,8 +556,13 @@ final class Chat: Identifiable {
     var currentExecutionFetchCount = 0
     var currentExecutionFetchBytes = 0
     var transcript: [Block] { document.projection }
+    var transcriptBlockCount: Int { document.blockCount }
     var referencedArtifacts: [Artifact] { document.referencedArtifacts }
     var blocksWithTurnID: [(block: Block, turnID: TurnID)] { document.blocksWithTurnID() }
+
+    func blocksWithTurnID(in range: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
+        document.blocksWithTurnID(in: range)
+    }
 
     func pendingPrompt(excluding handled: Set<UUID> = []) -> ChatPendingPrompt? {
         guard case .prompt(let prompt) = interaction,
