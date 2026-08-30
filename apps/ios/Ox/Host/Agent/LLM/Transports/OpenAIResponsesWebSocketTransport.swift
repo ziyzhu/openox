@@ -8,6 +8,7 @@ nonisolated public enum OpenAIResponsesStreamingTransport: Sendable {
 nonisolated struct OpenAIResponsesWebSocketFailure: Error {
     let underlying: Error
     let eventsReceived: Bool
+    let connectionReused: Bool
 }
 
 nonisolated struct OpenAIResponsesWebSocketContinuation: Sendable {

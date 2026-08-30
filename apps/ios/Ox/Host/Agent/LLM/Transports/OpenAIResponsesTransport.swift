@@ -98,25 +98,34 @@ public struct OpenAIResponsesTransport: ProviderClient {
                let accountID = endpoint.headers.first(where: { $0.key.caseInsensitiveCompare(accountHeader) == .orderedSame })?.value {
                 let sessionID = options.promptCachePolicy == .standard ? options.sessionID : nil
                 if !(await OpenAIResponsesWebSocketPool.shared.fallbackActive(sessionID: sessionID)) {
-                    do {
-                        try await runWebSocket(
-                            endpoint: endpoint,
-                            body: body,
-                            model: model,
-                            cacheKey: cacheKey,
-                            sessionID: sessionID,
-                            accountID: accountID,
-                            label: label,
-                            continuation: continuation
-                        )
-                        return
-                    } catch let failure as OpenAIResponsesWebSocketFailure {
-                        await OpenAIResponsesWebSocketPool.shared.recordFailure(
-                            sessionID: sessionID,
-                            message: failure.underlying.localizedDescription
-                        )
-                        if failure.eventsReceived { throw failure.underlying }
-                        Log.network.warning("\(label) WebSocket failed before stream start; falling back to SSE error=\(LogPrivacy.text(failure.underlying.localizedDescription, limit: 2_048))")
+                    var reconnectAvailable = true
+                    while true {
+                        do {
+                            try await runWebSocket(
+                                endpoint: endpoint,
+                                body: body,
+                                model: model,
+                                cacheKey: cacheKey,
+                                sessionID: sessionID,
+                                accountID: accountID,
+                                label: label,
+                                continuation: continuation
+                            )
+                            return
+                        } catch let failure as OpenAIResponsesWebSocketFailure {
+                            if reconnectAvailable, failure.connectionReused, !failure.eventsReceived {
+                                reconnectAvailable = false
+                                Log.network.warning("\(label) reused WebSocket failed before stream start; reconnecting error=\(LogPrivacy.text(failure.underlying.localizedDescription, limit: 2_048))")
+                                continue
+                            }
+                            await OpenAIResponsesWebSocketPool.shared.recordFailure(
+                                sessionID: sessionID,
+                                message: failure.underlying.localizedDescription
+                            )
+                            if failure.eventsReceived { throw failure.underlying }
+                            Log.network.warning("\(label) WebSocket failed before stream start; falling back to SSE error=\(LogPrivacy.text(failure.underlying.localizedDescription, limit: 2_048))")
+                            break
+                        }
                     }
                 }
             }
@@ -191,14 +200,16 @@ public struct OpenAIResponsesTransport: ProviderClient {
         guard var components = URLComponents(url: endpoint.url, resolvingAgainstBaseURL: false) else {
             throw OpenAIResponsesWebSocketFailure(
                 underlying: OpenAIClientError(message: "Invalid ChatGPT Responses URL"),
-                eventsReceived: false
+                eventsReceived: false,
+                connectionReused: false
             )
         }
         components.scheme = components.scheme == "http" ? "ws" : "wss"
         guard let url = components.url else {
             throw OpenAIResponsesWebSocketFailure(
                 underlying: OpenAIClientError(message: "Invalid ChatGPT WebSocket URL"),
-                eventsReceived: false
+                eventsReceived: false,
+                connectionReused: false
             )
         }
 
@@ -253,7 +264,11 @@ public struct OpenAIResponsesTransport: ProviderClient {
             )
         } catch {
             await OpenAIResponsesWebSocketPool.shared.release(lease, keep: false, continuation: nil)
-            throw OpenAIResponsesWebSocketFailure(underlying: error, eventsReceived: eventsReceived)
+            throw OpenAIResponsesWebSocketFailure(
+                underlying: error,
+                eventsReceived: eventsReceived,
+                connectionReused: lease.reused
+            )
         }
     }
 
