@@ -1,42 +1,5 @@
 import SwiftUI
 
-struct ChatEarlierPageCoordinator {
-    private enum Request {
-        case idle
-        case pending(UUID)
-    }
-
-    private var boundaryVisible = false
-    private var request = Request.idle
-
-    mutating func reset() {
-        boundaryVisible = false
-        request = .idle
-    }
-
-    mutating func setBoundaryVisible(_ visible: Bool) {
-        boundaryVisible = visible
-    }
-
-    mutating func requestIfNeeded(anchor: UUID?, isUserScrolling: Bool) {
-        guard boundaryVisible,
-              isUserScrolling,
-              case .idle = request,
-              let anchor else { return }
-        request = .pending(anchor)
-    }
-
-    mutating func takePendingAnchor() -> UUID? {
-        guard case .pending(let anchor) = request else { return nil }
-        request = .idle
-        return anchor
-    }
-
-    mutating func cancel() {
-        request = .idle
-    }
-}
-
 struct ChatViewportLayout {
     static let responseComposerSpacing: CGFloat = 48
 

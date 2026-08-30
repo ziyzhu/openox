@@ -855,7 +855,6 @@ struct ChatPage: View {
     }
 
     @State private var scroller = ChatViewportController()
-    @State private var earlierPageCoordinator = ChatEarlierPageCoordinator()
 
     private func transcript(
         blocks: [ChatBlock],
@@ -892,8 +891,10 @@ struct ChatPage: View {
                     if new == .interacting {
                         requestEarlierReveal(blocks: blocks)
                     }
-                    if new == .idle {
-                        applyEarlierReveal(blocks: blocks)
+                    if new == .idle,
+                       let anchor = transcriptWindow.applyPendingEarlier() {
+                        scroller.preservePageAnchor(anchor)
+                        logTranscriptWindow(reason: "earlier", total: blocks.count)
                     }
                 }
                 .scrollPosition($scroller.position)
@@ -928,7 +929,6 @@ struct ChatPage: View {
                 }
                 .onChange(of: submissionAnchor) { old, new in
                     guard old != new, let new else { return }
-                    earlierPageCoordinator.cancel()
                     Log.ui.info("ChatPage.submissionAnchor chat=\(chat.id) id=\(new.id)")
                     transcriptWindow.anchor(on: new.id, in: blocks.map(\.id))
                 }
@@ -954,7 +954,6 @@ struct ChatPage: View {
                     )
                 }
                 .onAppear {
-                    earlierPageCoordinator.reset()
                     transcriptWindow.open(
                         total: blocks.count,
                         initialBatchSize: initialTranscriptBatchSize
@@ -1090,25 +1089,16 @@ struct ChatPage: View {
         Color.clear
             .frame(height: transcriptWindow.hasEarlier ? 1 : 0)
             .onScrollVisibilityChange(threshold: 0.01) { visible in
-                earlierPageCoordinator.setBoundaryVisible(visible)
+                transcriptWindow.setEarlierBoundaryVisible(visible)
                 if visible { requestEarlierReveal(blocks: blocks) }
             }
     }
 
     private func requestEarlierReveal(blocks: [ChatBlock]) {
-        earlierPageCoordinator.requestIfNeeded(
+        transcriptWindow.requestEarlier(
             anchor: readerAnchor(in: blocks),
             isUserScrolling: scroller.isUserScrolling
         )
-    }
-
-    private func applyEarlierReveal(blocks: [ChatBlock]) {
-        guard let pendingEarlierAnchor = earlierPageCoordinator.takePendingAnchor() else { return }
-        guard let anchor = transcriptWindow.loadEarlier(
-            visibleAnchor: pendingEarlierAnchor
-        ) else { return }
-        scroller.preservePageAnchor(anchor)
-        logTranscriptWindow(reason: "earlier", total: blocks.count)
     }
 
     private func readerAnchor(in blocks: [ChatBlock]) -> UUID? {
@@ -1123,7 +1113,6 @@ struct ChatPage: View {
 
     private func scrollToBottomButton(_ blocks: [ChatBlock]) -> some View {
         Button {
-            earlierPageCoordinator.cancel()
             transcriptWindow.showLatest(total: blocks.count)
             DispatchQueue.main.async { scroller.rideToBottom() }
         } label: {
