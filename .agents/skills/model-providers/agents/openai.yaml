@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Providers"
+  short_description: "Maintain Ox model-provider metadata"
+  default_prompt: "Use $model-providers to research or update an Ox model provider and its human-facing metadata."
