@@ -725,7 +725,14 @@
       }
     },
     "Add schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加定时任务"
+          }
+        }
+      }
     },
     "Add service" : {
       "extractionState" : "manual",
@@ -1945,7 +1952,14 @@
       }
     },
     "Change a scheduled skill" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改定时技能"
+          }
+        }
+      }
     },
     "Character" : {
       "comment" : "The title of a screen where a user can edit text that describes a character, in this case, Ox.",
@@ -2758,7 +2772,14 @@
       }
     },
     "Couldn't Save Schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存定时任务"
+          }
+        }
+      }
     },
     "Couldn't update artifact" : {
       "extractionState" : "manual",
@@ -2784,7 +2805,14 @@
       }
     },
     "Couldn't Update Schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更新定时任务"
+          }
+        }
+      }
     },
     "Create" : {
       "comment" : "A button that creates a new profile.",
@@ -2989,7 +3017,14 @@
       }
     },
     "Day" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星期"
+          }
+        }
+      }
     },
     "Default" : {
       "extractionState" : "manual",
@@ -3073,7 +3108,14 @@
       }
     },
     "Delete a scheduled skill" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除定时技能"
+          }
+        }
+      }
     },
     "Delete a skill" : {
       "localizations" : {
@@ -3149,7 +3191,14 @@
       }
     },
     "Delete Schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除定时任务"
+          }
+        }
+      }
     },
     "Delete this artifact?" : {
       "extractionState" : "manual",
@@ -3174,7 +3223,14 @@
       }
     },
     "Delete this schedule?" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除此定时任务？"
+          }
+        }
+      }
     },
     "Deleted /%@" : {
       "extractionState" : "stale",
@@ -3686,7 +3742,14 @@
       }
     },
     "Edit Schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑定时任务"
+          }
+        }
+      }
     },
     "Edit text" : {
       "localizations" : {
@@ -5019,7 +5082,14 @@
       }
     },
     "List scheduled skills" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出定时技能"
+          }
+        }
+      }
     },
     "List skills" : {
       "extractionState" : "stale",
@@ -5847,7 +5917,14 @@
       }
     },
     "Next %@" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次：%@"
+          }
+        }
+      }
     },
     "No artifacts yet" : {
       "extractionState" : "manual",
@@ -6795,10 +6872,24 @@
       }
     },
     "Pause" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂停"
+          }
+        }
+      }
     },
     "Paused" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停"
+          }
+        }
+      }
     },
     "Pay" : {
       "extractionState" : "manual",
@@ -8015,7 +8106,14 @@
       }
     },
     "Repeat" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复"
+          }
+        }
+      }
     },
     "Replace Skill" : {
       "extractionState" : "manual",
@@ -8153,7 +8251,14 @@
       }
     },
     "Resume" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
+          }
+        }
+      }
     },
     "Return Ox's latest completed response." : {
       "localizations" : {
@@ -8214,16 +8319,44 @@
       }
     },
     "Run a scheduled skill" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行定时技能"
+          }
+        }
+      }
     },
     "Run At" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行时间"
+          }
+        }
+      }
     },
     "Run Now" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即运行"
+          }
+        }
+      }
     },
     "Run this skill once or on a repeating schedule." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单次运行此技能，或设置定期运行。"
+          }
+        }
+      }
     },
     "Running…" : {
       "extractionState" : "manual",
@@ -8335,7 +8468,14 @@
       }
     },
     "Schedule" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时运行"
+          }
+        }
+      }
     },
     "Schedule a local notification with a relative or absolute time." : {
       "extractionState" : "manual",
@@ -8360,7 +8500,14 @@
       }
     },
     "Schedule a skill" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时运行技能"
+          }
+        }
+      }
     },
     "Schedule notification" : {
       "extractionState" : "manual",
@@ -8385,10 +8532,24 @@
       }
     },
     "Schedule Skill" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时运行技能"
+          }
+        }
+      }
     },
     "Scheduled" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时任务"
+          }
+        }
+      }
     },
     "Scheduled a reminder" : {
       "extractionState" : "manual",
@@ -8402,7 +8563,14 @@
       }
     },
     "Schedules" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时任务"
+          }
+        }
+      }
     },
     "Scroll to bottom" : {
       "extractionState" : "manual",
