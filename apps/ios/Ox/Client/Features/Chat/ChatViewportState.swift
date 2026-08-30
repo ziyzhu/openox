@@ -40,31 +40,18 @@ struct ChatEarlierPageCoordinator {
 struct ChatViewportLayout {
     static let responseComposerSpacing: CGFloat = 48
 
-    var composerBounds = CGRect.zero
-    var dockBounds = CGRect.zero
+    var composerTop: CGFloat = 0
+    var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
     var anchorFloor: CGFloat = 0
     var anchorContentHeight: CGFloat = 0
 
-    var composerTop: CGFloat { composerBounds.minY }
-    var composerHeight: CGFloat { composerBounds.height }
-    var dockHeight: CGFloat { dockBounds.height }
-
     mutating func measureComposer(_ bounds: CGRect) -> Bool {
-        let changed = abs(composerBounds.minY - bounds.minY) > 0.5
-            || abs(composerBounds.height - bounds.height) > 0.5
-            || abs(composerBounds.width - bounds.width) > 0.5
+        let changed = abs(composerTop - bounds.minY) > 0.5
+            || abs(composerHeight - bounds.height) > 0.5
         guard changed else { return false }
-        composerBounds = bounds
-        return true
-    }
-
-    mutating func measureDock(_ bounds: CGRect) -> Bool {
-        let changed = abs(dockBounds.minY - bounds.minY) > 0.5
-            || abs(dockBounds.height - bounds.height) > 0.5
-            || abs(dockBounds.width - bounds.width) > 0.5
-        guard changed else { return false }
-        dockBounds = bounds
+        composerTop = bounds.minY
+        composerHeight = bounds.height
         return true
     }
 

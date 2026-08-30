@@ -643,15 +643,15 @@ final class Chat: Identifiable {
         submissions.compactMap(\.queuedMessage)
     }
 
-    func anchor(for receipt: SubmissionReceipt) -> SubmissionAnchor? {
+    func anchor(forSubmissionID submissionID: UUID) -> SubmissionAnchor? {
         if let entry = document.turns.firstIndex(where: { entry in
             guard case .user(let turn, _) = entry else { return false }
-            return turn.submissionID?.rawValue == receipt.id
+            return turn.submissionID?.rawValue == submissionID
         }), let block = document.blocksWithTurn().first(where: { $0.1 == entry })?.0 {
-            return .turn(blockID: block.id, submissionID: receipt.id)
+            return .turn(blockID: block.id, submissionID: submissionID)
         }
-        if submissions.contains(where: { $0.id.rawValue == receipt.id && $0.needsPosting }) {
-            return .queued(receipt.id)
+        if submissions.contains(where: { $0.id.rawValue == submissionID && $0.needsPosting }) {
+            return .queued(submissionID)
         }
         return nil
     }

@@ -58,7 +58,7 @@ struct ChatPage: View {
     @State private var composer = ChatComposerModel()
     @State private var speechInput = ChatSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
-    @State private var latestSubmission: Chat.SubmissionReceipt?
+    @State private var latestSubmissionID: UUID?
     @FocusState private var composerFocused: Bool
     @State private var editDraft: String = ""
     @State private var pendingArtifactPreview: Artifact?
@@ -289,8 +289,7 @@ struct ChatPage: View {
                 dock(dockState, chatBlocks: blocks)
                     .frame(maxWidth: Theme.ContainerWidth.readable)
                     .frame(maxWidth: .infinity)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-                        guard viewportLayout.measureDock(bounds) else { return }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
                         scroller.viewportResized()
                     }
         }
@@ -454,7 +453,7 @@ struct ChatPage: View {
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Regenerate")) {
                         Log.ui.info("ChatPage.retry chat=\(chat.id) atBlock=\(id)")
-                        latestSubmission = chat.retry(at: id)
+                        latestSubmissionID = chat.retry(at: id)?.id
                     }
                 )
             }
@@ -630,7 +629,7 @@ struct ChatPage: View {
     }
 
     private var submissionAnchor: Chat.SubmissionAnchor? {
-        latestSubmission.flatMap { chat.anchor(for: $0) }
+        latestSubmissionID.flatMap { chat.anchor(forSubmissionID: $0) }
     }
 
     private var anchoredTurnID: TurnID? {
@@ -785,8 +784,7 @@ struct ChatPage: View {
     @ViewBuilder
     private func blockRow(
         _ block: ChatBlock,
-        identified: Bool = true,
-        isLast: Bool = false
+        identified: Bool = true
     ) -> some View {
         let view = chatBlockHost(block)
         let enters = block.sourceBlockID == chat.transcript.last?.id
@@ -863,7 +861,6 @@ struct ChatPage: View {
         blocks: [ChatBlock],
         renderedBlocks: [ChatBlock]
     ) -> some View {
-        let lastBlockID = renderedBlocks.last?.id
         let anchoredViewportHeight = max(
             0,
             max(viewportLayout.anchorFloor, viewportLayout.contentFloorHeight)
@@ -874,7 +871,6 @@ struct ChatPage: View {
                     transcriptRows(
                         blocks: blocks,
                         renderedBlocks: renderedBlocks,
-                        lastBlockID: lastBlockID,
                         anchoredViewportHeight: anchoredViewportHeight,
                         scrollToTurn: { id in
                             scroller.rideToTurn(id, animated: true) {
@@ -893,10 +889,6 @@ struct ChatPage: View {
                 }
                 .onScrollPhaseChange { old, new in
                     scroller.phaseChanged(from: old, to: new)
-                    if new == .interacting,
-                       transcriptWindow.readerMoved(visibleAnchor: readerAnchor(in: blocks)) {
-                        logTranscriptWindow(reason: "readerMoved", total: blocks.count)
-                    }
                     if new == .interacting {
                         requestEarlierReveal(blocks: blocks)
                     }
@@ -983,7 +975,6 @@ struct ChatPage: View {
     private func transcriptRows(
         blocks: [ChatBlock],
         renderedBlocks: [ChatBlock],
-        lastBlockID: UUID?,
         anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) -> Void
     ) -> some View {
@@ -994,7 +985,7 @@ struct ChatPage: View {
             earlierWindowBoundary(blocks: blocks)
             if let anchor = anchoredQueuedMessage {
                 ForEach(renderedBlocks) { block in
-                    blockRow(block, isLast: block.id == lastBlockID)
+                    blockRow(block)
                 }
                 activityRow
                 ForEach(chat.queuedMessages.filter { $0.id != anchor.id }) { queued in
@@ -1016,17 +1007,16 @@ struct ChatPage: View {
             } else if let anchorID = anchoredTurnID,
                       let anchorIndex = renderedBlocks.firstIndex(where: { $0.id == anchorID }) {
                 ForEach(Array(renderedBlocks[..<anchorIndex])) { block in
-                    blockRow(block, isLast: block.id == lastBlockID)
+                    blockRow(block)
                 }
                 VStack(spacing: 0) {
                     blockRow(
                         renderedBlocks[anchorIndex],
-                        identified: false,
-                        isLast: renderedBlocks[anchorIndex].id == lastBlockID
+                        identified: false
                     )
                     .id(anchorID)
                     ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
-                        blockRow(block, identified: false, isLast: block.id == lastBlockID)
+                        blockRow(block, identified: false)
                     }
                     activityRow
                     queuedRows
@@ -1042,7 +1032,7 @@ struct ChatPage: View {
                 }
             } else {
                 ForEach(renderedBlocks) { block in
-                    blockRow(block, isLast: block.id == lastBlockID)
+                    blockRow(block)
                 }
                 activityRow
                 queuedRows
@@ -1128,7 +1118,7 @@ struct ChatPage: View {
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {
-        Log.ui.info("Transcript.window chat=\(chat.id) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(transcriptWindow.mode.anchor?.uuidString ?? "none") reason=\(reason) mode=\(transcriptWindow.mode.label)")
+        Log.ui.info("Transcript.window chat=\(chat.id) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") reason=\(reason)")
     }
 
     private func scrollToBottomButton(_ blocks: [ChatBlock]) -> some View {
@@ -1364,7 +1354,7 @@ struct ChatPage: View {
             attachments: message.attachments,
             skillInvocation: skillInvocation
         )
-        latestSubmission = receipt
+        latestSubmissionID = receipt.id
         Log.ui.info("ChatPage.send chat=\(chat.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 
@@ -1395,7 +1385,7 @@ struct ChatPage: View {
         guard !trimmed.isEmpty else { return }
         Log.ui.info("ChatPage.commitEdit chat=\(chat.id) block=\(target.id) chars=\(trimmed.count)")
         modalPresentation = nil
-        latestSubmission = chat.editAndRerun(at: target.id, newText: trimmed)
+        latestSubmissionID = chat.editAndRerun(at: target.id, newText: trimmed)?.id
     }
 
     private func openAttachment(_ att: Artifact, sourceID _: String? = nil) {
