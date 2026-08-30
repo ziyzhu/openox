@@ -1,9 +1,9 @@
 import Foundation
 
-nonisolated enum OpenAIClient {
-    static func make(models: [ProviderModel]) -> OpenAIResponsesClient {
+nonisolated enum OpenAIProvider {
+    static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
         let baseURL = URL(string: "https://api.openai.com/v1")!
-        return OpenAIResponsesClient(
+        return OpenAIResponsesTransport(
             id: "openai",
             displayName: "OpenAI",
             models: models,

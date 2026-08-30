@@ -10,12 +10,12 @@ nonisolated public struct OpenAIResponsesEndpoint: Sendable {
     }
 }
 
-nonisolated public protocol OpenAIResponsesAuth: Sendable {
+nonisolated public protocol OpenAIResponsesTransportAuth: Sendable {
     var canRefresh: Bool { get }
     func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint
 }
 
-nonisolated public struct OpenAIResponsesAPIKeyAuth: OpenAIResponsesAuth {
+nonisolated public struct OpenAIResponsesAPIKeyAuth: OpenAIResponsesTransportAuth {
     let clientID: String
     let baseURL: URL
     let extraHeaders: [String: String]

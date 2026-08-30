@@ -1,6 +1,6 @@
 import Foundation
 
-public struct MockLLMClient: LLMClient {
+public struct MockLLMClient: ProviderClient {
     public var scenarios: [String: Scenario]
     public var fallback: Scenario
     public var clock: Clock

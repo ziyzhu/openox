@@ -86,7 +86,7 @@ nonisolated enum XAIOAuth {
     }
 }
 
-nonisolated struct XAIError: LLMClientError {
+nonisolated struct XAIError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind = .authentication
 }

@@ -14,12 +14,12 @@ nonisolated public struct OpenAIChatEndpoint: Sendable {
 // A pasted API key resolves to a fixed base URL and a static bearer; a
 // subscription resolves to a token (and possibly a base URL) that may be
 // refreshed when the server rejects the current one with a 401.
-nonisolated public protocol OpenAIChatAuth: Sendable {
+nonisolated public protocol OpenAIChatTransportAuth: Sendable {
     var canRefresh: Bool { get }
     func resolve(forceRefresh: Bool) async throws -> OpenAIChatEndpoint
 }
 
-nonisolated public enum OpenAIAuthError: LLMClientError {
+nonisolated public enum OpenAIAuthError: ProviderClientError {
     case missingAPIKey(String)
 
     public var message: String {
@@ -29,7 +29,7 @@ nonisolated public enum OpenAIAuthError: LLMClientError {
     }
 }
 
-nonisolated public struct OpenAIAPIKeyAuth: OpenAIChatAuth {
+nonisolated public struct OpenAIAPIKeyAuth: OpenAIChatTransportAuth {
     let clientID: String
     let baseURL: URL
     let extraHeaders: [String: String]
@@ -45,7 +45,7 @@ nonisolated public struct OpenAIAPIKeyAuth: OpenAIChatAuth {
     }
 }
 
-nonisolated public struct OpenAIOptionalAPIKeyAuth: OpenAIChatAuth {
+nonisolated public struct OpenAIOptionalAPIKeyAuth: OpenAIChatTransportAuth {
     let clientID: String
     let baseURL: URL
 

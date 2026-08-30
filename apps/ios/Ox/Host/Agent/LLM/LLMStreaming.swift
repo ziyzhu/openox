@@ -586,7 +586,7 @@ nonisolated func requiredInputModalities(in messages: [Message]) -> Set<Provider
     return modalities
 }
 
-nonisolated struct UnsupportedModelInputError: LLMClientError {
+nonisolated struct UnsupportedModelInputError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind = .unsupportedInput
 }

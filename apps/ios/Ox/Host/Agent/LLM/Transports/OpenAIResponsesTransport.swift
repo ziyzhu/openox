@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OpenAIResponsesClient: LLMClient {
+public struct OpenAIResponsesTransport: ProviderClient {
     public let id: String
     public let displayName: String
     public let models: [ProviderModel]
@@ -11,7 +11,7 @@ public struct OpenAIResponsesClient: LLMClient {
     public let acceptsAPIKey: Bool
     public let credentialKind: LLMCredentialKind
     public let subscriptionAccount: (any SubscriptionAccount)?
-    public let auth: any OpenAIResponsesAuth
+    public let auth: any OpenAIResponsesTransportAuth
     public let sessionHeaderName: String
     public let extraBody: [String: JSONValue]
     public let reasoningEffort: LLMReasoningEffort
@@ -29,7 +29,7 @@ public struct OpenAIResponsesClient: LLMClient {
         acceptsAPIKey: Bool? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
         subscriptionAccount: (any SubscriptionAccount)? = nil,
-        auth: any OpenAIResponsesAuth,
+        auth: any OpenAIResponsesTransportAuth,
         sessionHeaderName: String = "x-session-id",
         extraBody: [String: JSONValue] = [:],
         reasoningEffort: LLMReasoningEffort = .none,

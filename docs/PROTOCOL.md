@@ -33,7 +33,7 @@ Components communicate only through adjacent boundaries. A Client does not reach
 | Development CLI ↔ Host | [`vm-protocol.ts`](../apps/cli/src/vm-protocol.ts), [`OxHostProtocolMessages.swift`](../apps/ios/Ox/Host/OxHostProtocolMessages.swift) | Version 1 VM control; DEBUG Simulator only |
 | WebSocket transport | [`debug-ws.ts`](../apps/cli/src/debug-ws.ts), [`WebSocketOxHostTransport.swift`](../apps/ios/Ox/Host/WebSocketOxHostTransport.swift) | Loopback development transport |
 | Host ↔ Agent | [`Agent.swift`](../apps/ios/Ox/Host/Agent/Agent.swift), [`AgentRunner.swift`](../apps/ios/Ox/Host/Agent/AgentRunner.swift) | In-process Swift contract |
-| Agent ↔ Model Provider | [`LLMClient.swift`](../apps/ios/Ox/Host/Agent/LLM/LLMClient.swift) | Provider-neutral Swift contract |
+| Agent ↔ Model Provider | [`ProviderClient.swift`](../apps/ios/Ox/Host/Agent/LLM/ProviderClient.swift) | Provider-neutral Swift contract |
 | Agent ↔ VM | [`ChatJavaScriptTool.swift`](../apps/ios/Ox/Host/Chats/ChatJavaScriptTool.swift), [`VirtualMachine.swift`](../apps/ios/Ox/Host/VM/VirtualMachine.swift) | In-process Swift contract |
 | VM ↔ Host capabilities | [`OxFunction.swift`](../apps/ios/Ox/Host/VM/OxFunctions/OxFunction.swift), [`OxFunctionBridge.swift`](../apps/ios/Ox/Host/VM/OxFunctions/OxFunctionBridge.swift) | Runtime-discovered `ox.*` contract |
 | Host ↔ Profile | [`Profile.swift`](../apps/ios/Ox/Host/Profile/Profile.swift), [`ChatModel.swift`](../apps/ios/Ox/Host/Chats/ChatModel.swift), [`StorageMigration.swift`](../apps/ios/Ox/Host/Profile/StorageMigration.swift), [`ProfileMigration.swift`](../apps/ios/Ox/Host/Profile/ProfileMigration.swift) | Versioned persisted format |

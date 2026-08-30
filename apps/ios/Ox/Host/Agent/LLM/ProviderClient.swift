@@ -111,7 +111,7 @@ nonisolated public enum LLMCredentialKind: Sendable, Equatable {
     }
 }
 
-nonisolated public protocol LLMClient: Sendable {
+nonisolated public protocol ProviderClient: Sendable {
     var id: String { get }
     var displayName: String { get }
     var models: [ProviderModel] { get }
@@ -145,7 +145,7 @@ nonisolated public protocol LLMClient: Sendable {
     ) -> AsyncThrowingStream<AssistantEvent, Error>
 }
 
-nonisolated extension LLMClient {
+nonisolated extension ProviderClient {
     public var regions: Set<LLMRegion> { [.global, .china] }
     public var website: URL? { nil }
     public var authNotice: String? { nil }
@@ -173,12 +173,12 @@ nonisolated extension LLMClient {
     }
 }
 
-nonisolated public protocol LLMClientError: LocalizedError, Sendable {
+nonisolated public protocol ProviderClientError: LocalizedError, Sendable {
     var message: String { get }
     var failureKind: LLMFailureKind { get }
 }
 
-nonisolated extension LLMClientError {
+nonisolated extension ProviderClientError {
     public var errorDescription: String? { message }
     public var failureKind: LLMFailureKind { llmFailureKind(message: message) }
 }
@@ -220,12 +220,12 @@ nonisolated func llmFailureKind(statusCode: Int? = nil, message: String) -> LLMF
 }
 
 nonisolated func llmFailureKind(error: Error) -> LLMFailureKind {
-    if let error = error as? any LLMClientError { return error.failureKind }
+    if let error = error as? any ProviderClientError { return error.failureKind }
     if error is URLError { return .network }
     return llmFailureKind(message: error.localizedDescription)
 }
 
-nonisolated extension LLMClient {
+nonisolated extension ProviderClient {
     func streamingTask(
         model: ProviderModel,
         messages: [Message],
@@ -235,7 +235,7 @@ nonisolated extension LLMClient {
             let task = Task {
                 do {
                     if let error = modelInputCompatibilityError(messages: messages, model: model) {
-                        Log.agent.error("LLMClient rejected unsupported input model=\(model.id) required=[\(requiredInputModalities(in: messages).map(\.rawValue).sorted().joined(separator: ","))] supported=[\(model.modalities.input.map(\.rawValue).sorted().joined(separator: ","))]")
+                        Log.agent.error("ProviderClient rejected unsupported input model=\(model.id) required=[\(requiredInputModalities(in: messages).map(\.rawValue).sorted().joined(separator: ","))] supported=[\(model.modalities.input.map(\.rawValue).sorted().joined(separator: ","))]")
                         throw error
                     }
                     try await run(continuation)
@@ -245,7 +245,7 @@ nonisolated extension LLMClient {
                     msg.stopReason = aborted ? .aborted : .error
                     msg.errorMessage = aborted
                         ? "aborted"
-                        : ((error as? LLMClientError)?.message ?? error.localizedDescription)
+                        : ((error as? ProviderClientError)?.message ?? error.localizedDescription)
                     if !aborted { msg.failureKind = llmFailureKind(error: error) }
                     continuation.yield(.failed(reason: aborted ? .aborted : .error, error: msg))
                     continuation.finish()

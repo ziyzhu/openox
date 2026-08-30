@@ -37,14 +37,14 @@ final class ProviderRegistry {
         }
     }
 
-    private let builtInClients: [LLMRegion: [any LLMClient]]
+    private let builtInClients: [LLMRegion: [any ProviderClient]]
     private(set) var customProviders: [CustomLLMProvider] {
         didSet { Self.persist(customProviders) }
     }
     private(set) var customProviderLoading: Set<UUID> = []
     private(set) var customProviderErrors: [UUID: String] = [:]
 
-    var clients: [any LLMClient] {
+    var clients: [any ProviderClient] {
         clients(for: AppRegion.shared.region)
     }
 
@@ -71,29 +71,15 @@ final class ProviderRegistry {
         let modelLookup = { (clientID: String, region: LLMRegion) in
             providerModels.models(for: clientID, in: region)
         }
-        let leadingClients: [any LLMClient] = [
-            ChatGPTResponsesClient(models: modelLookup("chatgpt", .global)),
-            GeminiClient(models: modelLookup("gemini", .global)),
-            GitHubCopilotClient(models: modelLookup("github-copilot", .global)),
-        ]
-        let middleClients: [any LLMClient] = [
-            OpenAIClient.make(models: modelLookup("openai", .global)),
-            AnthropicClient.make(models: modelLookup("anthropic", .global)),
-            BedrockClient(models: modelLookup("amazon-bedrock", .global)),
-            XAIClient.make(models: modelLookup("xai", .global)),
-        ]
-        var prefixClients: [any LLMClient] = []
+        var prefixClients: [any ProviderClient] = []
         if MockLLMClient.isEnabled {
             prefixClients.append(MockLLMClient())
             Log.agent.info("ProviderRegistry added MockLLMClient")
         }
-        var builtInClients: [LLMRegion: [any LLMClient]] = [:]
+        var builtInClients: [LLMRegion: [any ProviderClient]] = [:]
         for candidate in LLMRegion.allCases {
             var clients = prefixClients
-            clients.append(contentsOf: leadingClients)
-            clients.append(contentsOf: Self.leadingClients(for: candidate, modelLookup: modelLookup))
-            clients.append(contentsOf: middleClients)
-            clients.append(contentsOf: Self.trailingClients(for: candidate, modelLookup: modelLookup))
+            clients.append(contentsOf: BuiltInProviders.clients(for: candidate, modelLookup: modelLookup))
             builtInClients[candidate] = clients
         }
         let customProviders = Self.loadCustomProviders()
@@ -117,11 +103,11 @@ final class ProviderRegistry {
         }
     }
 
-    func client(id: String) -> (any LLMClient)? {
+    func client(id: String) -> (any ProviderClient)? {
         clients.first { $0.id == id }
     }
 
-    func client(id: String, in region: LLMRegion) -> (any LLMClient)? {
+    func client(id: String, in region: LLMRegion) -> (any ProviderClient)? {
         clients(for: region).first { $0.id == id && $0.regions.contains(region) }
     }
 
@@ -130,17 +116,17 @@ final class ProviderRegistry {
         return provider.models.isEmpty && customProviderErrors[provider.id] == nil
     }
 
-    func clients(in region: LLMRegion) -> [any LLMClient] {
+    func clients(in region: LLMRegion) -> [any ProviderClient] {
         clients(for: region).filter { $0.regions.contains(region) }
     }
 
-    func client(forSnapshot id: String?) -> any LLMClient {
+    func client(forSnapshot id: String?) -> any ProviderClient {
         if let id, let client = client(id: id) { return client }
         if let id, let provider = customProviders.first(where: { $0.clientID == id }) { return provider.client }
         return newSessionClient
     }
 
-    func model(forSnapshot id: String?, reasoningEffort: String?, client: any LLMClient) -> ProviderModel {
+    func model(forSnapshot id: String?, reasoningEffort: String?, client: any ProviderClient) -> ProviderModel {
         if let id, var model = client.models.first(where: { $0.id == id }) {
             model.reasoningEffort = reasoningEffort
             return model
@@ -151,7 +137,7 @@ final class ProviderRegistry {
         return selected(for: client.id)
     }
 
-    var newSessionClient: any LLMClient {
+    var newSessionClient: any ProviderClient {
         let region = AppRegion.shared.region
         let inRegion = clients(in: region)
         if let preferred = client(id: defaultClient), preferred.regions.contains(region), !preferred.models.isEmpty {
@@ -273,7 +259,7 @@ final class ProviderRegistry {
         }
     }
 
-    private func clients(for region: LLMRegion) -> [any LLMClient] {
+    private func clients(for region: LLMRegion) -> [any ProviderClient] {
         let candidates = builtInClients[region, default: []] + customProviders.map(\.client)
         return candidates.filter { client in
             client.models.contains { client.supportsTools(for: $0) }

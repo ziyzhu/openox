@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesAuth {
+nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesTransportAuth {
     private static let installationID: String = {
         let key = "chatgpt.installationId"
         if let existing = UserDefaults.standard.string(forKey: key) { return existing }
@@ -27,11 +27,11 @@ nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesAuth {
     }
 }
 
-struct ChatGPTResponsesClient: LLMClient {
-    private let client: OpenAIResponsesClient
+struct ChatGPTProvider: ProviderClient {
+    private let client: OpenAIResponsesTransport
 
     init(models: [ProviderModel]) {
-        client = OpenAIResponsesClient(
+        client = OpenAIResponsesTransport(
             id: "chatgpt",
             displayName: "ChatGPT",
             models: models,

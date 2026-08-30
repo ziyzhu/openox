@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct AnthropicMessagesClient: LLMClient {
+nonisolated struct AnthropicMessagesTransport: ProviderClient {
     let id: String
     let displayName: String
     let models: [ProviderModel]
@@ -404,20 +404,7 @@ nonisolated struct AnthropicMessagesClient: LLMClient {
     }
 }
 
-nonisolated enum AnthropicClient {
-    static func make(models: [ProviderModel]) -> AnthropicMessagesClient {
-        AnthropicMessagesClient(
-            id: "anthropic",
-            displayName: "Anthropic",
-            models: models,
-            endpoint: URL(string: "https://api.anthropic.com/v1/messages")!,
-            website: URL(string: "https://console.anthropic.com/settings/keys"),
-            adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]
-        )
-    }
-}
-
-nonisolated struct AnthropicMessagesError: LLMClientError {
+nonisolated struct AnthropicMessagesError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind
 

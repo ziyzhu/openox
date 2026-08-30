@@ -66,8 +66,8 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
 
     var clientID: String { "custom:\(id.uuidString.lowercased())" }
 
-    var profile: OpenAICompatibleProviderProfile {
-        OpenAICompatibleProviderProfile(
+    var profile: OpenAICompatibleProvider {
+        OpenAICompatibleProvider(
             id: clientID,
             displayName: RegionalValue(name),
             models: RegionalValue(models.map(\.modelInfo)),
@@ -78,7 +78,7 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
         )
     }
 
-    var client: OpenAIChatClient { profile.client(for: .global, models: []) }
+    var client: OpenAIChatTransport { profile.client(for: .global, models: []) }
 }
 
 nonisolated enum CustomLLMProviderError: LocalizedError {

@@ -45,7 +45,7 @@ public actor Agent {
 
     private var lastTurnTokens = 0
     private var resumeContinuation: CheckedContinuation<Void, Never>?
-    private var client: any LLMClient
+    private var client: any ProviderClient
     private var currentTask: Task<Void, Never>?
     private var steeringQueue = PendingMessageQueue()
     private var followUpQueue = PendingMessageQueue()
@@ -64,7 +64,7 @@ public actor Agent {
     }
 
     public init(
-        client: any LLMClient,
+        client: any ProviderClient,
         model: ProviderModel,
         transformContext: TransformContextHook? = nil
     ) {
@@ -98,7 +98,7 @@ public actor Agent {
     }
 
     public func configure(
-        client: any LLMClient,
+        client: any ProviderClient,
         model: ProviderModel,
         systemPrompt: String,
         tools: [any AgentTool]

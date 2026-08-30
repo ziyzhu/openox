@@ -1,11 +1,11 @@
 import Foundation
 
-public struct OpenAIChatClient: LLMClient {
+public struct OpenAIChatTransport: ProviderClient {
     public let id: String
     public let displayName: String
     public let models: [ProviderModel]
     public let regions: Set<LLMRegion>
-    public let auth: any OpenAIChatAuth
+    public let auth: any OpenAIChatTransportAuth
     public let usesAPIKey: Bool
     public let acceptsAPIKey: Bool
     public let credentialKind: LLMCredentialKind
@@ -90,7 +90,7 @@ public struct OpenAIChatClient: LLMClient {
         displayName: String,
         models: [ProviderModel],
         regions: Set<LLMRegion>,
-        auth: any OpenAIChatAuth,
+        auth: any OpenAIChatTransportAuth,
         usesAPIKey: Bool = true,
         acceptsAPIKey: Bool? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
@@ -506,7 +506,7 @@ public struct OpenAIChatClient: LLMClient {
 
 }
 
-public struct OpenAIClientError: LLMClientError {
+public struct OpenAIClientError: ProviderClientError {
     public let message: String
     public let failureKind: LLMFailureKind
 

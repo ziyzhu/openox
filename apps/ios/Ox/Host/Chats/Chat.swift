@@ -170,7 +170,7 @@ final class Chat: Identifiable {
     @ObservationIgnored private var pendingCompactionTokens: Int?
     @ObservationIgnored private var pendingContextCompactions: [ContextCompaction] = []
 
-    private(set) var client: any LLMClient
+    private(set) var client: any ProviderClient
     private(set) var model: ProviderModel
     let presentations: AppPresentations
     let repository: ProfileRepository
@@ -192,7 +192,7 @@ final class Chat: Identifiable {
         return true
     }
 
-    func switchModel(to client: any LLMClient, model: ProviderModel) {
+    func switchModel(to client: any ProviderClient, model: ProviderModel) {
         self.client = client
         self.model = model
         let configuration = agentConfiguration(client: client, model: model)
@@ -776,7 +776,7 @@ final class Chat: Identifiable {
 
     init(id: UUID = UUID(),
          createdAt: Date = Date(),
-         client: any LLMClient,
+         client: any ProviderClient,
          model: ProviderModel,
          repository: ProfileRepository,
          scope: ProfileScope,
@@ -894,7 +894,7 @@ final class Chat: Identifiable {
         meta: ChatMeta,
         turns: [Turn],
         context: AgentContextCheckpoint? = nil,
-        client: any LLMClient,
+        client: any ProviderClient,
         model: ProviderModel,
         repository: ProfileRepository,
         scope: ProfileScope,
@@ -2540,7 +2540,7 @@ final class Chat: Identifiable {
         ChatPromptComposer.turnContext(state, toolsAvailable: toolsAvailable)
     }
 
-    private func agentConfiguration(client: any LLMClient, model: ProviderModel) -> AgentConfiguration {
+    private func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
         let supportsJavaScript = client.supportsTools(for: model)
         return AgentConfiguration(
             systemPrompt: Self.composeSystemPrompt(

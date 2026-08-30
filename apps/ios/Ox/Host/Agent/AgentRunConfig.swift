@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated struct AgentTurnSnapshot: Sendable {
     var context: AgentContext
-    var client: any LLMClient
+    var client: any ProviderClient
     var model: ProviderModel
     var streamOptions: StreamOptions
     var compactionThreshold: Double

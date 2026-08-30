@@ -21,7 +21,7 @@ nonisolated func isRetryableLLMFailure(_ message: AssistantMessage) -> Bool {
 
 nonisolated func isRetryableLLMFailure(_ error: Error) -> Bool {
     isRetryableLLMFailure(
-        message: (error as? any LLMClientError)?.message ?? error.localizedDescription,
+        message: (error as? any ProviderClientError)?.message ?? error.localizedDescription,
         kind: llmFailureKind(error: error)
     )
 }

@@ -8,7 +8,7 @@ public struct GeminiConfig: Sendable {
     }
 }
 
-public struct GeminiClient: LLMClient {
+public struct GeminiProvider: ProviderClient {
     public let config: GeminiConfig
     public let models: [ProviderModel]
     public init(models: [ProviderModel], config: GeminiConfig = GeminiConfig()) {
@@ -510,7 +510,7 @@ public struct GeminiClient: LLMClient {
 
 }
 
-public struct GeminiError: LLMClientError {
+public struct GeminiError: ProviderClientError {
     public let message: String
     public let failureKind: LLMFailureKind
 

@@ -33,6 +33,6 @@ nonisolated extension SubscriptionAccount {
     public var policyNotice: String? { nil }
 }
 
-nonisolated extension LLMClient {
+nonisolated extension ProviderClient {
     public var subscriptionAccount: (any SubscriptionAccount)? { nil }
 }

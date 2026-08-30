@@ -27,7 +27,7 @@ nonisolated enum AgentCompactor {
         messages: [Message],
         lastTurnTokens: Int,
         threshold: Double,
-        client: any LLMClient,
+        client: any ProviderClient,
         model: ProviderModel,
         options: StreamOptions,
         reason: AgentCompactionReason,
@@ -220,7 +220,7 @@ nonisolated enum AgentCompactor {
 
     private static func streamSummary(
         of history: [Message],
-        client: any LLMClient,
+        client: any ProviderClient,
         model: ProviderModel,
         options: StreamOptions,
         reserveTokens: Int,

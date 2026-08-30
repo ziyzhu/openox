@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct XAIResponsesAuth: OpenAIResponsesAuth {
+nonisolated struct XAIResponsesAuth: OpenAIResponsesTransportAuth {
     var canRefresh: Bool { XAISubscriptionAccount.shared.isSignedIn }
     func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
         let token: String
@@ -20,9 +20,9 @@ nonisolated struct XAIResponsesAuth: OpenAIResponsesAuth {
     }
 }
 
-nonisolated enum XAIClient {
-    static func make(models: [ProviderModel]) -> OpenAIResponsesClient {
-        OpenAIResponsesClient(
+nonisolated enum XAIProvider {
+    static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
+        OpenAIResponsesTransport(
             id: "xai",
             displayName: "xAI",
             models: models,

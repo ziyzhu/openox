@@ -193,7 +193,7 @@ nonisolated enum GitHubCopilotOAuth {
     }
 }
 
-nonisolated struct GitHubCopilotError: LLMClientError {
+nonisolated struct GitHubCopilotError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind
 

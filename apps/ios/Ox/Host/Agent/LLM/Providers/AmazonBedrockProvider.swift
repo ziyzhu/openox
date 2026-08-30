@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct BedrockClient: LLMClient {
+nonisolated struct AmazonBedrockProvider: ProviderClient {
     let id = "amazon-bedrock"
     let displayName = "Amazon Bedrock"
     let regions: Set<LLMRegion> = [.global]
@@ -9,14 +9,14 @@ nonisolated struct BedrockClient: LLMClient {
     let reasoningPolicy: LLMReasoningPolicy = .none
     let models: [ProviderModel]
 
-    private let responses: OpenAIResponsesClient
-    private let messages: AnthropicMessagesClient
+    private let responses: OpenAIResponsesTransport
+    private let messages: AnthropicMessagesTransport
 
     init(models: [ProviderModel]) {
         self.models = models
         let gptModels = models.filter { $0.wireID.hasPrefix("openai.") }
         let claudeModels = models.filter { $0.wireID.hasPrefix("anthropic.") }
-        responses = OpenAIResponsesClient(
+        responses = OpenAIResponsesTransport(
             id: id,
             displayName: displayName,
             models: gptModels,
@@ -28,7 +28,7 @@ nonisolated struct BedrockClient: LLMClient {
                 baseURL: URL(string: "https://bedrock-mantle.us-east-1.api.aws/openai/v1")!
             )
         )
-        messages = AnthropicMessagesClient(
+        messages = AnthropicMessagesTransport(
             id: id,
             displayName: displayName,
             models: claudeModels,

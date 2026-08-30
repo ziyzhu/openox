@@ -6,7 +6,7 @@ struct ProviderAuthenticationView: View {
         case subscription
     }
 
-    let client: any LLMClient
+    let client: any ProviderClient
     @Binding var apiKey: String
     let onChange: () -> Void
 
@@ -19,7 +19,7 @@ struct ProviderAuthenticationView: View {
     @State private var signInError: String?
 
     init(
-        client: any LLMClient,
+        client: any ProviderClient,
         apiKey: Binding<String>,
         onChange: @escaping () -> Void
     ) {
@@ -223,7 +223,7 @@ struct ProviderAuthenticationView: View {
                 ))
             } catch {
                 signedInSuccessfully = false
-                signInError = (error as? LLMClientError)?.message ?? error.localizedDescription
+                signInError = (error as? ProviderClientError)?.message ?? error.localizedDescription
                 Log.ui.error("ProviderAuthentication.signIn client=\(client.id) error=\(signInError ?? "unknown")")
             }
             busy = false

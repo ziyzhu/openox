@@ -7,7 +7,7 @@ nonisolated struct ChatGPTTokens: Codable, Sendable {
     var accountID: String
 }
 
-nonisolated struct ChatGPTAuthError: LLMClientError {
+nonisolated struct ChatGPTAuthError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind = .authentication
 }

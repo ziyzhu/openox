@@ -482,7 +482,7 @@ struct ModelPickerContent: View {
     let activeClientID: String
     let activeModelID: String
     var onClose: (() -> Void)?
-    let onSelect: (any LLMClient, ProviderModel) -> Void
+    let onSelect: (any ProviderClient, ProviderModel) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var authRevision = 0
@@ -507,7 +507,7 @@ struct ModelPickerContent: View {
         activeModelID: String,
         activeReasoningEffort: String? = nil,
         onClose: (() -> Void)? = nil,
-        onSelect: @escaping (any LLMClient, ProviderModel) -> Void
+        onSelect: @escaping (any ProviderClient, ProviderModel) -> Void
     ) {
         self.title = title
         self.activeClientID = activeClientID
@@ -525,7 +525,7 @@ struct ModelPickerContent: View {
         return clientID
     }
 
-    private var displayedClients: [any LLMClient] {
+    private var displayedClients: [any ProviderClient] {
         var list = registry.clients(in: selectedRegion)
         if !list.contains(where: { $0.id == activeClientID }),
            let active = registry.client(id: activeClientID, in: selectedRegion) {
@@ -534,7 +534,7 @@ struct ModelPickerContent: View {
         return list
     }
 
-    private var selectedClient: (any LLMClient)? {
+    private var selectedClient: (any ProviderClient)? {
         guard let selectedClientID else { return nil }
         return displayedClients.first { $0.id == selectedClientID }
     }
@@ -864,7 +864,7 @@ struct ModelPickerContent: View {
         .contentShape(Rectangle())
     }
 
-    private func authenticationSection(_ client: any LLMClient) -> some View {
+    private func authenticationSection(_ client: any ProviderClient) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("Authentication")
                 .font(Theme.Fonts.labelMd)
@@ -1005,7 +1005,7 @@ struct ModelPickerContent: View {
 }
 
 private struct ProviderPickerView: View {
-    let clients: [any LLMClient]
+    let clients: [any ProviderClient]
     @Binding var selectedClientID: String?
 
     var body: some View {

@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct GitHubCopilotResponsesAuth: OpenAIResponsesAuth {
+nonisolated struct GitHubCopilotResponsesAuth: OpenAIResponsesTransportAuth {
     var canRefresh: Bool { false }
     func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
         let accessToken = try GitHubCopilotSubscriptionAccount.shared.accessToken()
@@ -19,13 +19,13 @@ nonisolated struct GitHubCopilotResponsesAuth: OpenAIResponsesAuth {
     }
 }
 
-nonisolated struct GitHubCopilotClient: LLMClient {
-    private let client: OpenAIResponsesClient
+nonisolated struct GitHubCopilotProvider: ProviderClient {
+    private let client: OpenAIResponsesTransport
     private let curatedModels: [ProviderModel]
 
     init(models: [ProviderModel]) {
         curatedModels = models
-        client = OpenAIResponsesClient(
+        client = OpenAIResponsesTransport(
             id: "github-copilot",
             displayName: "GitHub Copilot",
             models: curatedModels,
