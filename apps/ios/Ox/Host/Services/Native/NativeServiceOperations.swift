@@ -109,7 +109,7 @@ final class NativeServiceOperations {
                 .session(for: browser, ownerID: id)
                 .waitForNavigation(timeoutMilliseconds: fields["timeoutMs"]?.intValue ?? 15_000)
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
-        case ("ios:browser", "displayPage"):
+        case ("ios:browser", "showPage"):
             _ = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
                 .inspectionPage()
@@ -141,7 +141,7 @@ final class NativeServiceOperations {
                 "attached": .bool(true),
                 "artifact": artifact.map { .string($0.fileName) } ?? .null,
             ])
-        case ("ios:browser", "interactPage"):
+        case ("ios:browser", "waitForUserInteraction"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
             session.stopCapture()
             _ = try await session.clearScripts()
@@ -153,7 +153,7 @@ final class NativeServiceOperations {
                 options: [done, L10n.string("Cancel")],
                 purpose: purpose ?? L10n.string("Wait for browser interaction")
             )?.stringValue
-            guard answer == done else { throw RuntimeError.bridge("ios:browser:interactPage: the user cancelled.") }
+            guard answer == done else { throw RuntimeError.bridge("ios:browser:waitForUserInteraction: the user cancelled.") }
             return .object(["completed": .bool(true)])
         case ("ios:browser", "injectScript"):
             guard let source = fields["script"]?.stringValue,

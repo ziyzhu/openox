@@ -229,13 +229,13 @@
     },
     {
       "description": "Add a chat row the user can tap to view Browser's live page.",
-      "id": "displayPage",
+      "id": "showPage",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {},
         "type": "object"
       },
-      "label": "View Page",
+      "label": "Show Page",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -308,7 +308,7 @@
     },
     {
       "description": "Pause automation and let the user sign in or complete a human-only step in Browser. Active network capture and injected scripts are cleared before the page is shown.",
-      "id": "interactPage",
+      "id": "waitForUserInteraction",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -321,7 +321,7 @@
         "required": ["instructions"],
         "type": "object"
       },
-      "label": "User Interaction",
+      "label": "Wait for User Interaction",
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -477,7 +477,7 @@
           "label": "前往页面",
           "description": "将浏览器导航到网站。"
         },
-        "displayPage": {
+        "showPage": {
           "label": "查看页面",
           "description": "在聊天中添加一行，用户可轻点查看“浏览器”的实时页面。"
         },
