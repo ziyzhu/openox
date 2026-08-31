@@ -358,15 +358,15 @@ struct ChatPage: View {
             messageSpeech.stop(reason: "pageDisappear")
             speechInput.cancel(reason: "pageDisappear")
         }
-        .task(id: chat.monoRepositoryRevision) {
+        .task(id: chat.serviceBootstrapRevision) {
             let updated = await chat.syncToMonoRepository()
-            guard !updated.isEmpty else { return }
-            let msg = updated.count == 1
-                ? "\(updated[0]) updated"
-                : "\(updated.count) services updated"
-            withAnimation(.easeOut(duration: 0.2)) { toast = Toast(message: msg) }
-        }
-        .task(id: chat.id) {
+            guard !Task.isCancelled else { return }
+            if !updated.isEmpty {
+                let msg = updated.count == 1
+                    ? "\(updated[0]) updated"
+                    : "\(updated.count) services updated"
+                withAnimation(.easeOut(duration: 0.2)) { toast = Toast(message: msg) }
+            }
             await refreshAttachedServiceAuth()
         }
         .task(id: authProbe?.id) {

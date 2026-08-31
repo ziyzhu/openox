@@ -2585,6 +2585,10 @@ final class Chat: Identifiable {
 
     var monoRepositoryRevision: UInt64 { serviceManager.monoRepositoryRevision }
 
+    var serviceBootstrapRevision: String {
+        "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
+    }
+
     // MARK: - Session lifecycle
 
     func attach() async {

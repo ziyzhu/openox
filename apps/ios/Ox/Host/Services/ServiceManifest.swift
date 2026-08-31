@@ -459,12 +459,38 @@ nonisolated enum Manifest {
 
     @MainActor
     static func getSignInState(service: Service) async -> GetSignInStateResult {
-        let result = await service.invokeAction(
-            SIGN_IN_STATE_ACTION_ID,
-            args: .object([:]),
-            role: .authenticationProbe
-        )
-        guard case .success(let v) = result else { return GetSignInStateResult(.error("getSignInState invoke failed")) }
-        return GetSignInStateResult(getSignInStateOutcome(v))
+        for attempt in 1...2 {
+            let result = await service.invokeAction(
+                SIGN_IN_STATE_ACTION_ID,
+                args: .object([:]),
+                role: .authenticationProbe
+            )
+            switch result {
+            case .success(let value):
+                return GetSignInStateResult(getSignInStateOutcome(value))
+            case .failure(let error):
+                let contextInvalidated = if let evalError = error as? Service.EvalError,
+                                           case .contextInvalidated = evalError {
+                    true
+                } else {
+                    false
+                }
+                let invalidContract = if let invokeError = error as? Service.InvokeError,
+                                         case .invalidContract = invokeError {
+                    true
+                } else {
+                    false
+                }
+                let manifestRefreshing = service.resolutionState.resolved == nil
+                guard attempt == 1,
+                      !Task.isCancelled,
+                      manifestRefreshing || contextInvalidated || invalidContract else {
+                    return GetSignInStateResult(.error("getSignInState invoke failed"))
+                }
+                Log.service.info("Service.getSignInState retry domain=\(service.domain) attempt=\(attempt) manifestRefreshing=\(manifestRefreshing) contextInvalidated=\(contextInvalidated) invalidContract=\(invalidContract)")
+                _ = await service.loadManifest(reason: .invoke)
+            }
+        }
+        return GetSignInStateResult(.error("getSignInState invoke failed"))
     }
 }
