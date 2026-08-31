@@ -167,7 +167,11 @@ extension OxHostProtocol {
                         supportsTools: client.supportsTools(for: $0),
                         reasoning: $0.reasoning,
                         reasoningEfforts: $0.reasoningEfforts,
-                        selectedReasoningEffort: registry.reasoningEffort(for: $0, in: client.id),
+                        selectedReasoningEffort: registry.reasoningEffort(
+                            for: $0,
+                            in: client.id,
+                            region: registry.defaultRegion
+                        ),
                         inputModalities: $0.modalities.input.map(\.rawValue).sorted(),
                         outputModalities: $0.modalities.output.map(\.rawValue).sorted(),
                         wireProtocol: client.wireProtocol(for: $0)?.rawValue
@@ -266,7 +270,8 @@ extension OxHostProtocol {
                     secondRunNoOp: replay.secondRunNoOp,
                     ordinaryExportOmitsContext: replay.ordinaryExportOmitsContext,
                     compactedExportRetainsContext: replay.compactedExportRetainsContext,
-                    chatRegionRoundTrips: replay.chatRegionRoundTrips,
+                    defaultModelMigrated: replay.defaultModelMigrated,
+                    chatModelMigrated: replay.chatModelMigrated,
                     error: nil
                 )))
             } catch {
@@ -283,7 +288,8 @@ extension OxHostProtocol {
                     secondRunNoOp: nil,
                     ordinaryExportOmitsContext: nil,
                     compactedExportRetainsContext: nil,
-                    chatRegionRoundTrips: nil,
+                    defaultModelMigrated: nil,
+                    chatModelMigrated: nil,
                     error: error.localizedDescription
                 )))
             }

@@ -18,6 +18,7 @@ nonisolated enum ProfileSchema {
         "2026-08-10-plain-skill-names",
         "2026-08-17-runtime",
         "2026-08-29-compacted-context",
+        "2026-08-31-model-selection",
     ]
     static var current: String { versions.last! }
 
@@ -35,6 +36,7 @@ nonisolated enum ProfileSchema {
         { try StorageMigrator.removeUserSkillNamespace(at: $0) },
         { _ in },
         { try StorageMigrator.removeRedundantAgentContexts(at: $0) },
+        { try StorageMigrator.migrateChatModelSelections(at: $0) },
     ]
 }
 
@@ -79,7 +81,8 @@ nonisolated struct ContextRetentionMigrationReplay: Sendable {
     let secondRunNoOp: Bool
     let ordinaryExportOmitsContext: Bool
     let compactedExportRetainsContext: Bool
-    let chatRegionRoundTrips: Bool
+    let defaultModelMigrated: Bool
+    let chatModelMigrated: Bool
 }
 
 nonisolated enum StorageMigrator {
@@ -116,6 +119,7 @@ nonisolated enum StorageMigrator {
             defaults: .standard,
             key: ProviderRegistry.customProvidersKey
         )
+        _ = migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
         removeRetiredAutoApproveActions()
         migrateTheme()
         Log.app.info("StorageMigrator.application done")
@@ -226,6 +230,12 @@ nonisolated enum StorageMigrator {
             guard let data = defaults.data(forKey: ProviderRegistry.customProvidersKey),
                   (try? JSONDecoder().decode([CustomLLMProvider].self, from: data)) != nil else {
                 throw StorageMigrationError.invalidApplicationStorage("custom provider")
+            }
+        }
+        if defaults.object(forKey: ProviderRegistry.defaultModelKey) != nil {
+            guard let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+                  (try? JSONDecoder().decode(ModelSelection.self, from: data)) != nil else {
+                throw StorageMigrationError.invalidApplicationStorage("default model")
             }
         }
     }
@@ -354,6 +364,64 @@ nonisolated enum StorageMigrator {
         } catch {
             Log.app.error("StorageMigrator.customLLMProviders failed error=\(error.localizedDescription)")
             return []
+        }
+    }
+
+    static func migrateDefaultModel(
+        defaults: UserDefaults,
+        fallbackRegion: LLMRegion
+    ) -> ModelSelection? {
+        let selectedModelsKey = "llm.selectedModels"
+        let selectedReasoningEffortsKey = "llm.selectedReasoningEfforts"
+        let defaultProviderKey = "llm.defaultClient"
+        let defaultRegionKey = "llm.defaultRegion"
+        let legacyKeys = [
+            selectedModelsKey,
+            selectedReasoningEffortsKey,
+            defaultProviderKey,
+            defaultRegionKey,
+        ]
+        if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+           let stored = try? JSONDecoder().decode(ModelSelection.self, from: data) {
+            legacyKeys.forEach { defaults.removeObject(forKey: $0) }
+            return stored
+        }
+        guard defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil else { return nil }
+        let hasLegacyValue = legacyKeys.contains { defaults.object(forKey: $0) != nil }
+        guard hasLegacyValue else { return nil }
+        let region = defaults.string(forKey: defaultRegionKey).flatMap(LLMRegion.init(rawValue:)) ?? fallbackRegion
+        let providerID = defaults.string(forKey: defaultProviderKey)
+        let selectedModels = defaults.dictionary(forKey: selectedModelsKey) as? [String: String] ?? [:]
+        let modelID = providerID.flatMap {
+            selectedModels["\(region.rawValue)\u{1F}\($0)"] ?? selectedModels[$0]
+        }
+        let selection: ModelSelection?
+        if let providerID, let modelID {
+            let efforts = defaults.dictionary(forKey: selectedReasoningEffortsKey) as? [String: String] ?? [:]
+            selection = ModelSelection(
+                region: region,
+                providerID: providerID,
+                modelID: modelID,
+                reasoningEffort: efforts["\(providerID)\u{1F}\(modelID)"]
+            )
+        } else {
+            selection = nil
+        }
+        do {
+            if let selection {
+                defaults.set(try JSONEncoder().encode(selection), forKey: ProviderRegistry.defaultModelKey)
+                guard let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+                      (try? JSONDecoder().decode(ModelSelection.self, from: data)) == selection else {
+                    Log.app.error("StorageMigrator.defaultModel verification failed")
+                    return nil
+                }
+            }
+            legacyKeys.forEach { defaults.removeObject(forKey: $0) }
+            Log.app.info("StorageMigrator.defaultModel migrated complete=\(selection != nil)")
+            return selection
+        } catch {
+            Log.app.error("StorageMigrator.defaultModel failed error=\(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -1019,6 +1087,65 @@ nonisolated enum StorageMigrator {
         Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained) unreadable=\(unreadable)")
     }
 
+    static func migrateChatModelSelections(at root: URL) throws {
+        let manager = FileManager.default
+        let chats = root.appendingPathComponent("chats", isDirectory: true)
+        guard manager.fileExists(atPath: chats.path) else { return }
+        let directories = try manager.contentsOfDirectory(
+            at: chats,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ).filter {
+            try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
+        }
+        let fallbackRegion = modelMigrationFallbackRegion()
+        let legacyKeys = ["clientID", "modelID", "region", "reasoningEffort"]
+        var migrated = 0
+        var incomplete = 0
+        for directory in directories {
+            let metadataURL = directory.appendingPathComponent("chat.json", isDirectory: false)
+            guard manager.fileExists(atPath: metadataURL.path) else { continue }
+            let data = try Data(contentsOf: metadataURL)
+            guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            let hasLegacyValue = legacyKeys.contains { object[$0] != nil }
+            guard hasLegacyValue else { continue }
+            if object["model"] == nil,
+               let providerID = object["clientID"] as? String,
+               let modelID = object["modelID"] as? String {
+                let region = (object["region"] as? String).flatMap(LLMRegion.init(rawValue:)) ?? fallbackRegion
+                var selection: [String: Any] = [
+                    "region": region.rawValue,
+                    "providerID": providerID,
+                    "modelID": modelID,
+                ]
+                if let reasoningEffort = object["reasoningEffort"] as? String {
+                    selection["reasoningEffort"] = reasoningEffort
+                }
+                object["model"] = selection
+                migrated += 1
+            } else if object["model"] == nil {
+                incomplete += 1
+            }
+            legacyKeys.forEach { object.removeValue(forKey: $0) }
+            var encoded = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+            encoded.append(0x0A)
+            try encoded.write(to: metadataURL, options: .atomic)
+        }
+        Log.app.info("StorageMigrator.chatModelSelections root=\(root.lastPathComponent) migrated=\(migrated) incomplete=\(incomplete)")
+    }
+
+    private static func modelMigrationFallbackRegion(defaults: UserDefaults = .standard) -> LLMRegion {
+        if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+           let selection = try? JSONDecoder().decode(ModelSelection.self, from: data) {
+            return selection.region
+        }
+        if let region = defaults.string(forKey: "app.region").flatMap(LLMRegion.init(rawValue:)) {
+            return region
+        }
+        return Locale.current.region?.identifier == "CN" ? .china : .global
+    }
+
     #if targetEnvironment(simulator)
     static func replayContextRetentionMigration(turns: [Turn]) async throws -> ContextRetentionMigrationReplay {
         guard !turns.isEmpty,
@@ -1027,6 +1154,28 @@ nonisolated enum StorageMigrator {
               let generation = compactedAgent.generations.last else {
             throw CocoaError(.fileReadCorruptFile)
         }
+        let defaultsName = "ai.openox.storage-migration-replay"
+        guard let defaults = UserDefaults(suiteName: defaultsName) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        defaults.removePersistentDomain(forName: defaultsName)
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        defaults.set("mock", forKey: "llm.defaultClient")
+        defaults.set(LLMRegion.china.rawValue, forKey: "llm.defaultRegion")
+        defaults.set(["china\u{1F}mock": "mock-model"], forKey: "llm.selectedModels")
+        defaults.set(["mock\u{1F}mock-model": "high"], forKey: "llm.selectedReasoningEfforts")
+        let migratedDefault = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
+        let migratedDefaultAgain = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
+        let defaultModelMigrated = migratedDefault == ModelSelection(
+            region: .china,
+            providerID: "mock",
+            modelID: "mock-model",
+            reasoningEffort: "high"
+        ) && migratedDefaultAgain == migratedDefault
+            && defaults.object(forKey: "llm.defaultClient") == nil
+            && defaults.object(forKey: "llm.defaultRegion") == nil
+            && defaults.object(forKey: "llm.selectedModels") == nil
+            && defaults.object(forKey: "llm.selectedReasoningEfforts") == nil
         var compactedTurns = turns
         compactedAgent.steps.append(Step(
             generation: generation.id,
@@ -1083,20 +1232,33 @@ nonisolated enum StorageMigrator {
         try ordinaryContextData.write(to: unreadableContextURL, options: .atomic)
         try compactedContextData.write(to: compactedContextURL, options: .atomic)
 
+        let selection = ModelSelection(
+            region: .china,
+            providerID: "mock",
+            modelID: "mock-model",
+            reasoningEffort: "high"
+        )
         let meta = ChatMeta(
             id: UUID(),
             createdAt: config.createdAt,
             lastActivity: config.createdAt,
             title: "Context migration replay",
             isFavorite: false,
-            modelID: "mock",
-            clientID: "mock",
-            region: .china,
+            model: selection,
             monoRepositoryHash: nil,
             attachedServiceDomains: [],
             preview: nil
         )
-        let decodedMeta = try JSONDecoder().decode(ChatMeta.self, from: encoder.encode(meta))
+        var legacyMetadata = try JSONSerialization.jsonObject(with: encoder.encode(meta)) as! [String: Any]
+        legacyMetadata.removeValue(forKey: "model")
+        legacyMetadata["clientID"] = selection.providerID
+        legacyMetadata["modelID"] = selection.modelID
+        legacyMetadata["region"] = selection.region.rawValue
+        legacyMetadata["reasoningEffort"] = selection.reasoningEffort
+        try JSONSerialization.data(withJSONObject: legacyMetadata).write(
+            to: ordinaryDirectory.appendingPathComponent("chat.json", isDirectory: false),
+            options: .atomic
+        )
         let ordinaryPackage = try ChatPackageCodec.decode(
             ChatPackageCodec.encode(ChatState(meta: meta, turns: turns, context: ordinaryContext)),
             sourceName: "ordinary.chat"
@@ -1121,8 +1283,11 @@ nonisolated enum StorageMigrator {
         let firstCompactedTranscript = try Data(contentsOf: compactedTranscriptURL)
         let firstNoContextTranscript = try Data(contentsOf: noContextTranscriptURL)
         let firstCompactedContext = try Data(contentsOf: compactedContextURL)
+        let migratedMetadataURL = ordinaryDirectory.appendingPathComponent("chat.json", isDirectory: false)
+        let firstMigratedMetadata = try Data(contentsOf: migratedMetadataURL)
         let decoder = JSONDecoder()
         let retainedContext = try decoder.decode(AgentContextCheckpoint.self, from: firstCompactedContext)
+        let decodedMeta = try decoder.decode(ChatMeta.self, from: firstMigratedMetadata)
         _ = try await migrate(migrated)
 
         let versionUpdated = ProfileIO.readConfig(at: root)?.version == ProfileSchema.current
@@ -1143,6 +1308,7 @@ nonisolated enum StorageMigrator {
             && Data(contentsOf: compactedTranscriptURL) == firstCompactedTranscript
             && Data(contentsOf: noContextTranscriptURL) == firstNoContextTranscript
             && Data(contentsOf: compactedContextURL) == firstCompactedContext
+            && Data(contentsOf: migratedMetadataURL) == firstMigratedMetadata
             && !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
             && Data(contentsOf: unreadableContextURL) == ordinaryContextData
         return ContextRetentionMigrationReplay(
@@ -1156,7 +1322,8 @@ nonisolated enum StorageMigrator {
             secondRunNoOp: secondRunNoOp,
             ordinaryExportOmitsContext: !ordinaryPackage.header.hasContext && ordinaryPackage.payload.context == nil,
             compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil,
-            chatRegionRoundTrips: decodedMeta.region == .china
+            defaultModelMigrated: defaultModelMigrated,
+            chatModelMigrated: decodedMeta.model == selection
         )
     }
     #endif

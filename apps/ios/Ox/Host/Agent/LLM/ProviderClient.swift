@@ -63,6 +63,13 @@ nonisolated public enum LLMRegion: String, CaseIterable, Sendable, Codable, Hash
     }
 }
 
+nonisolated struct ModelSelection: Codable, Equatable, Sendable {
+    let region: LLMRegion
+    let providerID: String
+    let modelID: String
+    let reasoningEffort: String?
+}
+
 nonisolated public enum LLMInferenceLocation: Sendable, Equatable {
     case remote
     case userHosted

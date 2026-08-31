@@ -16,7 +16,8 @@ type ReplayResult = {
   secondRunNoOp?: boolean;
   ordinaryExportOmitsContext?: boolean;
   compactedExportRetainsContext?: boolean;
-  chatRegionRoundTrips?: boolean;
+  defaultModelMigrated?: boolean;
+  chatModelMigrated?: boolean;
 };
 
 const input = JSON.parse(await readFile(

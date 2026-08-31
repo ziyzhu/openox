@@ -172,7 +172,8 @@ final class Chat: Identifiable {
 
     private(set) var client: any ProviderClient
     private(set) var model: ProviderModel
-    private(set) var region: LLMRegion
+    private(set) var modelSelection: ModelSelection
+    var region: LLMRegion { modelSelection.region }
     let presentations: AppPresentations
     let repository: ProfileRepository
     let scope: ProfileScope
@@ -193,10 +194,15 @@ final class Chat: Identifiable {
         return true
     }
 
-    func switchModel(to client: any ProviderClient, model: ProviderModel, region: LLMRegion) {
+    func switchModel(to client: any ProviderClient, model: ProviderModel, selection: ModelSelection) {
         self.client = client
         self.model = model
-        self.region = region
+        modelSelection = ModelSelection(
+            region: selection.region,
+            providerID: client.id,
+            modelID: model.id,
+            reasoningEffort: model.selectedReasoningEffort
+        )
         let configuration = agentConfiguration(client: client, model: model)
         enqueueAgentMutation { agent in
             await agent.configure(
@@ -207,7 +213,7 @@ final class Chat: Identifiable {
             )
         }
         scheduleModelPreparation()
-        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue)")
+        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue)")
         onPersistableChange?()
     }
 
@@ -873,7 +879,7 @@ final class Chat: Identifiable {
          createdAt: Date = Date(),
          client: any ProviderClient,
          model: ProviderModel,
-         region: LLMRegion,
+         selection: ModelSelection,
          repository: ProfileRepository,
          scope: ProfileScope,
          virtualMachine: VirtualMachine,
@@ -886,7 +892,12 @@ final class Chat: Identifiable {
         self.createdAt = createdAt
         self.scheduledSkillID = scheduledSkillID
         self.client = client
-        self.region = region
+        self.modelSelection = ModelSelection(
+            region: selection.region,
+            providerID: client.id,
+            modelID: model.id,
+            reasoningEffort: model.selectedReasoningEffort
+        )
         self.repository = repository
         self.scope = scope
         self.virtualMachine = virtualMachine
@@ -896,7 +907,7 @@ final class Chat: Identifiable {
         self.executionLease = executionLease
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
-        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
+        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
         self.agent = Agent(
             client: client,
             model: model,
@@ -992,7 +1003,7 @@ final class Chat: Identifiable {
         context: AgentContextCheckpoint? = nil,
         client: any ProviderClient,
         model: ProviderModel,
-        region: LLMRegion,
+        selection: ModelSelection,
         repository: ProfileRepository,
         scope: ProfileScope,
         virtualMachine: VirtualMachine,
@@ -1006,7 +1017,7 @@ final class Chat: Identifiable {
             createdAt: meta.createdAt,
             client: client,
             model: model,
-            region: region,
+            selection: selection,
             repository: repository,
             scope: scope,
             virtualMachine: virtualMachine,
@@ -1045,10 +1056,7 @@ final class Chat: Identifiable {
             lastActivity: lastActivityAt,
             title: customTitle,
             isFavorite: isFavorite,
-            modelID: model.id,
-            clientID: client.id,
-            region: region,
-            reasoningEffort: model.selectedReasoningEffort,
+            model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
             preview: document.preview,
@@ -1747,10 +1755,7 @@ final class Chat: Identifiable {
             lastActivity: Date(),
             title: nil,
             isFavorite: false,
-            modelID: model.id,
-            clientID: client.id,
-            region: region,
-            reasoningEffort: model.selectedReasoningEffort,
+            model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
             preview: nil

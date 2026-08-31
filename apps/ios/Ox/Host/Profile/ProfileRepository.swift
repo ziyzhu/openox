@@ -462,8 +462,7 @@ actor ProfileRepository {
             lastActivity: Date(),
             title: String(payload.header.title.prefix(60)),
             isFavorite: false,
-            modelID: nil,
-            clientID: nil,
+            model: nil,
             monoRepositoryHash: nil,
             attachedServiceDomains: [],
             preview: document.preview

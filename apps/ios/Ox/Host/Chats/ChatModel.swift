@@ -214,10 +214,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
     var lastActivity: Date?
     var title: String?
     var isFavorite: Bool
-    var modelID: String?
-    var clientID: String?
-    var region: LLMRegion?
-    var reasoningEffort: String?
+    var model: ModelSelection?
     var monoRepositoryHash: String?
     var attachedServiceDomains: [String]
     var preview: String?
@@ -231,10 +228,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         lastActivity: Date?,
         title: String?,
         isFavorite: Bool,
-        modelID: String?,
-        clientID: String?,
-        region: LLMRegion? = nil,
-        reasoningEffort: String? = nil,
+        model: ModelSelection?,
         monoRepositoryHash: String?,
         attachedServiceDomains: [String],
         preview: String?,
@@ -247,10 +241,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         self.lastActivity = lastActivity
         self.title = title
         self.isFavorite = isFavorite
-        self.modelID = modelID
-        self.clientID = clientID
-        self.region = region
-        self.reasoningEffort = reasoningEffort
+        self.model = model
         self.monoRepositoryHash = monoRepositoryHash
         self.attachedServiceDomains = attachedServiceDomains
         self.preview = preview
@@ -265,6 +256,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
     }
 
     var activityDate: Date { lastActivity ?? createdAt }
+    var modelID: String? { model?.modelID }
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
@@ -273,10 +265,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         case lastActivity
         case title
         case isFavorite
-        case modelID
-        case clientID
-        case region
-        case reasoningEffort
+        case model
         case monoRepositoryHash
         case attachedServiceDomains
         case preview
@@ -292,10 +281,7 @@ nonisolated struct ChatMeta: Codable, Equatable, Identifiable, Sendable {
         lastActivity = try values.decodeIfPresent(Date.self, forKey: .lastActivity)
         title = try values.decodeIfPresent(String.self, forKey: .title)
         isFavorite = try values.decode(Bool.self, forKey: .isFavorite)
-        modelID = try values.decodeIfPresent(String.self, forKey: .modelID)
-        clientID = try values.decodeIfPresent(String.self, forKey: .clientID)
-        region = try values.decodeIfPresent(LLMRegion.self, forKey: .region)
-        reasoningEffort = try values.decodeIfPresent(String.self, forKey: .reasoningEffort)
+        model = try values.decodeIfPresent(ModelSelection.self, forKey: .model)
         monoRepositoryHash = try values.decodeIfPresent(String.self, forKey: .monoRepositoryHash)
         attachedServiceDomains = try values.decode([String].self, forKey: .attachedServiceDomains)
         preview = try values.decodeIfPresent(String.self, forKey: .preview)

@@ -481,7 +481,8 @@ extension OxHostProtocol {
         let secondRunNoOp: Bool?
         let ordinaryExportOmitsContext: Bool?
         let compactedExportRetainsContext: Bool?
-        let chatRegionRoundTrips: Bool?
+        let defaultModelMigrated: Bool?
+        let chatModelMigrated: Bool?
         let error: String?
     }
 
