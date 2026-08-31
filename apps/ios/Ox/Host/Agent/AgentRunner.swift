@@ -13,8 +13,6 @@ nonisolated enum AgentRunner {
         var errorMessage: String?
         var failureKind: LLMFailureKind?
         var overflowRecoveryAttempted = false
-        var preparedMessages: [Message]?
-        var preparedIncludesPendingMessages = false
 
         LogContext.latency?.mark(.agentStarted)
         await emit(.agentStart(turnID: config.turnID))
@@ -35,14 +33,11 @@ nonisolated enum AgentRunner {
                 snapshot: snapshot,
                 config: config,
                 reason: .prePrompt,
-                compatibilityMessages: preparedPreflightMessages,
                 emit: emit
             )
             messages = preflight.messages
             lastTurnTokens = preflight.lastTurnTokens
             snapshot = preflight.snapshot
-            preparedMessages = preflight.preparedMessages
-            preparedIncludesPendingMessages = preparedMessages != nil
             if preflight.cancelled {
                 Log.agent.info("Agent.run terminating: pre-prompt compaction cancelled")
                 let retainedMessages = retained(messages)
@@ -51,11 +46,7 @@ nonisolated enum AgentRunner {
                 return AgentRunResult(messages: retainedMessages, errorMessage: nil, failureKind: nil, lastTurnTokens: lastTurnTokens)
             }
         } else if !newMessages.isEmpty {
-            preparedMessages = preparedPreflightMessages
-            preparedIncludesPendingMessages = true
             Log.agent.info("Agent.compact skipped reason=unsupported-new-input model=\(snapshot.model.id)")
-        } else {
-            preparedMessages = preparedPreflightMessages
         }
 
         var iter = 0
@@ -72,8 +63,6 @@ nonisolated enum AgentRunner {
                 messages = preparation.messages
                 lastTurnTokens = preparation.lastTurnTokens
                 snapshot = preparation.snapshot
-                preparedMessages = preparation.preparedMessages
-                preparedIncludesPendingMessages = false
                 if preparation.cancelled {
                     Log.agent.info("Agent.run terminating: next-turn preparation cancelled")
                     break loop
@@ -88,9 +77,6 @@ nonisolated enum AgentRunner {
             await emit(.turnStart(model: snapshot.model.id, turnID: config.turnID))
 
             if !pendingMessages.isEmpty {
-                if !preparedIncludesPendingMessages {
-                    preparedMessages = nil
-                }
                 for message in pendingMessages {
                     messages.append(message)
                     runMessages.append(message)
@@ -101,17 +87,11 @@ nonisolated enum AgentRunner {
                 snapshot.context.messages = messages
             }
 
-            let modelMessages = if let preparedMessages {
-                preparedMessages
-            } else {
-                await transformed(
-                    messages: messages,
-                    model: snapshot.model,
-                    using: config.transformContext
-                )
-            }
-            preparedMessages = nil
-            preparedIncludesPendingMessages = false
+            let modelMessages = await transformed(
+                messages: messages,
+                model: snapshot.model,
+                using: config.transformContext
+            )
             snapshot.context.messages = modelMessages
             let assistant = await streamAssistantTurn(snapshot: snapshot, emit: emit)
             LogContext.latency?.recordModelCompleted(assistant.usage)
@@ -257,7 +237,6 @@ nonisolated enum AgentRunner {
         var snapshot: AgentTurnSnapshot
         var cancelled: Bool
         var compacted: Bool
-        var preparedMessages: [Message]?
     }
 
     private static func prepareNextTurn(
@@ -286,18 +265,13 @@ nonisolated enum AgentRunner {
         config: AgentRunConfig,
         reason: AgentCompactionReason,
         force: Bool = false,
-        compatibilityMessages: [Message]? = nil,
         emit: EventSink
     ) async -> CompactionApplication {
-        let preparedMessages = if let compatibilityMessages {
-            compatibilityMessages
-        } else {
-            await transformed(
-                messages: messages,
-                model: snapshot.model,
-                using: config.transformContext
-            )
-        }
+        let preparedMessages = await transformed(
+            messages: messages,
+            model: snapshot.model,
+            using: config.transformContext
+        )
         if modelInputCompatibilityError(messages: preparedMessages, model: snapshot.model) != nil {
             Log.agent.info("Agent.compact skipped reason=unsupported-input model=\(snapshot.model.id)")
             return CompactionApplication(
@@ -305,8 +279,7 @@ nonisolated enum AgentRunner {
                 lastTurnTokens: lastTurnTokens,
                 snapshot: snapshot,
                 cancelled: false,
-                compacted: false,
-                preparedMessages: preparedMessages
+                compacted: false
             )
         }
         let outcome = await AgentCompactor.compact(
@@ -335,8 +308,7 @@ nonisolated enum AgentRunner {
                 lastTurnTokens: lastTurnTokens,
                 snapshot: snapshot,
                 cancelled: cancelled,
-                compacted: false,
-                preparedMessages: preparedMessages
+                compacted: false
             )
         }
         var refreshed = await config.refreshSnapshot(compaction.messages) ?? snapshot
@@ -352,8 +324,7 @@ nonisolated enum AgentRunner {
             lastTurnTokens: 0,
             snapshot: refreshed,
             cancelled: false,
-            compacted: true,
-            preparedMessages: nil
+            compacted: true
         )
     }
 
