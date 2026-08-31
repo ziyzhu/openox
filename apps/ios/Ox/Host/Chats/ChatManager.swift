@@ -342,17 +342,20 @@ final class ChatManager {
     }
 
     private func startTemporaryChat(continuing continuation: ChatContinuation) {
-        let client = providerRegistry.client(forSnapshot: continuation.meta.clientID)
+        let region = continuation.meta.region ?? providerRegistry.defaultRegion
+        let client = providerRegistry.client(forSnapshot: continuation.meta.clientID, in: region)
         let model = providerRegistry.model(
             forSnapshot: continuation.meta.modelID,
             reasoningEffort: continuation.meta.reasoningEffort,
-            client: client
+            client: client,
+            in: region
         )
         let chat = Chat(
             meta: continuation.meta,
             turns: continuation.turns,
             client: client,
             model: model,
+            region: region,
             repository: repository,
             scope: repositoryScope,
             virtualMachine: virtualMachine,
@@ -436,17 +439,20 @@ final class ChatManager {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
             return nil
         }
-        let client = providerRegistry.client(forSnapshot: result.meta.clientID)
+        let region = result.meta.region ?? providerRegistry.defaultRegion
+        let client = providerRegistry.client(forSnapshot: result.meta.clientID, in: region)
         let model = providerRegistry.model(
             forSnapshot: result.meta.modelID,
             reasoningEffort: result.meta.reasoningEffort,
-            client: client
+            client: client,
+            in: region
         )
         let branched = Chat(
             meta: result.meta,
             turns: result.turns,
             client: client,
             model: model,
+            region: region,
             repository: repository,
             scope: repositoryScope,
             virtualMachine: virtualMachine,
@@ -631,9 +637,11 @@ final class ChatManager {
         scheduledSkillID: UUID? = nil
     ) -> Chat {
         let client = providerRegistry.newSessionClient
+        let region = providerRegistry.defaultRegion
         let chat = Chat(
             client: client,
-            model: providerRegistry.selected(for: client.id),
+            model: providerRegistry.selected(for: client.id, in: region),
+            region: region,
             repository: repository,
             scope: repositoryScope,
             virtualMachine: virtualMachine,
@@ -678,11 +686,13 @@ final class ChatManager {
     }
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {
-        let client = providerRegistry.client(forSnapshot: loaded.state.meta.clientID)
+        let region = loaded.state.meta.region ?? providerRegistry.defaultRegion
+        let client = providerRegistry.client(forSnapshot: loaded.state.meta.clientID, in: region)
         let model = providerRegistry.model(
             forSnapshot: loaded.state.meta.modelID,
             reasoningEffort: loaded.state.meta.reasoningEffort,
-            client: client
+            client: client,
+            in: region
         )
         let chat = Chat(
             meta: loaded.state.meta,
@@ -690,6 +700,7 @@ final class ChatManager {
             context: loaded.state.context,
             client: client,
             model: model,
+            region: region,
             repository: repository,
             scope: scope,
             virtualMachine: virtualMachine,

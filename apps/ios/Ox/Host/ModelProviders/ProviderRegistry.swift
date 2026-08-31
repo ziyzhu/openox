@@ -45,7 +45,7 @@ final class ProviderRegistry {
     private(set) var customProviderErrors: [UUID: String] = [:]
 
     var clients: [any ProviderClient] {
-        clients(for: AppRegion.shared.region)
+        clients(for: defaultRegion)
     }
 
     private var selectedModelIds: [String: String] {
@@ -60,13 +60,20 @@ final class ProviderRegistry {
         didSet { UserDefaults.standard.set(defaultClient, forKey: Self.defaultClientKey) }
     }
 
+    private(set) var defaultRegion: LLMRegion {
+        didSet { UserDefaults.standard.set(defaultRegion.rawValue, forKey: Self.defaultRegionKey) }
+    }
+
     private static let selectedKey = "llm.selectedModels"
     private static let selectedReasoningEffortsKey = "llm.selectedReasoningEfforts"
     private static let defaultClientKey = "llm.defaultClient"
+    private static let defaultRegionKey = "llm.defaultRegion"
     nonisolated static let customProvidersKey = "llm.customProviders"
 
     private init() {
-        let region = AppRegion.shared.region
+        let detectedRegion = AppRegion.shared.region
+        let region = UserDefaults.standard.string(forKey: Self.defaultRegionKey)
+            .flatMap(LLMRegion.init(rawValue:)) ?? detectedRegion
         let providerModels = Self.loadProviderModels()
         let modelLookup = { (clientID: String, region: LLMRegion) in
             providerModels.models(for: clientID, in: region)
@@ -91,11 +98,12 @@ final class ProviderRegistry {
         self.customProviders = customProviders
         self.selectedModelIds = UserDefaults.standard.dictionary(forKey: Self.selectedKey) as? [String: String] ?? [:]
         self.selectedReasoningEfforts = UserDefaults.standard.dictionary(forKey: Self.selectedReasoningEffortsKey) as? [String: String] ?? [:]
+        self.defaultRegion = region
         let configuredClientIDs = Set(availableClients.map(\.id) + customProviders.map(\.clientID))
         let storedDefault = UserDefaults.standard.string(forKey: Self.defaultClientKey)
         self.defaultClient = storedDefault.flatMap { configuredClientIDs.contains($0) ? $0 : nil } ?? availableClients[0].id
         UserDefaults.standard.set(self.defaultClient, forKey: Self.defaultClientKey)
-        Log.agent.info("ProviderRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(self.defaultClient) region=\(region.rawValue)")
+        Log.agent.info("ProviderRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(self.defaultClient) region=\(region.rawValue) detectedRegion=\(detectedRegion.rawValue)")
         for provider in customProviders {
             Task { [weak self] in
                 await self?.refresh(provider)
@@ -120,13 +128,19 @@ final class ProviderRegistry {
         clients(for: region).filter { $0.regions.contains(region) }
     }
 
-    func client(forSnapshot id: String?) -> any ProviderClient {
-        if let id, let client = client(id: id) { return client }
+    func client(forSnapshot id: String?, in region: LLMRegion?) -> any ProviderClient {
+        let region = region ?? defaultRegion
+        if let id, let client = client(id: id, in: region) { return client }
         if let id, let provider = customProviders.first(where: { $0.clientID == id }) { return provider.client }
         return newSessionClient
     }
 
-    func model(forSnapshot id: String?, reasoningEffort: String?, client: any ProviderClient) -> ProviderModel {
+    func model(
+        forSnapshot id: String?,
+        reasoningEffort: String?,
+        client: any ProviderClient,
+        in region: LLMRegion?
+    ) -> ProviderModel {
         if let id, var model = client.models.first(where: { $0.id == id }) {
             model.reasoningEffort = reasoningEffort
             return model
@@ -134,11 +148,11 @@ final class ProviderRegistry {
         if let id, customProviders.contains(where: { $0.clientID == client.id }) {
             return CustomLLMModel(id: id, supportsTools: true).modelInfo
         }
-        return selected(for: client.id)
+        return selected(for: client.id, in: region ?? defaultRegion)
     }
 
     var newSessionClient: any ProviderClient {
-        let region = AppRegion.shared.region
+        let region = defaultRegion
         let inRegion = clients(in: region)
         if let preferred = client(id: defaultClient), preferred.regions.contains(region), !preferred.models.isEmpty {
             return preferred
@@ -147,17 +161,19 @@ final class ProviderRegistry {
     }
 
     var defaultClientModel: ProviderModel {
-        selected(for: defaultClient)
+        selected(for: defaultClient, in: defaultRegion)
     }
 
     func selected(for clientID: String) -> ProviderModel {
-        selected(for: clientID, in: AppRegion.shared.region)
+        selected(for: clientID, in: defaultRegion)
     }
 
     func selected(for clientID: String, in region: LLMRegion) -> ProviderModel {
         let regionalClients = clients(in: region)
         let client = regionalClients.first { $0.id == clientID } ?? regionalClients[0]
-        if let modelId = selectedModelIds[client.id],
+        let modelId = selectedModelIds[modelSelectionKey(clientID: client.id, region: region)]
+            ?? selectedModelIds[client.id]
+        if let modelId,
            var model = client.models.first(where: { $0.id == modelId }) {
             model.reasoningEffort = reasoningEffort(for: model, in: client.id)
             return model
@@ -172,16 +188,17 @@ final class ProviderRegistry {
         return stored.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
     }
 
-    func select(_ model: ProviderModel, in clientID: String) {
-        selectedModelIds[clientID] = model.id
+    func select(_ model: ProviderModel, in clientID: String, region: LLMRegion) {
+        selectedModelIds[modelSelectionKey(clientID: clientID, region: region)] = model.id
         let reasoningKey = reasoningSelectionKey(clientID: clientID, modelID: model.id)
         if let effort = model.selectedReasoningEffort {
             selectedReasoningEfforts[reasoningKey] = effort
         } else {
             selectedReasoningEfforts.removeValue(forKey: reasoningKey)
         }
+        defaultRegion = region
         defaultClient = clientID
-        Log.agent.info("ProviderRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
+        Log.agent.info("ProviderRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue)")
     }
 
     func upsert(_ provider: CustomLLMProvider) {
@@ -223,11 +240,13 @@ final class ProviderRegistry {
         customProviders.removeAll { $0.id == provider.id }
         customProviderLoading.remove(provider.id)
         customProviderErrors.removeValue(forKey: provider.id)
-        selectedModelIds.removeValue(forKey: provider.clientID)
+        selectedModelIds = selectedModelIds.filter {
+            $0.key != provider.clientID && !$0.key.hasSuffix("\u{1F}\(provider.clientID)")
+        }
         selectedReasoningEfforts = selectedReasoningEfforts.filter { !$0.key.hasPrefix("\(provider.clientID)\u{1F}") }
         Credentials.clear(for: provider.client.credentialID)
         if defaultClient == provider.clientID {
-            defaultClient = builtInClients[AppRegion.shared.region]![0].id
+            defaultClient = builtInClients[defaultRegion]![0].id
         }
         Log.agent.info("ProviderRegistry.custom removed client=\(provider.clientID)")
     }
@@ -268,5 +287,9 @@ final class ProviderRegistry {
 
     private func reasoningSelectionKey(clientID: String, modelID: String) -> String {
         "\(clientID)\u{1F}\(modelID)"
+    }
+
+    private func modelSelectionKey(clientID: String, region: LLMRegion) -> String {
+        "\(region.rawValue)\u{1F}\(clientID)"
     }
 }

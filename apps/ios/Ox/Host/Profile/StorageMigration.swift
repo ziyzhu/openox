@@ -79,6 +79,7 @@ nonisolated struct ContextRetentionMigrationReplay: Sendable {
     let secondRunNoOp: Bool
     let ordinaryExportOmitsContext: Bool
     let compactedExportRetainsContext: Bool
+    let chatRegionRoundTrips: Bool
 }
 
 nonisolated enum StorageMigrator {
@@ -1090,10 +1091,12 @@ nonisolated enum StorageMigrator {
             isFavorite: false,
             modelID: "mock",
             clientID: "mock",
+            region: .china,
             monoRepositoryHash: nil,
             attachedServiceDomains: [],
             preview: nil
         )
+        let decodedMeta = try JSONDecoder().decode(ChatMeta.self, from: encoder.encode(meta))
         let ordinaryPackage = try ChatPackageCodec.decode(
             ChatPackageCodec.encode(ChatState(meta: meta, turns: turns, context: ordinaryContext)),
             sourceName: "ordinary.chat"
@@ -1152,7 +1155,8 @@ nonisolated enum StorageMigrator {
             transcriptsUnchanged: transcriptsUnchanged,
             secondRunNoOp: secondRunNoOp,
             ordinaryExportOmitsContext: !ordinaryPackage.header.hasContext && ordinaryPackage.payload.context == nil,
-            compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil
+            compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil,
+            chatRegionRoundTrips: decodedMeta.region == .china
         )
     }
     #endif

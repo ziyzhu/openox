@@ -16,9 +16,10 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── autoApproveAll                   global Always approve setting, off by default
 │   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
 │   │   ├── api.url                          Ox service API override
-│   │   ├── llm.selectedModels               client → new-chat model default
+│   │   ├── llm.selectedModels               region/client → new-chat model default
 │   │   ├── llm.selectedReasoningEfforts      client/model → new-chat thinking level
 │   │   ├── llm.defaultClient                new-chat provider default
+│   │   ├── llm.defaultRegion                new-chat provider account region
 │   │   ├── llm.customProviders              custom provider names and endpoints
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
@@ -178,7 +179,7 @@ app's writes.
 Each persisted chat owns one directory:
 
 - `chat.json` contains `ChatMeta`: schema version, identity, dates, title,
-  favorite state, provider/model/thinking-level choice, MonoRepository hash, attached
+  favorite state, provider/model/account-region/thinking-level choice, MonoRepository hash, attached
   services, sidebar preview, and whether the latest completed response is
   unread. Chats created by a scheduled skill execution also retain that
   schedule's identifier so clients can group them separately from recent chats.

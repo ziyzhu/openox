@@ -790,10 +790,11 @@ private struct ProviderPickerButton: View {
                     title: L10n.string("Choose your model"),
                     activeClientID: registry.defaultClient,
                     activeModelID: registry.defaultClientModel.id,
+                    activeRegion: registry.defaultRegion,
                     activeReasoningEffort: registry.defaultClientModel.selectedReasoningEffort
-                ) { client, model in
-                    Log.ui.info("Onboarding.pick client=\(client.id) model=\(model.id)")
-                    registry.select(model, in: client.id)
+                ) { client, model, region in
+                    Log.ui.info("Onboarding.pick client=\(client.id) model=\(model.id) region=\(region.rawValue)")
+                    registry.select(model, in: client.id, region: region)
                     onPick(client.displayName, model.displayName)
                     showPicker = false
                 }

@@ -172,6 +172,7 @@ final class Chat: Identifiable {
 
     private(set) var client: any ProviderClient
     private(set) var model: ProviderModel
+    private(set) var region: LLMRegion
     let presentations: AppPresentations
     let repository: ProfileRepository
     let scope: ProfileScope
@@ -192,9 +193,10 @@ final class Chat: Identifiable {
         return true
     }
 
-    func switchModel(to client: any ProviderClient, model: ProviderModel) {
+    func switchModel(to client: any ProviderClient, model: ProviderModel, region: LLMRegion) {
         self.client = client
         self.model = model
+        self.region = region
         let configuration = agentConfiguration(client: client, model: model)
         enqueueAgentMutation { agent in
             await agent.configure(
@@ -205,7 +207,7 @@ final class Chat: Identifiable {
             )
         }
         scheduleModelPreparation()
-        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable")")
+        Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue)")
         onPersistableChange?()
     }
 
@@ -871,6 +873,7 @@ final class Chat: Identifiable {
          createdAt: Date = Date(),
          client: any ProviderClient,
          model: ProviderModel,
+         region: LLMRegion,
          repository: ProfileRepository,
          scope: ProfileScope,
          virtualMachine: VirtualMachine,
@@ -883,6 +886,7 @@ final class Chat: Identifiable {
         self.createdAt = createdAt
         self.scheduledSkillID = scheduledSkillID
         self.client = client
+        self.region = region
         self.repository = repository
         self.scope = scope
         self.virtualMachine = virtualMachine
@@ -892,7 +896,7 @@ final class Chat: Identifiable {
         self.executionLease = executionLease
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
-        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") server=\(serviceManager.serverURL.absoluteString)")
+        Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
         self.agent = Agent(
             client: client,
             model: model,
@@ -988,6 +992,7 @@ final class Chat: Identifiable {
         context: AgentContextCheckpoint? = nil,
         client: any ProviderClient,
         model: ProviderModel,
+        region: LLMRegion,
         repository: ProfileRepository,
         scope: ProfileScope,
         virtualMachine: VirtualMachine,
@@ -1001,6 +1006,7 @@ final class Chat: Identifiable {
             createdAt: meta.createdAt,
             client: client,
             model: model,
+            region: region,
             repository: repository,
             scope: scope,
             virtualMachine: virtualMachine,
@@ -1041,6 +1047,7 @@ final class Chat: Identifiable {
             isFavorite: isFavorite,
             modelID: model.id,
             clientID: client.id,
+            region: region,
             reasoningEffort: model.selectedReasoningEffort,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
@@ -1742,6 +1749,7 @@ final class Chat: Identifiable {
             isFavorite: false,
             modelID: model.id,
             clientID: client.id,
+            region: region,
             reasoningEffort: model.selectedReasoningEffort,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,

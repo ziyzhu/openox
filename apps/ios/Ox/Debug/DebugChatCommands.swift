@@ -266,6 +266,7 @@ extension OxHostProtocol {
                     secondRunNoOp: replay.secondRunNoOp,
                     ordinaryExportOmitsContext: replay.ordinaryExportOmitsContext,
                     compactedExportRetainsContext: replay.compactedExportRetainsContext,
+                    chatRegionRoundTrips: replay.chatRegionRoundTrips,
                     error: nil
                 )))
             } catch {
@@ -282,6 +283,7 @@ extension OxHostProtocol {
                     secondRunNoOp: nil,
                     ordinaryExportOmitsContext: nil,
                     compactedExportRetainsContext: nil,
+                    chatRegionRoundTrips: nil,
                     error: error.localizedDescription
                 )))
             }

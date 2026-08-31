@@ -11,11 +11,12 @@ struct ModelPickerSheet: View {
                 title: "Model",
                 activeClientID: chat.client.id,
                 activeModelID: chat.model.id,
+                activeRegion: chat.region,
                 activeReasoningEffort: chat.model.selectedReasoningEffort,
                 onClose: { dismiss() }
-            ) { client, model in
-                Log.ui.info("ModelPicker.select chat=\(chat.id) client=\(client.id) model=\(model.id)")
-                chat.switchModel(to: client, model: model)
+            ) { client, model, region in
+                Log.ui.info("ModelPicker.select chat=\(chat.id) client=\(client.id) model=\(model.id) region=\(region.rawValue)")
+                chat.switchModel(to: client, model: model, region: region)
             }
         }
     }
@@ -138,10 +139,11 @@ struct SettingsSheet: View {
                                 title: "Model",
                                 activeClientID: registry.defaultClient,
                                 activeModelID: defaultModel.id,
+                                activeRegion: registry.defaultRegion,
                                 activeReasoningEffort: defaultModel.selectedReasoningEffort
-                            ) { client, model in
-                                Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id)")
-                                registry.select(model, in: client.id)
+                            ) { client, model, region in
+                                Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(region.rawValue)")
+                                registry.select(model, in: client.id, region: region)
                             }
                         } label: {
                             SettingsDisclosureRow(
@@ -481,8 +483,9 @@ struct ModelPickerContent: View {
     let title: String
     let activeClientID: String
     let activeModelID: String
+    let activeRegion: LLMRegion
     var onClose: (() -> Void)?
-    let onSelect: (any ProviderClient, ProviderModel) -> Void
+    let onSelect: (any ProviderClient, ProviderModel, LLMRegion) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var authRevision = 0
@@ -505,16 +508,18 @@ struct ModelPickerContent: View {
         title: String,
         activeClientID: String,
         activeModelID: String,
+        activeRegion: LLMRegion,
         activeReasoningEffort: String? = nil,
         onClose: (() -> Void)? = nil,
-        onSelect: @escaping (any ProviderClient, ProviderModel) -> Void
+        onSelect: @escaping (any ProviderClient, ProviderModel, LLMRegion) -> Void
     ) {
         self.title = title
         self.activeClientID = activeClientID
         self.activeModelID = activeModelID
+        self.activeRegion = activeRegion
         self.onClose = onClose
         self.onSelect = onSelect
-        _selectedRegion = State(initialValue: AppRegion.shared.region)
+        _selectedRegion = State(initialValue: activeRegion)
         _providerSelection = State(initialValue: .client(activeClientID))
         _selectedModelID = State(initialValue: activeModelID)
         _selectedReasoningEffort = State(initialValue: activeReasoningEffort ?? "")
@@ -970,7 +975,7 @@ struct ModelPickerContent: View {
             if !key.isEmpty { Credentials.set(key, for: selectedClient.credentialID) }
         }
         Log.ui.info("ModelPicker.save client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
-        onSelect(selectedClient, selectedModel)
+        onSelect(selectedClient, selectedModel, selectedRegion)
         finishSaving()
     }
 
@@ -986,7 +991,7 @@ struct ModelPickerContent: View {
         let key = customAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if !key.isEmpty { Credentials.set(key, for: provider.clientID) }
         Log.ui.info("ModelPicker.save custom client=\(provider.clientID) model=\(model.id)")
-        onSelect(provider.client, model.modelInfo)
+        onSelect(provider.client, model.modelInfo, selectedRegion)
         finishSaving()
     }
 
