@@ -276,8 +276,20 @@ extension Service {
         settlement: ServiceWebPage.NavigationSettlement
     ) {
         settlement.task = Task { @MainActor [weak self, weak session, weak settlement] in
-            try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled, let self, let session, let settlement else { return }
+            let serviceHost = settlement.url.host.map(self.isServiceHost) == true
+            let dispatcherReady: Bool
+            if serviceHost {
+                dispatcherReady = await self.dispatcherIsReady(in: session, generation: settlement.load.generation)
+            } else {
+                dispatcherReady = false
+            }
+            let delayMs = self.domain == "ios:browser" || dispatcherReady ? 0 : 400
+            if delayMs > 0 {
+                try? await Task.sleep(for: .milliseconds(delayMs))
+            }
+            guard !Task.isCancelled else { return }
+            Log.webView.info("Service.navigation settlement-ready domain=\(self.domain) session=\(session.logLabel) nav=\(settlement.load.generation) delayMs=\(delayMs)")
             await self.receive(.settled(settlement), from: session)
         }
     }
@@ -334,7 +346,7 @@ extension Service {
 
         case .settled(let settlement):
             guard transitionNavigation(event, on: session) else { return }
-            Log.webView.info("Service.navigation settled domain=\(domain) session=\(session.logLabel) nav=\(settlement.load.generation) delayMs=400 url=\(LogPrivacy.url(settlement.url.absoluteString))")
+            Log.webView.info("Service.navigation settled domain=\(domain) session=\(session.logLabel) nav=\(settlement.load.generation) url=\(LogPrivacy.url(settlement.url.absoluteString))")
             await verifyNavigation(in: session, load: settlement.load, url: settlement.url)
 
         case .failed(let error):
