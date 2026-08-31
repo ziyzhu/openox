@@ -62,6 +62,29 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             throw new Error(`Expected "owner/repo", got ${JSON.stringify(nwo)}`);
         return { owner, repo };
     };
+    const formBody = (form) => {
+        const body = new URLSearchParams();
+        for (const element of form.querySelectorAll("input[name], textarea[name], select[name]")) {
+            if (element.disabled)
+                continue;
+            const type = (element.getAttribute("type") ?? "").toLowerCase();
+            if ((type === "checkbox" || type === "radio") && !element.checked)
+                continue;
+            body.append(element.name, element.value ?? "");
+        }
+        return body;
+    };
+    const pullRequestFromURL = (value) => {
+        if (!value)
+            return null;
+        const url = new URL(value, ORIGIN);
+        if (url.origin !== ORIGIN)
+            return null;
+        const match = url.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/);
+        if (!match)
+            return null;
+        return { id: Number(match[3]), url: `${ORIGIN}/${match[1]}/${match[2]}/pull/${match[3]}` };
+    };
     const repoFromSearch = (r) => {
         const name = decode(r.hl_name ?? "");
         return {
@@ -271,6 +294,47 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const q = `repo:${owner}/${name} is:pr is:${state || "open"} sort:updated`;
             const { results, nextCursor } = await searchPayload("issues", q, cursor);
             return { items: results.map(issueFromSearch), nextCursor };
+        },
+    });
+    action("createPullRequest", {
+        async invoke({ owner, repo, title, head, base, body, draft, maintainerCanModify }) {
+            const comparePath = `/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?expand=1`;
+            const doc = await fetchDoc(comparePath);
+            const form = [...doc.querySelectorAll("form")]
+                .find((candidate) => candidate.querySelector('[name="pull_request[title]"]'));
+            if (!form)
+                throw new Error("GitHub did not return a pull-request form; sign in and verify repository access and branch names");
+            const actionURL = new URL(form.getAttribute("action") ?? "", ORIGIN);
+            if (actionURL.origin !== ORIGIN || (form.getAttribute("method") ?? "get").toLowerCase() !== "post")
+                throw new Error("GitHub returned an unsupported pull-request form");
+            const payload = formBody(form);
+            payload.set("pull_request[title]", title);
+            if (body !== undefined)
+                payload.set("pull_request[body]", body);
+            payload.set("pull_request[draft]", draft ? "true" : "false");
+            if (maintainerCanModify !== undefined)
+                payload.set("pull_request[maintainer_can_modify]", maintainerCanModify ? "1" : "0");
+            log(`createPullRequest submit repo=${owner}/${repo} base=${base} head=${head} draft=${!!draft}`);
+            const response = await fetch(actionURL.href, {
+                method: "POST",
+                credentials: "include",
+                headers: { "content-type": "application/x-www-form-urlencoded" },
+                body: payload.toString(),
+            });
+            const text = await response.text();
+            if (response.status >= 400)
+                throw new Error(`GitHub pull-request creation failed (HTTP ${response.status})`);
+            const resultDoc = new DOMParser().parseFromString(text, "text/html");
+            const result = [
+                response.url,
+                response.headers.get("location"),
+                attr(resultDoc, 'link[rel="canonical"]', "href"),
+                attr(resultDoc, 'meta[property="og:url"]', "content"),
+            ].map(pullRequestFromURL).find(Boolean);
+            if (!result)
+                throw new Error("GitHub did not confirm the created pull request");
+            log(`createPullRequest created repo=${owner}/${repo} number=${result.id}`);
+            return result;
         },
     });
     const getThread = async (repo, kind, number) => {

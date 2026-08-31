@@ -1,7 +1,7 @@
 {
   "domain": "github.com",
   "name": "GitHub",
-  "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Sign in to view your repositories, work items, and notifications. Read-only.",
+  "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Sign in to view your repositories, work items, and notifications, and create pull requests with approval.",
   "baseUrl": "https://github.com/",
   "$defs": {
     "repo": {
@@ -876,6 +876,79 @@
       "requireAuth": false
     },
     {
+      "id": "createPullRequest",
+      "label": "Create pull request",
+      "description": "Creates a pull request from a head branch into a base branch. Sign-in and approval required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository owner."
+          },
+          "repo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository name without the owner."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pull-request title."
+          },
+          "head": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Branch containing the changes. For a fork, use owner:branch."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Branch to merge the changes into."
+          },
+          "body": {
+            "type": "string",
+            "description": "Pull-request body. When omitted, GitHub's repository template is preserved."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "Whether to create a draft pull request. Defaults to false."
+          },
+          "maintainerCanModify": {
+            "type": "boolean",
+            "description": "Whether maintainers may modify the head branch."
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "title",
+          "head",
+          "base"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true
+    },
+    {
       "id": "getIssue",
       "label": "Get issue",
       "description": "Returns one issue's title, state, body, repository, and link.",
@@ -1633,7 +1706,7 @@
   "locales": {
     "zh-Hans": {
       "name": "GitHub",
-      "description": "协作式软件开发平台。浏览和搜索仓库、代码、分支、提交、议题、拉取请求、审查、检查、工作流运行、发布版本和标签。登录后可查看自己拥有的仓库、相关议题和拉取请求以及通知。只读。",
+      "description": "协作式软件开发平台。浏览和搜索仓库、代码、分支、提交、议题、拉取请求、审查、检查、工作流运行、发布版本和标签。登录后可查看自己拥有的仓库、相关议题和拉取请求以及通知，并在确认后创建拉取请求。",
       "actions": {
         "getSignInUrl": {
           "label": "登录 GitHub",
@@ -1690,6 +1763,10 @@
         "listPullRequests": {
           "label": "拉取请求列表",
           "description": "列出仓库中开启或关闭的拉取请求，按最近更新时间排序。"
+        },
+        "createPullRequest": {
+          "label": "创建拉取请求",
+          "description": "从源分支向目标分支创建拉取请求。需要登录并在提交前确认。"
         },
         "getIssue": {
           "label": "获取议题",

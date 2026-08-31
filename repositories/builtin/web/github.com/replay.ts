@@ -345,5 +345,28 @@ export const replayCases = [
       "ref": "HEAD",
       "content": "Hello World!\n"
     }
+  },
+  {
+    "action": "createPullRequest",
+    "name": "default",
+    "args": {
+      "owner": "fixture-owner",
+      "repo": "fixture-repo",
+      "title": "Add fixture coverage",
+      "head": "feature/pr-action",
+      "base": "main",
+      "body": "Exercises pull-request creation.",
+      "draft": true,
+      "maintainerCanModify": true
+    },
+    "output": {
+      "id": 42,
+      "url": "https://github.com/fixture-owner/fixture-repo/pull/42"
+    },
+    "replay": {
+      "ignoreBodyParameters": [
+        "authenticity_token"
+      ]
+    }
   }
 ];
