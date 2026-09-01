@@ -4,6 +4,7 @@ import Foundation
 nonisolated enum ChatProjection {
     private enum EmbedKey: Hashable {
         case artifact(String)
+        case serviceInspector(String)
         case skill(String)
     }
 
@@ -244,6 +245,10 @@ nonisolated enum ChatProjection {
                                 openGroup(at: createdAt, entry: entry)
                                 bubble.append(.serviceControl(control))
                             case let .serviceInspector(link):
+                                guard consumeEmbed(
+                                    .serviceInspector(link.domain.lowercased()),
+                                    from: &remainingEmbedCounts
+                                ) else { continue }
                                 flushTrace()
                                 openGroup(at: createdAt, entry: entry)
                                 bubble.append(.serviceInspector(link))
@@ -308,8 +313,9 @@ nonisolated enum ChatProjection {
                 let key: EmbedKey?
                 switch effect {
                 case let .artifact(artifact): key = .artifact(artifact.fileName.lowercased())
+                case let .serviceInspector(link): key = .serviceInspector(link.domain.lowercased())
                 case let .skill(skill): key = .skill(skill.name.lowercased())
-                case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .media: key = nil
+                case .invocation, .progress, .serviceControl, .shoveler, .video, .media: key = nil
                 }
                 if let key { counts[key, default: 0] += 1 }
             }

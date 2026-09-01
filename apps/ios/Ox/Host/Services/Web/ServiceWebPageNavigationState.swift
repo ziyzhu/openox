@@ -214,6 +214,7 @@ extension Service.ServiceWebPage {
             guard let load = navigationPhase.load else { return false }
             navigationPhase.settlement?.cancel()
             load.lease?.timeoutTask?.cancel()
+            navigationFailure = navigationFailure ?? error.localizedDescription
             navigationPhase = .unavailable("failed")
             load.lease?.settleCompletion(nil)
             failPending(Service.EvalError.navigationFailed(error.localizedDescription))

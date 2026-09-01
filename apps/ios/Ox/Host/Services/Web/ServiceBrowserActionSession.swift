@@ -59,10 +59,13 @@ final class ServiceBrowserActionSession {
         return try await page(for: action)
     }
 
-    func navigate(_ url: URL, timeout: TimeInterval = 15) async -> URL? {
-        guard let action = await service.inspectionAction(),
-              let page = try? await page(for: action) else { return nil }
-        return await service.navigate(url, in: page, timeout: timeout)
+    func navigate(_ url: URL, timeout: TimeInterval = 15) async throws -> URL {
+        guard let action = await service.inspectionAction() else { throw Service.EvalError.notActive }
+        let page = try await page(for: action)
+        guard let landed = await service.navigate(url, in: page, timeout: timeout) else {
+            throw Service.EvalError.navigationFailed(page.navigationFailure ?? "Browser did not complete the navigation")
+        }
+        return landed
     }
 
     func reload(fromOrigin: Bool = false, timeout: TimeInterval = 15) async -> URL? {

@@ -60,11 +60,18 @@ final class NativeServiceOperations {
                   let url = URL(string: rawURL),
                   let scheme = url.scheme?.lowercased(),
                   (scheme == "http" || scheme == "https"),
-                  url.host?.isEmpty == false,
-                  let landed = await serviceManager.browserActionSessions
+                  url.host?.isEmpty == false else {
+                throw RuntimeError.bridge("ios:browser:navigate requires an absolute HTTP or HTTPS URL.")
+            }
+            let landed: URL
+            do {
+                landed = try await serviceManager.browserActionSessions
                     .session(for: browser, ownerID: id)
-                    .navigate(url) else {
-                throw RuntimeError.bridge("ios:browser:navigate requires an absolute HTTP or HTTPS URL that Browser can load.")
+                    .navigate(url)
+            } catch Service.EvalError.navigationFailed(let message) {
+                throw RuntimeError.bridge("ios:browser:navigate failed to load the requested URL: \(message)")
+            } catch {
+                throw RuntimeError.bridge("ios:browser:navigate failed to load the requested URL: \(error.localizedDescription)")
             }
             return .object(["url": .string(landed.absoluteString)])
         case ("ios:browser", "reload"):

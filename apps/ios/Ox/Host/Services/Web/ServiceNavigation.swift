@@ -133,10 +133,12 @@ extension Service {
         guard owns(session) else { return nil }
         let lease = ServiceWebPage.NavigationLease(label: label, timeout: timeout, predecessor: predecessor)
         if transitionNavigation(.requested(lease), on: session) {
+            session.navigationFailure = nil
             Log.webView.info("Service.navigation requested domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(label) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
             advancePage(session)
             return lease
         } else {
+            session.navigationFailure = "Browser was busy with another navigation"
             Log.webView.info("Service.navigation rejected-busy domain=\(domain) session=\(session.logLabel) label=\(label) phase=\(session.navigationPhase.logLabel)")
             return nil
         }
@@ -239,6 +241,7 @@ extension Service {
     ) {
         guard owns(session),
               session.navigationPhase.load?.lease === lease else { return }
+        session.navigationFailure = session.navigationFailure ?? "navigation timed out after \(Int(lease.timeout)) seconds"
         transitionNavigation(.timedOut(lease), on: session)
         Log.webView.error("Service.navigation timeout domain=\(domain) session=\(session.logLabel) id=\(lease.id.uuidString.prefix(8)) label=\(lease.label) seconds=\(Int(lease.timeout))")
     }

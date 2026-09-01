@@ -15,6 +15,12 @@
       "kind": {
         "items": [
           {
+            "serviceInspector": {
+              "domain": "ios:browser",
+              "serviceName": "Browser"
+            }
+          },
+          {
             "skill": {
               "description": "Prepare a weekly review with unfinished work",
               "instructions": "Review completed and unfinished work.",
@@ -40,6 +46,12 @@
       "id": "4E074085-62BE-5B8B-A0CE-05C1DECFE3AD",
       "kind": {
         "items": [
+          {
+            "serviceInspector": {
+              "domain": "ios:browser",
+              "serviceName": "Browser"
+            }
+          },
           {
             "skill": {
               "description": "Prepare a Friday review",
@@ -120,6 +132,13 @@
               "execute": {
                 "effects": [
                   {
+                    "serviceInspector": {
+                      "domain": "ios:browser",
+                      "serviceName": "Browser"
+                    },
+                    "type": "serviceInspector"
+                  },
+                  {
                     "skill": {
                       "description": "Prepare a weekly review",
                       "instructions": "Review completed work.",
@@ -145,6 +164,13 @@
             "action": {
               "execute": {
                 "effects": [
+                  {
+                    "serviceInspector": {
+                      "domain": "ios:browser",
+                      "serviceName": "Browser"
+                    },
+                    "type": "serviceInspector"
+                  },
                   {
                     "skill": {
                       "description": "Prepare a weekly review with unfinished work",
@@ -204,6 +230,13 @@
             "action": {
               "execute": {
                 "effects": [
+                  {
+                    "serviceInspector": {
+                      "domain": "ios:browser",
+                      "serviceName": "Browser"
+                    },
+                    "type": "serviceInspector"
+                  },
                   {
                     "skill": {
                       "description": "Prepare a Friday review",

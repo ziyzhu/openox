@@ -370,6 +370,7 @@ final class Service: NSObject, Identifiable {
         var finishedNavigationGeneration = 0
         var navigationStartedAt: Date?
         var navigationPhase: NavigationPhase = .unavailable("new")
+        var navigationFailure: String?
         var pendingEvaluations: [UUID: PendingEvaluation] = [:]
         var scriptMode: ScriptMode?
 

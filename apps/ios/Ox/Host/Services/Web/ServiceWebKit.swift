@@ -35,7 +35,17 @@ extension Service {
         let url = action.request.url
         let allowed = url.map(ServiceHandoffSession.allowsNavigation) == true
         guard allowed else {
+            let scheme = url?.scheme?.uppercased() ?? "unsupported"
+            let failure = scheme == "HTTPS"
+                ? "Browser blocked navigation to a private-network or unsupported HTTPS destination"
+                : "Browser blocked navigation to an unsupported \(scheme) destination; Browser only loads public HTTPS destinations"
+            if owns(session) {
+                session.navigationFailure = failure
+            }
             Log.webView.error("Service.navigation rejected domain=\(domain) url=\(LogPrivacy.url(url?.absoluteString ?? "?"))")
+            if owns(session), session.navigationPhase.load != nil {
+                await receive(.failed(RuntimeError.bridge(failure)), from: session)
+            }
             return .cancel
         }
         guard owns(session) else { return .cancel }
