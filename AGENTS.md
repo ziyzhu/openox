@@ -12,6 +12,10 @@
 1. Reference Apple development documentation for iOS changes.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 
+## Review Rules
+
+1. For each commit, review lines of code and cyclomatic complexity, prefer low.
+
 ## Repository Boundary
 
 1. This repository must build without private repositories or production credentials.
