@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Official built-in service repository for Ox",
   "author": "Ziyuan Zhu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "files": [
     "dist",

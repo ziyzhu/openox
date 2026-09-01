@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Connect to Ox Hosts and manage Ox Profiles, VMs, and services",
   "author": "Ziyuan Zhu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "ox": "./dist/ox.js"

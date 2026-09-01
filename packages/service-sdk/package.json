@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Author, validate, and test Ox services",
   "author": "Ziyuan Zhu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "files": [
     "src",

@@ -1,7 +1,7 @@
 {
   "private": true,
   "author": "Ziyuan Zhu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
   "scripts": {
     "test:llm": "bun apps/ios/tests/llm/run.ts",
