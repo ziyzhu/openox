@@ -1200,6 +1200,9 @@ extension Scenario {
             const domain = "example.test";
             const path = "services/web/" + domain + "/";
             await ox.service.create({ kind: "web", domain, purpose: "Create validation fixture" });
+            const companionDomain = "valid.example.test";
+            await ox.service.create({ kind: "web", domain: companionDomain, purpose: "Create valid companion service" });
+            check((await ox.service.validate({ domain: companionDomain, purpose: "Validate companion service" })).valid, "Valid companion service");
             const manifest = JSON.parse((await ox.fs.read({ path: path + "service.json", purpose: "Read generated manifest" })).text);
             const skeleton = (await ox.fs.read({ path: path + "actions.js", purpose: "Read generated installer" })).text;
             check((await ox.service.validate({ domain, purpose: "Validate generated service" })).valid, "Valid skeleton");
@@ -1207,7 +1210,10 @@ extension Scenario {
             check((await ox.fs.read({ path: path + "actions.js", purpose: "Read invalid draft" })).text === ")", "Invalid draft retained");
             await rejected(() => ox.service.validate({ domain, purpose: "Reject invalid JavaScript" }), "actions.js syntax");
             await rejected(() => ox.service.attach({ domain, purpose: "Reject invalid attachment" }), "actions.js syntax");
-            await rejected(() => ox.service.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }), "actions.js syntax");
+            await rejected(
+              () => ox.service.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }),
+              "Validation failed for services/web/example.test: actions.js syntax"
+            );
             await ox.fs.write({ path: path + "actions.js", content: skeleton, purpose: "Restore generated installer" });
             manifest.actions = [{
               id: "version", label: "Version", description: "Draft one",
@@ -1246,11 +1252,11 @@ extension Scenario {
             """#)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["checks"]?.arrayValue?.count == 17,
+              result["checks"]?.arrayValue?.count == 18,
               result["readyForRestart"]?.boolValue == true else {
             return [.say("Local service validation failed: \(output)"), .stop(.stop)]
         }
-        return [.say("PASS: 17 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
+        return [.say("PASS: 18 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
     }
 
     static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in

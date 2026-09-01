@@ -736,7 +736,15 @@ final class ServiceManager {
                   let kind = ServicesMount.Kind(rawValue: String(service.id[..<separator])) else {
                 throw ServiceRepository.Failure(message: "Local contains an invalid service identity")
             }
-            try await validateLocalService(kind: kind, domain: service.runtimeID)
+            do {
+                try await validateLocalService(kind: kind, domain: service.runtimeID)
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                throw ServiceRepository.Failure(
+                    message: "Validation failed for services/\(kind.rawValue)/\(service.runtimeID): \(error.localizedDescription)"
+                )
+            }
         }
     }
 
