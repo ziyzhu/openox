@@ -194,6 +194,7 @@ extension OxHostProtocol {
     struct ReplayStorageMigrationRequest: Decodable {
         let id: String
         let turns: [Turn]
+        let fixtures: [StorageMigrationFixture]
     }
 
     enum Command: Decodable {
@@ -471,6 +472,7 @@ extension OxHostProtocol {
         let kind = "replay-storage-migration-result"
         let id: String
         let ok: Bool
+        let currentVersion: String?
         let versionUpdated: Bool?
         let ordinaryContextRemoved: Bool?
         let unreadableContextRetained: Bool?
@@ -483,6 +485,8 @@ extension OxHostProtocol {
         let compactedExportRetainsContext: Bool?
         let defaultModelMigrated: Bool?
         let chatModelMigrated: Bool?
+        let unsupportedVersionRejected: Bool?
+        let fixtureResults: [StorageMigrationFixtureReplay]?
         let error: String?
     }
 

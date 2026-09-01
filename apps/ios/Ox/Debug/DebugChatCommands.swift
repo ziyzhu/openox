@@ -256,10 +256,14 @@ extension OxHostProtocol {
     ) {
         Task {
             do {
-                let replay = try await StorageRoot.replayContextRetentionMigration(turns: command.turns)
+                let replay = try await StorageRoot.replayStorageMigration(
+                    turns: command.turns,
+                    fixtures: command.fixtures
+                )
                 reply(encode(StorageMigrationReplayResult(
                     id: command.id,
                     ok: true,
+                    currentVersion: replay.currentVersion,
                     versionUpdated: replay.versionUpdated,
                     ordinaryContextRemoved: replay.ordinaryContextRemoved,
                     unreadableContextRetained: replay.unreadableContextRetained,
@@ -272,12 +276,15 @@ extension OxHostProtocol {
                     compactedExportRetainsContext: replay.compactedExportRetainsContext,
                     defaultModelMigrated: replay.defaultModelMigrated,
                     chatModelMigrated: replay.chatModelMigrated,
+                    unsupportedVersionRejected: replay.unsupportedVersionRejected,
+                    fixtureResults: replay.fixtureResults,
                     error: nil
                 )))
             } catch {
                 reply(encode(StorageMigrationReplayResult(
                     id: command.id,
                     ok: false,
+                    currentVersion: nil,
                     versionUpdated: nil,
                     ordinaryContextRemoved: nil,
                     unreadableContextRetained: nil,
@@ -290,6 +297,8 @@ extension OxHostProtocol {
                     compactedExportRetainsContext: nil,
                     defaultModelMigrated: nil,
                     chatModelMigrated: nil,
+                    unsupportedVersionRejected: nil,
+                    fixtureResults: nil,
                     error: error.localizedDescription
                 )))
             }

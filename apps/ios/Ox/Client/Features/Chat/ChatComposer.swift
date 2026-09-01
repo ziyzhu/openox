@@ -384,17 +384,24 @@ enum AttachmentChoice {
 }
 
 struct ChatComposer: View, Equatable {
+    static let surfaceSpacing = Theme.Spacing.md
     static let restingVerticalOffset = Theme.Spacing.md
+    private static let topStripSurfaceInset = max(
+        0,
+        (Theme.Size.minimumTouchTarget - Theme.Size.chipHeight) / 2
+    )
+    private static let topStripSpacing = surfaceSpacing - topStripSurfaceInset
+    static let floatingTopStripClearance = Theme.Size.minimumTouchTarget + topStripSpacing
 
     static func firstSurfaceTopOffset(
         isResting: Bool,
-        showsTopStrip: Bool
+        showsTopStrip: Bool,
+        floatsTopStrip: Bool
     ) -> CGFloat {
         let restingOffset = isResting ? restingVerticalOffset : 0
-        let surfaceTouchInset = showsTopStrip
-            ? max(0, (Theme.Size.minimumTouchTarget - Theme.Size.chipHeight) / 2)
-            : 0
-        return Theme.Spacing.sm + restingOffset + surfaceTouchInset
+        let surfaceTouchInset = showsTopStrip ? topStripSurfaceInset : 0
+        let floatingOffset = floatsTopStrip ? -floatingTopStripClearance : 0
+        return Theme.Spacing.sm + restingOffset + surfaceTouchInset + floatingOffset
     }
 
     private enum PromptTemplate: String, Identifiable {
@@ -420,6 +427,8 @@ struct ChatComposer: View, Equatable {
     let sessionID: UUID
     let isChatEmpty: Bool
     let isBusy: Bool
+    let floatsTopStrip: Bool
+    let isEmbedded: Bool
     let iconButtonSize: CGFloat
     let composerButtonSize: CGFloat
     let onOpenAttachment: (Artifact, String) -> Void
@@ -458,6 +467,8 @@ struct ChatComposer: View, Equatable {
             && lhs.sessionID == rhs.sessionID
             && lhs.isChatEmpty == rhs.isChatEmpty
             && lhs.isBusy == rhs.isBusy
+            && lhs.floatsTopStrip == rhs.floatsTopStrip
+            && lhs.isEmbedded == rhs.isEmbedded
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
     }
@@ -578,7 +589,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var layoutState: LayoutState {
-        isFieldFocused || !empty ? .active : .resting
+        isEmbedded || isFieldFocused || !empty ? .active : .resting
     }
 
     private var isResting: Bool {
@@ -613,7 +624,7 @@ struct ChatComposer: View, Equatable {
 
         }
         .padding(.horizontal, horizontalSpacing)
-        .padding(.top, Theme.Spacing.sm)
+        .padding(.top, inputBarTopSpacing)
         .padding(.bottom, Theme.Spacing.sm)
         .background(alignment: .bottom) {
             if appTheme == .creatorPick && isFieldFocused {
@@ -631,9 +642,14 @@ struct ChatComposer: View, Equatable {
         .animation(.easeOut(duration: Theme.Animation.standard), value: isResting)
     }
 
+    private var inputBarTopSpacing: CGFloat {
+        guard isEmbedded else { return Theme.Spacing.sm }
+        return showsTopStrip ? Self.topStripSpacing : Self.surfaceSpacing
+    }
+
     private var composerCluster: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            if showsTopStrip {
+        VStack(alignment: .leading, spacing: Self.topStripSpacing) {
+            if showsTopStrip && !floatsTopStrip {
                 composerTopStrip
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
@@ -648,6 +664,13 @@ struct ChatComposer: View, Equatable {
                 Color.clear
                     .glassEffect(.regular, in: composerShape)
                     .id(appTheme)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if showsTopStrip && floatsTopStrip {
+                composerTopStrip
+                    .offset(y: -Self.floatingTopStripClearance)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
     }

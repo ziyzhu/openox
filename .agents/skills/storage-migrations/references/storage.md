@@ -107,9 +107,11 @@ The same `StorageMigrator` owns ordered Profile milestones and the scoped
 transforms used by the gate. All of that code stays in the single
 `Host/Profile/StorageMigration.swift` file. Service-repository repair remains
 structurally detected because the old Local layouts predate a shared application
-schema marker. Unknown Profile versions and unsuccessful migrations fail closed
-at the loading screen rather than allowing consumers to interpret incompatible
-data.
+schema marker. Profile milestone identifiers are immutable after any build can
+stamp them. Unknown Profile versions and unsuccessful migrations fail closed at
+the loading screen rather than allowing consumers to interpret incompatible
+data; an unknown version specifically directs the user to the Ox build that last
+opened the Profile or a newer one.
 
 ## Shared preferences
 

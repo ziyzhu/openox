@@ -260,6 +260,9 @@ struct ChatPage: View {
             interaction: activeInteraction,
             acknowledgement: dockAcknowledgement
         )
+        let floatsTopStrip = floatsTopStrip(for: dockState)
+        let dockClearance = ChatViewportLayout.responseComposerSpacing
+            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
         let authProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
@@ -268,7 +271,8 @@ struct ChatPage: View {
             blocks,
             totalBlockCount: totalBlockCount,
             sourceRange: requestedSourceRange,
-            sourceBlockIDs: requestedSourceIDs
+            sourceBlockIDs: requestedSourceIDs,
+            dockClearance: dockClearance
         )
             .toast($toast)
             .safeAreaBar(edge: .top, spacing: 0) {
@@ -304,7 +308,12 @@ struct ChatPage: View {
             }
         return transcript
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                dock(dockState, chatBlocks: blocks, totalBlockCount: totalBlockCount)
+                dock(
+                    dockState,
+                    chatBlocks: blocks,
+                    totalBlockCount: totalBlockCount,
+                    floatsTopStrip: floatsTopStrip
+                )
                     .frame(maxWidth: Theme.ContainerWidth.readable)
                     .frame(maxWidth: .infinity)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
@@ -314,10 +323,10 @@ struct ChatPage: View {
         .background(Theme.Colors.chatSurface)
         .accessibilityHidden(speechInput.isPresented)
         .overlay(alignment: .bottom) {
-            servicePickerOverlay
+            servicePickerOverlay(floatsTopStrip: floatsTopStrip)
         }
         .overlay(alignment: .bottom) {
-            slashPickerOverlay
+            slashPickerOverlay(floatsTopStrip: floatsTopStrip)
         }
         .overlay {
             if speechInput.isPresented {
@@ -506,13 +515,15 @@ struct ChatPage: View {
         _ blocks: [ChatBlock],
         totalBlockCount: Int,
         sourceRange: Range<Int>,
-        sourceBlockIDs: [UUID]
+        sourceBlockIDs: [UUID],
+        dockClearance: CGFloat
     ) -> some View {
         return transcript(
             blocks: blocks,
             totalBlockCount: totalBlockCount,
             sourceRange: sourceRange,
-            sourceBlockIDs: sourceBlockIDs
+            sourceBlockIDs: sourceBlockIDs,
+            dockClearance: dockClearance
         )
     }
 
@@ -553,25 +564,30 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private var servicePickerOverlay: some View {
+    private func servicePickerOverlay(floatsTopStrip: Bool) -> some View {
         ComposerServicePicker(
             composer: composer,
             excludedDomains: Set(chat.attachedServices.map(\.domain)),
             space: viewportLayout.composerTop,
-            composerHeight: viewportLayout.composerHeight,
+            composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
             onSelect: selectMentionService,
             onExplore: openServiceExplorer
         )
     }
 
-    private var slashPickerOverlay: some View {
+    private func slashPickerOverlay(floatsTopStrip: Bool) -> some View {
         ComposerSlashPicker(
             composer: composer,
             isFocused: composerFocused,
             space: viewportLayout.composerTop,
-            composerHeight: viewportLayout.composerHeight,
+            composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
             onSelect: { submitSkill($0, argument: "") }
         )
+    }
+
+    private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
+        viewportLayout.composerHeight
+            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
     }
 
     private func selectMentionService(_ service: Service) {
@@ -657,8 +673,9 @@ struct ChatPage: View {
         viewportLayout.slack(hasAnchor: anchoredTurnID != nil)
     }
 
-    private var dockClearance: CGFloat {
-        ChatViewportLayout.responseComposerSpacing
+    private func floatsTopStrip(for dock: ChatDock) -> Bool {
+        guard case .composer = dock.kind else { return false }
+        return !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
@@ -701,7 +718,11 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func dockHost(_ dock: ChatDock, isChatEmpty: Bool) -> some View {
+    private func dockHost(
+        _ dock: ChatDock,
+        isChatEmpty: Bool,
+        floatsTopStrip: Bool
+    ) -> some View {
         switch dock.kind {
         case .permission(let request):
             PermissionRequestCard(request: request) { option in
@@ -735,27 +756,35 @@ struct ChatPage: View {
                     }
                 )
                 .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty)
+                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
             }
         case .permissionAcknowledgement(let acknowledgement):
             VStack(spacing: 0) {
                 PermissionAcknowledgementView(acknowledgement: acknowledgement)
                     .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty)
+                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
             }
         case .choiceAcknowledgement(let acknowledgement):
             VStack(spacing: 0) {
                 ChoiceAcknowledgementView(acknowledgement: acknowledgement)
                     .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty)
+                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
             }
         case .composer:
-            composerBlock(isChatEmpty: isChatEmpty)
+            composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: floatsTopStrip, isEmbedded: false)
         }
     }
 
-    private func composerBlock(isChatEmpty: Bool) -> some View {
-        inputBar(isChatEmpty: isChatEmpty)
+    private func composerBlock(
+        isChatEmpty: Bool,
+        floatsTopStrip: Bool,
+        isEmbedded: Bool
+    ) -> some View {
+        inputBar(
+            isChatEmpty: isChatEmpty,
+            floatsTopStrip: floatsTopStrip,
+            isEmbedded: isEmbedded
+        )
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
                 guard viewportLayout.measureComposer(bounds) else { return }
                 scroller.viewportResized()
@@ -872,7 +901,8 @@ struct ChatPage: View {
         blocks: [ChatBlock],
         totalBlockCount: Int,
         sourceRange: Range<Int>,
-        sourceBlockIDs: [UUID]
+        sourceBlockIDs: [UUID],
+        dockClearance: CGFloat
     ) -> some View {
         let anchoredViewportHeight = max(
             0,
@@ -1138,7 +1168,11 @@ struct ChatPage: View {
         .accessibilityIdentifier(A11yID.Chat.scrollToBottom)
     }
 
-    private func scrollToBottomOffset(for dock: ChatDock, isChatEmpty: Bool) -> CGFloat {
+    private func scrollToBottomOffset(
+        for dock: ChatDock,
+        isChatEmpty: Bool,
+        floatsTopStrip: Bool
+    ) -> CGFloat {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
         let firstSurfaceTop: CGFloat
         switch dock.kind {
@@ -1152,7 +1186,8 @@ struct ChatPage: View {
                     && composer.draftAttachments.isEmpty
             firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
                 isResting: isResting,
-                showsTopStrip: showsTopStrip
+                showsTopStrip: showsTopStrip,
+                floatsTopStrip: floatsTopStrip
             )
         case .permission,
              .choice,
@@ -1161,10 +1196,14 @@ struct ChatPage: View {
              .choiceAcknowledgement:
             firstSurfaceTop = 0
         }
-        return firstSurfaceTop - Theme.Spacing.md - composerButtonSize - touchTargetInset
+        return firstSurfaceTop - ChatComposer.surfaceSpacing - composerButtonSize - touchTargetInset
     }
 
-    private func inputBar(isChatEmpty: Bool) -> some View {
+    private func inputBar(
+        isChatEmpty: Bool,
+        floatsTopStrip: Bool,
+        isEmbedded: Bool
+    ) -> some View {
         ChatComposer(
             composer: composer,
             speech: speechInput,
@@ -1175,6 +1214,8 @@ struct ChatPage: View {
             sessionID: chat.id,
             isChatEmpty: isChatEmpty,
             isBusy: chat.isBusy,
+            floatsTopStrip: floatsTopStrip,
+            isEmbedded: isEmbedded,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
             onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
@@ -1206,15 +1247,24 @@ struct ChatPage: View {
     private func dock(
         _ dock: ChatDock,
         chatBlocks: [ChatBlock],
-        totalBlockCount: Int
+        totalBlockCount: Int,
+        floatsTopStrip: Bool
     ) -> some View {
         let isChatEmpty = chat.canChangeRetention && chatBlocks.isEmpty
-        return dockHost(dock, isChatEmpty: isChatEmpty)
+        return dockHost(
+            dock,
+            isChatEmpty: isChatEmpty,
+            floatsTopStrip: floatsTopStrip
+        )
             .transition(.opacity)
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
                     scrollToBottomButton(totalBlockCount: totalBlockCount)
-                        .offset(y: scrollToBottomOffset(for: dock, isChatEmpty: isChatEmpty))
+                        .offset(y: scrollToBottomOffset(
+                            for: dock,
+                            isChatEmpty: isChatEmpty,
+                            floatsTopStrip: floatsTopStrip
+                        ))
                         .transition(.opacity)
                 }
             }

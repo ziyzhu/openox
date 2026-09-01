@@ -1,0 +1,16 @@
+{
+  "attachedServiceDomains" : [
+
+  ],
+  "createdAt" : 809850378.04500699,
+  "hasUnreadResponse" : false,
+  "id" : "A5167091-44A1-4DE9-9F46-75C323FAC88B",
+  "isFavorite" : false,
+  "model" : {
+    "modelID" : "mock",
+    "providerID" : "mock",
+    "region" : "global"
+  },
+  "monoRepositoryHash" : "7cd64f73e511518e08cc4f98371fd3ef439e1955b9e20dd77c1c7d5546ef81f2",
+  "schemaVersion" : 1
+}

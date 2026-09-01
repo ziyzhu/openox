@@ -73,7 +73,7 @@ The VM is the platform-neutral contract between skills and the Host. Skills depe
 
 The VM has no direct access to the network, Host filesystem, or mobile device. It operates through `ox.*`, with `ox.fs` presenting mounted content as a stable namespace without revealing its backing storage.
 
-The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in [`docs/VM.md`](docs/VM.md).
+The execution model, JavaScript capability bridge, limits, and virtual filesystem are documented in the [OpenOx Whitepaper](https://openox.ai/whitepaper#inside-vm).
 
 ## Ox Service Repository
 

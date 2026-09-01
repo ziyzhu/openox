@@ -52,6 +52,7 @@ nonisolated enum StorageMigrationError: LocalizedError {
     case missingConfig
     case localServiceRepositoryRollbackFailed(String)
     case profileMigrationFailed(String)
+    case unsupportedProfileVersion(String, String)
 
     var errorDescription: String? {
         switch self {
@@ -66,11 +67,15 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .missingConfig: "The Profile configuration could not be read."
         case .localServiceRepositoryRollbackFailed(let detail): "The Local service repository repair and rollback failed: \(detail)"
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
+        case .unsupportedProfileVersion(let name, let version):
+            "The Profile “\(name)” uses data format “\(version)”, which this version of Ox does not support. Install the Ox version that last opened it or a newer one."
         }
     }
 }
 
-nonisolated struct ContextRetentionMigrationReplay: Sendable {
+#if targetEnvironment(simulator)
+nonisolated struct StorageMigrationReplay: Sendable {
+    let currentVersion: String
     let versionUpdated: Bool
     let ordinaryContextRemoved: Bool
     let unreadableContextRetained: Bool
@@ -83,7 +88,27 @@ nonisolated struct ContextRetentionMigrationReplay: Sendable {
     let compactedExportRetainsContext: Bool
     let defaultModelMigrated: Bool
     let chatModelMigrated: Bool
+    let unsupportedVersionRejected: Bool
+    let fixtureResults: [StorageMigrationFixtureReplay]
 }
+
+nonisolated struct StorageMigrationFixtureEntry: Codable, Sendable {
+    let path: String
+    let base64: String?
+}
+
+nonisolated struct StorageMigrationFixture: Codable, Sendable {
+    let name: String
+    let before: [StorageMigrationFixtureEntry]
+    let after: [StorageMigrationFixtureEntry]
+}
+
+nonisolated struct StorageMigrationFixtureReplay: Codable, Sendable {
+    let name: String
+    let migratedAsExpected: Bool
+    let secondRunNoOp: Bool
+}
+#endif
 
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
@@ -135,6 +160,10 @@ nonisolated enum StorageMigrator {
     }
 
     static func migrate(_ profile: Profile) async throws -> Profile {
+        guard sourceVersion(for: profile.version) != nil else {
+            Log.app.error("StorageMigrator.reject unknown version=\(profile.version) id=\(profile.id)")
+            throw StorageMigrationError.unsupportedProfileVersion(profile.name, profile.version)
+        }
         guard await migrateProfile(profile) else {
             throw StorageMigrationError.profileMigrationFailed(profile.name)
         }
@@ -572,11 +601,8 @@ nonisolated enum StorageMigrator {
     }
 
     private static func migrateProfile(_ profile: Profile) async -> Bool {
-        let sourceVersion = ["2026-07-12", "2026-07-12-ids"].contains(profile.version) ? "2026-07-11" : profile.version
-        guard let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else {
-            Log.app.info("StorageMigrator.skip unknown version=\(profile.version) id=\(profile.id)")
-            return false
-        }
+        guard let sourceVersion = sourceVersion(for: profile.version),
+              let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else { return false }
         let target = ProfileSchema.versions.count - 1
         guard from < target else { return true }
         let url = profile.url
@@ -602,6 +628,11 @@ nonisolated enum StorageMigrator {
             Log.app.info("StorageMigrator.done id=\(id) version=\(ProfileSchema.current)")
             return true
         }.value
+    }
+
+    private static func sourceVersion(for version: String) -> String? {
+        let normalized = ["2026-07-12", "2026-07-12-ids"].contains(version) ? "2026-07-11" : version
+        return ProfileSchema.versions.contains(normalized) ? normalized : nil
     }
 
     nonisolated private static func materialize(at root: URL, timeout: TimeInterval = 60) async -> Bool {
@@ -1147,7 +1178,15 @@ nonisolated enum StorageMigrator {
     }
 
     #if targetEnvironment(simulator)
-    static func replayContextRetentionMigration(turns: [Turn]) async throws -> ContextRetentionMigrationReplay {
+    private enum StorageMigrationFixtureSnapshot: Equatable {
+        case directory
+        case file(Data)
+    }
+
+    static func replayStorageMigration(
+        turns: [Turn],
+        fixtures: [StorageMigrationFixture]
+    ) async throws -> StorageMigrationReplay {
         guard !turns.isEmpty,
               let lastAgent = turns.lastIndex(where: { if case .agent = $0 { return true }; return false }),
               case .agent(var compactedAgent, let compactedAgentID) = turns[lastAgent],
@@ -1289,6 +1328,29 @@ nonisolated enum StorageMigrator {
         let retainedContext = try decoder.decode(AgentContextCheckpoint.self, from: firstCompactedContext)
         let decodedMeta = try decoder.decode(ChatMeta.self, from: firstMigratedMetadata)
         _ = try await migrate(migrated)
+        let unsupportedProfile = Profile(
+            id: migrated.id,
+            name: migrated.name,
+            location: migrated.location,
+            url: migrated.url,
+            createdAt: migrated.createdAt,
+            version: "2099-01-01-future"
+        )
+        let unsupportedVersionRejected: Bool
+        do {
+            _ = try await migrate(unsupportedProfile)
+            unsupportedVersionRejected = false
+        } catch let error as StorageMigrationError {
+            if case .unsupportedProfileVersion = error {
+                unsupportedVersionRejected = true
+            } else {
+                unsupportedVersionRejected = false
+            }
+        }
+        var fixtureResults: [StorageMigrationFixtureReplay] = []
+        for fixture in fixtures {
+            fixtureResults.append(try await replay(fixture))
+        }
 
         let versionUpdated = ProfileIO.readConfig(at: root)?.version == ProfileSchema.current
         let ordinaryContextRemoved = !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
@@ -1311,7 +1373,8 @@ nonisolated enum StorageMigrator {
             && Data(contentsOf: migratedMetadataURL) == firstMigratedMetadata
             && !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
             && Data(contentsOf: unreadableContextURL) == ordinaryContextData
-        return ContextRetentionMigrationReplay(
+        return StorageMigrationReplay(
+            currentVersion: ProfileSchema.current,
             versionUpdated: versionUpdated,
             ordinaryContextRemoved: ordinaryContextRemoved,
             unreadableContextRetained: unreadableContextRetained,
@@ -1323,8 +1386,110 @@ nonisolated enum StorageMigrator {
             ordinaryExportOmitsContext: !ordinaryPackage.header.hasContext && ordinaryPackage.payload.context == nil,
             compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil,
             defaultModelMigrated: defaultModelMigrated,
-            chatModelMigrated: decodedMeta.model == selection
+            chatModelMigrated: decodedMeta.model == selection,
+            unsupportedVersionRejected: unsupportedVersionRejected,
+            fixtureResults: fixtureResults
         )
+    }
+
+    private static func replay(_ fixture: StorageMigrationFixture) async throws -> StorageMigrationFixtureReplay {
+        let root = try FileStaging.createDirectory(
+            in: FileManager.default.temporaryDirectory,
+            prefix: "storage-migration-fixture"
+        )
+        defer { FileStaging.cleanup(root, operation: "storage-migration-fixture") }
+        try write(fixture.before, to: root)
+        guard let profile = ProfileIO.profile(at: root, location: .local) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let migrated = try await migrate(profile)
+        let firstSnapshot = try snapshot(at: root)
+        let expectedSnapshot = try decodedEntries(fixture.after)
+        _ = try await migrate(migrated)
+        return StorageMigrationFixtureReplay(
+            name: fixture.name,
+            migratedAsExpected: firstSnapshot == expectedSnapshot,
+            secondRunNoOp: try snapshot(at: root) == firstSnapshot
+        )
+    }
+
+    private static func write(_ entries: [StorageMigrationFixtureEntry], to root: URL) throws {
+        for (path, entry) in try decodedEntries(entries).sorted(by: { $0.key < $1.key }) {
+            let destination = try fixtureURL(path, in: root)
+            switch entry {
+            case .directory:
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            case .file(let data):
+                try FileManager.default.createDirectory(
+                    at: destination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try data.write(to: destination, options: .atomic)
+            }
+        }
+    }
+
+    private static func decodedEntries(
+        _ entries: [StorageMigrationFixtureEntry]
+    ) throws -> [String: StorageMigrationFixtureSnapshot] {
+        var decoded: [String: StorageMigrationFixtureSnapshot] = [:]
+        for entry in entries {
+            guard decoded[entry.path] == nil else { throw CocoaError(.fileReadCorruptFile) }
+            let snapshot: StorageMigrationFixtureSnapshot
+            if let base64 = entry.base64 {
+                guard let data = Data(base64Encoded: base64) else { throw CocoaError(.fileReadCorruptFile) }
+                snapshot = .file(data)
+            } else {
+                snapshot = .directory
+            }
+            _ = try fixtureURL(entry.path, in: FileManager.default.temporaryDirectory)
+            decoded[entry.path] = snapshot
+        }
+        return decoded
+    }
+
+    private static func fixtureURL(_ path: String, in root: URL) throws -> URL {
+        let components = path.split(separator: "/", omittingEmptySubsequences: false)
+        guard !path.hasPrefix("/"),
+              !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            throw CocoaError(.fileReadInvalidFileName)
+        }
+        return components.reduce(root) { url, component in
+            url.appendingPathComponent(String(component), isDirectory: false)
+        }
+    }
+
+    private static func snapshot(at root: URL) throws -> [String: StorageMigrationFixtureSnapshot] {
+        try snapshot(directory: root, relativePath: "")
+    }
+
+    private static func snapshot(
+        directory: URL,
+        relativePath: String
+    ) throws -> [String: StorageMigrationFixtureSnapshot] {
+        var result: [String: StorageMigrationFixtureSnapshot] = [:]
+        let items = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+        ).sorted { $0.lastPathComponent < $1.lastPathComponent }
+        for item in items {
+            let values = try item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isSymbolicLink != true else { throw CocoaError(.fileReadInvalidFileName) }
+            let path = relativePath.isEmpty ? item.lastPathComponent : "\(relativePath)/\(item.lastPathComponent)"
+            if values.isDirectory == true {
+                result[path] = .directory
+                for (childPath, entry) in try snapshot(directory: item, relativePath: path) {
+                    guard result[childPath] == nil else { throw CocoaError(.fileReadCorruptFile) }
+                    result[childPath] = entry
+                }
+            } else if values.isRegularFile == true {
+                result[path] = .file(try Data(contentsOf: item))
+            } else {
+                throw CocoaError(.fileReadUnknown)
+            }
+        }
+        return result
     }
     #endif
 

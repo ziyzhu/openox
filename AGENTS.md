@@ -29,7 +29,7 @@
 1. Keep machine-specific state, build products, dependency caches, diagnostics, recordings, traces, and generated reports outside the repository unless they are intentionally reviewed fixtures.
 1. When collaborators need an uncommitted file, provide a sanitized example or generator that contains no private values.
 
-## npm Releases
+## NPM Releases
 
 1. Public npm package source, verification, and Trusted Publishing workflows belong in this repository so provenance resolves to the public source revision.
 1. Bootstrap an unregistered package only from an exact `package:check` tarball through an interactive npm session with two-factor authentication.
