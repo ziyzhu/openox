@@ -38,6 +38,59 @@ private struct EmptyChatMark: View {
     }
 }
 
+private struct ScrollToBottomButton: View {
+    let composerButtonSize: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.down")
+                .font(.system(.subheadline, weight: .medium))
+                .foregroundStyle(Theme.Colors.onSurface)
+                .frame(width: composerButtonSize, height: composerButtonSize)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .minimumTouchTarget()
+        .accessibilityLabel(A11yLabel.scrollToBottom)
+        .accessibilityIdentifier(A11yID.Chat.scrollToBottom)
+    }
+}
+
+private struct ScrollToBottomControl: View {
+    let composer: ChatComposerModel
+    let composerFocused: Bool
+    let isChatEmpty: Bool
+    let hasArtifacts: Bool
+    let hasAttachedServices: Bool
+    let isBusy: Bool
+    let floatsTopStrip: Bool
+    let composerButtonSize: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        ScrollToBottomButton(composerButtonSize: composerButtonSize, action: action)
+            .offset(y: offset)
+    }
+
+    private var offset: CGFloat {
+        let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
+        let isResting = !composerFocused && composer.isEmpty
+        let showsTopStrip = hasArtifacts
+            || hasAttachedServices
+            || isChatEmpty
+                && !isBusy
+                && composer.draft.isEmpty
+                && composer.draftAttachments.isEmpty
+        let firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
+            isResting: isResting,
+            showsTopStrip: showsTopStrip,
+            floatsTopStrip: floatsTopStrip
+        )
+        return firstSurfaceTop - ChatComposer.surfaceSpacing - composerButtonSize - touchTargetInset
+    }
+}
+
 struct ChatPage: View {
     let chat: Chat
     let composerFocusRequestID: UUID?
@@ -326,7 +379,10 @@ struct ChatPage: View {
         .accessibilityHidden(speechInput.isPresented)
         .overlay(alignment: .bottom) {
             if !showsComposer, scroller.showsJumpButton {
-                scrollToBottomButton(totalBlockCount: totalBlockCount)
+                ScrollToBottomButton(composerButtonSize: composerButtonSize) {
+                    transcriptWindow.showLatest(total: totalBlockCount)
+                    DispatchQueue.main.async { scroller.rideToBottom() }
+                }
                     .padding(.bottom, Theme.Spacing.md)
                     .transition(.opacity)
             }
@@ -1188,40 +1244,6 @@ struct ChatPage: View {
         Log.ui.info("Transcript.window chat=\(chat.id) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") reason=\(reason)")
     }
 
-    private func scrollToBottomButton(totalBlockCount: Int) -> some View {
-        Button {
-            transcriptWindow.showLatest(total: totalBlockCount)
-            DispatchQueue.main.async { scroller.rideToBottom() }
-        } label: {
-            Image(systemName: "arrow.down")
-                .font(.system(.subheadline, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: composerButtonSize, height: composerButtonSize)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .minimumTouchTarget()
-        .accessibilityLabel(A11yLabel.scrollToBottom)
-        .accessibilityIdentifier(A11yID.Chat.scrollToBottom)
-    }
-
-    private func scrollToBottomOffset(isChatEmpty: Bool, floatsTopStrip: Bool) -> CGFloat {
-        let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
-        let isResting = !composerFocused && composer.isEmpty
-        let showsTopStrip = !chatArtifacts.isEmpty
-            || !chat.attachedServices.isEmpty
-            || isChatEmpty
-                && !chat.isBusy
-                && composer.draft.isEmpty
-                && composer.draftAttachments.isEmpty
-        let firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
-            isResting: isResting,
-            showsTopStrip: showsTopStrip,
-            floatsTopStrip: floatsTopStrip
-        )
-        return firstSurfaceTop - ChatComposer.surfaceSpacing - composerButtonSize - touchTargetInset
-    }
-
     private func inputBar(
         isChatEmpty: Bool,
         floatsTopStrip: Bool,
@@ -1276,11 +1298,19 @@ struct ChatPage: View {
             .transition(.opacity)
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
-                    scrollToBottomButton(totalBlockCount: totalBlockCount)
-                        .offset(y: scrollToBottomOffset(
-                            isChatEmpty: isChatEmpty,
-                            floatsTopStrip: floatsTopStrip
-                        ))
+                    ScrollToBottomControl(
+                        composer: composer,
+                        composerFocused: composerFocused,
+                        isChatEmpty: isChatEmpty,
+                        hasArtifacts: !chatArtifacts.isEmpty,
+                        hasAttachedServices: !chat.attachedServices.isEmpty,
+                        isBusy: chat.isBusy,
+                        floatsTopStrip: floatsTopStrip,
+                        composerButtonSize: composerButtonSize
+                    ) {
+                        transcriptWindow.showLatest(total: totalBlockCount)
+                        DispatchQueue.main.async { scroller.rideToBottom() }
+                    }
                         .transition(.opacity)
                 }
             }
