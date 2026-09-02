@@ -1165,7 +1165,6 @@ struct ChatComposer: View, Equatable {
 struct ComposerServicePicker: View {
     @Bindable var composer: ChatComposerModel
     let excludedDomains: Set<String>
-    let space: CGFloat
     let composerHeight: CGFloat
     let onSelect: (Service) -> Void
     let onExplore: () -> Void
@@ -1173,16 +1172,19 @@ struct ComposerServicePicker: View {
     @ViewBuilder
     var body: some View {
         if case .mention(let query) = composer.surface {
-            ServicePickerPanel(
-                query: query,
-                excludedDomains: excludedDomains,
-                space: space,
-                onSelect: onSelect,
-                onExplore: onExplore
-            )
-            .frame(maxWidth: Theme.ContainerWidth.readable)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.bottom, composerHeight + Theme.Spacing.xs)
+            GeometryReader { geometry in
+                ServicePickerPanel(
+                    query: query,
+                    excludedDomains: excludedDomains,
+                    space: max(0, geometry.size.height - composerHeight),
+                    onSelect: onSelect,
+                    onExplore: onExplore
+                )
+                .frame(maxWidth: Theme.ContainerWidth.readable)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
         }
     }
 }
@@ -1190,7 +1192,6 @@ struct ComposerServicePicker: View {
 struct ComposerSlashPicker: View {
     @Bindable var composer: ChatComposerModel
     let isFocused: Bool
-    let space: CGFloat
     let composerHeight: CGFloat
     let onSelect: (Skill) -> Void
 
@@ -1198,14 +1199,17 @@ struct ComposerSlashPicker: View {
     var body: some View {
         let suggestions = composer.slashSuggestions
         if isFocused, !suggestions.isEmpty {
-            SlashPickerPanel(
-                suggestions: suggestions,
-                space: space,
-                onSelect: onSelect
-            )
-            .frame(maxWidth: Theme.ContainerWidth.readable)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.bottom, composerHeight + Theme.Spacing.xs)
+            GeometryReader { geometry in
+                SlashPickerPanel(
+                    suggestions: suggestions,
+                    space: max(0, geometry.size.height - composerHeight),
+                    onSelect: onSelect
+                )
+                .frame(maxWidth: Theme.ContainerWidth.readable)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.easeOut(duration: Theme.Animation.standard), value: suggestions.map(\.id))
         }

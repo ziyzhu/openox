@@ -3,18 +3,14 @@ import SwiftUI
 struct ChatViewportLayout {
     static let responseComposerSpacing: CGFloat = 48
 
-    var composerTop: CGFloat = 0
     var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
     var anchorFloor: CGFloat = 0
     var anchorContentHeight: CGFloat = 0
 
-    mutating func measureComposer(_ bounds: CGRect) -> Bool {
-        let changed = abs(composerTop - bounds.minY) > 0.5
-            || abs(composerHeight - bounds.height) > 0.5
-        guard changed else { return false }
-        composerTop = bounds.minY
-        composerHeight = bounds.height
+    mutating func measureComposerHeight(_ height: CGFloat) -> Bool {
+        guard abs(composerHeight - height) > 0.5 else { return false }
+        composerHeight = height
         return true
     }
 

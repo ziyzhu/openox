@@ -568,7 +568,6 @@ struct ChatPage: View {
         ComposerServicePicker(
             composer: composer,
             excludedDomains: Set(chat.attachedServices.map(\.domain)),
-            space: viewportLayout.composerTop,
             composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
             onSelect: selectMentionService,
             onExplore: openServiceExplorer
@@ -579,7 +578,6 @@ struct ChatPage: View {
         ComposerSlashPicker(
             composer: composer,
             isFocused: composerFocused,
-            space: viewportLayout.composerTop,
             composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
             onSelect: { submitSkill($0, argument: "") }
         )
@@ -785,8 +783,8 @@ struct ChatPage: View {
             floatsTopStrip: floatsTopStrip,
             isEmbedded: isEmbedded
         )
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-                guard viewportLayout.measureComposer(bounds) else { return }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                guard viewportLayout.measureComposerHeight(height) else { return }
                 scroller.viewportResized()
             }
     }
