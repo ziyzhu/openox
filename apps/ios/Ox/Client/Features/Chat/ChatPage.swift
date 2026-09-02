@@ -116,7 +116,6 @@ struct ChatPage: View {
     @State private var copiedBlockId: UUID?
     @State private var messageSpeech = MessageSpeechPlayback()
     @State private var toast: Toast?
-    @State private var dockAcknowledgement: ChatDock.Acknowledgement?
     @State private var runningServiceControlID: UUID?
     @State private var choiceInputFocused = false
 
@@ -238,6 +237,8 @@ struct ChatPage: View {
 
     private var page: some View {
         let totalBlockCount = chat.transcriptBlockCount
+        let interaction = activeInteraction
+        let activeInteractionID = interactionID(for: interaction)
         let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
         let sourceWindow = chat.blocksWithTurnID(
             in: requestedSourceRange
@@ -245,22 +246,22 @@ struct ChatPage: View {
         let projectedBlocks = ChatBlock.project(
             sourceWindow.blocks,
             thinkingActivity: chat.thinkingActivity,
-            isBusy: chat.isBusy
+            isBusy: chat.isBusy,
+            interaction: interaction
         )
         let requestedOffset = requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
         let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
         let blocks: [ChatBlock]
         if requestedOffset > 0 {
             let requestedSourceIDSet = Set(requestedSourceIDs)
-            blocks = projectedBlocks.filter { requestedSourceIDSet.contains($0.sourceBlockID) }
+            blocks = projectedBlocks.filter {
+                requestedSourceIDSet.contains($0.sourceBlockID) || $0.isActiveInteraction
+            }
         } else {
             blocks = projectedBlocks
         }
-        let dockState = ChatDock.project(
-            interaction: activeInteraction,
-            acknowledgement: dockAcknowledgement
-        )
-        let floatsTopStrip = floatsTopStrip(for: dockState)
+        let showsComposer = interaction == nil
+        let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ChatViewportLayout.responseComposerSpacing
             + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
         let authProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
@@ -308,25 +309,37 @@ struct ChatPage: View {
             }
         return transcript
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                dock(
-                    dockState,
-                    chatBlocks: blocks,
-                    totalBlockCount: totalBlockCount,
-                    floatsTopStrip: floatsTopStrip
-                )
-                    .frame(maxWidth: Theme.ContainerWidth.readable)
-                    .frame(maxWidth: .infinity)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
-                        scroller.viewportResized()
-                    }
+                if showsComposer {
+                    composerDock(
+                        isChatEmpty: chat.canChangeRetention && blocks.isEmpty,
+                        totalBlockCount: totalBlockCount,
+                        floatsTopStrip: floatsTopStrip
+                    )
+                        .frame(maxWidth: Theme.ContainerWidth.readable)
+                        .frame(maxWidth: .infinity)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
+                            scroller.viewportResized()
+                        }
+                }
         }
         .background(Theme.Colors.chatSurface)
         .accessibilityHidden(speechInput.isPresented)
         .overlay(alignment: .bottom) {
-            servicePickerOverlay(floatsTopStrip: floatsTopStrip)
+            if !showsComposer, scroller.showsJumpButton {
+                scrollToBottomButton(totalBlockCount: totalBlockCount)
+                    .padding(.bottom, Theme.Spacing.md)
+                    .transition(.opacity)
+            }
         }
         .overlay(alignment: .bottom) {
-            slashPickerOverlay(floatsTopStrip: floatsTopStrip)
+            if showsComposer {
+                servicePickerOverlay(floatsTopStrip: floatsTopStrip)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showsComposer {
+                slashPickerOverlay(floatsTopStrip: floatsTopStrip)
+            }
         }
         .overlay {
             if speechInput.isPresented {
@@ -340,6 +353,9 @@ struct ChatPage: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { speechInput.interrupt() }
+        }
+        .onChange(of: showsComposer) { _, visible in
+            if !visible { composerFocused = false }
         }
         .onChange(of: chat.id) { _, _ in
             speechInput.cancel(reason: "chatChanged")
@@ -380,6 +396,14 @@ struct ChatPage: View {
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
+        }
+        .task(id: activeInteractionID) {
+            guard let activeInteractionID else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            transcriptWindow.showLatest(total: totalBlockCount)
+            scroller.rideToBottom()
+            Log.ui.info("ChatPage.interactionPresent chat=\(chat.id) interaction=\(activeInteractionID)")
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: sheetModal, onDismiss: presentPendingArtifactPreview) { presented in
@@ -647,7 +671,7 @@ struct ChatPage: View {
     }
 
     private var showsActivity: Bool {
-        chat.activity.isThinking && chat.thinkingActivity == nil
+        chat.isBusy && activeInteraction == nil && chat.thinkingActivity == nil
     }
 
     private var chatArtifacts: [Artifact] {
@@ -671,9 +695,8 @@ struct ChatPage: View {
         viewportLayout.slack(hasAnchor: anchoredTurnID != nil)
     }
 
-    private func floatsTopStrip(for dock: ChatDock) -> Bool {
-        guard case .composer = dock.kind else { return false }
-        return !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty
+    private func floatsTopStrip(showsComposer: Bool) -> Bool {
+        showsComposer && (!chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
@@ -710,67 +733,76 @@ struct ChatPage: View {
                 isVisible: phase.isVisible,
                 controls: messageControls(sourceBlockID: block.sourceBlockID)
             )
+        case .prompt(let prompt):
+            promptBlock(prompt, sourceBlockID: block.sourceBlockID)
+                .padding(.horizontal, 4)
+        case .serviceControl(let control, let interactionID):
+            serviceControlBlock(control, interactionID: interactionID)
+                .padding(.horizontal, 4)
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction:
             transcriptContentBlock(block)
         }
     }
 
     @ViewBuilder
-    private func dockHost(
-        _ dock: ChatDock,
-        isChatEmpty: Bool,
-        floatsTopStrip: Bool
-    ) -> some View {
-        switch dock.kind {
-        case .permission(let request):
-            PermissionRequestCard(request: request) { option in
-                chat.resolvePrompt(blockId: request.id, answer: option)
-                dockAcknowledgement = .permission(request.acknowledgement(for: option))
+    private func promptBlock(_ prompt: ChatPromptBlock, sourceBlockID: UUID) -> some View {
+        switch prompt.kind {
+        case .permission:
+            if let request = PermissionRequest(
+                id: sourceBlockID,
+                prompt: prompt.prompt,
+                options: prompt.options
+            ) {
+                PermissionRequestCard(
+                    request: request,
+                    selection: prompt.answer,
+                    resolution: prompt.resolution
+                ) { option in
+                    guard prompt.isActive else { return }
+                    chat.resolvePrompt(blockId: sourceBlockID, answer: option)
+                }
+                .allowsHitTesting(prompt.isActive)
+                .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
+            } else if prompt.isActive {
+                ActivityBubble()
             }
-            .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-        case .choice(let request):
-            AgentChoiceRequestCard(request: request, onCustomFocusChange: { focused in
-                choiceInputFocused = focused
-            }) { option in
-                chat.resolvePrompt(blockId: request.id, answer: option)
-                dockAcknowledgement = .choice(ChoiceAcknowledgement(id: request.id, selection: option))
+        case .choice:
+            let request = AgentChoiceRequest(
+                id: sourceBlockID,
+                prompt: prompt.prompt,
+                options: prompt.options,
+                allowsCustomAnswer: prompt.allowsCustomAnswer
+            )
+            AgentChoiceRequestCard(
+                request: request,
+                selection: prompt.answer,
+                resolution: prompt.resolution,
+                onCustomFocusChange: { choiceInputFocused = $0 }
+            ) { option in
+                guard prompt.isActive else { return }
+                chat.resolvePrompt(blockId: sourceBlockID, answer: option)
             }
-            .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-        case .serviceControl(let item):
-            VStack(spacing: 0) {
-                ServiceControlView(
-                    control: item.control,
-                    signIn: { domain in
-                        runningServiceControlID = item.id
-                        let succeeded = await chat.signInService(domain: domain, resumeAgent: false)
-                        if !succeeded { runningServiceControlID = nil }
-                        return succeeded
-                    },
-                    completeBotControl: { await chat.completeBotControl(domain: $0, args: $1, resumeAgent: false) },
-                    completePayment: { await chat.completePayment(domain: $0, args: $1) },
-                    onResolved: { result in
-                        runningServiceControlID = nil
-                        chat.resolveServiceControl(id: item.id, result: result)
-                    }
-                )
-                .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
-            }
-        case .permissionAcknowledgement(let acknowledgement):
-            VStack(spacing: 0) {
-                PermissionAcknowledgementView(acknowledgement: acknowledgement)
-                    .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
-            }
-        case .choiceAcknowledgement(let acknowledgement):
-            VStack(spacing: 0) {
-                ChoiceAcknowledgementView(acknowledgement: acknowledgement)
-                    .padding(.horizontal, Theme.Spacing.sm + Theme.Spacing.xs)
-                composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: false, isEmbedded: true)
-            }
-        case .composer:
-            composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: floatsTopStrip, isEmbedded: false)
+            .allowsHitTesting(prompt.isActive)
+            .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
         }
+    }
+
+    private func serviceControlBlock(_ control: ServiceControl, interactionID: UUID) -> some View {
+        ServiceControlView(
+            control: control,
+            signIn: { domain in
+                runningServiceControlID = interactionID
+                let succeeded = await chat.signInService(domain: domain, resumeAgent: false)
+                if !succeeded { runningServiceControlID = nil }
+                return succeeded
+            },
+            completeBotControl: { await chat.completeBotControl(domain: $0, args: $1, resumeAgent: false) },
+            completePayment: { await chat.completePayment(domain: $0, args: $1) },
+            onResolved: { result in
+                runningServiceControlID = nil
+                chat.resolveServiceControl(id: interactionID, result: result)
+            }
+        )
     }
 
     private func composerBlock(
@@ -790,12 +822,12 @@ struct ChatPage: View {
     }
 
     private func transcriptContentBlock(_ block: ChatBlock) -> some View {
-        let isStreamingTail = chat.isBusy && block.sourceBlockID == chat.transcript.last?.id
+        let isTail = block.sourceBlockID == chat.transcript.last?.id
         return BlockView(
             block: block,
-            isStreamingTail: isStreamingTail,
+            isStreamingTail: chat.isBusy && isTail,
             chatID: chat.id,
-            continuesThinking: isStreamingTail && chat.activity.isThinking,
+            isThinkingTail: chat.activity.isThinking && isTail,
             controls: messageControls(
                 sourceBlockID: block.sourceBlockID,
                 editableBlock: editableBlock(block)
@@ -814,7 +846,7 @@ struct ChatPage: View {
             kind = .userText(text, attachments: attachments)
         case .userSkill(let invocation, let attachments):
             kind = .userSkill(invocation, attachments: attachments)
-        case .agentContent, .thinking, .contextCompaction, .responseFooter:
+        case .agentContent, .thinking, .contextCompaction, .prompt, .serviceControl, .responseFooter:
             return nil
         }
         return Block(id: block.sourceBlockID, createdAt: block.createdAt, kind: kind)
@@ -1166,34 +1198,20 @@ struct ChatPage: View {
         .accessibilityIdentifier(A11yID.Chat.scrollToBottom)
     }
 
-    private func scrollToBottomOffset(
-        for dock: ChatDock,
-        isChatEmpty: Bool,
-        floatsTopStrip: Bool
-    ) -> CGFloat {
+    private func scrollToBottomOffset(isChatEmpty: Bool, floatsTopStrip: Bool) -> CGFloat {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
-        let firstSurfaceTop: CGFloat
-        switch dock.kind {
-        case .composer:
-            let isResting = !composerFocused && composer.isEmpty
-            let showsTopStrip = !chatArtifacts.isEmpty
-                || !chat.attachedServices.isEmpty
-                || isChatEmpty
-                    && !chat.isBusy
-                    && composer.draft.isEmpty
-                    && composer.draftAttachments.isEmpty
-            firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
-                isResting: isResting,
-                showsTopStrip: showsTopStrip,
-                floatsTopStrip: floatsTopStrip
-            )
-        case .permission,
-             .choice,
-             .serviceControl,
-             .permissionAcknowledgement,
-             .choiceAcknowledgement:
-            firstSurfaceTop = 0
-        }
+        let isResting = !composerFocused && composer.isEmpty
+        let showsTopStrip = !chatArtifacts.isEmpty
+            || !chat.attachedServices.isEmpty
+            || isChatEmpty
+                && !chat.isBusy
+                && composer.draft.isEmpty
+                && composer.draftAttachments.isEmpty
+        let firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
+            isResting: isResting,
+            showsTopStrip: showsTopStrip,
+            floatsTopStrip: floatsTopStrip
+        )
         return firstSurfaceTop - ChatComposer.surfaceSpacing - composerButtonSize - touchTargetInset
     }
 
@@ -1242,24 +1260,17 @@ struct ChatPage: View {
         }
     }
 
-    private func dock(
-        _ dock: ChatDock,
-        chatBlocks: [ChatBlock],
+    private func composerDock(
+        isChatEmpty: Bool,
         totalBlockCount: Int,
         floatsTopStrip: Bool
     ) -> some View {
-        let isChatEmpty = chat.canChangeRetention && chatBlocks.isEmpty
-        return dockHost(
-            dock,
-            isChatEmpty: isChatEmpty,
-            floatsTopStrip: floatsTopStrip
-        )
+        composerBlock(isChatEmpty: isChatEmpty, floatsTopStrip: floatsTopStrip, isEmbedded: false)
             .transition(.opacity)
             .overlay(alignment: .top) {
                 if scroller.showsJumpButton {
                     scrollToBottomButton(totalBlockCount: totalBlockCount)
                         .offset(y: scrollToBottomOffset(
-                            for: dock,
                             isChatEmpty: isChatEmpty,
                             floatsTopStrip: floatsTopStrip
                         ))
@@ -1268,18 +1279,8 @@ struct ChatPage: View {
             }
             .animation(
                 reduceMotion ? nil : .easeOut(duration: Theme.Animation.standard),
-                value: dock.id
-            )
-            .animation(
-                reduceMotion ? nil : .easeOut(duration: Theme.Animation.standard),
                 value: scroller.showsJumpButton
             )
-            .task(id: dockAcknowledgement?.id) {
-                guard let id = dockAcknowledgement?.id else { return }
-                try? await Task.sleep(for: .seconds(3))
-                guard !Task.isCancelled, dockAcknowledgement?.id == id else { return }
-                dockAcknowledgement = nil
-            }
     }
 
     private var activeInteraction: Chat.Interaction? {
@@ -1287,6 +1288,14 @@ struct ChatPage: View {
             return chat.interaction
         }
         return activeServiceControl(control).map(Chat.Interaction.serviceControl)
+    }
+
+    private func interactionID(for interaction: Chat.Interaction?) -> UUID? {
+        switch interaction {
+        case .prompt(let prompt): prompt.id
+        case .serviceControl(let control): control.id
+        case nil: nil
+        }
     }
 
     private func activeServiceControl(_ item: Chat.PendingServiceControl?) -> Chat.PendingServiceControl? {

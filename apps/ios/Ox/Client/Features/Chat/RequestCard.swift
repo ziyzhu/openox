@@ -11,17 +11,16 @@ struct PermissionRequest: Identifiable, Equatable {
 
     @MainActor private static var actionIconKindsByTitle: [String: OxActionIconKind] = [:]
 
-    @MainActor init?(_ request: Chat.PendingPrompt) {
-        guard request.kind == .permission,
-              let approve = request.options.first,
-              let deny = request.options.last,
+    @MainActor init?(id: UUID, prompt: String, options: [String]) {
+        guard let approve = options.first,
+              let deny = options.last,
               approve != deny else { return nil }
-        id = request.id
-        prompt = request.prompt
+        self.id = id
+        self.prompt = prompt
         self.approve = approve
-        alwaysApprove = request.options.count == 3 ? request.options[1] : nil
+        alwaysApprove = options.count == 3 ? options[1] : nil
         self.deny = deny
-        let title = RequestCardCopy(request.prompt).title
+        let title = RequestCardCopy(prompt).title
         actionIconKind = title.contains(" - ")
             ? nil
             : Self.actionIconKind(for: title)
@@ -60,51 +59,9 @@ struct PermissionRequest: Identifiable, Equatable {
         return "\(copy.title[..<range.lowerBound]) · \(copy.title[range.upperBound...])"
     }
 
-    func acknowledgement(for selection: String) -> PermissionAcknowledgement {
-        let decision: PermissionAcknowledgement.Decision
-        if selection == deny {
-            decision = .denied
-        } else if let alwaysApprove, selection == alwaysApprove {
-            decision = .alwaysApproved
-        } else {
-            decision = .approved
-        }
-        return PermissionAcknowledgement(id: id, actionName: actionName, decision: decision)
+    var options: [String] {
+        [approve, alwaysApprove, deny].compactMap { $0 }
     }
-}
-
-struct PermissionAcknowledgement: Identifiable, Equatable {
-    enum Decision: Equatable {
-        case approved
-        case alwaysApproved
-        case denied
-
-        var title: String {
-            switch self {
-            case .approved: String(localized: "Approved")
-            case .alwaysApproved: String(localized: "Always approved")
-            case .denied: String(localized: "Denied")
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .approved, .alwaysApproved: "checkmark.circle.fill"
-            case .denied: "xmark.circle.fill"
-            }
-        }
-
-        var isApproved: Bool {
-            switch self {
-            case .approved, .alwaysApproved: true
-            case .denied: false
-            }
-        }
-    }
-
-    let id: UUID
-    let actionName: String
-    let decision: Decision
 }
 
 struct AgentChoiceRequest: Identifiable, Equatable {
@@ -113,22 +70,18 @@ struct AgentChoiceRequest: Identifiable, Equatable {
     let options: [String]
     let allowsCustomAnswer: Bool
 
-    init?(_ request: Chat.PendingPrompt) {
-        guard request.kind == .choice else { return nil }
-        id = request.id
-        prompt = request.prompt
-        options = request.options
-        allowsCustomAnswer = request.allowsCustomAnswer
+    init(id: UUID, prompt: String, options: [String], allowsCustomAnswer: Bool) {
+        self.id = id
+        self.prompt = prompt
+        self.options = options
+        self.allowsCustomAnswer = allowsCustomAnswer
     }
-}
-
-struct ChoiceAcknowledgement: Identifiable, Equatable {
-    let id: UUID
-    let selection: String
 }
 
 struct AgentChoiceRequestCard: View {
     let request: AgentChoiceRequest
+    var selection: String? = nil
+    var resolution: String? = nil
     let onCustomFocusChange: (Bool) -> Void
     let onSelect: (String) -> Void
 
@@ -139,8 +92,8 @@ struct AgentChoiceRequestCard: View {
         RequestCard(title: copy.title, message: copy.message) {
             RequestCardOptions(
                 options: request.options,
-                selection: nil,
-                resolution: nil,
+                selection: selection,
+                resolution: resolution,
                 onCustomFocusChange: onCustomFocusChange,
                 kind: .choice(allowsCustomAnswer: request.allowsCustomAnswer),
                 onSelect: onSelect
@@ -156,31 +109,10 @@ struct AgentChoiceRequestCard: View {
     }
 }
 
-struct ChoiceAcknowledgementView: View {
-    let acknowledgement: ChoiceAcknowledgement
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(.subheadline, weight: .semibold))
-                .foregroundStyle(Theme.Colors.primary)
-                .accessibilityHidden(true)
-            Text(acknowledgement.selection)
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(acknowledgement.selection)
-        .accessibilityIdentifier(A11yID.Chat.choiceAcknowledgement)
-        .alertGlassPill(in: Capsule())
-    }
-}
-
 struct PermissionRequestCard: View {
     let request: PermissionRequest
+    var selection: String? = nil
+    var resolution: String? = nil
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -224,18 +156,18 @@ struct PermissionRequestCard: View {
 
     @ViewBuilder
     private var permissionActions: some View {
-        if submittedSelection == nil {
-            PermissionActionButtons(
-                options: [request.approve, request.alwaysApprove, request.deny].compactMap { $0 },
-                onSelect: select
-            )
-            .transition(.opacity)
-        } else if let submittedSelection {
-            PermissionAcknowledgementView(
-                acknowledgement: request.acknowledgement(for: submittedSelection),
-                displaysGlass: false
+        if let selection = selection ?? submittedSelection {
+            RequestCardOptions(
+                options: request.options,
+                selection: selection,
+                resolution: resolution,
+                kind: .permission,
+                onSelect: onSelect
             )
                 .transition(.scale(scale: 0.97).combined(with: .opacity))
+        } else {
+            PermissionActionButtons(options: request.options, onSelect: select)
+                .transition(.opacity)
         }
     }
 
@@ -246,43 +178,6 @@ struct PermissionRequestCard: View {
             submittedSelection = option
         }
         onSelect(option)
-    }
-}
-
-struct PermissionAcknowledgementView: View {
-    let acknowledgement: PermissionAcknowledgement
-    var displaysGlass = true
-
-    @ViewBuilder
-    var body: some View {
-        if displaysGlass {
-            label
-                .alertGlassPill(in: Capsule())
-        } else {
-            label
-        }
-    }
-
-    private var label: some View {
-        HStack(spacing: 6) {
-            Image(systemName: acknowledgement.decision.systemImage)
-                .font(.system(.subheadline, weight: .semibold))
-                .foregroundStyle(
-                    acknowledgement.decision.isApproved
-                        ? Theme.Colors.primary
-                        : Theme.Colors.onSurfaceMuted
-                )
-                .accessibilityHidden(true)
-            Text(verbatim: "\(acknowledgement.decision.title) · \(acknowledgement.actionName)")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(acknowledgement.decision.title), \(acknowledgement.actionName)")
-        .accessibilityIdentifier(A11yID.Chat.permissionAcknowledgement)
     }
 }
 

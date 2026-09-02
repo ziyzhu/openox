@@ -1,5 +1,15 @@
 import SwiftUI
 
+struct ChatPromptBlock: Equatable {
+    let kind: ChatPromptKind
+    let prompt: String
+    let options: [String]
+    let answer: String?
+    let resolution: String?
+    let allowsCustomAnswer: Bool
+    let isActive: Bool
+}
+
 struct ChatBlock: Identifiable, Equatable {
     enum ResponseFooterPhase: Equatable {
         case streaming
@@ -14,6 +24,8 @@ struct ChatBlock: Identifiable, Equatable {
         case agentContent(ContentItem)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
+        case prompt(ChatPromptBlock)
+        case serviceControl(ServiceControl, interactionID: UUID)
         case responseFooter(text: String, phase: ResponseFooterPhase)
     }
 
@@ -26,7 +38,7 @@ struct ChatBlock: Identifiable, Equatable {
     var isUserInitiated: Bool {
         switch kind {
         case .userText, .userSkill: true
-        case .agentContent, .thinking, .contextCompaction, .responseFooter: false
+        case .agentContent, .thinking, .contextCompaction, .prompt, .serviceControl, .responseFooter: false
         }
     }
 
@@ -44,9 +56,22 @@ struct ChatBlock: Identifiable, Equatable {
         guard case .thinking(let trace) = kind else { return false }
         return trace.isEmpty && trace.completedAt == nil
     }
+
+    var isActiveInteraction: Bool {
+        switch kind {
+        case .prompt(let prompt): prompt.isActive
+        case .serviceControl: true
+        case .userText, .userSkill, .agentContent, .thinking, .contextCompaction, .responseFooter: false
+        }
+    }
 }
 
 extension ChatBlock {
+    private struct ServiceControlLocation: Equatable {
+        let blockID: UUID
+        let itemIndex: Int
+    }
+
     private struct ProjectedTurn {
         let id: TurnID
         var blocks: [ChatBlock] = []
@@ -59,17 +84,48 @@ extension ChatBlock {
     static func project(
         _ sources: [(block: Block, turnID: TurnID)],
         thinkingActivity: Chat.ThinkingActivity?,
-        isBusy: Bool
+        isBusy: Bool,
+        interaction: Chat.Interaction?
     ) -> [ChatBlock] {
         var projectedTurns: [ProjectedTurn] = []
+        let pendingPrompt: Chat.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
+        let pendingServiceControl: Chat.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
+        let serviceControlLocation = pendingServiceControl.flatMap { pending in
+            sources.reversed().compactMap { source -> ServiceControlLocation? in
+                guard case .agentContent(let items) = source.block.kind,
+                      let itemIndex = items.lastIndex(where: { item in
+                          guard case .serviceControl(let control) = item else { return false }
+                          return control == pending.control
+                      }) else { return nil }
+                return ServiceControlLocation(blockID: source.block.id, itemIndex: itemIndex)
+            }.first
+        }
 
         for source in sources {
             let block = source.block
-            if case .prompt = block.kind { continue }
             if projectedTurns.last?.id != source.turnID {
                 projectedTurns.append(ProjectedTurn(id: source.turnID))
             }
             let turnIndex = projectedTurns.count - 1
+            if case let .prompt(kind, prompt, options, answer, resolution) = block.kind {
+                let activePrompt = pendingPrompt?.id == block.id ? pendingPrompt : nil
+                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                    id: block.id,
+                    sourceBlockID: block.id,
+                    createdAt: block.createdAt,
+                    kind: .prompt(ChatPromptBlock(
+                        kind: kind,
+                        prompt: prompt,
+                        options: options,
+                        answer: answer,
+                        resolution: resolution,
+                        allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
+                        isActive: activePrompt != nil
+                    )),
+                    spacingBefore: Self.spacingBefore(block.kind)
+                ))
+                continue
+            }
             if case .thinking(let trace) = block.kind {
                 let index = projectedTurns[turnIndex].thinkingCount
                 projectedTurns[turnIndex].thinkingCount += 1
@@ -94,26 +150,33 @@ extension ChatBlock {
                 continue
             }
 
-            let visibleItems = items.filter {
-                if case .serviceControl = $0 { return false }
-                return true
+            let visibleItems = items.enumerated().filter { index, item in
+                guard case .serviceControl = item else { return true }
+                return serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
             }
             if !visibleItems.isEmpty {
                 projectedTurns[turnIndex].footerSourceBlockID = block.id
                 projectedTurns[turnIndex].footerCreatedAt = block.createdAt
-                projectedTurns[turnIndex].footerText += visibleItems.compactMap { item -> String? in
+                projectedTurns[turnIndex].footerText += visibleItems.compactMap { _, item -> String? in
                     guard case .text(let text) = item, !text.isEmpty else { return nil }
                     return text
                 }
             }
-            for (index, item) in visibleItems.enumerated() {
+            for (position, element) in visibleItems.enumerated() {
+                let (index, item) = element
                 let id = StableID.uuid("chat.block.\(block.id.uuidString).item.\(index)")
-                let spacing = index == 0 ? Self.spacingBefore(block.kind) : Self.spacingBefore(item)
+                let spacing = position == 0 ? Self.spacingBefore(block.kind) : Self.spacingBefore(item)
+                let kind: Kind
+                if case .serviceControl(let control) = item, let pendingServiceControl {
+                    kind = .serviceControl(control, interactionID: pendingServiceControl.id)
+                } else {
+                    kind = .agentContent(item)
+                }
                 projectedTurns[turnIndex].blocks.append(ChatBlock(
                     id: id,
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
-                    kind: .agentContent(item),
+                    kind: kind,
                     spacingBefore: spacing
                 ))
             }
@@ -203,60 +266,5 @@ extension ChatBlock {
         case .serviceInspector, .shoveler, .video, .artifact, .skill: Theme.Spacing.xs
         case .text, .progress, .serviceControl: MarkdownText.blockSpacing
         }
-    }
-}
-
-struct ChatDock: Identifiable, Equatable {
-    enum Acknowledgement: Identifiable, Equatable {
-        case permission(PermissionAcknowledgement)
-        case choice(ChoiceAcknowledgement)
-
-        var id: UUID {
-            switch self {
-            case .permission(let acknowledgement): acknowledgement.id
-            case .choice(let acknowledgement): acknowledgement.id
-            }
-        }
-    }
-
-    enum Kind: Equatable {
-        case permission(PermissionRequest)
-        case choice(AgentChoiceRequest)
-        case serviceControl(Chat.PendingServiceControl)
-        case permissionAcknowledgement(PermissionAcknowledgement)
-        case choiceAcknowledgement(ChoiceAcknowledgement)
-        case composer
-    }
-
-    let id: UUID
-    let kind: Kind
-
-    @MainActor
-    static func project(
-        interaction: Chat.Interaction?,
-        acknowledgement: Acknowledgement?
-    ) -> ChatDock {
-        switch acknowledgement {
-        case .permission(let acknowledgement):
-            return ChatDock(id: acknowledgement.id, kind: .permissionAcknowledgement(acknowledgement))
-        case .choice(let acknowledgement):
-            return ChatDock(id: acknowledgement.id, kind: .choiceAcknowledgement(acknowledgement))
-        case nil:
-            break
-        }
-        switch interaction {
-        case .prompt(let prompt):
-            if let permission = PermissionRequest(prompt) {
-                return ChatDock(id: permission.id, kind: .permission(permission))
-            }
-            if let choice = AgentChoiceRequest(prompt) {
-                return ChatDock(id: choice.id, kind: .choice(choice))
-            }
-        case .serviceControl(let control):
-            return ChatDock(id: control.id, kind: .serviceControl(control))
-        case nil:
-            break
-        }
-        return ChatDock(id: StableID.uuid("chat.dock.composer"), kind: .composer)
     }
 }

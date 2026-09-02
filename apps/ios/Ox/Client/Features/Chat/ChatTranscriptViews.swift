@@ -230,7 +230,6 @@ private struct ThinkingRow: View {
     let trace: ThinkingTrace
     let startedAt: Date
     let isActive: Bool
-    let continuesThinking: Bool
 
     private struct LiveAnimation {
         var label: String
@@ -251,9 +250,6 @@ private struct ThinkingRow: View {
             }
         }
 
-        var showsLive: Bool {
-            if case .live = self { true } else { false }
-        }
     }
 
     @State private var isExpanded = false
@@ -261,16 +257,10 @@ private struct ThinkingRow: View {
     @State private var animationPhase = AnimationPhase.settled("")
     @State private var animationTask: Task<Void, Never>?
 
-    private var isLive: Bool { isActive && (trace.completedAt == nil || continuesThinking) }
-    private var showsLive: Bool { animationPhase.showsLive }
-    private var rendersLive: Bool { showsLive || (isLive && animationPhase.label.isEmpty) }
-    private var hasError: Bool {
-        if case let .invocation(invocation) = trace.entries.last { return invocation.isFailed }
-        return false
-    }
+    private var isLive: Bool { isActive }
 
     private var liveTargetLabel: String {
-        if continuesThinking, trace.completedAt != nil { return String(localized: "Plowing…") }
+        if trace.completedAt != nil { return String(localized: "Plowing…") }
         guard let last = trace.entries.last else {
             return L10n.string("Plowing…")
         }
@@ -287,7 +277,7 @@ private struct ThinkingRow: View {
         return previewLabel(last)
     }
 
-    private var targetLabel: String { rendersLive ? liveTargetLabel : settledTargetLabel }
+    private var targetLabel: String { isLive ? liveTargetLabel : settledTargetLabel }
 
     private func previewLabel(_ entry: TraceEntry) -> String {
         switch entry {
@@ -300,7 +290,7 @@ private struct ThinkingRow: View {
 
     private var label: String { animationPhase.label.isEmpty ? targetLabel : animationPhase.label }
     private var showsLoader: Bool {
-        rendersLive && !hasError && label == L10n.string("Plowing…")
+        isLive && label == L10n.string("Plowing…")
     }
 
     var body: some View {
@@ -363,7 +353,7 @@ private struct ThinkingRow: View {
                     .frame(height: singleLineHeight)
                     .transition(.opacity)
             } else if !label.isEmpty {
-                if rendersLive, !hasError {
+                if isLive {
                     ShimmerText(text: AttributedString(label))
                         .transition(.opacity)
                 } else {
@@ -376,7 +366,7 @@ private struct ThinkingRow: View {
                         .transition(.opacity)
                 }
             }
-            if !rendersLive {
+            if !isLive {
                 Image(systemName: "chevron.right")
                     .font(Theme.Icons.sm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -385,7 +375,7 @@ private struct ThinkingRow: View {
             }
             Spacer(minLength: 0)
         }
-        .animation(.easeOut(duration: Theme.Animation.standard), value: rendersLive)
+        .animation(.easeOut(duration: Theme.Animation.standard), value: isLive)
         .frame(maxWidth: .infinity, minHeight: singleLineHeight, alignment: .leading)
         .padding(.vertical, (Theme.Size.minimumTouchTarget - singleLineHeight) / 2)
         .contentShape(Rectangle())
@@ -1056,7 +1046,7 @@ struct BlockView: View, Equatable {
     let block: ChatBlock
     let isStreamingTail: Bool
     let chatID: UUID
-    let continuesThinking: Bool
+    let isThinkingTail: Bool
     let controls: MessageControls
     let artifactControls: ArtifactControls
     let onOpenAttachment: (Artifact, String) -> Void
@@ -1067,7 +1057,7 @@ struct BlockView: View, Equatable {
     static func == (lhs: BlockView, rhs: BlockView) -> Bool {
         lhs.block == rhs.block
             && lhs.isStreamingTail == rhs.isStreamingTail
-            && lhs.continuesThinking == rhs.continuesThinking
+            && lhs.isThinkingTail == rhs.isThinkingTail
             && lhs.controls.isCopied == rhs.controls.isCopied
             && lhs.controls.isSpeaking == rhs.controls.isSpeaking
             && lhs.controls.canMutate == rhs.controls.canMutate
@@ -1088,13 +1078,12 @@ struct BlockView: View, Equatable {
             ThinkingRow(
                 trace: trace,
                 startedAt: block.createdAt,
-                isActive: isStreamingTail,
-                continuesThinking: continuesThinking
+                isActive: isThinkingTail
             )
             .padding(.horizontal, 4)
         case .contextCompaction:
             contextCompactionDivider
-        case .responseFooter:
+        case .prompt, .serviceControl, .responseFooter:
             EmptyView()
         }
     }
