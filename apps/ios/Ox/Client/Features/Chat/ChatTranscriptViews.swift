@@ -354,13 +354,13 @@ private struct ThinkingRow: View {
                     .transition(.opacity)
             } else if !label.isEmpty {
                 if isLive {
-                    ShimmerText(text: AttributedString(label))
+                    ShimmerText(text: AttributedString(label), lineLimit: 1)
                         .transition(.opacity)
                 } else {
                     Text(label)
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .lineLimit(3)
+                        .lineLimit(1)
                         .truncationMode(.tail)
                         .contentTransition(.opacity)
                         .transition(.opacity)
@@ -377,8 +377,11 @@ private struct ThinkingRow: View {
         }
         .animation(.easeOut(duration: Theme.Animation.standard), value: isLive)
         .frame(maxWidth: .infinity, minHeight: singleLineHeight, alignment: .leading)
-        .padding(.vertical, (Theme.Size.minimumTouchTarget - singleLineHeight) / 2)
-        .contentShape(Rectangle())
+        .contentShape(
+            Rectangle().inset(
+                by: -(Theme.Size.minimumTouchTarget - singleLineHeight) / 2
+            )
+        )
     }
 
     private func route(_ next: String) {
