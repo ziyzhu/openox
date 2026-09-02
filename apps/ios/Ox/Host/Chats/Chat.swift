@@ -557,7 +557,10 @@ final class Chat: Identifiable {
 
     // MARK: - Transcript (folded in from ChatManager)
 
-    private var document = ChatDocument()
+    private var document = ChatDocument() {
+        didSet { transcriptRevision &+= 1 }
+    }
+    private(set) var transcriptRevision: UInt64 = 0
     private var currentExecutionArtifacts: [Artifact] = []
     var currentExecutionTransientAttachments: [(sequence: Int, attachment: TransientAttachment)] = []
     private var currentExecutionActivatedSkills: [String: ActivatedSkillContext] = [:]

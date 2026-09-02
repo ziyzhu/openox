@@ -24,6 +24,7 @@ The highest-value changes are:
 1. Stop observing composer text from the root `ChatPage`. Implemented in this
    change.
 2. Move transcript projection below a narrow transcript-specific view boundary.
+   Implemented in this change.
 3. Activate the equality boundaries already defined for transcript rows.
 4. Cache artifact discovery instead of rescanning the projection during updates.
 5. Keep scroll-position changes inside the transcript subtree.
@@ -78,11 +79,12 @@ Implementation status: `ScrollToBottomControl` now owns the composer-dependent
 offset calculation. `ChatPage` passes stable semantic inputs into that child and
 no longer reads draft text or attachments while laying out the jump button. A
 simulator focus transition while scrolled away kept the visible transcript
-anchor fixed; per-keystroke body-evaluation counts remain to be instrumented.
+anchor fixed. Ten direct draft mutations triggered no root-page or projection
+evaluations after the dependency was isolated.
 
 ### Transcript projection runs above unrelated state
 
-`ChatPage.page` currently performs all of the following:
+Before this change, `ChatPage.page` performed all of the following:
 
 - resolves the transcript window,
 - calls `blocksWithTurnID`,
@@ -101,6 +103,14 @@ outside that dependency boundary. If projection remains material, cache it using
 the document revision, requested source range, thinking activity, and busy state.
 
 Expected result: unrelated page state does not call `ChatBlock.project`.
+
+Implementation status: `ChatTranscriptProjection` now caches a resolved window
+behind a key containing the chat identity, monotonic transcript revision,
+requested source range, thinking activity, busy state, and active interaction.
+The root page can still reevaluate for focus and presentation state without
+reprojecting unchanged transcript content. A temporary DEBUG probe measured one
+composer focus transition at three projection calls before this change and zero
+after it; transcript streaming continued to invalidate projection normally.
 
 ### Transcript row equality is not an explicit pruning boundary
 
@@ -235,7 +245,7 @@ keyboard behavior, accessibility, and animations remain unchanged.
 
 1. Measure the baseline.
 2. Isolate composer-dependent jump-button layout. Done in this change.
-3. Add a transcript-specific update boundary.
+3. Add a transcript-specific update boundary. Done in this change.
 4. Correct `BlockView` equality and apply row `.equatable()` boundaries.
 5. Cache referenced artifacts.
 6. Isolate scroll ownership.

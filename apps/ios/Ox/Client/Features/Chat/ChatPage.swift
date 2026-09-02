@@ -91,6 +91,84 @@ private struct ScrollToBottomControl: View {
     }
 }
 
+private struct ChatTranscriptProjectionSnapshot {
+    let key: ChatTranscriptProjectionKey
+    let totalBlockCount: Int
+    let sourceRange: Range<Int>
+    let sourceBlockIDs: [UUID]
+    let blocks: [ChatBlock]
+
+    init(key: ChatTranscriptProjectionKey, chat: Chat) {
+        self.key = key
+        let sourceWindow = chat.blocksWithTurnID(in: key.requestedSourceRange)
+        let projectedBlocks = ChatBlock.project(
+            sourceWindow.blocks,
+            thinkingActivity: key.thinkingActivity,
+            isBusy: key.isBusy,
+            interaction: key.interaction
+        )
+        let requestedOffset = key.requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
+        let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
+        let blocks: [ChatBlock]
+        if requestedOffset > 0 {
+            let requestedSourceIDSet = Set(requestedSourceIDs)
+            blocks = projectedBlocks.filter {
+                requestedSourceIDSet.contains($0.sourceBlockID) || $0.isActiveInteraction
+            }
+        } else {
+            blocks = projectedBlocks
+        }
+        totalBlockCount = key.totalBlockCount
+        sourceRange = key.requestedSourceRange
+        sourceBlockIDs = requestedSourceIDs
+        self.blocks = blocks
+    }
+}
+
+private struct ChatTranscriptProjectionKey: Equatable {
+    let chatID: UUID
+    let transcriptRevision: UInt64
+    let totalBlockCount: Int
+    let requestedSourceRange: Range<Int>
+    let thinkingActivity: Chat.ThinkingActivity?
+    let isBusy: Bool
+    let interaction: Chat.Interaction?
+}
+
+private struct ChatTranscriptProjection<Content: View>: View {
+    let chat: Chat
+    let transcriptWindow: TranscriptWindow
+    let interaction: Chat.Interaction?
+    let content: (ChatTranscriptProjectionSnapshot) -> Content
+
+    @State private var cache: ChatTranscriptProjectionSnapshot?
+
+    var body: some View {
+        let key = projectionKey
+        let resolved = cache.flatMap { $0.key == key ? $0 : nil }
+            ?? ChatTranscriptProjectionSnapshot(key: key, chat: chat)
+        return content(resolved)
+            .onChange(of: key, initial: true) { _, key in
+                guard cache?.key != key else { return }
+                cache = resolved
+            }
+    }
+
+    private var projectionKey: ChatTranscriptProjectionKey {
+        let totalBlockCount = chat.transcriptBlockCount
+        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
+        return ChatTranscriptProjectionKey(
+            chatID: chat.id,
+            transcriptRevision: chat.transcriptRevision,
+            totalBlockCount: totalBlockCount,
+            requestedSourceRange: requestedSourceRange,
+            thinkingActivity: chat.thinkingActivity,
+            isBusy: chat.isBusy,
+            interaction: interaction
+        )
+    }
+}
+
 struct ChatPage: View {
     let chat: Chat
     let composerFocusRequestID: UUID?
@@ -289,30 +367,8 @@ struct ChatPage: View {
     }
 
     private var page: some View {
-        let totalBlockCount = chat.transcriptBlockCount
         let interaction = activeInteraction
         let activeInteractionID = interactionID(for: interaction)
-        let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
-        let sourceWindow = chat.blocksWithTurnID(
-            in: requestedSourceRange
-        )
-        let projectedBlocks = ChatBlock.project(
-            sourceWindow.blocks,
-            thinkingActivity: chat.thinkingActivity,
-            isBusy: chat.isBusy,
-            interaction: interaction
-        )
-        let requestedOffset = requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
-        let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
-        let blocks: [ChatBlock]
-        if requestedOffset > 0 {
-            let requestedSourceIDSet = Set(requestedSourceIDs)
-            blocks = projectedBlocks.filter {
-                requestedSourceIDSet.contains($0.sourceBlockID) || $0.isActiveInteraction
-            }
-        } else {
-            blocks = projectedBlocks
-        }
         let showsComposer = interaction == nil
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ChatViewportLayout.responseComposerSpacing
@@ -321,8 +377,36 @@ struct ChatPage: View {
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
         }
-        let transcript = pageContent(
-            blocks,
+        return ChatTranscriptProjection(
+            chat: chat,
+            transcriptWindow: transcriptWindow,
+            interaction: interaction
+        ) { projection in
+            projectedPage(
+                projection,
+                activeInteractionID: activeInteractionID,
+                showsComposer: showsComposer,
+                floatsTopStrip: floatsTopStrip,
+                dockClearance: dockClearance,
+                authProbe: authProbe
+            )
+        }
+    }
+
+    private func projectedPage(
+        _ projection: ChatTranscriptProjectionSnapshot,
+        activeInteractionID: UUID?,
+        showsComposer: Bool,
+        floatsTopStrip: Bool,
+        dockClearance: CGFloat,
+        authProbe: Chat.PendingServiceControl?
+    ) -> some View {
+        let totalBlockCount = projection.totalBlockCount
+        let requestedSourceRange = projection.sourceRange
+        let requestedSourceIDs = projection.sourceBlockIDs
+        let blocks = projection.blocks
+        let transcript = transcript(
+            blocks: blocks,
             totalBlockCount: totalBlockCount,
             sourceRange: requestedSourceRange,
             sourceBlockIDs: requestedSourceIDs,
@@ -589,22 +673,6 @@ struct ChatPage: View {
                 showAttachmentError(err)
             }
         }
-    }
-
-    private func pageContent(
-        _ blocks: [ChatBlock],
-        totalBlockCount: Int,
-        sourceRange: Range<Int>,
-        sourceBlockIDs: [UUID],
-        dockClearance: CGFloat
-    ) -> some View {
-        return transcript(
-            blocks: blocks,
-            totalBlockCount: totalBlockCount,
-            sourceRange: sourceRange,
-            sourceBlockIDs: sourceBlockIDs,
-            dockClearance: dockClearance
-        )
     }
 
     private func pageTopBar(blockCount: Int) -> some View {
