@@ -200,18 +200,12 @@ final class ChatViewportController {
 
     func phaseChanged(from old: ScrollPhase, to new: ScrollPhase) {
         if new.isUserDriven {
+            viewportHold = nil
             motion = .user(new)
         } else if new == .idle {
             motion = .stationary
         }
         Log.ui.info("Transcript.phase chat=\(chatID) \(String(describing: old)) -> \(String(describing: new)) owner=\(motion.label)")
-    }
-
-    func gestureStarted() {
-        viewportHold = nil
-        guard !isUserScrolling else { return }
-        motion = .user(.tracking)
-        Log.ui.info("Transcript.gestureStart chat=\(chatID)")
     }
 
     func geometryChanged(_ new: Frame) {

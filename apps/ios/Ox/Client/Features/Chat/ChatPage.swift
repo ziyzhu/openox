@@ -1051,12 +1051,6 @@ struct ChatPage: View {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
                 })
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            scroller.gestureStarted()
-                        }
-                )
                 .onChange(of: totalBlockCount) { _, total in
                     transcriptWindow.reconcile(total: total)
                     logTranscriptWindow(reason: "blocks", total: total)
