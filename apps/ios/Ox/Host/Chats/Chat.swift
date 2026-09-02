@@ -857,6 +857,8 @@ final class Chat: Identifiable {
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
     @ObservationIgnored private var agentHapticPhase = AgentHapticPhase.waitingForDelta
+    @ObservationIgnored private var finishingStartedAt: Date?
+    @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
     @ObservationIgnored private var agentEventCycle = AgentEventCycle.completed(cancelled: false)
     @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ChatSubmissionOutcome, Never>] = [:]
@@ -1503,6 +1505,8 @@ final class Chat: Identifiable {
             registerAgentDelta()
         case .toolCallDelta:
             registerAgentDelta()
+            flushBufferedAgentText()
+            setRunPhase(.thinking)
         case .start, .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
             break
         }
@@ -1966,6 +1970,7 @@ final class Chat: Identifiable {
         let task = runState.task
         let runID = runState.id
         runState.backgroundExecution?.finish(success: true)
+        finishFinishingDiagnostics(next: "idle")
         runState = .idle
         task?.cancel()
         Log.session.info("Chat.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
@@ -2152,6 +2157,7 @@ final class Chat: Identifiable {
         if chatFailed { runState.backgroundExecution?.updatePhase(.failed) }
         let completionNotification = chatSucceeded ? runState.completionNotification : nil
         runState.backgroundExecution?.finish(success: leaseSucceeded)
+        finishFinishingDiagnostics(next: "idle")
         runState = .idle
         if hasUnreadResult, !isTranscriptVisible {
             hasUnreadResponse = true
@@ -2177,13 +2183,46 @@ final class Chat: Identifiable {
 
     private func replaceRunPhase(_ phase: RunPhase) {
         guard runState.phase != phase else { return }
+        Log.session.debug("Chat.phase id=\(id) from=\(runState.phase?.logLabel ?? "idle") to=\(phase.logLabel)")
+        if runState.phase == .finishing {
+            finishFinishingDiagnostics(next: phase.logLabel)
+        }
         switch runState {
         case .idle:
             break
         case .running(var run):
             run.phase = phase
             runState = .running(run)
+            if phase == .finishing { beginFinishingDiagnostics() }
         }
+    }
+
+    private func beginFinishingDiagnostics() {
+        let startedAt = Date()
+        finishingStartedAt = startedAt
+        finishingWatchdog?.cancel()
+        Log.session.debug("Chat.finishing begin id=\(id)")
+        finishingWatchdog = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                return
+            }
+            guard let self,
+                  self.runState.phase == .finishing,
+                  self.finishingStartedAt == startedAt else { return }
+            let durationMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
+            Log.session.warning("Chat.finishing slow id=\(self.id) durationMs=\(durationMs)")
+        }
+    }
+
+    private func finishFinishingDiagnostics(next: String) {
+        guard let startedAt = finishingStartedAt else { return }
+        finishingStartedAt = nil
+        finishingWatchdog?.cancel()
+        finishingWatchdog = nil
+        let durationMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
+        Log.session.debug("Chat.finishing end id=\(id) next=\(next) durationMs=\(durationMs)")
     }
 
     private func startBackgroundExecution() {

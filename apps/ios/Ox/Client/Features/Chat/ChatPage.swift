@@ -135,6 +135,12 @@ private struct ChatTranscriptProjectionKey: Equatable {
     let interaction: Chat.Interaction?
 }
 
+private struct DelayedActivityKey: Equatable {
+    let chatID: UUID
+    let activity: Chat.Activity
+    let transcriptRevision: UInt64
+}
+
 private struct ChatTranscriptProjection<Content: View>: View {
     let chat: Chat
     let transcriptWindow: TranscriptWindow
@@ -249,6 +255,7 @@ struct ChatPage: View {
     @State private var toast: Toast?
     @State private var runningServiceControlID: UUID?
     @State private var choiceInputFocused = false
+    @State private var showsDelayedActivity = false
 
     @State private var viewportLayout = ChatViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
@@ -545,6 +552,13 @@ struct ChatPage: View {
             scroller.rideToBottom()
             Log.ui.info("ChatPage.interactionPresent chat=\(chat.id) interaction=\(activeInteractionID)")
         }
+        .task(id: DelayedActivityKey(
+            chatID: chat.id,
+            activity: chat.activity,
+            transcriptRevision: chat.transcriptRevision
+        )) {
+            await updateDelayedActivity()
+        }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: sheetModal, onDismiss: presentPendingArtifactPreview) { presented in
             Group {
@@ -800,8 +814,24 @@ struct ChatPage: View {
             chat.thinkingActivity == nil
         case .running(.awaiting(_)):
             activeInteraction == nil
-        case .idle, .running(.streaming):
+        case .running(.streaming):
+            showsDelayedActivity
+        case .idle:
             false
+        }
+    }
+
+    private func updateDelayedActivity() async {
+        showsDelayedActivity = false
+        guard chat.activity == .running(.streaming) else { return }
+        do {
+            try await Task.sleep(for: .milliseconds(700))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled, chat.activity == .running(.streaming) else { return }
+        withAnimation(.easeOut(duration: 0.2)) {
+            showsDelayedActivity = true
         }
     }
 
