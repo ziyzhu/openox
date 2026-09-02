@@ -263,8 +263,9 @@ extension ChatBlock {
 
     private static func spacingBefore(_ item: ContentItem) -> CGFloat {
         switch item {
-        case .serviceInspector, .shoveler, .video, .artifact, .skill: Theme.Spacing.xs
-        case .text, .progress, .serviceControl: MarkdownText.blockSpacing
+        case .video: Theme.Spacing.xs
+        case .text, .progress, .serviceControl, .serviceInspector, .shoveler, .artifact, .skill:
+            MarkdownText.blockSpacing
         }
     }
 }

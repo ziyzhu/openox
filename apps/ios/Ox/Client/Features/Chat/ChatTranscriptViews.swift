@@ -1210,14 +1210,12 @@ struct BlockView: View, Equatable {
                     case let .serviceInspector(link):
                         ServiceInspectorRow(link: link, chatID: chatID)
                             .padding(.horizontal, 4)
-                            .padding(.vertical, Theme.Spacing.xs)
                     case let .shoveler(shoveler):
                         ShovelerView(
                             shoveler: shoveler,
                             accessibilityPrefix: A11yID.Chat.Message.shoveler(block.id.uuidString),
                             onOpenArtifact: onOpenAttachment
                         )
-                        .padding(.vertical, Theme.Spacing.xs)
                     case let .video(video):
                         VideoWidgetView(video: video)
                             .padding(.horizontal, 4)
@@ -1230,7 +1228,6 @@ struct BlockView: View, Equatable {
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 4)
-                            .padding(.vertical, Theme.Spacing.xs)
                             .accessibilityLabel(artifact.userFacingAccessibilityLabel)
                             .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))
                             .contextMenuPreviewShape()
@@ -1246,7 +1243,6 @@ struct BlockView: View, Equatable {
                         } else {
                             ChatArtifactRow(artifact: artifact)
                                 .padding(.horizontal, 4)
-                                .padding(.vertical, Theme.Spacing.xs)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(String(
                                     format: L10n.string("Deleted artifact: %@"),
@@ -1260,7 +1256,6 @@ struct BlockView: View, Equatable {
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 4)
-                        .padding(.vertical, Theme.Spacing.xs)
                         .accessibilityLabel("/\(skill.displayName), \(skill.description)")
                         .accessibilityIdentifier(A11yID.Chat.Message.skill(skill.name))
                     }
