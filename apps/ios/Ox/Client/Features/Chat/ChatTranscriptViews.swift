@@ -229,7 +229,7 @@ private struct ThinkingRow: View {
     private let singleLineHeight: CGFloat = 22
     let trace: ThinkingTrace
     let startedAt: Date
-    let isActive: Bool
+    let isLive: Bool
 
     private struct LiveAnimation {
         var label: String
@@ -238,7 +238,6 @@ private struct ThinkingRow: View {
         var lastAdvance: Date
         var sourceLive: Bool
     }
-
     private enum AnimationPhase {
         case settled(String)
         case live(LiveAnimation)
@@ -256,8 +255,6 @@ private struct ThinkingRow: View {
     @State private var seenEntries = 0
     @State private var animationPhase = AnimationPhase.settled("")
     @State private var animationTask: Task<Void, Never>?
-
-    private var isLive: Bool { isActive }
 
     private var liveTargetLabel: String {
         if trace.completedAt != nil { return String(localized: "Plowing…") }
@@ -1081,7 +1078,7 @@ struct BlockView: View, Equatable {
             ThinkingRow(
                 trace: trace,
                 startedAt: block.createdAt,
-                isActive: isThinkingTail
+                isLive: isThinkingTail
             )
             .padding(.horizontal, 4)
         case .contextCompaction:

@@ -671,7 +671,14 @@ struct ChatPage: View {
     }
 
     private var showsActivity: Bool {
-        chat.isBusy && activeInteraction == nil && chat.thinkingActivity == nil
+        switch chat.activity {
+        case .running(.thinking):
+            chat.thinkingActivity == nil
+        case .running(.awaiting(_)):
+            activeInteraction == nil
+        case .idle, .running(.streaming):
+            false
+        }
     }
 
     private var chatArtifacts: [Artifact] {
