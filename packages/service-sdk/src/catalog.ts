@@ -32,10 +32,11 @@ const IOSCatalogManifestSchema = Type.Object({
   domain: Type.String({ pattern: IOS_ID_RE.source }),
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
-  icon: Type.Union([
+  icon: Type.Optional(Type.Union([
     Type.Object({ asset: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
     Type.Object({ system: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
-  ]),
+  ])),
+  faviconUrl: Type.Optional(Type.String({ minLength: 1 })),
   permission: Type.Optional(Type.Union([
     Type.Literal("calendar"),
     Type.Literal("contacts"),
@@ -62,6 +63,7 @@ const MCPCatalogManifestSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   endpoint: Type.String({ minLength: 1 }),
+  faviconUrl: Type.Optional(Type.String({ minLength: 1 })),
   transport: Type.Optional(Type.Union([
     Type.Literal("streamable-http"),
     Type.Literal("sse"),
@@ -83,21 +85,23 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
-function validateEndpoint(endpoint: string): string | undefined {
+function validateURL(value: string, label: string): string | undefined {
   let url: URL;
   try {
-    url = new URL(endpoint);
+    url = new URL(value);
   } catch {
-    return "endpoint must be an absolute URL";
+    return `${label} must be an absolute URL`;
   }
-  if (url.protocol !== "https:") return "endpoint must use HTTPS";
-  if (!url.hostname || url.username || url.password || url.hash) return "endpoint contains unsupported URL components";
+  if (url.protocol !== "https:") return `${label} must use HTTPS`;
+  if (!url.hostname || url.username || url.password || url.hash) return `${label} contains unsupported URL components`;
 }
 
 export function validateIOSManifest(id: string, raw: unknown): IOSCatalogManifest | { error: string } {
   if (!Value.Check(IOSCatalogManifestSchema, raw)) return { error: `ios ${id}: invalid manifest` };
   const manifest = raw as IOSCatalogManifest;
   if (manifest.domain !== id) return { error: `ios ${id}: manifest domain ${manifest.domain} does not match directory` };
+  const faviconError = manifest.faviconUrl ? validateURL(manifest.faviconUrl, "faviconUrl") : undefined;
+  if (faviconError) return { error: `ios ${id}: ${faviconError}` };
   if (manifest.supportedIOS.maximum
     && compareVersions(manifest.supportedIOS.minimum, manifest.supportedIOS.maximum) > 0) {
     return { error: `ios ${id}: minimum iOS version exceeds maximum` };
@@ -124,6 +128,8 @@ export function validateMCPManifest(id: string, raw: unknown): MCPCatalogManifes
   if (!Value.Check(MCPCatalogManifestSchema, raw)) return { error: `mcp ${id}: invalid manifest` };
   const manifest = raw as MCPCatalogManifest;
   if (manifest.id !== id) return { error: `mcp ${id}: manifest id ${manifest.id} does not match directory` };
-  const endpointError = validateEndpoint(manifest.endpoint);
-  return endpointError ? { error: `mcp ${id}: ${endpointError}` } : manifest;
+  const endpointError = validateURL(manifest.endpoint, "endpoint");
+  if (endpointError) return { error: `mcp ${id}: ${endpointError}` };
+  const faviconError = manifest.faviconUrl ? validateURL(manifest.faviconUrl, "faviconUrl") : undefined;
+  return faviconError ? { error: `mcp ${id}: ${faviconError}` } : manifest;
 }

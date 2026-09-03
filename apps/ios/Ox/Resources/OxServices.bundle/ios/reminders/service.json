@@ -2,9 +2,7 @@
   "domain": "ios:reminders",
   "name": "Reminders",
   "description": "Add to-dos to Reminders without reading your lists.",
-  "icon": {
-    "asset": "ios:reminders"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:reminders/favicon.png",
   "permission": "reminders",
   "supportedIOS": {
     "minimum": "26.0"

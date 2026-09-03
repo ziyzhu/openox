@@ -2,9 +2,7 @@
   "domain": "ios:contacts",
   "name": "Contacts",
   "description": "Look up contact details by name for tasks that need an email address or phone number.",
-  "icon": {
-    "asset": "ios:contacts"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:contacts/favicon.png",
   "permission": "contacts",
   "supportedIOS": {
     "minimum": "26.0"

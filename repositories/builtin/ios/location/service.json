@@ -2,9 +2,7 @@
   "domain": "ios:location",
   "name": "Location",
   "description": "Read your approximate, city-level location for nearby search, local prices, and weather.",
-  "icon": {
-    "asset": "ios:location"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:location/favicon.png",
   "permission": "location",
   "supportedIOS": {
     "minimum": "26.0"

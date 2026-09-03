@@ -40,7 +40,7 @@ struct ServiceAvatar: View {
         }
         .frame(width: size, height: size)
         .task(id: "\(service.domain):\(colorScheme)") {
-            guard service.webService != nil || service.isMCPService else { return }
+            guard loadsFavicon else { return }
             let theme = colorScheme == .dark ? "dark" : "light"
             let cacheKey = service.isMCPService ? "\(service.domain):\(theme)" : service.domain
             if let image = ServiceAvatarCache.images[cacheKey] {
@@ -66,9 +66,13 @@ struct ServiceAvatar: View {
     }
 
     private var isLoadingFavicon: Bool {
-        guard service.webService != nil || service.isMCPService else { return false }
+        guard loadsFavicon else { return false }
         if case .loading = faviconState { return true }
         return false
+    }
+
+    private var loadsFavicon: Bool {
+        service.definition.faviconURL != nil || service.isMCPService
     }
 
     @ViewBuilder

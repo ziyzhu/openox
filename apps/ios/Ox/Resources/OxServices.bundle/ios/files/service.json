@@ -2,9 +2,7 @@
   "domain": "ios:files",
   "name": "Files",
   "description": "Let Ox access folders you choose in Files.",
-  "icon": {
-    "asset": "ios:files"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:files/favicon.png",
   "supportedIOS": {
     "minimum": "26.0"
   },

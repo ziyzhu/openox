@@ -11,6 +11,10 @@ export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../reposi
 const SOURCE_ROOT = join(BUILTIN_REPOSITORY_ROOT, "web");
 export const SERVICE_ASSET_BASE_URL = "https://openox.ai/assets/services";
 
+export function serviceAssetURL(id: string): string {
+  return `${SERVICE_ASSET_BASE_URL}/${id}/favicon.png`;
+}
+
 export function sourceDirFor(domain: string): string {
   return join(SOURCE_ROOT, domain);
 }
@@ -119,7 +123,7 @@ export async function buildService(domain: string): Promise<
   const skillResult = readSkills(dir);
   if (!skillResult.ok) return { error: `service ${domain}: ${skillResult.error}` };
   const faviconUrl = existsSync(join(dir, "favicon.png"))
-    ? `${SERVICE_ASSET_BASE_URL}/${domain}/favicon.png`
+    ? serviceAssetURL(domain)
     : undefined;
 
   const manifest: Manifest = {

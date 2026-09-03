@@ -2,9 +2,7 @@
   "domain": "ios:notifications",
   "name": "Notifications",
   "description": "Schedule reminders and alerts on this device.",
-  "icon": {
-    "asset": "ios:notifications"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:notifications/favicon.png",
   "permission": "notifications",
   "supportedIOS": {
     "minimum": "26.0"

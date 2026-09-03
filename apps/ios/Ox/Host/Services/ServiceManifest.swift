@@ -32,7 +32,7 @@ nonisolated enum ServiceIcon: Equatable, Sendable {
 nonisolated struct ServiceDefinition: Sendable {
     enum Source: Equatable, Sendable {
         case repository(id: String, provenance: ServiceRepository.Repository.Provenance)
-        case iOS(icon: ServiceIcon, permission: NativePermission?)
+        case iOS(icon: ServiceIcon?, permission: NativePermission?)
         case mcp(endpoint: URL, transport: RemoteMCPTransport?, icon: ServiceIcon)
     }
 
@@ -85,17 +85,7 @@ nonisolated struct ServiceDefinition: Sendable {
               Self.isServiceHost(host, domain: domain) else {
             throw ValidationError.invalid("baseUrl")
         }
-        let faviconURL: URL?
-        if let rawFaviconURL = object["faviconUrl"]?.stringValue {
-            guard let parsed = URL(string: rawFaviconURL),
-                  parsed.scheme?.lowercased() == "https",
-                  WebFetchURLPolicy.allows(parsed) else {
-                throw ValidationError.invalid("faviconUrl")
-            }
-            faviconURL = parsed
-        } else {
-            faviconURL = nil
-        }
+        let faviconURL = try Self.faviconURL(object["faviconUrl"]?.stringValue)
         let rawActions = object["actions"]?.arrayValue ?? []
         let actions = try rawActions.map { value in
             guard let action = Manifest.Action(value, serviceDomain: domain, serviceBaseURL: baseURL),
@@ -142,7 +132,7 @@ nonisolated struct ServiceDefinition: Sendable {
     }
 
     init(iOS manifest: IOSCatalogManifest, repositoryID: String? = nil) throws {
-        guard manifest.isValid, let icon = manifest.icon.value else {
+        guard manifest.isValid else {
             throw ValidationError.invalid("iOS manifest")
         }
         let baseURL = manifest.domain == "ios:browser" ? URL(string: "https://www.google.com/")! : nil
@@ -161,13 +151,13 @@ nonisolated struct ServiceDefinition: Sendable {
             actionIndex[action.id] = action
         }
         self.manifest = manifest.jsonValue
-        self.source = .iOS(icon: icon, permission: manifest.permission)
+        self.source = .iOS(icon: manifest.icon?.value, permission: manifest.permission)
         self.repositoryID = repositoryID
         self.domain = manifest.domain
         self.name = manifest.name
         self.description = manifest.description ?? ""
         self.baseURL = baseURL
-        self.faviconURL = nil
+        self.faviconURL = try Self.faviconURL(manifest.faviconUrl)
         self.actions = resolvedActions
         self.actionIndex = actionIndex
         self.definitions = [:]
@@ -175,13 +165,14 @@ nonisolated struct ServiceDefinition: Sendable {
         self.remoteMCPIcons = []
     }
 
-    init(mcp manifest: MCPCatalogManifest, repositoryID: String? = nil) {
+    init(mcp manifest: MCPCatalogManifest, repositoryID: String? = nil) throws {
         self.init(
             mcpEndpoint: manifest.endpoint,
             transport: manifest.transport,
             name: manifest.name,
             description: manifest.description,
-            repositoryID: repositoryID
+            repositoryID: repositoryID,
+            faviconURL: try Self.faviconURL(manifest.faviconUrl)
         )
     }
 
@@ -190,7 +181,8 @@ nonisolated struct ServiceDefinition: Sendable {
         transport: RemoteMCPTransport?,
         name: String? = nil,
         description: String? = nil,
-        repositoryID: String? = nil
+        repositoryID: String? = nil,
+        faviconURL: URL? = nil
     ) {
         let domain = RemoteMCPDescriptor.serviceID(for: endpoint)
         let resolvedName = name ?? endpoint.host ?? "Remote MCP"
@@ -208,7 +200,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.name = resolvedName
         self.description = resolvedDescription
         self.baseURL = endpoint
-        self.faviconURL = nil
+        self.faviconURL = faviconURL
         self.actions = []
         self.actionIndex = [:]
         self.definitions = [:]
@@ -244,7 +236,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.name = name
         self.description = description
         self.baseURL = descriptor.endpoint
-        self.faviconURL = nil
+        self.faviconURL = metadata?.faviconURL
         self.actions = actions
         self.actionIndex = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, $0) })
         self.definitions = [:]
@@ -254,6 +246,16 @@ nonisolated struct ServiceDefinition: Sendable {
 
     private static func isServiceHost(_ host: String, domain: String) -> Bool {
         host == domain || host.hasSuffix("." + domain)
+    }
+
+    private static func faviconURL(_ value: String?) throws -> URL? {
+        guard let value else { return nil }
+        guard let url = URL(string: value),
+              url.scheme?.lowercased() == "https",
+              WebFetchURLPolicy.allows(url) else {
+            throw ValidationError.invalid("faviconUrl")
+        }
+        return url
     }
 
     var exposedActions: [Manifest.Action] {
@@ -283,7 +285,8 @@ nonisolated struct ServiceDefinition: Sendable {
     var icon: ServiceIcon? {
         switch source {
         case .repository: nil
-        case .iOS(let icon, _), .mcp(_, _, let icon): icon
+        case .iOS(let icon, _): icon
+        case .mcp(_, _, let icon): icon
         }
     }
 

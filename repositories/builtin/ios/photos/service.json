@@ -2,9 +2,7 @@
   "domain": "ios:photos",
   "name": "Photos",
   "description": "Find accessible photos and videos, preview them, and organize them in user-created albums without deleting originals.",
-  "icon": {
-    "system": "photo.on.rectangle.angled"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:photos/favicon.png",
   "supportedIOS": {
     "minimum": "26.0"
   },

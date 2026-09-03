@@ -44,7 +44,8 @@ nonisolated struct IOSCatalogManifest: Decodable, Sendable {
     let domain: String
     let name: String
     let description: String?
-    let icon: Icon
+    let icon: Icon?
+    let faviconUrl: String?
     let permission: NativePermission?
     let supportedIOS: SupportedIOS
     let actions: [JSONValue]
@@ -53,7 +54,7 @@ nonisolated struct IOSCatalogManifest: Decodable, Sendable {
     var isValid: Bool {
         domain.range(of: #"^ios:[a-z0-9]+(?:[.-][a-z0-9]+)*$"#, options: .regularExpression) != nil
             && !name.isEmpty
-            && icon.value != nil
+            && (icon?.value != nil || faviconUrl != nil)
     }
 
     func localized(_ locale: String?) -> IOSCatalogManifest {
@@ -71,6 +72,7 @@ nonisolated struct IOSCatalogManifest: Decodable, Sendable {
             name: overlay.name ?? name,
             description: overlay.description ?? description,
             icon: icon,
+            faviconUrl: faviconUrl,
             permission: permission,
             supportedIOS: supportedIOS,
             actions: localizedActions,
@@ -82,11 +84,12 @@ nonisolated struct IOSCatalogManifest: Decodable, Sendable {
         var object: [String: JSONValue] = [
             "domain": .string(domain),
             "name": .string(name),
-            "icon": icon.jsonValue,
             "supportedIOS": supportedIOS.jsonValue,
             "actions": .array(actions),
         ]
         if let description { object["description"] = .string(description) }
+        if let icon { object["icon"] = icon.jsonValue }
+        if let faviconUrl { object["faviconUrl"] = .string(faviconUrl) }
         if let permission { object["permission"] = .string(permission.rawValue) }
         return .object(object)
     }
@@ -133,6 +136,7 @@ nonisolated struct MCPCatalogManifest: Decodable, Identifiable, Equatable, Senda
     let name: String
     let description: String?
     let endpoint: URL
+    let faviconUrl: String?
     let transport: RemoteMCPTransport?
     let locales: [String: LocaleOverlay]?
 
@@ -143,6 +147,7 @@ nonisolated struct MCPCatalogManifest: Decodable, Identifiable, Equatable, Senda
             name: overlay.name ?? name,
             description: overlay.description ?? description,
             endpoint: endpoint,
+            faviconUrl: faviconUrl,
             transport: transport,
             locales: nil
         )

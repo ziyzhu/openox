@@ -30,7 +30,12 @@ async function readManifest(kind: CatalogKind, id: string): Promise<unknown | { 
 export async function loadIOSManifest(id: string): Promise<IOSCatalogManifest | { error: string }> {
   const raw = await readManifest("ios", id);
   if (raw && typeof raw === "object" && "error" in raw) return raw as { error: string };
-  return validateIOSManifest(id, raw);
+  const manifest = validateIOSManifest(id, raw);
+  if ("error" in manifest) return manifest;
+  if (!manifest.icon && !manifest.faviconUrl) {
+    return { error: `ios ${id}: icon or faviconUrl is required` };
+  }
+  return manifest;
 }
 
 export async function loadMCPManifest(id: string): Promise<MCPCatalogManifest | { error: string }> {

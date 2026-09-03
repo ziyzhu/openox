@@ -369,11 +369,13 @@ final class ServiceManager {
     }
 
     func faviconImage(for domain: String, preferredTheme: String? = nil) async -> Data? {
-        guard let service = byDomain[domain], !service.definition.isIOS else { return nil }
+        guard let service = byDomain[domain] else { return nil }
         let cacheKey = service.isMCPService ? "\(domain):\(preferredTheme ?? "any")" : domain
         if let data = faviconData[cacheKey] { return data }
         let data: Data?
-        if service.isMCPService {
+        if let url = service.definition.faviconURL {
+            data = await ServiceImageLoader.data(url: url)
+        } else if service.isMCPService {
             guard let endpoint = service.definition.baseURL else {
                 Log.service.error("RemoteMCP.icon missing endpoint id=\(domain)")
                 return nil
@@ -384,15 +386,12 @@ final class ServiceManager {
                 preferredTheme: preferredTheme
             )
         } else {
-            guard let url = service.definition.faviconURL else {
-                Log.service.info("Service.icon missing id=\(domain)")
-                return nil
-            }
-            data = await ServiceImageLoader.data(url: url)
+            Log.service.info("Service.icon missing id=\(domain)")
+            return nil
         }
         if let data {
             faviconData[cacheKey] = data
-            if service.isMCPService {
+            if service.isMCPService && service.definition.faviconURL == nil {
                 Log.service.info("RemoteMCP.icon loaded id=\(domain) bytes=\(data.count) theme=\(preferredTheme ?? "any")")
             } else {
                 Log.service.info("Service.icon loaded id=\(domain) bytes=\(data.count)")
@@ -1035,10 +1034,15 @@ final class ServiceManager {
                 Log.service.error("ServiceManager.listMCPServices invalid id=\(file.id)")
                 return nil
             }
-            return ServiceDefinition(
-                mcp: manifest.localized(locale),
-                repositoryID: file.repositoryID
-            )
+            do {
+                return try ServiceDefinition(
+                    mcp: manifest.localized(locale),
+                    repositoryID: file.repositoryID
+                )
+            } catch {
+                Log.service.error("ServiceManager.listMCPServices invalid id=\(file.id) error=\(error.localizedDescription)")
+                return nil
+            }
         }
         Log.service.info("ServiceManager.listMCPServices count=\(definitions.count)")
         return definitions

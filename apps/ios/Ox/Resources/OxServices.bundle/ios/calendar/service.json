@@ -2,9 +2,7 @@
   "domain": "ios:calendar",
   "name": "Calendar",
   "description": "Add events to your calendar without reading it.",
-  "icon": {
-    "asset": "ios:calendar"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:calendar/favicon.png",
   "permission": "calendar",
   "supportedIOS": {
     "minimum": "26.0"

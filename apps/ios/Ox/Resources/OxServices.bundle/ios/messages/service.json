@@ -2,9 +2,7 @@
   "domain": "ios:messages",
   "name": "Messages",
   "description": "Open a message pre-filled with a recipient and body for you to review and send.",
-  "icon": {
-    "asset": "ios:messages"
-  },
+  "faviconUrl": "https://openox.ai/assets/services/ios:messages/favicon.png",
   "permission": "contacts",
   "supportedIOS": {
     "minimum": "26.0"

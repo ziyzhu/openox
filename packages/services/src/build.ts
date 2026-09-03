@@ -1,12 +1,10 @@
 import { mkdir, writeFile, copyFile, readdir, readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildService, sourceDirFor,
   BUILTIN_REPOSITORY_ROOT,
 } from "./service.ts";
 import {
-  catalogDir,
   loadIOSManifest,
   loadMCPManifest,
   type CatalogKind,
@@ -112,8 +110,6 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     const out = join(outDir, repositoryServicePath(serviceID));
     await mkdir(out, { recursive: true });
     await writeFile(join(out, "service.json"), JSON.stringify(manifest, null, 2));
-    const favicon = join(catalogDir(kind, id), "favicon.png");
-    if (existsSync(favicon)) await copyFile(favicon, join(out, "favicon.png"));
     entries.push(serviceID);
   }
   const services = entries.sort((a, b) => a.localeCompare(b));

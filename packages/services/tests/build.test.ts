@@ -25,6 +25,18 @@ describe("buildArtifacts", () => {
     expect(existsSync(join(service, "favicon.png"))).toBeFalse();
   });
 
+  test("preserves native icon URLs without packaging image files", async () => {
+    const output = await mkdtemp(join(tmpdir(), "ox-services-build-test-"));
+    temporaryDirectories.push(output);
+
+    await buildArtifacts(output, { domains: [], catalogKinds: ["ios"] });
+
+    const service = join(output, "ios", "calendar");
+    const manifest = JSON.parse(await readFile(join(service, "service.json"), "utf8"));
+    expect(manifest.faviconUrl).toBe(`${SERVICE_ASSET_BASE_URL}/ios:calendar/favicon.png`);
+    expect(existsSync(join(service, "favicon.png"))).toBeFalse();
+  });
+
   test("copies the canonical JavaScript installer without compilation", async () => {
     const output = await mkdtemp(join(tmpdir(), "ox-services-build-test-"));
     temporaryDirectories.push(output);
