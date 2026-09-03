@@ -203,7 +203,8 @@ struct StreamingFadeSelectableText: View {
                 )
             } else if let rendered {
                 SelectableText(
-                    rendered,
+                    streamingAttributed: rendered,
+                    resetKey: resetKey,
                     fade: .init(
                         color: color,
                         arrivals: tracker.arrivals,

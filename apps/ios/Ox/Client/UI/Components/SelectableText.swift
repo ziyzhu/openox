@@ -51,7 +51,7 @@ extension View {
 // selection gestures, so the chat ScrollView and sidebar drag don't steal them.
 struct SelectableText: UIViewRepresentable {
     let attributed: NSAttributedString
-    private let streamingPlain: StreamingPlain?
+    private let streaming: Streaming?
     var fade: Fade?
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.chatLinkHandler) private var chatLinkHandler
@@ -62,6 +62,16 @@ struct SelectableText: UIViewRepresentable {
         let font: UIFont
         let color: UIColor
         let lineSpacing: CGFloat
+    }
+
+    fileprivate struct StreamingAttributed {
+        let value: NSAttributedString
+        let resetKey: Int
+    }
+
+    private enum Streaming {
+        case plain(StreamingPlain)
+        case attributed(StreamingAttributed)
     }
 
     // Fading recolors ranges in place on the text view's storage: color-only
@@ -75,7 +85,7 @@ struct SelectableText: UIViewRepresentable {
 
     init(_ attributed: NSAttributedString, fade: Fade? = nil) {
         self.attributed = attributed
-        streamingPlain = nil
+        streaming = nil
         self.fade = fade
     }
 
@@ -84,7 +94,7 @@ struct SelectableText: UIViewRepresentable {
             string: text,
             attributes: SelectableText.baseAttributes(font: font, color: color, lineSpacing: lineSpacing)
         )
-        streamingPlain = nil
+        streaming = nil
     }
 
     init(
@@ -96,19 +106,29 @@ struct SelectableText: UIViewRepresentable {
         fade: Fade? = nil
     ) {
         attributed = NSAttributedString()
-        streamingPlain = StreamingPlain(
+        streaming = .plain(StreamingPlain(
             source: text,
             resetKey: resetKey,
             font: font,
             color: color,
             lineSpacing: lineSpacing
-        )
+        ))
+        self.fade = fade
+    }
+
+    init(
+        streamingAttributed value: NSAttributedString,
+        resetKey: Int,
+        fade: Fade? = nil
+    ) {
+        attributed = value
+        streaming = .attributed(StreamingAttributed(value: value, resetKey: resetKey))
         self.fade = fade
     }
 
     init(markdown source: String, font: UIFont, color: UIColor, lineSpacing: CGFloat = 0) {
         self.attributed = SelectableText.renderMarkdown(source, font: font, color: color, lineSpacing: lineSpacing)
-        streamingPlain = nil
+        streaming = nil
     }
 
     init(code source: String, language: String?) {
@@ -117,7 +137,7 @@ struct SelectableText: UIViewRepresentable {
             weight: .regular
         )
         attributed = SyntaxHighlighter.selectable(source, language: language, font: font)
-        streamingPlain = nil
+        streaming = nil
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -142,13 +162,18 @@ struct SelectableText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.chatLinkHandler = chatLinkHandler
-        if let streamingPlain {
+        switch streaming {
+        case .plain(let streamingPlain):
             context.coordinator.updateStreamingPlain(streamingPlain, in: view)
-        } else if context.coordinator.lastSet !== attributed {
-            context.coordinator.endStreamingPlain()
-            view.linkTextAttributes = linkTextAttributes
-            view.attributedText = attributed
-            context.coordinator.textReplaced(attributed)
+        case .attributed(let streamingAttributed):
+            context.coordinator.updateStreamingAttributed(streamingAttributed, in: view)
+        case nil:
+            context.coordinator.endStreaming()
+            if context.coordinator.lastSet !== attributed {
+                view.linkTextAttributes = linkTextAttributes
+                view.attributedText = attributed
+                context.coordinator.textReplaced(attributed)
+            }
         }
         guard let fade else { return }
         context.coordinator.fadedStart = applyFade(
@@ -238,7 +263,19 @@ struct SelectableText: UIViewRepresentable {
         let key = Coordinator.SizeKey(width: maxWidth, category: uiView.traitCollection.preferredContentSizeCategory)
         if let cached = memo.sizes[key] { return cached }
         let width = proposal.width ?? ceil(uiView.sizeThatFits(CGSize(width: unbounded, height: unbounded)).width)
-        let height = uiView.sizeThatFits(CGSize(width: width, height: unbounded)).height
+        let height: CGFloat
+        if memo.isStreaming {
+            let containerWidth = max(0, width - uiView.textContainerInset.left - uiView.textContainerInset.right)
+            let containerSize = CGSize(width: containerWidth, height: unbounded)
+            if uiView.textContainer.size != containerSize {
+                uiView.textContainer.size = containerSize
+            }
+            uiView.layoutManager.ensureLayout(for: uiView.textContainer)
+            let used = uiView.layoutManager.usedRect(for: uiView.textContainer)
+            height = used.maxY + uiView.textContainerInset.bottom
+        } else {
+            height = uiView.sizeThatFits(CGSize(width: width, height: unbounded)).height
+        }
         let size = CGSize(width: width, height: ceil(height))
         memo.sizes[key] = size
         return size
@@ -263,10 +300,19 @@ struct SelectableText: UIViewRepresentable {
         var sizes: [SizeKey: CGSize] = [:]
         private let serviceManager: ServiceManager
         var fadedStart: Int?
-        private var streamingUTF8 = 0
-        private var streamingReset = Int.min
-        private var streamingStyle: String?
+        private var streaming = StreamingState.none
         var chatLinkHandler: ((URL) -> Void)?
+
+        var isStreaming: Bool {
+            if case .none = streaming { return false }
+            return true
+        }
+
+        private enum StreamingState {
+            case none
+            case plain(utf8Count: Int, resetKey: Int, style: String)
+            case attributed(NSAttributedString, resetKey: Int)
+        }
 
         init(serviceManager: ServiceManager, chatLinkHandler: ((URL) -> Void)?) {
             self.serviceManager = serviceManager
@@ -287,28 +333,59 @@ struct SelectableText: UIViewRepresentable {
                 lineSpacing: stream.lineSpacing
             )
             let total = stream.source.utf8.count
-            guard streamingStyle == style,
-                  streamingReset == stream.resetKey,
-                  total >= streamingUTF8 else {
+            guard case let .plain(previousCount, resetKey, previousStyle) = streaming,
+                  previousStyle == style,
+                  resetKey == stream.resetKey,
+                  total >= previousCount else {
                 let rendered = NSAttributedString(string: stream.source, attributes: attributes)
                 view.attributedText = rendered
-                streamingUTF8 = total
-                streamingReset = stream.resetKey
-                streamingStyle = style
+                streaming = .plain(utf8Count: total, resetKey: stream.resetKey, style: style)
                 textReplaced(rendered)
                 return
             }
-            guard total > streamingUTF8 else { return }
-            let delta = String(decoding: stream.source.utf8.suffix(total - streamingUTF8), as: UTF8.self)
+            guard total > previousCount else { return }
+            let delta = String(decoding: stream.source.utf8.suffix(total - previousCount), as: UTF8.self)
             view.textStorage.append(NSAttributedString(string: delta, attributes: attributes))
-            streamingUTF8 = total
+            streaming = .plain(utf8Count: total, resetKey: stream.resetKey, style: style)
             sizes.removeAll()
         }
 
-        func endStreamingPlain() {
-            streamingUTF8 = 0
-            streamingReset = Int.min
-            streamingStyle = nil
+        fileprivate func updateStreamingAttributed(_ stream: StreamingAttributed, in view: UITextView) {
+            let next = stream.value
+            guard case let .attributed(previous, resetKey) = streaming,
+                  resetKey == stream.resetKey else {
+                replaceStreamedAttributed(next, resetKey: stream.resetKey, in: view)
+                return
+            }
+            if next.isEqual(to: previous) { return }
+            guard next.length > previous.length,
+                  next.attributedSubstring(from: NSRange(location: 0, length: previous.length)).isEqual(to: previous) else {
+                replaceStreamedAttributed(next, resetKey: stream.resetKey, in: view)
+                return
+            }
+            let delta = next.attributedSubstring(
+                from: NSRange(location: previous.length, length: next.length - previous.length)
+            )
+            view.textStorage.append(delta)
+            streaming = .attributed(next, resetKey: stream.resetKey)
+            lastSet = next
+            sizes.removeAll()
+        }
+
+        func endStreaming() {
+            let wasStreaming = isStreaming
+            streaming = .none
+            if wasStreaming { sizes.removeAll() }
+        }
+
+        private func replaceStreamedAttributed(
+            _ attributed: NSAttributedString,
+            resetKey: Int,
+            in view: UITextView
+        ) {
+            view.attributedText = attributed
+            streaming = .attributed(attributed, resetKey: resetKey)
+            textReplaced(attributed)
         }
 
         func textView(_ textView: UITextView, primaryActionFor textItem: UITextItem,

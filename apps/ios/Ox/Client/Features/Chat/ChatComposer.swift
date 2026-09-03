@@ -903,9 +903,6 @@ struct ChatComposer: View, Equatable {
                 .foregroundStyle(Theme.Colors.onSurface)
                 .tint(Theme.Colors.primary.dynamic)
                 .background(ComposerPasteDelegateInstaller(textViewReference: textViewReference, allowsSelection: !speech.isPresented))
-                .onChange(of: composerSelection) { _, selection in
-                    selectionChanged(selection)
-                }
                 .onChange(of: composer.caretEndRequest) { _, _ in
                     composerSelection = AttributedTextSelection(insertionPoint: composer.attributedDraft.endIndex)
                 }
@@ -1148,16 +1145,6 @@ struct ChatComposer: View, Equatable {
             let fallback = resolved.count == 1 ? "Pasted Image.png" : "Pasted Image \(index + 1).png"
             return PastedComposerImage(data: image.0, suggestedName: image.1 ?? fallback)
         }
-    }
-
-    private func selectionChanged(_ selection: AttributedTextSelection) {
-        let state = switch selection.indices(in: composer.attributedDraft) {
-        case .insertionPoint(let index):
-            "caretAtEnd=\(index == composer.attributedDraft.endIndex)"
-        case .ranges:
-            "range"
-        }
-        Log.ui.info("ChatComposer.selection chat=\(sessionID) \(state) chars=\(composer.attributedDraft.characters.count)")
     }
 
 }

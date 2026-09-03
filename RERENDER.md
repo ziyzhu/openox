@@ -13,21 +13,23 @@ architecture, measure body evaluations and projection cost in the simulator.
 
 ## Summary
 
-The largest avoidable update path starts in `ChatPage`. It owns transcript,
-composer, navigation, speech, artifact, toast, focus, dock, and viewport state in
-one view. Changes in any of those domains can reevaluate the root and repeat work
-such as transcript projection, artifact discovery, array construction, and row
-construction.
+The static review found that the broadest avoidable update path starts in
+`ChatPage`. Simulator profiling then found a more expensive active path: every
+streamed text delta could remeasure the complete growing `UITextView`. Long
+single-paragraph responses reached roughly one CPU core and more than 200 MB of
+app-process memory.
 
 The highest-value changes are:
 
-1. Stop observing composer text from the root `ChatPage`. Implemented in this
+1. Make streaming text storage and layout incremental. Implemented in this
    change.
-2. Move transcript projection below a narrow transcript-specific view boundary.
+2. Stop observing composer text from the root `ChatPage`. Implemented in this
+   change.
+3. Move transcript projection below a narrow transcript-specific view boundary.
    Implemented in this change.
-3. Activate the equality boundaries already defined for transcript rows.
-4. Cache artifact discovery instead of rescanning the projection during updates.
-5. Keep scroll-position changes inside the transcript subtree.
+4. Activate the equality boundaries already defined for transcript rows.
+5. Cache artifact discovery instead of rescanning the projection during updates.
+6. Keep scroll-position changes inside the transcript subtree.
 
 ## Existing protections
 
@@ -51,6 +53,41 @@ their available space locally with `GeometryReader`, which keeps that geometry
 out of root state.
 
 ## High-priority update paths
+
+### Growing streaming text remeasures the complete text view
+
+Plain streaming already appended only the new text to `NSTextStorage`, but it
+also cleared every cached size. The next SwiftUI layout asked
+`UITextView.sizeThatFits` to measure the complete growing response. Formatted
+tails additionally replaced the complete attributed string after each parse.
+Apple notes that SwiftUI may call a representable's
+[`sizeThatFits`](https://developer.apple.com/documentation/swiftui/uiviewrepresentable/sizethatfits%28_%3Auiview%3Acontext%3A%29)
+more than once during one layout pass.
+
+Keep one text view so selection can span the response, but make its changing work
+incremental. Append a formatted suffix when its attributed prefix is unchanged;
+fall back to replacement when completing a link or another syntax change alters
+earlier attributes. During streaming, derive height from TextKit's existing
+layout manager after the storage mutation. On completion, explicitly leave
+streaming mode and restore UIKit's normal sizing path for settled rows. This
+uses the incremental layout notifications owned by
+[`NSTextStorage`](https://developer.apple.com/documentation/uikit/nstextstorage)
+without changing the view's frame directly.
+
+Implementation status: plain and stable formatted growth now append only their
+new attributed suffix. Attribute-changing Markdown still replaces the text, and
+settled content always uses the original UIKit sizing path. The per-character
+`ChatComposer.selection` info log was also removed; selection actions and state
+transitions remain observable elsewhere without one log entry per keystroke.
+
+Directional simulator measurements for the same 6.8K plain and 8.4K formatted
+Mock scenarios improved from about 95% and 90% CPU to peaks of about 62% and 48%.
+The corresponding app-process memory peaks fell from 221 MB and 206 MB to 106 MB
+and 140 MB. The after runs contained more settled history and shared a host with
+other active simulators, so treat the numbers as directional rather than a
+device benchmark. Completed rows retained their full measured heights after
+relaunch and another submission; mixed Markdown rendering and range selection
+also remained intact.
 
 ### Composer text invalidates the root while scrolled away
 
