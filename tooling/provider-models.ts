@@ -11,7 +11,7 @@ const expectedClients = {
   ],
   china: [
     "qwen-coding-plan", "minimax-token-plan", "kimi", "deepseek", "zai-coding-plan",
-    "zai", "qwen", "minimax", "stepfun", "siliconflow",
+    "zai", "qwen", "minimax", "stepfun", "siliconflow", "tencent-tokenhub", "modelscope",
   ],
 } as const;
 

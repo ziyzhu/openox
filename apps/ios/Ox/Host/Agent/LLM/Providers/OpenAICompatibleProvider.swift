@@ -36,6 +36,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
     let reasoningControl: OpenAIChatTransport.ReasoningControl
     let website: RegionalValue<URL>?
     let authNotice: String?
+    let authNoticeRegions: Set<LLMRegion>
     let gettingStartedOffer: ProviderGettingStartedOffer?
     let inferenceLocation: LLMInferenceLocation
 
@@ -56,6 +57,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         reasoningControl: OpenAIChatTransport.ReasoningControl = .providerDefault,
         website: RegionalValue<URL>? = nil,
         authNotice: String? = nil,
+        authNoticeRegions: Set<LLMRegion> = [.global, .china],
         gettingStartedOffer: ProviderGettingStartedOffer? = nil,
         inferenceLocation: LLMInferenceLocation = .remote
     ) {
@@ -75,6 +77,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         self.reasoningControl = reasoningControl
         self.website = website
         self.authNotice = authNotice
+        self.authNoticeRegions = authNoticeRegions
         self.gettingStartedOffer = gettingStartedOffer
         self.inferenceLocation = inferenceLocation
     }
@@ -109,8 +112,8 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
             reasoningReplayModelIDs: reasoningReplayModelIDs,
             reasoningControl: reasoningControl,
             website: website?.value(for: region),
-            authNotice: authNotice,
-            gettingStartedOffer: gettingStartedOffer,
+            authNotice: authNotice.flatMap { authNoticeRegions.contains(region) ? $0 : nil },
+            gettingStartedOffer: gettingStartedOffer.flatMap { $0.regions.contains(region) ? $0 : nil },
             inferenceLocation: inferenceLocation,
             diagnosticsEndpoint: baseURL
         )

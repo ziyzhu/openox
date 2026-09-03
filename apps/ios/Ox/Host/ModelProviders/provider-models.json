@@ -1884,6 +1884,29 @@
         "catalogProvider": "zhipuai",
         "models": [
           {
+            "source": "glm-4.7-flash",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "glm-4.7-flash",
+              "displayName": "GLM-4.7-Flash",
+              "maxTokens": 16384,
+              "maxContext": 200000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
             "source": "glm-5.2",
             "overrides": {
               "maxTokens": 16384
@@ -2108,6 +2131,32 @@
         "catalogProvider": "siliconflow-cn",
         "models": [
           {
+            "source": "Qwen/Qwen3.5-4B",
+            "overrides": {
+              "displayName": "Qwen 3.5 4B",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "Qwen/Qwen3.5-4B",
+              "displayName": "Qwen 3.5 4B",
+              "maxTokens": 16384,
+              "maxContext": 262144,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "video"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
             "source": "deepseek-ai/DeepSeek-V4-Flash",
             "overrides": {
               "displayName": "DeepSeek V4 Flash",
@@ -2171,6 +2220,67 @@
                 "high",
                 "max"
               ],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "tencent-tokenhub": {
+      "china": {
+        "catalogProvider": "tencent-tokenhub",
+        "models": [
+          {
+            "source": "hy3",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "hy3",
+              "displayName": "Hy3",
+              "maxTokens": 16384,
+              "maxContext": 256000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "modelscope": {
+      "china": {
+        "catalogProvider": "modelscope",
+        "models": [
+          {
+            "source": "ZhipuAI/GLM-4.6",
+            "overrides": {
+              "displayName": "GLM-4.6",
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "ZhipuAI/GLM-4.6",
+              "displayName": "GLM-4.6",
+              "maxTokens": 16384,
+              "maxContext": 202752,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
               "modalities": {
                 "input": [
                   "text"

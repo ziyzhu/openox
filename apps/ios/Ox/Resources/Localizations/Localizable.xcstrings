@@ -1103,6 +1103,50 @@
         }
       }
     },
+    "API key · Free GLM-4.7 Flash" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥 · 免费 GLM-4.7 Flash"
+          }
+        }
+      }
+    },
+    "API key · Free Qwen 3.5 4B" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥 · 免费 Qwen 3.5 4B"
+          }
+        }
+      }
+    },
+    "API key · 90-day free trial" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥 · 90 天免费试用"
+          }
+        }
+      }
+    },
+    "API key · 1M-token trial" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥 · 100 万 Token 试用"
+          }
+        }
+      }
+    },
     "App info" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4312,6 +4356,17 @@
         }
       }
     },
+    "GLM-4.7 Flash is free. Other Z.AI models may charge your account. Usage and rate limits apply." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GLM-4.7 Flash 可免费使用。其他 Z.AI 模型可能会产生费用。受用量和速率限制。"
+          }
+        }
+      }
+    },
     "Get your approximate, city-level location." : {
       "comment" : "Description of an action that retrieves the user's approximate, city-level location.",
       "extractionState" : "stale",
@@ -5807,6 +5862,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mistral 免费模式无需信用卡即可使用有限的 API 用量，并受用量和速率限制。"
+          }
+        }
+      }
+    },
+    "Free for development: 2,000 calls/day total, typically 200/model. Requires a verified, linked Alibaba Cloud account; limits can change." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发体验免费：每日共 2,000 次调用，通常每个模型 200 次。需关联已实名认证的阿里云账号；额度可能调整。"
+          }
+        }
+      }
+    },
+    "New Model Studio accounts receive time-limited free quotas on eligible models. Free quotas expire after 90 days. Verified accounts may be charged after quotas are exhausted unless stop-when-free-quota-ends is enabled." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新开通的百炼账号可获得符合条件模型的限时免费额度。免费额度将在 90 天后到期。已实名认证的账号若未开启“免费额度用完即停”，额度耗尽后可能会产生费用。"
+          }
+        }
+      }
+    },
+    "New accounts can claim 1M free tokens per language model for 90 days. Calls stop at the limit unless you enable postpaid billing." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新账号可在 90 天内为每个语言模型领取 100 万免费 Token。除非启用后付费，额度用完后将停止调用。"
           }
         }
       }
@@ -9491,6 +9579,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免费选项"
+          }
+        }
+      }
+    },
+    "Qwen 3.5 4B is free after identity verification. Other SiliconFlow models may charge your account. Fixed rate limits apply." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成实名认证后可免费使用 Qwen 3.5 4B。其他 SiliconFlow 模型可能会产生费用。免费模型有固定的速率限制。"
+          }
+        }
+      }
+    },
+    "SDK token · 2,000 calls/day" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SDK Token · 每日 2,000 次调用"
           }
         }
       }

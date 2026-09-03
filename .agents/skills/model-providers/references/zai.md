@@ -5,11 +5,14 @@
 - Global website: [Z.AI](https://z.ai/)
 - Global developer documentation: [Z.AI Developer Documentation](https://docs.z.ai/)
 - China website and developer platform: [BigModel Open Platform](https://open.bigmodel.cn/)
+- China free-model documentation: [GLM-4.7-Flash](https://docs.bigmodel.cn/cn/guide/models/free/glm-4.7-flash)
 - Account management: general API keys or GLM Coding Plan subscriptions on the regional platform. Current deep links belong in the provider source.
 
 ## Ox account placement
 
 Ox exposes the general Z.AI API and Z.AI Coding Plan in Global and China. Each product keeps distinct credentials, and each product's Global and China credentials are also separate. The Coding Plan is a supported-tools product, not a general-API alias.
+
+The China general API is a first-run option because its curated catalog begins with Z.AI's documented free GLM Flash model. Other curated models on the same account may be billed.
 
 ## Runtime sources
 

@@ -21,6 +21,13 @@ nonisolated enum QwenProvider {
         regionalCredentials: true,
         cachesSystemPrompt: true,
         reasoningControl: .disabled(.qwen),
-        website: regionalURL("https://modelstudio.console.alibabacloud.com/?tab=model#/api-key", overrides: [.china: "https://bailian.console.aliyun.com/?tab=model#/api-key"])
+        website: regionalURL("https://modelstudio.console.alibabacloud.com/?tab=model#/api-key", overrides: [.china: "https://bailian.console.aliyun.com/?tab=model#/api-key"]),
+        authNotice: "New Model Studio accounts receive time-limited free quotas on eligible models. Free quotas expire after 90 days. Verified accounts may be charged after quotas are exhausted unless stop-when-free-quota-ends is enabled.",
+        authNoticeRegions: [.china],
+        gettingStartedOffer: ProviderGettingStartedOffer(
+            summary: "API key · 90-day free trial",
+            priority: 2,
+            regions: [.china]
+        )
     )
 }

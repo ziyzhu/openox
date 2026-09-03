@@ -19,6 +19,13 @@ nonisolated enum ZAIProvider {
         endpoint: regionalURL("https://api.z.ai/api/paas/v4", overrides: [.china: "https://open.bigmodel.cn/api/paas/v4"]),
         regionalCredentials: true,
         reasoningControl: .disabled(.thinking),
-        website: regionalURL("https://z.ai/manage-apikey/apikey-list", overrides: [.china: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"])
+        website: regionalURL("https://z.ai/manage-apikey/apikey-list", overrides: [.china: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"]),
+        authNotice: "GLM-4.7 Flash is free. Other Z.AI models may charge your account. Usage and rate limits apply.",
+        authNoticeRegions: [.china],
+        gettingStartedOffer: ProviderGettingStartedOffer(
+            summary: "API key · Free GLM-4.7 Flash",
+            priority: 0,
+            regions: [.china]
+        )
     )
 }

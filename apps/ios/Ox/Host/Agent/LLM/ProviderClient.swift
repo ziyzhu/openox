@@ -121,10 +121,16 @@ nonisolated public enum LLMCredentialKind: Sendable, Equatable {
 nonisolated public struct ProviderGettingStartedOffer: Sendable {
     public let summary: String
     public let priority: Int
+    public let regions: Set<LLMRegion>
 
-    public init(summary: String, priority: Int) {
+    public init(
+        summary: String,
+        priority: Int,
+        regions: Set<LLMRegion> = [.global, .china]
+    ) {
         self.summary = summary
         self.priority = priority
+        self.regions = regions
     }
 }
 

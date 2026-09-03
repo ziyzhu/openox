@@ -48,5 +48,7 @@ nonisolated enum BuiltInProviders {
         MiniMaxProvider.api,
         StepFunProvider.profile,
         SiliconFlowProvider.profile,
+        TencentTokenHubProvider.profile,
+        ModelScopeProvider.profile,
     ]
 }
