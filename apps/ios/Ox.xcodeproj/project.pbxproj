@@ -389,7 +389,7 @@
 					"@executable_path/Frameworks",
 				);
 				LM_SKIP_METADATA_EXTRACTION = NO;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(OX_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = Ox;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -425,7 +425,7 @@
 					"@executable_path/Frameworks",
 				);
 				LM_SKIP_METADATA_EXTRACTION = NO;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(OX_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = Ox;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -456,7 +456,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LM_SKIP_METADATA_EXTRACTION = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(OX_BUNDLE_IDENTIFIER).ShareExtension";
 				PRODUCT_NAME = ShareExtension;
 				SKIP_INSTALL = YES;
@@ -488,7 +488,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LM_SKIP_METADATA_EXTRACTION = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(OX_BUNDLE_IDENTIFIER).ShareExtension";
 				PRODUCT_NAME = ShareExtension;
 				SKIP_INSTALL = YES;
