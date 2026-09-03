@@ -118,6 +118,16 @@ nonisolated public enum LLMCredentialKind: Sendable, Equatable {
     }
 }
 
+nonisolated public struct ProviderGettingStartedOffer: Sendable {
+    public let summary: String
+    public let priority: Int
+
+    public init(summary: String, priority: Int) {
+        self.summary = summary
+        self.priority = priority
+    }
+}
+
 nonisolated public protocol ProviderClient: Sendable {
     var id: String { get }
     var displayName: String { get }
@@ -125,6 +135,7 @@ nonisolated public protocol ProviderClient: Sendable {
     var regions: Set<LLMRegion> { get }
     var website: URL? { get }
     var authNotice: String? { get }
+    var gettingStartedOffer: ProviderGettingStartedOffer? { get }
     var usesAPIKey: Bool { get }
     var acceptsAPIKey: Bool { get }
     var credentialKind: LLMCredentialKind { get }
@@ -156,6 +167,7 @@ nonisolated extension ProviderClient {
     public var regions: Set<LLMRegion> { [.global, .china] }
     public var website: URL? { nil }
     public var authNotice: String? { nil }
+    public var gettingStartedOffer: ProviderGettingStartedOffer? { nil }
     public var usesAPIKey: Bool { true }
     public var acceptsAPIKey: Bool { usesAPIKey }
     public var credentialKind: LLMCredentialKind { usesAPIKey ? .apiKey : .bearerToken }

@@ -35,6 +35,8 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
     let reasoningReplayModelIDs: Set<String>
     let reasoningControl: OpenAIChatTransport.ReasoningControl
     let website: RegionalValue<URL>?
+    let authNotice: String?
+    let gettingStartedOffer: ProviderGettingStartedOffer?
     let inferenceLocation: LLMInferenceLocation
 
     init(
@@ -53,6 +55,8 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         reasoningReplayModelIDs: Set<String> = [],
         reasoningControl: OpenAIChatTransport.ReasoningControl = .providerDefault,
         website: RegionalValue<URL>? = nil,
+        authNotice: String? = nil,
+        gettingStartedOffer: ProviderGettingStartedOffer? = nil,
         inferenceLocation: LLMInferenceLocation = .remote
     ) {
         self.id = id
@@ -70,6 +74,8 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         self.reasoningReplayModelIDs = reasoningReplayModelIDs
         self.reasoningControl = reasoningControl
         self.website = website
+        self.authNotice = authNotice
+        self.gettingStartedOffer = gettingStartedOffer
         self.inferenceLocation = inferenceLocation
     }
 
@@ -103,6 +109,8 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
             reasoningReplayModelIDs: reasoningReplayModelIDs,
             reasoningControl: reasoningControl,
             website: website?.value(for: region),
+            authNotice: authNotice,
+            gettingStartedOffer: gettingStartedOffer,
             inferenceLocation: inferenceLocation,
             diagnosticsEndpoint: baseURL
         )

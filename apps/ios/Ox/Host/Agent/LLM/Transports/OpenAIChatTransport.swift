@@ -18,6 +18,8 @@ public struct OpenAIChatTransport: ProviderClient {
     public let reasoningReplayModelIDs: Set<String>
     public let reasoningControl: ReasoningControl
     public let website: URL?
+    public let authNotice: String?
+    public let gettingStartedOffer: ProviderGettingStartedOffer?
     public let inferenceLocation: LLMInferenceLocation
     public let diagnosticsEndpoint: URL?
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .openAIChatCompletions }
@@ -103,6 +105,8 @@ public struct OpenAIChatTransport: ProviderClient {
         reasoningReplayModelIDs: Set<String> = [],
         reasoningControl: ReasoningControl = .providerDefault,
         website: URL? = nil,
+        authNotice: String? = nil,
+        gettingStartedOffer: ProviderGettingStartedOffer? = nil,
         inferenceLocation: LLMInferenceLocation = .remote,
         diagnosticsEndpoint: URL? = nil
     ) {
@@ -123,6 +127,8 @@ public struct OpenAIChatTransport: ProviderClient {
         self.reasoningReplayModelIDs = reasoningReplayModelIDs
         self.reasoningControl = reasoningControl
         self.website = website
+        self.authNotice = authNotice
+        self.gettingStartedOffer = gettingStartedOffer
         self.inferenceLocation = inferenceLocation
         self.diagnosticsEndpoint = diagnosticsEndpoint
     }

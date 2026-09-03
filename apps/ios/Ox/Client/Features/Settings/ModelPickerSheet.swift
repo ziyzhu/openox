@@ -476,6 +476,7 @@ struct ModelPickerContent: View {
 
     let title: String
     let activeSelection: ModelSelection
+    let highlightsGettingStartedOffers: Bool
     var onClose: (() -> Void)?
     let onSelect: (any ProviderClient, ProviderModel, ModelSelection) -> Void
 
@@ -499,11 +500,13 @@ struct ModelPickerContent: View {
     init(
         title: String,
         activeSelection: ModelSelection,
+        highlightsGettingStartedOffers: Bool = false,
         onClose: (() -> Void)? = nil,
         onSelect: @escaping (any ProviderClient, ProviderModel, ModelSelection) -> Void
     ) {
         self.title = title
         self.activeSelection = activeSelection
+        self.highlightsGettingStartedOffers = highlightsGettingStartedOffers
         self.onClose = onClose
         self.onSelect = onSelect
         _selectedRegion = State(initialValue: activeSelection.region)
@@ -651,6 +654,7 @@ struct ModelPickerContent: View {
         NavigationLink {
             ProviderPickerView(
                 clients: displayedClients,
+                highlightsGettingStartedOffers: highlightsGettingStartedOffers,
                 selectedClientID: Binding(
                     get: { selectedClientID },
                     set: { providerSelection = $0.map(ProviderSelection.client) ?? .custom }
@@ -1020,29 +1024,47 @@ struct ModelPickerContent: View {
 
 private struct ProviderPickerView: View {
     let clients: [any ProviderClient]
+    let highlightsGettingStartedOffers: Bool
     @Binding var selectedClientID: String?
 
     var body: some View {
+        let featuredClients = clients
+            .filter { $0.gettingStartedOffer != nil }
+            .sorted {
+                ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max)
+            }
+        let featuredIDs = Set(featuredClients.map(\.id))
+        let customOption = SettingsSelectionOption<String?>(
+            id: "custom",
+            value: nil,
+            title: "Custom provider",
+            systemImage: "plus",
+            accessibilityIdentifier: A11yID.Chat.modelCustomProviders
+        )
+        let providerOption = { (client: any ProviderClient) in
+            SettingsSelectionOption<String?>(
+                id: client.id,
+                value: client.id,
+                title: client.displayName,
+                subtitle: highlightsGettingStartedOffers ? client.gettingStartedOffer?.summary : nil,
+                accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
+            )
+        }
+        let showsFeatured = highlightsGettingStartedOffers && !featuredClients.isEmpty
+        let options = showsFeatured
+            ? featuredClients.map(providerOption)
+                + [customOption]
+                + clients.filter { !featuredIDs.contains($0.id) }.map(providerOption)
+            : [customOption] + clients.map(providerOption)
+
         SettingsSelectionPickerView(
             title: "Provider",
-            options: [
-                SettingsSelectionOption(
-                    id: "custom",
-                    value: nil,
-                    title: "Custom provider",
-                    systemImage: "plus",
-                    accessibilityIdentifier: A11yID.Chat.modelCustomProviders
-                ),
-            ] + clients.map { client in
-                SettingsSelectionOption(
-                    id: client.id,
-                    value: client.id,
-                    title: client.displayName,
-                    accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
-                )
-            },
+            options: options,
             selection: $selectedClientID,
-            separatesFirstOption: true
+            separatesFirstOption: !showsFeatured,
+            promotedOptionCount: showsFeatured ? featuredClients.count : 0,
+            promotedTitle: "Start free",
+            remainingTitle: "More providers"
         )
     }
 }
@@ -1052,6 +1074,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let value: Value
     let title: String
     var systemImage: String? = nil
+    var subtitle: String? = nil
     let accessibilityIdentifier: String
 }
 
@@ -1060,12 +1083,18 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value
     var separatesFirstOption = false
+    var promotedOptionCount = 0
+    var promotedTitle: LocalizedStringKey?
+    var remainingTitle: LocalizedStringKey?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.lg) {
-                if separatesFirstOption, let first = options.first {
+                if promotedOptionCount > 0, promotedOptionCount < options.count {
+                    titledOptionGroup(promotedTitle, Array(options.prefix(promotedOptionCount)))
+                    titledOptionGroup(remainingTitle, Array(options.dropFirst(promotedOptionCount)))
+                } else if separatesFirstOption, let first = options.first {
                     optionRow(first, horizontalInset: SettingsLayout.rowVerticalInset)
                         .settingsSurface(singleRow: true)
                     optionGroup(Array(options.dropFirst()))
@@ -1091,6 +1120,21 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
         .settingsSurface()
     }
 
+    private func titledOptionGroup(
+        _ title: LocalizedStringKey?,
+        _ options: [SettingsSelectionOption<Value>]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if let title {
+                Text(title)
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .settingsSectionHeaderInset()
+            }
+            optionGroup(options)
+        }
+    }
+
     private func optionRow(
         _ option: SettingsSelectionOption<Value>,
         horizontalInset: CGFloat = SettingsLayout.horizontalInset
@@ -1106,9 +1150,16 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
                         .foregroundStyle(Theme.Colors.primary)
                         .frame(width: 24, alignment: .leading)
                 }
-                Text(verbatim: option.title)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: option.title)
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                    if let subtitle = option.subtitle {
+                        Text(LocalizedStringKey(subtitle))
+                            .font(Theme.Fonts.caption)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    }
+                }
                 Spacer(minLength: 0)
                 if selection == option.value {
                     Image(systemName: "checkmark")

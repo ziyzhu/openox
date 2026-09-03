@@ -21,6 +21,11 @@ public struct GeminiProvider: ProviderClient {
     public let regions: Set<LLMRegion> = [.global]
     public let reasoningPolicy: LLMReasoningPolicy = .minimal
     public let website = URL(string: "https://aistudio.google.com/apikey")
+    public let authNotice: String? = "Gemini's free tier is available for eligible models with usage limits. Google may use free-tier prompts and responses to improve its products."
+    public let gettingStartedOffer: ProviderGettingStartedOffer? = ProviderGettingStartedOffer(
+        summary: "API key · Free tier",
+        priority: 1
+    )
     public var protocolDiagnostics: LLMProtocolDiagnostics {
         LLMProtocolDiagnostics(endpoint: config.baseURL.absoluteString)
     }

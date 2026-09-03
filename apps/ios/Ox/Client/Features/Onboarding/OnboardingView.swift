@@ -70,9 +70,15 @@ struct OnboardingView: View {
                 ProxyDisclosureDiagram()
             } actions: {
                 VStack(spacing: Theme.Spacing.md) {
-                    Button { finish() } label: { Text("Acknowledge") }
-                        .buttonStyle(OnboardingCTAButton())
-                        .accessibilityIdentifier(A11yID.Onboarding.complete)
+                    if picked == nil {
+                        Button { step = .ownership } label: { Text("Choose your model") }
+                            .buttonStyle(OnboardingCTAButton())
+                            .accessibilityIdentifier(A11yID.Onboarding.chooseAI)
+                    } else {
+                        Button { finish() } label: { Text("Acknowledge") }
+                            .buttonStyle(OnboardingCTAButton())
+                            .accessibilityIdentifier(A11yID.Onboarding.complete)
+                    }
                     OnboardingCommunityLinks()
                 }
             }
@@ -285,6 +291,10 @@ struct OnboardingView: View {
     }
 
     private func finish() {
+        guard picked != nil else {
+            step = .ownership
+            return
+        }
         Log.ui.info("Onboarding.done picked=\(picked != nil)")
         onDone()
     }
@@ -788,7 +798,8 @@ private struct ProviderPickerButton: View {
             NavigationStack {
                 ModelPickerContent(
                     title: L10n.string("Choose your model"),
-                    activeSelection: registry.defaultModel
+                    activeSelection: registry.defaultModel,
+                    highlightsGettingStartedOffers: true
                 ) { client, model, selection in
                     Log.ui.info("Onboarding.pick client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
                     registry.select(model, in: client.id, region: selection.region)

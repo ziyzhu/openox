@@ -84,7 +84,7 @@ struct ProviderAuthenticationView: View {
                 if let account = client.subscriptionAccount { signOut(account) }
             }
         } message: {
-            Text("You'll need to sign in again to use your \(client.displayName) subscription.")
+            Text("You'll need to sign in again to use \(client.displayName).")
         }
         .onAppear {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
@@ -97,7 +97,7 @@ struct ProviderAuthenticationView: View {
                 authenticationMethod = .apiKey
             }
                 .buttonStyle(OxChipButton(filled: authenticationMethod == .apiKey))
-            Button("Subscription (OAuth)") {
+            Button("Account (OAuth)") {
                 authenticationMethod = .subscription
             }
                 .buttonStyle(OxChipButton(filled: authenticationMethod == .subscription))

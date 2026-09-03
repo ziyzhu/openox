@@ -181,13 +181,13 @@ struct SettingsNoticeMessage: View {
             Image(systemName: systemImage)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Colors.primary)
-            Text(verbatim: message)
+            Text(LocalizedStringKey(message))
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
         }
         .alertGlassPill(in: SettingsSurfaceShape())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: message))
+        .accessibilityLabel(Text(LocalizedStringKey(message)))
     }
 }

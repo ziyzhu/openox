@@ -984,6 +984,27 @@
         "catalogProvider": "openrouter",
         "models": [
           {
+            "source": "openrouter/free",
+            "model": {
+              "id": "openrouter/free",
+              "displayName": "Free Models Router",
+              "maxTokens": 8000,
+              "maxContext": 200000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
             "source": "stealth/ox-alpha",
             "overrides": {
               "maxTokens": 16384

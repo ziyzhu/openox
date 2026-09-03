@@ -15,7 +15,9 @@ nonisolated enum BuiltInProviders {
             XAIProvider.client(models: modelLookup("xai", .global)),
         ]
         return leading
-            + clients(from: leadingProfiles, for: region, modelLookup: modelLookup)
+            + clients(from: planProfiles, for: region, modelLookup: modelLookup)
+            + (region == .global ? [OpenRouterProvider.client(models: modelLookup("openrouter", .global))] : [])
+            + clients(from: [ModelArkProvider.profile], for: region, modelLookup: modelLookup)
             + middle
             + clients(from: trailingProfiles, for: region, modelLookup: modelLookup)
     }
@@ -30,12 +32,10 @@ nonisolated enum BuiltInProviders {
         }
     }
 
-    private static let leadingProfiles = [
+    private static let planProfiles = [
         OpenCodeGoProvider.profile,
         QwenProvider.codingPlan,
         MiniMaxProvider.tokenPlan,
-        OpenRouterProvider.profile,
-        ModelArkProvider.profile,
     ]
 
     private static let trailingProfiles = [

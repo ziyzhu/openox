@@ -240,12 +240,11 @@ private final class LoopbackRedirectListener {
             let target = data
                 .flatMap { String(data: $0, encoding: .utf8) }
                 .flatMap(Self.requestTarget)
+            let callback = target
+                .flatMap { URL(string: $0, relativeTo: self.base)?.absoluteURL }
+                .flatMap { $0.path == self.callbackPath ? $0 : nil }
             self.servePage(over: connection)
-            if let target,
-               let url = URL(string: target, relativeTo: self.base)?.absoluteURL,
-               url.path == self.callbackPath {
-                self.complete(url)
-            }
+            if let callback { self.complete(callback) }
         }
     }
 
@@ -278,7 +277,7 @@ private final class LoopbackRedirectListener {
     }
 
     private static var page: String {
-        let title = L10n.string("You're signed in")
+        let title = L10n.string("Sign in")
         let body = L10n.string("Return to Ox to continue.")
         return """
         <!doctype html><html><head><meta charset="utf-8">\
