@@ -44,13 +44,18 @@ Retries and recovery remain inside the same clock and model-call cap. Default to
 
 Capture continuously enough that a timeout remains diagnosable:
 
-- Initial and terminal accessibility state.
-- Screenshots at meaningful transitions and failures.
+- Initial and terminal accessibility state with matching screenshots.
+- Screenshots or photos at meaningful state transitions and failures, including before and after state when the difference matters.
+- A short screen recording when motion, streaming, gesture handling, transient UI, background/return, cancellation, or timing cannot be established by still images. Start immediately before the relevant sequence and stop immediately after it; do not record an entire campaign by default.
 - Exact prompts and visible responses.
 - User actions and outcomes with monotonic elapsed time.
-- Relevant structured Ox log interval, including `AgentLatency.summary` when present.
+- The smallest relevant structured Ox log interval, including `AgentLatency.summary`, correlation identifiers, warnings, and errors when present.
 - Chat state and selected model verification.
 - Resource samples when assigned.
+
+Record every artifact in `result.json` with its kind, relative path, capture time or monotonic offset, and what it proves. Correlate videos and screenshots with action timestamps and log intervals. Treat visual evidence and logs as complementary: the visual artifact establishes user impact, while the log explains timing or cause.
+
+Do not photograph or record credential entry, authentication codes, provider keys, or other reusable secrets. If an unrelated secret appears unexpectedly, stop capture and exclude that artifact from the report. Keep all raw evidence inside the assigned temporary directory.
 
 Do not run heavy traces during ordinary discovery. When the coordinator requests reproduction, record one deterministic interaction with `sim trace` and avoid concurrent diagnostics. `sim stats` covers the app process but not separate WebKit helpers; state that limitation when it matters.
 
@@ -75,7 +80,15 @@ Write `result.json` before returning:
   "metrics": {},
   "observations": [],
   "candidateIssues": [],
-  "evidence": [],
+  "evidence": [
+    {
+      "kind": "screenshot|photo|video|accessibility|structuredLog|resourceSample",
+      "path": "screenshots/terminal.png",
+      "capturedAt": "ISO-8601",
+      "elapsedMs": 42000,
+      "proves": "The response remained visible after background return"
+    }
+  ],
   "cleanup": { "attempted": true, "complete": true, "detail": "" }
 }
 ```

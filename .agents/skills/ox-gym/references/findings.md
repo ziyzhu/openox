@@ -10,7 +10,7 @@ Use several independent signals where possible:
 - Differential results across builds, providers, models, themes, languages, or devices.
 - Structured warning and error logs.
 - Missing or anomalous latency milestones.
-- Accessibility and screenshot inspection.
+- Accessibility, screenshot or photo, and short screen-recording inspection.
 - Repeated actions, excessive repairs, confusing approvals, or abandonment.
 - Metamorphic checks such as equivalent rephrasing, background and return, relaunch, retry, or model switch.
 - Sequential reproduction of performance or reliability anomalies.
@@ -42,10 +42,14 @@ likelyOwner: provider
 evidence:
   - sessions/session-002/result.json
   - sessions/session-002/screenshots/terminal.png
+  - sessions/session-002/recordings/cancel-retry.mov
+  - sessions/session-002/logs/agent-latency.json
 recommendation: Reproduce sequentially and inspect provider preparation latency
 ```
 
 Use severity for user impact and confidence for evidentiary strength. A severe single synthetic observation can remain low-confidence. Never fabricate thresholds after seeing a result; use an existing baseline, a request-specific threshold, or report the metric descriptively.
+
+Prefer evidence that triangulates the observation: a screenshot or short video for the user-visible effect, accessibility state for semantic UI, and a narrow structured-log interval for timing or cause. Do not require every format when one artifact is sufficient, and do not treat a log-only anomaly as confirmed user impact without visible or behavioral evidence.
 
 ## Campaign report
 
