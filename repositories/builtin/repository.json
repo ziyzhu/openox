@@ -9,6 +9,7 @@
     "ios:location",
     "ios:messages",
     "ios:notifications",
+    "ios:photos",
     "ios:reminders",
     "web:amazon.com",
     "web:americanexpress.com",

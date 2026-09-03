@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "Built-in",
-  "contentHash": "4ccf5e107e4144f4a715dbc0b5ebcf0b4fd7d7b08ee75c7438d9259197fc6a89",
+  "contentHash": "e67e11d11cacc3f30c773e3fc8c1d2aba2ee70bbdc9f6ae91d94228e247f8b5f",
   "services": [
     "ios:browser",
     "ios:calendar",
@@ -10,6 +10,7 @@
     "ios:location",
     "ios:messages",
     "ios:notifications",
+    "ios:photos",
     "ios:reminders",
     "web:amazon.com",
     "web:americanexpress.com",

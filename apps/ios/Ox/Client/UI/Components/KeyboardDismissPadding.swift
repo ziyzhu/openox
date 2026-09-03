@@ -36,7 +36,7 @@ struct KeyboardDismissPadding: UIViewRepresentable {
                 if let scroll = current as? UIScrollView {
                     guard scroll.keyboardLayoutGuide.keyboardDismissPadding != padding else { return }
                     scroll.keyboardLayoutGuide.keyboardDismissPadding = padding
-                    Log.ui.info("KeyboardDismissPadding.apply padding=\(Int(self.padding)) scroll=\(type(of: scroll))")
+                    Log.ui.debug("KeyboardDismissPadding.apply padding=\(Int(self.padding)) scroll=\(type(of: scroll))")
                     return
                 }
                 node = current.superview

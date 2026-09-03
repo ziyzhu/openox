@@ -398,6 +398,30 @@
       }
     },
     {
+      "id": "javascript-photos-search-preview",
+      "prompt": "The Photos iOS service is attached. Search images created from 2026-01-01T00:00:00Z through 2026-02-01T00:00:00Z with `ios:photos:searchAssets`, then preview up to 20 returned ids with `ios:photos:previewAssets`. Use `ox.service.invoke({ name, input, purpose })` for both actions and print the label mapping.",
+      "expect": {
+        "javascriptCalls": ["ox.service.invoke", "console.log"],
+        "javascriptCallCounts": { "ox.service.invoke": 2 },
+        "javascriptArgumentPatterns": {
+          "ox.service.invoke": ["ios:photos:searchAssets", "from\\s*:\\s*[\"']2026-01-01T00:00:00Z[\"']", "to\\s*:\\s*[\"']2026-02-01T00:00:00Z[\"']", "ios:photos:previewAssets", "assetIDs"]
+        },
+        "forbiddenJavascriptCalls": ["ox.help"]
+      }
+    },
+    {
+      "id": "javascript-photos-create-organize",
+      "prompt": "The Photos iOS service is attached and candidate asset ids are in `candidateIDs`. Create an album named Japan 2026 with `ios:photos:createAlbum`, then add the candidate assets to its returned id with `ios:photos:addAssetsToAlbum`. Use `ox.service.invoke({ name, input, purpose })` and print the result. Runtime approval is sufficient; don't ask a duplicate confirmation.",
+      "expect": {
+        "javascriptCalls": ["ox.service.invoke", "console.log"],
+        "javascriptCallCounts": { "ox.service.invoke": 2 },
+        "javascriptArgumentPatterns": {
+          "ox.service.invoke": ["ios:photos:createAlbum", "title\\s*:\\s*[\"']Japan 2026[\"']", "ios:photos:addAssetsToAlbum", "albumID", "assetIDs"]
+        },
+        "forbiddenJavascriptCalls": ["ox.help"]
+      }
+    },
+    {
       "id": "javascript-notification-cancel",
       "prompt": "The Notifications iOS service is attached. Use `ox.service.invoke({ name: \"ios:notifications:cancel\", input: { id }, purpose })` to cancel pending notification notify-123 and print the disposition.",
       "expect": {

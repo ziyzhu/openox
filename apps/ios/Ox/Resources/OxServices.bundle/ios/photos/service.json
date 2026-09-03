@@ -1,0 +1,415 @@
+{
+  "domain": "ios:photos",
+  "name": "Photos",
+  "description": "Find accessible photos and videos, preview them, and organize them in user-created albums without deleting originals.",
+  "icon": {
+    "system": "photo.on.rectangle.angled"
+  },
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "id": "listAlbums",
+      "label": "List photo albums",
+      "description": "List user-created albums visible to Ox. System and smart albums aren't returned.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "assetCount": {
+              "type": "integer"
+            },
+            "canAddAssets": {
+              "type": "boolean"
+            },
+            "canRemoveAssets": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "assetCount",
+            "canAddAssets",
+            "canRemoveAssets"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "searchAssets",
+      "label": "Search photos",
+      "description": "Search accessible, non-hidden photos and videos by album, media type, creation date, or favorite status. Continue with nextCursor when present.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "albumID": {
+            "type": "string",
+            "description": "Optional album id from listAlbums."
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "any",
+              "image",
+              "video"
+            ],
+            "default": "image"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional inclusive ISO-8601 creation timestamp."
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional inclusive ISO-8601 creation timestamp."
+          },
+          "favorite": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "mediaType": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "modifiedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "duration": {
+                  "type": "number"
+                },
+                "isFavorite": {
+                  "type": "boolean"
+                },
+                "subtypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "mediaType",
+                "width",
+                "height",
+                "duration",
+                "isFavorite",
+                "subtypes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assets",
+          "totalCount"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "previewAssets",
+      "label": "Preview photos",
+      "description": "Attach a temporary labeled contact sheet for up to 20 accessible asset ids to the current model. Use the returned label mapping when interpreting it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "assetIDs"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attached": {
+            "type": "boolean"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "assetID": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "assetID"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "missingAssetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "attached",
+          "labels",
+          "missingAssetIDs"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "createAlbum",
+      "label": "Create photo album",
+      "description": "Create a user album without changing or deleting any photos.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "assetCount": {
+            "type": "integer"
+          },
+          "canAddAssets": {
+            "type": "boolean"
+          },
+          "canRemoveAssets": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "assetCount",
+          "canAddAssets",
+          "canRemoveAssets"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "addAssetsToAlbum",
+      "label": "Add photos to album",
+      "description": "Add up to 200 accessible assets to a user album. Originals remain in the library and other albums.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "albumID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetIDs",
+          "albumID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "albumID": {
+            "type": "string"
+          },
+          "changedCount": {
+            "type": "integer"
+          },
+          "missingAssetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "albumID",
+          "changedCount",
+          "missingAssetIDs"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "removeAssetsFromAlbum",
+      "label": "Remove photos from album",
+      "description": "Remove up to 200 assets from a user album without deleting the originals from Photos.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "albumID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetIDs",
+          "albumID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "albumID": {
+            "type": "string"
+          },
+          "changedCount": {
+            "type": "integer"
+          },
+          "missingAssetIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "albumID",
+          "changedCount",
+          "missingAssetIDs"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "照片",
+      "description": "查找可访问的照片和视频、预览内容，并在不删除原片的情况下整理到用户相簿。",
+      "actions": {
+        "listAlbums": {
+          "label": "列出照片相簿",
+          "description": "列出 Ox 可见的用户相簿，不返回系统或智能相簿。"
+        },
+        "searchAssets": {
+          "label": "搜索照片",
+          "description": "按相簿、媒体类型、拍摄日期或收藏状态搜索可访问且未隐藏的照片和视频。"
+        },
+        "previewAssets": {
+          "label": "预览照片",
+          "description": "把最多 20 个项目合成带编号的临时联系表，提供给当前模型查看。"
+        },
+        "createAlbum": {
+          "label": "创建照片相簿",
+          "description": "创建用户相簿，不更改或删除任何照片。"
+        },
+        "addAssetsToAlbum": {
+          "label": "将照片加入相簿",
+          "description": "将最多 200 个项目加入用户相簿；原片仍保留在图库和其他相簿中。"
+        },
+        "removeAssetsFromAlbum": {
+          "label": "从相簿移除照片",
+          "description": "从用户相簿移除最多 200 个项目，但不从“照片”删除原片。"
+        }
+      }
+    }
+  }
+}

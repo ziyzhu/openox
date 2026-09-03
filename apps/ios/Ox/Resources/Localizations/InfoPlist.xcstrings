@@ -166,6 +166,24 @@
         }
       }
     },
+    "NSPhotoLibraryUsageDescription" : {
+      "comment" : "Privacy - Photo Library Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ox accesses photos you allow so it can preview and organize them in albums when you ask."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 会访问你允许的照片，以便在你要求时预览照片并整理到相簿。"
+          }
+        }
+      }
+    },
     "NSRemindersFullAccessUsageDescription" : {
       "comment" : "Privacy - Reminders Full Access Usage Description",
       "extractionState" : "extracted_with_value",

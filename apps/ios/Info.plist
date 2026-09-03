@@ -79,6 +79,8 @@
 	<string>Ox uses the camera to capture photos to attach to your chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ox transcribes your speech on this device. Hold the input area to talk and release to send the text to your chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ox accesses photos you allow so it can preview and organize them in albums when you ask.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ox uses your approximate location to help with nearby search, local prices, and weather.</string>
 	<key>NSLocationDefaultAccuracyReduced</key>

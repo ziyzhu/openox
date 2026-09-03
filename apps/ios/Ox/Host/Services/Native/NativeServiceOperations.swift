@@ -246,6 +246,18 @@ final class NativeServiceOperations {
             return try await composeMessage(options: fields["options"], purpose: purpose)
         case ("ios:contacts", "search"):
             return try await searchContacts(query: fields["query"]?.stringValue, purpose: purpose)
+        case ("ios:photos", "listAlbums"):
+            return try await listPhotoAlbums(purpose: purpose)
+        case ("ios:photos", "searchAssets"):
+            return try await searchPhotoAssets(options: args, purpose: purpose)
+        case ("ios:photos", "previewAssets"):
+            return try await previewPhotoAssets(assetIDs: fields["assetIDs"], purpose: purpose)
+        case ("ios:photos", "createAlbum"):
+            return try await createPhotoAlbum(title: fields["title"]?.stringValue, purpose: purpose)
+        case ("ios:photos", "addAssetsToAlbum"):
+            return try await addPhotoAssets(assetIDs: fields["assetIDs"], albumID: fields["albumID"]?.stringValue, purpose: purpose)
+        case ("ios:photos", "removeAssetsFromAlbum"):
+            return try await removePhotoAssets(assetIDs: fields["assetIDs"], albumID: fields["albumID"]?.stringValue, purpose: purpose)
         default:
             throw Service.InvokeError.unknown("\(serviceID):\(actionID)")
         }

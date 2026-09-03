@@ -82,6 +82,7 @@ struct AgentChoiceRequestCard: View {
     let request: AgentChoiceRequest
     var selection: String? = nil
     var resolution: String? = nil
+    let composerButtonSize: CGFloat
     let onCustomFocusChange: (Bool) -> Void
     let onSelect: (String) -> Void
 
@@ -94,6 +95,7 @@ struct AgentChoiceRequestCard: View {
                 options: request.options,
                 selection: selection,
                 resolution: resolution,
+                composerButtonSize: composerButtonSize,
                 onCustomFocusChange: onCustomFocusChange,
                 kind: .choice(allowsCustomAnswer: request.allowsCustomAnswer),
                 onSelect: onSelect
@@ -301,6 +303,7 @@ struct RequestCardOptions: View {
     let options: [String]
     let selection: String?
     let resolution: String?
+    var composerButtonSize: CGFloat = 34
     var onCustomFocusChange: (Bool) -> Void = { _ in }
     let kind: Kind
     let onSelect: (String) -> Void
@@ -370,8 +373,11 @@ struct RequestCardOptions: View {
         Label(text, systemImage: wasSelected ? "checkmark.circle.fill" : "stop.circle.fill")
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(wasSelected ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
+            .frame(minHeight: Theme.Size.minimumTouchTarget)
             .background(
                 Theme.Colors.surfaceSunken,
                 in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -420,11 +426,12 @@ struct RequestCardOptions: View {
                 .accessibilityIdentifier(A11yID.Chat.choiceCustomInput)
             if !trimmedCustomAnswer.isEmpty {
                 Button(action: submitCustomAnswer) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(Theme.Icons.lg)
-                        .foregroundStyle(Theme.Colors.primary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    Image(systemName: "arrow.up")
+                        .font(.system(.subheadline, weight: .bold))
+                        .foregroundStyle(Theme.Colors.onPrimary)
+                        .frame(width: composerButtonSize, height: composerButtonSize)
+                        .background(Theme.Colors.primary, in: Circle())
+                        .minimumTouchTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(A11yLabel.send)

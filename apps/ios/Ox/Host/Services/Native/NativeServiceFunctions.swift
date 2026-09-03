@@ -185,6 +185,81 @@ extension NativeServiceOperations {
         }
     }
 
+    public func listPhotoAlbums(purpose: String?) async throws -> JSONValue? {
+        try await performIOSServiceAction("photos.listAlbums", .object([:]), purpose: purpose) {
+            try ServiceOperations.encodeToJSON(try await PhotoLibraryProvider.shared.listAlbums())
+        }
+    }
+
+    public func searchPhotoAssets(options: JSONValue, purpose: String?) async throws -> JSONValue? {
+        let fields = options.objectValue ?? [:]
+        return try await performIOSServiceAction("photos.searchAssets", options, purpose: purpose) {
+            let page = try await PhotoLibraryProvider.shared.searchAssets(
+                albumID: fields["albumID"]?.stringValue,
+                mediaType: fields["mediaType"]?.stringValue,
+                from: fields["from"]?.stringValue,
+                to: fields["to"]?.stringValue,
+                favorite: fields["favorite"]?.boolValue,
+                cursor: fields["cursor"]?.stringValue,
+                limit: fields["limit"]?.intValue
+            )
+            return try ServiceOperations.encodeToJSON(page)
+        }
+    }
+
+    public func previewPhotoAssets(assetIDs: JSONValue?, purpose: String?) async throws -> JSONValue? {
+        let ids = try photoAssetIDs(assetIDs, action: "previewAssets")
+        return try await performIOSServiceAction("photos.previewAssets", .object(["assetIDs": .array(ids.map(JSONValue.string))]), purpose: purpose) {
+            let preview = try await PhotoLibraryProvider.shared.previewAssets(ids: ids)
+            try attachTransient(TransientAttachment(
+                kind: .image,
+                mimeType: "image/jpeg",
+                displayName: "Photo previews.jpg",
+                data: preview.data
+            ))
+            return .object([
+                "attached": .bool(true),
+                "labels": try ServiceOperations.encodeToJSON(preview.labels),
+                "missingAssetIDs": .array(preview.missingAssetIDs.map(JSONValue.string)),
+            ])
+        }
+    }
+
+    public func createPhotoAlbum(title: String?, purpose: String?) async throws -> JSONValue? {
+        guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
+            throw RuntimeError.bridge("ios:photos:createAlbum: 'title' is required.")
+        }
+        return try await performIOSServiceAction("photos.createAlbum", .object(["title": .string(title)]), purpose: purpose) {
+            try ServiceOperations.encodeToJSON(try await PhotoLibraryProvider.shared.createAlbum(title: title))
+        }
+    }
+
+    public func addPhotoAssets(assetIDs: JSONValue?, albumID: String?, purpose: String?) async throws -> JSONValue? {
+        let ids = try photoAssetIDs(assetIDs, action: "addAssetsToAlbum")
+        guard let albumID, !albumID.isEmpty else {
+            throw RuntimeError.bridge("ios:photos:addAssetsToAlbum: 'albumID' is required.")
+        }
+        return try await performIOSServiceAction("photos.addAssetsToAlbum", .object([
+            "assetIDs": .array(ids.map(JSONValue.string)),
+            "albumID": .string(albumID),
+        ]), purpose: purpose) {
+            try ServiceOperations.encodeToJSON(try await PhotoLibraryProvider.shared.addAssets(ids: ids, toAlbum: albumID))
+        }
+    }
+
+    public func removePhotoAssets(assetIDs: JSONValue?, albumID: String?, purpose: String?) async throws -> JSONValue? {
+        let ids = try photoAssetIDs(assetIDs, action: "removeAssetsFromAlbum")
+        guard let albumID, !albumID.isEmpty else {
+            throw RuntimeError.bridge("ios:photos:removeAssetsFromAlbum: 'albumID' is required.")
+        }
+        return try await performIOSServiceAction("photos.removeAssetsFromAlbum", .object([
+            "assetIDs": .array(ids.map(JSONValue.string)),
+            "albumID": .string(albumID),
+        ]), purpose: purpose) {
+            try ServiceOperations.encodeToJSON(try await PhotoLibraryProvider.shared.removeAssets(ids: ids, fromAlbum: albumID))
+        }
+    }
+
     private func resolveRecipients(_ queries: [String]) async throws -> [String] {
         var resolved: [String] = []
         for query in queries {
@@ -205,5 +280,14 @@ extension NativeServiceOperations {
     private static func looksLikePhoneNumber(_ value: String) -> Bool {
         let allowed = CharacterSet(charactersIn: "+0123456789 ()-.")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) } && value.filter(\.isNumber).count >= 5
+    }
+
+    private func photoAssetIDs(_ value: JSONValue?, action: String) throws -> [String] {
+        let ids = value?.arrayValue?.compactMap(\.stringValue).filter { !$0.isEmpty } ?? []
+        guard !ids.isEmpty, ids.count <= 200 else {
+            throw RuntimeError.bridge("ios:photos:\(action): 'assetIDs' must contain 1-200 ids.")
+        }
+        var seen = Set<String>()
+        return ids.filter { seen.insert($0).inserted }
     }
 }

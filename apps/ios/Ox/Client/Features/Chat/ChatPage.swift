@@ -521,7 +521,6 @@ struct ChatPage: View {
         }
         .quickLookPreview(previewAttachmentURL)
         .onAppear {
-            Log.ui.info("ChatPage.onAppear chat=\(chat.id) title=\(chat.title)")
             #if targetEnvironment(simulator)
             DebugUIAPI.composer = composer
             #endif
@@ -938,6 +937,7 @@ struct ChatPage: View {
                 request: request,
                 selection: prompt.answer,
                 resolution: prompt.resolution,
+                composerButtonSize: composerButtonSize,
                 onCustomFocusChange: { choiceInputFocused = $0 }
             ) { option in
                 guard prompt.isActive else { return }
@@ -1132,6 +1132,9 @@ struct ChatPage: View {
                         logTranscriptWindow(reason: "earlier", total: totalBlockCount)
                     }
                 }
+                .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) {
+                    scroller.visibleTargetsChanged($0)
+                }
                 .scrollPosition($scroller.position)
                 .modifier(SidebarScrollLockModifier())
                 .scrollEdgeEffectStyle(.soft, for: .top)
@@ -1143,7 +1146,7 @@ struct ChatPage: View {
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     guard anyInputFocused else { return }
-                    Log.ui.info("ChatPage.dismissKeyboard chat=\(chat.id) via=transcriptTap")
+                    Log.ui.info("ChatUX.intent chat=\(chat.id) kind=dismissKeyboard via=transcriptTap")
                     composerFocused = false
                     if choiceInputFocused {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -1158,25 +1161,25 @@ struct ChatPage: View {
                 }
                 .onChange(of: submissionAnchor) { old, new in
                     guard old != new, let new else { return }
-                    Log.ui.info("ChatPage.submissionAnchor chat=\(chat.id) id=\(new.id)")
                     transcriptWindow.anchor(
                         on: new.id,
                         in: sourceBlockIDs,
                         startingAt: sourceRange.lowerBound
                     )
+                    logTranscriptWindow(reason: "submissionAnchor", total: totalBlockCount)
                 }
-                .onChange(of: composerFocused) { _, focused in
-                    Log.ui.info("ChatComposer.focusChange chat=\(chat.id) focused=\(focused)")
+                .onChange(of: composerFocused) { _, _ in
                     scroller.focusChanged(
                         anyInputFocused,
-                        slack: anchorSlack
+                        slack: anchorSlack,
+                        source: "composer"
                     )
                 }
-                .onChange(of: choiceInputFocused) { _, focused in
-                    Log.ui.info("ChatChoice.focusChange chat=\(chat.id) focused=\(focused)")
+                .onChange(of: choiceInputFocused) { _, _ in
                     scroller.focusChanged(
                         anyInputFocused,
-                        slack: anchorSlack
+                        slack: anchorSlack,
+                        source: "choice"
                     )
                 }
                 .onChange(of: outer.size.height, initial: true) { _, height in
@@ -1188,9 +1191,7 @@ struct ChatPage: View {
                 }
                 .onAppear {
                     transcriptWindow.open(total: totalBlockCount)
-                    Log.ui.info("RenderContext chat=\(chat.id) viewport=\(Int(outer.size.width))x\(Int(outer.size.height)) scale=\(displayScale) safeArea=\(Int(outer.safeAreaInsets.top))/\(Int(outer.safeAreaInsets.bottom)) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
-                    Log.ui.info("ChatPage.open chat=\(chat.id) position=bottom")
-                    logTranscriptWindow(reason: "open", total: totalBlockCount)
+                    Log.ui.info("ChatUX.lifecycle chat=\(chat.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
                     scroller.openAtBottom(chatID: "\(chat.id)", onSettled: onInitialTranscriptPresented)
                 }
             }
@@ -1333,7 +1334,7 @@ struct ChatPage: View {
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {
-        Log.ui.info("Transcript.window chat=\(chat.id) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") reason=\(reason)")
+        Log.ui.info("ChatUX.content chat=\(chat.id) reason=\(reason) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") busy=\(chat.isBusy)")
     }
 
     private func inputBar(
@@ -1376,7 +1377,7 @@ struct ChatPage: View {
             guard let composerFocusRequestID else { return }
             await Task.yield()
             composerFocused = true
-            Log.ui.info("ChatComposer.focusRequest chat=\(chat.id) request=\(composerFocusRequestID)")
+            Log.ui.info("ChatUX.intent chat=\(chat.id) kind=focusRequest phase=applied request=\(composerFocusRequestID)")
             onComposerFocusRequestHandled(composerFocusRequestID)
         }
     }

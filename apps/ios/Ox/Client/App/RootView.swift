@@ -897,11 +897,11 @@ struct RootView: View {
         }
         pendingChatPresentationId = id
         compactChatTransition = .closing(id)
-        Log.ui.info("RootView.chatTransition phase=closing chat=\(id)")
+        Log.ui.info("ChatUX.lifecycle chat=\(id) phase=shellClosing")
         setSidebar(false) {
             guard compactChatTransition == .closing(id) else { return }
             compactChatTransition = .opening(id)
-            Log.ui.info("RootView.chatTransition phase=opening chat=\(id)")
+            Log.ui.info("ChatUX.lifecycle chat=\(id) phase=shellOpening")
             chats.open(id)
         }
     }
@@ -914,7 +914,7 @@ struct RootView: View {
                 pendingChatPresentationId = nil
                 compactChatTransition = .idle
             }
-            Log.ui.info("RootView.chatTransition phase=ready chat=\(visibleId)")
+            Log.ui.info("ChatUX.lifecycle chat=\(visibleId) phase=shellReady")
         }
     }
 
@@ -991,13 +991,12 @@ struct RootView: View {
     private func requestComposerFocus(for chat: Chat, reason: String) {
         let request = ComposerFocusRequest(chatID: chat.id, reason: reason)
         composerFocusRequest = request
-        Log.ui.info("RootView.composerFocus request=\(request.id) chat=\(chat.id) reason=\(reason)")
+        Log.ui.info("ChatUX.intent chat=\(chat.id) kind=focusRequest phase=requested request=\(request.id) reason=\(reason)")
     }
 
     private func handleComposerFocusRequest(_ id: UUID) {
-        guard let request = composerFocusRequest, request.id == id else { return }
+        guard composerFocusRequest?.id == id else { return }
         composerFocusRequest = nil
-        Log.ui.info("RootView.composerFocus handled=\(id) chat=\(request.chatID) reason=\(request.reason)")
     }
 
     private func dismissPresentation() {
@@ -1051,7 +1050,7 @@ struct RootView: View {
     }
 
     private func dismissKeyboard(via: String) {
-        Log.ui.info("RootView.dismissKeyboard via=\(via)")
+        Log.ui.info("ChatUX.intent chat=\(chats.currentId?.uuidString ?? "none") kind=dismissKeyboard via=\(via)")
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
