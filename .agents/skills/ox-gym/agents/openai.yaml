@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ox Gym"
+  short_description: "Simulate diverse users and surface Ox issues"
+  default_prompt: "Use $ox-gym to run a seeded synthetic-user campaign against Ox and report reproducible findings."
