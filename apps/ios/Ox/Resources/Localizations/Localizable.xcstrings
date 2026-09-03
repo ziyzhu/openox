@@ -9484,13 +9484,13 @@
         }
       }
     },
-    "Start free" : {
+    "Free options" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "免费开始使用"
+            "value" : "免费选项"
           }
         }
       }

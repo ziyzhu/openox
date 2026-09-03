@@ -476,7 +476,6 @@ struct ModelPickerContent: View {
 
     let title: String
     let activeSelection: ModelSelection
-    let highlightsGettingStartedOffers: Bool
     var onClose: (() -> Void)?
     let onSelect: (any ProviderClient, ProviderModel, ModelSelection) -> Void
 
@@ -500,13 +499,11 @@ struct ModelPickerContent: View {
     init(
         title: String,
         activeSelection: ModelSelection,
-        highlightsGettingStartedOffers: Bool = false,
         onClose: (() -> Void)? = nil,
         onSelect: @escaping (any ProviderClient, ProviderModel, ModelSelection) -> Void
     ) {
         self.title = title
         self.activeSelection = activeSelection
-        self.highlightsGettingStartedOffers = highlightsGettingStartedOffers
         self.onClose = onClose
         self.onSelect = onSelect
         _selectedRegion = State(initialValue: activeSelection.region)
@@ -654,7 +651,6 @@ struct ModelPickerContent: View {
         NavigationLink {
             ProviderPickerView(
                 clients: displayedClients,
-                highlightsGettingStartedOffers: highlightsGettingStartedOffers,
                 selectedClientID: Binding(
                     get: { selectedClientID },
                     set: { providerSelection = $0.map(ProviderSelection.client) ?? .custom }
@@ -1024,7 +1020,6 @@ struct ModelPickerContent: View {
 
 private struct ProviderPickerView: View {
     let clients: [any ProviderClient]
-    let highlightsGettingStartedOffers: Bool
     @Binding var selectedClientID: String?
 
     var body: some View {
@@ -1046,11 +1041,11 @@ private struct ProviderPickerView: View {
                 id: client.id,
                 value: client.id,
                 title: client.displayName,
-                subtitle: highlightsGettingStartedOffers ? client.gettingStartedOffer?.summary : nil,
+                subtitle: client.gettingStartedOffer?.summary,
                 accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
             )
         }
-        let showsFeatured = highlightsGettingStartedOffers && !featuredClients.isEmpty
+        let showsFeatured = !featuredClients.isEmpty
         let options = showsFeatured
             ? featuredClients.map(providerOption)
                 + [customOption]
@@ -1063,7 +1058,7 @@ private struct ProviderPickerView: View {
             selection: $selectedClientID,
             separatesFirstOption: !showsFeatured,
             promotedOptionCount: showsFeatured ? featuredClients.count : 0,
-            promotedTitle: "Start free",
+            promotedTitle: "Free options",
             remainingTitle: "More providers"
         )
     }
