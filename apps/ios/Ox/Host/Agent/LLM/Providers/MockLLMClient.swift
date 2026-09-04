@@ -1136,7 +1136,7 @@ extension Scenario {
                 execute("""
                 const manager = await ox.fs.read({ path: "skills/system:manage-skills/SKILL.md", purpose: "Read skill manager" });
                 const workflow = await ox.fs.read({ path: "skills/system:manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
-                console.log(manager.text + "\n" + workflow.text);
+                console.log(manager.text + "\\n" + workflow.text);
                 """),
             ]
         }

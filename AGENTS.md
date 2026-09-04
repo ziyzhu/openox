@@ -16,6 +16,11 @@
 
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 
+## Commit Messages
+
+1. Include the current iOS marketing version in every commit subject using `<imperative summary> (iOS <version>)`, including commits that do not modify the iOS app.
+1. Read `<version>` from `MARKETING_VERSION` in `apps/ios/Ox.xcodeproj/project.pbxproj` and confirm all build configurations agree before committing.
+
 ## Repository Boundary
 
 1. This repository must build without private repositories or production credentials.
