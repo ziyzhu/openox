@@ -8,7 +8,7 @@ OpenOx: a protocol for an open ecosystem of self-evolving agents.
 
 <h3>
 
-[Website](https://openox.ai) · [TestFlight](https://testflight.apple.com/join/Y3x7nxj9) · [Discord](https://discord.gg/7baSAHZTA)
+[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/7baSAHZTA)
 
 </h3>
 
