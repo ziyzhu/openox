@@ -1,0 +1,674 @@
+{
+  "domain": "ios:bluetooth",
+  "name": "Bluetooth",
+  "description": "Explore and interact with nearby BLE/GATT devices through native iOS Bluetooth. Discover protocols, read values, watch updates, and send verified commands with approval. Foreground sessions only; unknown proprietary protocols require documentation and verification.",
+  "icon": {
+    "system": "antenna.radiowaves.left.and.right"
+  },
+  "permission": "bluetooth",
+  "supportedIOS": {
+    "minimum": "26.0"
+  },
+  "actions": [
+    {
+      "id": "status",
+      "label": "Bluetooth status",
+      "description": "Check permission without prompting. Radio state is unknown until a radio action initializes Bluetooth; status does not keep a connection alive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authorization": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "notDetermined",
+              "denied",
+              "restricted",
+              "unknown"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "poweredOn",
+              "poweredOff",
+              "unsupported",
+              "unauthorized",
+              "resetting"
+            ]
+          },
+          "connectedDeviceIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "foregroundOnly": {
+            "type": "boolean"
+          },
+          "idleTimeoutSeconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "authorization",
+          "state",
+          "connectedDeviceIDs",
+          "foregroundOnly",
+          "idleTimeoutSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "scan",
+      "label": "Find nearby devices",
+      "description": "Scan advertising BLE devices for 1–15 seconds (default 5), up to 100 results. Optional service UUID filter. Advertisements do not identify a device securely or describe proprietary commands. Bluetooth permission may be requested.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "durationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "serviceUUIDs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?:[0-9A-Fa-f]{4}|[0-9A-Fa-f]{8}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deviceID": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rssi": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "connectable": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "serviceUUIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "manufacturerDataHex": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "serviceData": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "uuid": {
+                        "type": "string"
+                      },
+                      "valueHex": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "uuid",
+                      "valueHex"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "deviceID",
+                "name",
+                "rssi",
+                "connectable",
+                "serviceUUIDs",
+                "manufacturerDataHex",
+                "serviceData"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "devices"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "connect",
+      "label": "Connect device",
+      "description": "Connect to a device from scan in this caller's session. Maximum four connections. iOS handles pairing when a protected attribute is accessed; app-specific authentication is not discovered automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "deviceID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deviceID",
+          "connected"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "disconnect",
+      "label": "Disconnect device",
+      "description": "Disconnect this caller's connection and invalidate its attribute handles.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "deviceID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deviceID",
+          "connected"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "inspect",
+      "label": "Inspect Bluetooth services",
+      "description": "Connect first. Discover the GATT service/characteristic/descriptor tree without reading values. Use returned opaque ids for reads/writes; UUIDs may repeat. Unknown UUIDs do not reveal command semantics. Handles expire on disconnect or service changes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "deviceID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceID": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string"
+                },
+                "primary": {
+                  "type": "boolean"
+                },
+                "characteristics": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "uuid": {
+                        "type": "string"
+                      },
+                      "properties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "subscribed": {
+                        "type": "boolean"
+                      },
+                      "descriptors": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "uuid": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "uuid"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "uuid",
+                      "properties",
+                      "subscribed",
+                      "descriptors"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "uuid",
+                "primary",
+                "characteristics"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "maximumWriteWithResponse": {
+            "type": "integer"
+          },
+          "maximumWriteWithoutResponse": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deviceID",
+          "services",
+          "maximumWriteWithResponse",
+          "maximumWriteWithoutResponse"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "read",
+      "label": "Read Bluetooth value",
+      "description": "Read an inspected characteristic or descriptor by attributeID. Unsubscribe before reading a notifying characteristic. Returns raw hex plus text/number when recognized (Battery Level and Device Information). Reading protected values can trigger iOS pairing. Do not retrieve reusable authentication secrets into chat.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "attributeID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeID": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "valueHex": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "attributeID",
+          "uuid",
+          "valueHex",
+          "text",
+          "number",
+          "unit"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "write",
+      "label": "Write Bluetooth value",
+      "description": "Write exact protocol bytes to an inspected characteristic. Verify the protocol and intended effect before requesting approval; never guess commands. No automatic framing, chunking, or retry. withResponse means ATT acknowledged, not that the device performed the intended action; withoutResponse only means queued. Do not put reusable authentication secrets in arguments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "characteristicID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          },
+          "valueHex": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2})*$",
+            "maxLength": 1024
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "withResponse",
+              "withoutResponse"
+            ]
+          }
+        },
+        "required": [
+          "characteristicID",
+          "valueHex"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "acknowledged",
+              "queued"
+            ]
+          }
+        },
+        "required": [
+          "bytes",
+          "delivery"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": false
+    },
+    {
+      "id": "subscribe",
+      "label": "Watch Bluetooth value",
+      "description": "Enable notifications/indications. Fetch timestamped updates with events. Subscriptions expire after 120 seconds without an action, when the caller closes/deselects, or when Ox backgrounds.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "characteristicID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "characteristicID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscribed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subscribed"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "events",
+      "label": "Read Bluetooth updates",
+      "description": "Read the last 256 events in this caller's session. Pass the previous nextCursor as after (default zero). dropped reports missing events after overflow or session cleanup. Process protocol timing locally; do not send every notification to the model.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "value",
+                    "error",
+                    "disconnected",
+                    "servicesChanged"
+                  ]
+                },
+                "deviceID": {
+                  "type": "string"
+                },
+                "characteristicID": {
+                  "type": "string"
+                },
+                "valueHex": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sequence",
+                "kind",
+                "deviceID",
+                "timestamp"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "integer"
+          },
+          "dropped": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "nextCursor",
+          "dropped"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    },
+    {
+      "id": "unsubscribe",
+      "label": "Stop watching Bluetooth value",
+      "description": "Disable notifications/indications for an inspected characteristic. Previously buffered events remain available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "characteristicID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque identifier returned in this caller's current session; never invent it."
+          }
+        },
+        "required": [
+          "characteristicID"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscribed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subscribed"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": false
+    }
+  ],
+  "locales": {
+    "zh-Hans": {
+      "name": "蓝牙",
+      "description": "通过 iOS 原生蓝牙探索附近的 BLE/GATT 设备，读取值、订阅更新，并经批准发送已验证的命令。仅支持前台会话；专有协议需要查阅文档并验证。",
+      "actions": {
+        "status": {
+          "label": "蓝牙状态",
+          "description": "查看蓝牙权限和会话状态，不触发权限请求。"
+        },
+        "scan": {
+          "label": "查找附近设备",
+          "description": "扫描广播中的低功耗蓝牙设备，可按服务 UUID 筛选。"
+        },
+        "connect": {
+          "label": "连接设备",
+          "description": "连接当前会话扫描到的设备，最多同时连接四台。"
+        },
+        "disconnect": {
+          "label": "断开设备",
+          "description": "断开当前会话的连接并使属性标识符失效。"
+        },
+        "inspect": {
+          "label": "查看蓝牙服务",
+          "description": "发现服务、特征和描述符；使用返回的标识符读写属性。"
+        },
+        "read": {
+          "label": "读取蓝牙值",
+          "description": "读取已发现的特征或描述符，返回原始字节及可识别的值。"
+        },
+        "write": {
+          "label": "写入蓝牙值",
+          "description": "确认协议和预期效果后，经批准写入确切字节。不会自动分包或重试。"
+        },
+        "subscribe": {
+          "label": "订阅蓝牙值",
+          "description": "启用值更新通知，通过 events 获取；闲置或离开会话后订阅结束。"
+        },
+        "events": {
+          "label": "读取蓝牙更新",
+          "description": "读取最近 256 条更新，可用游标继续读取并检查丢失事件数。"
+        },
+        "unsubscribe": {
+          "label": "取消蓝牙订阅",
+          "description": "停止特征更新通知，已缓存事件仍可读取。"
+        }
+      }
+    }
+  }
+}

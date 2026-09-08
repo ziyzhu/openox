@@ -113,6 +113,7 @@ final class OxCanvas {
     }
 
     private func cancelWork() {
+        bluetooth.close()
         pending.values.forEach { $0.cancel() }
         loading.values.forEach { $0.cancel() }
         resolveInteraction(id: interaction?.id, value: nil)
@@ -158,6 +159,8 @@ final class OxCanvas {
         return (service, parts[2])
     }
 
+    @ObservationIgnored private let bluetooth = BluetoothProvider()
+
     private var operations: ServiceOperations {
         ServiceOperations(
             serviceManager: serviceManager,
@@ -192,6 +195,7 @@ final class OxCanvas {
             native: NativeServiceOperations(
                 id: id,
                 serviceManager: serviceManager,
+                bluetooth: bluetooth,
                 presentations: AppPresentations(
                     serviceSignIn: CanvasAuthPresenter(canvas: self),
                     serviceHandoff: CanvasHandoffPresenter(canvas: self),

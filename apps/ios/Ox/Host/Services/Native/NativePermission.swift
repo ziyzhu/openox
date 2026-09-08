@@ -11,6 +11,7 @@ enum NativePermissionState: Equatable {
 }
 
 enum NativePermission: String, Decodable, Equatable, Sendable {
+    case bluetooth
     case location
     case notifications
     case calendar
@@ -20,6 +21,8 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
 
     func state() async -> NativePermissionState {
         switch self {
+        case .bluetooth:
+            return BluetoothProvider.permissionState
         case .contacts:
             return Self.map(CNContactStore.authorizationStatus(for: .contacts))
         case .location:
@@ -41,6 +44,8 @@ enum NativePermission: String, Decodable, Equatable, Sendable {
 
     func request() async -> NativePermissionState {
         switch self {
+        case .bluetooth:
+            await BluetoothProvider.requestPermission()
         case .location:
             await LocationProvider.shared.requestAccess()
         case .notifications:

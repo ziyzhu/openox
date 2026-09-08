@@ -117,6 +117,12 @@ external state. Supply `--approve` only when the user's request authorizes the
 effect. Treat `service eval` as arbitrary code on a Host-managed service page
 and keep it narrowly scoped.
 
+Native iOS actions also require their service to be attached to the selected
+chat. A catalog search result alone is insufficient. Attach through the app's
+Services picker or the authorized chat workflow before invoking
+`ios:<service>:<action>`; an unattached native service may report an unknown
+action even when it appears in the catalog.
+
 Sign-in, human verification, page creation, and page lifecycle happen through
 the Host's interface. Do not attempt to choose a page engine, tab, or another
 implementation from the Client.

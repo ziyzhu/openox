@@ -38,6 +38,7 @@ const IOSCatalogManifestSchema = Type.Object({
   ])),
   faviconUrl: Type.Optional(Type.String({ minLength: 1 })),
   permission: Type.Optional(Type.Union([
+    Type.Literal("bluetooth"),
     Type.Literal("calendar"),
     Type.Literal("contacts"),
     Type.Literal("health"),

@@ -69,6 +69,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Ox uses Bluetooth to discover and interact with nearby devices when you ask.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Ox looks up a contact’s number so it can pre-fill a text message you ask it to send. You always tap Send yourself.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>

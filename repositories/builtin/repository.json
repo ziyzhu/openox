@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Built-in",
   "services": [
+    "ios:bluetooth",
     "ios:browser",
     "ios:calendar",
     "ios:contacts",

@@ -304,6 +304,7 @@ final class Chat: Identifiable {
         isSelected = false
         setTranscriptVisible(false)
         serviceManager.browserActionSessions.closeSession(for: id)
+        bluetooth.close()
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         outputDelivery.setVisibility(.hidden)
@@ -312,6 +313,7 @@ final class Chat: Identifiable {
     }
 
     func release(cancelling: Bool = true) {
+        bluetooth.close()
         onPersistableChange = nil
         onPrivateDataTemporaryContinuation = nil
         modelPreparationIntent = false
@@ -498,13 +500,16 @@ final class Chat: Identifiable {
         catch { return .failure(error) }
     }
 
+    @ObservationIgnored private let bluetooth = BluetoothProvider()
+
     var nativeServiceOperations: NativeServiceOperations {
         NativeServiceOperations(
             id: id,
             serviceManager: serviceManager,
+            bluetooth: bluetooth,
             presentations: presentations,
             requireActive: { [unowned self] in
-                guard isSelected else { throw RuntimeError.bridge("Browser requires the active chat.") }
+                guard isSelected else { throw RuntimeError.bridge("This device service requires the active chat.") }
             },
             showBrowser: { [unowned self] service, _ in
                 embedServiceInspector(ServiceInspectorLink(domain: service.domain, serviceName: service.title))
@@ -1970,6 +1975,7 @@ final class Chat: Identifiable {
     }
 
     func cancelAll() {
+        bluetooth.close()
         let cancelled = drainSubmissions()
         for submission in cancelled {
             submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
@@ -2625,6 +2631,7 @@ final class Chat: Identifiable {
         if removed.contains(where: { $0.domain == "ios:browser" }) {
             serviceManager.browserActionSessions.closeSession(for: id)
         }
+        if removed.contains(where: { $0.domain == "ios:bluetooth" }) { bluetooth.close() }
         cancelServiceInteractions(domains: Set(removed.map(\.domain)))
         attachedServices = services
         Log.session.info("Chat.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")
