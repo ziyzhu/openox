@@ -11,8 +11,6 @@ struct ChatPromptBlock: Equatable {
 }
 
 struct ChatBlock: Identifiable, Equatable {
-    static let thinkingRowHeight: CGFloat = 22
-
     enum ResponseFooterPhase: Equatable {
         case streaming
         case settled
@@ -122,7 +120,7 @@ extension ChatBlock {
                         allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
                         isActive: activePrompt != nil
                     )),
-                    spacingBefore: MarkdownText.blockSpacing
+                    spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
@@ -134,7 +132,7 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: .thinking(trace),
-                    spacingBefore: MarkdownText.blockSpacing
+                    spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
@@ -145,7 +143,7 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: MarkdownText.blockSpacing
+                    spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
@@ -180,7 +178,7 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: MarkdownText.blockSpacing
+                    spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))
             }
         }
@@ -201,7 +199,7 @@ extension ChatBlock {
                     sourceBlockID: sources.last?.block.id ?? id,
                     createdAt: activity.startedAt,
                     kind: .thinking(ThinkingTrace(entries: [], completedAt: nil)),
-                    spacingBefore: MarkdownText.blockSpacing
+                    spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))
                 projectedTurns[turnIndex].thinkingCount += 1
             }
@@ -221,7 +219,7 @@ extension ChatBlock {
                     text: text,
                     phase: turn.id == activeTurnID ? .streaming : .settled
                 ),
-                spacingBefore: MarkdownText.responseFooterSpacing
+                spacingBefore: ChatTranscriptMetrics.responseFooterSpacing
             )]
         }
         return blocks.enumerated().map { index, block in
@@ -231,7 +229,10 @@ extension ChatBlock {
                 sourceBlockID: block.sourceBlockID,
                 createdAt: block.createdAt,
                 kind: block.kind,
-                spacingBefore: max(MarkdownText.blockSpacing, Theme.Size.minimumTouchTarget - Self.thinkingRowHeight)
+                spacingBefore: max(
+                    ChatTranscriptMetrics.blockSpacing,
+                    Theme.Size.minimumTouchTarget - ChatTranscriptMetrics.thinkingRowHeight
+                )
             )
         }
     }

@@ -226,7 +226,7 @@ struct ActivityBubble: View {
 }
 
 private struct ThinkingRow: View {
-    private let singleLineHeight = ChatBlock.thinkingRowHeight
+    private let singleLineHeight = ChatTranscriptMetrics.thinkingRowHeight
     let trace: ThinkingTrace
     let startedAt: Date
     let isLive: Bool

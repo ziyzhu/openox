@@ -400,15 +400,12 @@ private struct StreamingMarkdownTail: View {
 }
 
 struct MarkdownText: View {
-    static let blockSpacing: CGFloat = 20
-    static let responseFooterSpacing: CGFloat = 12
-
     static func spacing(before block: MarkdownBlock, after previous: MarkdownBlock?) -> CGFloat {
         guard let previous else { return 0 }
         return switch (previous, block) {
         case (.paragraph, .lists): 8
         case (.heading, .paragraph): 16
-        default: blockSpacing
+        default: ChatTranscriptMetrics.blockSpacing
         }
     }
 
@@ -511,7 +508,7 @@ private struct MarkdownRenderBlockView: View {
                     font: MarkdownText.bodyFont,
                     color: textColor.uiColor,
                     lineSpacing: 1,
-                    paragraphSpacing: MarkdownText.blockSpacing
+                    paragraphSpacing: ChatTranscriptMetrics.blockSpacing
                 )
             )
         case .block(let block):

@@ -895,7 +895,10 @@ struct ChatPage: View {
             .overlay(alignment: .topLeading) {
                 if phase == .streaming, showsActivity {
                     ActivityBubble()
-                        .padding(.top, MarkdownText.blockSpacing - MarkdownText.responseFooterSpacing)
+                        .padding(
+                            .top,
+                            ChatTranscriptMetrics.blockSpacing - ChatTranscriptMetrics.responseFooterSpacing
+                        )
                         .padding(.horizontal, 4)
                         .transition(.opacity)
                 }
@@ -1085,7 +1088,7 @@ struct ChatPage: View {
             ActivityBubble()
                 .id("__activity")
                 .transition(.opacity)
-                .padding(.top, MarkdownText.blockSpacing)
+                .padding(.top, ChatTranscriptMetrics.blockSpacing)
                 .padding(.horizontal, 4)
         }
     }
@@ -1098,7 +1101,7 @@ struct ChatPage: View {
             onOpenSkill: { openSkill($0) }
         ) { chat.cancelQueued(queued.id) }
             .transition(.opacity)
-            .padding(.top, MarkdownText.blockSpacing)
+            .padding(.top, ChatTranscriptMetrics.blockSpacing)
         if identified {
             row.id(queued.id)
         } else {
