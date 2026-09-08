@@ -14,118 +14,79 @@ export function debugEndpoint(): string {
   }
 }
 
-export function runOnce(
+export async function runOnce(
   envelope: Record<string, unknown> & { id: string },
   timeoutMs: number,
   endpoint = debugEndpoint(),
 ): Promise<DebugResult> {
-  return new Promise((resolve) => {
-    const ws = new WebSocket(endpoint);
-    let done = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const finish = (result: DebugResult) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      try { ws.close(); } catch {}
-      resolve(result);
-    };
-    timer = setTimeout(() => finish({ ok: false, error: `timeout after ${timeoutMs}ms` }), timeoutMs);
-    ws.onopen = () => ws.send(JSON.stringify(envelope));
-    ws.onerror = (event: Event) => {
-      const message = String((event as ErrorEvent).message ?? event);
-      finish({ ok: false, error: `ws error (is the Ox Host running?): ${message}` });
-    };
-    ws.onclose = () => finish({ ok: false, error: "ws closed before result" });
-    ws.onmessage = (event: MessageEvent) => {
-      let message: any;
-      try {
-        message = JSON.parse(typeof event.data === "string"
-          ? event.data
-          : new TextDecoder().decode(event.data as ArrayBuffer));
-      } catch {
-        return;
-      }
-      if (message?.id !== envelope.id) return;
-      finish(message.ok ? message : { ...message, ok: false, error: String(message.error ?? "unknown") });
-    };
-  });
+  const connection = new DebugConnection(endpoint);
+  try {
+    return await connection.request(envelope, timeoutMs);
+  } finally {
+    connection.close();
+  }
 }
 
 export class DebugConnection {
   private socket?: WebSocket;
-  private opening?: Promise<WebSocket>;
   private disposed = false;
   private readonly pending = new Map<string, {
+    envelope: Record<string, unknown> & { id: string };
     resolve: (result: DebugResult) => void;
     timer: ReturnType<typeof setTimeout>;
   }>();
 
   constructor(private readonly endpoint = debugEndpoint()) {}
 
-  async request(envelope: Record<string, unknown> & { id: string }, timeoutMs: number): Promise<DebugResult> {
-    if (this.disposed) return { ok: false, error: "connection is closed" };
-    let socket: WebSocket;
-    try {
-      socket = await this.connect(timeoutMs);
-    } catch (error) {
-      return { ok: false, error: `ws error (is the Ox Host running?): ${(error as Error).message}` };
-    }
+  request(envelope: Record<string, unknown> & { id: string }, timeoutMs: number): Promise<DebugResult> {
+    if (this.disposed) return Promise.resolve({ ok: false, error: "connection is closed" });
+    if (this.pending.has(envelope.id)) return Promise.resolve({ ok: false, error: "request id is already pending" });
     return new Promise(resolve => {
       const timer = setTimeout(() => {
-        this.pending.delete(envelope.id);
-        resolve({ ok: false, error: `timeout after ${timeoutMs}ms` });
+        this.finish(envelope.id, { ok: false, error: `timeout after ${timeoutMs}ms` });
+        if (!this.pending.size) this.disconnect("connection timed out");
       }, timeoutMs);
-      this.pending.set(envelope.id, { resolve, timer });
+      this.pending.set(envelope.id, { envelope, resolve, timer });
       try {
-        socket.send(JSON.stringify(envelope));
+        const socket = this.connect();
+        if (socket.readyState === WebSocket.OPEN) this.send(socket, envelope);
       } catch (error) {
-        clearTimeout(timer);
-        this.pending.delete(envelope.id);
-        resolve({ ok: false, error: `ws send failed: ${(error as Error).message}` });
+        this.disconnect(`ws error (is the Ox Host running?): ${(error as Error).message}`);
       }
     });
   }
 
   close(): void {
     this.disposed = true;
-    this.socket?.close(1000);
-    this.socket = undefined;
-    this.opening = undefined;
-    this.failPending("connection closed");
+    this.disconnect("connection closed");
   }
 
-  private connect(timeoutMs: number): Promise<WebSocket> {
-    if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve(this.socket);
-    if (this.opening) return this.opening;
-    this.opening = new Promise((resolve, reject) => {
-      const socket = new WebSocket(this.endpoint);
-      const timer = setTimeout(() => {
-        socket.close();
-        reject(new Error(`timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-      socket.onopen = () => {
-        clearTimeout(timer);
-        this.socket = socket;
-        this.opening = undefined;
-        resolve(socket);
-      };
-      socket.onerror = (event: Event) => {
-        if (socket.readyState !== WebSocket.OPEN) {
-          clearTimeout(timer);
-          this.opening = undefined;
-          reject(new Error(String((event as ErrorEvent).message ?? event)));
-        }
-      };
-      socket.onclose = () => {
-        clearTimeout(timer);
-        if (this.socket === socket) this.socket = undefined;
-        this.opening = undefined;
-        this.failPending("ws closed before result");
-      };
-      socket.onmessage = event => this.receive(event);
-    });
-    return this.opening;
+  private connect(): WebSocket {
+    if (this.socket) return this.socket;
+    const socket = new WebSocket(this.endpoint);
+    this.socket = socket;
+    socket.onopen = () => {
+      if (this.socket !== socket) return;
+      for (const { envelope } of this.pending.values()) this.send(socket, envelope);
+    };
+    socket.onerror = (event: Event) => {
+      if (this.socket === socket) this.disconnect(`ws error (is the Ox Host running?): ${String((event as ErrorEvent).message ?? event)}`);
+    };
+    socket.onclose = () => {
+      if (this.socket === socket) this.disconnect("ws closed before result");
+    };
+    socket.onmessage = event => {
+      if (this.socket === socket) this.receive(event);
+    };
+    return socket;
+  }
+
+  private send(socket: WebSocket, envelope: Record<string, unknown> & { id: string }): void {
+    try {
+      socket.send(JSON.stringify(envelope));
+    } catch (error) {
+      this.finish(envelope.id, { ok: false, error: `ws send failed: ${(error as Error).message}` });
+    }
   }
 
   private receive(event: MessageEvent): void {
@@ -138,18 +99,21 @@ export class DebugConnection {
       return;
     }
     if (typeof message?.id !== "string") return;
-    const pending = this.pending.get(message.id);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    this.pending.delete(message.id);
-    pending.resolve(message.ok ? message : { ...message, ok: false, error: String(message.error ?? "unknown") });
+    this.finish(message.id, message.ok ? message : { ...message, ok: false, error: String(message.error ?? "unknown") });
   }
 
-  private failPending(error: string): void {
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.resolve({ ok: false, error });
-    }
-    this.pending.clear();
+  private finish(id: string, result: DebugResult): void {
+    const pending = this.pending.get(id);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pending.delete(id);
+    pending.resolve(result);
+  }
+
+  private disconnect(error: string): void {
+    const socket = this.socket;
+    this.socket = undefined;
+    for (const id of this.pending.keys()) this.finish(id, { ok: false, error });
+    socket?.close();
   }
 }
