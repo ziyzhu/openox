@@ -27,7 +27,7 @@ enum SyntaxHighlighter {
         let key = TextRenderCachePolicy.key("\(font.fontName)|\(font.pointSize)|\(language ?? "")\u{1}\(source)")
         if let hit = selectableCache.object(forKey: key) { return hit }
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakStrategy = .pushOut
+        paragraph.lineBreakStrategy = []
         let rendered = NSMutableAttributedString(string: source, attributes: [
             .font: font,
             .foregroundColor: UIColor.label,

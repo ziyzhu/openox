@@ -535,7 +535,7 @@ extension Scenario {
     ]).pacing(betweenDeltas: .milliseconds(0))
 
     static let formattedStreamStress = Scenario(name: "formatstress", steps: [
-        .say("**" + String(repeating: "A long formatted paragraph keeps growing without a settling boundary. ", count: 120) + "**"),
+        .say("**" + Array(repeating: "A long formatted paragraph keeps growing without a settling boundary.", count: 120).joined(separator: " ") + "**"),
         .stop(.stop)
     ])
 

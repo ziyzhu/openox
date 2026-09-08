@@ -263,19 +263,7 @@ struct SelectableText: UIViewRepresentable {
         let key = Coordinator.SizeKey(width: maxWidth, category: uiView.traitCollection.preferredContentSizeCategory)
         if let cached = memo.sizes[key] { return cached }
         let width = proposal.width ?? ceil(uiView.sizeThatFits(CGSize(width: unbounded, height: unbounded)).width)
-        let height: CGFloat
-        if memo.isStreaming {
-            let containerWidth = max(0, width - uiView.textContainerInset.left - uiView.textContainerInset.right)
-            let containerSize = CGSize(width: containerWidth, height: unbounded)
-            if uiView.textContainer.size != containerSize {
-                uiView.textContainer.size = containerSize
-            }
-            uiView.layoutManager.ensureLayout(for: uiView.textContainer)
-            let used = uiView.layoutManager.usedRect(for: uiView.textContainer)
-            height = used.maxY + uiView.textContainerInset.bottom
-        } else {
-            height = uiView.sizeThatFits(CGSize(width: width, height: unbounded)).height
-        }
+        let height = uiView.sizeThatFits(CGSize(width: width, height: unbounded)).height
         let size = CGSize(width: width, height: ceil(height))
         memo.sizes[key] = size
         return size
@@ -452,7 +440,7 @@ struct SelectableText: UIViewRepresentable {
         -> [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = lineSpacing
-        paragraph.lineBreakStrategy = .pushOut
+        paragraph.lineBreakStrategy = []
         return [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
     }
 
@@ -529,7 +517,7 @@ struct SelectableText: UIViewRepresentable {
             }
             let style = NSMutableParagraphStyle()
             style.lineSpacing = lineSpacing
-            style.lineBreakStrategy = .pushOut
+            style.lineBreakStrategy = []
             style.paragraphSpacing = index < sources.count - 1 ? max(0, paragraphSpacing - lineSpacing) : 0
             paragraph.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: paragraph.length))
             result.append(paragraph)
