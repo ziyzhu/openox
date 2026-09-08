@@ -332,7 +332,7 @@ struct RequestCardOptions: View {
             resolutionLabel(
                 resolution ?? effectiveSelection,
                 selection: effectiveSelection,
-                wasSelected: options.contains(effectiveSelection)
+                isConfirmed: options.contains(effectiveSelection) || resolution == nil
             )
             .transition(.scale(scale: 0.97).combined(with: .opacity))
         } else {
@@ -369,10 +369,10 @@ struct RequestCardOptions: View {
         }
     }
 
-    private func resolutionLabel(_ text: String, selection: String, wasSelected: Bool) -> some View {
-        Label(text, systemImage: wasSelected ? "checkmark.circle.fill" : "stop.circle.fill")
+    private func resolutionLabel(_ text: String, selection: String, isConfirmed: Bool) -> some View {
+        Label(text, systemImage: isConfirmed ? "checkmark.circle.fill" : "stop.circle.fill")
             .font(Theme.Fonts.labelMd)
-            .foregroundStyle(wasSelected ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
+            .foregroundStyle(isConfirmed ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.Spacing.md)
