@@ -412,7 +412,7 @@ struct ChatComposer: View, Equatable {
 
         var title: LocalizedStringKey {
             switch self {
-            case .actions: "New Actions"
+            case .actions: "New Capabilities"
             case .workflows: "New Workflow"
             }
         }
@@ -711,7 +711,7 @@ struct ChatComposer: View, Equatable {
             GlassEffectContainer(spacing: Theme.Spacing.sm) {
                 HStack(spacing: Theme.Spacing.sm) {
                     promptTemplateButton(
-                        "New Actions",
+                        "New Capabilities",
                         systemImage: "hammer",
                         template: .actions,
                         accessibilityIdentifier: A11yID.Chat.newActions
@@ -779,7 +779,7 @@ struct ChatComposer: View, Equatable {
     private func promptMessage(_ template: PromptTemplate) -> some View {
         switch template {
         case .actions:
-            Text("Describe the service and the actions you want Ox to add.")
+            Text("Describe the service and the capabilities you want Ox to add.")
         case .workflows:
             Text("Describe the services the skill needs and its goal.")
         }
@@ -791,7 +791,7 @@ struct ChatComposer: View, Equatable {
         let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
         composer.draft = switch promptTemplate {
         case .actions:
-            String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nFeatures: \(secondary)")
+            String(localized: "Create a new service for \(primary), or add capabilities to the existing service if one is already available.\n\nFeatures: \(secondary)")
         case .workflows:
             String(localized: "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
         }

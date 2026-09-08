@@ -1615,11 +1615,11 @@ final class Chat: Identifiable {
     func gateServiceAttach(_ service: Service) async throws {
         let title = "\(service.title) - \(L10n.string( "Attach"))"
         let message = if service.isIOSService {
-            L10n.string("Its actions and permitted device data become available to this chat.")
+            L10n.string("Its capabilities and permitted device data become available to this chat.")
         } else if service.isMCPService {
             L10n.string("Its remote tools can receive arguments from this chat and return data to Ox.")
         } else {
-            L10n.string("Its actions and your signed-in data become available to this chat.")
+            L10n.string("Its capabilities and your signed-in data become available to this chat.")
         }
         switch await requestApproval(
             action: Self.attachApproveKey(service.domain),

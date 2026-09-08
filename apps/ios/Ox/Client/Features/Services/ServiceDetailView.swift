@@ -456,7 +456,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Actions")
+            Text("Capabilities")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .padding(.horizontal, Theme.Spacing.md)
@@ -472,7 +472,7 @@ struct ServiceDetailView: View {
                     }
                 }
             } else if actions.isEmpty {
-                Text("This service exposes no actions.")
+                Text("This service provides no capabilities.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.horizontal, Theme.Spacing.md)
@@ -581,8 +581,8 @@ struct ServiceDetailView: View {
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data."
-        case .onDevice: "Its actions and permitted device data become available to this chat."
+        case .signedIn: "Adds this service to a chat, giving Ox its capabilities, skills, and your signed-in data."
+        case .onDevice: "Its capabilities and permitted device data become available to this chat."
         case .remote: "Its remote tools can receive arguments from this chat and return data to Ox."
         }
     }

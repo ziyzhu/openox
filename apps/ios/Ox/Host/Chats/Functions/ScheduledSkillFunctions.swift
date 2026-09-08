@@ -27,7 +27,7 @@ extension Chat {
             let next = recurrence.next(after: Date()).map(ISODate.string) ?? ""
             try await confirmScheduledSkillChange(
                 action: L10n.string("Schedule"),
-                prompt: "Schedule /\(skill.displayName) for \(next)? Future service actions will still use their normal approval policy."
+                prompt: "Schedule /\(skill.displayName) for \(next)? Future use of service capabilities will still follow their normal approval policy."
             )
             let schedule = try ScheduledSkills.shared.create(
                 skill: skill,

@@ -151,7 +151,7 @@ struct SettingsSheet: View {
 
                     SettingsSection(
                         "Permissions",
-                        footer: "Give agents permission to use all available actions without asking in any chat. Mistakes may cause data loss or unwanted charges."
+                        footer: "Give agents permission to use all available capabilities without asking in any chat. Mistakes may cause data loss or unwanted charges."
                     ) {
                         Toggle("Always approve", isOn: alwaysApproveBinding)
                             .font(Theme.Fonts.bodyMd)
@@ -308,14 +308,14 @@ struct SettingsSheet: View {
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
         }
-        .alert("Always approve all actions?", isPresented: $confirmingAlwaysApprove) {
+        .alert("Always allow all capabilities?", isPresented: $confirmingAlwaysApprove) {
             Button("Cancel", role: .cancel) {}
             Button("Always approve", role: .destructive) {
                 serverManager.autoApproveAll = true
             }
             .accessibilityIdentifier(A11yID.Settings.autoApproveConfirm)
         } message: {
-            Text("Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending and future actions in all chats and profiles until turned off. System permissions and private-data consent still apply.")
+            Text("Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending requests and future use of capabilities in all chats and profiles until turned off. System permissions and private-data consent still apply.")
         }
         .task {
             await storage.refreshAvailability()

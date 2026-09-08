@@ -31,7 +31,7 @@ struct OnboardingView: View {
 
             slide(
                 title: "Acts everywhere",
-                description: "Ox turns websites into reusable actions, then runs them much faster than you could by hand."
+                description: "Ox turns websites into reusable capabilities that complete tasks much faster than you could by hand."
             ) {
                 VStack(spacing: Theme.Spacing.md) {
                     WebsitesDemo(height: welcomeIllustrationHeight)
@@ -57,7 +57,7 @@ struct OnboardingView: View {
 
             slide(
                 title: "Peace of mind",
-                description: "Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time."
+                description: "Ox asks before using sensitive capabilities, keeps account credentials isolated on the web page, and lets you pull the plug at any time."
             ) {
                 ApprovalDemo()
             }
