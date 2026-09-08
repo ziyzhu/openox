@@ -55,8 +55,14 @@ final class Chat: Identifiable {
     }
 
     struct PendingServiceControl: Identifiable, Equatable {
+        struct Source: Equatable {
+            let blockID: UUID
+            let itemIndex: Int
+        }
+
         let id: UUID
         let control: ServiceControl
+        var source: Source?
     }
 
     struct PendingPrompt: Identifiable, Equatable {
@@ -1187,8 +1193,16 @@ final class Chat: Identifiable {
     @discardableResult
     func embedServiceControl(_ control: ServiceControl) -> PendingServiceControl {
         let standalone = ensureExecutionContext()
-        let pending = PendingServiceControl(id: UUID(), control: control)
         document.apply(.embedServiceControl(control))
+        let source = document.projection.last.flatMap { block -> PendingServiceControl.Source? in
+            guard case .agentContent(let items) = block.kind, let itemIndex = items.indices.last else { return nil }
+            return PendingServiceControl.Source(blockID: block.id, itemIndex: itemIndex)
+        }
+        let pending = PendingServiceControl(
+            id: UUID(),
+            control: control,
+            source: source
+        )
         if standalone { finishStandaloneExecution() }
         Log.session.info("Chat.embedServiceControl id=\(pending.id.uuidString) domain=\(control.domain)")
         return pending

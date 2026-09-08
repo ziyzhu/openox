@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ServiceControlView: View {
     let control: ServiceControl
+    var isActive: Bool = true
+    var reflectsAuthentication: Bool = true
     let signIn: @MainActor (String) async -> Bool
     let completeBotControl: @MainActor (String, JSONValue) async -> Bool
     let completePayment: @MainActor (String, JSONValue) async -> JSONValue?
@@ -35,7 +37,7 @@ struct ServiceControlView: View {
         return false
     }
 
-    private var completed: Bool { phase == .completed || authenticated }
+    private var completed: Bool { phase == .completed || reflectsAuthentication && authenticated }
     private var isMCP: Bool { service?.isMCPService == true }
 
     var body: some View {
@@ -44,6 +46,7 @@ struct ServiceControlView: View {
             Spacer(minLength: Theme.Spacing.sm)
             action.frame(width: 108, alignment: .trailing)
         }
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
         .padding(Theme.Spacing.md)
         .background {
             Color.clear.glassEffect(
@@ -95,7 +98,9 @@ struct ServiceControlView: View {
     }
 
     private var message: String {
-        if completed {
+        if !isActive {
+            actionLabel
+        } else if completed {
             switch control {
             case .signIn: isMCP ? String(localized: "Authorized") : String(localized: "You're signed in")
             case .botControl: String(localized: "Verification completed")
@@ -112,7 +117,9 @@ struct ServiceControlView: View {
 
     @ViewBuilder
     private var action: some View {
-        if completed {
+        if !isActive {
+            EmptyView()
+        } else if completed {
             switch control {
             case .signIn:
                 EmptyView()
@@ -173,6 +180,7 @@ struct ServiceControlView: View {
     }
 
     private func run() {
+        guard isActive, phase == .ready else { return }
         phase = .working
         Task {
             let result: JSONValue?

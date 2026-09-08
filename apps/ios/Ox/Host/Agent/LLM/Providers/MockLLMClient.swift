@@ -735,7 +735,7 @@ extension Scenario {
         }
         let domain = "github.com"
         return [
-            .say("You'll need to sign in first — use the handoff above the composer.\n"),
+            .say("You'll need to sign in first — use the sign-in card in this chat.\n"),
             execute("console.log(await ox.service.signIn({ domain: \"\(domain)\", purpose: \"Sign in to service\" }));"),
         ]
     }
@@ -751,7 +751,7 @@ extension Scenario {
         let domain = "archive.ph"
         #endif
         return [
-            .say("Complete the human-verification handoff above the composer.\n"),
+            .say("Complete the human-verification card in this chat.\n"),
             execute("await ox.service.solve({ domain: \"\(domain)\", args: { requestId: \"req-7\" }, purpose: \"Complete verification\" }); console.log({ verified: true });"),
         ]
     }
@@ -767,7 +767,7 @@ extension Scenario {
         let domain = "oftendining.com"
         #endif
         return [
-            .say("Review and complete checkout in the handoff above the composer.\n"),
+            .say("Review and complete checkout using the payment card in this chat.\n"),
             execute("console.log(await ox.service.pay({ domain: \"\(domain)\", args: {}, purpose: \"Review checkout\" }));"),
         ]
     }

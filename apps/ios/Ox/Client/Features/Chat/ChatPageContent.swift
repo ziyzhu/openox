@@ -11,6 +11,8 @@ struct ChatPromptBlock: Equatable {
 }
 
 struct ChatBlock: Identifiable, Equatable {
+    static let thinkingRowHeight: CGFloat = 22
+
     enum ResponseFooterPhase: Equatable {
         case streaming
         case settled
@@ -25,7 +27,7 @@ struct ChatBlock: Identifiable, Equatable {
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
         case prompt(ChatPromptBlock)
-        case serviceControl(ServiceControl, interactionID: UUID)
+        case serviceControl(ServiceControl, interactionID: UUID?)
         case responseFooter(text: String, phase: ResponseFooterPhase)
     }
 
@@ -60,17 +62,14 @@ struct ChatBlock: Identifiable, Equatable {
     var isActiveInteraction: Bool {
         switch kind {
         case .prompt(let prompt): prompt.isActive
-        case .serviceControl: true
+        case .serviceControl(_, let interactionID): interactionID != nil
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction, .responseFooter: false
         }
     }
 }
 
 extension ChatBlock {
-    private struct ServiceControlLocation: Equatable {
-        let blockID: UUID
-        let itemIndex: Int
-    }
+    private typealias ServiceControlLocation = Chat.PendingServiceControl.Source
 
     private struct ProjectedTurn {
         let id: TurnID
@@ -91,7 +90,8 @@ extension ChatBlock {
         let pendingPrompt: Chat.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
         let pendingServiceControl: Chat.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
         let serviceControlLocation = pendingServiceControl.flatMap { pending in
-            sources.reversed().compactMap { source -> ServiceControlLocation? in
+            if let source = pending.source { return source }
+            return sources.reversed().compactMap { source -> ServiceControlLocation? in
                 guard case .agentContent(let items) = source.block.kind,
                       let itemIndex = items.lastIndex(where: { item in
                           guard case .serviceControl(let control) = item else { return false }
@@ -122,7 +122,7 @@ extension ChatBlock {
                         allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
                         isActive: activePrompt != nil
                     )),
-                    spacingBefore: Self.spacingBefore(block.kind)
+                    spacingBefore: MarkdownText.blockSpacing
                 ))
                 continue
             }
@@ -134,7 +134,7 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: .thinking(trace),
-                    spacingBefore: Self.spacingBefore(block.kind)
+                    spacingBefore: MarkdownText.blockSpacing
                 ))
                 continue
             }
@@ -145,14 +145,18 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: Self.spacingBefore(block.kind)
+                    spacingBefore: MarkdownText.blockSpacing
                 ))
                 continue
             }
 
-            let visibleItems = items.enumerated().filter { index, item in
-                guard case .serviceControl = item else { return true }
-                return serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
+            let visibleItems = items.enumerated().filter { _, item in
+                switch item {
+                case .text(let text), .progress(let text):
+                    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                default:
+                    true
+                }
             }
             if !visibleItems.isEmpty {
                 projectedTurns[turnIndex].footerSourceBlockID = block.id
@@ -162,13 +166,12 @@ extension ChatBlock {
                     return text
                 }
             }
-            for (position, element) in visibleItems.enumerated() {
-                let (index, item) = element
+            for (index, item) in visibleItems {
                 let id = StableID.uuid("chat.block.\(block.id.uuidString).item.\(index)")
-                let spacing = position == 0 ? Self.spacingBefore(block.kind) : Self.spacingBefore(item)
                 let kind: Kind
-                if case .serviceControl(let control) = item, let pendingServiceControl {
-                    kind = .serviceControl(control, interactionID: pendingServiceControl.id)
+                if case .serviceControl(let control) = item {
+                    let isActive = serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
+                    kind = .serviceControl(control, interactionID: isActive ? pendingServiceControl?.id : nil)
                 } else {
                     kind = .agentContent(item)
                 }
@@ -177,7 +180,7 @@ extension ChatBlock {
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: spacing
+                    spacingBefore: MarkdownText.blockSpacing
                 ))
             }
         }
@@ -228,7 +231,7 @@ extension ChatBlock {
                 sourceBlockID: block.sourceBlockID,
                 createdAt: block.createdAt,
                 kind: block.kind,
-                spacingBefore: 0
+                spacingBefore: max(MarkdownText.blockSpacing, Theme.Size.minimumTouchTarget - Self.thinkingRowHeight)
             )
         }
     }
@@ -251,21 +254,6 @@ extension ChatBlock {
             .thinking(trace)
         case .contextCompaction(let compaction):
             .contextCompaction(compaction)
-        }
-    }
-
-    private static func spacingBefore(_ kind: Block.Kind) -> CGFloat {
-        guard case .agentContent(let items) = kind, let first = items.first else {
-            return MarkdownText.blockSpacing
-        }
-        return spacingBefore(first)
-    }
-
-    private static func spacingBefore(_ item: ContentItem) -> CGFloat {
-        switch item {
-        case .video: Theme.Spacing.xs
-        case .text, .progress, .serviceControl, .serviceInspector, .shoveler, .artifact, .skill:
-            MarkdownText.blockSpacing
         }
     }
 }

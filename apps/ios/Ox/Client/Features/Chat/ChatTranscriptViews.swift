@@ -226,7 +226,7 @@ struct ActivityBubble: View {
 }
 
 private struct ThinkingRow: View {
-    private let singleLineHeight: CGFloat = 22
+    private let singleLineHeight = ChatBlock.thinkingRowHeight
     let trace: ThinkingTrace
     let startedAt: Date
     let isLive: Bool
@@ -1219,7 +1219,6 @@ struct BlockView: View, Equatable {
                     case let .video(video):
                         VideoWidgetView(video: video)
                             .padding(.horizontal, 4)
-                            .padding(.vertical, Theme.Spacing.xs)
                     case let .artifact(artifact):
                         if artifact.exists {
                             let sourceID = "block:\(block.id.uuidString):\(index):\(artifact.id)"

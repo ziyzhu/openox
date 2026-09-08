@@ -253,7 +253,6 @@ struct ChatPage: View {
     @State private var copiedBlockId: UUID?
     @State private var messageSpeech = MessageSpeechPlayback()
     @State private var toast: Toast?
-    @State private var runningServiceControlID: UUID?
     @State private var choiceInputFocused = false
     @State private var showsDelayedActivity = false
 
@@ -893,6 +892,14 @@ struct ChatPage: View {
                 isVisible: phase.isVisible,
                 controls: messageControls(sourceBlockID: block.sourceBlockID)
             )
+            .overlay(alignment: .topLeading) {
+                if phase == .streaming, showsActivity {
+                    ActivityBubble()
+                        .padding(.top, MarkdownText.blockSpacing - MarkdownText.responseFooterSpacing)
+                        .padding(.horizontal, 4)
+                        .transition(.opacity)
+                }
+            }
         case .prompt(let prompt):
             promptBlock(prompt, sourceBlockID: block.sourceBlockID)
                 .padding(.horizontal, 4)
@@ -948,22 +955,38 @@ struct ChatPage: View {
         }
     }
 
-    private func serviceControlBlock(_ control: ServiceControl, interactionID: UUID) -> some View {
+    private func serviceControlBlock(_ control: ServiceControl, interactionID: UUID?) -> some View {
         ServiceControlView(
             control: control,
+            isActive: interactionID != nil,
+            reflectsAuthentication: false,
             signIn: { domain in
-                runningServiceControlID = interactionID
-                let succeeded = await chat.signInService(domain: domain, resumeAgent: false)
-                if !succeeded { runningServiceControlID = nil }
-                return succeeded
+                guard prepareServiceControl(control) else { return false }
+                return await chat.signInService(domain: domain, resumeAgent: false)
             },
-            completeBotControl: { await chat.completeBotControl(domain: $0, args: $1, resumeAgent: false) },
-            completePayment: { await chat.completePayment(domain: $0, args: $1) },
+            completeBotControl: { domain, args in
+                guard prepareServiceControl(control) else { return false }
+                return await chat.completeBotControl(domain: domain, args: args, resumeAgent: false)
+            },
+            completePayment: { domain, args in
+                guard prepareServiceControl(control) else { return nil }
+                return await chat.completePayment(domain: domain, args: args)
+            },
             onResolved: { result in
-                runningServiceControlID = nil
+                guard let interactionID else { return }
                 chat.resolveServiceControl(id: interactionID, result: result)
             }
         )
+    }
+
+    private func prepareServiceControl(_ control: ServiceControl) -> Bool {
+        if isAttached(control) { return true }
+        guard let service = serviceManager.service(domain: control.domain) else {
+            Log.ui.warning("ChatPage.serviceControl unavailable chat=\(chat.id) domain=\(control.domain)")
+            return false
+        }
+        chat.attachService(service)
+        return true
     }
 
     private func composerBlock(
@@ -1054,8 +1077,11 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private var activityRow: some View {
-        if showsActivity {
+    private func activityRow(blocks: [ChatBlock]) -> some View {
+        if showsActivity, !blocks.contains(where: {
+            if case .responseFooter(_, .streaming) = $0.kind { return true }
+            return false
+        }) {
             ActivityBubble()
                 .id("__activity")
                 .transition(.opacity)
@@ -1213,7 +1239,7 @@ struct ChatPage: View {
                 ForEach(renderedBlocks) { block in
                     blockRow(block)
                 }
-                activityRow
+                activityRow(blocks: renderedBlocks)
                 ForEach(chat.queuedMessages.filter { $0.id != anchor.id }) { queued in
                     queuedRow(queued)
                 }
@@ -1244,7 +1270,7 @@ struct ChatPage: View {
                     ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
                         blockRow(block, identified: false)
                     }
-                    activityRow
+                    activityRow(blocks: renderedBlocks)
                     queuedRows
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
@@ -1260,7 +1286,7 @@ struct ChatPage: View {
                 ForEach(renderedBlocks) { block in
                     blockRow(block)
                 }
-                activityRow
+                activityRow(blocks: renderedBlocks)
                 queuedRows
             }
         }
@@ -1414,10 +1440,7 @@ struct ChatPage: View {
     }
 
     private var activeInteraction: Chat.Interaction? {
-        guard case .serviceControl(let control) = chat.interaction else {
-            return chat.interaction
-        }
-        return activeServiceControl(control).map(Chat.Interaction.serviceControl)
+        chat.interaction
     }
 
     private func interactionID(for interaction: Chat.Interaction?) -> UUID? {
@@ -1426,17 +1449,6 @@ struct ChatPage: View {
         case .serviceControl(let control): control.id
         case nil: nil
         }
-    }
-
-    private func activeServiceControl(_ item: Chat.PendingServiceControl?) -> Chat.PendingServiceControl? {
-        guard let item,
-              isAttached(item.control) else { return nil }
-        if case .signIn(let domain, _) = item.control,
-           runningServiceControlID != item.id,
-           chat.attachedService(domain: domain)?.signInState.isAuthenticated == true {
-            return nil
-        }
-        return item
     }
 
     private func isAttached(_ control: ServiceControl) -> Bool {
