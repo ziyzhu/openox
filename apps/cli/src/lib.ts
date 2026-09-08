@@ -74,88 +74,41 @@ function printUsage(program: string, description: string, groups: Record<string,
 }
 
 export function parseGlobalOptions(args: string[]): { context: CliContext; rest: string[] } {
-  let host: string | undefined;
-  let hostSeen = false;
-  let profile: string | undefined;
-  let profileSeen = false;
-  let chat: string | undefined;
-  let chatSeen = false;
-  let repository: string | undefined = process.env.OX_REPOSITORY;
-  let repositorySeen = false;
+  const options = new Map<string, { key: keyof CliContext; requirement: string }>([
+    ["--host", { key: "host", requirement: "a WebSocket URL" }],
+    ["--profile", { key: "profile", requirement: "a path" }],
+    ["--chat", { key: "chat", requirement: "a chat id" }],
+    ["--repository", { key: "repository", requirement: "a path or URL" }],
+  ]);
+  const removedOptions = new Map([
+    ["--runtime", "--runtime was removed; the selected Host owns service page implementation"],
+    ["--session", "--session was removed; use --chat for ox vm or --herdr-session for ox herdr"],
+    ["--vm-session", "--vm-session was renamed to --chat"],
+    ["--root", "--root was renamed to --profile"],
+  ]);
+  const context: CliContext = process.env.OX_REPOSITORY ? { repository: process.env.OX_REPOSITORY } : {};
+  const seen = new Set<string>();
   const rest: string[] = [];
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
-    let value: string | undefined;
-    if (argument === "--host") {
-      value = args[++index];
-      if (hostSeen) throw new Error("--host may only be specified once");
-      hostSeen = true;
-      if (!value) throw new Error("--host requires a WebSocket URL");
-      host = value;
-      continue;
-    } else if (argument.startsWith("--host=")) {
-      value = argument.slice("--host=".length);
-      if (hostSeen) throw new Error("--host may only be specified once");
-      hostSeen = true;
-      if (!value) throw new Error("--host requires a WebSocket URL");
-      host = value;
-      continue;
-    } else if (argument === "--profile") {
-      value = args[++index];
-      if (profileSeen) throw new Error("--profile may only be specified once");
-      profileSeen = true;
-      if (!value) throw new Error("--profile requires a path");
-      profile = value;
-      continue;
-    } else if (argument === "--repository") {
-      value = args[++index];
-      if (repositorySeen) throw new Error("--repository may only be specified once");
-      repositorySeen = true;
-      if (!value) throw new Error("--repository requires a path or URL");
-      repository = value;
-      continue;
-    } else if (argument.startsWith("--repository=")) {
-      value = argument.slice("--repository=".length);
-      if (repositorySeen) throw new Error("--repository may only be specified once");
-      repositorySeen = true;
-      if (!value) throw new Error("--repository requires a path or URL");
-      repository = value;
-      continue;
-    } else if (argument.startsWith("--profile=")) {
-      value = argument.slice("--profile=".length);
-      if (profileSeen) throw new Error("--profile may only be specified once");
-      profileSeen = true;
-      if (!value) throw new Error("--profile requires a path");
-      profile = value;
-      continue;
-    } else if (argument === "--chat") {
-      value = args[++index];
-      if (chatSeen) throw new Error("--chat may only be specified once");
-      chatSeen = true;
-      if (!value) throw new Error("--chat requires a chat id");
-      chat = value;
-      continue;
-    } else if (argument.startsWith("--chat=")) {
-      value = argument.slice("--chat=".length);
-      if (chatSeen) throw new Error("--chat may only be specified once");
-      chatSeen = true;
-      if (!value) throw new Error("--chat requires a chat id");
-      chat = value;
-      continue;
-    } else if (argument === "--runtime" || argument.startsWith("--runtime=")) {
-      throw new Error("--runtime was removed; the selected Host owns service page implementation");
-    } else if (argument === "--session" || argument.startsWith("--session=")) {
-      throw new Error("--session was removed; use --chat for ox vm or --herdr-session for ox herdr");
-    } else if (argument === "--vm-session" || argument.startsWith("--vm-session=")) {
-      throw new Error("--vm-session was renamed to --chat");
-    } else if (argument === "--root" || argument.startsWith("--root=")) {
-      throw new Error("--root was renamed to --profile");
-    } else {
+    const assignment = argument.indexOf("=");
+    const flag = assignment === -1 ? argument : argument.slice(0, assignment);
+    const removed = removedOptions.get(flag);
+    if (removed) throw new Error(removed);
+    const option = options.get(flag);
+    if (!option) {
       rest.push(argument);
       continue;
     }
+    if (seen.has(flag)) throw new Error(`${flag} may only be specified once`);
+    const value = assignment === -1 ? args[++index] : argument.slice(assignment + 1);
+    if (!value || (assignment === -1 && value.startsWith("-"))) {
+      throw new Error(`${flag} requires ${option.requirement}`);
+    }
+    seen.add(flag);
+    context[option.key] = value;
   }
-  return { context: { ...(host ? { host } : {}), ...(profile ? { profile } : {}), ...(chat ? { chat } : {}), ...(repository ? { repository } : {}) }, rest };
+  return { context, rest };
 }
 
 export async function runCli(
