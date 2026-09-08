@@ -24,7 +24,7 @@ struct OnboardingView: View {
     var body: some View {
         TabView(selection: $step) {
             titleSlide(
-                title: "Moo Moo",
+                title: "Moo moo",
                 description: "Ox is a self-evolving agent\nthat lives on your mobile device."
             )
             .tag(Step.welcome)
