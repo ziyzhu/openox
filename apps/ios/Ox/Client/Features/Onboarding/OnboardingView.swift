@@ -46,7 +46,7 @@ struct OnboardingView: View {
             .tag(Step.services)
 
             slide(
-                title: "Yours, by design",
+                title: "Yours",
                 description: "Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones."
             ) {
                 pickAIComponent

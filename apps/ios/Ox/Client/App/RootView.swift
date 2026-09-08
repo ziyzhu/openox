@@ -276,6 +276,74 @@ private struct CurrentChatActivityObserver: View {
     }
 }
 
+private struct SplitSidebarResizer: View {
+    let width: CGFloat
+    let limits: ClosedRange<CGFloat>
+    let onResize: (CGFloat) -> Void
+
+    @State private var dragStartWidth: CGFloat?
+    @State private var hovered = false
+
+    private var active: Bool {
+        dragStartWidth != nil
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(width: 28)
+            .contentShape(Rectangle())
+            .overlay {
+                Rectangle()
+                    .fill(.quaternary)
+                    .frame(width: 1)
+                if active || hovered {
+                    Rectangle()
+                        .fill(Theme.Colors.primary)
+                        .frame(width: 2)
+                }
+            }
+            .onHover { hovered = $0 }
+            .gesture(resizeGesture)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(A11yLabel.resizeSidebar)
+            .accessibilityValue(Text(verbatim: "\(Int(width))"))
+            .accessibilityIdentifier(A11yID.Sidebar.resizer)
+            .accessibilityAction(named: A11yLabel.widenSidebar) {
+                resize(to: width + 32, source: "accessibilityWiden")
+            }
+            .accessibilityAction(named: A11yLabel.narrowSidebar) {
+                resize(to: width - 32, source: "accessibilityNarrow")
+            }
+    }
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                if dragStartWidth == nil {
+                    dragStartWidth = width
+                    Log.ui.info("RootView.sidebarResize phase=start width=\(Int(width))")
+                }
+                onResize(clamp((dragStartWidth ?? width) + value.translation.width))
+            }
+            .onEnded { value in
+                let resizedWidth = clamp((dragStartWidth ?? width) + value.translation.width)
+                onResize(resizedWidth)
+                dragStartWidth = nil
+                Log.ui.info("RootView.sidebarResize phase=end width=\(Int(resizedWidth))")
+            }
+    }
+
+    private func resize(to newWidth: CGFloat, source: String) {
+        let resizedWidth = clamp(newWidth)
+        onResize(resizedWidth)
+        Log.ui.info("RootView.sidebarResize phase=end source=\(source) width=\(Int(resizedWidth))")
+    }
+
+    private func clamp(_ width: CGFloat) -> CGFloat {
+        min(limits.upperBound, max(limits.lowerBound, width))
+    }
+}
+
 private struct ComposerFocusRequest: Equatable {
     let id = UUID()
     let chatID: UUID
@@ -475,6 +543,7 @@ struct RootView: View {
     @State private var chats: ChatManager
     @State private var compactPage: CompactPage = .workspace
     @State private var showSplitSidebar = true
+    @State private var splitSidebarWidth: CGFloat?
     @State private var compactSidebarSummaries: [ChatMeta] = []
     @State private var compactSidebarCurrentId: UUID?
     @State private var compactChatTransition = CompactChatTransition.idle
@@ -700,24 +769,34 @@ struct RootView: View {
     }
 
     private func splitLayout(width: CGFloat) -> some View {
-        let sidebarWidth = max(280, min(width * 0.35, 360))
+        let limits = splitSidebarWidthLimits(for: width)
+        let defaultWidth = max(280, min(width * 0.35, 360))
+        let sidebarWidth = min(limits.upperBound, max(limits.lowerBound, splitSidebarWidth ?? defaultWidth))
         return HStack(spacing: 0) {
             if showSplitSidebar {
                 sidebarPanel
                     .frame(width: sidebarWidth)
+                    .overlay(alignment: .trailing) {
+                        SplitSidebarResizer(
+                            width: sidebarWidth,
+                            limits: limits,
+                            onResize: { splitSidebarWidth = $0 }
+                        )
+                        .offset(x: 14)
+                        .zIndex(1)
+                    }
                     .transition(.move(edge: .leading))
+                    .zIndex(1)
             }
             chatLayer
-                .overlay(alignment: .leading) {
-                    if showSplitSidebar {
-                        Rectangle()
-                            .fill(.quaternary)
-                            .frame(width: 1)
-                            .ignoresSafeArea()
-                    }
-                }
         }
         .animation(sidebarAnimation, value: showSplitSidebar)
+    }
+
+    private func splitSidebarWidthLimits(for totalWidth: CGFloat) -> ClosedRange<CGFloat> {
+        let minimum: CGFloat = 240
+        let maximum = min(500, max(minimum, totalWidth - 360))
+        return minimum...maximum
     }
 
     private var sidebarPanel: some View {

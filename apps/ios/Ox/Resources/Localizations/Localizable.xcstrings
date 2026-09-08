@@ -5934,6 +5934,17 @@
         }
       }
     },
+    "Narrow chat history" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩窄对话历史"
+          }
+        }
+      }
+    },
     "Native capabilities the agent can use on this device. Access is managed by iOS." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8374,6 +8385,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置"
+          }
+        }
+      }
+    },
+    "Resize chat history" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整对话历史宽度"
           }
         }
       }
@@ -11394,6 +11416,17 @@
         }
       }
     },
+    "Widen chat history" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加宽对话历史"
+          }
+        }
+      }
+    },
     "Work through the part that doesn’t quite add up." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11593,7 +11626,7 @@
         }
       }
     },
-    "Yours, by design" : {
+    "Yours" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {

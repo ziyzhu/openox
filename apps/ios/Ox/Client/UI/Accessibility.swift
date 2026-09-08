@@ -39,6 +39,7 @@ nonisolated enum A11yID {
 
     enum Sidebar {
         static let panel = "sidebar.panel"
+        static let resizer = "sidebar.resizer"
         static let close = "sidebar.close"
         static let newChat = "sidebar.newChat"
         static let settings = "sidebar.settings"
@@ -341,6 +342,9 @@ enum A11yLabel {
     static var artifacts: String { L10n.string("Artifacts", comment: "") }
     static var skills: String { L10n.string("Skills", comment: "") }
     static var openSidebar: String { L10n.string("Open chat history", comment: "") }
+    static var resizeSidebar: String { L10n.string("Resize chat history", comment: "") }
+    static var widenSidebar: String { L10n.string("Widen chat history", comment: "") }
+    static var narrowSidebar: String { L10n.string("Narrow chat history", comment: "") }
     static var searchChats: String { L10n.string("Search chats", comment: "") }
     static var closeChatHistory: String { L10n.string("Close chat history", comment: "") }
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
