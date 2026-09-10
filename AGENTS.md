@@ -21,6 +21,7 @@
 
 1. Include the current iOS marketing version in every commit subject using `<imperative summary> (iOS <version>)`, including commits that do not modify the iOS app.
 1. Read `<version>` from `MARKETING_VERSION` in `apps/ios/Ox.xcodeproj/project.pbxproj` and confirm all build configurations agree before committing.
+1. After an iOS release, advance `MARKETING_VERSION` in all build configurations to the next planned release before creating new commits. Use that unreleased version in new commit subjects; do not keep labeling new work with the released version.
 
 ## Repository Boundary
 

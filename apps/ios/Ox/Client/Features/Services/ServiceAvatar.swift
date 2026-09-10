@@ -3,11 +3,6 @@ import UIKit
 
 enum ServiceAvatarShape { case roundedRect(CGFloat), circle }
 
-@MainActor
-private enum ServiceAvatarCache {
-    static var images: [String: UIImage] = [:]
-}
-
 struct ServiceAvatar: View {
     private enum FaviconState {
         case loading
@@ -39,21 +34,20 @@ struct ServiceAvatar: View {
             }
         }
         .frame(width: size, height: size)
-        .task(id: "\(service.domain):\(colorScheme)") {
-            guard loadsFavicon else { return }
-            let theme = colorScheme == .dark ? "dark" : "light"
-            let cacheKey = service.isMCPService ? "\(service.domain):\(theme)" : service.domain
-            if let image = ServiceAvatarCache.images[cacheKey] {
-                faviconState = .loaded(image)
-                return
-            }
-            faviconState = .loading
-            guard let image = await serviceManager.faviconImage(for: service.domain, preferredTheme: theme).flatMap(UIImage.init) else {
+        .task(id: "\(service.domain):\(colorScheme):\(serviceManager.faviconRevision)") {
+            guard loadsFavicon else {
                 faviconState = .unavailable
                 return
             }
-            guard !Task.isCancelled else { return }
-            ServiceAvatarCache.images[cacheKey] = image
+            let theme = colorScheme == .dark ? "dark" : "light"
+            faviconState = .loading
+            let revision = serviceManager.faviconRevision
+            let image = await serviceManager.faviconImage(for: service.domain, preferredTheme: theme).flatMap(UIImage.init)
+            guard !Task.isCancelled, serviceManager.faviconRevision == revision else { return }
+            guard let image else {
+                faviconState = .unavailable
+                return
+            }
             withAnimation(reduceMotion ? nil : .easeOut(duration: Theme.Animation.quick)) {
                 faviconState = .loaded(image)
             }
@@ -61,7 +55,7 @@ struct ServiceAvatar: View {
     }
 
     private var favicon: UIImage? {
-        guard case .loaded(let image) = faviconState else { return nil }
+        guard loadsFavicon, case .loaded(let image) = faviconState else { return nil }
         return image
     }
 

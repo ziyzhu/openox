@@ -61,7 +61,10 @@ final class ServiceManager {
     private var resolvedServices = ResolvedServices()
     var services: [Service] { resolvedServices.services }
     private var byDomain: [String: Service] { resolvedServices.byDomain }
-    private(set) var monoRepositoryRevision: UInt64 = 0
+    private(set) var monoRepositoryRevision: UInt64 = 0 {
+        didSet { invalidateFavicons() }
+    }
+    private(set) var faviconRevision: UInt64 = 0
     private let index = ServiceSearchIndex()
     @ObservationIgnored private var faviconData: [String: Data] = [:]
     @ObservationIgnored private var persistedRemoteMCPServers: [PersistedRemoteMCP] = []
@@ -370,6 +373,7 @@ final class ServiceManager {
 
     func faviconImage(for domain: String, preferredTheme: String? = nil) async -> Data? {
         guard let service = byDomain[domain] else { return nil }
+        let revision = faviconRevision
         let cacheKey = service.isMCPService ? "\(domain):\(preferredTheme ?? "any")" : domain
         if let data = faviconData[cacheKey] { return data }
         let data: Data?
@@ -389,6 +393,7 @@ final class ServiceManager {
             Log.service.info("Service.icon missing id=\(domain)")
             return nil
         }
+        guard faviconRevision == revision, !Task.isCancelled else { return nil }
         if let data {
             faviconData[cacheKey] = data
             if service.isMCPService && service.definition.faviconURL == nil {
@@ -398,6 +403,12 @@ final class ServiceManager {
             }
         }
         return data
+    }
+
+    private func invalidateFavicons() {
+        faviconData.removeAll()
+        faviconRevision &+= 1
+        Log.service.info("Service.icon invalidated revision=\(self.faviconRevision)")
     }
 
     @discardableResult
@@ -429,13 +440,13 @@ final class ServiceManager {
             monoRepositoryHash = monoRepository.hash
             repositoryState = .ready
             guard before != monoRepository.hash || monoRepositoryState != .ready || monoRepositoryLocale != locale else {
+                invalidateFavicons()
                 Log.service.info("ServiceManager.refreshServices unchanged monoRepository=\(monoRepository.hash.prefix(12))")
                 return []
             }
             let stale = byDomain.values.filter { $0.webService != nil }
             for service in stale {
                 service.invalidateResolved()
-                faviconData[service.domain] = nil
             }
             let generation = beginMonoRepositoryUpdate(locale: locale, showLoading: monoRepositoryState != .ready)
             await rebuildMonoRepository(locale: locale, generation: generation)
