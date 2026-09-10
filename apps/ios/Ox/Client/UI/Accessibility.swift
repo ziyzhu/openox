@@ -6,12 +6,6 @@ nonisolated enum A11yID {
     }
 
     enum Onboarding {
-        static let pagination = "onboarding.pagination"
-        static let websitesDemo = "onboarding.websitesDemo"
-        static let chooseAI = "onboarding.chooseAI"
-        static let continueToDisclaimer = "onboarding.continueToDisclaimer"
-        static let discord = "onboarding.discord"
-        static let github = "onboarding.github"
         static let complete = "onboarding.complete"
     }
 
@@ -170,6 +164,7 @@ nonisolated enum A11yID {
         static let delete = "chat.delete"
         static let export = "chat.export"
         static let modelPicker = "chat.modelPicker"
+        static let modelSetup = "chat.modelSetup"
         static let modelRegion = "chat.modelRegion"
         static let modelProvider = "chat.modelProvider"
         static func modelProviderOption(_ clientId: String) -> String { "chat.modelProviderOption.\(clientId)" }

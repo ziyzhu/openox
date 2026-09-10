@@ -411,13 +411,13 @@
         }
       }
     },
-    "Acknowledge" : {
+    "A few things to know" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "确认"
+            "value" : "几件需要了解的事"
           }
         }
       }
@@ -466,13 +466,13 @@
         }
       }
     },
-    "Acts everywhere" : {
+    "Gains new capabilities" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "助你行动。"
+            "value" : "获得新能力"
           }
         }
       }
@@ -2143,6 +2143,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择"
+          }
+        }
+      }
+    },
+    "Choose a model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择模型"
+          }
+        }
+      }
+    },
+    "Choose a model to start chatting." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择模型以开始聊天。"
           }
         }
       }
@@ -5796,13 +5818,13 @@
         }
       }
     },
-    "Moo moo" : {
+    "Get started" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "哞哞"
+            "value" : "开始使用"
           }
         }
       }
@@ -6260,6 +6282,17 @@
         }
       }
     },
+    "Not configured" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未配置"
+          }
+        }
+      }
+    },
     "Not now" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6675,13 +6708,13 @@
         }
       }
     },
-    "Ox asks before using sensitive capabilities, keeps account credentials isolated on the web page, and lets you pull the plug at any time." : {
+    "Ox asks before using sensitive capabilities, keeps credentials inside the web page, and lets you pull the plug at any time." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 在使用敏感能力前会先询问，把账户凭据隔离在网页中，并让你随时可以停止。"
+            "value" : "Ox 会在使用敏感能力前征求你的同意，将凭据保留在网页内，并让你随时停止它。"
           }
         }
       }
@@ -6818,13 +6851,13 @@
         }
       }
     },
-    "Ox may act on your behalf, so you are responsible for evaluating the risks and granting permissions." : {
+    "Ox can act on your behalf and make mistakes. By continuing, you agree to review its work and grant permissions carefully." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 可能代表你执行操作，因此你有责任评估风险并授予权限。"
+            "value" : "Ox 可以代你操作，也可能出错。继续即表示你同意检查其工作，并谨慎授予权限。"
           }
         }
       }
@@ -6872,13 +6905,13 @@
         }
       }
     },
-    "Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones." : {
+    "Ox runs on your device and stores your profile in a folder you control. Use any model provider, including free or self-hosted ones." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 在你的设备上运行，数据也留在设备上。它兼容任何模型，包括免费或自托管模型。"
+            "value" : "Ox 在你的设备上运行，并将你的配置档案存储在由你控制的文件夹中。你可以使用任何模型提供商，包括免费或自托管模型。"
           }
         }
       }
@@ -6917,13 +6950,13 @@
         }
       }
     },
-    "Ox turns websites into reusable capabilities that complete tasks much faster than you could by hand." : {
+    "Ox turns websites into reusable capabilities. Use one that exists, or ask Ox to build a new one." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 把网站变成可重复使用的能力，以远快于手动操作的速度完成任务。"
+            "value" : "Ox 可以将网站转化为可重复使用的能力。你可以使用现有能力，也可以让 Ox 创建新的能力。"
           }
         }
       }

@@ -4,6 +4,7 @@ struct ChatPageTopBar: View {
     let chat: Chat
     let blockCount: Int
     let hasArtifacts: Bool
+    let showsModelPicker: Bool
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onToggleTemporary: () -> Void
@@ -15,7 +16,7 @@ struct ChatPageTopBar: View {
     var body: some View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
-            if blockCount == 0, chat.canChangeRetention || !chat.isTemporary {
+            if showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
                 modelPill
             }
             Spacer()

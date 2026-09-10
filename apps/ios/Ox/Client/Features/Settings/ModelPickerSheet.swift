@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ModelPickerSheet: View {
     let chat: Chat
     @Environment(\.dismiss) private var dismiss
+    private var registry: ProviderRegistry { .shared }
 
     var body: some View {
         NavigationStack {
@@ -13,6 +14,9 @@ struct ModelPickerSheet: View {
                 onClose: { dismiss() }
             ) { client, model, selection in
                 Log.ui.info("ModelPicker.select chat=\(chat.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
+                if registry.defaultModel == nil {
+                    registry.select(model, in: client.id, region: selection.region)
+                }
                 chat.switchModel(to: client, model: model, selection: selection)
             }
         }
@@ -59,12 +63,11 @@ struct SettingsSheet: View {
         return count == 0 ? Text("Empty") : Text(verbatim: "\(count)")
     }
 
-    private var defaultModel: ProviderModel {
-        registry.selected(for: registry.defaultClient)
-    }
-
-    private var defaultProviderName: String {
-        registry.client(id: registry.defaultClient)?.displayName ?? registry.defaultClient
+    private var defaultModelValue: Text {
+        guard let selection = registry.defaultModel else { return Text("Not configured") }
+        let client = registry.client(for: selection)
+        let model = registry.model(for: selection, client: client)
+        return Text(verbatim: "\(client.displayName) · \(model.displayName)")
     }
 
     var body: some View {
@@ -134,7 +137,7 @@ struct SettingsSheet: View {
                         NavigationLink {
                             ModelPickerContent(
                                 title: "Model",
-                                activeSelection: registry.defaultModel
+                                activeSelection: registry.sessionModel
                             ) { client, model, selection in
                                 Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
                                 registry.select(model, in: client.id, region: selection.region)
@@ -142,7 +145,7 @@ struct SettingsSheet: View {
                         } label: {
                             SettingsDisclosureRow(
                                 title: "Model",
-                                value: Text(verbatim: "\(defaultProviderName) · \(defaultModel.displayName)")
+                                value: defaultModelValue
                             )
                         }
                         .buttonStyle(.plain)

@@ -342,7 +342,7 @@ final class ChatManager {
     }
 
     private func startTemporaryChat(continuing continuation: ChatContinuation) {
-        let selection = continuation.meta.model ?? providerRegistry.defaultModel
+        let selection = continuation.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
         let chat = Chat(
@@ -434,7 +434,7 @@ final class ChatManager {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
             return nil
         }
-        let selection = result.meta.model ?? providerRegistry.defaultModel
+        let selection = result.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
         let branched = Chat(
@@ -627,7 +627,7 @@ final class ChatManager {
         scheduledSkillID: UUID? = nil
     ) -> Chat {
         let client = providerRegistry.newSessionClient
-        let selection = providerRegistry.defaultModel
+        let selection = providerRegistry.sessionModel
         let chat = Chat(
             client: client,
             model: providerRegistry.model(for: selection, client: client),
@@ -676,7 +676,7 @@ final class ChatManager {
     }
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {
-        let selection = loaded.state.meta.model ?? providerRegistry.defaultModel
+        let selection = loaded.state.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
         let chat = Chat(

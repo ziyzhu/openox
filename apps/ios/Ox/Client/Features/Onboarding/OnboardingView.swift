@@ -6,303 +6,102 @@ struct OnboardingView: View {
     let onDone: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var step: Step = .welcome
-    @State private var picked: PickedModel?
-
-    private let welcomeIllustrationHeight: CGFloat = 220
-    private let welcomeHeaderMinHeight: CGFloat = 136
-
-    private enum Step: Int, CaseIterable {
-        case welcome, services, ownership, controlled, proxyDisclosure
-    }
-
-    private struct PickedModel {
-        let provider: String
-        let model: String
-    }
 
     var body: some View {
-        TabView(selection: $step) {
-            titleSlide(
-                title: "Moo moo",
-                description: "Ox is a self-evolving agent\nthat lives on your mobile device."
-            )
-            .tag(Step.welcome)
+        GeometryReader { geometry in
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    OnboardingCellularField(isActive: true)
+                        .frame(height: dynamicTypeSize.isAccessibilitySize ? 80 : 112)
+                        .accessibilityHidden(true)
 
-            slide(
-                title: "Acts everywhere",
-                description: "Ox turns websites into reusable capabilities that complete tasks much faster than you could by hand."
-            ) {
-                VStack(spacing: Theme.Spacing.md) {
-                    WebsitesDemo(height: welcomeIllustrationHeight)
-                    Text("“Hey Ox, add LinkedIn as a service”")
-                        .font(Theme.Fonts.bodySm)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
-                .padding(.top, Theme.Spacing.md + Theme.Spacing.sm)
-            }
-            .tag(Step.services)
+                    Text("A few things to know")
+                        .font(Theme.Fonts.display)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .padding(.top, Theme.Spacing.lg)
 
-            slide(
-                title: "Yours",
-                description: "Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones."
-            ) {
-                pickAIComponent
-            } actions: {
-                pickAIActions
-            }
-            .tag(Step.ownership)
-
-            slide(
-                title: "Peace of mind",
-                description: "Ox asks before using sensitive capabilities, keeps account credentials isolated on the web page, and lets you pull the plug at any time."
-            ) {
-                ApprovalDemo()
-            }
-            .tag(Step.controlled)
-
-            slide(
-                title: "Disclaimer",
-                description: "Ox may act on your behalf, so you are responsible for evaluating the risks and granting permissions."
-            ) {
-                ProxyDisclosureDiagram()
-            } actions: {
-                VStack(spacing: Theme.Spacing.md) {
-                    if picked == nil {
-                        Button { step = .ownership } label: { Text("Choose your model") }
-                            .buttonStyle(OnboardingCTAButton())
-                            .accessibilityIdentifier(A11yID.Onboarding.chooseAI)
-                    } else {
-                        Button { finish() } label: { Text("Acknowledge") }
-                            .buttonStyle(OnboardingCTAButton())
-                            .accessibilityIdentifier(A11yID.Onboarding.complete)
+                    VStack(spacing: Theme.Spacing.xxl) {
+                        OnboardingDisclosureRow(
+                            symbol: "hammer",
+                            title: "Gains new capabilities",
+                            description: "Ox turns websites into reusable capabilities. Use one that exists, or ask Ox to build a new one."
+                        )
+                        OnboardingDisclosureRow(
+                            symbol: "folder",
+                            title: "Yours",
+                            description: "Ox runs on your device and stores your profile in a folder you control. Use any model provider, including free or self-hosted ones."
+                        )
+                        OnboardingDisclosureRow(
+                            symbol: "hand.raised",
+                            title: "Peace of mind",
+                            description: "Ox asks before using sensitive capabilities, keeps credentials inside the web page, and lets you pull the plug at any time."
+                        )
                     }
-                    OnboardingCommunityLinks()
+                    .padding(.top, Theme.Spacing.xxl)
+
+                    Spacer(minLength: Theme.Spacing.xxl)
+
+                    VStack(spacing: Theme.Spacing.lg) {
+                        Text("Ox can act on your behalf and make mistakes. By continuing, you agree to review its work and grant permissions carefully.")
+                            .font(Theme.Fonts.caption)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Button {
+                            Log.ui.info("Onboarding.done")
+                            onDone()
+                        } label: {
+                            Text("Get started")
+                        }
+                        .buttonStyle(OnboardingCTAButton())
+                        .accessibilityIdentifier(A11yID.Onboarding.complete)
+                    }
+                    .padding(.top, Theme.Spacing.xxl)
                 }
+                .frame(maxWidth: 560)
+                .frame(
+                    minHeight: max(0, geometry.size.height - Theme.Spacing.xxl),
+                    alignment: .top
+                )
+                .padding(.horizontal, Theme.Spacing.xxl)
+                .padding(.vertical, Theme.Spacing.lg)
+                .frame(maxWidth: .infinity)
             }
-            .tag(Step.proxyDisclosure)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .animation(.easeInOut(duration: 0.35), value: step)
         .background(Theme.Colors.surface, ignoresSafeAreaEdges: .all)
         .environment(\.locale, AppLocale.shared.locale)
     }
+}
 
-    private func titleSlide(
-        title: LocalizedStringKey,
-        description: LocalizedStringKey
-    ) -> some View {
-        GeometryReader { geo in
-            VStack(spacing: 0) {
-                VStack(spacing: Theme.Spacing.md) {
-                    titleBlock(title: title)
-                    Text(description)
-                        .font(Theme.Fonts.bodyMd)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
-                .frame(minHeight: welcomeHeaderMinHeight, alignment: .top)
-                OnboardingCellularField(isActive: step == .welcome)
-                    .frame(height: welcomeIllustrationHeight)
-                    .padding(.top, Theme.Spacing.xl)
-                    .accessibilityHidden(true)
-                Spacer()
-                pagination
-                    .padding(.top, Theme.Spacing.xl)
-            }
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
-            .padding(.top, max(Theme.Spacing.xxl, geo.size.height * 0.16))
-            .padding(.bottom, Theme.Spacing.lg)
-        }
-        .padding(.horizontal, Theme.Spacing.xxl)
-    }
+private struct OnboardingDisclosureRow: View {
+    let symbol: String
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
 
-    private func slide<Component: View>(
-        title: LocalizedStringKey,
-        titleLead: LocalizedStringKey? = nil,
-        titleTail: LocalizedStringKey? = nil,
-        description: LocalizedStringKey? = nil,
-        @ViewBuilder component: () -> Component
-    ) -> some View {
-        let componentContent = component()
-        return slide(title: title, titleLead: titleLead, titleTail: titleTail, description: description) {
-            componentContent
-        } actions: {
-            EmptyView()
-        }
-    }
-
-    private func slide<Component: View, Actions: View>(
-        title: LocalizedStringKey,
-        titleLead: LocalizedStringKey? = nil,
-        titleTail: LocalizedStringKey? = nil,
-        description: LocalizedStringKey? = nil,
-        @ViewBuilder component: () -> Component,
-        @ViewBuilder actions: () -> Actions
-    ) -> some View {
-        let componentContent = component()
-        let actionContent = actions()
-        return GeometryReader { geo in
-            let content = VStack(spacing: 0) {
-                VStack(spacing: Theme.Spacing.md) {
-                    inlineTitleBlock(lead: titleLead, emphasis: title, tail: titleTail)
-                    if let description {
-                        Text(description)
-                            .font(Theme.Fonts.bodyMd)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    }
-                }
-                componentContent
-                    .padding(.top, Theme.Spacing.xl)
-                Spacer(minLength: Theme.Spacing.lg)
-                actionContent
-                pagination
-                    .padding(.top, Theme.Spacing.xl)
-            }
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
-            .padding(
-                .top,
-                dynamicTypeSize.isAccessibilitySize
-                    ? Theme.Spacing.xxl
-                    : max(Theme.Spacing.xxl, geo.size.height * 0.16)
-            )
-            .padding(.bottom, Theme.Spacing.lg)
-
-            if dynamicTypeSize.isAccessibilitySize {
-                ScrollView(.vertical) {
-                    content.frame(minHeight: geo.size.height)
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollIndicators(.hidden)
-            } else {
-                content
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.xxl)
-    }
-
-    private func titleBlock(title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(Theme.Fonts.display)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-            .minimumScaleFactor(0.75)
-            .allowsTightening(true)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(Theme.Colors.onSurface)
-    }
-
-    private func inlineTitleBlock(
-        lead: LocalizedStringKey?,
-        emphasis: LocalizedStringKey,
-        tail: LocalizedStringKey?
-    ) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                inlineTitleLabel(lead: lead, emphasis: emphasis, tail: tail)
-                    .multilineTextAlignment(.center)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs) {
-                    if let lead {
-                        Text(lead)
-                    }
-                    Text(emphasis)
-                    if let tail {
-                        Text(tail)
-                    }
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .allowsTightening(true)
-            }
-        }
-        .font(Theme.Fonts.display)
-        .foregroundStyle(Theme.Colors.onSurface)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(inlineTitleLabel(lead: lead, emphasis: emphasis, tail: tail))
-    }
-
-    private func inlineTitleLabel(
-        lead: LocalizedStringKey?,
-        emphasis: LocalizedStringKey,
-        tail: LocalizedStringKey?
-    ) -> Text {
-        switch (lead, tail) {
-        case (.some(let lead), .some(let tail)):
-            Text("\(Text(lead)) \(Text(emphasis)) \(Text(tail))")
-        case (.some(let lead), .none):
-            Text("\(Text(lead)) \(Text(emphasis))")
-        case (.none, .some(let tail)):
-            Text("\(Text(emphasis)) \(Text(tail))")
-        case (.none, .none):
-            Text(emphasis)
-        }
-    }
-
-    @ViewBuilder
-    private var pickAIComponent: some View {
-        if let picked {
-            pickedCard(picked)
-        } else {
-            ProviderPickerButton { provider, model in
-                withAnimation(.easeOut(duration: 0.2)) {
-                    self.picked = PickedModel(provider: provider, model: model)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var pickAIActions: some View {
-        if picked != nil {
-            Button { showDisclaimer() } label: { Text("Continue") }
-                .buttonStyle(OnboardingCTAButton())
-                .accessibilityIdentifier(A11yID.Onboarding.continueToDisclaimer)
-        }
-    }
-
-    private func pickedCard(_ picked: PickedModel) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Text(verbatim: "\(picked.provider) · \(picked.model)")
-                .font(Theme.Fonts.labelMd)
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.lg) {
+            Image(systemName: symbol)
+                .font(Theme.Icons.lg)
                 .foregroundStyle(Theme.Colors.onSurface)
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.vertical, Theme.Spacing.md)
-        .background(Theme.Colors.primary.opacity(0.12), in: Capsule(style: .continuous))
-    }
+                .frame(width: 32)
+                .accessibilityHidden(true)
 
-    private var pagination: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            ForEach(Step.allCases, id: \.self) { s in
-                Circle()
-                    .fill(s == step ? Theme.Colors.primary.dynamic : Theme.Colors.onSurfaceMuted.dynamic.opacity(0.25))
-                    .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(title)
+                    .font(Theme.Fonts.title)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                Text(description)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Page"))
-        .accessibilityValue(Text(verbatim: "\(step.rawValue + 1)/\(Step.allCases.count)"))
-        .accessibilityIdentifier(A11yID.Onboarding.pagination)
-    }
-
-    private func finish() {
-        guard picked != nil else {
-            step = .ownership
-            return
-        }
-        Log.ui.info("Onboarding.done picked=\(picked != nil)")
-        onDone()
-    }
-
-    private func showDisclaimer() {
-        withAnimation(.easeInOut(duration: 0.35)) {
-            step = .proxyDisclosure
-        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -540,274 +339,15 @@ private final class OnboardingCellularFieldView: UIView {
     }
 }
 
-private struct ProxyDisclosureDiagram: View {
-    var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "person.fill")
-            Image(systemName: "arrow.right")
-            Image("OxIcon")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-            Image(systemName: "arrow.right")
-            Image(systemName: "globe")
-        }
-        .font(Theme.Icons.lg)
-        .foregroundStyle(Theme.Colors.onSurface)
-        .frame(maxWidth: .infinity, minHeight: 92)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct OnboardingCommunityLinks: View {
-    var body: some View {
-        HStack(spacing: Theme.Spacing.xl) {
-            Link(destination: OxLinks.discord) {
-                Label {
-                    Text("Discord")
-                } icon: {
-                    Image("DiscordIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                }
-            }
-            .frame(minHeight: Theme.Size.minimumTouchTarget)
-            .contentShape(Rectangle())
-            .accessibilityIdentifier(A11yID.Onboarding.discord)
-
-            Link(destination: OxLinks.github) {
-                Label {
-                    Text("GitHub")
-                } icon: {
-                    Image("GitHubIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                }
-            }
-            .frame(minHeight: Theme.Size.minimumTouchTarget)
-            .contentShape(Rectangle())
-            .accessibilityIdentifier(A11yID.Onboarding.github)
-        }
-        .font(.system(size: 12, weight: .semibold, design: .rounded))
-        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-    }
-}
-
-private struct WebsitesDemo: View {
-    private struct Website {
-        let title: String
-        let domain: String
-    }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(ServiceManager.self) private var manager
-    let height: CGFloat
-
-    private let websites = [
-        Website(title: "Google", domain: "google.com"),
-        Website(title: "Amazon", domain: "amazon.com"),
-        Website(title: "Airbnb", domain: "www.airbnb.com"),
-        Website(title: "Instagram", domain: "instagram.com"),
-        Website(title: "GitHub", domain: "github.com"),
-        Website(title: "Gmail", domain: "mail.google.com"),
-        Website(title: "LinkedIn", domain: "linkedin.com"),
-        Website(title: "Wikipedia", domain: "en.wikipedia.org"),
-        Website(title: "X", domain: "x.com"),
-        Website(title: "Perplexity", domain: "www.perplexity.ai"),
-        Website(title: "Apple Developer", domain: "developer.apple.com"),
-        Website(title: "App Store Connect", domain: "appstoreconnect.apple.com"),
-        Website(title: "Chase Travel", domain: "chase.com"),
-        Website(title: "Bank of America", domain: "secure.bankofamerica.com"),
-        Website(title: "American Express", domain: "americanexpress.com"),
-        Website(title: "Hacker News", domain: "news.ycombinator.com"),
-        Website(title: "FlightAware", domain: "www.flightaware.com"),
-        Website(title: "USCIS", domain: "www.uscis.gov"),
-        Website(title: "DoorDash", domain: "www.doordash.com"),
-        Website(title: "Facebook", domain: "www.facebook.com")
-    ]
-
-    private var repeatedWebsites: [Website] { websites + websites + websites }
-    private var gridSize: CGFloat {
-        height
-    }
-    private var columns: [GridItem] {
-        Array(
-            repeating: GridItem(.fixed(iconSize), spacing: Theme.Spacing.sm),
-            count: 4
-        )
-    }
-    private var iconSize: CGFloat {
-        (gridSize - Theme.Spacing.sm * 3) / 4
-    }
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-                    ForEach(Array(repeatedWebsites.enumerated()), id: \.offset) { index, website in
-                        WebsiteDemoIcon(title: website.title, domain: website.domain, size: iconSize)
-                            .id(index)
-                    }
-                }
-            }
-            .scrollDisabled(true)
-            .scrollIndicators(.hidden)
-            .frame(width: gridSize, height: gridSize)
-            .clipped()
-            .task {
-                var position = 0
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1.4))
-                    guard !Task.isCancelled else { return }
-                    position += 4
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.45)) {
-                        proxy.scrollTo(position, anchor: .top)
-                    }
-                    if position == websites.count {
-                        try? await Task.sleep(for: .seconds(0.5))
-                        guard !Task.isCancelled else { return }
-                        position = 0
-                        proxy.scrollTo(position, anchor: .top)
-                    }
-                }
-            }
-        }
-        .frame(width: height, height: height)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: websites.map(\.domain).joined(separator: ", ")))
-        .accessibilityIdentifier(A11yID.Onboarding.websitesDemo)
-        .task {
-            if manager.services.isEmpty {
-                let locale = AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
-                await manager.refreshServices(locale: locale)
-            }
-        }
-    }
-}
-
-private struct WebsiteDemoIcon: View {
-    let title: String
-    let domain: String
-    let size: CGFloat
-    @Environment(ServiceManager.self) private var manager
-
-    private var service: Service? {
-        manager.services.first { $0.domain == domain }
-    }
-
-    var body: some View {
-        Group {
-            if let service {
-                ServiceAvatar(
-                    service: service,
-                    size: size,
-                    shape: .roundedRect(Theme.Radius.md),
-                    monogramSize: 13
-                )
-            } else {
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .fill(Theme.Colors.primary.opacity(0.12))
-                    .frame(width: size, height: size)
-                    .overlay {
-                        Text(verbatim: String(title.prefix(1)))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Theme.Colors.primary)
-                    }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-
 private struct OnboardingCTAButton: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Fonts.labelMd)
             .foregroundStyle(Theme.Colors.onPrimary)
-            .padding(.vertical, 10)
-            .padding(.horizontal, Theme.Spacing.xl)
-            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .background(
-                (configuration.isPressed ? Theme.Colors.primaryPressed : Theme.Colors.primary),
+                configuration.isPressed ? Theme.Colors.primaryPressed : Theme.Colors.primary,
                 in: Capsule(style: .continuous)
             )
-            .opacity(isEnabled ? 1 : 0.35)
-    }
-}
-
-private struct ApprovalDemo: View {
-    @State private var answer: String?
-
-    private var options: [String] {
-        [L10n.string("Approve"), L10n.string("Always approve"), L10n.string("Deny")]
-    }
-    private var prompt: String { L10n.string("Allow \("Amazon: Place order")?") }
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            if let answer {
-                Text("You replied: \(answer)")
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.vertical, 2)
-            } else {
-                Text(prompt)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                PermissionActionButtons(options: options, onSelect: resolve)
-            }
-        }
-        .padding(Theme.Spacing.lg)
-        .frame(maxWidth: .infinity)
-        .background {
-            Color.clear.glassEffect(
-                .regular.tint(Theme.Colors.surface.dynamic),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-            )
-        }
-    }
-
-    private func resolve(_ opt: String) {
-        Haptics.impact(.selectionConfirmed)
-        withAnimation(.easeOut(duration: 0.25)) { answer = opt }
-    }
-}
-
-private struct ProviderPickerButton: View {
-    let onPick: (String, String) -> Void
-    @State private var showPicker = false
-
-    private var registry: ProviderRegistry { .shared }
-
-    var body: some View {
-        Button { showPicker = true } label: {
-            Text("Choose your model")
-        }
-        .buttonStyle(OnboardingCTAButton())
-        .accessibilityIdentifier(A11yID.Onboarding.chooseAI)
-        .sheet(isPresented: $showPicker) {
-            NavigationStack {
-                ModelPickerContent(
-                    title: L10n.string("Choose your model"),
-                    activeSelection: registry.defaultModel
-                ) { client, model, selection in
-                    Log.ui.info("Onboarding.pick client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
-                    registry.select(model, in: client.id, region: selection.region)
-                    onPick(client.displayName, model.displayName)
-                    showPicker = false
-                }
-            }
-            .presentationBackground(Theme.Colors.background)
-            .environment(\.locale, AppLocale.shared.locale)
-        }
     }
 }

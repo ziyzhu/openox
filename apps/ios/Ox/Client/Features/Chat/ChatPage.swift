@@ -190,6 +190,8 @@ struct ChatPage: View {
     let onInitialTranscriptPresented: () -> Void
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.appTheme) private var appTheme
+    private var providerRegistry: ProviderRegistry { .shared }
+    private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
     @State private var composer = ChatComposerModel()
     @State private var speechInput = ChatSpeechInput()
@@ -375,7 +377,7 @@ struct ChatPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let activeInteractionID = interactionID(for: interaction)
-        let showsComposer = interaction == nil
+        let showsComposer = interaction == nil && isModelConfigured
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ChatViewportLayout.responseComposerSpacing
             + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
@@ -692,6 +694,7 @@ struct ChatPage: View {
             chat: chat,
             blockCount: blockCount,
             hasArtifacts: !chatArtifacts.isEmpty,
+            showsModelPicker: isModelConfigured,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onToggleTemporary: onToggleTemporary,
@@ -1305,11 +1308,29 @@ struct ChatPage: View {
 
     @ViewBuilder
     private var emptyChatState: some View {
-        if chat.isTemporary {
+        if !isModelConfigured {
+            modelSetupState
+        } else if chat.isTemporary {
             temporaryEmptyState
         } else {
             persistedEmptyState
         }
+    }
+
+    private var modelSetupState: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            Text("Choose a model to start chatting.")
+                .font(Theme.Fonts.headline)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .multilineTextAlignment(.center)
+            Button("Choose a model") { modalPresentation = .modelPicker }
+                .font(Theme.Fonts.labelMd)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.Colors.primary)
+                .accessibilityIdentifier(A11yID.Chat.modelSetup)
+        }
+        .padding(.horizontal, Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .center)
     }
 
     private var persistedEmptyState: some View {
