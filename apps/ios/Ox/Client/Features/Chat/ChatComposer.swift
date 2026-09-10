@@ -1284,7 +1284,7 @@ private struct ServicePickerPanel: View {
 
     @State private var results: [ServiceManager.ServiceMatch] = []
     @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var headerHeight: CGFloat = 44
+    @ScaledMetric(relativeTo: .body) private var headerHeight: CGFloat = 52
 
     private let maxResults = 40
 
@@ -1325,12 +1325,14 @@ private struct ServicePickerPanel: View {
     }
 
     private var header: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             Text("Services")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .padding(.top, Theme.Spacing.sm)
             Spacer(minLength: 0)
             exploreButton
+                .padding(.top, Theme.Spacing.sm)
         }
         .padding(.horizontal, Theme.Spacing.md)
     }
@@ -1342,7 +1344,7 @@ private struct ServicePickerPanel: View {
                 .frame(
                     width: Theme.Size.minimumTouchTarget,
                     height: Theme.Size.minimumTouchTarget,
-                    alignment: .trailing
+                    alignment: .topTrailing
                 )
                 .contentShape(Rectangle())
         }
