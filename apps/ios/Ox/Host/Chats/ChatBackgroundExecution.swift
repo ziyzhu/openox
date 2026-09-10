@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class ChatBackgroundExecution {
     private static var title: String { String(localized: "Ox is plowing") }
+    private static let activityPulseInterval = Duration.seconds(15)
 
     enum Phase: String {
         case thinking
@@ -34,6 +35,7 @@ final class ChatBackgroundExecution {
     private var terminalResult: Bool?
     private var completedUnits: Int64 = 0
     private var lastProgressAt: Date?
+    private var activityPulse: Task<Void, Never>?
     private var onExpiration: (() -> Void)?
 
     init(chatID: UUID, runID: RunID, onExpiration: @escaping () -> Void) {
@@ -104,6 +106,8 @@ final class ChatBackgroundExecution {
         guard terminalResult == nil else { return }
         terminalResult = success
         onExpiration = nil
+        activityPulse?.cancel()
+        activityPulse = nil
         if let task {
             let total = max(completedUnits + 1, 1)
             task.progress.totalUnitCount = total
@@ -126,6 +130,17 @@ final class ChatBackgroundExecution {
             return
         }
         self.task = task
+        activityPulse = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: Self.activityPulseInterval)
+                } catch {
+                    return
+                }
+                guard let self else { return }
+                self.advance()
+            }
+        }
         task.updateTitle(Self.title, subtitle: phase.subtitle)
         task.progress.totalUnitCount = max(completedUnits + 1, 1)
         task.progress.completedUnitCount = completedUnits
@@ -141,12 +156,15 @@ final class ChatBackgroundExecution {
 
     private func expire() {
         guard terminalResult == nil else { return }
-        terminalResult = true
+        terminalResult = false
+        activityPulse?.cancel()
+        activityPulse = nil
         let expiration = onExpiration
         onExpiration = nil
         expiration?()
-        task?.setTaskCompleted(success: true)
+        task?.setTaskCompleted(success: false)
         task = nil
-        Log.session.warning("ChatBackground.expire chat=\(chatID) run=\(runID.rawValue) task=\(identifier)")
+        let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
+        Log.session.warning("ChatBackground.expire chat=\(chatID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
     }
 }

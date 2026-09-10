@@ -1514,6 +1514,7 @@ final class Chat: Identifiable {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
             registerAgentDelta()
+            runState.backgroundExecution?.advance()
             runState.backgroundExecution?.updatePhase(.responding)
             let chunk = streamedTextBlockIndex == nil || streamedTextBlockIndex == index ? delta : "\n" + delta
             streamedTextBlockIndex = index
@@ -1522,8 +1523,10 @@ final class Chat: Identifiable {
         case .thinkingDelta(_, let delta, _):
             guard !delta.isEmpty else { return }
             registerAgentDelta()
+            runState.backgroundExecution?.advance()
         case .toolCallDelta:
             registerAgentDelta()
+            runState.backgroundExecution?.advance()
             flushBufferedAgentText()
             setRunPhase(.thinking)
         case .start, .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
