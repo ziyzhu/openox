@@ -1283,8 +1283,8 @@ private struct ServicePickerPanel: View {
     @Environment(ServiceManager.self) private var serviceManager
 
     @State private var results: [ServiceManager.ServiceMatch] = []
-    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var headerHeight: CGFloat = 52
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 36
+    @ScaledMetric(relativeTo: .body) private var headerHeight: CGFloat = 30
 
     private let maxResults = 40
 
@@ -1325,28 +1325,18 @@ private struct ServicePickerPanel: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
-            Text("Services")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .padding(.top, Theme.Spacing.sm)
-            Spacer(minLength: 0)
-            exploreButton
-                .padding(.top, Theme.Spacing.sm)
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-    }
-
-    private var exploreButton: some View {
         Button(action: onExplore) {
-            OxActionIcon(.services, size: 20)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .frame(
-                    width: Theme.Size.minimumTouchTarget,
-                    height: Theme.Size.minimumTouchTarget,
-                    alignment: .topTrailing
-                )
-                .contentShape(Rectangle())
+            HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                Text("Services")
+                    .font(Theme.Fonts.labelMd)
+                Spacer(minLength: 0)
+                OxActionIcon(.services, size: 20)
+            }
+            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, 2)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Services")
@@ -1395,8 +1385,8 @@ private struct ServicePickerPanel: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, 8)
-        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .padding(.vertical, 6)
+        .frame(minHeight: rowHeight)
         .contentShape(Rectangle())
     }
 
