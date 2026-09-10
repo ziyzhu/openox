@@ -1,15 +1,18 @@
 ---
 version: alpha
 name: Ox
-description: "A warm, provider-neutral personal assistant for iOS. The look should feel like the fruit it's named for: sun-warm, ripe, and unfussy."
+description: "A warm, provider-neutral personal assistant for iOS. Grounded, capable, and unfussy, with soft shapes and a harvest-gold accent."
 colors:
   primary: "#FFA500"
   primary-pressed: "#D87A0A"
-  surface: "#FFFFFF"
-  surface-sunken: "#FDF2D9"
-  background: "#F5F5F5"
-  on-surface: "#000000"
-  on-surface-muted: "#8E8E93"
+  surface: "#FFFDF7"
+  surface-sunken: "#FBE9C7"
+  chip-on-background: "#FBE9C7"
+  chat-surface: "#FFFFFF"
+  bubble: "#FBE9C7"
+  background: "#FFF6E6"
+  on-surface: "#3A2410"
+  on-surface-muted: "#7A5A3A"
   on-primary: "#FFFDF7"
   error: "#B8422E"
 typography:
@@ -17,44 +20,42 @@ typography:
     fontFamily: SF Pro Rounded
     fontSize: 34px
     fontWeight: 700
-    lineHeight: 1.1
-    letterSpacing: -0.02em
   headline:
     fontFamily: SF Pro Rounded
     fontSize: 22px
     fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: -0.01em
   title:
     fontFamily: SF Pro
     fontSize: 17px
     fontWeight: 600
-    lineHeight: 1.3
   body-md:
     fontFamily: SF Pro
     fontSize: 17px
     fontWeight: 400
-    lineHeight: 1.45
   body-sm:
     fontFamily: SF Pro
     fontSize: 15px
     fontWeight: 400
-    lineHeight: 1.4
   caption:
     fontFamily: SF Pro
-    fontSize: 13px
+    fontSize: 12px
     fontWeight: 400
-    lineHeight: 1.3
+  caption-md:
+    fontFamily: SF Pro
+    fontSize: 12px
+    fontWeight: 600
+  caption-sm:
+    fontFamily: SF Pro
+    fontSize: 11px
+    fontWeight: 600
   label-md:
     fontFamily: SF Pro Rounded
     fontSize: 15px
     fontWeight: 600
-    lineHeight: 1.2
   mono-sm:
     fontFamily: SF Mono
-    fontSize: 13px
+    fontSize: 12px
     fontWeight: 400
-    lineHeight: 1.4
 spacing:
   xs: 4px
   sm: 8px
@@ -75,16 +76,20 @@ components:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
     typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
-    padding: 14px
+    rounded: "{rounded.full}"
+    paddingHorizontal: 12px
+    height: 32px
+    minimumTouchTarget: 44px
   button-primary-pressed:
-    backgroundColor: "{colors.primary-pressed}"
+    backgroundOpacity: 0.7
   button-secondary:
-    backgroundColor: "{colors.surface-sunken}"
+    backgroundColor: "{colors.chip-on-background}"
     textColor: "{colors.on-surface}"
     typography: "{typography.label-md}"
-    rounded: "{rounded.md}"
-    padding: 12px
+    rounded: "{rounded.full}"
+    paddingHorizontal: 12px
+    height: 32px
+    minimumTouchTarget: 44px
   link:
     textColor: "{colors.primary}"
     typography: "{typography.body-md}"
@@ -102,15 +107,31 @@ components:
     textColor: "{colors.on-surface}"
     rounded: "{rounded.md}"
     padding: 12px
-  composer:
+  settings-row:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    padding: 10px
-  toast:
-    backgroundColor: "{colors.on-surface}"
-    textColor: "{colors.surface}"
+    typography: "{typography.body-md}"
     rounded: "{rounded.full}"
-    padding: 12px
+    paddingHorizontal: 20px
+    paddingVertical: 14px
+  composer:
+    backgroundMaterial: regular-glass
+    textColor: "{colors.on-surface}"
+    rounded: "{rounded.xl}"
+  toast:
+    backgroundMaterial: regular-glass
+    textColor: "{colors.on-surface}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+    paddingHorizontal: 14px
+    paddingVertical: 10px
+  toast-error:
+    backgroundMaterial: regular-glass
+    textColor: "{colors.on-surface}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.xl}"
+    paddingHorizontal: 14px
+    paddingVertical: 10px
 ---
 
 # Ox Design System
@@ -119,103 +140,112 @@ components:
 
 Ox is a provider-neutral personal assistant for iOS. Its primary surface is a streaming chat connected to website and device services, user-owned files, memory, and skills. The native app owns navigation, approvals, service handoffs, content libraries, and one compact Shoveler for displaying cards in chat; a card may open one referenced artifact, while agent-created interactive experiences remain self-contained HTML artifacts. The design system must keep those varied surfaces coherent without making the shell feel heavy.
 
-The brand is steady, capable, and warm. **Ox feels grounded and strong without becoming heavy or stern** — a dependable working companion with an easy, informal voice. The warmth lives in the accents rather than the backdrop: surfaces stay clean and neutral so harvest gold and pale hay carry the temperature.
+The brand is steady, capable, and warm. **Ox feels grounded and strong without becoming heavy or stern** — a dependable working companion with an easy, informal voice. The default Ox theme uses cream surfaces, brown text, and harvest gold. Light and Dark offer neutral alternatives with the same warm accent.
 
 The voice is curious and direct. Native screens and agent-created artifacts should prefer **a few large, legible elements over dense layouts**. When in doubt: bigger type, more breathing room, fewer chrome lines.
 
+This document describes the current native implementation and provides defaults for HTML artifacts. Shared native tokens live in [Theme.swift](apps/ios/Ox/Client/UI/Theme.swift); individual components own their layout and state variants. The frontmatter uses the default Ox palette. Its `px` dimensions are CSS equivalents for artifacts; native layout uses points and semantic fonts that support Dynamic Type. Generic card, list-row, and input tokens are artifact defaults, not universal native component styles. Primary and secondary button tokens describe the shared chip buttons; native exceptions are listed below.
+
 ## Colors
 
-The accents come from a warm field palette — harvest gold and pale hay — laid over neutral surfaces so they read cleanly.
+Ox has three explicit themes: **Ox** (`creatorPick`, the default), **Light**, and **Dark**. Ox and Light use the light color scheme; Dark uses the dark color scheme.
 
-- **Primary — Harvest Gold (#FFA500):** The defining accent. Used for primary actions, active states, success, confirmation, and any element that anchors the user's attention. Saturated enough to read on white, never used as a large fill.
+| Token | Ox | Light | Dark |
+| --- | --- | --- | --- |
+| `primary` | `#FFA500` | `#FFA500` | `#F5A030` |
+| `primary-pressed` | `#D87A0A` | `#D87A0A` | `#C77410` |
+| `surface` | `#FFFDF7` | `#FFFFFF` | `#1C1C1E` |
+| `surface-sunken` | `#FBE9C7` | `#F2F2F7` | `#2C2C2E` |
+| `chip-on-background` | `#FBE9C7` | `#FFFFFF` | `#2C2C2E` |
+| `chat-surface` | `#FFFFFF` | `#FFFFFF` | `#0A0A0A` |
+| `bubble` | `#FBE9C7` | `#F2F2F7` | `#1C1C1E` |
+| `background` | `#FFF6E6` | `#F5F5F5` | `#0A0A0A` |
+| `on-surface` | `#3A2410` | `#000000` | `#ECECEC` |
+| `on-surface-muted` | `#7A5A3A` | `#8E8E93` | `#9A9A9A` |
+| `on-primary` | `#FFFDF7` | `#FFFDF7` | `#FFFDF7` |
+| `error` | `#B8422E` | `#B8422E` | `#E25A45` |
 
-Surfaces are three tones, and only three:
+Use `surface` for content and settings rows, `background` for grouped pages, and `chat-surface` for the conversation canvas. `surface-sunken` supports small recessed accents; `bubble` is a separate message token. Chips on grouped pages use `chip-on-background`, which is white in Light and hay in Ox. Composer chips use glass instead of an opaque token fill.
 
-- **Surface — White (#FFFFFF):** The content layer — cards, cells, inputs, and plain full-screen pages, including the chat canvas.
-- **Background — Cloud (#F5F5F5):** The recessed sheet and grouped-screen backdrop. White cards sit on it to create settings-style depth.
-- **Surface Sunken — Hay (#FDF2D9):** The one warm surface — chips, pills, secondary buttons, quiet emphasis. It is reserved for small accents, never whole backgrounds.
-
-A chip always reads as one step off its backdrop: `surface-sunken` (hay) when it sits on white content, but **white (`surface`) when it sits on the grey `background`** of a grouped screen. Same chip, picked to contrast with whatever it's on.
-
-**The rule:** white is content, `background` is the grouped backdrop behind it, `surface-sunken` is anything recessed *inside* content. If you're unsure which a thing is, it's almost always `surface`.
-
-Text sits on these as **On-Surface — Ink (#000000)** for body and **On-Surface Muted (#8E8E93)** for metadata, captions, and disabled states. (Dark mode keeps the warmer near-black surface and cream-on-dark text; the neutral shift is a light-mode choice, but the same three-tone logic holds.)
+Harvest gold marks primary actions, active states, and confirmation. Keep its emphasis selective. Body text uses `on-surface`; metadata and supporting text use `on-surface-muted`. Resolve colors through the selected theme rather than assuming that content is always white or text is always black.
 
 ## Typography
 
-The type system uses Apple's SF Pro families, with **SF Pro Rounded for display and label roles** to keep the strong identity approachable, and **SF Pro for body** so long-form reading stays sharp. SF Mono shows up only for URLs and debug overlays.
+The type system uses **SF Pro Rounded for display and label roles**, SF Pro for body text, and a monospaced system font for URLs, code, and diagnostics. Native tokens use SwiftUI semantic text styles, not fixed pixel sizes or custom line-height and tracking values.
 
-- **Display / Headline:** SF Pro Rounded, semibold to bold, slightly tightened tracking. Used for screen and section titles.
-- **Title:** SF Pro Semibold at body size — for list-row headers and card titles.
-- **Body:** SF Pro Regular at 17px, the iOS native body size. Use it for chat, settings, service content, and artifact prose.
-- **Caption / Muted:** SF Pro at 13–15px in `on-surface-muted` for timestamps, state, provenance, and other supporting metadata.
-- **Label:** SF Pro Rounded Semibold for buttons and chips. Reinforces the friendly tone at the points the user actually touches.
-- **Mono:** SF Mono for URLs, code, and debug surfaces.
+| Token | Native style | Design / weight |
+| --- | --- | --- |
+| `display` | `.largeTitle` | Rounded, bold |
+| `headline` | `.title2` | Rounded, semibold |
+| `title` | `.headline` | Default |
+| `body-md` | `.body` | Default |
+| `body-sm` | `.subheadline` | Default |
+| `caption` | `.caption` | Default |
+| `caption-md` | `.caption` | Semibold |
+| `caption-sm` | `.caption2` | Semibold |
+| `label-md` | `.subheadline` | Rounded, semibold |
+| `mono-sm` | `.caption` | Monospaced |
 
-The agent should not use more than two type sizes per visible region.
+The frontmatter gives nominal artifact sizes; native text scales with the user's text-size setting. Prefer a small number of type roles per visible region. See Apple's [SwiftUI Font documentation](https://developer.apple.com/documentation/swiftui/font) for the native font model.
 
 ## Layout
 
 Ox centers the active conversation and uses a sidebar for chats, artifacts, skills, services, and settings. The sidebar is a full-screen peer page in compact environments and may remain visible beside the chat on regular-width iPad. On compact layouts, a rightward swipe from the workspace opens the sidebar and a leftward swipe returns to the workspace; both pages also keep visible navigation controls. The compact sidebar bottom bar keeps chat search, settings, and new chat within reach, while regular layouts let native search follow the platform toolbar placement. The layout system is deliberately minimal:
 
-- **One reading column.** Chat content and the composer use a centered readable-width column with a 16px phone margin. Full-screen artifacts own their internal responsive layout.
-- **8-based scale with a 4px half-step.** All vertical rhythm is `xs` (4), `sm` (8), `md` (12), `lg` (16), `xl` (24), or `xxl` (32). The default `VStack` spacing is `md` (12).
-- **Generous touch targets.** Any `Button` is at least 44pt tall; the agent should pad rather than shrink.
-- **The composer lives at the bottom.** Service handoffs dock immediately above it; neither surface becomes a persistent card in message history.
+- **One reading column.** The shared readable-width limit is 700pt. Keep equal outer-edge padding; 16pt is the general phone margin, with component-specific insets. Full-screen artifacts own their internal responsive layout.
+- **Shared spacing scale.** Prefer `xs` (4), `sm` (8), `md` (12), `lg` (16), `xl` (24), and `xxl` (32). Native components also use optical and content-specific spacing: transcript blocks use 20pt, and settings rows use 20pt horizontal and 14pt vertical padding. Set stack spacing explicitly for the component.
+- **Generous touch targets.** Target at least 44pt in both dimensions for custom buttons. Shared chip buttons keep a 32pt visual height inside a minimum 44pt target.
+- **The composer lives at the bottom.** It is narrower and centered while empty and unfocused, then expands when active. Its resting width is 84% of the container; horizontal outer padding is 8pt at rest and 12pt when active. Attached services and artifacts sit in a strip above it.
+- **Requests belong to the conversation.** Permission, choice, and service-control surfaces appear as transcript blocks. Service controls remain as inactive history after resolution; authentication and verification do not use a separate transient dock above the composer.
 
-Spacing tokens keep chat, libraries, settings, sheets, and handoff surfaces recognizably part of the same product.
+Settings pages use 20pt horizontal and 16pt vertical padding, with 32pt between sections and 8pt between a section header and its content.
 
 ## Elevation & Depth
 
-Ox is a **flat, tonal design** — no drop shadows, no borders. Depth comes from the three-surface stack:
+Ox combines **tonal content surfaces with Liquid Glass controls and overlays**. Grouped pages place `surface` content on `background`; the chat canvas uses `chat-surface`. Navigation controls, the composer, composer chips, request surfaces, and toasts use regular glass, with interactive glass on applicable controls. Glass is a material, so its appearance depends on the content behind it. See Apple's [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views).
 
-- Plain screens, sheets, and the chat canvas sit on `surface` (white).
-- Grouped screens put their cards on `surface` and the page behind them on `background` (cloud) — the white-on-cloud contrast is the only separation needed.
-- Small recessed accents — chips, pills, secondary buttons — use `surface-sunken` (pulp).
-
-Layers are told apart by tone alone. A card never gets a hairline and an input never gets a ring; if two things need separating, change the tone, don't draw a line. If a future feature genuinely needs a shadow (a sheet, a popover), keep it soft and low-opacity.
+Prefer tone and spacing for ordinary content separation. Native settings groups and structured content can use dividers. The hold-to-talk overlay uses a subtle 1pt border and soft shadow; its selected actions also use an outline. These are component-specific treatments, not defaults for every card or input.
 
 ## Shapes
 
 The shape language is **soft, broad, and continuous**. Strength comes from stable proportions rather than sharp corners.
 
-- Buttons, inputs, list rows, and cards all use `rounded.md` (12px) by default.
-- Standalone settings rows use capsules, matching the default Liquid Glass shape. Grouped settings surfaces use `rounded.xl` (24px) so multi-row and larger content does not become excessively round.
-- Larger surfaces (cards containing rich content, sheets) use `rounded.lg` (18px).
-- Chips use `rounded.full` and a 32px height. Toasts also use `rounded.full`.
-- Avoid `rounded.sm` (8px) except for nested elements inside an already-rounded container.
-- Never use sharp 90° corners on an interactive element.
-
-There are no borders. Surfaces are separated by tone, not hairlines — an input is a `surface` fill on a `background` page, not a stroked rectangle.
+- Chips and primary chip buttons use capsules with a 32pt visual height. Circular navigation controls use circles.
+- Standalone settings rows and fields use the default glass-effect shape, a capsule, with an opaque `surface` fill. Grouped settings surfaces use `rounded.xl` (24pt).
+- The composer, its draft attachment chips, and hold-to-talk overlay use `rounded.xl` (24pt).
+- Permission, choice, and service-control surfaces use `rounded.lg` (18pt).
+- Shoveler cards use `rounded.md` (12pt).
+- Informational toasts use capsules; error toasts use `rounded.xl` (24pt).
+- Smaller radii support nested thumbnails and service icons. Match the component's role rather than imposing one radius across an entire screen.
 
 ## Components
 
-The component tokens below describe how native SwiftUI surfaces should be styled when they take on common roles. Interactive artifacts use the same visual defaults without pretending to be native controls.
+These descriptions capture native behavior. Interactive artifacts can reuse the palette, typography, and generic frontmatter defaults while keeping their own responsive layout.
 
-- **Button (primary):** Filled `primary`, `on-primary` text, 12px radius, ~14px padding, label typography. One per screen if possible — this is the "bite" action.
-- **Button (secondary):** `surface-sunken` fill, `on-surface` text. Used for everything that isn't the headline action: filters, "show more", view toggles.
+- **Button (primary):** Shared chip buttons use `primary` fill, `on-primary` text, label typography, capsule shape, and 12pt horizontal padding. Onboarding uses a full-width capsule with a minimum 44pt height. Request actions use their own capsule sizing.
+- **Button (secondary):** Shared unfilled chip buttons use `chip-on-background` fill and `on-surface` text. Settings action labels use a capsule with `primary` at 14% opacity and primary-colored text. Composer controls may use interactive glass.
 - **Link:** Inline `primary` color on body type. Used when the agent is surfacing a navigable item from the page (a story title, an author, a comment thread).
-- **List row:** `surface` background, `body-md` text, 12px vertical padding. Rows separate from the `background` page by tone, not by a divider. The default container the agent reaches for when it has a list of N things.
-- **Settings surface:** `surface` background with the same row typography and padding. Use a capsule for standalone rows, fields, and actions to match the default Liquid Glass shape; use the shared `rounded.xl` group shape for multi-row and larger content. Pad row content by 14px on every edge. Inset section headers and supporting copy by 14px to keep their text aligned with row content. Give dividers that same 14px inset on both ends.
-- **Card:** `surface`, `rounded.lg`, 16px padding, sitting on a `background` page. For a single rich item the agent wants to feature (a top story, a summary, a generated answer).
-- **Input:** `surface` fill, 12px radius, no border. Focus is shown by the cursor, not a ring.
-- **Composer:** `surface` background, anchored at the bottom of chat, with attachment, service, text-entry, send, and stop states sized for thumb reach.
-- **Service chip:** `surface-sunken`, `rounded.full`, and 32px height, with the service identity and a trailing authentication status: a muted filled check when signed in, a muted hollow circle when signed out or authentication is unavailable or unnecessary, and a spinner while checking or signing in. A tap opens service details. A long press offers Remove plus the state-appropriate sign-in or sign-out action; loading and sign-in-not-required states are shown disabled.
-- **Scope chip:** `surface-sunken`, `rounded.full`, and 32px height, with the scope identity and a trailing remove action. Scopes wrap within their service row. The matching add chip uses the same shape, fill, typography, and spacing and opens the system picker that creates another scope.
-- **Handoff dock:** A compact glass surface immediately above the composer with one service identity, one short instruction, and one 44pt primary action. Sign-in and verification never become transcript cards; success briefly changes the action to a checkmark, then the dock collapses.
+- **List row:** Native lists use role-specific layouts. For artifact lists, start with `surface`, `body-md`, and 12px padding; settings use the explicit native metrics below.
+- **Settings surface:** Opaque `surface` fill, body row typography, capsules for standalone rows and fields, and `rounded.xl` groups for multi-row content. Row padding is 20pt horizontal and 14pt vertical. Section headers, supporting copy, and dividers use the same 20pt horizontal inset.
+- **Card / Shoveler:** The generic artifact card uses `surface`, `rounded.lg`, and 16px padding. Native Shoveler cards use `background`, `rounded.md`, and 12pt text-content padding. They scroll horizontally with 12pt spacing and widths from 160–280pt; a card can open one referenced artifact.
+- **Input:** Use the containing native component's shape and material: settings fields use settings surfaces and chat entry uses the glass composer. The generic artifact input uses `surface`, a 12px radius, and 12px padding. Keep keyboard focus visible and preserve native editing behavior.
+- **Composer:** Regular glass with a 24pt continuous radius, attachment control, text entry, and send, stop, or attachment-loading states. The strip above it exposes attached services, artifacts, and applicable prompt shortcuts.
+- **Service chip:** A 32pt capsule with service identity and optional authentication status. Composer chips use interactive glass; the shared chip defaults to `surface-sunken` elsewhere. Signed-in or authorized services show a muted filled check; signed-out, unknown, or unavailable states show a hollow circle. Checking and signing in show a cellular-automaton loader. No icon appears when sign-in is not required. A tap opens service details. The current chip has no long-press menu; variants without auth status can expose a trailing remove button.
+- **Service control:** An 18pt rounded glass transcript surface with 12pt padding, service identity, a short instruction, and an active sign-in, verification, or payment action. Only the pending interaction is actionable; older blocks retain their identity and instruction without an action. Verification and payment can show completion checkmarks while resolving; sign-in hides its action on success. The real service page opens in a separate native sheet when needed.
 - **Interactive artifact:** A dedicated full-screen HTML canvas with only Ox's close control above it. The artifact owns its internal visual language, but should default to one phone-width column, native body type, generous targets, and warm accents.
-- **Toast:** Ink-on-hay pill (`on-surface` fill, `surface` text), `rounded.full`. The agent uses these for transient acknowledgements ("Summarizing…").
+- **Toast:** Regular glass, `on-surface` label text, and 14pt horizontal / 10pt vertical padding. Info uses a capsule and primary-colored check icon; errors use a 24pt rounded rectangle and error-colored warning icon. Info dismisses automatically after 1.8 seconds by default; errors stay until dismissed. Toasts can include an Open Settings action.
 
-States are layered onto these via `*-pressed`, `*-disabled` variants that adjust only background or text color — never radius, never size — so the layout doesn't reflow on touch.
+Pressed treatments vary by component: onboarding uses `primary-pressed`, shared chip buttons reduce fill opacity to 0.7, and `OxPressedSurfaceButtonStyle` reduces the whole label's opacity to 0.7. Interactive glass supplies native touch feedback. Preserve target geometry during presses; composer expansion and loading or completion transitions follow the component's explicit state.
 
 ## Do's and Don'ts
 
-- **Do** keep surfaces neutral — white content on a mist `background`. The warmth comes from the orange and the pulp accents, not the backdrop.
-- **Do** use `primary` (Harvest Gold) for at most one element per visible region. It loses meaning the moment there are two.
+- **Do** use theme tokens: warm cream and brown in Ox, neutral surfaces in Light and Dark, and a distinct chat canvas.
+- **Do** give primary emphasis a clear purpose. Avoid making adjacent controls compete for attention.
 - **Do** prefer larger type and fewer items. The agent has license to drop content the user didn't ask for.
 - **Do** use `on-surface` for text and `on-surface-muted` for metadata and disabled states.
-- **Don't** add borders or shadows to separate layers — tone does that. Don't spread `surface-sunken` cream across a whole background; it's a small-accent tone now.
-- **Don't** mix radii on a single screen — pick `md` or `lg` and stay there.
-- **Don't** stack two or more `primary`-colored elements adjacent to each other.
+- **Do** use tonal fills for content and glass for the native controls and overlays described here.
+- **Don't** add decorative borders or shadows to every surface. Preserve purposeful dividers and the hold-to-talk treatments.
+- **Do** choose shapes by component role and keep matching components consistent.
+- **Do** support Dynamic Type and provide generous touch targets around compact visual controls.
 - **Do** keep service pages behind the credential firewall during ordinary assistant work; present the real page only for explicit browsing, authentication, bot control, or payment review.
 - **Don't** use SF Mono outside URLs, code, and debug surfaces — it cools the palette instantly.
