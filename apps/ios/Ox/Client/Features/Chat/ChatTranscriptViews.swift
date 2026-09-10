@@ -230,6 +230,7 @@ private struct ThinkingRow: View {
     let trace: ThinkingTrace
     let startedAt: Date
     let isLive: Bool
+    @Environment(ServiceManager.self) private var serviceManager
 
     private struct LiveAnimation {
         var label: String
@@ -275,7 +276,12 @@ private struct ThinkingRow: View {
     }
 
     private var targetLabel: String { isLive ? liveTargetLabel : settledTargetLabel }
-
+    private var sources: [InvocationFormat.Source]? {
+        guard !isLive,
+              let last = trace.entries.last,
+              case .invocation(let invocation) = last else { return nil }
+        return InvocationFormat.sources(invocation, serviceManager: serviceManager)
+    }
     private func previewLabel(_ entry: TraceEntry) -> String {
         switch entry {
         case let .reasoning(reasoning):
@@ -293,16 +299,29 @@ private struct ThinkingRow: View {
     var body: some View {
         Group {
             if trace.isEmpty {
-                rowContent
+                rowHeader
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(label)
                     .accessibilityIdentifier(A11yID.Chat.activity)
             } else {
-                Button { isExpanded = true } label: {
-                    rowContent
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Button { isExpanded = true } label: {
+                        rowHeader
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(label)
+                    if let sources {
+                        SourceChipList(sources: sources) { source in
+                            SourceChipButton(source: source) {
+                                if let url = source.url {
+                                    LinkOpener.open(url: url, serviceManager: serviceManager)
+                                } else {
+                                    isExpanded = true
+                                }
+                            }
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(label)
             }
         }
         .sheet(isPresented: $isExpanded) {
@@ -311,6 +330,7 @@ private struct ThinkingRow: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.Colors.background)
         }
+        .animation(.easeOut(duration: Theme.Animation.standard), value: isLive)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             let now = Date()
@@ -343,7 +363,7 @@ private struct ThinkingRow: View {
         }
     }
 
-    private var rowContent: some View {
+    private var rowHeader: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.sm) {
             if showsLoader {
                 CellularAutomatonLoader.small
@@ -372,7 +392,6 @@ private struct ThinkingRow: View {
             }
             Spacer(minLength: 0)
         }
-        .animation(.easeOut(duration: Theme.Animation.standard), value: isLive)
         .frame(maxWidth: .infinity, minHeight: singleLineHeight, alignment: .leading)
         .contentShape(
             Rectangle().inset(
@@ -523,6 +542,7 @@ private struct ThinkingSheet: View {
 private struct TraceRow: View {
     let entry: TraceEntry
     let isLast: Bool
+    @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serviceManager
 
     var body: some View {
@@ -538,33 +558,55 @@ private struct TraceRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         case let .invocation(invocation):
-            NavigationLink(value: invocation) {
-                railed(node: { InvocationNode(invocation: invocation) }) {
-                    HStack(alignment: .center, spacing: Theme.Spacing.sm) {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            railed(node: { InvocationNode(invocation: invocation) }) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    NavigationLink(value: invocation) {
+                        HStack(alignment: .center, spacing: Theme.Spacing.sm) {
                             Text(InvocationFormat.humanLabel(invocation))
                                 .font(Theme.Fonts.bodyMd)
                                 .foregroundStyle(Theme.Colors.onSurface)
                                 .lineLimit(3)
                                 .truncationMode(.tail)
                                 .contentTransition(.opacity)
-                            if let source = InvocationFormat.source(invocation, serviceManager: serviceManager) {
-                                SourceChip(source: source)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(Theme.Icons.sm)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        }
+                        .frame(minHeight: Theme.Size.minimumTouchTarget)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
+                        SourceChipList(sources: sources) { source in
+                            if let url = source.url {
+                                SourceChipButton(source: source) {
+                                    open(url)
+                                }
+                            } else {
+                                NavigationLink(value: invocation) {
+                                    SourceChip(source: source)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(minHeight: Theme.Size.minimumTouchTarget)
+                                .contentShape(Rectangle())
+                                .accessibilityLabel(source.accessibilityLabel)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "chevron.right")
-                            .font(Theme.Icons.sm)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
-                    .frame(minHeight: 22)
-                    .animation(.easeInOut(duration: 0.16), value: invocation)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.easeInOut(duration: 0.16), value: invocation)
             }
-            .buttonStyle(.plain)
-            .frame(minHeight: Theme.Size.minimumTouchTarget, alignment: .top)
-            .contentShape(Rectangle())
             .accessibilityIdentifier(A11yID.Chat.step(InvocationFormat.iconKind(invocation).rawValue))
+        }
+    }
+
+    private func open(_ url: URL) {
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            LinkOpener.open(url: url, serviceManager: serviceManager)
         }
     }
 
@@ -626,16 +668,92 @@ private struct SourceChip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            if let service = source.service {
+            switch source.icon {
+            case .none:
+                EmptyView()
+            case .domain(let domain):
+                DomainFavicon(domain: domain, size: 16)
+            case .service(let service):
                 ServiceAvatar(service: service, size: 20, shape: .roundedRect(4), monogramSize: 11)
             }
             Text(source.label)
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
         .padding(.leading, 8)
         .padding(.trailing, 10)
         .chipSurface(Theme.Colors.onSurfaceMuted.opacity(0.1))
+    }
+}
+
+private struct SourceChipButton: View {
+    let source: InvocationFormat.Source
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            SourceChip(source: source)
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .contentShape(Rectangle())
+        .accessibilityLabel(source.accessibilityLabel)
+    }
+}
+
+private struct SourceChipList<Chip: View>: View {
+    let sources: [InvocationFormat.Source]
+    let chip: (InvocationFormat.Source) -> Chip
+
+    init(
+        sources: [InvocationFormat.Source],
+        @ViewBuilder chip: @escaping (InvocationFormat.Source) -> Chip
+    ) {
+        self.sources = sources
+        self.chip = chip
+    }
+
+    var body: some View {
+        ChipFlowLayout(spacing: Theme.Spacing.xs) {
+            ForEach(sources.indices, id: \.self) { index in
+                chip(sources[index])
+            }
+        }
+    }
+}
+
+private struct DomainFavicon: View {
+    let domain: String
+    let size: CGFloat
+
+    var body: some View {
+        AsyncImage(url: faviconURL, transaction: Transaction(animation: .easeOut(duration: Theme.Animation.quick))) { phase in
+            if case .success(let image) = phase {
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .transition(.opacity)
+            } else {
+                Image(systemName: "globe")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(2)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    private var faviconURL: URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = domain
+        components.path = "/favicon.ico"
+        return components.url
     }
 }
 
@@ -732,25 +850,81 @@ private enum InvocationFormat {
     }
 
     struct Source {
+        enum Icon {
+            case none
+            case domain(String)
+            case service(Service)
+        }
+
         let label: String
-        let service: Service?
+        let icon: Icon
+        let url: URL?
+        let accessibilityLabel: String
+
+        init(label: String, icon: Icon, url: URL? = nil, accessibilityLabel: String? = nil) {
+            self.label = label
+            self.icon = icon
+            self.url = url
+            self.accessibilityLabel = accessibilityLabel ?? label
+        }
     }
 
-    static func source(_ invocation: Invocation, serviceManager: ServiceManager) -> Source? {
+    static func sources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
         let args = invocation.args.objectValue
         switch InvocationName(rawValue: invocation.name) {
+        case .webSearch:
+            if let sources = searchSources(invocation), !sources.isEmpty {
+                return sources
+            }
+            let query = args?["query"]?.stringValue ?? ""
+            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
+        case .webFetch:
+            guard let source = fetchSource(invocation) else { return nil }
+            return [source]
         case .serviceFind:
             let query = args?["query"]?.stringValue ?? ""
-            return query.isEmpty ? nil : Source(label: query, service: nil)
+            return query.isEmpty ? nil : [Source(label: query, icon: .none)]
         case .serviceAttach, .serviceValidate, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach:
             guard let domain = args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
             let service = serviceManager.service(domain: domain)
-            return Source(label: service?.title ?? domain, service: service)
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
         default:
             guard let domain = invokeDomain(invocation.name) else { return nil }
             let service = serviceManager.service(domain: domain)
-            return Source(label: service?.title ?? domain, service: service)
+            return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
         }
+    }
+
+    private static func searchSources(_ invocation: Invocation) -> [Source]? {
+        guard case .succeeded(let result?) = invocation.outcome,
+              let items = result.objectValue?["items"]?.arrayValue else { return nil }
+        return items.compactMap { item in
+            guard let value = item.objectValue?["url"]?.stringValue,
+                  let url = URL(string: value),
+                  let domain = domain(url) else { return nil }
+            let title = item.objectValue?["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let accessibilityLabel = title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" }
+            return Source(label: domain, icon: .domain(domain), url: url, accessibilityLabel: accessibilityLabel)
+        }
+    }
+
+    private static func fetchSource(_ invocation: Invocation) -> Source? {
+        let argsURL = invocation.args.objectValue?["url"]?.stringValue
+        let finalURL: String? = if case .succeeded(let result?) = invocation.outcome {
+            result.objectValue?["url"]?.stringValue
+        } else {
+            nil
+        }
+        guard let value = finalURL ?? argsURL,
+              let url = URL(string: value),
+              let domain = domain(url) else { return nil }
+        return Source(label: domain, icon: .domain(domain), url: url)
+    }
+
+    private static func domain(_ url: URL) -> String? {
+        guard let domain = url.host(percentEncoded: false)?.lowercased(),
+              !domain.isEmpty else { return nil }
+        return domain
     }
 
     private static func invokeDomain(_ name: String) -> String? {
