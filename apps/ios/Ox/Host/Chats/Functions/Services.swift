@@ -138,6 +138,7 @@ extension Chat {
             } else {
                 setAttachedServices(attachedServices + [service])
             }
+            await service.resolveAccess(reason: .attach)
             guard case .object(var result) = try Self.encodeToJSON(service.snapshot(attached: true)) else {
                 throw RuntimeError.bridge("ox.service.attach: failed to encode service snapshot")
             }

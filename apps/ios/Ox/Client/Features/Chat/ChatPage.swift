@@ -1462,7 +1462,7 @@ struct ChatPage: View {
         await withTaskGroup(of: Void.self) { group in
             for service in chat.attachedServices {
                 group.addTask { @MainActor in
-                    await service.resolveSignInState(reason: .chatOpen)
+                    await service.resolveAccess(reason: .chatOpen)
                 }
             }
         }

@@ -2638,7 +2638,7 @@ final class Chat: Identifiable {
         if servicesAttached {
             serviceManager.setAttachedServices(services, for: id)
             for service in added {
-                Task { await service.resolveSignInState(reason: .attach) }
+                Task { await service.resolveAccess(reason: .attach) }
             }
         }
         for svc in services {
