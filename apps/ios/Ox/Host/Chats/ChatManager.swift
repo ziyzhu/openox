@@ -669,7 +669,7 @@ final class ChatManager {
             let outcome = await group.next() ?? .cancelled
             group.cancelAll()
             if case .failed = outcome, chat.hasPendingInteraction {
-                chat.cancelAll()
+                Log.session.info("ChatManager.scheduled paused chat=\(chat.id) reason=pendingInteraction")
             }
             return outcome
         }
