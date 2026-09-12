@@ -573,8 +573,12 @@ private struct TraceRow: View {
                                 .font(Theme.Icons.sm)
                                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         }
-                        .frame(minHeight: Theme.Size.minimumTouchTarget)
-                        .contentShape(Rectangle())
+                        .frame(minHeight: 22)
+                        .contentShape(
+                            Rectangle().inset(
+                                by: -(Theme.Size.minimumTouchTarget - 22) / 2
+                            )
+                        )
                     }
                     .buttonStyle(.plain)
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
@@ -595,7 +599,11 @@ private struct TraceRow: View {
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: isLast ? Theme.Size.minimumTouchTarget : nil,
+                    alignment: .topLeading
+                )
                 .animation(.easeInOut(duration: 0.16), value: invocation)
             }
             .accessibilityIdentifier(A11yID.Chat.step(InvocationFormat.iconKind(invocation).rawValue))
