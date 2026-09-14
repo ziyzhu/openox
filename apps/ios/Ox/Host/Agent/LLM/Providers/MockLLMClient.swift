@@ -1262,7 +1262,11 @@ extension Scenario {
 
     static let mcpManagement = Scenario(name: "mcp-management") { ctx in
         guard let output = ctx.resultText("execute") else {
+            #if targetEnvironment(simulator)
             let endpoint = SimEnv.servicesURL(path: "/mcp-a").absoluteString
+            #else
+            let endpoint = "https://example.com/mcp-a"
+            #endif
             return [execute("""
             const endpoint = \(JSONValue.string(endpoint).jsonString());
             const checks = [];
