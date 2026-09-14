@@ -1,142 +1,81 @@
-# Xiaohongshu session lost after sign-in
+# Xiaohongshu loses sign-in on a fresh Ox install
 
 Status: unresolved. Updated September 13, 2026.
 
-A friend using a fresh Ox installation reports that Xiaohongshu appears to
-complete sign-in, but Ox's sign-in window stays open. Reloading that same window
-asks them to sign in again. The cause has not been reproduced or confirmed.
+## Symptoms
 
-## Reported behavior
+On a friend's fresh Ox installation, Xiaohongshu appears to sign in, but the
+sign-in window stays open. Reloading the window asks them to sign in again.
 
-| Detail | Working phone | Failing phone |
-| --- | --- | --- |
-| iOS version | 26.6 | Unknown |
-| Ox version/build | Unknown | Unknown |
-| Installation state | Existing installation; session history unknown | Fresh installation |
-| Sign-in window | Dismisses | Remains open after apparent sign-in |
-| Reload after apparent sign-in | Not separately reported | Asks for sign-in again |
+It works on the reporter's phone running iOS 26.6. The friend's iOS version and
+both Ox builds are unknown. A fresh login on the working phone has not been
+tested, so its existing session may hide the problem.
 
-The working phone has not been tested with a clean Xiaohongshu session. Its
-success does not establish that a fresh login works under the same conditions.
-Safari behavior on the failing phone, login method, network, account verification
-state, and cookie contents have not been inspected.
+## What the code does
 
-## Confirmed code behavior
+- Login and service pages share one
+  [persistent cookie store](../apps/ios/Ox/Host/Services/Web/ServiceWebsiteDataCoordinator.swift).
+- [Reload](../apps/ios/Ox/Host/Services/Web/ServiceHandoffSession.swift) reloads the
+  same page. It does not clear cookies or switch stores.
+- While the login window is open, a separate page checks sign-in roughly every
+  second using the same cookies.
+- The [sign-in check](../repositories/builtin/web/xiaohongshu.com/actions.js)
+  sends `HEAD /notification` and follows redirects. A redirect to `/login` means
+  signed out; staying at `/notification` without a redirect means signed in.
+  Other results are errors. The check logs HTTP status but does not validate it.
+- Ox closes the login window when this check reports signed in, then checks again.
 
-- [ServiceWebsiteDataCoordinator](../apps/ios/Ox/Host/Services/Web/ServiceWebsiteDataCoordinator.swift)
-  creates one persistent `WKWebsiteDataStore(forIdentifier:)`, retains it, and
-  derives its identifier from the app's website-data namespace. Login and service
-  pages receive that store through
-  [ServiceManager](../apps/ios/Ox/Host/Services/ServiceManager.swift). The
-  configuration requests desktop content.
-- [ServiceHandoffSession](../apps/ios/Ox/Host/Services/Web/ServiceHandoffSession.swift)
-  reloads the existing page with `page.reload()`. This path does not replace the
-  data store or explicitly clear cookies.
-- [ServiceFlowSession](../apps/ios/Ox/Host/Services/Web/ServiceFlowSession.swift)
-  owns separate action and visible login pages. They share website storage, but
-  have separate page state and `sessionStorage`.
-- While the login window is open, the handoff requests an authentication probe
-  roughly every second, with at most one handoff probe in flight. It also probes
-  after navigation finishes on the service domain.
-- [Xiaohongshu's getSignInState](../repositories/builtin/web/xiaohongshu.com/actions.js)
-  sends `HEAD https://www.xiaohongshu.com/notification` with credentials included,
-  redirects followed, and caching disabled. A redirect ending at `/login` means
-  signed out. A response without a redirect at `/notification` means signed in.
-  Other destinations produce an error. HTTP status is logged but not validated.
-- [ServiceAuthSession](../apps/ios/Ox/Host/Services/Web/ServiceAuthSession.swift)
-  uses that probe on the separate action page to decide when to complete the
-  visible login flow, then verifies sign-in again.
+These findings describe the reviewed source. The friend's installed build has
+not been checked.
 
-These findings describe the reviewed source, not a verified match to the build
-installed on the failing phone.
+## Explanations that do not fit
 
-## Explanations that do not fit the report
+- **Closing the window too early:** ignoring HTTP status can cause a false
+  sign-in result, but the friend's window never closes.
+- **Old cookies left after clearing data:** WebKit fixed a cookie-deletion bug
+  in [iOS 26.6](https://webkit.org/blog/18178/webkit-features-for-safari-26-6/).
+  It prevents some cookies from being deleted; it does not make new cookies
+  disappear. This is a poor explanation for a fresh install.
+- **An upgrade losing old sessions:** this is a fresh install, and reload does
+  not switch cookie stores.
 
-### Premature dismissal from a false positive
+There is no confirmed iOS-version bug behind this report.
 
-Ignoring HTTP status is a real weakness: an error response that stays at
-`/notification` can be classified as signed in. However, the friend's window
-does not dismiss, so premature dismissal does not explain the reported flow.
+## Possible causes
 
-### Old cookies surviving an attempted reset
+1. Login does not finish or does not issue a usable session cookie.
+2. WebKit rejects the cookie or does not send it on the next request.
+3. Xiaohongshu receives the cookie but rejects or replaces the session.
+4. The background sign-in checks interfere with login by receiving responses
+   that replace shared cookies. This has not been observed.
 
-WebKit had a bug where `getAllCookies()` stripped partition information, causing
-subsequent `deleteCookie()` calls to fail for affected partitioned cookies. Ox's
-cookie-clearing implementation uses this sequence. See the
-[WebKit fix](https://github.com/WebKit/WebKit/commit/29ed7a84dc8525afe42f8a94ebde345c565d067e)
-and the [Safari 26.6 release notes](https://webkit.org/blog/18178/webkit-features-for-safari-26-6/).
+None of these causes is confirmed.
 
-This bug prevents deletion; it does not directly discard newly created cookies.
-There is no evidence that Xiaohongshu uses an affected cookie here or that a
-reset occurred. The fresh-install report makes stale cookies from an earlier Ox
-session a poor explanation. Do not treat this fix, or the working phone's iOS
-version, as evidence of the incident's root cause.
+## Next investigation
 
-### Storage migration or a different cookie store on reload
+Trace one failed login through the first reload:
 
-No store switch or cookie deletion was found on the reload path. A fresh
-installation also provides no reported older Ox session to migrate. The reviewed
-configuration uses WebKit's
-[documented persistent-store API](https://webkit.org/blog/14423/building-profiles-with-new-webkit-api/).
-This source review does not rule out a WebKit runtime failure.
+1. Did the login response issue a session cookie?
+2. Did WebKit store it?
+3. Did the next request send it?
+4. Which response first rejected or replaced the session?
+5. Was that request from the login page or the background check?
 
-## Open hypotheses
+Record timing, status, redirects, and cookie names and attributes. Never log
+cookie values, login codes, authorization headers, or tokens. Keep raw captures
+outside the repository.
 
-The failure appears to concern establishing or accepting a new session. The UI
-alone cannot distinguish these possibilities:
+Existing logs include `getSignInState`, `ServiceAuthSession candidate`,
+`ServiceAuthSession verification`, and `Service.authRetention`. Cookie counts
+alone cannot show what happened to the session cookie.
 
-1. Login never issues a usable session cookie, perhaps because authentication or
-   a verification step is incomplete.
-2. A session cookie is issued but the browser rejects it, stores it under an
-   unexpected scope, or does not send it on the subsequent request.
-3. The browser stores and sends the cookie, but Xiaohongshu rejects the session
-   or replaces it with an unauthenticated session.
-4. Requests from the separate action page interfere with login. The probe follows
-   redirects to `/login` while sharing cookies with the visible page. Cookie
-   replacement by those responses is possible in principle, but has not been
-   observed in this incident.
+Compare fresh logins with background checks enabled and disabled. Also compare
+Safari and Ox on the failing phone. Safari success would help narrow the cause,
+but would not prove an Ox storage bug. Preserve the working session when testing.
+Use Ox's built-in `manage-services` workflow for service changes and verification.
 
-No specific iOS regression, account restriction, or network condition has been
-established as the cause.
+## Work completed
 
-## Evidence needed to resolve it
-
-Capture one failing login from before submission through the first reload, and
-answer these questions in order:
-
-1. Does the successful-looking login response actually issue a session cookie?
-2. Does the WebKit store contain that cookie immediately afterward?
-3. Is it sent on the next authenticated request and on reload?
-4. Which response first rejects, expires, deletes, or replaces the session?
-5. Does that response belong to the visible login page or the background probe?
-
-Record request timing, HTTP status, redirect destination, page role, and cookie
-metadata such as name, domain, path, expiry, Secure, HttpOnly, SameSite, and
-partition information where available. Do not put cookie values, authorization
-headers, login codes, or reusable tokens in logs or this repository. Keep raw
-authenticated diagnostics outside the repository.
-
-Existing logs include `getSignInState: status=... redirected=... path=...`,
-`ServiceAuthSession candidate`, `ServiceAuthSession verification`, and
-`Service.authRetention`. Retention logs contain aggregate cookie counts and
-expiry summaries; they cannot establish whether a particular session cookie was
-issued, accepted, sent, or replaced. They also do not provide a cookie timeline
-for each probe while the login window remains open.
-
-Useful controlled comparisons are a fresh login with background probing disabled
-versus enabled, and a fresh login on the working device versus the failing
-device. Preserve the working session by using an isolated test environment.
-Safari login followed by reload on the failing phone is another useful control,
-but Safari and Ox have different browsing contexts, so success there would not
-by itself prove an Ox cookie-storage defect.
-
-Service exploration, repairs, and live verification must follow the repository's
-Ox chat and built-in `manage-services` workflow. Do not change Xiaohongshu service
-behavior solely to match an unverified hypothesis.
-
-## Investigation scope
-
-The investigation reviewed local source and WebKit documentation. The available
-local Ox hosts had no useful failed Xiaohongshu login trace. The friend's phone
-was not inspected, and no failing login was reproduced. No runtime fix has been
-implemented or verified for this incident.
+Reviewed source and WebKit documentation. Local Ox hosts had no useful failed
+login trace. The friend's phone was not inspected, the failure was not reproduced,
+and no fix has been made.
