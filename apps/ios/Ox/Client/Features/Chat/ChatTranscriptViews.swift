@@ -162,7 +162,7 @@ private struct ServiceInspectorRow: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             if let service {
-                ServiceAvatar(service: service, size: 44, shape: .roundedRect(Theme.Radius.sm), monogramSize: 20)
+                ServiceAvatar(service: service, size: 44, shape: .roundedRect(Theme.Radius.sm))
             } else {
                 Image(systemName: "safari")
                     .font(.title3)
@@ -682,7 +682,7 @@ private struct SourceChip: View {
             case .domain(let domain):
                 DomainFavicon(domain: domain, size: 16)
             case .service(let service):
-                ServiceAvatar(service: service, size: 20, shape: .roundedRect(4), monogramSize: 11)
+                ServiceAvatar(service: service, size: 20, shape: .roundedRect(4))
             }
             Text(source.label)
                 .font(Theme.Fonts.caption)

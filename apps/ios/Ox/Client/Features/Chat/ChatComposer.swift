@@ -1378,7 +1378,7 @@ private struct ServicePickerPanel: View {
 
     private func row(_ match: ServiceManager.ServiceMatch) -> some View {
         HStack(spacing: Theme.Spacing.md) {
-            ServiceAvatar(service: match.service, size: 24, shape: .roundedRect(Theme.Radius.sm), monogramSize: 10)
+            ServiceAvatar(service: match.service, size: 24, shape: .roundedRect(Theme.Radius.sm))
             Text(match.service.title)
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)

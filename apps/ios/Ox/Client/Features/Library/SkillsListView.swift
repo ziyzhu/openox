@@ -498,7 +498,7 @@ private struct SkillServicePicker: View {
     private func row(_ service: Service) -> some View {
         let picked = selected.contains(service.domain)
         return HStack(spacing: Theme.Spacing.md) {
-            ServiceAvatar(service: service, size: 34, shape: .roundedRect(Theme.Radius.sm), monogramSize: 14)
+            ServiceAvatar(service: service, size: 34, shape: .roundedRect(Theme.Radius.sm))
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.title)
                     .font(Theme.Fonts.bodyMd)

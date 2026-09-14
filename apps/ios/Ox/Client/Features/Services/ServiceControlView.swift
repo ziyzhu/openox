@@ -63,8 +63,7 @@ struct ServiceControlView: View {
                 ServiceAvatar(
                     service: service,
                     size: 34,
-                    shape: .roundedRect(Theme.Radius.sm),
-                    monogramSize: 15
+                    shape: .roundedRect(Theme.Radius.sm)
                 )
             } else {
                 Image(systemName: fallbackIconName)

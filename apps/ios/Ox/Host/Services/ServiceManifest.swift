@@ -27,6 +27,8 @@ nonisolated struct GetSignInStateResult: Equatable {
 nonisolated enum ServiceIcon: Equatable, Sendable {
     case asset(String)
     case system(String)
+
+    static let fallback = ServiceIcon.system("network")
 }
 
 nonisolated struct ServiceDefinition: Sendable {
@@ -194,7 +196,7 @@ nonisolated struct ServiceDefinition: Sendable {
             "baseUrl": .string(endpoint.absoluteString),
             "actions": .array([]),
         ])
-        self.source = .mcp(endpoint: endpoint, transport: transport, icon: .asset("MCPFallback"))
+        self.source = .mcp(endpoint: endpoint, transport: transport, icon: .fallback)
         self.repositoryID = repositoryID
         self.domain = domain
         self.name = resolvedName
@@ -230,7 +232,7 @@ nonisolated struct ServiceDefinition: Sendable {
             "baseUrl": .string(descriptor.endpoint.absoluteString),
             "actions": .array(actions.map { .object($0.raw) }),
         ])
-        self.source = .mcp(endpoint: descriptor.endpoint, transport: descriptor.transport, icon: .asset("MCPFallback"))
+        self.source = .mcp(endpoint: descriptor.endpoint, transport: descriptor.transport, icon: .fallback)
         self.repositoryID = metadata?.repositoryID
         self.domain = descriptor.id
         self.name = name

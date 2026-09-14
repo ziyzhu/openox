@@ -13,7 +13,6 @@ struct ServiceAvatar: View {
     let service: Service
     let size: CGFloat
     let shape: ServiceAvatarShape
-    var monogramSize: CGFloat = 22
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -90,7 +89,8 @@ struct ServiceAvatar: View {
     private var content: some View {
         if let favicon {
             Image(uiImage: favicon).resizable().scaledToFill()
-        } else if let icon = service.icon {
+        } else {
+            let icon = service.icon ?? .fallback
             switch icon {
             case .asset(let name):
                 Image(name)
@@ -104,15 +104,7 @@ struct ServiceAvatar: View {
                     .foregroundStyle(Theme.Colors.onPrimary)
                     .padding(size * 0.12)
             }
-        } else {
-            monogram
         }
-    }
-
-    private var monogram: some View {
-        Text(service.monogram)
-            .font(.system(size: monogramSize, weight: .semibold, design: .rounded))
-            .foregroundStyle(Theme.Colors.onPrimary)
     }
 }
 
@@ -254,7 +246,7 @@ struct ServiceChip: View {
     private var label: some View {
         HStack(spacing: 6) {
             if let service {
-                ServiceAvatar(service: service, size: 20, shape: .roundedRect(4), monogramSize: 11)
+                ServiceAvatar(service: service, size: 20, shape: .roundedRect(4))
             }
             Text(title)
                 .font(Theme.Fonts.labelMd)

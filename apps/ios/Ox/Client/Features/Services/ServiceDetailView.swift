@@ -325,8 +325,7 @@ struct ServiceDetailView: View {
             ServiceAvatar(
                 service: service,
                 size: 64,
-                shape: .roundedRect(Theme.Radius.lg),
-                monogramSize: 26
+                shape: .roundedRect(Theme.Radius.lg)
             )
             VStack(alignment: .leading, spacing: 0) {
                 Text(service.title)

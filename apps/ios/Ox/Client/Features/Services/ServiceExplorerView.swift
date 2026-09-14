@@ -277,14 +277,6 @@ struct ServiceExplorerView: View {
             }
     }
 
-    private var mcpAvatar: some View {
-        Image("MCPFallback")
-            .resizable()
-            .scaledToFill()
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-    }
-
     private var connectMCPRow: some View {
         Button {
             endSearch()
@@ -318,8 +310,7 @@ struct ServiceExplorerView: View {
             ServiceAvatar(
                 service: service,
                 size: 44,
-                shape: .roundedRect(Theme.Radius.md),
-                monogramSize: 18
+                shape: .roundedRect(Theme.Radius.md)
             )
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.title)

@@ -16,7 +16,6 @@ final class Service: NSObject, Identifiable {
     let remoteMCPService: RemoteMCPService?
 
     private(set) var title: String
-    private(set) var monogram: String
     private(set) var summary: String
 
     nonisolated var tint: Color { Color(hex: tintHex) }
@@ -533,7 +532,6 @@ final class Service: NSObject, Identifiable {
 
     init(
         definition: ServiceDefinition,
-        monogram: String,
         tint: UInt32,
         manager: ServiceManager
     ) {
@@ -541,7 +539,6 @@ final class Service: NSObject, Identifiable {
         self.title = definition.name
         self.domain = definition.domain
         self.url = definition.baseURL?.absoluteString ?? ""
-        self.monogram = monogram
         self.tintHex = tint
         self.summary = definition.description
         self.definition = definition
@@ -905,10 +902,8 @@ extension Service {
     ]
 
     convenience init(definition: ServiceDefinition, manager: ServiceManager) {
-        let monogram = String(definition.name.unicodeScalars.first.map { String(Character($0)) }?.uppercased() ?? "?")
         self.init(
             definition: definition,
-            monogram: monogram,
             tint: Service.brandedTints[definition.domain] ?? Service.tintFor(seed: definition.domain),
             manager: manager
         )
@@ -943,7 +938,6 @@ extension Service {
         }
         self.definition = localized
         title = localized.name
-        monogram = String(localized.name.unicodeScalars.first.map { String(Character($0)) }?.uppercased() ?? "?")
         summary = localized.description
         Log.service.info("Service.relocalize domain=\(domain) title=\(localized.name)")
     }

@@ -198,7 +198,7 @@ private struct PermissionSourceIcon: View {
     var body: some View {
         Group {
             if let service {
-                ServiceAvatar(service: service, size: 18, shape: .roundedRect(4), monogramSize: 9)
+                ServiceAvatar(service: service, size: 18, shape: .roundedRect(4))
             } else if sourceName == "Ox", let actionIconKind {
                 OxActionIcon(actionIconKind, size: 16)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
