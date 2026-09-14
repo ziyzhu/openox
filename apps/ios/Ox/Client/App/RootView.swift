@@ -133,7 +133,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
             workspace
                 .environment(\.sidebarInteraction, interaction)
                 .safeAreaPadding(safeAreaInsets)
-                .ignoresSafeArea()
+                .ignoresSafeArea(.container)
                 .blur(radius: blurRadius)
                 .offset(x: reduceMotion ? 0 : travel)
                 .opacity(reduceMotion ? 1 - progress : 1)
