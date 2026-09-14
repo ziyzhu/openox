@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 final class ChatBackgroundExecution {
-    private static var title: String { String(localized: "Ox is plowing") }
+    private static var title: String { String(localized: "Ox is on it") }
     private static let activityPulseInterval = Duration.seconds(15)
 
     enum Phase: String {

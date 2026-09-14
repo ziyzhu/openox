@@ -6828,14 +6828,14 @@
         }
       }
     },
-    "Ox is plowing" : {
+    "Ox is on it" : {
       "comment" : "Privacy-safe title for a background chat Live Activity.",
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 正在耕耘"
+            "value" : "Ox 正在处理"
           }
         }
       }
