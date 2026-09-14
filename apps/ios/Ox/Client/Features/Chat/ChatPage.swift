@@ -259,7 +259,6 @@ struct ChatPage: View {
     @State private var showsDelayedActivity = false
 
     @State private var viewportLayout = ChatViewportLayout()
-    @State private var keyboardOverlapGuard = ChatKeyboardOverlapGuard()
     @State private var transcriptWindow = TranscriptWindow()
 
     @Environment(\.displayScale) private var displayScale
@@ -463,9 +462,7 @@ struct ChatPage: View {
                     )
                         .frame(maxWidth: Theme.ContainerWidth.readable)
                         .frame(maxWidth: .infinity)
-                        .offset(y: -keyboardOverlapGuard.correction)
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-                            updateComposerFrame(frame)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
                             scroller.viewportResized()
                         }
                 }
@@ -506,10 +503,7 @@ struct ChatPage: View {
             if phase != .active { speechInput.interrupt() }
         }
         .onChange(of: showsComposer) { _, visible in
-            if !visible {
-                composerFocused = false
-                keyboardOverlapGuard.reset()
-            }
+            if !visible { composerFocused = false }
         }
         .onChange(of: chat.id) { _, _ in
             speechInput.cancel(reason: "chatChanged")
@@ -535,7 +529,6 @@ struct ChatPage: View {
         .onDisappear {
             messageSpeech.stop(reason: "pageDisappear")
             speechInput.cancel(reason: "pageDisappear")
-            keyboardOverlapGuard.reset()
         }
         .task(id: chat.serviceBootstrapRevision) {
             let updated = await chat.syncToMonoRepository()
@@ -1310,12 +1303,7 @@ struct ChatPage: View {
         .frame(maxWidth: Theme.ContainerWidth.readable)
         .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .top)
         .contentShape(Rectangle())
-        .background(
-            KeyboardDismissPadding(
-                padding: viewportLayout.composerHeight,
-                onKeyboardFrameChange: updateKeyboardFrame
-            )
-        )
+        .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
     }
 
     @ViewBuilder
@@ -1473,27 +1461,6 @@ struct ChatPage: View {
                 reduceMotion ? nil : .easeOut(duration: Theme.Animation.standard),
                 value: scroller.showsJumpButton
             )
-    }
-
-    private func updateComposerFrame(_ frame: CGRect) {
-        let previous = keyboardOverlapGuard.correction
-        guard keyboardOverlapGuard.measureComposer(
-            frame,
-            toleratedOverlap: max(viewportLayout.composerHeight, frame.height)
-        ) else { return }
-        logKeyboardCorrection(from: previous)
-    }
-
-    private func updateKeyboardFrame(_ frame: CGRect?) {
-        let previous = keyboardOverlapGuard.correction
-        guard keyboardOverlapGuard.keyboardChanged(to: frame) else { return }
-        logKeyboardCorrection(from: previous)
-    }
-
-    private func logKeyboardCorrection(from previous: CGFloat) {
-        Log.ui.info(
-            "ChatUX.layout chat=\(chat.id) keyboardCorrection=\(previous)->\(keyboardOverlapGuard.correction) focused=\(composerFocused)"
-        )
     }
 
     private var activeInteraction: Chat.Interaction? {
