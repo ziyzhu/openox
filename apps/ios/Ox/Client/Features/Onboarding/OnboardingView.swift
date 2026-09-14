@@ -24,18 +24,18 @@ struct OnboardingView: View {
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
                             symbol: "hammer",
-                            title: "Gains new capabilities",
-                            description: "Ox turns websites into reusable capabilities. Use one that exists, or ask Ox to build a new one."
+                            title: "Connects to any app",
+                            description: "Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly."
                         )
                         OnboardingDisclosureRow(
-                            symbol: "folder",
-                            title: "Yours",
-                            description: "Ox runs on your device and stores your profile in a folder you control. Use any model provider, including free or self-hosted ones."
+                            symbol: "chevron.left.forwardslash.chevron.right",
+                            title: "Free software",
+                            description: "Ox is completely free and open source. You can use any model provider while keeping all your data on device."
                         )
                         OnboardingDisclosureRow(
                             symbol: "hand.raised",
-                            title: "Peace of mind",
-                            description: "Ox asks before using sensitive capabilities, keeps credentials inside the web page, and lets you pull the plug at any time."
+                            title: "Guaranteed safety",
+                            description: "Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time."
                         )
                     }
                     .padding(.top, Theme.Spacing.xxl)
@@ -43,7 +43,7 @@ struct OnboardingView: View {
                     Spacer(minLength: Theme.Spacing.xxl)
 
                     VStack(spacing: Theme.Spacing.lg) {
-                        Text("Ox can act on your behalf and make mistakes. By continuing, you agree to review its work and grant permissions carefully.")
+                        Text("Ox can make mistakes when acting on your behalf. Review its work and grant permissions carefully.")
                             .font(Theme.Fonts.caption)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)

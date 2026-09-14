@@ -486,13 +486,13 @@
         }
       }
     },
-    "Gains new capabilities" : {
+    "Connects to any app" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "获得新能力"
+            "value" : "连接任何应用"
           }
         }
       }
@@ -6728,13 +6728,13 @@
         }
       }
     },
-    "Ox asks before using sensitive capabilities, keeps credentials inside the web page, and lets you pull the plug at any time." : {
+    "Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 会在使用敏感能力前征求你的同意，将凭据保留在网页内，并让你随时停止它。"
+            "value" : "Ox 会在执行任何敏感操作前征求你的同意，隔离存放你的凭据，并让你随时停止它。"
           }
         }
       }
@@ -6871,13 +6871,13 @@
         }
       }
     },
-    "Ox can act on your behalf and make mistakes. By continuing, you agree to review its work and grant permissions carefully." : {
+    "Ox can make mistakes when acting on your behalf. Review its work and grant permissions carefully." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 可以代你操作，也可能出错。继续即表示你同意检查其工作，并谨慎授予权限。"
+            "value" : "Ox 代你操作时也可能出错。请检查它的工作，并谨慎授予权限。"
           }
         }
       }
@@ -6925,13 +6925,13 @@
         }
       }
     },
-    "Ox runs on your device and stores your profile in a folder you control. Use any model provider, including free or self-hosted ones." : {
+    "Ox is completely free and open source. You can use any model provider while keeping all your data on device." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 在你的设备上运行，并将你的配置档案存储在由你控制的文件夹中。你可以使用任何模型提供商，包括免费或自托管模型。"
+            "value" : "Ox 完全免费且开源。你可以使用任何模型提供商，同时将所有数据保留在设备上。"
           }
         }
       }
@@ -6970,13 +6970,13 @@
         }
       }
     },
-    "Ox turns websites into reusable capabilities. Use one that exists, or ask Ox to build a new one." : {
+    "Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 可以将网站转化为可重复使用的能力。你可以使用现有能力，也可以让 Ox 创建新的能力。"
+            "value" : "Ox 可以连接任何应用，用得比你更好。如果缺少某项能力，Ox 可以即时修改自身。"
           }
         }
       }
@@ -7143,13 +7143,13 @@
         }
       }
     },
-    "Peace of mind" : {
+    "Free software" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "让你安心。"
+            "value" : "自由软件"
           }
         }
       }
@@ -11679,13 +11679,13 @@
         }
       }
     },
-    "Yours" : {
+    "Guaranteed safety" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "由你掌控。"
+            "value" : "安全保障"
           }
         }
       }
