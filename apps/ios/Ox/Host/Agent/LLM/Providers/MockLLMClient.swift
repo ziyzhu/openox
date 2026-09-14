@@ -331,6 +331,7 @@ extension Scenario {
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
             Entry("89", "browser PDF — export full page as artifact", .browserPDF),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
+            Entry("92", "MCP management — approve, connect, refresh, replace, and remove", .mcpManagement),
         ]),
     ]
 
@@ -1259,6 +1260,55 @@ extension Scenario {
         return [.say("PASS: 18 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
     }
 
+    static let mcpManagement = Scenario(name: "mcp-management") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            let endpoint = SimEnv.servicesURL(path: "/mcp-a").absoluteString
+            return [execute("""
+            const endpoint = \(JSONValue.string(endpoint).jsonString());
+            const checks = [];
+            const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
+            const rejected = async (call, name) => {
+              let failed = false;
+              try { await call(); } catch { failed = true; }
+              check(failed, name);
+            };
+            await rejected(() => ox.service.create({ kind: "mcp", endpoint: "https://user:password@example.com/mcp", purpose: "Reject embedded credentials" }), "Credential endpoint rejected");
+            await rejected(() => ox.service.create({ kind: "mcp", purpose: "Reject missing endpoint" }), "Missing endpoint rejected");
+            await rejected(() => ox.service.create({ kind: "mcp", endpoint, purpose: "Deny this test connection" }), "Creation denied");
+            const created = await ox.service.create({ kind: "mcp", endpoint, purpose: "Create test MCP connection" });
+            const domain = created.domain;
+            check(created.kind === "mcp" && created.endpoint === endpoint, "MCP connection created");
+            const duplicate = await ox.service.create({ kind: "mcp", endpoint, purpose: "Reuse existing test connection" });
+            check(duplicate.domain === domain, "Duplicate endpoint reused");
+            await ox.service.attach({ domain, purpose: "Attach test MCP connection" });
+            const before = await ox.service.inspect({ domain, actions: ["echo"], purpose: "Inspect test MCP tools" });
+            check(Boolean(before.actions.echo), "MCP tools discovered");
+            const result = await ox.service.invoke({ name: "mcp:" + domain + ":echo", input: {message: "MCP lifecycle verified"}, purpose: "Invoke test echo tool" });
+            check(JSON.stringify(result).includes("MCP lifecycle verified"), "MCP tool invoked");
+            await rejected(() => ox.service.update({ domain, endpoint: endpoint.replace("mcp-a", "mcp-fail"), transport: "streamable-http", purpose: "Test failed replacement" }), "Failed replacement rejected");
+            check((await ox.service.listAttached({kind: "mcp", purpose: "Check preserved connection"})).some(x => x.domain === domain), "Failed replacement preserves attachment");
+            const refreshed = await ox.service.update({ domain, transport: "auto", purpose: "Refresh test MCP tools" });
+            check(refreshed.domain === domain, "Refresh preserves service identity");
+            await ox.service.invoke({ name: "mcp:" + domain + ":echo", input: {message: "Refreshed"}, purpose: "Invoke refreshed MCP tool" });
+            const changed = await ox.service.update({ domain, endpoint: endpoint.replace("mcp-a", "mcp-b"), purpose: "Change test MCP endpoint" });
+            check(changed.domain !== domain, "Changed endpoint has new identity");
+            check(!(await ox.service.listAttached({kind: "mcp", purpose: "Check detached old endpoint"})).some(x => x.domain === domain), "Old endpoint detached");
+            await ox.service.attach({ domain: changed.domain, purpose: "Attach replacement MCP connection" });
+            await rejected(() => ox.service.delete({domain: changed.domain, purpose: "Deny this test deletion"}), "Deletion denied");
+            check((await ox.service.listAttached({kind: "mcp", purpose: "Check denied deletion"})).some(x => x.domain === changed.domain), "Denied deletion preserves attachment");
+            await ox.service.delete({ domain: changed.domain, purpose: "Delete test MCP connection" });
+            check(!(await ox.service.listAttached({kind: "mcp", purpose: "Check removed connection"})).some(x => x.domain === changed.domain), "Deleted endpoint detached");
+            await rejected(() => ox.service.invoke({name: "mcp:" + changed.domain + ":echo", input: {message: "removed"}, purpose: "Reject removed MCP tool"}), "Removed tool unavailable");
+            console.log(JSON.stringify({checks}));
+            """)]
+        }
+        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
+              result["checks"]?.arrayValue?.count == 16 else {
+            return [.say("MCP management failed: \(output)"), .stop(.stop)]
+        }
+        return [.say("PASS: 16 MCP lifecycle checks, including denied creation and deletion, failed replacement, refresh, invocation, endpoint change, and removal."), .stop(.stop)]
+    }
+
     static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
@@ -1457,7 +1507,7 @@ extension Scenario {
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
         let userSkill = "- `skills/grocery-planner/SKILL.md` — Plan a weekly grocery list from meals, dietary needs, and pantry items."
         let manageArtifacts = "- `skills/system:manage-artifacts/SKILL.md` — Create, inspect, revise, import, rename, present, attach, or delete Profile artifacts, with specialized guidance for Markdown notes and interactive HTML canvases."
-        let manageServices = "- `skills/system:manage-services/SKILL.md` — Create, inspect, copy, update, verify, version, or delete Ox service definitions and Local web-service source. Do not use merely to invoke a service."
+        let manageServices = "- `skills/system:manage-services/SKILL.md` — Create, inspect, copy, update, verify, version, or delete Ox service definitions, remote MCP connections, and Local web-service source. Do not use merely to invoke a service."
         let manageSkills = "- `skills/system:manage-skills/SKILL.md` — Create, inspect, revise, copy, or delete Profile-owned and Local service-owned skills while respecting read-only system and external service skills."
         let serviceSkill = "- `skills/service:127.0.0.1:sanity/SKILL.md` — Deterministic fixture workflow for validating service skill loading."
         let expectsService = ctx.latestUserSaid("attached")

@@ -110,21 +110,33 @@ nonisolated enum OxServices {
                 (
                     "ox.service.create",
                     .object([
-                        "description": .string("Create a service in the always-available editable Local repository and select it under `services/<kind>/<domain>/`: `await ox.service.create({ kind: \"web\", domain, purpose })`. The user approves service creation. The valid skeleton can then be changed with `ox.fs` tools."),
+                        "description": .string("Create a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. Requires approval. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "kind": .object([
-                                    "type": .string("string"),
-                                    "enum": .array([.string("web")]),
-                                ]),
-                                "domain": .object([
-                                    "type": .string("string"),
-                                    "minLength": .int(3),
-                                    "maxLength": .int(253),
-                                ]),
+                                "kind": .object(["type": .string("string"), "enum": .array([.string("web"), .string("mcp")])]),
+                                "domain": .object(["type": .string("string"), "minLength": .int(3), "maxLength": .int(253)]),
+                                "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048), "description": .string("Public HTTPS MCP endpoint without credentials. Required for MCP; omit domain.")]),
+                                "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
                             ]),
-                            "required": .array([.string("kind"), .string("domain")]),
+                            "required": .array([.string("kind")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
+                    "ox.service.update",
+                    .object([
+                        "description": .string("Update a directly connected MCP service: `await ox.service.update({ domain, endpoint?, transport?, purpose })`. With no settings, reconnects and refreshes tools. Omitted settings are preserved; transport auto enables detection. Requires approval, validates before replacing, and saves immediately. A failed connection leaves the previous service intact. A changed endpoint gets a new domain, clears old local authorization, and must be attached separately; it never inherits old tool approvals. Repository MCP definitions are read-only. For Local web services, edit source with ox.fs instead."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253)]),
+                                "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
+                                "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
+                            ]),
+                            "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["type": .string("object")]),
@@ -152,7 +164,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.delete",
                     .object([
-                        "description": .string("Delete one service from the editable Local repository: `await ox.service.delete({ domain, purpose })`. The user approves deletion. The source and Local package entry become uncommitted Git changes; another enabled repository candidate for the same domain becomes active when available."),
+                        "description": .string("Delete a Local web service or remove a saved MCP connection: `await ox.service.delete({ domain, purpose })`. The user approves deletion. For web services, source deletion becomes an uncommitted Local Git change and another repository candidate may become active. MCP removal is immediate, detaches it from this chat, clears local authorization and tool approvals, and does not revoke access at the server or delete a repository definition."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -443,18 +455,25 @@ nonisolated enum OxServices {
             }
             ctx.setObject(validateBlock as AnyObject, forKeyedSubscript: "__nativeServiceValidate" as NSString)
 
-            let createBlock: @convention(block) (String, String, JSValue) -> JSValue = { kind, domain, purposeValue in
-                env.call { try await $0.createService(kind: kind, domain: domain, purpose: purposeValue.toString()!) }
+            let createBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
+                let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
+                return env.call(suspendingTimeout: true) { try await $0.createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(createBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreate" as NSString)
 
+            let updateBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
+                let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
+                return env.call(suspendingTimeout: true) { try await $0.updateService(domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(updateBlock as AnyObject, forKeyedSubscript: "__nativeServiceUpdate" as NSString)
+
             let copyBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                env.call { try await $0.copyService(domain: domain, purpose: purposeValue.toString()!) }
+                env.call(suspendingTimeout: true) { try await $0.copyService(domain: domain, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(copyBlock as AnyObject, forKeyedSubscript: "__nativeServiceCopy" as NSString)
 
             let deleteBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
-                env.call { try await $0.deleteService(domain: domain, purpose: purposeValue.toString()!) }
+                env.call(suspendingTimeout: true) { try await $0.deleteService(domain: domain, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(deleteBlock as AnyObject, forKeyedSubscript: "__nativeServiceDelete" as NSString)
 
@@ -543,7 +562,7 @@ nonisolated enum OxServices {
 
             let attachBlock: @convention(block) (String, JSValue) -> JSValue = { domain, purposeValue in
                 let purpose = purposeValue.toString()!
-                return env.call { try await $0.attachService(domain: domain, purpose: purpose) }
+                return env.call(suspendingTimeout: true) { try await $0.attachService(domain: domain, purpose: purpose) }
             }
             ctx.setObject(attachBlock as AnyObject, forKeyedSubscript: "__nativeServiceAttach" as NSString)
 
@@ -582,7 +601,8 @@ nonisolated enum OxServices {
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },
-          create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(String(options.kind), String(options.domain), String(options.purpose)); },
+          create: (value) => { const options = __oxOptions(value, 'ox.service.create'); return __nativeServiceCreate(options, String(options.purpose)); },
+          update: (value) => { const options = __oxOptions(value, 'ox.service.update'); return __nativeServiceUpdate(options, String(options.purpose)); },
           copy: (value) => { const options = __oxOptions(value, 'ox.service.copy'); return __nativeServiceCopy(String(options.domain), String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           git: {

@@ -68,6 +68,9 @@ final class ServiceOperations {
 
     func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
         let (service, actionID) = try await resolveAction(name)
+        guard !service.isMCPService || serviceManager.service(domain: service.domain) === service else {
+            throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
+        }
         let input = args ?? .object([:])
         return try await tracked("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
             let approve: @MainActor (String, Any?) async -> Bool = { action, args in
@@ -105,11 +108,23 @@ final class ServiceOperations {
         }
     }
 
-    func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue? {
+    func createService(kind: String, domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
+        if kind == "mcp" {
+            guard domain.isEmpty, let endpoint else {
+                throw RuntimeError.bridge("ox.service.create: MCP requires endpoint and no domain; Ox assigns the service ID.")
+            }
+            return try await saveMCP(endpoint: endpoint, transport: transport, replacing: nil, purpose: purpose)
+        }
+        guard endpoint == nil, transport == nil else {
+            throw RuntimeError.bridge("ox.service.create: endpoint and transport apply only to MCP services.")
+        }
         guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), serviceKind == .web else {
-            throw RuntimeError.bridge("ox.service.create: kind must be 'web'")
+            throw RuntimeError.bridge("ox.service.create: kind must be 'web' or 'mcp'")
         }
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanDomain.isEmpty else {
+            throw RuntimeError.bridge("ox.service.create: web services require domain.")
+        }
         let args: JSONValue = .object(["kind": .string(kind), "domain": .string(cleanDomain)])
         return try await tracked(.serviceCreate, args, purpose: purpose) {
             try await self.requireApproval(action: InvocationName.serviceCreate.rawValue, args: args.toAny())
@@ -123,6 +138,43 @@ final class ServiceOperations {
                 "manifestPath": .string("services/web/\(cleanDomain)/service.json"),
                 "source": .string("local"),
             ])
+        }
+    }
+
+    func updateService(domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
+        let domain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let service = serviceManager.service(domain: domain), let currentEndpoint = service.definition.mcpEndpoint else {
+            throw RuntimeError.bridge("ox.service.update: requires an existing MCP service; edit Local web source with ox.fs.")
+        }
+        return try await saveMCP(
+            endpoint: endpoint ?? currentEndpoint.absoluteString,
+            transport: transport ?? service.definition.mcpTransport?.rawValue,
+            replacing: service,
+            purpose: purpose
+        )
+    }
+
+    private func saveMCP(endpoint: String, transport: String?, replacing: Service?, purpose: String) async throws -> JSONValue? {
+        let endpoint = try RemoteMCPService.endpoint(endpoint)
+        guard transport == nil || transport == "auto" || RemoteMCPTransport(rawValue: transport!) != nil else {
+            throw RuntimeError.bridge("MCP transport must be 'auto', 'streamable-http', or 'sse'.")
+        }
+        let resolvedTransport = transport.flatMap(RemoteMCPTransport.init(rawValue:))
+        let name: InvocationName = replacing == nil ? .serviceCreate : .serviceUpdate
+        var fields: [String: JSONValue] = [
+            "kind": .string("mcp"),
+            "endpoint": .string(endpoint.absoluteString),
+            "transport": .string(transport ?? "auto"),
+        ]
+        if let replacing { fields["domain"] = .string(replacing.domain) }
+        let args: JSONValue = .object(fields)
+        return try await tracked(name, args, purpose: purpose) {
+            try await self.requireApproval(action: name.rawValue, args: args.toAny())
+            let service = try await self.serviceManager.connectRemoteMCP(
+                endpoint.absoluteString, transport: resolvedTransport, replacing: replacing
+            )
+            if let replacing { serviceChanged(replacing.domain) }
+            return try serviceSnapshot(service)
         }
     }
 
@@ -150,9 +202,18 @@ final class ServiceOperations {
     func deleteService(domain: String, purpose: String) async throws -> JSONValue? {
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let currentService = serviceManager.service(domain: cleanDomain)
-        let args: JSONValue = .object(["domain": .string(cleanDomain)])
+        var fields: [String: JSONValue] = ["domain": .string(cleanDomain)]
+        if let endpoint = currentService?.definition.mcpEndpoint {
+            fields["endpoint"] = .string(endpoint.absoluteString)
+        }
+        let args: JSONValue = .object(fields)
         return try await tracked(.serviceDelete, args, purpose: purpose) {
             try await self.requireApproval(action: InvocationName.serviceDelete.rawValue, args: args.toAny())
+            if let currentService, currentService.isMCPService {
+                await self.serviceManager.removeRemoteMCP(currentService)
+                serviceChanged(cleanDomain)
+                return .object(["domain": .string(cleanDomain), "kind": .string("mcp"), "deleted": .bool(true)])
+            }
             let kind = try await self.serviceManager.deleteLocalService(
                 domain: cleanDomain,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -486,6 +547,10 @@ final class ServiceOperations {
             throw RuntimeError.bridge("service snapshot is not an object")
         }
         fields["kind"] = .string(serviceKind(service))
+        if let endpoint = service.definition.mcpEndpoint {
+            fields["endpoint"] = .string(endpoint.absoluteString)
+            fields["transport"] = .string(service.definition.mcpTransport?.rawValue ?? "auto")
+        }
         if case .repository(let id, let provenance) = service.definition.source {
             fields["repository"] = .string(id)
             fields["repositoryProvenance"] = .string(provenance.rawValue)

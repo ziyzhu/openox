@@ -246,18 +246,22 @@ final class ServiceManager {
     func connectRemoteMCP(
         _ rawEndpoint: String,
         transport: RemoteMCPTransport? = nil,
-        allowsAuthorization: Bool = true
+        allowsAuthorization: Bool = true,
+        replacing: Service? = nil
     ) async throws -> Service {
-        let trimmed = rawEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasScheme = trimmed.range(
-            of: "^[A-Za-z][A-Za-z0-9+.-]*://",
-            options: .regularExpression
-        ) != nil
-        let normalized = hasScheme ? trimmed : "https://\(trimmed)"
-        guard let endpoint = URL(string: normalized), endpoint.absoluteString == normalized, endpoint.fragment == nil else {
-            throw RemoteMCPError.invalidEndpoint
+        let endpoint = try RemoteMCPService.endpoint(rawEndpoint)
+        if let replacing {
+            guard replacing.isMCPService,
+                  persistedRemoteMCPServers.contains(where: { $0.endpoint == replacing.definition.mcpEndpoint?.absoluteString }),
+                  !monoRepositoryMCPEndpoints.contains(replacing.definition.mcpEndpoint?.absoluteString ?? "") else {
+                throw RuntimeError.bridge("Only directly connected MCP servers can be updated; repository definitions are read-only.")
+            }
+            guard !services.contains(where: { $0.definition.mcpEndpoint == endpoint && $0 !== replacing }) else {
+                throw RuntimeError.bridge("An MCP service already uses this endpoint.")
+            }
         }
-        let service = services.first(where: { $0.definition.mcpEndpoint == endpoint })
+        let existing = services.first(where: { $0.definition.mcpEndpoint == endpoint })
+        let service = (replacing == nil ? existing : nil)
             ?? Service(
                 definition: ServiceDefinition(mcpEndpoint: endpoint, transport: transport),
                 manager: self
@@ -270,41 +274,53 @@ final class ServiceManager {
         guard service.capabilityState == .ready else {
             throw RemoteMCPError.protocolError("Ox could not load this MCP server's tools")
         }
+        try Task.checkCancellation()
+        if let replacing {
+            if replacing.definition.mcpEndpoint != endpoint {
+                await removeRemoteMCP(replacing)
+            } else {
+                await replacing.remoteMCPService?.deactivate()
+                clearMCPApprovals(replacing)
+                resolvedServices = ResolvedServices(services.filter { $0 !== replacing })
+            }
+        }
         if byDomain[service.domain] == nil {
             resolvedServices = ResolvedServices(services + [service])
             monoRepositoryRevision &+= 1
             reindexMonoRepository()
         }
-        if !persistedRemoteMCPServers.contains(where: { $0.endpoint == endpoint.absoluteString }) {
-            persistedRemoteMCPServers.append(PersistedRemoteMCP(
-                endpoint: endpoint.absoluteString,
-                transport: service.definition.mcpTransport
-            ))
-            persistRemoteMCPServers()
-        }
+        persistedRemoteMCPServers.removeAll { $0.endpoint == endpoint.absoluteString }
+        persistedRemoteMCPServers.append(PersistedRemoteMCP(
+            endpoint: endpoint.absoluteString,
+            transport: service.definition.mcpTransport
+        ))
+        persistRemoteMCPServers()
+        Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil)")
         setSaved(service, true)
         return service
     }
 
-    func removeRemoteMCP(_ service: Service) {
+    func removeRemoteMCP(_ service: Service) async {
         guard service.isMCPService, let endpoint = service.definition.mcpEndpoint else { return }
-        let mcp = service.remoteMCPService
+        await service.remoteMCPService?.remove()
         persistedRemoteMCPServers.removeAll { $0.endpoint == endpoint.absoluteString }
         savedDomains.remove(service.domain)
-        autoApproveActions = autoApproveActions.filter { !$0.hasPrefix("\(service.domain):") }
+        clearMCPApprovals(service)
         if monoRepositoryMCPEndpoints.contains(endpoint.absoluteString) {
-            Task {
-                await mcp?.remove()
-                service.resetMCPCapabilities()
-            }
+            service.resetMCPCapabilities()
         } else {
-            Task { await mcp?.remove() }
             resolvedServices = ResolvedServices(services.filter { $0.domain != service.domain })
         }
         monoRepositoryRevision &+= 1
         persistRemoteMCPServers()
         reindexMonoRepository()
         Log.service.info("RemoteMCP.remove id=\(service.domain) endpoint=\(LogPrivacy.url(service.url))")
+    }
+
+    private func clearMCPApprovals(_ service: Service) {
+        autoApproveActions = autoApproveActions.filter {
+            !$0.hasPrefix("mcp:\(service.domain):") && !$0.hasPrefix("\(service.domain):")
+        }
     }
 
     // An attached service whose origin owns this URL, so a tapped link can open

@@ -5,8 +5,12 @@ extension Chat: OxFunctionBridge {
         try await serviceOperations.validateService(domain: domain, purpose: purpose)
     }
 
-    public func createService(kind: String, domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.createService(kind: kind, domain: domain, purpose: purpose)
+    public func createService(kind: String, domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.createService(kind: kind, domain: domain, endpoint: endpoint, transport: transport, purpose: purpose)
+    }
+
+    public func updateService(domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.updateService(domain: domain, endpoint: endpoint, transport: transport, purpose: purpose)
     }
 
     public func copyService(domain: String, purpose: String) async throws -> JSONValue? {
@@ -14,7 +18,12 @@ extension Chat: OxFunctionBridge {
     }
 
     public func deleteService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.deleteService(domain: domain, purpose: purpose)
+        let result = try await serviceOperations.deleteService(domain: domain, purpose: purpose)
+        if result?.objectValue?["kind"]?.stringValue == "mcp" {
+            let deleted = result?.objectValue?["domain"]?.stringValue
+            setAttachedServices(attachedServices.filter { $0.domain != deleted })
+        }
+        return result
     }
 
     public func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
@@ -89,6 +98,10 @@ extension Chat: OxFunctionBridge {
             throw RuntimeError.bridge("service snapshot is not an object")
         }
         fields["kind"] = .string(serviceKind(service))
+        if let endpoint = service.definition.mcpEndpoint {
+            fields["endpoint"] = .string(endpoint.absoluteString)
+            fields["transport"] = .string(service.definition.mcpTransport?.rawValue ?? "auto")
+        }
         if case .repository(let id, let provenance) = service.definition.source {
             fields["repository"] = .string(id)
             fields["repositoryProvenance"] = .string(provenance.rawValue)

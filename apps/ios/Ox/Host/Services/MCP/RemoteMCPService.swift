@@ -849,6 +849,17 @@ final class RemoteMCPService {
         self.isAuthorized = false
     }
 
+    nonisolated static func endpoint(_ raw: String) throws -> URL {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasScheme = trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*://", options: .regularExpression) != nil
+        let normalized = hasScheme ? trimmed : "https://\(trimmed)"
+        guard let url = URL(string: normalized), url.absoluteString == normalized,
+              url.fragment == nil,
+              url.scheme?.lowercased() == "https" || allowsDevelopmentHTTP(url),
+              WebFetchURLPolicy.allows(url) else { throw RemoteMCPError.invalidEndpoint }
+        return url
+    }
+
     func resolve(allowsAuthorization: Bool = false) async throws -> RemoteMCPDescriptor {
         if let descriptor { return descriptor }
         guard endpoint.scheme?.lowercased() == "https" || Self.allowsDevelopmentHTTP(endpoint),

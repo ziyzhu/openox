@@ -45,7 +45,9 @@ extension ServiceOperations {
         case "ox.service.invoke":
             return try await invokeAction(name: fields["name"]?.stringValue ?? "", args: fields["input"], purpose: purpose)
         case "ox.service.create":
-            return try await createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
+            return try await createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purpose)
+        case "ox.service.update":
+            return try await updateService(domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purpose)
         case "ox.service.copy":
             return try await copyService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.delete":

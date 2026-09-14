@@ -3,6 +3,7 @@ import { mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHerdrMCPHandler } from "../apps/cli/src/herdr.ts";
+import { mcpManagementFixture } from "./fixtures/mcp-management.ts";
 import { ROOT } from "./lib.ts";
 import { qaConfig, qaNumberedDevice } from "./qa-config.ts";
 
@@ -43,7 +44,9 @@ try {
     hostname: "127.0.0.1", port: config.registryPort,
     fetch: request => new URL(request.url).pathname === "/mcp"
       ? mcp(request)
-      : fetch(new Request(upstream + new URL(request.url).pathname + new URL(request.url).search, request)),
+      : ["/mcp-a", "/mcp-b", "/mcp-fail"].includes(new URL(request.url).pathname)
+        ? mcpManagementFixture(request)
+        : fetch(new Request(upstream + new URL(request.url).pathname + new URL(request.url).search, request)),
   });
   const endpoint = `http://127.0.0.1:${server.port}/mcp`;
   const domain = "mcp." + createHash("sha256").update(endpoint).digest("hex").slice(0, 16);

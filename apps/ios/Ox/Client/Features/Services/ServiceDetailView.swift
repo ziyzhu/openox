@@ -144,8 +144,10 @@ struct ServiceDetailView: View {
         }
         .alert("Remove MCP server?", isPresented: $confirmRemoveMCP) {
             Button("Remove", role: .destructive) {
-                serviceManager.removeRemoteMCP(service)
-                dismiss()
+                Task {
+                    await serviceManager.removeRemoteMCP(service)
+                    dismiss()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
