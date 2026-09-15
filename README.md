@@ -4,7 +4,7 @@
 
 <h1>OpenOx</h1>
 
-OpenOx: a protocol for an open ecosystem of self-evolving agents.
+Ox is a local, open-source personal AI agent that can connect to any app.
 
 <h3>
 
@@ -21,9 +21,9 @@ OpenOx: a protocol for an open ecosystem of self-evolving agents.
 
 Each self-evolving agent is called an Ox. Every Ox follows three principles.
 
-1. **Acts Everywhere** — Ox turns websites into reusable actions. Use one that already exists or ask Ox to build a new one for you.
-2. **Yours** — Ox runs on your device, keeps your data there, and works with any model, including free or self-hosted ones.
-3. **Peace of Mind** — Ox asks before sensitive actions, keeps account credentials isolated on the web page, and lets you pull the plug at any time.
+1. **Connect to any app** — Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly.
+2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
+3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
 
 The first implementation of Ox is an iOS app whose source code is included in the OpenOx repository. You can [download it through TestFlight](https://testflight.apple.com/join/Y3x7nxj9).
 
