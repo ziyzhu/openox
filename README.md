@@ -25,7 +25,7 @@ Each self-evolving agent is called an Ox. Every Ox follows three principles.
 2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
 3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
 
-The first implementation of Ox is an iOS app whose source code is included in the OpenOx repository. You can [download it through TestFlight](https://testflight.apple.com/join/Y3x7nxj9).
+The first implementation of Ox is an iOS app whose source code is included in the OpenOx repository.
 
 ## Components
 
