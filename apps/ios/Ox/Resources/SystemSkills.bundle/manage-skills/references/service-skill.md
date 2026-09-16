@@ -78,17 +78,17 @@ For deletion, read the skill file and manifest, remove the matching manifest dec
 
 ## 5. Verify activation
 
-1. Read the final source file and manifest back.
+1. Read the resulting manifest and any remaining changed skill source back.
 2. Confirm every named action still exists and its schema supports the instructed use.
 3. Confirm the manifest declares each skill once and every declaration has a matching valid file.
-4. Confirm the Local service remains attached and discoverable.
-5. Read `skills/service:<domain>:<name>/SKILL.md` to prove the service skill is available in this chat.
-6. For creation or revision, recheck the two trigger examples and the boundary example against the final description and instructions. For deletion, prove both the declaration and file are absent.
+4. Call `ox.service.validate({ domain, purpose })`, fix any errors, then `ox.service.attach({ domain, purpose })` to reload the current source. File edits alone do not update mounted skills.
+5. Confirm the Local service is attached and discoverable.
+6. For creation or revision, read `skills/service:<domain>:<name>/SKILL.md` and compare it with the final source; recheck the trigger and boundary examples. For deletion, prove the declaration, source file, and mounted skill are absent.
 
-## 6. Review and commit
+## 6. Review and save
 
-Inspect complete Local Git status and diff. Confirm the change contains the skill file and matching manifest registration, plus only intentional related edits. Commit with approval and a concise message describing the workflow added and why.
+Inspect complete Local Git status and diff. Confirm only intentional skill, manifest, and related edits are included. Ask the user to **Save** the skill changes, with a purpose such as `Save research skill`. After approval, use Local Git internally to persist them; keep Git and revision mechanics internal unless the user asks or recovery requires them.
 
-Report the mounted skill name, trigger, actions used, verified boundaries, committed files, and remaining limitations.
+Report the saved skill name, trigger, actions used, verified boundaries, and remaining limitations. For deletion, report the removed skill instead. Mention source files or revisions only when requested.
 
 If manifest registration fails after creating a new file, correct the manifest and retry. If the draft is abandoned, show every pending Local path before requesting approval for a full Local restore.

@@ -168,6 +168,7 @@ enum ChatPromptComposer {
         - Prefer a suitable attached service. If none fits, call `ox.service.find` before claiming the service or capability is unavailable.
         - When discovery returns a strong match, read its returned `manifestPath` when action details affect selection, then call `ox.service.attach`. Do not ask for duplicate confirmation; the runtime provides the required attachment approval.
         - Say no suitable service exists only after successful discovery returns no relevant match. If discovery is temporarily unavailable, name that blocker instead of claiming the service does not exist.
+        - If successful discovery finds no suitable service for a website task, read `skills/system:manage-services/SKILL.md` to fulfill it through Browser while building a minimal Local service. General public-information questions need no new service.
         - Use public web only when no Ox Server service fits or the user asks; general public-information questions may use it directly.
         """ : ""
         let toolDiscipline = toolsAvailable ? """

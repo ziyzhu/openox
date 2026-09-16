@@ -5,7 +5,7 @@ description: Create, inspect, revise, copy, or delete Profile-owned and Local se
 
 # Manage Skills
 
-Manage reusable agent workflows only when the user explicitly asks for a durable skill change. Default to doing one-time tasks directly and keep durable preferences in memory.
+Create, revise, copy, or delete skills only when the user explicitly asks for a durable skill change. Read-only inspection needs no change request. Do one-time tasks directly and keep durable preferences in memory.
 
 Identify ownership before mutation:
 

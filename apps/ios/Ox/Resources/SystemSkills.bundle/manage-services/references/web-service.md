@@ -1,6 +1,17 @@
 # Web Service
 
-Deliver one useful, verified Local service from live website evidence. Work inside Ox with awaited `ox.*` calls, `ios:browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service action ABI directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
+Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ios:browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service action ABI directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
+
+## Missing-service bootstrap
+
+Use when successful `ox.service.find` finds no suitable service for a website task, not when discovery fails. General public-information questions need no service.
+
+1. Attach Browser and inspect its contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
+2. Answer reads as soon as evidence supports them; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
+3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Creation, attachment, mutation, and Save approvals still apply.
+4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is declined or blocked, continue authorized Browser fulfillment and report the persistence limitation.
+
+Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
 
 ```text
 services/web/<domain>/
@@ -17,13 +28,13 @@ services/web/<domain>/
 5. Choose a bare lowercase service domain that equals or is a parent suffix of every base URL host. Keep distinct products or account surfaces as separate services.
 6. When the service already exists, inspect its manifest and source read-only. Do not copy or edit it yet.
 
-For a new service, defer `ox.service.create` until the action plan is confirmed. For an existing non-Local service, defer `ox.service.copy` until confirmation. Discovery and planning must not leave an abandoned Local draft.
+Defer creation or copying until evidence supports the established action scope. Deliberate authoring also requires plan confirmation below. Discovery alone must not leave a Local draft.
 
-Choose the concise product name users recognize in the service picker. Prefer the canonical brand or product name, such as `Outlook`, over a hostname-derived label such as `Outlook.com`. Include a domain suffix only when it is an inseparable part of the official product name or distinguishes two otherwise ambiguous products.
+Use the recognizable product name, such as `Outlook`, rather than a hostname-derived label. Include a domain suffix only when it is part of the official name or distinguishes otherwise ambiguous products.
 
 Choose the lightest stable top-level `baseUrl` on the service domain or a subdomain that preserves the cookies, storage, page globals, and runtime behavior the actions need. Prefer an inert same-origin resource that returns a displayable `200` without authentication-dependent redirects when the actions need only cookies, storage, and same-origin requests. Stable HTML, text, `robots.txt`, or favicon resources are candidates only after Browser verifies the final URL, dispatcher injection, and required same-origin requests while signed in and signed out. Never use a cross-origin CDN asset as an execution base. Keep actions that depend on application DOM or page globals on the actual application route through an action-specific `baseUrl`. For example, `xiaohongshu.com` can use a page on `www.xiaohongshu.com`, while a distinct creator surface can remain its own service.
 
-Inspect nearby service contracts through their manifests and `ox.service.inspect`:
+Consult one existing service only when it clarifies the implementation. Choose the closest observed pattern:
 
 - `news.ycombinator.com`: public HTML, pagination, authentication, mutation.
 - `github.com`: broad public and signed-in reads.
@@ -33,11 +44,11 @@ Inspect nearby service contracts through their manifests and `ox.service.inspect
 - `oftendining.com`: approved preparation and user-owned payment.
 - `matchatennis.com`: nested schemas.
 
-Read `actions.js` when an example is already Local. Read `skills/system:manage-skills/SKILL.md` later when verified actions need reusable multi-action guidance.
+Inspect the selected manifest and relevant available source; Bundled `actions.js` is readable without copying. Read `skills/system:manage-skills/SKILL.md` only when reusable guidance must be authored around verified actions.
 
 ## 2. Observe the website
 
-Inspect Browser action contracts, then perform the smallest read-only probes that reveal the required behavior.
+Use the smallest read-only Browser probes that reveal the required behavior; bootstrap execution follows the rules above.
 
 1. Start Browser capture in the target state and add a named mark.
 2. Exercise one representative interaction through an inspected Browser action or narrow page JavaScript.
@@ -52,9 +63,9 @@ Cover applicable success, empty, terminal pagination, safe missing-resource, sig
 3. One-shot `window.oxFetchCapture` when the page must generate an inherited signature: register the capture before triggering the request and register a fresh capture for every page.
 4. Stable SPA store or DOM state: navigate within the SPA, invalidate stale state, wait for target-specific identity and freshness, and collect bounded results.
 
-Keep evidence compact: return field names, types, counts, pagination facts, and a small safe sample. Keep cookies, authorization values, CSRF values, reusable tokens, private bodies, and raw signatures out of chat.
+Keep authoring evidence compact: field names, types, counts, pagination facts, and a safe sample. Exclude private bodies, cookies, authorization and CSRF values, reusable tokens, and raw signatures.
 
-On an authenticated page, never return broad `body.innerText`, `textContent`, HTML, private record contents, or similarly unbounded user content to the chat. Probe structural facts such as element presence, selectors, field names, counts, route identity, and bounded non-sensitive values. When private content is necessary to verify extraction, inspect only the minimum value needed and do not echo it in the result.
+On authenticated pages, probe bounded structural facts, not broad `body.innerText`, `textContent`, HTML, or private records. Bootstrap answers may include narrowly requested private values; verification-only probes should not echo them. Keep private values out of source and authoring logs, and never expose credentials.
 
 Preserve a resource-scoped URL only when it is the observed opaque identifier required to revisit that returned item and does not act as a reusable account credential. Pass it intact between actions and keep its token components out of logs and descriptions.
 
@@ -75,7 +86,7 @@ Resolve relative URLs and require a stable public HTTPS square SVG or raster at 
 
 ## 3. Present the action plan
 
-Present:
+For deliberate service authoring, present:
 
 - Service domain, concise product name, description, top-level base URL, and favicon evidence.
 - Every action ID, purpose, and action-specific base URL when needed.
@@ -86,11 +97,11 @@ Present:
 
 Include only actions with an observed extraction path in every authentication state needed for their implementation. Mark hypotheses and inaccessible capabilities as provisional or exclude them from the confirmed surface.
 
-End the response after presenting the plan. Continue authoring only after a later user message explicitly confirms this action surface. Creation approval, plan confirmation, live mutation approval, and saving are separate checkpoints. Call the final checkpoint **Save** in all user-visible text; do not expose Git or commit terminology unless the user asks for technical details.
+End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace creation, mutation, or Save approval.
 
 ## 4. Author service.json
 
-After the plan is confirmed, inspect complete Local Git status. Create the new service with `ox.service.create`, or copy the existing non-Local candidate with `ox.service.copy`, and obtain the required approval. Use the returned domain as the directory, manifest, and runtime identity, then read the generated or copied files before editing.
+Inspect complete Local Git status. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`, obtaining runtime approval. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
@@ -203,11 +214,11 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 2. Call `ox.service.validate` with the Local service's bare domain, then `ox.service.attach`. Validation checks the whole draft without invoking its actions; attach loads it when missing or reloads this chat's existing attachment from the current source. Repeat after another coherent set of edits is ready to test.
 3. Inspect the action index and full contract for every exposed action.
 4. Compare manifest and installer parity: every declared ID has one handler, every handler is declared, every input is consumed, defaults validate, and cursor inputs advance results.
-5. Invoke every new or changed action with a small success case.
+5. Invoke each changed action with a small success case. For already completed bootstrap mutations, inspect resulting state read-only and mark unexecuted handlers partially verified.
 6. Invoke each page-owned action as the first action on a fresh action page. Do not prime it with a sibling action, a manually opened panel, or state left by Browser exploration.
 7. For every detail action, pass an opaque identifier returned by its corresponding list or search action in the same verified state. Empty ranges, calendar time slots, placeholders, and synthetic identifiers do not count as successful detail verification.
 8. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
-9. Request separate approval before invoking a live mutation.
+9. Request separate approval before invoking a live mutation; follow the bootstrap single-execution rule.
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
@@ -221,8 +232,8 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 1. Inspect complete Local Git status and diff.
 2. Re-read the final manifest and actions.
 3. Correct unintended changes.
-4. Ask the user to **Save** the verified service. Keep Git, commit, hashes, staging, and repository mechanics out of the user-visible request and tool purpose. Use a concise purpose such as `Save Outlook service`.
-5. After approval, use Local Git internally to persist the verified service with a concise message describing what changed and why.
+4. Ask the user to **Save**, describing verified and unverified boundaries. Keep Git mechanics internal; use a purpose such as `Save Outlook service`.
+5. After approval, use Local Git internally to persist the reviewed service with a concise message describing what changed and why.
 6. Report that the service was saved, plus verified actions and boundaries, visible icon evidence, authentication or interaction requirements, excluded capabilities, and remaining limitations. Mention files or revision identifiers only when the user asks for technical details.
 
 ## Recovery

@@ -1511,7 +1511,7 @@ extension Scenario {
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
         let userSkill = "- `skills/grocery-planner/SKILL.md` — Plan a weekly grocery list from meals, dietary needs, and pantry items."
         let manageArtifacts = "- `skills/system:manage-artifacts/SKILL.md` — Create, inspect, revise, import, rename, present, attach, or delete Profile artifacts, with specialized guidance for Markdown notes and interactive HTML canvases."
-        let manageServices = "- `skills/system:manage-services/SKILL.md` — Create, inspect, copy, update, verify, version, or delete Ox service definitions, remote MCP connections, and Local web-service source. Do not use merely to invoke a service."
+        let manageServices = "- `skills/system:manage-services/SKILL.md` — Manage Ox service definitions and remote MCP connections; build Local web services, including website requests with no suitable service. Not for ordinary use of existing services."
         let manageSkills = "- `skills/system:manage-skills/SKILL.md` — Create, inspect, revise, copy, or delete Profile-owned and Local service-owned skills while respecting read-only system and external service skills."
         let serviceSkill = "- `skills/service:127.0.0.1:sanity/SKILL.md` — Deterministic fixture workflow for validating service skill loading."
         let expectsService = ctx.latestUserSaid("attached")
