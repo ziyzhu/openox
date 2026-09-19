@@ -149,6 +149,7 @@ nonisolated enum ChatProjection {
         var ordinal = ordinalOffset
 
         func slot() -> UUID { defer { ordinal += 1 }; return StableID.uuid("\(ordinal)") }
+        func promptSlot(_ id: StepID) -> UUID { defer { ordinal += 1 }; return id.rawValue }
         func openGroup(at: Date, entry: Int) {
             guard trace.isEmpty, bubble.isEmpty else { return }
             groupStart = at
@@ -284,12 +285,12 @@ nonisolated enum ChatProjection {
                         flushTrace()
                         flushBubble()
                         let kind: ChatPromptKind = step.toolCall?.name == "ask_user_confirmation" ? .choice : .permission
-                        out.append((Block(id: slot(), createdAt: createdAt,
+                        out.append((Block(id: promptSlot(step.id), createdAt: createdAt,
                                           kind: .prompt(kind: kind, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution)), entry))
                     case let .choice(prompt):
                         flushTrace()
                         flushBubble()
-                        out.append((Block(id: slot(), createdAt: createdAt,
+                        out.append((Block(id: promptSlot(step.id), createdAt: createdAt,
                                           kind: .prompt(kind: .choice, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution)), entry))
                     case let .contextCompaction(value):
                         flushTrace()

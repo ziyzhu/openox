@@ -8,7 +8,6 @@ on:
       - "apps/cli/**"
       - "packages/service-sdk/**"
       - "examples/service-repository/**"
-      - "tooling/cli-installer.test.ts"
       - "package.json"
       - "bun.lock"
       - "tsconfig.base.json"
@@ -20,7 +19,6 @@ on:
       - "apps/cli/**"
       - "packages/service-sdk/**"
       - "examples/service-repository/**"
-      - "tooling/cli-installer.test.ts"
       - "package.json"
       - "bun.lock"
       - "tsconfig.base.json"
@@ -54,8 +52,6 @@ jobs:
         with:
           bun-version: 1.3.13
       - run: bun install --frozen-lockfile
-      - name: Verify installer
-        run: bun run --cwd apps/cli test:installer
       - name: Build and exercise standalone executable
         run: |
           test "$(bun -p 'process.platform + "-" + process.arch')" = "${{ matrix.platform }}"

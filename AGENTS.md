@@ -26,6 +26,20 @@
 1. Before committing, use `asc apps list --bundle-id ai.oxcraft.bot` to resolve the App Store Connect app and `asc versions list --app <app-id> --platform IOS` to inspect its iOS versions and states.
 1. Treat the highest version in `READY_FOR_DISTRIBUTION` as released. Use an existing higher unreleased App Store Connect version when one exists; otherwise advance `MARKETING_VERSION` in every build configuration to the next planned release before committing.
 1. Read `<version>` from `MARKETING_VERSION` in `apps/ios/Ox.xcodeproj/project.pbxproj`, confirm all build configurations agree, and confirm it is higher than the released App Store Connect version. Use that unreleased version in new commit subjects.
+1. Use the commit message template below. Describe the changes and testing performed; include related issues, pull requests, or commits, or write `None` when there are no related references. State when testing was not run and why.
+
+```text
+<imperative summary> (iOS <version>)
+
+Changes:
+- <what changed and why>
+
+Testing:
+- <checks performed and results>
+
+Related:
+- <related references or None>
+```
 
 ## Repository Boundary
 
@@ -65,6 +79,7 @@
 1. Rebuild and install after switching worktrees.
 1. A green build is not verification; use repository health, build, launch, exercise, fix, and repeat.
 1. For iOS and UX behavior, exercise the flow manually with `sim` and preserve screenshots or videos outside the repository.
+1. Record simulator settings before changing them for a test, including Dynamic Type, appearance, and accessibility options, and restore their previous values when finished, including after failures. Keep standard text size for ordinary QA runs unless the test explicitly requires another size.
 1. Before pushing, run `bun run typecheck` and the smallest relevant tests.
 1. After updating an `.xcstrings` catalog, immediately run `bun run check:localizations` and resolve every missing, incomplete, or placeholder-mismatched required translation before committing it.
 1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/Ox/Resources/OxServices.bundle` changes.

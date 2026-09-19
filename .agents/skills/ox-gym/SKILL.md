@@ -17,7 +17,7 @@ Also use the `sim-cli` and `ox-cli` skills. Consult their current help instead o
 
 ## Relationship to deterministic tests
 
-Ox Gym does not replace type checking, unit tests, service replay, chat projection replay, storage migration fixtures, LLM evaluation or benchmarks, or focused iOS end-to-end cases. It explores realistic combinations and surfaces evidence that fixed suites may miss. Turn a stable finding into the smallest deterministic regression test owned by the relevant existing suite.
+Ox Gym does not replace type checking, service replay, chat projection replay, storage migration fixtures, LLM evaluation or benchmarks, or focused iOS end-to-end cases. It explores realistic combinations and surfaces evidence that fixed suites may miss. Turn a stable finding into the smallest deterministic regression check owned by the relevant existing suite.
 
 ## Roles
 

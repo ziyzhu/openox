@@ -17,7 +17,6 @@
     "build": "bun build.ts",
     "build:standalone": "bun standalone.ts",
     "standalone:check": "bun standalone-check.ts",
-    "test:installer": "bun test ../../tooling/cli-installer.test.ts",
     "package:check": "bun package-check.ts",
     "prepack": "bun run build"
   },

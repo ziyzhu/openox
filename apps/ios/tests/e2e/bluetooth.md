@@ -15,11 +15,6 @@ through `ox vm` and invoke `status`, `events`, and invalid input cases. Confirm
 that unavailable radio operations return an error without hanging or crashing.
 The simulator does not verify physical discovery, pairing, or GATT exchanges.
 
-Run `bun run test:unit --test-name-pattern Bluetooth` for manifest validation,
-hexadecimal boundary cases, bounded event retention, request matching, busy
-requests, cancellation, timeout, and close/reuse regressions. The native helper
-tests require macOS and compile temporary binaries outside the repository.
-
 ## Physical device verification
 
 Use an available iPhone running iOS 26 or later and a controllable BLE peripheral

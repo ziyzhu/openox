@@ -752,6 +752,7 @@ private struct SourceChipList<Chip: View>: View {
             }
         }
         .scrollIndicators(.hidden)
+        .excludesCompactPageSwitch()
     }
 }
 

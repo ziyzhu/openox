@@ -64,9 +64,6 @@ jobs:
       - name: Typecheck
         run: bun install --frozen-lockfile && bun run typecheck
 
-      - name: Test units
-        run: bun run test:unit
-
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 

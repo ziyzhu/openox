@@ -1409,7 +1409,14 @@ final class Chat: Identifiable {
         let stepID = StepID()
         document.apply(.appendPrompt(AgentPrompt(prompt: prompt, options: options, outcome: .pending), choice: kind == .choice, id: stepID))
         markActivity()
-        guard let blockId = transcript.last?.id else { return options.first ?? "" }
+        let blockId = stepID.rawValue
+        guard transcript.contains(where: { block in
+            guard block.id == blockId, case .prompt = block.kind else { return false }
+            return true
+        }) else {
+            Log.session.error("Chat.awaitPrompt rejected id=\(id) step=\(stepID.rawValue)")
+            return Self.abortedAnswer
+        }
         let pending = PendingPrompt(
             id: blockId,
             kind: kind,

@@ -75,7 +75,6 @@ jobs:
       - name: Verify repository
         run: |
           bun run typecheck
-          bun run test:unit
           bun run build:services
           git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 

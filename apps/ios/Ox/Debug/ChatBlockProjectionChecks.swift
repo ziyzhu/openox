@@ -5,6 +5,25 @@ enum ChatBlockProjectionChecks {
     @MainActor
     static func failures() -> [String] {
         var failures: [String] = []
+        var document = ChatDocument()
+        let promptID = StepID()
+        document.apply(.appendUser(intent: "Prompt identity", attachments: [], skillInvocation: nil, at: Date(), submissionID: nil))
+        document.apply(.beginAgentTurn(at: Date()))
+        document.apply(.beginGeneration(model: "mock", at: Date()))
+        document.apply(.beginExecution(source: ""))
+        document.apply(.appendPrompt(
+            AgentPrompt(prompt: "Approve?", options: ["Approve", "Deny"], outcome: .pending),
+            choice: false,
+            id: promptID
+        ))
+        document.apply(.appendProgress("Late progress"))
+        let promptBlocks = document.projection.filter {
+            if case .prompt = $0.kind { return true }
+            return false
+        }
+        if promptBlocks.map(\.id) != [promptID.rawValue] {
+            failures.append("Pending prompts must keep their step identity when earlier content changes")
+        }
         let turnID = TurnID()
         let controls: [ServiceControl] = [
             .signIn(domain: "example.com", serviceName: "Example"),

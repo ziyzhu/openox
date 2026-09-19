@@ -110,11 +110,24 @@ nonisolated enum CustomLLMProviderError: LocalizedError {
 nonisolated enum CustomLLMProviderDiscovery {
     private struct ModelsResponse: Decodable {
         struct Entry: Decodable {
+            struct TopProvider: Decodable {
+                let maxCompletionTokens: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case maxCompletionTokens = "max_completion_tokens"
+                }
+            }
+
             let id: String
+            let name: String?
+            let contextLength: Int?
+            let topProvider: TopProvider?
             let supportedParameters: [String]?
 
             enum CodingKeys: String, CodingKey {
-                case id
+                case id, name
+                case contextLength = "context_length"
+                case topProvider = "top_provider"
                 case supportedParameters = "supported_parameters"
             }
         }
@@ -161,7 +174,15 @@ nonisolated enum CustomLLMProviderDiscovery {
         let discovered = try JSONDecoder().decode(ModelsResponse.self, from: data).data.compactMap { entry -> CustomLLMModel? in
             let id = entry.id.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !id.isEmpty, entry.supportedParameters?.contains("tools") == true else { return nil }
-            return CustomLLMModel(id: id, supportsTools: true)
+            let maxContext = entry.contextLength.flatMap { $0 > 0 ? $0 : nil } ?? 32_768
+            let maxTokens = entry.topProvider?.maxCompletionTokens.flatMap { $0 > 0 ? $0 : nil } ?? 4_096
+            return CustomLLMModel(
+                id: id,
+                displayName: entry.name,
+                maxTokens: min(maxTokens, maxContext),
+                maxContext: maxContext,
+                supportsTools: true
+            )
         }
         let unique = Dictionary(discovered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             .values.sorted { $0.id < $1.id }
