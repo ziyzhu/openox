@@ -332,6 +332,7 @@ extension Scenario {
             Entry("89", "browser PDF — export full page as artifact", .browserPDF),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
             Entry("92", "MCP management — approve, connect, refresh, replace, and remove", .mcpManagement),
+            Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
         ]),
     ]
 
@@ -1634,6 +1635,58 @@ extension Scenario {
             return [.say("Memory could not be read on demand."), .stop(.stop)]
         }
         return [.say("Memory stayed on disk and loaded on demand."), .stop(.stop)]
+    }
+
+    static let providerCatalog = Scenario(name: "provider-catalog") { ctx in
+        guard ctx.turn == 0 else {
+            if ctx.toolResults.contains(where: \.isError) {
+                return [.say("The provider demo stopped before completing. Check the capability result."), .stop(.stop)]
+            }
+            return [.say("Added Demo Provider, customized Mistral, and kept the bundled defaults unchanged. Restoring removed Demo Provider and returned Mistral to its bundled definition."), .stop(.stop)]
+        }
+        return [execute("""
+        const check = (ok, message) => { if (!ok) throw new Error(message); };
+        const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+        const defaults = await ox.provider.default({ purpose: "Read bundled provider defaults" });
+        const original = defaults.find(provider => provider.id === "mistral");
+        const before = await ox.provider.list({ purpose: "Read active providers before demo" });
+        const existingDemo = before.find(provider => provider.id === "demo-provider");
+        if (existingDemo) {
+          const previous = await ox.provider.get({ id: existingDemo.id, purpose: "Check previous demo provider" });
+          check(previous.url === "https://demo.invalid/v1" && previous.name === "Demo Provider" && previous.auth.kind === "none", "Demo Provider already exists with different configuration");
+        }
+        const count = before.length - (existingDemo ? 1 : 0);
+        const current = await ox.provider.get({ id: original.id, purpose: "Preserve Mistral before demo" });
+        check((current.name === original.name || current.name === "Mistral (customized)") && JSON.stringify(canonical({ ...current, name: original.name })) === JSON.stringify(canonical(original)), "Mistral already has a saved override");
+        await ox.provider.save({
+          provider: {
+            id: "demo-provider", name: "Demo Provider", url: "https://demo.invalid/v1",
+            api: "openai-chat-completions", auth: { kind: "none" },
+            models: [{ id: "demo-model", name: "Demo Model" }]
+          },
+          purpose: "Add Demo Provider"
+        });
+        await ox.provider.save({ provider: { ...original, name: "Mistral (customized)" }, purpose: "Customize Mistral provider" });
+        const active = await ox.provider.list({ purpose: "Verify addition and override" });
+        const unchanged = await ox.provider.default({ purpose: "Verify bundled defaults remain unchanged" });
+        check(active.length === count + 1, "Added provider missing");
+        check(active.find(provider => provider.id === "mistral").name === "Mistral (customized)", "Override missing");
+        check(unchanged.find(provider => provider.id === "mistral").name === original.name, "Bundled default changed");
+        let choice;
+        do {
+          choice = await ox.user.choose({
+            body: "Demo Provider was added and Mistral is customized. Bundled defaults are unchanged. Open the model picker to inspect them, then restore the catalog.",
+            options: ["Restore catalog", "Inspect again"], purpose: "Inspect provider demo"
+          });
+        } while (choice !== "Restore catalog");
+        await ox.provider.delete({ id: "demo-provider", purpose: "Remove Demo Provider" });
+        await ox.provider.delete({ id: "mistral", purpose: "Restore bundled Mistral provider" });
+        const restored = await ox.provider.get({ id: "mistral", purpose: "Verify restored Mistral definition" });
+        const after = await ox.provider.list({ purpose: "Verify catalog restoration" });
+        check(JSON.stringify(canonical(restored)) === JSON.stringify(canonical(original)), "Bundled Mistral was not restored");
+        check(after.length === count && !after.some(provider => provider.id === "demo-provider"), "Demo Provider was not removed");
+        console.log(JSON.stringify({ added: true, overridden: true, defaultsUnchanged: true, restored: true }));
+        """)]
     }
 
     static let appInformation = Scenario(name: "app-information") { ctx in
