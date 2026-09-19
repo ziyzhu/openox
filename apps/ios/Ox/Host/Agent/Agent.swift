@@ -22,9 +22,7 @@ public actor Agent {
         case paused
     }
 
-    public private(set) var systemPrompt = ""
-    public private(set) var model: ProviderModel
-    public private(set) var tools: [any AgentTool] = []
+    public private(set) var configuration: AgentConfiguration
     public private(set) var messages: [Message] = []
     public private(set) var streamingMessage: AssistantMessage?
     public private(set) var pendingToolCalls: Set<String> = []
@@ -32,21 +30,12 @@ public actor Agent {
     public private(set) var failureKind: LLMFailureKind?
     public private(set) var runState = RunState.idle
 
-    public var streamOptions: StreamOptions
-    public var compactionThreshold = 0.75
-    public var transformContext: TransformContextHook?
-    public var beforeToolCall: BeforeToolCallHook?
-    public var afterToolCall: AfterToolCallHook?
-    public var shouldStopAfterTurn: ShouldStopAfterTurnHook?
-    public var toolExecutionMode = AgentToolExecutionMode.sequential
-
     nonisolated public let events: AsyncStream<AgentEvent>
     nonisolated private let eventsContinuation: AsyncStream<AgentEvent>.Continuation
 
     private var lastTurnTokens = 0
     private var resumeContinuation: CheckedContinuation<Void, Never>?
-    private var client: any ProviderClient
-    private var currentTask: Task<Void, Never>?
+    private var activeRun: (id: UUID, task: Task<AgentRunResult, Never>)?
     private var steeringQueue = PendingMessageQueue()
     private var followUpQueue = PendingMessageQueue()
 
@@ -63,55 +52,43 @@ public actor Agent {
         set { followUpQueue.mode = newValue }
     }
 
-    public init(
-        client: any ProviderClient,
-        model: ProviderModel,
-        sessionID: String? = nil,
-        transformContext: TransformContextHook? = nil
-    ) {
-        self.client = client
-        self.model = model
-        self.streamOptions = StreamOptions(sessionID: sessionID)
-        self.transformContext = transformContext
+    public init(configuration: AgentConfiguration) {
+        self.configuration = configuration
         let pair = AsyncStream.makeStream(of: AgentEvent.self)
         events = pair.stream
         eventsContinuation = pair.continuation
     }
 
     deinit {
-        currentTask?.cancel()
+        activeRun?.task.cancel()
         eventsContinuation.finish()
     }
 
     public func snapshot() -> AgentSnapshot {
         AgentSnapshot(
-            systemPrompt: systemPrompt,
-            model: model,
-            tools: tools,
+            systemPrompt: configuration.systemPrompt,
+            model: configuration.model,
+            tools: configuration.tools,
             messages: messages,
             streamingMessage: streamingMessage,
             pendingToolCalls: pendingToolCalls,
             errorMessage: errorMessage,
             failureKind: failureKind,
-            streamOptions: streamOptions,
-            compactionThreshold: compactionThreshold,
+            streamOptions: configuration.streamOptions,
+            compactionThreshold: configuration.compactionThreshold,
             runState: runState
         )
     }
 
-    public func configure(
-        client: any ProviderClient,
-        model: ProviderModel,
-        systemPrompt: String,
-        tools: [any AgentTool]
-    ) {
-        self.client = client
-        self.model = model
-        self.systemPrompt = systemPrompt
-        self.tools = tools
+    public func configure(_ configuration: AgentConfiguration) {
+        self.configuration = configuration
     }
 
     public func reset() {
+        guard activeRun == nil else {
+            Log.agent.error("Agent.reset ignored: run is active")
+            return
+        }
         messages = []
         runState = .idle
         streamingMessage = nil
@@ -124,7 +101,7 @@ public actor Agent {
     }
 
     public func restore(messages: [Message]) {
-        guard !isStreaming, currentTask == nil else {
+        guard !isStreaming, activeRun == nil else {
             Log.agent.error("Agent.restore ignored: loop is active")
             return
         }
@@ -138,8 +115,13 @@ public actor Agent {
         if runState == .pausePending || runState == .paused { runState = .running }
         steeringQueue.clear()
         followUpQueue.clear()
-        currentTask?.cancel()
+        activeRun?.task.cancel()
         continuation?.resume()
+    }
+
+    private func abort(runID: UUID) {
+        guard activeRun?.id == runID else { return }
+        abort()
     }
 
     public func pause() {
@@ -164,20 +146,27 @@ public actor Agent {
         }
     }
 
-    public func prompt(
-        _ text: String,
-        attachments: [Artifact] = [],
-        transientContext: String? = nil,
-        turnID: UUID? = nil
-    ) {
-        prompt(
-            [.user(UserMessage(
-                text: text,
-                attachments: attachments,
-                transientContext: transientContext
-            ))],
-            turnID: turnID
-        )
+    public func run(_ request: AgentRunRequest) async throws -> AgentRunResult {
+        try Task.checkCancellation()
+        guard activeRun == nil else {
+            Log.agent.error("Agent.run rejected: run is active")
+            throw AgentRunError.busy
+        }
+        runState = .running
+        errorMessage = nil
+        failureKind = nil
+        streamingMessage = nil
+        pendingToolCalls = []
+        let runID = UUID()
+        let initialConfiguration = configuration
+        let initialSnapshot = makeTurnSnapshot(messages: messages)
+        let task = Task { await execute(request, configuration: initialConfiguration, snapshot: initialSnapshot) }
+        activeRun = (runID, task)
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            Task { await self.abort(runID: runID) }
+        }
     }
 
     public func steer(_ text: String, attachments: [Artifact] = []) {
@@ -209,50 +198,35 @@ public actor Agent {
         followUpQueue.clear()
     }
 
-    public func prompt(_ newMessages: [Message], turnID: UUID? = nil) {
-        start(newMessages: newMessages, turnID: turnID)
-    }
-
-    public func continueFromContext() {
-        guard currentTask == nil else { return }
+    public func continueFromContext() async throws -> AgentRunResult {
+        try Task.checkCancellation()
+        guard activeRun == nil else { throw AgentRunError.busy }
         guard let last = messages.last else {
-            Log.agent.error("Agent.continueFromContext ignored: no messages")
-            return
+            throw AgentRunError.nothingToContinue
         }
         if case .assistant = last {
             let queued = steeringQueue.drain() + followUpQueue.drain()
             guard !queued.isEmpty else {
-                Log.agent.error("Agent.continueFromContext ignored: last message is assistant and no queued messages exist")
-                return
+                throw AgentRunError.nothingToContinue
             }
-            start(newMessages: queued, turnID: nil)
-            return
+            return try await run(AgentRunRequest(messages: queued))
         }
-        start(newMessages: [], turnID: nil)
+        return try await run(AgentRunRequest(messages: []))
     }
 
     public func waitForIdle() async {
-        let task = currentTask
-        await task?.value
+        let task = activeRun?.task
+        _ = await task?.value
     }
 
-    private func start(newMessages: [Message], turnID: UUID?) {
-        guard currentTask == nil else { return }
-        runState = .running
-        errorMessage = nil
-        failureKind = nil
-        streamingMessage = nil
-        pendingToolCalls = []
-        currentTask = Task { [weak self] in
-            await self?.run(newMessages: newMessages, turnID: turnID)
-        }
-    }
-
-    private func run(newMessages: [Message], turnID: UUID?) async {
-        let initialSnapshot = makeTurnSnapshot(messages: messages)
+    private func execute(
+        _ request: AgentRunRequest,
+        configuration: AgentConfiguration,
+        snapshot: AgentTurnSnapshot
+    ) async -> AgentRunResult {
         let config = AgentRunConfig(
-            turnID: turnID,
-            snapshot: initialSnapshot,
+            turnID: request.turnID,
+            snapshot: snapshot,
             shouldPause: { [weak self] in
                 await self?.claimPause() ?? false
             },
@@ -265,19 +239,19 @@ public actor Agent {
             getFollowUpMessages: { [weak self] in
                 await self?.drainFollowUpMessages() ?? []
             },
-            transformContext: transformContext,
-            beforeToolCall: beforeToolCall,
-            afterToolCall: afterToolCall,
-            shouldStopAfterTurn: shouldStopAfterTurn,
-            toolExecutionMode: toolExecutionMode,
+            transformContext: configuration.transformContext,
+            beforeToolCall: configuration.beforeToolCall,
+            afterToolCall: configuration.afterToolCall,
+            shouldStopAfterTurn: configuration.shouldStopAfterTurn,
+            toolExecutionMode: configuration.toolExecutionMode,
             priorTurnTokens: lastTurnTokens,
             refreshSnapshot: { [weak self] messages in
                 await self?.makeTurnSnapshot(messages: messages)
             }
         )
 
-        let result = await LogContext.$turnID.withValue(turnID) {
-            await AgentRunner.run(newMessages: newMessages, config: config) { [weak self] event in
+        let result = await LogContext.$turnID.withValue(request.turnID) {
+            await AgentRunner.run(newMessages: request.messages, config: config) { [weak self] event in
                 await self?.emit(event)
             }
         }
@@ -288,7 +262,9 @@ public actor Agent {
         runState = .idle
         streamingMessage = nil
         pendingToolCalls = []
-        currentTask = nil
+        activeRun = nil
+        emit(.runFinished(result))
+        return result
     }
 
     private func claimPause() -> Bool {
@@ -314,11 +290,11 @@ public actor Agent {
 
     private func makeTurnSnapshot(messages: [Message]) -> AgentTurnSnapshot {
         AgentTurnSnapshot(
-            context: AgentContext(systemPrompt: systemPrompt, messages: messages, tools: tools),
-            client: client,
-            model: model,
-            streamOptions: streamOptions,
-            compactionThreshold: compactionThreshold
+            context: AgentContext(systemPrompt: configuration.systemPrompt, messages: messages, tools: configuration.tools),
+            client: configuration.client,
+            model: configuration.model,
+            streamOptions: configuration.streamOptions,
+            compactionThreshold: configuration.compactionThreshold
         )
     }
 
@@ -340,16 +316,16 @@ public actor Agent {
             pendingToolCalls.insert(toolCall.id)
         case .toolExecutionEnd(let toolCall, _):
             pendingToolCalls.remove(toolCall.id)
-        case .turnEnd(let message, _):
+        case .generationFinished(let message, _):
             if let error = message.errorMessage {
                 errorMessage = error
                 failureKind = message.failureKind
             }
-        case .agentEnd:
+        case .runFinished:
             streamingMessage = nil
             pendingToolCalls = []
-        case .agentStart(turnID: _),
-             .turnStart(model: _, turnID: _),
+        case .runStarted(turnID: _),
+             .generationStarted(model: _, turnID: _),
              .reasoning,
              .compacted,
              .paused,

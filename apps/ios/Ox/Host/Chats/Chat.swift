@@ -49,11 +49,6 @@ final class Chat: Identifiable {
         case deltaReceived
     }
 
-    private struct AgentConfiguration {
-        let systemPrompt: String
-        let tools: [any AgentTool]
-    }
-
     struct PendingServiceControl: Identifiable, Equatable {
         struct Source: Equatable {
             let blockID: UUID
@@ -212,12 +207,7 @@ final class Chat: Identifiable {
         )
         let configuration = agentConfiguration(client: client, model: model)
         enqueueAgentMutation { agent in
-            await agent.configure(
-                client: client,
-                model: model,
-                systemPrompt: configuration.systemPrompt,
-                tools: configuration.tools
-            )
+            await agent.configure(configuration)
         }
         scheduleModelPreparation()
         Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue)")
@@ -925,28 +915,16 @@ final class Chat: Identifiable {
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
         Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
-        self.agent = Agent(
-            client: client,
-            model: model,
-            sessionID: id.uuidString,
-            transformContext: { request in
-                let messages = await ChatURLServiceContext.transform(
-                    request.messages,
-                    serviceManager: serviceManager,
-                    chatID: id
-                )
-                return await ModelAdapterPipeline.transform(messages: messages, model: request.model)
-            }
-        )
+        self.agent = Agent(configuration: AgentConfiguration(client: client, model: model))
         let stream = agent.events
         self.eventConsumer = Task { @MainActor [weak self] in
             for await event in stream {
                 guard let self else { return }
                 switch event {
-                case .agentStart:
+                case .runStarted:
                     self.pendingContextCompactions = []
                     self.beginAgentTurn()
-                case .turnStart(let model, _):
+                case .generationStarted(let model, _):
                     self.setRunPhase(.thinking)
                     self.resetStreamedText()
                     self.document.apply(.beginGeneration(model: model, at: Date()))
@@ -964,17 +942,16 @@ final class Chat: Identifiable {
                     self.document.apply(.setGenerationAssistant(assistant))
                     self.applyAssistantFinal(assistant)
                     self.endStreamingTurn(assistant)
-                case .turnEnd(let assistant, _):
+                case .generationFinished(let assistant, _):
                     await self.waitForStreamingDelivery()
                     self.document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
                     self.requestPersistence(.generationFinished)
                     self.runState.backgroundExecution?.advance()
-                case .agentEnd:
+                case .runFinished(let result):
                     self.runState.backgroundExecution?.updatePhase(.finishing)
-                    await self.agent.waitForIdle()
                     let snapshot = await self.agent.snapshot()
                     self.agentSnapshot = snapshot
-                    self.finishAgentTurnFromEvents(error: snapshot.errorMessage)
+                    self.finishAgentTurnFromEvents(error: result.errorMessage)
                     self.requestPersistence(.agentTurnFinished)
                     self.agentEventCycle.finish()
                 case .compacted(let before, let after, let chars, let tokensBefore):
@@ -1005,12 +982,7 @@ final class Chat: Identifiable {
         }
         let configuration = agentConfiguration(client: client, model: model)
         enqueueAgentMutation { agent in
-            await agent.configure(
-                client: client,
-                model: model,
-                systemPrompt: configuration.systemPrompt,
-                tools: configuration.tools
-            )
+            await agent.configure(configuration)
         }
     }
 
@@ -2291,12 +2263,7 @@ final class Chat: Identifiable {
         await Skills.shared.waitUntilCurrent()
         await agentControlTask?.value
         let configuration = agentConfiguration(client: client, model: model)
-        await agent.configure(
-            client: client,
-            model: model,
-            systemPrompt: configuration.systemPrompt,
-            tools: configuration.tools
-        )
+        await agent.configure(configuration)
         submission.latency.mark(.agentConfigured)
         agentSnapshot = await agent.snapshot()
         submission.latency.mark(.manifestsStarted)
@@ -2334,23 +2301,34 @@ final class Chat: Identifiable {
         agentEventCycle.begin()
         pendingCompactionTokens = nil
         submission.latency.mark(.agentSubmitted)
-        await LogContext.$latency.withValue(submission.latency) {
-            await agent.prompt(
-                submission.text,
-                attachments: submission.attachments,
-                transientContext: transientContext,
-                turnID: turnID
-            )
-            await agent.waitForIdle()
+        let result: AgentRunResult
+        do {
+            result = try await LogContext.$latency.withValue(submission.latency) {
+                try await agent.run(AgentRunRequest(
+                    text: submission.text,
+                    attachments: submission.attachments,
+                    transientContext: transientContext,
+                    turnID: turnID
+                ))
+            }
+        } catch {
+            agentEventCycle.finish()
+            let cancelled = error is CancellationError
+            let message = cancelled ? "aborted" : error.localizedDescription
+            Log.session.error("Chat.runOne rejected id=\(id) error=\(message)")
+            if !cancelled { notice = .error(message) }
+            submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
+            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            return
         }
         await waitForAgentEvents()
         let sealedAt = Date()
         let snapshot = await agent.snapshot()
         agentSnapshot = snapshot
-        installContextCheckpoint(messages: snapshot.messages, tokensBefore: pendingCompactionTokens)
+        installContextCheckpoint(messages: result.messages, tokensBefore: pendingCompactionTokens)
         pendingCompactionTokens = nil
-        let err = snapshot.errorMessage
-        let failureKind = snapshot.failureKind
+        let err = result.errorMessage
+        let failureKind = result.failureKind
         markActivity(sealedAt)
         if let err, err != "aborted" {
             Log.session.error("Chat.runOne agent error: \(err)")
@@ -2718,13 +2696,26 @@ final class Chat: Identifiable {
 
     private func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
         let supportsJavaScript = client.supportsTools(for: model)
+        let serviceManager = serviceManager
+        let chatID = id
         return AgentConfiguration(
+            client: client,
+            model: model,
             systemPrompt: Self.composeSystemPrompt(
                 memory: UserMemory.shared.text,
                 userSkills: Skills.shared.all,
                 toolsAvailable: supportsJavaScript
             ),
-            tools: supportsJavaScript ? [ChatJavaScriptTool(chat: self)] : []
+            tools: supportsJavaScript ? [ChatJavaScriptTool(chat: self)] : [],
+            streamOptions: StreamOptions(sessionID: chatID.uuidString),
+            transformContext: { request in
+                let messages = await ChatURLServiceContext.transform(
+                    request.messages,
+                    serviceManager: serviceManager,
+                    chatID: chatID
+                )
+                return await ModelAdapterPipeline.transform(messages: messages, model: request.model)
+            }
         )
     }
 

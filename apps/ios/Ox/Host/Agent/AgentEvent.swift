@@ -1,10 +1,10 @@
 import Foundation
 
 nonisolated public enum AgentEvent: Sendable {
-    case agentStart(turnID: UUID?)
-    case agentEnd(messages: [Message])
-    case turnStart(model: String, turnID: UUID?)
-    case turnEnd(message: AssistantMessage, toolResults: [ToolResultMessage])
+    case runStarted(turnID: UUID?)
+    case runFinished(AgentRunResult)
+    case generationStarted(model: String, turnID: UUID?)
+    case generationFinished(message: AssistantMessage, toolResults: [ToolResultMessage])
     case messageStart(Message)
     case messageUpdate(AssistantMessage, event: AssistantEvent)
     case messageEnd(Message)

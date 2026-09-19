@@ -23,10 +23,3 @@ nonisolated struct AgentRunConfig: Sendable {
     var priorTurnTokens: Int
     var refreshSnapshot: @Sendable ([Message]) async -> AgentTurnSnapshot?
 }
-
-nonisolated struct AgentRunResult: Sendable {
-    var messages: [Message]
-    var errorMessage: String?
-    var failureKind: LLMFailureKind?
-    var lastTurnTokens: Int
-}

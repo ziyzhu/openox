@@ -12,10 +12,11 @@ nonisolated enum AgentRunner {
         var lastTurnTokens = config.priorTurnTokens
         var errorMessage: String?
         var failureKind: LLMFailureKind?
+        var aborted = false
         var overflowRecoveryAttempted = false
 
         LogContext.latency?.mark(.agentStarted)
-        await emit(.agentStart(turnID: config.turnID))
+        await emit(.runStarted(turnID: config.turnID))
         let protocolDiagnostics = snapshot.client.protocolDiagnostics
         let wireProtocol = snapshot.client.wireProtocol(for: snapshot.model)?.rawValue ?? "synthetic"
         Log.agent.info("Agent.run start client=\(snapshot.client.id) model=\(snapshot.model.id) protocol=\(wireProtocol) prompt=\(systemPromptFingerprint(snapshot.context.systemPrompt)) cacheRoute=\(protocolDiagnostics.promptCacheRouting ?? "n/a") maxTokensField=\(protocolDiagnostics.maxTokensField ?? "n/a")")
@@ -42,8 +43,7 @@ nonisolated enum AgentRunner {
                 Log.agent.info("Agent.run terminating: pre-prompt compaction cancelled")
                 let retainedMessages = retained(messages)
                 LogContext.latency?.mark(.agentCompleted)
-                await emit(.agentEnd(messages: retainedMessages))
-                return AgentRunResult(messages: retainedMessages, errorMessage: nil, failureKind: nil, lastTurnTokens: lastTurnTokens)
+                return AgentRunResult(outcome: .aborted, messages: retainedMessages, lastTurnTokens: lastTurnTokens)
             }
         } else if !newMessages.isEmpty {
             Log.agent.info("Agent.compact skipped reason=unsupported-new-input model=\(snapshot.model.id)")
@@ -74,7 +74,7 @@ nonisolated enum AgentRunner {
             snapshot.context.messages = messages
             Log.agent.info("Agent.run iter=\(iter) msgs=\(messages.count) streaming…")
             LogContext.latency?.mark(.modelStarted)
-            await emit(.turnStart(model: snapshot.model.id, turnID: config.turnID))
+            await emit(.generationStarted(model: snapshot.model.id, turnID: config.turnID))
 
             if !pendingMessages.isEmpty {
                 for message in pendingMessages {
@@ -94,6 +94,7 @@ nonisolated enum AgentRunner {
             )
             snapshot.context.messages = modelMessages
             let assistant = await streamAssistantTurn(snapshot: snapshot, emit: emit)
+            aborted = assistant.stopReason == .aborted
             LogContext.latency?.recordModelCompleted(assistant.usage)
             let assistantText = text(of: assistant.content)
             Log.agent.info("Agent.run iter=\(iter) turn done stopReason=\(assistant.stopReason) rawReason=\(LogPrivacy.text(assistant.rawStopReason ?? "none", limit: 128)) failureKind=\(assistant.failureKind?.rawValue ?? "none") responseId=\(LogPrivacy.text(assistant.responseID ?? "none", limit: 128)) blocks=\(assistant.content.count) tokens(in/out)=\(assistant.usage.input)/\(assistant.usage.output) textChars=\(assistantText.count) err=\(LogPrivacy.text(assistant.errorMessage ?? "nil", limit: 2_048))")
@@ -107,9 +108,9 @@ nonisolated enum AgentRunner {
             let contextOverflow = isContextOverflow(assistant, contextWindow: snapshot.model.maxContext)
 
             if contextOverflow, assistant.stopReason != .stop {
-                errorMessage = assistant.errorMessage
+                errorMessage = assistant.errorMessage ?? "Model context overflow."
                 failureKind = assistant.failureKind
-                await emit(.turnEnd(message: assistant, toolResults: []))
+                await emit(.generationFinished(message: assistant, toolResults: []))
                 if !overflowRecoveryAttempted {
                     overflowRecoveryAttempted = true
                     messages.removeLast()
@@ -140,9 +141,9 @@ nonisolated enum AgentRunner {
             }
 
             if assistant.stopReason == .error || assistant.stopReason == .aborted {
-                errorMessage = assistant.errorMessage
+                errorMessage = assistant.errorMessage ?? "Model generation failed."
                 failureKind = assistant.failureKind
-                await emit(.turnEnd(message: assistant, toolResults: []))
+                await emit(.generationFinished(message: assistant, toolResults: []))
                 break loop
             }
             overflowRecoveryAttempted = false
@@ -174,7 +175,7 @@ nonisolated enum AgentRunner {
                 await emit(.messageStart(message))
                 await emit(.messageEnd(message))
             }
-            await emit(.turnEnd(message: assistant, toolResults: toolResults))
+            await emit(.generationFinished(message: assistant, toolResults: toolResults))
 
             let completedTurn = PrepareNextTurnContext(
                 message: assistant,
@@ -227,8 +228,14 @@ nonisolated enum AgentRunner {
 
         let retainedMessages = retained(messages)
         LogContext.latency?.mark(.agentCompleted)
-        await emit(.agentEnd(messages: retainedMessages))
-        return AgentRunResult(messages: retainedMessages, errorMessage: errorMessage, failureKind: failureKind, lastTurnTokens: lastTurnTokens)
+        let outcome: AgentRunOutcome = if Task.isCancelled || aborted {
+            .aborted
+        } else if let errorMessage {
+            .failed(message: errorMessage, kind: failureKind)
+        } else {
+            .completed
+        }
+        return AgentRunResult(outcome: outcome, messages: retainedMessages, lastTurnTokens: lastTurnTokens)
     }
 
     private struct CompactionApplication: Sendable {
