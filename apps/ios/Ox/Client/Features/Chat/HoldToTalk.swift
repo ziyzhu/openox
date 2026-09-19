@@ -56,7 +56,18 @@ struct HoldToTalkArea: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            canBegin && window != nil && bounds.contains(touch.location(in: self))
+            guard canBegin, window != nil, bounds.contains(touch.location(in: self)),
+                  let controller = owningViewController, let touchedView = touch.view else { return false }
+            return touchedView.isDescendant(of: controller.view)
+        }
+
+        private var owningViewController: UIViewController? {
+            var responder: UIResponder? = next
+            while let current = responder {
+                if let controller = current as? UIViewController { return controller }
+                responder = current.next
+            }
+            return nil
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
