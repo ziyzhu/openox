@@ -9,7 +9,6 @@
     "test:unit": "bun test tooling packages/services packages/service-sdk",
     "build:services": "bun tooling/ios-services-build.ts",
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
-    "build:web-worker": "bun tooling/build-public-web-worker.ts",
     "test:chat-projection": "bun tooling/chat-projection-replay.ts",
     "test:api-services": "bun tooling/api-service-replay.ts",
     "test:storage-migration": "bun tooling/storage-migration-replay.ts",
@@ -22,8 +21,7 @@
     "typecheck": "bun tooling/typecheck.ts"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.49",
-    "defuddle": "0.19.2"
+    "@sinclair/typebox": "^0.34.49"
   },
   "devDependencies": {
     "@types/bun": "latest",

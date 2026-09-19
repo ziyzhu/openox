@@ -67,9 +67,6 @@ jobs:
       - name: Test units
         run: bun run test:unit
 
-      - name: Verify generated public web worker
-        run: bun run build:web-worker && git diff --exit-code -- apps/ios/Ox/Host/Services/Web/PublicWeb/PublicWebWorker.js
-
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 

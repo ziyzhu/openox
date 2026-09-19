@@ -32,9 +32,12 @@ extension Chat {
                     guard let html = String(data: response.data, encoding: .utf8) else {
                         throw WebFetchError.invalidText
                     }
-                    let extraction = try await PublicWebWorker.shared.extract(html: html, url: response.url)
+                    let started = Date()
+                    let markdown = try await Defuddle.markdown(html: html, baseURL: response.url)
+                    let elapsed = Int(Date().timeIntervalSince(started) * 1_000)
+                    Log.webFetch.info("native extraction result url=\(LogPrivacy.url(response.url.absoluteString)) htmlChars=\(html.count) markdownChars=\(markdown.count) ms=\(elapsed)")
                     read = try ArtifactLibrary.read(
-                        data: Data(extraction.markdown.utf8),
+                        data: Data(markdown.utf8),
                         kind: .text,
                         options: readOptions
                     )
