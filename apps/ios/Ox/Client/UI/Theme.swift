@@ -73,8 +73,8 @@ enum Theme {
         static let quick: Double = 0.15
         static let standard: Double = 0.2
         static let entrance: Double = 0.3
-        static let ride = SwiftUI.Animation.timingCurve(0.26, 1, 0.32, 1, duration: 0.6)
-        static let drop: Double = 0.4
+        static let ride = SwiftUI.Animation.smooth(duration: 0.45)
+        static let drop = SwiftUI.Animation.smooth(duration: 0.35)
         static let streamFade: Double = 0.2
         static let thinkingHold: Double = 1.2
         static let sequenceHold: Double = 1.5

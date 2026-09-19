@@ -473,7 +473,7 @@ struct ChatPage: View {
             if !showsComposer, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
                     transcriptWindow.showLatest(total: totalBlockCount)
-                    DispatchQueue.main.async { scroller.rideToBottom() }
+                    DispatchQueue.main.async { scroller.rideToBottom(animated: !reduceMotion) }
                 }
                     .padding(.bottom, Theme.Spacing.md)
                     .transition(.opacity)
@@ -549,7 +549,7 @@ struct ChatPage: View {
             await Task.yield()
             guard !Task.isCancelled else { return }
             transcriptWindow.showLatest(total: totalBlockCount)
-            scroller.rideToBottom()
+            scroller.rideToBottom(animated: !reduceMotion)
             Log.ui.info("ChatPage.interactionPresent chat=\(chat.id) interaction=\(activeInteractionID)")
         }
         .task(id: DelayedActivityKey(
@@ -1139,7 +1139,7 @@ struct ChatPage: View {
                         renderedBlocks: blocks,
                         anchoredViewportHeight: anchoredViewportHeight,
                         scrollToTurn: { id in
-                            scroller.rideToTurn(id, animated: true) {
+                            scroller.rideToTurn(id, animated: !reduceMotion) {
                                 proxy.scrollTo(id, anchor: .top)
                             }
                         }
@@ -1452,7 +1452,7 @@ struct ChatPage: View {
                         composerButtonSize: composerButtonSize
                     ) {
                         transcriptWindow.showLatest(total: totalBlockCount)
-                        DispatchQueue.main.async { scroller.rideToBottom() }
+                        DispatchQueue.main.async { scroller.rideToBottom(animated: !reduceMotion) }
                     }
                         .transition(.opacity)
                 }

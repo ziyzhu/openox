@@ -457,6 +457,7 @@ struct ChatComposer: View, Equatable {
     @State private var promptSecondaryInput = ""
 
     @Environment(\.appTheme) private var appTheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
         lhs.composer === rhs.composer
@@ -639,7 +640,7 @@ struct ChatComposer: View, Equatable {
                 .frame(height: Theme.Spacing.lg)
             }
         }
-        .animation(.easeOut(duration: Theme.Animation.standard), value: isResting)
+        .animation(reduceMotion ? nil : .smooth(duration: Theme.Animation.standard), value: isResting)
     }
 
     private var inputBarTopSpacing: CGFloat {
@@ -651,7 +652,7 @@ struct ChatComposer: View, Equatable {
         VStack(alignment: .leading, spacing: Self.topStripSpacing) {
             if showsTopStrip && !floatsTopStrip {
                 composerTopStrip
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .transition(topStripTransition)
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -670,13 +671,17 @@ struct ChatComposer: View, Equatable {
             if showsTopStrip && floatsTopStrip {
                 composerTopStrip
                     .offset(y: -Self.floatingTopStripClearance)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .transition(topStripTransition)
             }
         }
     }
 
     private var composerShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+    }
+
+    private var topStripTransition: AnyTransition {
+        reduceMotion ? .opacity : .scale(scale: 0.8).combined(with: .opacity)
     }
 
     private var showsTopStrip: Bool {
@@ -883,6 +888,7 @@ struct ChatComposer: View, Equatable {
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.leading, textLineFragmentPadding)
+                    .transition(.identity)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
@@ -1178,28 +1184,31 @@ struct ComposerServicePicker: View {
 
 struct ComposerSlashPicker: View {
     @Bindable var composer: ChatComposerModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isFocused: Bool
     let composerHeight: CGFloat
     let onSelect: (Skill) -> Void
 
     @ViewBuilder
     var body: some View {
-        let suggestions = composer.slashSuggestions
-        if isFocused, !suggestions.isEmpty {
-            GeometryReader { geometry in
-                SlashPickerPanel(
-                    suggestions: suggestions,
-                    space: max(0, geometry.size.height - composerHeight),
-                    onSelect: onSelect
-                )
-                .frame(maxWidth: Theme.ContainerWidth.readable)
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, composerHeight + Theme.Spacing.xs)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        let suggestions = isFocused ? composer.slashSuggestions : []
+        Group {
+            if !suggestions.isEmpty {
+                GeometryReader { geometry in
+                    SlashPickerPanel(
+                        suggestions: suggestions,
+                        space: max(0, geometry.size.height - composerHeight),
+                        onSelect: onSelect
+                    )
+                    .frame(maxWidth: Theme.ContainerWidth.readable)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.bottom, composerHeight + Theme.Spacing.xs)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.easeOut(duration: Theme.Animation.standard), value: suggestions.map(\.id))
         }
+        .animation(reduceMotion ? nil : .smooth(duration: Theme.Animation.standard), value: suggestions.map(\.id))
     }
 }
 

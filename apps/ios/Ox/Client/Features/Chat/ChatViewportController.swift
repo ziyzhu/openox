@@ -148,16 +148,12 @@ final class ChatViewportController {
         let target = Target.turnTop(id)
         move(to: target)
         Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=\(target.label) anchor=top animated=\(animated) \(logSnapshot)")
-        guard animated else {
-            scroll()
-            return
-        }
-        withAnimation(Theme.Animation.ride) {
+        withAnimation(animated ? Theme.Animation.ride : nil) {
             scroll()
         }
     }
 
-    func rideToBottom() {
+    func rideToBottom(animated: Bool) {
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
             position.scrollTo(edge: .bottom)
@@ -165,8 +161,8 @@ final class ChatViewportController {
             return
         }
         move(to: .bottom)
-        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=bottom disposition=animated \(logSnapshot)")
-        withAnimation(.easeOut(duration: Theme.Animation.drop)) {
+        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=bottom disposition=\(animated ? "animated" : "immediate") \(logSnapshot)")
+        withAnimation(animated ? Theme.Animation.drop : nil) {
             position.scrollTo(edge: .bottom)
         }
     }

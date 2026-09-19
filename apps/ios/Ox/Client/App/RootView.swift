@@ -1100,7 +1100,7 @@ struct RootView: View {
     }
 
     private static let sidebarSpring: Animation = .smooth(duration: 0.3, extraBounce: 0)
-    fileprivate static let sidebarSettleAnimation: Animation = .easeOut(duration: 0.18)
+    fileprivate static let sidebarSettleAnimation: Animation = .smooth(duration: 0.25)
 
     private var sidebarAnimation: Animation {
         reduceMotion ? .easeOut(duration: 0.15) : Self.sidebarSpring
@@ -1117,7 +1117,7 @@ struct RootView: View {
             refreshCompactSidebar()
             refreshChatSummaries(reason: "sidebar")
         }
-        withAnimation(sidebarAnimation, completionCriteria: .removed) {
+        withAnimation(sidebarAnimation, completionCriteria: .logicallyComplete) {
             if isSplitLayout {
                 showSplitSidebar = open
             } else {
