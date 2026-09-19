@@ -10,41 +10,36 @@ protocol ServiceSheetSession: AnyObject {
     func goBack()
     func goForward()
     func reload()
+    func navigate(to url: URL) -> Bool
 }
 
 extension ServiceHandoffSession: ServiceSheetSession {}
 
 private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
     let session: Session
+    let mode: WebBrowserView.Mode
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            ServiceBrowserWebView(page: session.page)
-                .navigationTitle(session.navigationTitle)
-                .navigationSubtitle(session.page.url?.host ?? session.serviceDomain)
-                .navigationBarTitleDisplayMode(.inline)
-                .overlay(alignment: .top) {
+            WebBrowserView(
+                page: session.page,
+                mode: mode,
+                fallbackHost: session.serviceDomain,
+                navigate: { session.navigate(to: $0) },
+                goBack: session.goBack,
+                goForward: session.goForward,
+                reloadOrStop: {
                     if session.page.isLoading {
-                        ProgressView(value: session.page.estimatedProgress)
-                            .progressViewStyle(.linear)
+                        session.page.stopLoading()
+                    } else {
+                        session.reload()
                     }
                 }
+            )
+                .navigationTitle(session.navigationTitle)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Button(action: session.goBack) {
-                            Image(systemName: "chevron.left")
-                        }
-                        .accessibilityLabel(A11yLabel.back)
-                        .accessibilityIdentifier(A11yID.ServiceHandoff.back)
-                        .disabled(session.page.backForwardList.backList.isEmpty)
-                        Button(action: session.goForward) {
-                            Image(systemName: "chevron.right")
-                        }
-                        .accessibilityLabel(A11yLabel.forward)
-                        .accessibilityIdentifier(A11yID.ServiceHandoff.forward)
-                        .disabled(session.page.backForwardList.forwardList.isEmpty)
-                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
                             session.cancel()
@@ -78,9 +73,9 @@ private struct AppPresentationModifier: ViewModifier {
                 case .browser(let session):
                     ServiceBrowserView(session: session)
                 case .serviceSignIn(let session):
-                    ServiceSessionSheetView(session: session)
+                    ServiceSessionSheetView(session: session, mode: .signIn)
                 case .serviceHandoff(let session):
-                    ServiceSessionSheetView(session: session)
+                    ServiceSessionSheetView(session: session, mode: .handoff)
                 }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in

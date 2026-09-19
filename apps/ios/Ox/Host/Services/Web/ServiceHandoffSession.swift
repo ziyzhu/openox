@@ -135,6 +135,16 @@ final class ServiceHandoffSession {
         page.reload()
     }
 
+    func navigate(to url: URL) -> Bool {
+        guard phase == .running || phase == .verifying,
+              Self.allowsNavigation(to: url) else {
+            Log.service.warning("ServiceHandoffSession address rejected domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(url.host ?? "?") phase=\(phase.rawValue)")
+            return false
+        }
+        page.load(url)
+        return true
+    }
+
     private func start() {
         phase = .running
         let attempt = id.uuidString.prefix(8)

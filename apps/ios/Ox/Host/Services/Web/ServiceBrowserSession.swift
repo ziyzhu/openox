@@ -79,6 +79,14 @@ final class ServiceBrowserSession {
         Log.ui.info("ServiceBrowser.load domain=\(serviceDomain) url=\(LogPrivacy.url(initialURL.absoluteString))")
     }
 
+    func navigate(to url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
+        errorMessage = nil
+        observeNavigations()
+        page.load(url)
+        return true
+    }
+
     private func observeNavigations() {
         guard navigationTask == nil else { return }
         navigationTask = Task { @MainActor [weak self] in
@@ -127,10 +135,6 @@ final class ServiceBrowserSession {
             observeNavigations()
             page.reload()
         }
-    }
-
-    func openInSystemBrowser() {
-        UIApplication.shared.open(page.url ?? initialURL)
     }
 
     private func loadPopup(_ request: URLRequest) {

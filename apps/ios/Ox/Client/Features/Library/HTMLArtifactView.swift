@@ -197,9 +197,7 @@ private struct HTMLArtifactWebView: View {
     }
 
     var body: some View {
-        WebView(page)
-            .webViewBackForwardNavigationGestures(.disabled)
-            .webViewElementFullscreenBehavior(.enabled)
+        WebContentView(page: page, mode: .canvas)
             .opacity(isReady ? 1 : 0)
             .allowsHitTesting(isReady)
             .accessibilityHidden(!isReady)

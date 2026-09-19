@@ -55,80 +55,30 @@ struct ServiceBrowserView: View {
         session.page.title.isEmpty ? session.serviceTitle : session.page.title
     }
 
-    private var currentURL: URL {
-        session.page.url ?? session.initialURL
-    }
-
     var body: some View {
         NavigationStack {
-            ServiceBrowserWebView(page: session.page)
+            WebBrowserView(
+                page: session.page,
+                mode: .browse,
+                fallbackHost: session.serviceDomain,
+                initialURL: session.initialURL,
+                errorMessage: session.errorMessage,
+                navigate: { session.navigate(to: $0) },
+                goBack: session.goBack,
+                goForward: session.goForward,
+                reloadOrStop: session.reloadOrStop
+            )
                 .navigationTitle(title)
-                .navigationSubtitle(currentURL.host ?? session.serviceDomain)
                 .navigationBarTitleDisplayMode(.inline)
-                .overlay(alignment: .top) {
-                    if session.page.isLoading {
-                        ProgressView(value: session.page.estimatedProgress)
-                            .progressViewStyle(.linear)
-                    }
-                }
-                .overlay {
-                    if let error = session.errorMessage, !session.page.isLoading {
-                        ContentUnavailableView {
-                            Label("Couldn’t Load Page", systemImage: "wifi.exclamationmark")
-                        } description: {
-                            Text(error)
-                        } actions: {
-                            Button("Try Again", action: session.reloadOrStop)
-                        }
-                    }
-                }
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
                             .accessibilityIdentifier(A11yID.ServiceBrowser.done)
-                    }
-                    ToolbarItemGroup(placement: .bottomBar) {
-                        Button(action: session.goBack) {
-                            Image(systemName: "chevron.left")
-                        }
-                        .accessibilityIdentifier(A11yID.ServiceBrowser.back)
-                        .disabled(session.page.backForwardList.backList.isEmpty)
-                        Button(action: session.goForward) {
-                            Image(systemName: "chevron.right")
-                        }
-                        .accessibilityIdentifier(A11yID.ServiceBrowser.forward)
-                        .disabled(session.page.backForwardList.forwardList.isEmpty)
-                        Spacer()
-                        Button(action: session.reloadOrStop) {
-                            Image(systemName: session.page.isLoading ? "xmark" : "arrow.clockwise")
-                        }
-                        .accessibilityIdentifier(A11yID.ServiceBrowser.reloadOrStop)
-                        ShareLink(item: currentURL) {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .accessibilityIdentifier(A11yID.ServiceBrowser.share)
-                        Button(action: session.openInSystemBrowser) {
-                            Image(systemName: "safari")
-                        }
-                        .accessibilityIdentifier(A11yID.ServiceBrowser.openInSafari)
                     }
                 }
         }
         .presentationDragIndicator(.visible)
         .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
-    }
-}
-
-struct ServiceBrowserWebView: View {
-    let page: WebPage
-
-    var body: some View {
-        WebView(page)
-            .webViewBackForwardNavigationGestures(.enabled)
-            .webViewLinkPreviews(.enabled)
-            .webViewMagnificationGestures(.enabled)
-            .webViewTextSelection(.enabled)
-            .webViewElementFullscreenBehavior(.enabled)
     }
 }

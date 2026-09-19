@@ -38,7 +38,7 @@ final class ServiceAuthSession: ServiceSheetSession {
             },
             navigationObserver: { event, pageURL in
                 guard event == .finished, let pageURL else { return }
-                Log.webView.info("Service.navigation event=finish domain=\(domain) scope=auth url=\(LogPrivacy.url(pageURL.absoluteString))")
+                Log.webView.info("Service.navigation event=finish domain=\(domain) scope=auth host=\(pageURL.host ?? "?")")
             }
         )
         id = handoff.id
@@ -90,6 +90,10 @@ final class ServiceAuthSession: ServiceSheetSession {
 
     func reload() {
         handoff.reload()
+    }
+
+    func navigate(to url: URL) -> Bool {
+        handoff.navigate(to: url)
     }
 
     private func map(_ outcome: ServiceHandoffSession.Outcome) -> Outcome {

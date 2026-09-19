@@ -11222,6 +11222,39 @@
         }
       }
     },
+    "Enter a valid website address." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入有效的网站地址。"
+          }
+        }
+      }
+    },
+    "Couldn’t open this address in this session." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法在此次会话中打开此地址。"
+          }
+        }
+      }
+    },
+    "Open in Safari" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Safari 中打开"
+          }
+        }
+      }
+    },
     "Website address" : {
       "localizations" : {
         "zh-Hans" : {
