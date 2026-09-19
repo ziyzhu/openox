@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 final class ServiceOperations {
+    private static let maximumFindResults = 10
+
     let serviceManager: ServiceManager
     let resolveService: (String) async throws -> Service
     let resolveAction: (String) async throws -> (Service, String)
@@ -430,7 +432,7 @@ final class ServiceOperations {
                 Log.session.info("bridge.service.find unavailable monoRepository=loading chars=\(query.count)")
                 throw RuntimeError.bridge("ox.service.find: Ox Server is still loading services. Continue without service discovery or try again later.")
             }
-            let matches = await serviceManager.search(query, filter: .all).prefix(5)
+            let matches = await serviceManager.search(query, filter: .all).prefix(Self.maximumFindResults)
             let attached = attachedDomains()
             let results = matches.map {
                 ServiceFindResult(

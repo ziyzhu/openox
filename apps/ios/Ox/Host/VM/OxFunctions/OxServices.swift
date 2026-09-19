@@ -9,7 +9,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.find",
                     .object([
-                        "description": .string("Search the merged service MonoRepository with the same service search used by the app when no attached service covers the task: `await ox.service.find({ query, purpose })`. Returns up to five ranked matches (domain, kind, manifestPath, repository, repositoryProvenance, name, description, matchedAction, signIn, saved, attached). Read a strong candidate's `manifestPath` when its action contract matters, then bring the best match in with `ox.service.attach({ domain, purpose })`. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
+                        "description": .string("Search the merged service MonoRepository with the same service search used by the app when no attached service covers the task: `await ox.service.find({ query, purpose })`. Returns up to ten ranked matches (domain, kind, manifestPath, repository, repositoryProvenance, name, description, matchedAction, signIn, saved, attached). Read a strong candidate's `manifestPath` when its action contract matters, then bring the best match in with `ox.service.attach({ domain, purpose })`. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
