@@ -245,12 +245,28 @@ final class ChatManager {
         guard repositoryScope.profileID == schedule.profileID else {
             return (.failed("The scheduled skill's Profile is not active."), nil)
         }
+        let services: [Service]
+        do {
+            services = try await serviceManager.prepareServices(
+                domains: schedule.skill.services,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+        } catch is CancellationError {
+            return (.cancelled, nil)
+        } catch {
+            Log.session.error("ChatManager.scheduled preparation failed schedule=\(schedule.id) error=\(error.localizedDescription)")
+            return (.failed(error.localizedDescription), nil)
+        }
+        ensureRepositoryScope()
+        guard repositoryScope.profileID == schedule.profileID else {
+            return (.failed("The scheduled skill's Profile is not active."), nil)
+        }
         let chat = makeChat(
             executionLease: executionLease,
             scheduledSkillID: schedule.id
         )
         chat.rename(to: "Scheduled /\(schedule.skill.displayName)")
-        chat.attachServiceDomains(schedule.skill.services)
+        chat.setAttachedServices(services)
         hydrationOrdinal &+= 1
         records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
         let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)

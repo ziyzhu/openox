@@ -432,6 +432,41 @@ final class ServiceManager {
         await loadRepositories(locale: locale)
     }
 
+    func prepareServices(domains: [String], locale: String?) async throws -> [Service] {
+        try Task.checkCancellation()
+        await refreshServices(locale: locale)
+        try Task.checkCancellation()
+        if case .failed(let message) = repositoryState {
+            throw RuntimeError.bridge("Service catalog could not be loaded: \(message)")
+        }
+        guard monoRepositoryState == .ready else {
+            throw RuntimeError.bridge("Service catalog is not ready.")
+        }
+        var seen: Set<String> = []
+        let required = domains.filter { seen.insert($0).inserted }
+        let missing = required.filter { service(domain: $0) == nil }
+        guard missing.isEmpty else {
+            throw RuntimeError.bridge("Required services are unavailable: \(missing.joined(separator: ", "))")
+        }
+        let resolved = required.compactMap { service(domain: $0) }
+        let unavailable = await withTaskGroup(of: String?.self, returning: [String].self) { group in
+            for service in resolved {
+                group.addTask { await service.loadManifest() == nil ? service.domain : nil }
+            }
+            var unavailable: [String] = []
+            for await domain in group {
+                if let domain { unavailable.append(domain) }
+            }
+            return unavailable.sorted()
+        }
+        try Task.checkCancellation()
+        guard unavailable.isEmpty else {
+            throw RuntimeError.bridge("Required service capabilities could not be loaded: \(unavailable.joined(separator: ", "))")
+        }
+        Log.service.info("ServiceManager.prepareServices ready domains=\(required.joined(separator: ","))")
+        return resolved
+    }
+
     private func loadRepositories(locale: String?) async -> [String] {
         await acquireRepositoryLoad()
         defer { releaseRepositoryLoad() }
