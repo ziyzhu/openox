@@ -99,6 +99,7 @@ extension OxHostProtocol {
         let id: String
         let clientId: String
         let key: String?
+        let region: LLMRegion?
     }
 
     struct SetRegionRequest: Decodable {

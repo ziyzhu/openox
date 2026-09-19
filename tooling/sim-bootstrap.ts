@@ -115,6 +115,7 @@ async function bootstrap(args: string[]): Promise<void> {
       kind: "set-key",
       clientId: credential.clientId,
       key: credential.key,
+      region,
     }, 10_000);
     if (!result.ok) throw new Error(`provider ${credential.clientId} bootstrap failed: ${result.error}`);
     console.log(`Provider ${credential.clientId}: ready`);

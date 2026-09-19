@@ -21,7 +21,7 @@ extension OxHostProtocol {
             return
         }
         let clientId = command.clientId
-        guard let client = ProviderRegistry.shared.client(id: clientId) else {
+        guard let client = ProviderRegistry.shared.client(id: clientId, in: command.region ?? ProviderRegistry.shared.defaultRegion) else {
             reply(encode(StatusResult(kind: "set-key-result", id: command.id, error: "unknown client: \(clientId)")))
             return
         }
