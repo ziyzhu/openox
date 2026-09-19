@@ -451,7 +451,7 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.signIn: \(domain) declares no sign-in handoff")
         }
         return try await tracked(.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
-            await service.resolveSignInState(reason: .modelSignIn)
+            await service.checkAccess(policy: .current, reason: .modelSignIn)
             if service.auth.isSignedOut {
                 await service.attemptSilentSignIn(reason: .modelSignIn)
             }

@@ -241,7 +241,7 @@ final class OxCanvas {
         guard state == .running else { return nil }
         switch control {
         case .signIn:
-            await service.signIn(using: CanvasAuthPresenter(canvas: self), source: .canvas)
+            try? await service.requestAccess(using: CanvasAuthPresenter(canvas: self), source: .canvas)
             return service.signInState.isAuthenticated ? .null : nil
         case .botControl(_, _, let args):
             return await service.completeBotControl(args: args, using: CanvasHandoffPresenter(canvas: self)) ? .null : nil

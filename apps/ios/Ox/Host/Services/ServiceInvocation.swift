@@ -80,7 +80,7 @@ extension Service {
         if action.requireAuth {
             let initialAuth = auth.logLabel
             let previousObservation = auth.observation
-            await resolveSignInState(reason: .requireAuth)
+            await checkAccess(reason: .requireAuth)
             if auth.isSignedOut { await attemptSilentSignIn(reason: .requireAuth) }
             let decision = auth.isSignedIn
                 ? (auth.observation == previousObservation ? "cachedSignedIn" : "probePassed")

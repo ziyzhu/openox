@@ -1,10 +1,8 @@
 import Foundation
 
 extension Service {
-    private static let signInStateMaxAge: TimeInterval = 30 * 60
-
     var supportsAuthentication: Bool {
-        isMCPService || supportsWebAuthentication
+        isMCPService || iOSService?.requiresPermission == true || supportsWebAuthentication
     }
 
     private var supportsWebAuthentication: Bool {
@@ -12,131 +10,24 @@ extension Service {
     }
 
     @discardableResult
-    func resolveAccess(reason: SignInProbeReason) async -> SignInState {
-        if let iOS = iOSService {
-            guard let state = await iOS.permissionState() else {
-                setAuth(.notRequired)
-                return signInState
-            }
-            switch state {
-            case .granted: setAuth(.authorized)
-            case .denied: setAuth(.notAuthorized)
-            case .notDetermined: setAuth(.authorizationRequired)
-            }
-            return signInState
+    func checkAccess(policy: AccessPolicy = .cached, reason: SignInProbeReason, preflight: UUID? = nil) async -> SignInState {
+        await access.check(self, policy: policy, reason: reason, preflight: preflight) {
+            try await self.readAccess()
         }
-        if isMCPService {
-            _ = await loadManifest(reason: capabilityReason(for: reason))
-            return signInState
-        }
-        return await resolveSignInState(reason: reason)
     }
 
-    func requestAccess() async throws {
-        if let iOS = iOSService {
-            let current = await iOS.permissionState()
-            let next = await iOS.updatePermission(from: current)
-            switch next {
-            case .granted: setAuth(.authorized)
-            case .denied: setAuth(.notAuthorized)
-            case .notDetermined: setAuth(.authorizationRequired)
-            case nil: setAuth(.notRequired)
-            }
-            return
+    func readAccess() async throws -> Auth {
+        if let iOS = iOSService { return await iOS.checkAccess() }
+        if let mcp = remoteMCPService {
+            _ = try await mcp.resolve(refresh: true)
+            return mcp.requiresAuthorization ? (mcp.isAuthorized ? .authorized : .authorizationRequired) : .notRequired
         }
-        guard let mcp = remoteMCPService else { return }
-        let descriptor = try await mcp.authorize()
-        let resolved = ServiceDefinition(mcp: descriptor, metadata: definition)
-        applyResolvedDefinition(resolved, reason: .serviceDetail)
+        guard supportsWebAuthentication, let webService else { return .notRequired }
+        return try await webService.checkAccess(service: self)
     }
 
     var accessActionLabel: String {
         auth == .authorizationRequired ? "Set Up" : "Manage"
-    }
-
-    private func capabilityReason(for reason: SignInProbeReason) -> CapabilityReason {
-        switch reason {
-        case .serviceDetail: .serviceDetail
-        case .attach, .chatOpen: .attach
-        case .debug: .debug
-        case .modelSignIn, .requireAuth, .clearWebsiteData: .invoke
-        }
-    }
-
-    private func beginAuthCheck() -> Bool {
-        guard !auth.isSigningIn else { return false }
-        setAuth(.checking(previous: auth.observation))
-        return true
-    }
-
-    @discardableResult
-    func resolveSignInState(reason: SignInProbeReason) async -> SignInState {
-        if case .observed(let observation) = auth,
-           Date().timeIntervalSince(observation.observedAt) < Self.signInStateMaxAge {
-            Log.service.info("Service.resolveSignInState cached domain=\(domain) reason=\(reason.rawValue) auth=\(auth.logLabel)")
-            return signInState
-        }
-        return await refreshSignInState(reason: reason)
-    }
-
-    @discardableResult
-    func refreshSignInState(reason: SignInProbeReason) async -> SignInState {
-        if isMCPService { return signInState }
-        guard supportsWebAuthentication else {
-            setAuth(.notRequired)
-            return signInState
-        }
-        if let authProbeTask {
-            Log.service.info("Service.refreshSignInState joined domain=\(domain) reason=\(reason.rawValue)")
-            await authProbeTask.value
-            return signInState
-        }
-        if auth.isSigningIn {
-            do {
-                try await awaitAuthenticationAvailability(name: "refreshSignInState:\(reason.rawValue)")
-            } catch {
-                return signInState
-            }
-            return await refreshSignInState(reason: reason)
-        }
-        guard beginAuthCheck() else {
-            if let authProbeTask { await authProbeTask.value }
-            return signInState
-        }
-        let previous = auth.observation
-        let id = String(UUID().uuidString.prefix(8))
-        let task = Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.runGetSignInStateProbe(id: id, reason: reason, previous: previous)
-        }
-        authProbeTask = task
-        let started = Date()
-        Log.service.info("Service.refreshSignInState start domain=\(domain) id=\(id) reason=\(reason.rawValue) previous=\(previous?.value.rawValue ?? "unknown")")
-        await task.value
-        authProbeTask = nil
-        let status = Task.isCancelled ? "canceled" : "complete"
-        Log.service.info("Service.refreshSignInState done domain=\(domain) id=\(id) reason=\(reason.rawValue) status=\(status) auth=\(auth.logLabel) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
-        return signInState
-    }
-
-    private func runGetSignInStateProbe(id: String, reason: SignInProbeReason, previous: AuthObservation?) async {
-        let result = await Manifest.getSignInState(service: self)
-        Log.service.info("Service.runGetSignInStateProbe result domain=\(domain) id=\(id) reason=\(reason.rawValue) outcome=\(result.outcome.logLabel)")
-        guard !Task.isCancelled else {
-            setAuth(previous.map(Auth.observed) ?? .unknown)
-            Log.service.info("Service.runGetSignInStateProbe canceled domain=\(domain) id=\(id) reason=\(reason.rawValue)")
-            return
-        }
-        switch result.outcome {
-        case .signedIn:
-            setAuth(.observed(AuthObservation(value: .signedIn, observedAt: result.at)))
-        case .signedOut:
-            setAuth(.observed(AuthObservation(value: .signedOut, observedAt: result.at)))
-        case .error(let error):
-            setAuth(.unavailable(previous: previous, error: error))
-            Log.service.warning("Service.runGetSignInStateProbe unavailable domain=\(domain) id=\(id) reason=\(reason.rawValue) previous=\(previous?.value.rawValue ?? "unknown") error=\(LogPrivacy.text(error))")
-        }
-        await manager.logAuthRetention(domain: domain, trigger: "probe", outcome: result.outcome.logLabel)
     }
 
     func getSignInState(in session: ServiceFlowSession) async -> GetSignInStateResult {
@@ -202,7 +93,7 @@ extension Service {
     }
 
     func attemptSilentSignIn(reason: SignInProbeReason) async {
-        guard case .observed(let previous) = auth,
+        guard webService != nil, case .observed(let previous) = auth,
               previous.value == .signedOut else { return }
         if let task = silentSignInTask {
             Log.service.info("Service.silentAuth joined domain=\(domain) reason=\(reason.rawValue)")
@@ -264,33 +155,39 @@ extension Service {
         await manager.logAuthRetention(domain: domain, trigger: "silent-sign-in", outcome: "signedIn")
     }
 
-    func signIn(using presenter: any ServiceAuthPresenting, source: AuthSignInSource) async {
-        if isMCPService {
-            guard signInState != .authorized else { return }
-            let previous = auth
-            do {
-                try await authorizeMCP()
-            } catch {
-                setAuth(previous)
-                Log.service.error("RemoteMCP.authorize failed id=\(domain) source=\(source.rawValue) error=\(error.localizedDescription)")
-            }
+    func requestAccess(using presenter: (any ServiceAuthPresenting)? = nil, source: AuthSignInSource = .serviceDetail) async throws {
+        try await access.request(self) {
+            try await self.performAccessRequest(using: presenter, source: source)
+        }
+    }
+
+    private func performAccessRequest(using presenter: (any ServiceAuthPresenting)?, source: AuthSignInSource) async throws {
+        if let iOS = iOSService {
+            let current = await iOS.permissionState()
+            _ = await iOS.updatePermission(from: current)
+            setAuth(await iOS.checkAccess())
             return
         }
+        if let mcp = remoteMCPService {
+            await checkAccess(policy: .current, reason: .modelSignIn)
+            if source != .serviceDetail, signInState.isAuthenticated { return }
+            let descriptor = try await mcp.authorize()
+            applyResolvedDefinition(ServiceDefinition(mcp: descriptor, metadata: definition), reason: .serviceDetail)
+            return
+        }
+        await checkAccess(policy: .current, reason: .modelSignIn)
+        guard !Task.isCancelled, !signInState.isAuthenticated, auth != .notRequired else { return }
+        await attemptSilentSignIn(reason: .modelSignIn)
+        guard !signInState.isAuthenticated else { return }
+
         guard supportsWebAuthentication else {
             setAuth(.notRequired)
             return
         }
-        var previousAuth = auth
-        var previous = auth.observation
+        guard let presenter else { throw InvokeError.requiresAuth(domain) }
+        let previousAuth = auth
+        let previous = auth.observation
         setAuth(.signingIn(previous: previous))
-        if let silentSignInTask {
-            Log.service.info("Service.signIn joined silent domain=\(domain) source=\(source.rawValue)")
-            await silentSignInTask.value
-            if auth.isSignedIn { return }
-            previousAuth = auth
-            previous = auth.observation ?? previous
-            setAuth(.signingIn(previous: previous))
-        }
         let outcome = await manager.sessionCoordinator.run(for: self, kind: .authentication) { [weak self] flowID in
             guard let self else { return .cancelled }
             await self.performInteractiveSignIn(using: presenter, source: source, flowID: flowID)
@@ -347,10 +244,6 @@ extension Service {
         await manager.logAuthRetention(domain: domain, trigger: "interactive-sign-in", outcome: outcome.rawValue)
     }
 
-    func authorizeMCP() async throws {
-        try await requestAccess()
-    }
-
     func signOut() async {
         let started = Date()
         attemptedSilentSignIn = true
@@ -366,7 +259,115 @@ extension Service {
         attemptedSilentSignIn = true
         Log.service.info("Service.clearWebData start domain=\(domain) auth=\(auth.logLabel)")
         await manager.clearWebsiteData(domain: domain)
-        await refreshSignInState(reason: .clearWebsiteData)
+        await checkAccess(policy: .current, reason: .clearWebsiteData)
         Log.service.info("Service.clearWebData done domain=\(domain) auth=\(auth.logLabel) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
+    }
+}
+
+@MainActor
+final class ServiceAccess {
+    private static let maxAge: TimeInterval = 30 * 60
+    private(set) var signInPreflight: UUID?
+    private var checkedAt: Date?
+    private var revision = UUID()
+    private var task: Task<Void, Never>?
+    private var requestTask: Task<Void, Error>?
+
+    func request(_ service: Service, operation: @escaping @MainActor () async throws -> Void) async throws {
+        if let requestTask { return try await requestTask.value }
+        let task = Task { @MainActor in
+            do {
+                try await operation()
+            } catch {
+                Log.service.warning("Service.access request failed domain=\(service.domain) error=\(LogPrivacy.text(error.localizedDescription))")
+                throw error
+            }
+        }
+        requestTask = task
+        defer { requestTask = nil }
+        try await task.value
+    }
+
+    func didUpdate(_ auth: Service.Auth) {
+        revision = UUID()
+        signInPreflight = nil
+        switch auth {
+        case .observed(let observation): checkedAt = observation.observedAt
+        case .authorized, .notRequired: checkedAt = Date()
+        default: break
+        }
+    }
+
+    func check(_ service: Service, policy: Service.AccessPolicy, reason: Service.SignInProbeReason, preflight: UUID? = nil, read: @escaping @MainActor () async throws -> Service.Auth) async -> Service.SignInState {
+        guard !Task.isCancelled else { return service.signInState }
+        if let preflight, preflight == signInPreflight, isFresh(service.auth) {
+            signInPreflight = nil
+            Log.service.info("Service.access preflight domain=\(service.domain) reason=\(reason.rawValue)")
+            return service.signInState
+        }
+        if service.auth.isSigningIn {
+            let previousCheck = checkedAt
+            do {
+                try await service.awaitAuthenticationAvailability(name: "checkAccess:\(reason.rawValue)")
+            } catch {
+                return service.signInState
+            }
+            return await check(service, policy: checkedAt != previousCheck ? .cached : policy, reason: reason, read: read)
+        }
+        if let task {
+            Log.service.info("Service.access joined domain=\(service.domain) reason=\(reason.rawValue)")
+            await task.value
+            preparePreflight(service, policy: policy, reason: reason)
+            return service.signInState
+        }
+        let local = service.isIOSService
+        if !local, policy == .cached, isFresh(service.auth) {
+            Log.service.info("Service.access cached domain=\(service.domain) reason=\(reason.rawValue) auth=\(service.auth.logLabel)")
+            return service.signInState
+        }
+        let previous = service.auth
+        if !local { service.setAuth(.checking(previous: previous.observation)) }
+        let revision = revision
+        let started = Date()
+        Log.service.info("Service.access start domain=\(service.domain) reason=\(reason.rawValue) policy=\(policy.rawValue)")
+        let task = Task { @MainActor in
+            let next: Service.Auth
+            do {
+                next = try await read()
+            } catch is CancellationError {
+                next = previous
+            } catch RemoteMCPError.authorizationRequired {
+                next = .authorizationRequired
+            } catch {
+                next = .unavailable(previous: previous.observation, error: error.localizedDescription)
+                Log.service.warning("Service.access unavailable domain=\(service.domain) reason=\(reason.rawValue) error=\(LogPrivacy.text(error.localizedDescription))")
+            }
+            guard self.revision == revision else { return }
+            service.setAuth(next)
+            if service.webService != nil {
+                await service.manager.logAuthRetention(domain: service.domain, trigger: "probe", outcome: next.logLabel)
+            }
+        }
+        self.task = task
+        await task.value
+        self.task = nil
+        preparePreflight(service, policy: policy, reason: reason)
+        Log.service.info("Service.access done domain=\(service.domain) reason=\(reason.rawValue) auth=\(service.auth.logLabel) ms=\(Int(Date().timeIntervalSince(started) * 1000))")
+        return service.signInState
+    }
+
+    private func preparePreflight(_ service: Service, policy: Service.AccessPolicy, reason: Service.SignInProbeReason) {
+        if policy == .current, reason == .modelSignIn, isFresh(service.auth), !Task.isCancelled {
+            signInPreflight = revision
+        }
+    }
+
+    private func isFresh(_ auth: Service.Auth) -> Bool {
+        switch auth {
+        case .observed, .authorized, .notRequired:
+            return checkedAt.map { Date().timeIntervalSince($0) < Self.maxAge } ?? false
+        default:
+            return false
+        }
     }
 }

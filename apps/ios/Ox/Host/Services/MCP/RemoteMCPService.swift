@@ -860,8 +860,8 @@ final class RemoteMCPService {
         return url
     }
 
-    func resolve(allowsAuthorization: Bool = false) async throws -> RemoteMCPDescriptor {
-        if let descriptor { return descriptor }
+    func resolve(allowsAuthorization: Bool = false, refresh: Bool = false) async throws -> RemoteMCPDescriptor {
+        if let descriptor, !refresh { return descriptor }
         guard endpoint.scheme?.lowercased() == "https" || Self.allowsDevelopmentHTTP(endpoint),
               WebFetchURLPolicy.allows(endpoint) else {
             throw RemoteMCPError.invalidEndpoint

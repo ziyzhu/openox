@@ -207,7 +207,7 @@ extension OxHostProtocol {
         }
         Log.agent.debug("OxHostProtocol.refresh-service-auth id=\(command.id) domain=\(command.domain)")
         withService(id: command.id, domain: command.domain, kind: "refresh-service-auth-result", serviceManager: serviceManager, reply: reply) { service in
-            await service.refreshSignInState(reason: .debug)
+            await service.checkAccess(policy: .current, reason: .debug)
             return ActionPayload(ok: true, value: .string(service.signInState.rawValue), error: nil)
         }
     }

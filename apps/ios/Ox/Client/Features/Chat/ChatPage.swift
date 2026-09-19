@@ -1483,7 +1483,7 @@ struct ChatPage: View {
         await withTaskGroup(of: Void.self) { group in
             for service in chat.attachedServices {
                 group.addTask { @MainActor in
-                    await service.resolveAccess(reason: .chatOpen)
+                    await service.checkAccess(reason: .chatOpen)
                 }
             }
         }
@@ -1494,7 +1494,7 @@ struct ChatPage: View {
               case .signIn(let domain, _) = item.control,
               let service = chat.attachedService(domain: domain) else { return }
         Log.ui.info("ChatPage.authProbe start chat=\(chat.id) domain=\(domain) state=\(service.signInState.rawValue)")
-        await service.resolveSignInState(reason: .chatOpen)
+        await service.checkAccess(policy: .current, reason: .pendingSignIn, preflight: item.accessPreflight)
         guard !Task.isCancelled else {
             Log.ui.info("ChatPage.authProbe canceled chat=\(chat.id) domain=\(domain)")
             return

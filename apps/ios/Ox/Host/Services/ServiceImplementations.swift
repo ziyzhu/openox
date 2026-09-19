@@ -35,6 +35,29 @@ final class WebService {
         self.state = state
     }
 
+    func checkAccess(service: Service) async throws -> Service.Auth {
+        for attempt in 1...2 {
+            let result = await service.invokeAction(Manifest.SIGN_IN_STATE_ACTION_ID, args: .object([:]), role: .authenticationProbe)
+            switch result {
+            case .success(let value):
+                switch Manifest.getSignInStateOutcome(value) {
+                case .signedIn: return .observed(Service.AuthObservation(value: .signedIn, observedAt: Date()))
+                case .signedOut: return .observed(Service.AuthObservation(value: .signedOut, observedAt: Date()))
+                case .error(let error): throw Service.EvalError.js(error)
+                }
+            case .failure(let error):
+                let retryable = switch error {
+                case Service.EvalError.contextInvalidated, Service.InvokeError.invalidContract: true
+                default: service.resolutionState.resolved == nil
+                }
+                guard attempt == 1, retryable, !Task.isCancelled else { throw error }
+                Log.service.info("Service.access retry domain=\(service.domain) attempt=\(attempt)")
+                _ = await service.loadManifest(reason: .invoke)
+            }
+        }
+        throw Service.EvalError.notActive
+    }
+
     var detailCapabilities: ServiceDetailCapabilities {
         ServiceDetailCapabilities(
             authentication: .service,
@@ -83,6 +106,15 @@ final class IOSService {
     func permissionState() async -> NativePermissionState? {
         guard let permission else { return nil }
         return await permission.state()
+    }
+
+    func checkAccess() async -> Service.Auth {
+        switch await permissionState() {
+        case .granted: .authorized
+        case .denied: .notAuthorized
+        case .notDetermined: .authorizationRequired
+        case nil: .notRequired
+        }
     }
 
     func updatePermission(from state: NativePermissionState?) async -> NativePermissionState? {

@@ -178,7 +178,7 @@ struct ServiceChip: View {
         chipContent
             .task(id: "\(service?.id ?? "none"):\(scenePhase)") {
                 guard showsAuthStatus, scenePhase == .active, let service else { return }
-                await service.resolveAccess(reason: .chatOpen)
+                await service.checkAccess(reason: .chatOpen)
             }
     }
 

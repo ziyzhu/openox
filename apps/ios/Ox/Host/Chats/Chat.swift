@@ -63,6 +63,7 @@ final class Chat: Identifiable {
         let id: UUID
         let control: ServiceControl
         var source: Source?
+        var accessPreflight: UUID? = nil
     }
 
     struct PendingPrompt: Identifiable, Equatable {
@@ -1206,7 +1207,8 @@ final class Chat: Identifiable {
         let pending = PendingServiceControl(
             id: UUID(),
             control: control,
-            source: source
+            source: source,
+            accessPreflight: attachedService(domain: control.domain)?.access.signInPreflight
         )
         if standalone { finishStandaloneExecution() }
         Log.session.info("Chat.embedServiceControl id=\(pending.id.uuidString) domain=\(control.domain)")
@@ -1929,7 +1931,7 @@ final class Chat: Identifiable {
             return false
         }
         Log.session.info("Chat.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumeAgent)")
-        await service.signIn(using: presentations.serviceSignIn, source: .chatCard)
+        try? await service.requestAccess(using: presentations.serviceSignIn, source: .chatCard)
         let ok = service.signInState.isAuthenticated
         Log.session.info("Chat.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
         if ok, resumeAgent {
@@ -2641,7 +2643,7 @@ final class Chat: Identifiable {
         if servicesAttached {
             serviceManager.setAttachedServices(services, for: id)
             for service in added {
-                Task { await service.resolveAccess(reason: .attach) }
+                Task { await service.checkAccess(reason: .attach) }
             }
         }
         for svc in services {

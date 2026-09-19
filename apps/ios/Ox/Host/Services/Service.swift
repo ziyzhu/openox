@@ -78,6 +78,7 @@ final class Service: NSObject, Identifiable {
 
         var isSignedIn: Bool { observation?.value == .signedIn }
         var isSignedOut: Bool { observation?.value == .signedOut }
+        var isChecking: Bool { if case .checking = self { true } else { false } }
         var isSigningIn: Bool { if case .signingIn = self { true } else { false } }
         var isUnavailable: Bool { if case .unavailable = self { true } else { false } }
 
@@ -103,10 +104,16 @@ final class Service: NSObject, Identifiable {
         var requiresAuthentication: Bool { self == .signedOut || self == .notAuthorized }
     }
 
+    enum AccessPolicy: String {
+        case cached
+        case current
+    }
+
     enum SignInProbeReason: String {
         case attach
         case chatOpen
         case modelSignIn
+        case pendingSignIn
         case serviceDetail
         case requireAuth
         case clearWebsiteData
@@ -418,7 +425,7 @@ final class Service: NSObject, Identifiable {
     private(set) var auth: Auth = .unknown
     private(set) var capabilityState: CapabilityState = .unloaded
     @ObservationIgnored var authenticationWaiters: [AuthenticationWaiter] = []
-    @ObservationIgnored var authProbeTask: Task<Void, Never>?
+    @ObservationIgnored let access = ServiceAccess()
     @ObservationIgnored var silentSignInTask: Task<Void, Never>?
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
     @ObservationIgnored var attemptedSilentSignIn = false
@@ -555,6 +562,7 @@ final class Service: NSObject, Identifiable {
             auth = .unknown
             capabilityState = definition.actions.isEmpty ? .unloaded : .ready
         }
+        access.didUpdate(auth)
     }
 
     nonisolated override func isEqual(_ object: Any?) -> Bool {
@@ -580,6 +588,7 @@ final class Service: NSObject, Identifiable {
         guard auth != next else { return }
         let previous = auth
         auth = next
+        access.didUpdate(next)
         Log.service.info("Service.auth domain=\(domain) -> \(next.logLabel) from=\(previous.logLabel) pages=\(pageCount)")
         if !next.isSigningIn { releaseAuthenticationWaiters() }
         for page in servicePages { advancePage(page) }

@@ -45,10 +45,9 @@ struct ServiceDetailView: View {
 
     private var capabilities: ServiceDetailCapabilities { service.detailCapabilities }
 
-    @State private var actions: [Manifest.Action] = []
-    @State private var skills: [Manifest.Skill] = []
-    @State private var loadingManifest = true
-    @State private var refreshingAuth = true
+    private var actions: [Manifest.Action] { service.definition.exposedActions }
+    private var skills: [Manifest.Skill] { service.definition.skills }
+    private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
     @State private var signingOut = false
     @State private var descriptionExpanded = false
     @State private var descriptionFullHeight: CGFloat = 0
@@ -185,28 +184,9 @@ struct ServiceDetailView: View {
             }
         }
         .task(id: service.id) {
-            refreshingAuth = true
-            loadingManifest = true
             _ = await service.loadManifest(reason: .serviceDetail)
-            actions = service.definition.exposedActions
-            skills = service.definition.skills
-            loadingManifest = false
             guard !Task.isCancelled else { return }
-            switch capabilities.authentication {
-            case .systemPermission:
-                await service.resolveAccess(reason: .serviceDetail)
-                refreshingAuth = false
-                return
-            case .service:
-                await service.resolveSignInState(reason: .serviceDetail)
-                guard !Task.isCancelled else { return }
-                refreshingAuth = false
-            case .mcp:
-                await service.resolveAccess(reason: .serviceDetail)
-                refreshingAuth = false
-            case .none:
-                refreshingAuth = false
-            }
+            await service.checkAccess(reason: .serviceDetail)
         }
         .appPresentations(presentations)
     }
@@ -231,7 +211,7 @@ struct ServiceDetailView: View {
         case .systemPermission:
             permissionButton
         case .service:
-            if refreshingAuth && service.signInState == .unknown {
+            if service.auth == .unknown || service.auth.isChecking {
                 signInButton(signingIn: true)
                     .accessibilityIdentifier(A11yID.Chat.Attach.signInProgress(service.domain))
             } else {
@@ -296,7 +276,7 @@ struct ServiceDetailView: View {
             isDisabled: signingIn,
             layout: .compact
         ) {
-            Task { await service.signIn(using: presentations, source: .serviceDetail) }
+            Task { try? await service.requestAccess(using: presentations, source: .serviceDetail) }
         }
     }
 
@@ -311,7 +291,7 @@ struct ServiceDetailView: View {
         authorizingMCP = true
         defer { authorizingMCP = false }
         do {
-            try await service.authorizeMCP()
+            try await service.requestAccess()
         } catch {
             Log.service.error("RemoteMCP.authorize failed id=\(service.domain) error=\(error.localizedDescription)")
             mcpAuthorizationError = error.localizedDescription
