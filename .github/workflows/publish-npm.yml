@@ -14,7 +14,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  standalone:
+    if: startsWith(github.ref_name, 'ox-cli-v')
+    uses: ./.github/workflows/cli-standalone.yml
+    permissions:
+      contents: read
+
   publish:
+    needs: standalone
+    if: ${{ !cancelled() && (needs.standalone.result == 'success' || needs.standalone.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -53,6 +61,9 @@ jobs:
           esac
           version="$(node -p "require('./$package_directory/package.json').version")"
           test "$GITHUB_REF_NAME" = "$tag_prefix$version"
+          if [ "$package_key" = cli ]; then
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          fi
           git fetch origin main:refs/remotes/origin/main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           echo "package_directory=$package_directory" >> "$GITHUB_OUTPUT"
@@ -85,3 +96,43 @@ jobs:
           bun tooling/npm-publish.ts \
             --directory "${{ steps.release.outputs.package_key }}" \
             --tarball "${{ steps.artifact.outputs.tarball }}"
+
+  release-cli:
+    needs: [publish, standalone]
+    if: startsWith(github.ref_name, 'ox-cli-v')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: ox-cli-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/ox-cli-release
+      - name: Verify release payload
+        run: |
+          cd "$RUNNER_TEMP/ox-cli-release"
+          for platform in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+            test -f "ox-cli-$platform.tar.gz"
+            test -f "SHA256SUMS-$platform"
+          done
+          cat SHA256SUMS-* > SHA256SUMS
+          cp "$GITHUB_WORKSPACE/apps/cli/install.sh" install.sh
+          sha256sum install.sh >> SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Publish standalone release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag --latest=false \
+            --title "Ox CLI ${GITHUB_REF_NAME#ox-cli-v}" \
+            --notes "Standalone Ox CLI for macOS and Linux. Install or update with: curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh" \
+            "$RUNNER_TEMP/ox-cli-release/"*.tar.gz \
+            "$RUNNER_TEMP/ox-cli-release/SHA256SUMS" \
+            "$RUNNER_TEMP/ox-cli-release/install.sh"

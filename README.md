@@ -27,6 +27,23 @@ Each self-evolving agent is called an Ox. Every Ox follows three principles.
 
 The first implementation of Ox is an iOS app whose source code is included in the OpenOx repository.
 
+## Ox CLI
+
+Install the standalone terminal Client on macOS or Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh
+ox --help
+```
+
+Standalone downloads require a published `ox-cli-v<version>` GitHub Release.
+The installer verifies the download and installs into `~/.local/bin` without
+requiring Bun or Node.js. Run the same command to update.
+
+Live commands connect to a running Ox Host; the reference control endpoint is
+provided by a DEBUG iOS Simulator app. See the [CLI guide](apps/cli/README.md)
+for Host connections, offline commands, and package-manager alternatives.
+
 ## Components
 
 An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.

@@ -17,7 +17,38 @@ decides how each service page is implemented and managed.
 
 ## Install
 
-Ox CLI requires [Bun](https://bun.sh/) 1.3 or newer.
+Install the standalone CLI on macOS or Linux without installing Bun or Node.js:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh | sh
+ox --version
+ox --help
+```
+
+The installer downloads an `ox-cli-v<version>` GitHub Release, verifies its
+SHA-256 checksum and executable version, and installs `ox` into `~/.local/bin`.
+It supports Apple Silicon and Intel macOS, and ARM64 and x64 Linux with glibc.
+Standalone installation becomes available when the first CLI GitHub Release
+is published.
+
+Run the same installer command to update. If the install directory is missing
+from your PATH, follow the printed shell instructions. If another `ox` is
+already on PATH, remove that installation first or select its directory with
+`OX_INSTALL_DIR`. Package-manager symlinks must be uninstalled with their
+original package manager before switching to standalone installation.
+
+To select a version or installation directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh \
+  | OX_CLI_VERSION=0.1.0 OX_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+To uninstall a standalone installation, remove the installed `ox` executable.
+
+### Package managers
+
+Package-manager installations require [Bun](https://bun.sh/) 1.3 or newer:
 
 ```sh
 bun install --global @openox/cli
@@ -71,7 +102,8 @@ Global selectors are position-independent.
 ## Connect to an Ox Host
 
 A running DEBUG iOS Simulator app exposes the reference Host on a loopback
-WebSocket:
+WebSocket. Installing the CLI provides a Client; live commands require a
+running Host:
 
 ```sh
 ox discover
@@ -308,15 +340,29 @@ bun run typecheck
 cd apps/cli
 bun run build
 bun run package:check
+bun run standalone:check
+bun run build:standalone --platform linux-x64 --out /tmp/ox-cli-artifacts
 ```
 
 `package:check` builds the publishable bundle, verifies the tarball, installs
 it into a temporary global prefix, and exercises the installed CLI.
 
+`standalone:check` builds for the current platform, downloads and installs the
+archive through a local fixture server, and exercises the installed executable
+without Bun or Node.js on PATH. It checks repository inspection and validation,
+Host discovery, a WebSocket Host request, and isolation from working-directory
+`.env` and `bunfig.toml` files. Pass `--out <directory>` to retain release
+artifacts; otherwise they are removed with the temporary test files.
+
 ## Release
 
 The version in `package.json` is the source of truth. Update it on `main`,
-run the package check, then create a matching `ox-cli-v<version>` tag.
+run both package and standalone checks, wait for CI, then create a matching
+`ox-cli-v<version>` tag. The release workflow requires all four standalone
+platforms to pass installation and runtime checks before publishing npm.
+After npm publication succeeds, it publishes the standalone archives,
+`SHA256SUMS`, and `install.sh` as a CLI-specific GitHub Release. The installer
+selects stable CLI tags independently of SDK and service releases.
 
 The first npm release must be published interactively:
 
