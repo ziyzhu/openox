@@ -24,8 +24,8 @@ struct OnboardingView: View {
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
                             symbol: "hammer",
-                            title: "Connects to any app",
-                            description: "Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly."
+                            title: "Works across the internet",
+                            description: "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable."
                         )
                         OnboardingDisclosureRow(
                             symbol: "chevron.left.forwardslash.chevron.right",

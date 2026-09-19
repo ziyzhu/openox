@@ -2490,17 +2490,6 @@
         }
       }
     },
-    "Connects to any app" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接任何应用"
-          }
-        }
-      }
-    },
     "Contacts" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6816,13 +6805,13 @@
         }
       }
     },
-    "Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly." : {
+    "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 可以连接任何应用，用得比你更好。如果缺少某项能力，Ox 可以即时修改自身。"
+            "value" : "Ox 可以代你使用网站和应用，让你摆脱争夺注意力的界面和缓慢的旧式服务。Ox 还会把学到的内容转化为可复用的能力，让之后的交互更快、更可靠。"
           }
         }
       }
@@ -11573,6 +11562,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "梳理那个怎么都对不上的部分。"
+          }
+        }
+      }
+    },
+    "Works across the internet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用整个互联网"
           }
         }
       }

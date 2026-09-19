@@ -4,7 +4,7 @@
 
 <h1>OpenOx</h1>
 
-Ox is a local, open-source personal AI agent that can connect to any app.
+Ox is a mobile agent that uses the internet for you.
 
 <h3>
 
@@ -21,7 +21,7 @@ Ox is a local, open-source personal AI agent that can connect to any app.
 
 Each self-evolving agent is called an Ox. Every Ox follows three principles.
 
-1. **Connect to any app** — Ox can connect to any app and use them better than you do. If a capability is missing, Ox can modify itself on the fly.
+1. **Works across the internet** — Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable.
 2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
 3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
 
