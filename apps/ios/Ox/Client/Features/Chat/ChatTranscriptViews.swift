@@ -146,6 +146,23 @@ private struct ChatArtifactRow: View {
     }
 }
 
+private struct ChatInteractiveRowSurface: ViewModifier {
+    @Environment(\.appTheme) private var appTheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+        content
+            .padding(Theme.Spacing.md)
+            .frame(minHeight: Theme.Size.minimumTouchTarget)
+            .background {
+                Color.clear
+                    .glassEffect(.regular.interactive(), in: shape)
+                    .id(appTheme)
+            }
+            .contentShape(shape)
+    }
+}
+
 private struct ServiceInspectorRow: View {
     let link: ServiceInspectorLink
     let chatID: UUID
@@ -193,7 +210,7 @@ private struct ServiceInspectorRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: 44)
-        .contentShape(Rectangle())
+        .modifier(ChatInteractiveRowSurface())
         .onTapGesture { isPresented = canInspect }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
@@ -1171,6 +1188,7 @@ private struct UserSkillBubble: View {
                 SkillLibraryRow(skill: invocation.skill)
             }
             .buttonStyle(.plain)
+            .modifier(ChatInteractiveRowSurface())
             .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
             .accessibilityIdentifier(A11yID.Chat.Message.skill(invocation.skill.name))
 
@@ -1451,6 +1469,7 @@ struct BlockView: View, Equatable {
                             SkillLibraryRow(skill: skill)
                         }
                         .buttonStyle(.plain)
+                        .modifier(ChatInteractiveRowSurface())
                         .padding(.horizontal, 4)
                         .accessibilityLabel("/\(skill.displayName), \(skill.description)")
                         .accessibilityIdentifier(A11yID.Chat.Message.skill(skill.name))
