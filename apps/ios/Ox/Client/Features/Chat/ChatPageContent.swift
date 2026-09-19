@@ -34,6 +34,7 @@ struct ChatBlock: Identifiable, Equatable {
     let createdAt: Date
     let kind: Kind
     let spacingBefore: CGFloat
+    var sourceInvocations: [Invocation] = []
 
     var isUserInitiated: Bool {
         switch kind {
@@ -207,11 +208,25 @@ extension ChatBlock {
 
         let activeTurnID = thinkingActivity?.turnID ?? (isBusy ? sources.last?.turnID : nil)
         let blocks = projectedTurns.flatMap { turn in
+            var turnBlocks = turn.blocks
+            var invocations: [Invocation] = []
+            for index in turnBlocks.indices {
+                guard case .thinking(let trace) = turnBlocks[index].kind else { continue }
+                let stepInvocations = trace.entries.compactMap { entry -> Invocation? in
+                    guard case .invocation(let invocation) = entry else { return nil }
+                    return invocation
+                }
+                turnBlocks[index].sourceInvocations = stepInvocations
+                invocations.append(contentsOf: stepInvocations)
+            }
+            if let lastThinking = turnBlocks.lastIndex(where: \.isThinking) {
+                turnBlocks[lastThinking].sourceInvocations = invocations
+            }
             guard let sourceBlockID = turn.footerSourceBlockID,
-                  let createdAt = turn.footerCreatedAt else { return turn.blocks }
+                  let createdAt = turn.footerCreatedAt else { return turnBlocks }
             let text = turn.footerText.joined(separator: "\n\n")
-            guard !text.isEmpty else { return turn.blocks }
-            return turn.blocks + [ChatBlock(
+            guard !text.isEmpty else { return turnBlocks }
+            return turnBlocks + [ChatBlock(
                 id: StableID.uuid("chat.turn.\(turn.id.rawValue.uuidString).footer"),
                 sourceBlockID: sourceBlockID,
                 createdAt: createdAt,
@@ -232,7 +247,8 @@ extension ChatBlock {
                 spacingBefore: max(
                     ChatTranscriptMetrics.blockSpacing,
                     Theme.Size.minimumTouchTarget - ChatTranscriptMetrics.thinkingRowHeight
-                )
+                ),
+                sourceInvocations: block.sourceInvocations
             )
         }
     }

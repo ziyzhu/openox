@@ -228,6 +228,7 @@ struct ActivityBubble: View {
 private struct ThinkingRow: View {
     private let singleLineHeight = ChatTranscriptMetrics.thinkingRowHeight
     let trace: ThinkingTrace
+    let sourceInvocations: [Invocation]
     let startedAt: Date
     let isLive: Bool
     @Environment(ServiceManager.self) private var serviceManager
@@ -276,11 +277,12 @@ private struct ThinkingRow: View {
     }
 
     private var targetLabel: String { isLive ? liveTargetLabel : settledTargetLabel }
-    private var sources: [InvocationFormat.Source]? {
-        guard !isLive,
-              let last = trace.entries.last,
-              case .invocation(let invocation) = last else { return nil }
-        return InvocationFormat.sources(invocation, serviceManager: serviceManager)
+    private var sources: [InvocationFormat.Source] {
+        guard !isLive else { return [] }
+        var seen: Set<String> = []
+        return sourceInvocations.flatMap {
+            InvocationFormat.sources($0, serviceManager: serviceManager) ?? []
+        }.filter { seen.insert($0.id).inserted }
     }
     private func previewLabel(_ entry: TraceEntry) -> String {
         switch entry {
@@ -310,7 +312,7 @@ private struct ThinkingRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(label)
-                    if let sources {
+                    if !sources.isEmpty {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source) {
                                 if let url = source.url {
@@ -724,11 +726,15 @@ private struct SourceChipList<Chip: View>: View {
     }
 
     var body: some View {
-        ChipFlowLayout(spacing: Theme.Spacing.xs) {
-            ForEach(sources.indices, id: \.self) { index in
-                chip(sources[index])
+        ScrollView(.horizontal) {
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(sources.indices, id: \.self) { index in
+                    chip(sources[index])
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
         }
+        .scrollIndicators(.hidden)
     }
 }
 
@@ -868,6 +874,14 @@ private enum InvocationFormat {
         let icon: Icon
         let url: URL?
         let accessibilityLabel: String
+
+        var id: String {
+            switch icon {
+            case .service(let service): "service:\(service.domain)"
+            case .domain(let domain): "domain:\(url?.absoluteString ?? domain)"
+            case .none: "label:\(label)"
+            }
+        }
 
         init(label: String, icon: Icon, url: URL? = nil, accessibilityLabel: String? = nil) {
             self.label = label
@@ -1259,6 +1273,7 @@ struct BlockView: View, Equatable {
         case let .thinking(trace):
             ThinkingRow(
                 trace: trace,
+                sourceInvocations: block.sourceInvocations,
                 startedAt: block.createdAt,
                 isLive: isThinkingTail
             )

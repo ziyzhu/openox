@@ -63,6 +63,21 @@ enum ChatBlockProjectionChecks {
                 failures.append("Video must share rich block spacing")
             }
         }
+        let first = Invocation(name: "ox.service.invoke(web:first.example:read)", purpose: "First service", args: .object([:]), outcome: .succeeded(nil))
+        let second = Invocation(name: "ox.service.invoke(web:second.example:read)", purpose: "Second service", args: .object([:]), outcome: .succeeded(nil))
+        let serviceSources: [(block: Block, turnID: TurnID)] = [
+            (Block(.thinking(ThinkingTrace(entries: [.invocation(first)], completedAt: Date()))), turnID),
+            (Block(.agentContent([.progress("Continue")])), turnID),
+            (Block(.thinking(ThinkingTrace(entries: [.invocation(second)], completedAt: Date()))), turnID),
+            (Block(.thinking(ThinkingTrace(entries: [.reasoning(Reasoning(text: "Ready"))], completedAt: Date()))), turnID),
+            (Block(.agentContent([.text("Response")])), turnID),
+            (Block(.thinking(trace)), TurnID()),
+        ]
+        let serviceBlocks = ChatBlock.project(serviceSources, thinkingActivity: nil, isBusy: false, interaction: nil)
+            .filter(\.isThinking)
+        if serviceBlocks.map(\.sourceInvocations) != [[first], [second], [first, second], []] {
+            failures.append("Intermediate steps must keep their services; the final step must include only its turn's services even after reasoning")
+        }
         return failures
     }
 }
