@@ -11,7 +11,7 @@ download() {
 }
 
 install_ox() {
-  for tool in uname ls curl tar mktemp tr sed awk sort head chmod mv rm mkdir; do
+  for tool in uname ls curl tar gzip mktemp tr sed awk sort head chmod mv rm mkdir; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is required to install Ox CLI"
   done
   if command -v sha256sum >/dev/null 2>&1; then

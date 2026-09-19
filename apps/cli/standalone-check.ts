@@ -38,7 +38,7 @@ try {
   downloads.set("/SHA256SUMS", join(resolve(values.out ?? join(temporaryRoot, "artifacts")), `SHA256SUMS-${nativePlatform}`));
   const tools = join(temporaryRoot, "tools");
   await mkdir(tools);
-  for (const tool of ["uname", "curl", "tar", "mktemp", "tr", "sed", "awk", "sort", "head", "chmod", "mv", "rm", "mkdir", "ls", "shasum", "sha256sum"]) {
+  for (const tool of ["uname", "curl", "tar", "gzip", "mktemp", "tr", "sed", "awk", "sort", "head", "chmod", "mv", "rm", "mkdir", "ls", "shasum", "sha256sum"]) {
     const path = Bun.which(tool);
     if (path && tool !== "curl") await symlink(path, join(tools, tool));
   }

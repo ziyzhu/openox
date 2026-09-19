@@ -19,7 +19,7 @@ beforeEach(async () => {
   bin = join(root, "tools");
   destination = join(root, "install with spaces");
   await mkdir(bin);
-  for (const tool of ["tar", "mktemp", "tr", "sed", "awk", "sort", "head", "chmod", "mv", "rm", "mkdir", "ls", "shasum"]) {
+  for (const tool of ["tar", "gzip", "mktemp", "tr", "sed", "awk", "sort", "head", "chmod", "mv", "rm", "mkdir", "ls", "shasum"]) {
     const executable = Bun.which(tool);
     if (!executable) throw new Error(`Missing fixture tool: ${tool}`);
     await symlink(executable, join(bin, tool));
@@ -204,5 +204,13 @@ test("missing checksum tools fail before downloading", async () => {
   const result = await install("0.2.0");
   expect(result.code).not.toBe(0);
   expect(result.stderr).toContain("required to verify");
+  expect(downloads).toEqual([]);
+});
+
+test("missing gzip fails before downloading", async () => {
+  await rm(join(bin, "gzip"));
+  const result = await install("0.2.0");
+  expect(result.code).not.toBe(0);
+  expect(result.stderr).toContain("gzip is required");
   expect(downloads).toEqual([]);
 });
