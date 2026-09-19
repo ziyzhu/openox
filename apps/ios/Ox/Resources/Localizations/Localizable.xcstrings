@@ -2048,13 +2048,13 @@
         }
       }
     },
-    "Capabilities" : {
+    "Actions" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "能力"
+            "value" : "操作"
           }
         }
       }
@@ -10463,13 +10463,13 @@
         }
       }
     },
-    "This service provides no capabilities." : {
+    "This service provides no actions." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此服务未提供任何能力。"
+            "value" : "此服务未提供任何操作。"
           }
         }
       }

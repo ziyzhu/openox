@@ -437,7 +437,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Capabilities")
+            Text("Actions")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .padding(.horizontal, Theme.Spacing.md)
@@ -453,7 +453,7 @@ struct ServiceDetailView: View {
                     }
                 }
             } else if actions.isEmpty {
-                Text("This service provides no capabilities.")
+                Text("This service provides no actions.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.horizontal, Theme.Spacing.md)
