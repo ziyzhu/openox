@@ -80,7 +80,9 @@ final class ServiceOperations {
                 } catch { return false }
             }
             let result: Result<JSONValue, Error>
-            if let implementation = service.iOSService {
+            if let implementation = service.apiService {
+                result = await implementation.invoke(service: service, actionID: actionID, args: input, approve: approve)
+            } else if let implementation = service.iOSService {
                 result = await implementation.invoke(
                     service: service, actionID: actionID, args: input, purpose: purpose,
                     approve: approve,
@@ -118,8 +120,8 @@ final class ServiceOperations {
         guard endpoint == nil, transport == nil else {
             throw RuntimeError.bridge("ox.service.create: endpoint and transport apply only to MCP services.")
         }
-        guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), serviceKind == .web else {
-            throw RuntimeError.bridge("ox.service.create: kind must be 'web' or 'mcp'")
+        guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), [.web, .api].contains(serviceKind) else {
+            throw RuntimeError.bridge("ox.service.create: kind must be 'web', 'api', or 'mcp'")
         }
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !cleanDomain.isEmpty else {
@@ -135,7 +137,7 @@ final class ServiceOperations {
             )
             return .object([
                 "domain": .string(cleanDomain),
-                "manifestPath": .string("services/web/\(cleanDomain)/service.json"),
+                "manifestPath": .string("services/\(kind)/\(cleanDomain)/service.json"),
                 "source": .string("local"),
             ])
         }
@@ -560,6 +562,7 @@ final class ServiceOperations {
 
     private func serviceKind(_ service: Service) -> String {
         if service.isIOSService { return "ios" }
+        if service.isAPIService { return "api" }
         if service.isMCPService { return "mcp" }
         return "web"
     }

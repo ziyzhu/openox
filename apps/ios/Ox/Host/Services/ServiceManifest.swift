@@ -80,17 +80,26 @@ nonisolated struct ServiceDefinition: Sendable {
         guard let name = object["name"]?.stringValue, !name.isEmpty else {
             throw ValidationError.missing("name")
         }
+        let api = object["kind"]?.stringValue == "api"
+        if api {
+            guard let auth = object["auth"], domain.range(of: "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$", options: .regularExpression) != nil else {
+                throw ValidationError.invalid("API identity or authentication")
+            }
+            _ = try APIServiceAuth(auth)
+        } else if object["kind"] != nil || object["auth"] != nil {
+            throw ValidationError.invalid("kind or auth")
+        }
         guard let rawBaseURL = object["baseUrl"]?.stringValue,
               let baseURL = URL(string: rawBaseURL),
               baseURL.scheme == "http" || baseURL.scheme == "https",
               let host = baseURL.host?.lowercased(),
-              Self.isServiceHost(host, domain: domain) else {
+              api ? APIServiceAuth.validEndpoint(baseURL) : Self.isServiceHost(host, domain: domain) else {
             throw ValidationError.invalid("baseUrl")
         }
         let faviconURL = try Self.faviconURL(object["faviconUrl"]?.stringValue)
         let rawActions = object["actions"]?.arrayValue ?? []
         let actions = try rawActions.map { value in
-            guard let action = Manifest.Action(value, serviceDomain: domain, serviceBaseURL: baseURL),
+            guard let action = Manifest.Action(value, serviceDomain: api ? nil : domain, serviceBaseURL: baseURL),
                   !action.id.isEmpty,
                   action.inputSchema != nil,
                   action.outputSchema != nil else {
@@ -101,7 +110,15 @@ nonisolated struct ServiceDefinition: Sendable {
         var actionIndex: [String: Manifest.Action] = [:]
         for action in actions {
             guard actionIndex[action.id] == nil else { throw ValidationError.duplicateAction(action.id) }
-            if let host = action.baseURL?.host?.lowercased(), !Self.isServiceHost(host, domain: domain) {
+            if api {
+                guard action.raw["baseUrl"] == nil, action.raw["blocking"] == nil,
+                      action.raw["requireAuth"]?.boolValue != nil, action.raw["requireApproval"]?.boolValue != nil,
+                      !["getSignInUrl", "getSignInState", "getBotControlUrl", "getBotControlState", "getPaymentUrl", "getPaymentState"].contains(action.id),
+                      !action.requireAuth || object["auth"]?.objectValue?["type"]?.stringValue != "none" else {
+                    throw ValidationError.invalid("API action")
+                }
+            }
+            if !api, let host = action.baseURL?.host?.lowercased(), !Self.isServiceHost(host, domain: domain) {
                 throw ValidationError.invalid("action baseUrl")
             }
             actionIndex[action.id] = action
@@ -264,6 +281,8 @@ nonisolated struct ServiceDefinition: Sendable {
         actions.filter { !Manifest.STANDARD_ACTION_IDS.contains($0.id) }
     }
 
+    var isAPI: Bool { manifest.objectValue?["kind"]?.stringValue == "api" }
+
     var isIOS: Bool {
         if case .iOS = source { true } else { false }
     }
@@ -274,7 +293,7 @@ nonisolated struct ServiceDefinition: Sendable {
 
     var actionNamespace: String {
         switch source {
-        case .repository: "web:\(domain)"
+        case .repository: "\(isAPI ? "api" : "web"):\(domain)"
         case .iOS: domain
         case .mcp: "mcp:\(domain)"
         }

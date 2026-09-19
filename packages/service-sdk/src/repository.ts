@@ -6,7 +6,7 @@ export const REPOSITORY_VERSION = 1;
 const RepositoryServiceSchema = Type.String({
   minLength: 5,
   maxLength: 253,
-  pattern: "^(?:web|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+  pattern: "^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
 });
 
 export const RepositoryPackageSchema = Type.Object({
@@ -21,7 +21,7 @@ export const RepositoryPackageSchema = Type.Object({
 
 export type RepositoryPackage = Static<typeof RepositoryPackageSchema>;
 export type RepositoryService = Static<typeof RepositoryServiceSchema>;
-export type RepositoryServiceKind = "web" | "ios" | "mcp";
+export type RepositoryServiceKind = "web" | "api" | "ios" | "mcp";
 
 export function repositoryServiceKind(id: string): RepositoryServiceKind {
   return id.slice(0, id.indexOf(":")) as RepositoryServiceKind;

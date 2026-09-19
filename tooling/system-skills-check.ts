@@ -7,7 +7,7 @@ const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"];
 const expectedReferences = new Map([
   ["manage-artifacts", ["canvas.md", "note.md"]],
-  ["manage-services", ["web-service.md"]],
+  ["manage-services", ["api-service.md", "web-service.md"]],
   ["manage-skills", ["service-skill.md", "user-skill.md"]],
 ]);
 

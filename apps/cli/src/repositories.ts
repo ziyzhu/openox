@@ -25,7 +25,7 @@ type Snapshot = {
   dispose: () => Promise<void>;
 };
 
-const SERVICE_ID = /^(?:web|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
+const SERVICE_ID = /^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
 const CONTENT_HASH = /^[a-f0-9]{64}$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -165,7 +165,7 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
       ? join(path, "service.json")
       : join(path, "manifest.json");
     await regularFile(manifestPath, 512_000);
-    if (service.startsWith("web:")) await regularFile(join(path, "actions.js"), 1_000_000);
+    if (service.startsWith("web:") || service.startsWith("api:")) await regularFile(join(path, "actions.js"), 1_000_000);
   }
   return repository;
 }

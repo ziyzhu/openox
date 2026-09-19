@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { readSkills } from "../../../packages/service-sdk/src/skills.ts";
 import {
   HOST_PATTERN,
+  validateServiceManifest,
   validateJSONSchemaProfile,
   validateStandardActions,
   type JSONSchema,
@@ -50,7 +51,7 @@ export async function verifyRepository(args: string[], _context: CliContext): Pr
     }
     result.pass(`main → ${mainSha.slice(0, 12)}`);
 
-    const kinds = ["web", "ios", "mcp"] as const;
+    const kinds = ["web", "api", "ios", "mcp"] as const;
     const rootDirectories = await directoryNames(directory);
     const unexpected = rootDirectories.filter(name => !name.startsWith(".") && !kinds.includes(name as typeof kinds[number]));
     if (unexpected.length) {
@@ -70,7 +71,7 @@ export async function verifyRepository(args: string[], _context: CliContext): Pr
     result.pass(`${services.length} services discovered`);
 
     for (const service of services) {
-      if (service.kind === "web") await checkWebService(join(directory, service.kind), service.id, result);
+      if (service.kind === "web" || service.kind === "api") await checkWebService(join(directory, service.kind), service.id, result, service.kind);
       else await checkCatalogService(join(directory, service.kind), service.kind, service.id, result);
     }
     await probeReceivePack(origin, result);
@@ -141,12 +142,12 @@ function serviceManifestPath(directory: string): string {
   return existsSync(current) ? current : join(directory, "manifest.json");
 }
 
-async function checkWebService(servicesDirectory: string, domain: string, result: Verification): Promise<void> {
+async function checkWebService(servicesDirectory: string, domain: string, result: Verification, kind: "web" | "api" = "web"): Promise<void> {
   const directory = join(servicesDirectory, domain);
   const manifestPath = serviceManifestPath(directory);
   const actionsPath = join(directory, "actions.js");
-  const label = `web/${domain}`;
-  if (!HOST_PATTERN.test(domain)) {
+  const label = `${kind}/${domain}`;
+  if (kind === "web" && !HOST_PATTERN.test(domain)) {
     result.fail(label, "invalid web service domain");
     return;
   }
@@ -156,7 +157,12 @@ async function checkWebService(servicesDirectory: string, domain: string, result
   }
   const manifest = await readJSON(manifestPath, `${label}: service.json`, result);
   if (manifest === undefined) return;
-  const issues = validateManifest(domain, manifest);
+  const sourceManifest = { ...manifest };
+  delete sourceManifest.faviconUrl;
+  delete sourceManifest.skills;
+  const apiValidation = kind === "api" ? validateServiceManifest(sourceManifest) : null;
+  const issues = apiValidation ? apiValidation.ok ? [] : apiValidation.errors : validateManifest(domain, manifest);
+  if (kind === "api" && (manifest.kind !== "api" || manifest.domain !== domain)) issues.push("API identity must match its repository directory");
   if (issues.length) {
     result.fail(label, issues.join("; "));
     return;

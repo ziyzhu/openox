@@ -95,7 +95,7 @@ final class ServiceManager {
     }
 
     enum Filter: String, CaseIterable, Identifiable {
-        case all, web, local, iOS, mcp, saved
+        case all, web, api, local, iOS, mcp, saved
         var id: String { rawValue }
     }
 
@@ -495,7 +495,7 @@ final class ServiceManager {
                 Log.service.info("ServiceManager.refreshServices unchanged monoRepository=\(monoRepository.hash.prefix(12))")
                 return []
             }
-            let stale = byDomain.values.filter { $0.webService != nil }
+            let stale = byDomain.values.filter { $0.webService != nil || $0.apiService != nil }
             for service in stale {
                 service.invalidateResolved()
             }
@@ -678,26 +678,32 @@ final class ServiceManager {
         try await repository.sourcePaths(kind: kind.repositoryKind, id: domain)
     }
 
+    private func localScriptKind(_ domain: String) -> ServicesMount.Kind {
+        monoRepository?.repositories.contains(where: {
+            $0.id == ServiceRepository.localID && $0.services.contains(where: { $0.id == "api:\(domain)" })
+        }) == true ? .api : .web
+    }
+
     func validateService(domain: String) async throws {
-        try await validateLocalService(kind: .web, domain: domain)
+        try await validateLocalService(kind: localScriptKind(domain), domain: domain)
         Log.service.info("ServiceManager.validate passed domain=\(domain)")
     }
 
     private func validateLocalService(kind: ServicesMount.Kind, domain: String) async throws {
         try await repository.validateLocalSource(kind: kind.repositoryKind, id: domain)
         switch kind {
-        case .web:
+        case .web, .api:
             let manifestData = try await repository.readLocalSource(
-                kind: .web,
+                kind: kind.repositoryKind,
                 id: domain,
                 path: ["service.json"]
             )
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
             let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local)
-            guard definition.domain == domain else {
-                throw ServiceRepository.Failure(message: "manifest domain does not match its directory")
+            guard definition.domain == domain, definition.isAPI == (kind == .api) else {
+                throw ServiceRepository.Failure(message: "manifest identity does not match its directory")
             }
-            let actionsData = try await repository.readLocalSource(kind: .web, id: domain, path: ["actions.js"])
+            let actionsData = try await repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: ["actions.js"])
             guard let source = String(data: actionsData, encoding: .utf8) else {
                 throw ServiceRepository.Failure(message: "actions.js is not UTF-8")
             }
@@ -731,6 +737,7 @@ final class ServiceManager {
                 const result = installer({
                   action,
                   retryFetch: unavailable,
+                  request: unavailable,
                   log() {},
                   lib: {
                     cookie: unavailable,
@@ -768,7 +775,7 @@ final class ServiceManager {
             }
             for skill in definition.skills {
                 let data = try await repository.readLocalSource(
-                    kind: .web,
+                    kind: kind.repositoryKind,
                     id: domain,
                     path: ["skills", skill.name, "SKILL.md"]
                 )
@@ -811,17 +818,18 @@ final class ServiceManager {
 
     func serviceForCaller(domain: String, reason: Service.CapabilityReason) async throws -> Service {
         let service = service(domain: domain)
-        if let service, !service.isWebService {
+        if let service, !service.isWebService && !service.isAPIService {
             _ = await service.loadManifest(reason: reason)
             return service
         }
 
+        let kind = localScriptKind(domain)
         let definition: ServiceDefinition
         if let service, !service.isLocalService {
             definition = service.definition
         } else {
-            try await validateLocalService(kind: .web, domain: domain)
-            let manifestData = try await repository.readLocalSource(kind: .web, id: domain, path: ["service.json"])
+            try await validateLocalService(kind: kind, domain: domain)
+            let manifestData = try await repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: ["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
             definition = try ServiceDefinition(
                 manifest: Manifest.localized(raw, locale: monoRepositoryLocale),
@@ -974,6 +982,7 @@ final class ServiceManager {
         switch filter {
         case .all: return base
         case .web: return base.filter { $0.service.isWebService }
+        case .api: return base.filter { $0.service.isAPIService }
         case .local: return base.filter { $0.service.isLocalService }
         case .iOS: return base.filter { $0.service.isIOSService }
         case .mcp: return base.filter { $0.service.isMCPService }
@@ -1119,7 +1128,7 @@ final class ServiceManager {
         guard let definition = byDomain[domain]?.definition else { return nil }
         if definition.repositoryID == ServiceRepository.localID {
             do {
-                try await validateLocalService(kind: .web, domain: domain)
+                try await validateLocalService(kind: localScriptKind(domain), domain: domain)
             } catch {
                 Log.service.error("ServiceManager.fetch invalid Local draft domain=\(domain) error=\(error.localizedDescription)")
                 return nil

@@ -14,6 +14,7 @@ final class Service: NSObject, Identifiable {
     let webService: WebService?
     let iOSService: IOSService?
     let remoteMCPService: RemoteMCPService?
+    private(set) var apiService: APIService?
 
     private(set) var title: String
     private(set) var summary: String
@@ -21,11 +22,13 @@ final class Service: NSObject, Identifiable {
     nonisolated var tint: Color { Color(hex: tintHex) }
     var isWebService: Bool { webService != nil }
     var isIOSService: Bool { iOSService != nil }
+    var isAPIService: Bool { apiService != nil }
     var isMCPService: Bool { remoteMCPService != nil }
     var isLocalService: Bool { definition.repositoryID == ServiceRepository.localID }
     var hasWebRuntime: Bool { webService != nil || iOSService?.hasBrowserRuntime == true }
     var icon: ServiceIcon? { definition.icon }
     var detailCapabilities: ServiceDetailCapabilities {
+        if let apiService { return apiService.detailCapabilities }
         if let remoteMCPService { return remoteMCPService.detailCapabilities }
         if let iOSService { return iOSService.detailCapabilities }
         guard let webService else { preconditionFailure("service has no implementation") }
@@ -46,8 +49,20 @@ final class Service: NSObject, Identifiable {
             case signedOut
         }
 
+        enum Evidence {
+            case verified
+            case configured
+        }
+
         let value: Value
         let observedAt: Date
+        let evidence: Evidence
+
+        init(value: Value, observedAt: Date, evidence: Evidence = .verified) {
+            self.value = value
+            self.observedAt = observedAt
+            self.evidence = evidence
+        }
 
         var state: SignInState {
             switch value {
@@ -91,7 +106,7 @@ final class Service: NSObject, Identifiable {
             case .authorized: return "authorized"
             case .authorizationRequired: return "authorizationRequired"
             case .notAuthorized: return "notAuthorized"
-            case .observed(let observation): return observation.value.rawValue
+            case .observed(let observation): return observation.evidence == .configured ? "configured:\(observation.value.rawValue)" : observation.value.rawValue
             case .unavailable(let previous, _): return "unavailable:\(previous?.value.rawValue ?? "unknown")"
             }
         }
@@ -477,7 +492,7 @@ final class Service: NSObject, Identifiable {
     var supportsBotControl: Bool { definition.supportsBotControl }
 
     func skill(named name: String) -> String? {
-        hasWebRuntime ? resolutionState.resolved?.skills[name] : nil
+        apiService?.source?.skills[name] ?? (hasWebRuntime ? resolutionState.resolved?.skills[name] : nil)
     }
 
     func actionLabel(for id: String) -> String? {
@@ -550,12 +565,20 @@ final class Service: NSObject, Identifiable {
         self.summary = definition.description
         self.definition = definition
         let implementations = Self.makeImplementations(for: definition)
+        self.apiService = definition.isAPI ? try! APIService(definition: definition) : nil
         self.webService = implementations.web
         self.iOSService = implementations.iOS
         self.remoteMCPService = implementations.remoteMCP
         self.manager = manager
         super.init()
-        if definition.isIOS {
+        if definition.isAPI {
+            if let authorization = apiService?.authorization, authorization.auth.requiresCredentials {
+                auth = .observed(AuthObservation(value: authorization.isConfigured ? .signedIn : .signedOut, observedAt: Date(), evidence: .configured))
+            } else {
+                auth = .notRequired
+            }
+            capabilityState = .ready
+        } else if definition.isIOS {
             auth = iOSService?.requiresPermission == true ? .unknown : .notRequired
             capabilityState = .ready
         } else if definition.isMCP {
@@ -573,6 +596,7 @@ final class Service: NSObject, Identifiable {
     private static func makeImplementations(
         for definition: ServiceDefinition
     ) -> (web: WebService?, iOS: IOSService?, remoteMCP: RemoteMCPService?) {
+        if definition.isAPI { return (nil, nil, nil) }
         if let endpoint = definition.mcpEndpoint {
             return (nil, nil, RemoteMCPService(endpoint: endpoint, transport: definition.mcpTransport))
         }
@@ -792,6 +816,10 @@ final class Service: NSObject, Identifiable {
     }
 
     func invalidateResolved() {
+        if let apiService {
+            apiService.source = nil
+            return
+        }
         guard webService != nil else { return }
         manager.sessionCoordinator.cancel(for: self)
         #if targetEnvironment(simulator)
@@ -925,7 +953,8 @@ extension Service {
         manager: ServiceManager
     ) {
         self.init(definition: definition, manager: manager)
-        resolutionState = .idle(Resolved(actions: actions, skills: skills))
+        if let apiService { apiService.source = Resolved(actions: actions, skills: skills) }
+        else { resolutionState = .idle(Resolved(actions: actions, skills: skills)) }
         capabilityState = .ready
     }
 
@@ -934,7 +963,7 @@ extension Service {
             Log.service.error("Service.relocalize domain-mismatch actual=\(definition.domain) expected=\(domain)")
             return
         }
-        guard definition.isIOS == isIOSService, definition.isMCP == isMCPService else {
+        guard definition.isAPI == isAPIService, definition.isIOS == isIOSService, definition.isMCP == isMCPService else {
             Log.service.error("Service.relocalize backend-mismatch domain=\(domain) iOS=\(definition.isIOS) mcp=\(definition.isMCP)")
             return
         }
@@ -945,6 +974,7 @@ extension Service {
         } else {
             definition
         }
+        if localized.isAPI { apiService = try! APIService(definition: localized) }
         self.definition = localized
         title = localized.name
         summary = localized.description

@@ -1,6 +1,46 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "API" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API"
+          }
+        }
+      }
+    },
+    "Password" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
+    },
+    "Token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "令牌"
+          }
+        }
+      }
+    },
+    "Username" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名"
+          }
+        }
+      }
+    },
     "" : {
       "shouldTranslate" : false
     },

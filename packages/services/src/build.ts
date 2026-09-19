@@ -52,8 +52,8 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
   );
   if ("error" in sourcePackage) throw new Error(sourcePackage.error);
   const domains = options.domains ?? sourcePackage.services
-    .filter((service) => repositoryServiceKind(service) === "web")
-    .map(repositoryServiceIdentity);
+    .filter((service) => ["web", "api"].includes(repositoryServiceKind(service)))
+    .map((service) => repositoryServiceKind(service) === "api" ? service : repositoryServiceIdentity(service));
   const catalogKinds = options.catalogKinds ?? ["ios", "mcp"];
   const results = await Promise.all(domains.map(async (domain) => ({
     domain,
@@ -90,7 +90,9 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
   const entries: RepositoryService[] = [];
   for (const { domain, service } of results) {
     if ("error" in service) throw new Error(service.error);
-    const out = join(outDir, "web", domain);
+    const kind = domain.startsWith("api:") ? "api" : "web";
+    const identity = domain.replace(/^api:/, "");
+    const out = join(outDir, kind, identity);
     await mkdir(out, { recursive: true });
     await writeFile(join(out, "service.json"), JSON.stringify(service.manifest, null, 2));
     await writeFile(join(out, "actions.js"), service.actions);
@@ -102,7 +104,7 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
         join(skillOut, "SKILL.md"),
       );
     }
-    entries.push(qualifiedRepositoryServiceID("web", domain));
+    entries.push(qualifiedRepositoryServiceID(kind, identity));
   }
   for (const { kind, id, manifest } of catalogResults) {
     if ("error" in manifest) throw new Error(manifest.error);

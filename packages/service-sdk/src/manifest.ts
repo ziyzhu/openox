@@ -190,8 +190,22 @@ const LocaleOverlaySchema = Type.Object({
   }, { additionalProperties: false }))),
 }, { additionalProperties: false });
 
+export const APIAuthSchema = Type.Union([
+  Type.Object({ type: Type.Literal("none") }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("apiKey"), in: Type.Union([Type.Literal("header"), Type.Literal("query")]), name: Type.String({ pattern: "^[A-Za-z0-9_-]+$" }) }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("http"), scheme: Type.Union([Type.Literal("basic"), Type.Literal("bearer")]) }, { additionalProperties: false }),
+  Type.Object({
+    type: Type.Literal("oauth2"), flow: Type.Literal("authorizationCode"),
+    authorizationURL: Type.String(), tokenURL: Type.String(), clientID: Type.String({ minLength: 1 }),
+    redirectURI: Type.String(), scopes: Type.Array(Type.String({ minLength: 1 })), pkce: Type.Literal("S256"),
+  }, { additionalProperties: false }),
+]);
+export type APIAuth = Static<typeof APIAuthSchema>;
+
 export const ServiceManifestSchema = Type.Object({
-  domain: Type.String({ pattern: HOST_RE.source }),
+  domain: Type.String({ pattern: "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$" }),
+  kind: Type.Optional(Type.Literal("api")),
+  auth: Type.Optional(APIAuthSchema),
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   baseUrl: Type.String({ minLength: 1 }),
@@ -367,6 +381,28 @@ export function validateServiceManifest(input: unknown): ValidateServiceResult {
   if (errors.length > 0) return { ok: false, errors };
 
   const m = input as ServiceManifest;
+  const api = m.kind === "api";
+  if (!api && !HOST_RE.test(m.domain)) at("domain", "must be a website domain");
+  if (api !== (m.auth !== undefined)) at("auth", "is required only for API services");
+  if (api && m.auth?.type === "oauth2") {
+    for (const field of ["authorizationURL", "tokenURL"] as const) {
+      try {
+        const url = new URL(m.auth[field]);
+        if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search) throw new Error();
+      } catch { at(`auth.${field}`, "must be a credential-free HTTPS URL without query or fragment"); }
+    }
+    try {
+      const redirect = new URL(m.auth.redirectURI);
+      if (["http:", "https:"].includes(redirect.protocol) || redirect.search || redirect.hash) throw new Error();
+    } catch { at("auth.redirectURI", "must use an application callback scheme without query or fragment"); }
+  }
+  if (api) {
+    for (const action of m.actions) {
+      if (action.baseUrl || action.blocking !== undefined) at("actions", "API actions cannot declare page configuration");
+      if (action.requireAuth && m.auth?.type === "none") at("actions", "authenticated actions need service authentication");
+      if ([SIGN_IN_URL_ACTION_ID, SIGN_IN_STATE_ACTION_ID, BOT_CONTROL_URL_ACTION_ID, BOT_CONTROL_STATE_ACTION_ID, PAYMENT_URL_ACTION_ID, PAYMENT_STATE_ACTION_ID].includes(action.id)) at("actions", "API authentication is managed by the host");
+    }
+  }
 
   if (m.baseUrl.includes("{") || m.baseUrl.includes("}")) {
     at("baseUrl", "must be static");
@@ -375,7 +411,9 @@ export function validateServiceManifest(input: unknown): ValidateServiceResult {
     const baseUrl = new URL(m.baseUrl);
     if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
       at("baseUrl", "must use http or https");
-    } else if (!matchesServiceDomain(baseUrl.hostname, m.domain)) {
+    } else if (api && (baseUrl.protocol !== "https:" || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash)) {
+      at("baseUrl", "API base URL must use HTTPS without credentials, query, or fragment");
+    } else if (!api && !matchesServiceDomain(baseUrl.hostname, m.domain)) {
       at("baseUrl", "must use the service domain or a subdomain");
     }
   } catch {
@@ -435,7 +473,7 @@ export function validateServiceManifest(input: unknown): ValidateServiceResult {
     }
   });
 
-  errors.push(...validateStandardActions(m.actions));
+  if (!api) errors.push(...validateStandardActions(m.actions));
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, manifest: m };
 }

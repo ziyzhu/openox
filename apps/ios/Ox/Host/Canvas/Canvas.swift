@@ -150,11 +150,11 @@ final class OxCanvas {
 
     private func resolveAction(_ name: String) async throws -> (Service, String) {
         let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-        guard parts.count == 3, ["web", "ios", "mcp"].contains(parts[0]), !parts[1].isEmpty, !parts[2].isEmpty else {
-            throw RuntimeError.bridge("Use a qualified action: web:<domain>:<action>, ios:<app>:<action>, or mcp:<server>:<action>")
+        guard parts.count == 3, ["web", "api", "ios", "mcp"].contains(parts[0]), !parts[1].isEmpty, !parts[2].isEmpty else {
+            throw RuntimeError.bridge("Use a qualified action: web:<domain>:<action>, api:<service>:<action>, ios:<app>:<action>, or mcp:<server>:<action>")
         }
         let service = try await resolveService(parts[0] == "ios" ? "ios:\(parts[1])" : parts[1])
-        let kind = service.isIOSService ? "ios" : service.isMCPService ? "mcp" : "web"
+        let kind = service.isAPIService ? "api" : service.isIOSService ? "ios" : service.isMCPService ? "mcp" : "web"
         guard kind == parts[0] else { throw Service.InvokeError.unknown(name) }
         return (service, parts[2])
     }

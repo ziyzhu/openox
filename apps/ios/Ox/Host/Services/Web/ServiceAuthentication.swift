@@ -2,7 +2,7 @@ import Foundation
 
 extension Service {
     var supportsAuthentication: Bool {
-        isMCPService || iOSService?.requiresPermission == true || supportsWebAuthentication
+        isAPIService || isMCPService || iOSService?.requiresPermission == true || supportsWebAuthentication
     }
 
     private var supportsWebAuthentication: Bool {
@@ -18,6 +18,7 @@ extension Service {
 
     func readAccess() async throws -> Auth {
         if let iOS = iOSService { return await iOS.checkAccess() }
+        if let apiService { return try await apiService.authorization.checkAccess(previous: auth.observation) }
         if let mcp = remoteMCPService {
             _ = try await mcp.resolve(refresh: true)
             return mcp.requiresAuthorization ? (mcp.isAuthorized ? .authorized : .authorizationRequired) : .notRequired
@@ -180,6 +181,21 @@ extension Service {
         await attemptSilentSignIn(reason: .modelSignIn)
         guard !signInState.isAuthenticated else { return }
 
+        if let apiService {
+            guard !auth.isSigningIn else { return }
+            let previous = auth.observation
+            setAuth(.signingIn(previous: previous))
+            do {
+                try await APIServiceSignIn.present(self)
+                setAuth(try await apiService.authorization.checkAccess(previous: nil))
+            } catch is CancellationError {
+                setAuth(try await apiService.authorization.checkAccess(previous: nil))
+            } catch {
+                setAuth(.unavailable(previous: previous, error: error.localizedDescription))
+                throw error
+            }
+            return
+        }
         guard supportsWebAuthentication else {
             setAuth(.notRequired)
             return
@@ -245,6 +261,11 @@ extension Service {
     }
 
     func signOut() async {
+        if let apiService {
+            apiService.authorization.clear()
+            await checkAccess(policy: .current, reason: .clearWebsiteData)
+            return
+        }
         let started = Date()
         attemptedSilentSignIn = true
         Log.service.info("Service.signOut start domain=\(domain) auth=\(auth.logLabel)")
@@ -320,7 +341,7 @@ final class ServiceAccess {
             preparePreflight(service, policy: policy, reason: reason)
             return service.signInState
         }
-        let local = service.isIOSService
+        let local = service.isIOSService || service.isAPIService
         if !local, policy == .cached, isFresh(service.auth) {
             Log.service.info("Service.access cached domain=\(service.domain) reason=\(reason.rawValue) auth=\(service.auth.logLabel)")
             return service.signInState

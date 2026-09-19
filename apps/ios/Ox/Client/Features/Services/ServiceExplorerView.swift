@@ -440,6 +440,7 @@ private extension ServiceManager.Filter {
         switch self {
         case .all: return "All"
         case .web: return "Web"
+        case .api: return "API"
         case .local: return "Local"
         case .iOS: return "iOS"
         case .mcp: return "MCP"
@@ -451,6 +452,7 @@ private extension ServiceManager.Filter {
         switch self {
         case .all: return "square.grid.2x2"
         case .web: return "globe"
+        case .api: return "network"
         case .local: return "folder"
         case .iOS: return "iphone"
         case .mcp: return "point.3.connected.trianglepath.dotted"

@@ -119,6 +119,10 @@ extension OxHostProtocol {
                     return ActionPayload(ok: false, value: nil, error: "service capabilities unavailable")
                 }
             }
+            if let apiService = svc.apiService {
+                return resultPayload(await apiService.invoke(service: svc, actionID: action, args: args,
+                    approve: { _, _ in command.approve ?? false }))
+            }
             if let iOSService = svc.iOSService {
                 guard let session = chatManager.current else {
                     return ActionPayload(ok: false, value: nil, error: "session unavailable")

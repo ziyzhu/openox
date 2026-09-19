@@ -499,3 +499,23 @@ secrets.
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
 | App logs | Application Support | Excluded from backup | Retention compaction |
+
+## API service credentials
+
+API service manifests and handlers use the existing repository package layout at
+`api/<service-id>/service.json` and `actions.js`, with `api:<service-id>` entries
+in repository.json. Existing web, iOS, and MCP representations are unchanged.
+Older readers reject the unsupported API package identity rather than interpreting
+it as a website service. No legacy data transform is needed for this additive kind.
+
+The Host stores version-1 API credential envelopes through Credentials under the
+bundle-derived Keychain service. The account is `service:api:<sha256>` derived from
+the repository ID and service ID. Envelopes contain a binding hash, secret, and
+optional Basic username or OAuth refresh token, expiry, and granted scopes.
+The binding hashes canonical auth configuration, API base URL, repository ID,
+and service ID; a mismatch or unknown envelope version is treated as requiring
+setup. Updating public service configuration never transfers credentials to the
+new destination. Sign out deletes the envelope; replacing credentials overwrites
+it. These credentials are device-owned and never stored in Profile files or
+repository source. Accessibility and backup behavior follow Credentials' existing
+Keychain policy. Auth status is observed at runtime rather than persisted.

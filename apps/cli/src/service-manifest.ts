@@ -41,7 +41,7 @@ function parseAction(value: unknown): Action {
 }
 
 export async function readWebService(root: string, domain: string): Promise<{ manifest: Manifest; actions: string }> {
-  const serviceRoot = join(root, "web", domain);
+  const serviceRoot = existsSync(join(root, "api", domain)) ? join(root, "api", domain) : join(root, "web", domain);
   const servicePath = existsSync(join(serviceRoot, "service.json"))
     ? join(serviceRoot, "service.json")
     : join(serviceRoot, "manifest.json");

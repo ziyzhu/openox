@@ -55,6 +55,10 @@ public actor VirtualMachine {
         runtime = VirtualMachineRuntime()
     }
 
+    func runAPI(source: String, request: @escaping APIRequest) async throws -> VirtualMachineOutput {
+        try await runtime.run(source: source, bridge: nil, request: request, timeout: Self.defaultTimeout)
+    }
+
     public enum Error: LocalizedError {
         case noContext
         case js(String, logs: [VirtualMachineLog] = [])
@@ -99,9 +103,9 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
     private var thread: VirtualMachineThread { VirtualMachineThread.shared }
     private var vm: JSVirtualMachine?
 
-    func run(source: String, bridge: any OxFunctionBridge, timeout: TimeInterval) async throws -> VirtualMachineOutput {
+    func run(source: String, bridge: (any OxFunctionBridge)?, request: APIRequest? = nil, timeout: TimeInterval) async throws -> VirtualMachineOutput {
         let handle = RunHandle()
-        let environment = RunEnvironment(bridge: bridge, handle: handle)
+        let environment = RunEnvironment(bridge: bridge, handle: handle, request: request)
         let started = Date()
         let elapsedMs: @Sendable () -> Int = { Int(Date().timeIntervalSince(started) * 1000) }
 
@@ -214,6 +218,17 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
             return promise
         }
 
+        if let request = environment.request {
+            let invoke: @convention(block) (JSValue) -> JSValue = { value in
+                let args = jsValueToJSON(value) ?? .null
+                return makePromise(false) { resolve, reject in
+                    do { resolve(try await request(args)) }
+                    catch { reject(error.localizedDescription) }
+                }
+            }
+            ctx.setObject(invoke as AnyObject, forKeyedSubscript: "__apiRequest" as NSString)
+            return
+        }
         let env = OxFunctionEnvironment(makePromise: makePromise, bridge: { environment.activeBridge })
 
         for tool in OxFunctionCatalog.all {
@@ -396,13 +411,18 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
     }
 }
 
+typealias APIRequest = @MainActor @Sendable (JSONValue) async throws -> JSONValue
+
 nonisolated private final class RunEnvironment: @unchecked Sendable {
     weak var bridge: (any OxFunctionBridge)?
     weak var handle: RunHandle?
 
-    init(bridge: any OxFunctionBridge, handle: RunHandle) {
+    let request: APIRequest?
+
+    init(bridge: (any OxFunctionBridge)?, handle: RunHandle, request: APIRequest?) {
         self.bridge = bridge
         self.handle = handle
+        self.request = request
     }
 
     var activeBridge: (any OxFunctionBridge)? {

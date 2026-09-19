@@ -61,7 +61,7 @@ extension Service {
     var debugSnapshot: DebugSnapshot {
         guard hasWebRuntime else {
             return DebugSnapshot(
-                phase: isMCPService ? "MCP" : "iOS",
+                phase: isAPIService ? "API" : isMCPService ? "MCP" : "iOS",
                 navigation: "inactive",
                 activeInvocations: 0,
                 queuedInvocations: 0,

@@ -4,12 +4,14 @@ import Foundation
 struct ServicesMount {
     enum Kind: String, CaseIterable, Sendable {
         case web
+        case api
         case iOS = "ios"
         case mcp
 
         var repositoryKind: ServiceRepository.ServiceKind {
             switch self {
             case .web: .web
+            case .api: .api
             case .iOS: .iOS
             case .mcp: .mcp
             }
@@ -100,6 +102,7 @@ struct ServicesMount {
     }
 
     private static func kind(_ service: Service) -> Kind {
+        if service.isAPIService { return .api }
         if service.isIOSService { return .iOS }
         if service.isMCPService { return .mcp }
         return .web

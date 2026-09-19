@@ -16,7 +16,9 @@ export function serviceAssetURL(id: string): string {
 }
 
 export function sourceDirFor(domain: string): string {
-  return join(SOURCE_ROOT, domain);
+  return domain.startsWith("api:")
+    ? join(BUILTIN_REPOSITORY_ROOT, "api", domain.slice(4))
+    : join(SOURCE_ROOT, domain);
 }
 
 async function loadActions(
@@ -55,6 +57,7 @@ function inspectActions(
             actions[name] = definition.invoke;
           },
           retryFetch: stub,
+          request: stub,
           log: () => {},
           lib: {
             cookie: stub,
@@ -101,7 +104,10 @@ async function loadManifest(
   }
   const result = validateServiceManifest(raw);
   if (!result.ok) return { error: `invalid manifest: ${result.errors.join("; ")}` };
-  if (result.manifest.domain !== domain) {
+  if ((result.manifest.kind === "api") !== domain.startsWith("api:")) {
+    return { error: `manifest kind does not match dir "${domain}"` };
+  }
+  if (result.manifest.domain !== domain.replace(/^api:/, "")) {
     return { error: `manifest domain "${result.manifest.domain}" does not match dir "${domain}"` };
   }
   return result.manifest;

@@ -11,6 +11,7 @@ actor ServiceRepository {
 
     enum ServiceKind: String, Codable, Sendable {
         case web
+        case api
         case iOS = "ios"
         case mcp
     }
@@ -202,7 +203,7 @@ actor ServiceRepository {
         init(_ rawValue: String) throws {
             guard rawValue.count <= 253,
                   rawValue.range(
-                    of: "^(?:web|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+                    of: "^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
                     options: .regularExpression
                   ) != nil,
                   let separator = rawValue.firstIndex(of: ":"),
@@ -395,7 +396,12 @@ actor ServiceRepository {
                 continue
             }
             switch service.id.kind {
-            case .web:
+            case .web, .api:
+                guard let manifest = try? JSONDecoder().decode(JSONValue.self, from: data),
+                      (manifest.objectValue?["kind"]?.stringValue == "api") == (service.id.kind == .api) else {
+                    Log.service.error("ServiceRepository.manifest kind-mismatch id=\(service.id.rawValue)")
+                    continue
+                }
                 web.append(ManifestFile(
                     repositoryID: repository.descriptor.id,
                     provenance: repository.descriptor.provenance,
@@ -532,14 +538,14 @@ actor ServiceRepository {
     }
 
     func createService(kind: ServiceKind, id: String) throws {
-        guard kind == .web else {
-            throw Failure(message: "Only Local web services can be created.")
+        guard [.web, .api].contains(kind) else {
+            throw Failure(message: "Only Local web and API services can be created.")
         }
-        try createWebService(domain: id)
+        try createScriptService(kind: kind, domain: id)
     }
 
-    private func createWebService(domain: String) throws {
-        guard Self.isServiceID(domain), domain.contains(".") else {
+    private func createScriptService(kind: ServiceKind, domain: String) throws {
+        guard Self.isServiceID(domain), kind == .api || domain.contains(".") else {
             throw Failure(message: "Use a lowercase website domain for the Local service.")
         }
         _ = try editableLocalRepository()
@@ -547,20 +553,25 @@ actor ServiceRepository {
         guard !package.services.contains(where: { $0.id.runtimeID == domain }) else {
             throw Failure(message: "A Local service already exists for \(domain).")
         }
-        let service = Package.Service(id: try ServiceID(kind: .web, runtimeID: domain))
+        let service = Package.Service(id: try ServiceID(kind: kind, runtimeID: domain))
         let serviceRoot = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: serviceRoot.path) else {
             throw Failure(message: "Local source already exists for \(domain).")
         }
         do {
             try FileManager.default.createDirectory(at: serviceRoot, withIntermediateDirectories: true)
-            let manifest: [String: Any] = [
+            var manifest: [String: Any] = [
                 "domain": domain,
                 "name": domain,
                 "description": "Local service for \(domain).",
                 "baseUrl": "https://\(domain)/",
                 "actions": [],
             ]
+            if kind == .api {
+                manifest["kind"] = "api"
+                manifest["auth"] = ["type": "none"]
+                manifest["baseUrl"] = "https://example.com/"
+            }
             var manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
             manifestData.append(0x0A)
             try manifestData.write(to: serviceRoot.appendingPathComponent("service.json"), options: .atomic)
@@ -1362,7 +1373,7 @@ actor ServiceRepository {
         guard manifestID == service.id.runtimeID else {
             throw Failure(message: "Manifest identity mismatch for \(service.id.rawValue)")
         }
-        if service.id.kind == .web {
+        if [.web, .api].contains(service.id.kind) {
             try validateRegularFile(serviceRoot.appendingPathComponent("actions.js"), maximumSize: 1_000_000)
         }
         let enumerator = FileManager.default.enumerator(

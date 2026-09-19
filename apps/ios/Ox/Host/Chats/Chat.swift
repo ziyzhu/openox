@@ -366,10 +366,11 @@ final class Chat: Identifiable {
 
     private func resolveTarget(_ name: String, label: String) throws -> (service: Service, id: String) {
         let parts = name.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-        if parts.count == 3, ["web", "ios", "mcp"].contains(parts[0]) {
+        if parts.count == 3, ["web", "api", "ios", "mcp"].contains(parts[0]) {
             let service = attachedServices.first { candidate in
                 switch parts[0] {
-                case "web": !candidate.isIOSService && !candidate.isMCPService && candidate.domain == parts[1]
+                case "web": candidate.isWebService && candidate.domain == parts[1]
+                case "api": candidate.isAPIService && candidate.domain == parts[1]
                 case "ios": candidate.isIOSService && candidate.domain == "ios:\(parts[1])"
                 case "mcp": candidate.isMCPService && candidate.domain == parts[1]
                 default: false

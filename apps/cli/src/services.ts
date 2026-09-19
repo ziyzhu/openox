@@ -165,7 +165,7 @@ function parseServiceFlag(args: string[]): { domain: string; rest: string[] } {
 
 async function loadManifest(domain: string, context: CliContext) {
   return withRepository(requireRepository(context), async (root, repository) => {
-    if (!repository.services.includes(`web:${domain}`)) fail(`repository does not contain web:${domain}`);
+    if (!repository.services.includes(`web:${domain}`) && !repository.services.includes(`api:${domain}`)) fail(`repository does not contain service ${domain}`);
     return readWebService(root, domain);
   });
 }
@@ -174,7 +174,7 @@ async function listServicesCmd(rawArgs: string[], context: CliContext): Promise<
   const { json } = takeJsonFlag(rawArgs);
   const rows = await withRepository(requireRepository(context), async (root, repository) => {
     const values: { domain: string; name: string; actions: number }[] = [];
-    for (const id of repository.services.filter(service => service.startsWith("web:"))) {
+    for (const id of repository.services.filter(service => service.startsWith("web:") || service.startsWith("api:"))) {
       const domain = id.slice("web:".length);
       const { manifest } = await readWebService(root, domain);
       values.push({ domain, name: manifest.name, actions: manifest.actions.length });

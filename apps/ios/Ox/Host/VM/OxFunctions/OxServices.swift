@@ -38,7 +38,7 @@ nonisolated enum OxServices {
                             "properties": .object([
                                 "kind": .object([
                                     "type": .string("string"),
-                                    "enum": .array([.string("web"), .string("ios"), .string("mcp")]),
+                                    "enum": .array([.string("web"), .string("api"), .string("ios"), .string("mcp")]),
                                 ]),
                             ]),
                             "additionalProperties": .bool(false),
@@ -83,7 +83,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.validate",
                     .object([
-                        "description": .string("Validate a complete Local web-service draft: `await ox.service.validate({ domain, purpose })`. Checks the manifest, action installer and matching action IDs, declared skills, required files, and service size limits together. Returns `{ domain, valid: true }` or throws with the validation error. Does not edit, attach, reload, Save, or invoke service actions. Finish related source edits before calling; individual file writes do not validate service contents."),
+                        "description": .string("Validate a complete Local web or API service draft: `await ox.service.validate({ domain, purpose })`. Checks the manifest, action installer and matching action IDs, declared skills, required files, and service size limits together. Returns `{ domain, valid: true }` or throws with the validation error. Does not edit, attach, reload, Save, or invoke service actions. Finish related source edits before calling; individual file writes do not validate service contents."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -110,11 +110,11 @@ nonisolated enum OxServices {
                 (
                     "ox.service.create",
                     .object([
-                        "description": .string("Create a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. Requires approval. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
+                        "description": .string("Create a Local API service with kind api and a stable domain identifier, a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. Requires approval. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "kind": .object(["type": .string("string"), "enum": .array([.string("web"), .string("mcp")])]),
+                                "kind": .object(["type": .string("string"), "enum": .array([.string("web"), .string("api"), .string("mcp")])]),
                                 "domain": .object(["type": .string("string"), "minLength": .int(3), "maxLength": .int(253)]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048), "description": .string("Public HTTPS MCP endpoint without credentials. Required for MCP; omit domain.")]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),

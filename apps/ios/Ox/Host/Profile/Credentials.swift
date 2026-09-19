@@ -32,10 +32,20 @@ nonisolated enum Credentials {
         let trimmed = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { clearSecret(for: account); return }
         cache.withLock { cache in
-            write(account, trimmed)
+            _ = write(account, trimmed)
             cache[account] = trimmed
         }
         Log.agent.info("Credentials.set account=\(account) chars=\(trimmed.count)")
+    }
+
+    static func setSecretChecked(_ secret: String, for account: String) throws {
+        try cache.withLock { cache in
+            let status = write(account, secret)
+            guard status == errSecSuccess else {
+                throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Credentials could not be saved."])
+            }
+            cache[account] = secret
+        }
     }
 
     static func clearSecret(for account: String) {
@@ -66,18 +76,18 @@ nonisolated enum Credentials {
         return value
     }
 
-    private static func write(_ account: String, _ key: String) {
+    private static func write(_ account: String, _ key: String) -> OSStatus {
         let data = Data(key.utf8)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: accessibility,
         ]
         if SecItemCopyMatching(query(account) as CFDictionary, nil) == errSecSuccess {
-            SecItemUpdate(query(account) as CFDictionary, attributes as CFDictionary)
+            return SecItemUpdate(query(account) as CFDictionary, attributes as CFDictionary)
         } else {
             var add = query(account)
             add.merge(attributes) { _, new in new }
-            SecItemAdd(add as CFDictionary, nil)
+            return SecItemAdd(add as CFDictionary, nil)
         }
     }
 }
