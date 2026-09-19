@@ -9,6 +9,7 @@ struct ProviderAuthenticationView: View {
     let client: any ProviderClient
     @Binding var apiKey: String
     let onChange: () -> Void
+    var onAuthenticated: (() -> Void)? = nil
 
     @State private var authenticationMethod: AuthenticationMethod
     @State private var signedIn = false
@@ -21,11 +22,13 @@ struct ProviderAuthenticationView: View {
     init(
         client: any ProviderClient,
         apiKey: Binding<String>,
-        onChange: @escaping () -> Void
+        onChange: @escaping () -> Void,
+        onAuthenticated: (() -> Void)? = nil
     ) {
         self.client = client
         _apiKey = apiKey
         self.onChange = onChange
+        self.onAuthenticated = onAuthenticated
         let method: AuthenticationMethod = if client.acceptsAPIKey, client.subscriptionAccount != nil {
             !apiKey.wrappedValue.isEmpty ? .apiKey : .subscription
         } else if client.acceptsAPIKey {
@@ -134,6 +137,18 @@ struct ProviderAuthenticationView: View {
             .font(Theme.Fonts.caption)
             .foregroundStyle(Theme.Colors.onSurfaceMuted)
             .settingsContentInset()
+
+        Button("Save") {
+            do {
+                try ProviderCredentialEntry.save(apiKey, for: client)
+                signInError = nil
+                onChange()
+                onAuthenticated?()
+            } catch { signInError = error.localizedDescription }
+        }
+        .buttonStyle(.plain)
+        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .accessibilityIdentifier("provider.authentication.save")
     }
 
     @ViewBuilder
@@ -228,7 +243,10 @@ struct ProviderAuthenticationView: View {
             }
             busy = false
             refreshSubscription(account)
-            if signedInSuccessfully { onChange() }
+            if signedInSuccessfully {
+                onChange()
+                onAuthenticated?()
+            }
         }
     }
 

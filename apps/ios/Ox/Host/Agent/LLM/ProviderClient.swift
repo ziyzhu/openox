@@ -19,7 +19,7 @@ nonisolated public enum LLMReasoningPolicy: String, Sendable, Equatable {
     case unavailable
 }
 
-nonisolated public enum LLMReasoningEffort: String, Sendable, Equatable {
+nonisolated public enum LLMReasoningEffort: String, Sendable, Equatable, Codable {
     case none
     case minimal
     case low
@@ -64,10 +64,21 @@ nonisolated public enum LLMRegion: String, CaseIterable, Sendable, Codable, Hash
 }
 
 nonisolated struct ModelSelection: Codable, Equatable, Sendable {
-    let region: LLMRegion
     let providerID: String
     let modelID: String
     let reasoningEffort: String?
+
+    init(providerID: String, modelID: String, reasoningEffort: String?) {
+        self.providerID = providerID
+        self.modelID = modelID
+        self.reasoningEffort = reasoningEffort
+    }
+
+    init(region: LLMRegion, providerID: String, modelID: String, reasoningEffort: String?) {
+        self.init(providerID: providerID, modelID: modelID, reasoningEffort: reasoningEffort)
+    }
+
+    @MainActor var region: LLMRegion { ProviderRegistry.shared.region(for: providerID) }
 }
 
 nonisolated public enum LLMInferenceLocation: Sendable, Equatable {

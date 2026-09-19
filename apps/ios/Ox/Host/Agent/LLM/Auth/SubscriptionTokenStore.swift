@@ -64,6 +64,13 @@ nonisolated final class SubscriptionTokenStore<Tokens: Codable & Sendable>: @unc
         return result.0
     }
 
+    func cancelSignIn(expectedGeneration: UInt64) {
+        state.withLock { state in
+            guard state.generation == expectedGeneration else { return }
+            state.generation &+= 1
+        }
+    }
+
     func refreshTask(
         source: String,
         operation: @escaping @Sendable () async throws -> Tokens

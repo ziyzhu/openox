@@ -10,6 +10,10 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
     let credentialKind: LLMCredentialKind
     let credentialID: String
     let adaptiveThinkingModelIDs: Set<String>
+    let requestAuthentication: ProviderRequestAuthentication?
+    let version: String
+    let beta: [String]
+    let extraBody: [String: JSONValue]
     let reasoningPolicy: LLMReasoningPolicy = .low
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .anthropicMessages }
 
@@ -22,7 +26,11 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         website: URL? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
         credentialID: String? = nil,
-        adaptiveThinkingModelIDs: Set<String> = []
+        adaptiveThinkingModelIDs: Set<String> = [],
+        requestAuthentication: ProviderRequestAuthentication? = nil,
+        version: String = "2023-06-01",
+        beta: [String] = [],
+        extraBody: [String: JSONValue] = [:]
     ) {
         self.id = id
         self.displayName = displayName
@@ -33,6 +41,10 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         self.credentialKind = credentialKind
         self.credentialID = credentialID ?? id
         self.adaptiveThinkingModelIDs = adaptiveThinkingModelIDs
+        self.requestAuthentication = requestAuthentication
+        self.version = version
+        self.beta = beta
+        self.extraBody = extraBody
     }
 
     func stream(
@@ -62,8 +74,11 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         options: StreamOptions,
         continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
     ) async throws {
-        guard let key = Credentials.key(for: credentialID) else {
-            throw OpenAIAuthError.missingAPIKey(displayName)
+        let headers: [String: String]
+        if let requestAuthentication { headers = try await requestAuthentication.headers() }
+        else {
+            guard let key = Credentials.key(for: credentialID) else { throw OpenAIAuthError.missingAPIKey(displayName) }
+            headers = ["x-api-key": key]
         }
         LogContext.latency?.mark(.authReady)
         let body = try buildBody(
@@ -79,8 +94,9 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue(key, forHTTPHeaderField: "x-api-key")
+        request.setValue(version, forHTTPHeaderField: "anthropic-version")
+        if !beta.isEmpty { request.setValue(beta.joined(separator: ","), forHTTPHeaderField: "anthropic-beta") }
+        for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         request.httpBody = body
 
         let label = "\(displayName).messages"
@@ -274,10 +290,11 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
             }
             body["tool_choice"] = ["type": "auto"]
         }
-        if adaptiveThinkingModelIDs.contains(model.id) {
+        if adaptiveThinkingModelIDs.contains(model.wireID) {
             body["thinking"] = ["type": "adaptive"]
             body["output_config"] = ["effort": model.selectedReasoningEffort ?? "low"]
         }
+        body.merge(extraBody.mapValues { $0.toAny() }) { current, _ in current }
         return try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
     }
 

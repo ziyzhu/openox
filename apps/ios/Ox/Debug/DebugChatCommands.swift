@@ -285,6 +285,7 @@ extension OxHostProtocol {
                     defaultModelMigrated: replay.defaultModelMigrated,
                     chatModelMigrated: replay.chatModelMigrated,
                     unsupportedVersionRejected: replay.unsupportedVersionRejected,
+                    providerCatalogMigrated: replay.providerCatalogMigrated,
                     fixtureResults: replay.fixtureResults,
                     error: nil
                 )))
@@ -306,6 +307,7 @@ extension OxHostProtocol {
                     defaultModelMigrated: nil,
                     chatModelMigrated: nil,
                     unsupportedVersionRejected: nil,
+                    providerCatalogMigrated: nil,
                     fixtureResults: nil,
                     error: error.localizedDescription
                 )))

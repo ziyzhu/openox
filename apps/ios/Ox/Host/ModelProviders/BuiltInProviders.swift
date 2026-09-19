@@ -32,13 +32,13 @@ nonisolated enum BuiltInProviders {
         }
     }
 
-    private static let planProfiles = [
+    static let planProfiles = [
         OpenCodeGoProvider.profile,
         QwenProvider.codingPlan,
         MiniMaxProvider.tokenPlan,
     ]
 
-    private static let trailingProfiles = [
+    static let trailingProfiles = [
         ZAIProvider.codingPlan,
         MistralProvider.profile,
         KimiProvider.profile,

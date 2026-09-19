@@ -279,8 +279,8 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         };
         const __oxValidationError = (value, schema, path) => {
           if (schema == null || typeof schema !== 'object') return null;
-          if (Array.isArray(schema.oneOf)) {
-            const errors = schema.oneOf.map(candidate => __oxValidationError(value, candidate, path));
+          if (Array.isArray(schema.oneOf) || Array.isArray(schema.anyOf)) {
+            const errors = (schema.oneOf ?? schema.anyOf).map(candidate => __oxValidationError(value, candidate, path));
             if (errors.some(error => error == null)) return null;
             return errors[0] ?? `${path || 'value'} is invalid.`;
           }

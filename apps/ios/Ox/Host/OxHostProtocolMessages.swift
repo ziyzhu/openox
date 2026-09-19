@@ -490,6 +490,7 @@ extension OxHostProtocol {
         let defaultModelMigrated: Bool?
         let chatModelMigrated: Bool?
         let unsupportedVersionRejected: Bool?
+        let providerCatalogMigrated: Bool?
         let fixtureResults: [StorageMigrationFixtureReplay]?
         let error: String?
     }

@@ -38,10 +38,16 @@ protocol MessageComposing {
 }
 
 @MainActor
+protocol ProviderAuthenticating {
+    func present(session: ProviderAuthenticationSession) async -> ProviderAuthenticationSession.Outcome
+}
+
+@MainActor
 struct AppPresentations {
     let serviceSignIn: any ServiceAuthPresenting
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
+    var providerAuthentication: (any ProviderAuthenticating)? = nil
 
     static let unavailable = AppPresentations(
         serviceSignIn: UnavailableServiceAuthPresenter(),
@@ -57,6 +63,7 @@ final class AppPresentationCoordinator {
         case browser(ServiceBrowserSession)
         case serviceSignIn(ServiceAuthSession)
         case serviceHandoff(ServiceHandoffSession)
+        case providerAuthentication(ProviderAuthenticationSession)
     }
 
     struct Presented: Identifiable {
@@ -119,6 +126,7 @@ final class AppPresentationCoordinator {
         case .browser(let session): session.stop()
         case .serviceSignIn(let session): session.cancel()
         case .serviceHandoff(let session): session.cancel()
+        case .providerAuthentication(let session): session.complete(.cancelled)
         }
         self.presented = nil
     }
@@ -136,6 +144,18 @@ final class AppPresentationCoordinator {
     private func dismiss(id: UUID) {
         guard presented?.id == id else { return }
         presented = nil
+    }
+}
+
+extension AppPresentationCoordinator: ProviderAuthenticating {
+    func present(session: ProviderAuthenticationSession) async -> ProviderAuthenticationSession.Outcome {
+        guard let id = present(.providerAuthentication(session), label: "provider-auth") else {
+            session.complete(.failed)
+            return .failed
+        }
+        let outcome = await session.run()
+        dismiss(id: id)
+        return outcome
     }
 }
 
@@ -174,7 +194,8 @@ extension AppPresentations {
     static let live = AppPresentations(
         serviceSignIn: AppPresentationCoordinator.shared,
         serviceHandoff: ServiceHandoffSheetPresenter(coordinator: .shared),
-        messages: MessageSheetComposer()
+        messages: MessageSheetComposer(),
+        providerAuthentication: AppPresentationCoordinator.shared
     )
 }
 

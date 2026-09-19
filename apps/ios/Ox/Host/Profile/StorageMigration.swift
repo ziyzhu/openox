@@ -19,6 +19,7 @@ nonisolated enum ProfileSchema {
         "2026-08-17-runtime",
         "2026-08-29-compacted-context",
         "2026-08-31-model-selection",
+        "2026-09-18-providers",
     ]
     static var current: String { versions.last! }
 
@@ -37,6 +38,7 @@ nonisolated enum ProfileSchema {
         { _ in },
         { try StorageMigrator.removeRedundantAgentContexts(at: $0) },
         { try StorageMigrator.migrateChatModelSelections(at: $0) },
+        { try StorageMigrator.migrateChatProviderDefinitions(at: $0) },
     ]
 }
 
@@ -89,6 +91,7 @@ nonisolated struct StorageMigrationReplay: Sendable {
     let defaultModelMigrated: Bool
     let chatModelMigrated: Bool
     let unsupportedVersionRejected: Bool
+    let providerCatalogMigrated: Bool
     let fixtureResults: [StorageMigrationFixtureReplay]
 }
 
@@ -145,6 +148,8 @@ nonisolated enum StorageMigrator {
             key: ProviderRegistry.customProvidersKey
         )
         _ = migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
+        do { try migrateProviderCatalog(defaults: .standard) }
+        catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
         removeRetiredAutoApproveActions()
         migrateTheme()
         Log.app.info("StorageMigrator.application done")
@@ -249,6 +254,16 @@ nonisolated enum StorageMigrator {
         }
 
         let defaults = UserDefaults.standard
+        do {
+            guard let data = defaults.data(forKey: ProviderRegistry.catalogKey) else {
+                throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+            }
+            try JSONDecoder().decode(ProviderCatalog.self, from: data).validate()
+            if let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey),
+               let object = try JSONSerialization.jsonObject(with: selection) as? [String: Any], object["region"] != nil {
+                throw StorageMigrationError.invalidApplicationStorage("provider selection")
+            }
+        } catch { throw StorageMigrationError.invalidApplicationStorage("provider catalog") }
         if defaults.object(forKey: ServiceManager.remoteMCPKey) != nil {
             guard let data = defaults.data(forKey: ServiceManager.remoteMCPKey),
                   (try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data)) != nil else {
@@ -412,8 +427,16 @@ nonisolated enum StorageMigrator {
         ]
         if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
            let stored = try? JSONDecoder().decode(ModelSelection.self, from: data) {
+            var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            if let region = (object?["region"] as? String).flatMap(LLMRegion.init(rawValue:)) {
+                object?["providerID"] = providerIdentity(stored.providerID, region: region, modelID: stored.modelID)
+                object?.removeValue(forKey: "region")
+                if let object, let current = try? JSONSerialization.data(withJSONObject: object) {
+                    defaults.set(current, forKey: ProviderRegistry.defaultModelKey)
+                }
+            }
             legacyKeys.forEach { defaults.removeObject(forKey: $0) }
-            return stored
+            return defaults.data(forKey: ProviderRegistry.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
         }
         guard defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil else { return nil }
         let hasLegacyValue = legacyKeys.contains { defaults.object(forKey: $0) != nil }
@@ -429,7 +452,7 @@ nonisolated enum StorageMigrator {
             let efforts = defaults.dictionary(forKey: selectedReasoningEffortsKey) as? [String: String] ?? [:]
             selection = ModelSelection(
                 region: region,
-                providerID: providerID,
+                providerID: providerIdentity(providerID, region: region, modelID: modelID),
                 modelID: modelID,
                 reasoningEffort: efforts["\(providerID)\u{1F}\(modelID)"]
             )
@@ -1118,6 +1141,121 @@ nonisolated enum StorageMigrator {
         Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained) unreadable=\(unreadable)")
     }
 
+    static func providerIdentity(_ id: String, region: LLMRegion, modelID: String) -> String {
+        if id == "amazon-bedrock" {
+            return "amazon-bedrock:\(modelID.hasPrefix("claude") || modelID.hasPrefix("anthropic.") ? "messages" : "responses")"
+        }
+        let profiles = BuiltInProviders.planProfiles + [ModelArkProvider.profile] + BuiltInProviders.trailingProfiles
+        if let profile = profiles.first(where: { $0.id == id }),
+           profile.regionalCredentials || !profile.endpoint.overrides.isEmpty || !(profile.models?.overrides.isEmpty ?? true) {
+            return "\(id):\(region.rawValue)"
+        }
+        return id
+    }
+
+    static func migrateProviderCatalog(
+        defaults: UserDefaults,
+        copyCredential: (String, String) throws -> Void = { source, destination in
+            guard source != destination, let value = Credentials.key(for: source) else { return }
+            if let existing = Credentials.key(for: destination), existing != value {
+                throw StorageMigrationError.collision("provider credential")
+            }
+            try Credentials.setSecretChecked(value, for: "api:\(destination)")
+        }
+    ) throws {
+        let existing = defaults.data(forKey: ProviderRegistry.catalogKey)
+        if let existing {
+            let catalog = try JSONDecoder().decode(ProviderCatalog.self, from: existing)
+            if catalog.format == 2 {
+                try catalog.validate()
+                return
+            }
+            guard catalog.format == 1 else {
+                throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+            }
+        }
+        let bundled = ProviderRegistry.bundledDefinitions()
+        for entry in bundled {
+            _ = try ProviderDefinition.decode(entry.definition.json)
+            try ProviderClientFactory.validateAdapter(entry.definition)
+        }
+        var catalog = ProviderCatalog()
+        let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
+        if let existing {
+            struct Overlay: Decodable {
+                let providers: [ProviderDefinition]
+                let deleted: [String]
+            }
+            let overlay = try JSONDecoder().decode(Overlay.self, from: existing)
+            try ProviderCatalog(providers: overlay.providers).validate()
+            guard Set(overlay.deleted).count == overlay.deleted.count,
+                  Set(overlay.deleted).isDisjoint(with: Set(overlay.providers.map(\.id))) else {
+                throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+            }
+            catalog.providers = overlay.providers
+            for entry in bundled where overlay.deleted.contains(entry.definition.id) {
+                var disabled = entry.definition
+                disabled.models = []
+                catalog.providers.append(disabled)
+            }
+        } else if let data = defaults.data(forKey: ProviderRegistry.customProvidersKey) {
+            let custom = try JSONDecoder().decode([CustomLLMProvider].self, from: data)
+            for provider in custom {
+                var definition = provider.definition
+                if selection?.providerID == provider.clientID, let modelID = selection?.modelID {
+                    var model = ProviderDefinition.Model(ProviderModel(id: modelID, displayName: modelID, maxTokens: 4_096, maxContext: 32_768))
+                    model.contextTokens = nil
+                    model.outputTokens = nil
+                    model.input = nil
+                    model.output = nil
+                    definition.models = [model]
+                }
+                catalog.providers.append(definition)
+            }
+        }
+        try catalog.validate()
+        if existing == nil {
+            for entry in bundled { try copyCredential(entry.legacyCredentialID, entry.definition.credentialID) }
+            for provider in catalog.providers where !bundled.contains(where: { $0.definition.id == provider.id }) {
+                try copyCredential(provider.id, provider.credentialID)
+            }
+        }
+        let encoded = try JSONEncoder().encode(catalog)
+        defaults.set(encoded, forKey: ProviderRegistry.catalogKey)
+        guard defaults.data(forKey: ProviderRegistry.catalogKey) == encoded else {
+            throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+        }
+        defaults.removeObject(forKey: ProviderRegistry.customProvidersKey)
+        Log.app.info("StorageMigrator.providerCatalog migrated format=\(catalog.format) providers=\(catalog.providers.count) source=\(existing == nil ? "legacy" : "overlay")")
+    }
+
+    static func migrateChatProviderDefinitions(at root: URL) throws {
+        let chats = root.appendingPathComponent("chats", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: chats.path) else { return }
+        let directories = try FileManager.default.contentsOfDirectory(at: chats, includingPropertiesForKeys: [.isDirectoryKey])
+        var count = 0
+        for directory in directories {
+            guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else { continue }
+            let file = directory.appendingPathComponent("chat.json")
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            var object = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: file))
+            guard var selection = object["model"]?.objectValue,
+                  let id = selection["providerID"]?.stringValue,
+                  let modelID = selection["modelID"]?.stringValue,
+                  let region = selection["region"]?.stringValue.flatMap(LLMRegion.init(rawValue:)) else { continue }
+            selection["providerID"] = .string(providerIdentity(id, region: region, modelID: modelID))
+            selection.removeValue(forKey: "region")
+            object["model"] = .object(selection)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            var data = try encoder.encode(object)
+            data.append(0x0A)
+            try data.write(to: file, options: .atomic)
+            count += 1
+        }
+        Log.app.info("StorageMigrator.chatProviders migrated=\(count)")
+    }
+
     static func migrateChatModelSelections(at root: URL) throws {
         let manager = FileManager.default
         let chats = root.appendingPathComponent("chats", isDirectory: true)
@@ -1168,8 +1306,9 @@ nonisolated enum StorageMigrator {
 
     private static func modelMigrationFallbackRegion(defaults: UserDefaults = .standard) -> LLMRegion {
         if let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
-           let selection = try? JSONDecoder().decode(ModelSelection.self, from: data) {
-            return selection.region
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let region = (object["region"] as? String).flatMap(LLMRegion.init(rawValue:)) {
+            return region
         }
         if let region = defaults.string(forKey: "app.region").flatMap(LLMRegion.init(rawValue:)) {
             return region
@@ -1215,6 +1354,7 @@ nonisolated enum StorageMigrator {
             && defaults.object(forKey: "llm.defaultRegion") == nil
             && defaults.object(forKey: "llm.selectedModels") == nil
             && defaults.object(forKey: "llm.selectedReasoningEfforts") == nil
+        let providerCatalogMigrated = try replayProviderCatalogMigration(defaults: defaults)
         var compactedTurns = turns
         compactedAgent.steps.append(Step(
             generation: generation.id,
@@ -1292,7 +1432,7 @@ nonisolated enum StorageMigrator {
         legacyMetadata.removeValue(forKey: "model")
         legacyMetadata["clientID"] = selection.providerID
         legacyMetadata["modelID"] = selection.modelID
-        legacyMetadata["region"] = selection.region.rawValue
+        legacyMetadata["region"] = LLMRegion.china.rawValue
         legacyMetadata["reasoningEffort"] = selection.reasoningEffort
         try JSONSerialization.data(withJSONObject: legacyMetadata).write(
             to: ordinaryDirectory.appendingPathComponent("chat.json", isDirectory: false),
@@ -1388,8 +1528,53 @@ nonisolated enum StorageMigrator {
             defaultModelMigrated: defaultModelMigrated,
             chatModelMigrated: decodedMeta.model == selection,
             unsupportedVersionRejected: unsupportedVersionRejected,
+            providerCatalogMigrated: providerCatalogMigrated,
             fixtureResults: fixtureResults
         )
+    }
+
+    private static func replayProviderCatalogMigration(defaults: UserDefaults) throws -> Bool {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let key = ProviderRegistry.catalogKey
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        let seeded = try decoder.decode(ProviderCatalog.self, from: defaults.data(forKey: key)!)
+        let bundled = ProviderRegistry.bundledDefinitions().map(\.definition)
+        guard seeded.providers.isEmpty else { return false }
+        let empty = try encoder.encode(ProviderCatalog())
+        defaults.set(empty, forKey: key)
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        guard defaults.data(forKey: key) == empty else { return false }
+        var changed = bundled[0]
+        changed.name = "Fixture provider"
+        let overlay: JSONValue = .object([
+            "format": .int(1), "providers": .array([try changed.json]), "deleted": .array([.string(bundled[1].id)]),
+        ])
+        defaults.set(try encoder.encode(overlay), forKey: key)
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        let convertedBytes = defaults.data(forKey: key)!
+        let converted = try decoder.decode(ProviderCatalog.self, from: convertedBytes)
+        guard converted.format == 2, converted.providers.first == changed,
+              converted.providers.last?.id == bundled[1].id,
+              converted.providers.last?.models.isEmpty == true,
+              converted.providers.count == 2 else { return false }
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        guard defaults.data(forKey: key) == convertedBytes else { return false }
+        let unknown = try encoder.encode(ProviderCatalog(format: 999))
+        defaults.set(unknown, forKey: key)
+        do {
+            try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+            return false
+        } catch {
+            guard defaults.data(forKey: key) == unknown else { return false }
+        }
+        defaults.removeObject(forKey: key)
+        let custom = CustomLLMProvider(name: "Fixture custom", baseURL: URL(string: "https://fixture.invalid/v1")!, models: [])
+        defaults.set(try encoder.encode([custom]), forKey: ProviderRegistry.customProvidersKey)
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        let migrated = try decoder.decode(ProviderCatalog.self, from: defaults.data(forKey: key)!)
+        return migrated.providers == [custom.definition]
+            && defaults.object(forKey: ProviderRegistry.customProvidersKey) == nil
     }
 
     private static func replay(_ fixture: StorageMigrationFixture) async throws -> StorageMigrationFixtureReplay {
@@ -1405,6 +1590,14 @@ nonisolated enum StorageMigrator {
         let migrated = try await migrate(profile)
         let firstSnapshot = try snapshot(at: root)
         let expectedSnapshot = try decodedEntries(fixture.after)
+        if firstSnapshot != expectedSnapshot {
+            for path in Set(firstSnapshot.keys).union(expectedSnapshot.keys).sorted() where firstSnapshot[path] != expectedSnapshot[path] {
+                if case .file(let actual) = firstSnapshot[path], case .file(let expected) = expectedSnapshot[path] {
+                    let difference = zip(actual, expected).enumerated().first { $0.element.0 != $0.element.1 }?.offset ?? min(actual.count, expected.count)
+                    Log.app.error("StorageMigrator.fixture mismatch name=\(fixture.name) path=\(path) actualBytes=\(actual.count) expectedBytes=\(expected.count) offset=\(difference)")
+                } else { Log.app.error("StorageMigrator.fixture mismatch name=\(fixture.name) path=\(path) kind=different-entry") }
+            }
+        }
         _ = try await migrate(migrated)
         return StorageMigrationFixtureReplay(
             name: fixture.name,

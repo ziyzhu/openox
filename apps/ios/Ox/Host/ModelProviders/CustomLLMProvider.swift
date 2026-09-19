@@ -66,6 +66,12 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
 
     var clientID: String { "custom:\(id.uuidString.lowercased())" }
 
+    var definition: ProviderDefinition {
+        ProviderDefinition(id: clientID, name: name, url: baseURL, api: .openAIChatCompletions,
+                           auth: .init(kind: .bearer, optional: true),
+                           models: models.filter(\.supportsTools).map { ProviderDefinition.Model($0.modelInfo) })
+    }
+
     var profile: OpenAICompatibleProvider {
         OpenAICompatibleProvider(
             id: clientID,

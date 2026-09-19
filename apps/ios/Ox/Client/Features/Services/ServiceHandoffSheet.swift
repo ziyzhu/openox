@@ -76,6 +76,8 @@ private struct AppPresentationModifier: ViewModifier {
                     ServiceSessionSheetView(session: session, mode: .signIn)
                 case .serviceHandoff(let session):
                     ServiceSessionSheetView(session: session, mode: .handoff)
+                case .providerAuthentication(let session):
+                    ProviderAuthenticationSheet(session: session)
                 }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in

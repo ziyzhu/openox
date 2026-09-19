@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 public protocol OxFunctionBridge: AnyObject {
+    func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue?
     func appInfo(purpose: String) async throws -> JSONValue?
     func appProfile(purpose: String) async throws -> JSONValue?
@@ -60,4 +61,10 @@ public protocol OxFunctionBridge: AnyObject {
     func renameArtifact(filename: String, newFilename: String, purpose: String) async throws -> JSONValue?
     func presentArtifact(filename: String, purpose: String) async throws -> JSONValue?
     func presentArtifacts(filenames: [String], purpose: String) async throws -> JSONValue?
+}
+
+extension OxFunctionBridge {
+    public func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
+        throw RuntimeError.bridge("Provider management is unavailable in this context")
+    }
 }

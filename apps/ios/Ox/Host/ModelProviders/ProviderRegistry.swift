@@ -1,315 +1,247 @@
 import Foundation
 import Observation
 
+nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
+    var format = 2
+    var providers: [ProviderDefinition] = []
+
+    func validate() throws {
+        guard format == 2, Set(providers.map(\.id)).count == providers.count else {
+            throw RuntimeError.bridge("Invalid or unsupported provider catalog")
+        }
+        for provider in providers {
+            _ = try ProviderDefinition.decode(provider.json)
+            try ProviderClientFactory.validateAdapter(provider)
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class ProviderRegistry {
     static let shared = ProviderRegistry()
+    nonisolated static let defaultModelKey = "llm.defaultModel"
+    nonisolated static let customProvidersKey = "llm.customProviders"
+    nonisolated static let catalogKey = "llm.providerCatalog"
 
-    private struct ProviderModelsFile: Decodable {
-        struct Provider: Decodable {
-            let global: RegionalModels?
-            let china: RegionalModels?
+    private let bundled: [BundledProviderDefinition]
+    private var catalog: ProviderCatalog
+    private var catalogAvailable = true
+    private(set) var allClients: [any ProviderClient] = []
+    private(set) var defaultModel: ModelSelection?
 
-            func models(in region: LLMRegion) -> [ProviderModel]? {
-                switch region {
-                case .global: global?.models.map(\.model)
-                case .china: china?.models.map(\.model)
+    private init() {
+        bundled = Self.bundledDefinitions()
+        do {
+            if let data = UserDefaults.standard.data(forKey: Self.catalogKey) {
+                catalog = try JSONDecoder().decode(ProviderCatalog.self, from: data)
+                try catalog.validate()
+            } else { catalog = ProviderCatalog() }
+        } catch {
+            catalog = ProviderCatalog()
+            catalogAvailable = false
+            Log.agent.error("ProviderRegistry catalog unavailable error=\(error.localizedDescription)")
+        }
+        defaultModel = UserDefaults.standard.data(forKey: Self.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
+        rebuildClients()
+        Log.agent.info("ProviderRegistry ready definitions=\(definitions.count) default=\(defaultModel?.providerID ?? "unconfigured")")
+    }
+
+    nonisolated static func bundledDefinitions() -> [BundledProviderDefinition] {
+        struct File: Decodable {
+            struct Provider: Decodable {
+                struct Regional: Decodable {
+                    struct Entry: Decodable { let model: ProviderModel }
+                    let models: [Entry]
                 }
+                let global: Regional?
+                let china: Regional?
             }
+            let providers: [String: Provider]
         }
-
-        struct RegionalModels: Decodable {
-            struct Entry: Decodable {
-                let model: ProviderModel
-            }
-
-            let models: [Entry]
+        guard let url = Bundle.main.url(forResource: "provider-models", withExtension: "json"),
+              let data = try? Data(contentsOf: url), let file = try? JSONDecoder().decode(File.self, from: data) else {
+            fatalError("Missing bundled provider models")
         }
-
-        let providers: [String: Provider]
-
-        func models(for clientID: String, in region: LLMRegion) -> [ProviderModel] {
-            guard let models = providers[clientID]?.models(in: region) else {
-                fatalError("Missing provider models for \(clientID) in \(region.rawValue)")
-            }
-            return models
+        return BuiltInProviders.definitions { id, region in
+            let entry = file.providers[id]
+            let models = region == .global ? entry?.global?.models : entry?.china?.models
+            guard let models else { fatalError("Missing provider models \(id)/\(region.rawValue)") }
+            return models.map(\.model)
         }
     }
 
-    private let builtInClients: [LLMRegion: [any ProviderClient]]
-    private(set) var customProviders: [CustomLLMProvider] {
-        didSet { Self.persist(customProviders) }
+    var definitions: [ProviderDefinition] {
+        let replacements = Dictionary(uniqueKeysWithValues: catalog.providers.map { ($0.id, $0) })
+        let bundledIDs = Set(bundled.map { $0.definition.id })
+        return bundled.map { replacements[$0.definition.id] ?? $0.definition }
+            + catalog.providers.filter { !bundledIDs.contains($0.id) }
     }
-    private(set) var customProviderLoading: Set<UUID> = []
-    private(set) var customProviderErrors: [UUID: String] = [:]
+    var defaultDefinitions: [ProviderDefinition] { bundled.map(\.definition) }
 
-    var clients: [any ProviderClient] {
-        clients(for: defaultRegion)
-    }
-
-    private(set) var defaultModel: ModelSelection? {
-        didSet { Self.persist(defaultModel) }
-    }
-
+    var clients: [any ProviderClient] { allClients.filter { !$0.models.isEmpty } }
     var defaultClient: String { sessionModel.providerID }
-    var defaultRegion: LLMRegion { sessionModel.region }
+    var defaultRegion: LLMRegion { region(for: defaultModel?.providerID) }
 
     var sessionModel: ModelSelection {
         if let defaultModel { return defaultModel }
-        let region = AppRegion.shared.region
-        let client = clients(for: region)[0]
-        let model = client.models.first { client.supportsTools(for: $0) }!
-        return ModelSelection(
-            region: region,
-            providerID: client.id,
-            modelID: model.id,
-            reasoningEffort: model.lowestReasoningEffort
-        )
+        let client = clients(in: AppRegion.shared.region).first ?? clients.first ?? unavailableClient
+        return ModelSelection(providerID: client.id, modelID: client.models.first!.id, reasoningEffort: client.models.first!.lowestReasoningEffort)
     }
 
-    nonisolated static let defaultModelKey = "llm.defaultModel"
-    nonisolated static let customProvidersKey = "llm.customProviders"
+    var newSessionClient: any ProviderClient { client(for: sessionModel) }
+    var defaultClientModel: ProviderModel { model(for: sessionModel, client: newSessionClient) }
 
-    private init() {
-        let detectedRegion = AppRegion.shared.region
-        let providerModels = Self.loadProviderModels()
-        let modelLookup = { (clientID: String, region: LLMRegion) in
-            providerModels.models(for: clientID, in: region)
-        }
-        var prefixClients: [any ProviderClient] = []
-        if MockLLMClient.isEnabled {
-            prefixClients.append(MockLLMClient())
-            Log.agent.info("ProviderRegistry added MockLLMClient")
-        }
-        var builtInClients: [LLMRegion: [any ProviderClient]] = [:]
-        for candidate in LLMRegion.allCases {
-            var clients = prefixClients
-            clients.append(contentsOf: BuiltInProviders.clients(for: candidate, modelLookup: modelLookup))
-            builtInClients[candidate] = clients
-        }
-        let customProviders = Self.loadCustomProviders()
-        let storedDefault = UserDefaults.standard.data(forKey: Self.defaultModelKey).flatMap {
-            try? JSONDecoder().decode(ModelSelection.self, from: $0)
-        }
-        let region = storedDefault?.region ?? detectedRegion
-        let configuredClients = builtInClients[region, default: []] + customProviders.map(\.client)
-        let resolvedDefault: ModelSelection?
-        if let storedDefault,
-           let client = configuredClients.first(where: { $0.id == storedDefault.providerID }),
-           let model = client.models.first(where: { $0.id == storedDefault.modelID && client.supportsTools(for: $0) }) {
-            resolvedDefault = ModelSelection(
-                region: storedDefault.region,
-                providerID: client.id,
-                modelID: model.id,
-                reasoningEffort: storedDefault.reasoningEffort.flatMap {
-                    model.reasoningEfforts.contains($0) ? $0 : nil
-                } ?? model.lowestReasoningEffort
-            )
-        } else if let storedDefault,
-                  customProviders.contains(where: { $0.clientID == storedDefault.providerID }),
-                  !storedDefault.modelID.isEmpty {
-            resolvedDefault = storedDefault
-        } else {
-            resolvedDefault = nil
-        }
-        self.builtInClients = builtInClients
-        self.customProviders = customProviders
-        self.defaultModel = resolvedDefault
-        Self.persist(resolvedDefault)
-        let configured = resolvedDefault.map {
-            "\($0.providerID)/\($0.modelID) region=\($0.region.rawValue)"
-        } ?? "unconfigured"
-        Log.agent.info("ProviderRegistry ready clients=[\(self.clients.map(\.id).joined(separator: ","))] default=\(configured) detectedRegion=\(detectedRegion.rawValue)")
-        for provider in customProviders {
-            Task { [weak self] in
-                await self?.refresh(provider)
-            }
-        }
+    func definition(id: String) throws -> ProviderDefinition {
+        guard let definition = definitions.first(where: { $0.id == id }) else { throw RuntimeError.bridge("Provider not found: \(id)") }
+        return definition
     }
 
-    func client(id: String) -> (any ProviderClient)? {
-        clients.first { $0.id == id }
+    func region(for id: String?) -> LLMRegion {
+        let regions = id.flatMap { target in bundled.first { $0.definition.id == target }?.presentation.regions }
+        if regions?.count == 1 { return regions!.first! }
+        return AppRegion.shared.region
     }
 
-    func client(id: String, in region: LLMRegion) -> (any ProviderClient)? {
-        clients(for: region).first { $0.id == id && $0.regions.contains(region) }
-    }
-
-    func isCustomProviderPending(clientID: String) -> Bool {
-        guard let provider = customProviders.first(where: { $0.clientID == clientID }) else { return false }
-        return provider.models.isEmpty && customProviderErrors[provider.id] == nil
-    }
-
-    func clients(in region: LLMRegion) -> [any ProviderClient] {
-        clients(for: region).filter { $0.regions.contains(region) }
-    }
+    func client(id: String) -> (any ProviderClient)? { allClients.first { $0.id == id } }
+    func client(id: String, in region: LLMRegion) -> (any ProviderClient)? { client(id: id) }
+    func clients(in region: LLMRegion) -> [any ProviderClient] { clients.filter { $0.regions.contains(region) } }
 
     func client(for selection: ModelSelection?) -> any ProviderClient {
         let selection = selection ?? sessionModel
-        if let client = client(id: selection.providerID, in: selection.region) { return client }
-        if let provider = customProviders.first(where: { $0.clientID == selection.providerID }) { return provider.client }
-        return newSessionClient
+        return client(id: selection.providerID) ?? unavailableClient
     }
 
     func model(for selection: ModelSelection?, client: any ProviderClient) -> ProviderModel {
         let selection = selection ?? sessionModel
         if var model = client.models.first(where: { $0.id == selection.modelID }) {
-            model.reasoningEffort = selection.reasoningEffort.flatMap {
-                model.reasoningEfforts.contains($0) ? $0 : nil
-            } ?? model.lowestReasoningEffort
+            model.reasoningEffort = selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
             return model
         }
-        if customProviders.contains(where: { $0.clientID == client.id }) {
-            return CustomLLMModel(id: selection.modelID, supportsTools: true).modelInfo
-        }
-        return selected(for: client.id, in: selection.region)
+        return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
     }
 
-    var newSessionClient: any ProviderClient {
-        let selection = sessionModel
-        let region = selection.region
-        let inRegion = clients(in: region)
-        if let preferred = client(id: selection.providerID), preferred.regions.contains(region), !preferred.models.isEmpty {
-            return preferred
-        }
-        return inRegion.first(where: { !$0.models.isEmpty }) ?? clients.first(where: { !$0.models.isEmpty })!
-    }
-
-    var defaultClientModel: ProviderModel {
-        selected(for: defaultClient, in: defaultRegion)
-    }
-
-    func selected(for clientID: String) -> ProviderModel {
-        selected(for: clientID, in: defaultRegion)
-    }
-
+    func selected(for clientID: String) -> ProviderModel { selected(for: clientID, in: defaultRegion) }
     func selected(for clientID: String, in region: LLMRegion) -> ProviderModel {
-        let regionalClients = clients(in: region)
-        let client = regionalClients.first { $0.id == clientID } ?? regionalClients[0]
-        if let defaultModel,
-           defaultModel.region == region,
-           defaultModel.providerID == client.id,
-           var model = client.models.first(where: { $0.id == defaultModel.modelID }) {
-            model.reasoningEffort = reasoningEffort(for: model, in: client.id, region: region)
-            return model
-        }
-        var model = client.models.first ?? newSessionClient.models[0]
-        model.reasoningEffort = reasoningEffort(for: model, in: client.id, region: region)
-        return model
+        let client = client(id: clientID) ?? unavailableClient
+        if let selection = defaultModel, selection.providerID == clientID { return model(for: selection, client: client) }
+        return client.models.first ?? unavailableClient.models[0]
     }
 
     func reasoningEffort(for model: ProviderModel, in clientID: String, region: LLMRegion) -> String? {
-        let stored = defaultModel.flatMap { selection in
-            selection.region == region
-                && selection.providerID == clientID
-                && selection.modelID == model.id
-                ? selection.reasoningEffort
-                : nil
-        }
-        return stored.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
+        guard let selection = defaultModel, selection.providerID == clientID, selection.modelID == model.id else { return model.lowestReasoningEffort }
+        return selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
     }
 
     func select(_ model: ProviderModel, in clientID: String, region: LLMRegion) {
-        defaultModel = ModelSelection(
-            region: region,
-            providerID: clientID,
-            modelID: model.id,
-            reasoningEffort: model.selectedReasoningEffort
-        )
-        Log.agent.info("ProviderRegistry.select client=\(clientID) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(region.rawValue)")
+        let selection = ModelSelection(providerID: clientID, modelID: model.id, reasoningEffort: model.selectedReasoningEffort)
+        do {
+            UserDefaults.standard.set(try JSONEncoder().encode(selection), forKey: Self.defaultModelKey)
+            defaultModel = selection
+            Log.agent.info("ProviderRegistry.select provider=\(clientID) model=\(model.id)")
+        } catch { Log.agent.error("ProviderRegistry.select failed error=\(error.localizedDescription)") }
     }
+
+    func save(_ definition: ProviderDefinition) throws {
+        _ = try ProviderDefinition.decode(definition.json)
+        try ProviderClientFactory.validateAdapter(definition)
+        _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
+        var next = catalog
+        if let index = next.providers.firstIndex(where: { $0.id == definition.id }) {
+            next.providers[index] = definition
+        } else { next.providers.append(definition) }
+        try persist(next)
+        rebuildClients()
+        Log.agent.info("ProviderRegistry.save provider=\(definition.id) models=\(definition.models.count)")
+    }
+
+    func delete(id: String) throws {
+        let definition = try definition(id: id)
+        guard catalog.providers.contains(where: { $0.id == id }) else {
+            throw RuntimeError.bridge("Provider has no saved override: \(id)")
+        }
+        var next = catalog
+        next.providers.removeAll { $0.id == id }
+        try persist(next)
+        deauthenticate(definition)
+        if defaultModel?.providerID == id {
+            UserDefaults.standard.removeObject(forKey: Self.defaultModelKey)
+            defaultModel = nil
+        }
+        rebuildClients()
+        Log.agent.info("ProviderRegistry.delete provider=\(id)")
+    }
+
+    func deauthenticate(_ definition: ProviderDefinition) {
+        Credentials.clear(for: definition.credentialID)
+        if let account = client(id: definition.id)?.subscriptionAccount { account.signOut() }
+        else if definition.auth.kind == .oauth { ProviderOAuthAccount(definition).signOut() }
+        Log.agent.info("ProviderRegistry.deauthenticate provider=\(definition.id)")
+    }
+
+    func authenticationStatus(id: String) -> String {
+        guard let definition = try? definition(id: id) else { return "unavailable" }
+        if definition.auth.kind == .none { return "not-required" }
+        if client(id: id)?.subscriptionAccount?.isSignedIn == true { return "authenticated" }
+        if Credentials.key(for: definition.credentialID) != nil { return "credential-stored" }
+        return definition.auth.requiresCredential ? "required" : "optional"
+    }
+
+    private func presentation(for definition: ProviderDefinition) -> ProviderPresentation {
+        bundled.first { $0.definition.id == definition.id }?.presentation ?? ProviderPresentation(inferenceLocation: .userHosted)
+    }
+
+    private func persist(_ next: ProviderCatalog) throws {
+        guard catalogAvailable else { throw RuntimeError.bridge("Provider catalog is unavailable. Open a compatible Ox version before making changes.") }
+        try next.validate()
+        let data = try JSONEncoder().encode(next)
+        UserDefaults.standard.set(data, forKey: Self.catalogKey)
+        guard UserDefaults.standard.data(forKey: Self.catalogKey) == data else { throw RuntimeError.bridge("Provider catalog could not be saved") }
+        catalog = next
+    }
+
+    private func rebuildClients() {
+        var resolved: [any ProviderClient] = []
+        if MockLLMClient.isEnabled { resolved.append(MockLLMClient()) }
+        for definition in definitions {
+            do { resolved.append(try ProviderClientFactory.make(definition, presentation: presentation(for: definition))) }
+            catch { Log.agent.error("ProviderRegistry.resolve provider=\(definition.id) error=\(error.localizedDescription)") }
+        }
+        allClients = resolved
+    }
+
+    private var unavailableClient: any ProviderClient { UnavailableProviderClient() }
+
+    var customProviders: [CustomLLMProvider] {
+        definitions.compactMap { definition in
+            guard definition.id.hasPrefix("custom:"), let id = UUID(uuidString: String(definition.id.dropFirst(7))) else { return nil }
+            return CustomLLMProvider(id: id, name: definition.name, baseURL: definition.url,
+                                     models: definition.models.map { CustomLLMModel(id: $0.id, displayName: $0.name, maxTokens: $0.outputTokens ?? 4_096, maxContext: $0.contextTokens ?? 32_768, supportsTools: true) })
+        }
+    }
+    var customProviderLoading: Set<UUID> { [] }
+    var customProviderErrors: [UUID: String] { [:] }
+    func isCustomProviderPending(clientID: String) -> Bool { false }
 
     func upsert(_ provider: CustomLLMProvider) {
-        customProviderErrors.removeValue(forKey: provider.id)
-        if let index = customProviders.firstIndex(where: { $0.id == provider.id }) {
-            customProviders[index] = provider
-            Log.agent.info("ProviderRegistry.custom updated client=\(provider.clientID) models=\(provider.models.count)")
-        } else {
-            customProviders.append(provider)
-            Log.agent.info("ProviderRegistry.custom added client=\(provider.clientID) models=\(provider.models.count)")
-        }
-    }
-
-    func refresh(_ provider: CustomLLMProvider) async {
-        guard !customProviderLoading.contains(provider.id) else { return }
-        customProviderLoading.insert(provider.id)
-        customProviderErrors.removeValue(forKey: provider.id)
-        defer { customProviderLoading.remove(provider.id) }
-        do {
-            let models = try await CustomLLMProviderDiscovery.models(
-                baseURL: provider.baseURL,
-                apiKey: Credentials.key(for: provider.clientID)
-            )
-            guard let index = customProviders.firstIndex(where: {
-                $0.id == provider.id && $0.baseURL == provider.baseURL
-            }) else { return }
-            customProviders[index].models = models
-            Log.agent.info("ProviderRegistry.custom discovered client=\(provider.clientID) models=\(models.count)")
-        } catch {
-            guard customProviders.contains(where: {
-                $0.id == provider.id && $0.baseURL == provider.baseURL
-            }) else { return }
-            customProviderErrors[provider.id] = error.localizedDescription
-            Log.agent.error("ProviderRegistry.custom discovery failed client=\(provider.clientID) error=\(error.localizedDescription)")
-        }
+        do { try save(provider.definition) }
+        catch { Log.agent.error("ProviderRegistry.custom save failed error=\(error.localizedDescription)") }
     }
 
     func remove(_ provider: CustomLLMProvider) {
-        customProviders.removeAll { $0.id == provider.id }
-        customProviderLoading.remove(provider.id)
-        customProviderErrors.removeValue(forKey: provider.id)
-        Credentials.clear(for: provider.client.credentialID)
-        if defaultModel?.providerID == provider.clientID {
-            defaultModel = nil
-        }
-        Log.agent.info("ProviderRegistry.custom removed client=\(provider.clientID)")
+        do { try delete(id: provider.clientID) }
+        catch { Log.agent.error("ProviderRegistry.custom delete failed error=\(error.localizedDescription)") }
     }
+}
 
-    private static func loadProviderModels() -> ProviderModelsFile {
-        guard let url = Bundle.main.url(forResource: "provider-models", withExtension: "json") else {
-            fatalError("Missing bundled provider-models.json")
-        }
-        do {
-            let value = try JSONDecoder().decode(ProviderModelsFile.self, from: Data(contentsOf: url))
-            Log.agent.info("ProviderRegistry loaded provider models providers=\(value.providers.count)")
-            return value
-        } catch {
-            fatalError("Invalid bundled provider-models.json: \(error.localizedDescription)")
+nonisolated private struct UnavailableProviderClient: ProviderClient {
+    let id = "unconfigured"
+    let displayName = "Model"
+    let models = [ProviderModel(id: "unconfigured", displayName: "Model", maxTokens: 4_096, maxContext: 32_768)]
+
+    func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {
+        streamingTask(model: model, messages: messages) { _ in
+            throw RuntimeError.bridge("The selected provider is unavailable. Choose another model in Settings.")
         }
     }
-
-    private static func loadCustomProviders() -> [CustomLLMProvider] {
-        UserDefaults.standard.data(forKey: customProvidersKey).flatMap {
-            try? JSONDecoder().decode([CustomLLMProvider].self, from: $0)
-        } ?? []
-    }
-
-    private static func persist(_ providers: [CustomLLMProvider]) {
-        do {
-            UserDefaults.standard.set(try JSONEncoder().encode(providers), forKey: customProvidersKey)
-        } catch {
-            Log.agent.error("ProviderRegistry.custom encode failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private static func persist(_ selection: ModelSelection?) {
-        guard let selection else {
-            UserDefaults.standard.removeObject(forKey: defaultModelKey)
-            return
-        }
-        do {
-            UserDefaults.standard.set(try JSONEncoder().encode(selection), forKey: defaultModelKey)
-        } catch {
-            Log.agent.error("ProviderRegistry.defaultModel encode failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private func clients(for region: LLMRegion) -> [any ProviderClient] {
-        let candidates = builtInClients[region, default: []] + customProviders.map(\.client)
-        return candidates.filter { client in
-            client.models.contains { client.supportsTools(for: $0) }
-        }
-    }
-
 }

@@ -11,9 +11,20 @@ public struct GeminiConfig: Sendable {
 public struct GeminiProvider: ProviderClient {
     public let config: GeminiConfig
     public let models: [ProviderModel]
+    let requestAuthentication: ProviderRequestAuthentication?
+    let extraBody: [String: JSONValue]
     public init(models: [ProviderModel], config: GeminiConfig = GeminiConfig()) {
         self.models = models
         self.config = config
+        requestAuthentication = nil
+        extraBody = [:]
+    }
+
+    init(models: [ProviderModel], config: GeminiConfig, requestAuthentication: ProviderRequestAuthentication, extraBody: [String: JSONValue]) {
+        self.models = models
+        self.config = config
+        self.requestAuthentication = requestAuthentication
+        self.extraBody = extraBody
     }
 
     public let id = "gemini"
@@ -35,6 +46,11 @@ public struct GeminiProvider: ProviderClient {
             throw GeminiError(message: "Missing API key for Gemini. Add one in provider settings.")
         }
         return key
+    }
+
+    private func authenticationHeaders() async throws -> [String: String] {
+        if let requestAuthentication { return try await requestAuthentication.headers() }
+        return ["x-goog-api-key": try resolvedAPIKey()]
     }
 
     public func stream(
@@ -124,7 +140,7 @@ public struct GeminiProvider: ProviderClient {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        req.setValue(try resolvedAPIKey(), forHTTPHeaderField: "x-goog-api-key")
+        for (key, value) in try await authenticationHeaders() { req.setValue(value, forHTTPHeaderField: key) }
         LogContext.latency?.mark(.authReady)
 
         let body = try buildRequestBody(
@@ -289,6 +305,7 @@ public struct GeminiProvider: ProviderClient {
                 body["tools"] = toolDecls
             }
         }
+        body.merge(extraBody.mapValues { $0.toAny() }) { current, _ in current }
         return try JSONSerialization.data(withJSONObject: body)
     }
 
@@ -444,6 +461,8 @@ public struct GeminiProvider: ProviderClient {
         model: ProviderModel, systemPrompt: String?, tools: [any AgentTool]
     ) -> String {
         let payload: [String: Any] = [
+            "destination": config.baseURL.absoluteString,
+            "credentialScope": requestAuthentication?.definition.credentialID ?? id,
             "model": model.wireID,
             "systemInstruction": buildSystemInstruction(systemPrompt) ?? [:],
             "tools": buildToolDeclarations(tools) ?? []
@@ -495,7 +514,7 @@ public struct GeminiProvider: ProviderClient {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(try resolvedAPIKey(), forHTTPHeaderField: "x-goog-api-key")
+        for (key, value) in try await authenticationHeaders() { req.setValue(value, forHTTPHeaderField: key) }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: req)

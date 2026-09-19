@@ -16,8 +16,8 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── autoApproveAll                   global Always approve setting, off by default
 │   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
 │   │   ├── api.url                          Ox service API override
-│   │   ├── llm.defaultModel                 new-chat region/provider/model/thinking selection
-│   │   ├── llm.customProviders              custom provider names and endpoints
+│   │   ├── llm.defaultModel                 new-chat provider/model/thinking selection
+│   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
 │   │   ├── speech.voice.identifier          read-aloud voice preference
@@ -77,7 +77,7 @@ Primary owners:
 
 - UserDefaults onboarding state — owner: App.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
-- UserDefaults model state — owner: LLMConfiguration/LLMRegistry.swift
+- UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
 - UserDefaults read-aloud voice — owner: Models/SpeechVoiceSettings.swift
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
@@ -178,7 +178,7 @@ app's writes.
 Each persisted chat owns one directory:
 
 - `chat.json` contains `ChatMeta`: schema version, identity, dates, title,
-  favorite state, one region/provider/model/thinking `ModelSelection`, MonoRepository hash, attached
+  favorite state, one provider/model/thinking `ModelSelection`, MonoRepository hash, attached
   services, sidebar preview, and whether the latest completed response is
   unread. Chats created by a scheduled skill execution also retain that
   schedule's identifier so clients can group them separately from recent chats.
@@ -453,19 +453,33 @@ bootstrap therefore leaves target IndexedDB data unchanged.
 
 ## Provider configuration and credentials
 
-New-chat provider/model defaults, custom provider names and endpoints, region,
+New-chat provider/model defaults, provider additions and overrides, region,
 and language are stored in UserDefaults. Each chat persists its own
-provider/model selection. Custom-provider models and capabilities are discovered
-at runtime and are not persisted. Custom-provider JSON excludes credentials.
+provider/model selection. `llm.providerCatalog` contains a format-2 JSON envelope
+with saved provider definitions and their declared models. Bundled definitions
+remain the base; a saved definition replaces the entire bundled definition with
+the same ID or adds a new provider. Deleting an override restores its bundled
+default; deleting an added definition removes it entirely. A saved definition
+with no models disables that provider for model selection. An empty saved catalog
+uses bundled defaults. `ox.provider.default` returns a fresh copy of
+bundled definitions without changing storage. Provider JSON excludes credentials.
+Catalog format compatibility, conversion from the earlier format-1 overlay
+(deleted built-ins become saved replacements with no models),
+legacy `llm.customProviders`, and regional selection transforms belong solely
+to `StorageMigrator`. Unknown catalog formats fail closed without overwriting
+their bytes.
 
 Provider API keys and subscription token bundles are generic-password Keychain
 items under the bundle-derived `<application bundle identifier>.llm` service. They use After First Unlock accessibility
 so user-invoked background Siri and CarPlay requests can run after the device's
-first unlock following a restart. Custom endpoint bearer tokens attach only to
-their normalized configured endpoint. Providers with different global and China
-accounts store the global credential under the provider ID and the China
-credential under `<provider-id>:china`. Signing out removes the corresponding
-regional Keychain item.
+first unlock following a restart. Standard provider credentials are scoped to
+the provider ID and a hash of its endpoint and authentication configuration.
+Changing the endpoint or auth requires new authentication. Registered custom
+authentication adapters retain their existing credential identities and restrict
+credentials to their registered destination. Separate account regions use
+separate provider IDs. Deauthenticating removes the corresponding Keychain item.
+The compatibility gate copies legacy API keys to their destination-scoped items
+before publishing the new catalog; it preserves the source during migration.
 
 Built-in provider keys in `apps/ios/Ox/Host/ModelProviders/Secrets.swift` are compile-time binary
 contents rather than device storage.
@@ -489,6 +503,7 @@ secrets.
 | Local Profile content | App Documents | No device backup | Delete or move the Profile |
 | iCloud Profile content | iCloud Documents | iCloud Drive | Delete or move the Profile |
 | Temporary chat | Memory | None | Leave chat or terminate process |
+| Active provider catalog | UserDefaults | Device backup policy | Delete provider or app |
 | Provider credentials | Keychain | System policy | Sign out or clear credential |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | UserDefaults | Device backup policy | Disconnect the MCP server |

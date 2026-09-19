@@ -1,6 +1,7 @@
 import { ROOT } from "./lib.ts";
 import { validateLocalizations } from "./localization-check.ts";
 import { validateProviderModels } from "./provider-models.ts";
+import { validateProviderSchema } from "./provider-definitions.ts";
 import { validateSystemSkills } from "./system-skills-check.ts";
 
 const boundary = Bun.spawnSync(["bun", "tooling/public-boundary-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
@@ -16,6 +17,7 @@ const localizationEntries = await validateLocalizations();
 console.log(`PASS localizations ${localizationEntries} entries`);
 
 const providerModels = await validateProviderModels();
+await validateProviderSchema();
 console.log(`PASS provider models providers=${providerModels.providers} selected=${providerModels.selectedModels}`);
 
 const projects = [

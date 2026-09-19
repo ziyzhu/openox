@@ -1,6 +1,14 @@
 import Foundation
 
 enum InvocationName: String, CaseIterable {
+    case providerDefault = "ox.provider.default"
+    case providerList = "ox.provider.list"
+    case providerGet = "ox.provider.get"
+    case providerValidate = "ox.provider.validate"
+    case providerSave = "ox.provider.save"
+    case providerDelete = "ox.provider.delete"
+    case providerAuthenticate = "ox.provider.authenticate"
+    case providerDeauthenticate = "ox.provider.deauthenticate"
     case appInspect = "ox.app.inspect"
     case appInfo = "ox.app.info"
     case appProfile = "ox.app.profile"
@@ -68,6 +76,7 @@ enum InvocationName: String, CaseIterable {
 
     var approvalLabel: String {
         switch self {
+        case .providerDefault, .providerList, .providerGet, .providerValidate, .providerSave, .providerDelete, .providerAuthenticate, .providerDeauthenticate: L10n.string("Model")
         case .appInspect: L10n.string("Settings")
         case .appInfo: L10n.string("App info")
         case .appProfile: L10n.string("Profiles")
@@ -135,6 +144,7 @@ enum InvocationName: String, CaseIterable {
 
     var actionIconKind: OxActionIconKind {
         switch self {
+        case .providerDefault, .providerList, .providerGet, .providerValidate, .providerSave, .providerDelete, .providerAuthenticate, .providerDeauthenticate: .device
         case .appInspect, .appInfo, .appProfile, .appNotifications, .appLanguage, .appTheme, .appVoice, .appModel, .appLogs: .device
         case .appRenameChat: .chats
         case .webSearch, .webFetch: .web

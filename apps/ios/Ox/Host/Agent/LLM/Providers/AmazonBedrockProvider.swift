@@ -9,8 +9,8 @@ nonisolated struct AmazonBedrockProvider: ProviderClient {
     let reasoningPolicy: LLMReasoningPolicy = .none
     let models: [ProviderModel]
 
-    private let responses: OpenAIResponsesTransport
-    private let messages: AnthropicMessagesTransport
+    let responses: OpenAIResponsesTransport
+    let messages: AnthropicMessagesTransport
 
     init(models: [ProviderModel]) {
         self.models = models

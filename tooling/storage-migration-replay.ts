@@ -20,6 +20,7 @@ type ReplayResult = {
   defaultModelMigrated?: boolean;
   chatModelMigrated?: boolean;
   unsupportedVersionRejected?: boolean;
+  providerCatalogMigrated?: boolean;
   fixtureResults?: Array<{
     name: string;
     migratedAsExpected: boolean;
