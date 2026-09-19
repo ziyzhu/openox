@@ -259,6 +259,7 @@ nonisolated enum A11yID {
             static func domain(_ domain: String) -> String { "chat.attach.domain.\(domain)" }
             static func signIn(_ domain: String) -> String { "chat.attach.signIn.\(domain)" }
             static func signInProgress(_ domain: String) -> String { "chat.attach.signInProgress.\(domain)" }
+            static func signInDismiss(_ domain: String) -> String { "chat.attach.signInDismiss.\(domain)" }
             static func botControl(_ domain: String) -> String { "chat.attach.botControl.\(domain)" }
             static func payment(_ domain: String) -> String { "chat.attach.payment.\(domain)" }
             static func signOut(_ domain: String) -> String { "chat.attach.signOut.\(domain)" }

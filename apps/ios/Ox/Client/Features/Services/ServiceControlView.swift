@@ -44,7 +44,20 @@ struct ServiceControlView: View {
         HStack(spacing: Theme.Spacing.md) {
             identity
             Spacer(minLength: Theme.Spacing.sm)
-            action.frame(width: 108, alignment: .trailing)
+            HStack(spacing: Theme.Spacing.sm) {
+                if isActive, !completed, phase == .ready, case .signIn = control {
+                    RequestPillButton(title: String(localized: "Dismiss"), isPrimary: false) {
+                        onResolved(nil)
+                    }
+                    .accessibilityIdentifier(A11yID.Chat.Attach.signInDismiss(domain))
+                }
+                if case .signIn = control {
+                    action
+                } else {
+                    action.frame(width: 108, alignment: .trailing)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .padding(Theme.Spacing.md)
