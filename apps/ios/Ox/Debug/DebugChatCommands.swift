@@ -214,21 +214,6 @@ extension OxHostProtocol {
 
     @MainActor
     static func handleReplayReducer(_ command: ReplayReducerRequest, reply: @escaping @MainActor (Data) -> Void) {
-        Task {
-            let failures = await AgentRuntimeChecks.failures()
-            guard failures.isEmpty else {
-                reply(encode(ReducerReplayResult(
-                    id: command.id, ok: false, fixtures: nil,
-                    error: failures.joined(separator: "; ")
-                )))
-                return
-            }
-            replayReducerFixtures(command, reply: reply)
-        }
-    }
-
-    @MainActor
-    private static func replayReducerFixtures(_ command: ReplayReducerRequest, reply: @escaping @MainActor (Data) -> Void) {
         let presentationFailures = ChatBlockProjectionChecks.failures()
         guard presentationFailures.isEmpty else {
             reply(encode(ReducerReplayResult(
