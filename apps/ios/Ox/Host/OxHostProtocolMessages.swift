@@ -18,7 +18,6 @@ extension OxHostProtocol {
         case getComposerFormatting = "get-composer-formatting"
         case repositoryGate = "repository-gate"
         case replayStorageMigration = "replay-storage-migration"
-        case checkAPIServices = "check-api-services"
         case runAgent = "run-agent"
         case virtualMachineEval = "virtual-machine-eval"
         case vmInspect = "vm-inspect"
@@ -203,7 +202,6 @@ extension OxHostProtocol {
         case getComposerFormatting(IDRequest)
         case repositoryGate(RepositoryGateRequest)
         case replayStorageMigration(ReplayStorageMigrationRequest)
-        case checkAPIServices(IDRequest)
         case runAgent(RunAgentRequest)
         case virtualMachineEval(VirtualMachineEvalRequest)
         case vmInspect(VMRequest)
@@ -241,7 +239,6 @@ extension OxHostProtocol {
             case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
             case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
             case .replayStorageMigration: self = .replayStorageMigration(try ReplayStorageMigrationRequest(from: decoder))
-            case .checkAPIServices: self = .checkAPIServices(try IDRequest(from: decoder))
             case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
             case .virtualMachineEval: self = .virtualMachineEval(try VirtualMachineEvalRequest(from: decoder))
             case .vmInspect: self = .vmInspect(try VMRequest(from: decoder))

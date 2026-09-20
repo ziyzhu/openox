@@ -50,6 +50,3 @@ credentials only when the action declares `requireAuth: true`. Writes require
 `requireApproval: true`; redirects and automatic retries are disabled. There is
 no DOM, ambient fetch, agent bridge, or token access. Source authoring and live
 verification happen inside Ox through manage-services.
-
-Run `OX_HOST_ENDPOINT=ws://127.0.0.1:9101 bun run test:api-services` against a
-running simulator Host for synthetic authentication and HTTP boundary checks.

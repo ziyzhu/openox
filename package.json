@@ -8,7 +8,6 @@
     "test:services": "bun tooling/service-replay.ts",
     "build:services": "bun tooling/ios-services-build.ts",
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
-    "test:api-services": "bun tooling/api-service-replay.ts",
     "test:storage-migration": "bun tooling/storage-migration-replay.ts",
     "check:localizations": "bun tooling/localization-check.ts",
     "check:system-skills": "bun tooling/system-skills-check.ts",

@@ -29,11 +29,6 @@ enum OxHostProtocol {
         case .getComposerFormatting(let request): DebugUIAPI.handleGetComposerFormatting(request, reply: reply)
         case .repositoryGate(let request): handleRepositorySaveGate(request, chatManager: chats, reply: reply)
         case .replayStorageMigration(let request): handleReplayStorageMigration(request, reply: reply)
-        case .checkAPIServices(let request):
-            Task { @MainActor in
-                let result = await APIServiceChecks.run(manager: services)
-                reply(encode(JSONValue.object(["kind": .string("check-api-services-result"), "id": .string(request.id), "result": result])))
-            }
         case .runAgent(let request): handleRunAgent(request, chatManager: chats, reply: reply)
         case .virtualMachineEval(let request): handleVirtualMachineEval(request, chatManager: chats, reply: reply)
         case .vmInspect(let request): handleVMInspect(request, chatManager: chats, reply: reply)

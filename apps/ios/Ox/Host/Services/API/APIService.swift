@@ -11,15 +11,8 @@ nonisolated final class APIServiceHTTP: NSObject, URLSessionTaskDelegate, Sendab
         completionHandler(nil)
     }
 
-    #if targetEnvironment(simulator)
-    nonisolated(unsafe) static var fixtureProtocol: URLProtocol.Type?
-    #endif
-
     static func send(_ request: URLRequest, maximumBytes: Int = 2_000_000) async throws -> Response {
         let configuration = URLSessionConfiguration.ephemeral
-        #if targetEnvironment(simulator)
-        if let fixtureProtocol { configuration.protocolClasses = [fixtureProtocol] }
-        #endif
         configuration.httpCookieStorage = nil
         configuration.urlCredentialStorage = nil
         configuration.timeoutIntervalForRequest = 30
