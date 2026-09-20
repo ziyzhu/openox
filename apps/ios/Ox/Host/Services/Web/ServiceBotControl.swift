@@ -83,7 +83,7 @@ final class ServiceBotControlSession {
     ) {
         self.service = service
         self.flowSession = flowSession
-        handoff = flowSession.makeHandoff(
+        handoff = flowSession.makeActionPageHandoff(
             title: service.title,
             navigationTitle: String(localized: "Verify"),
             initialURL: url,

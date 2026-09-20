@@ -20,6 +20,19 @@ class CanvasNetwork:
             elif path in ["/", "/canvas-test/authorize", "/canvas-test/reset"]:
                 login = '<meta name="user-login" content="canvas-fixture">' if self.signed_in else ""
                 body = login + '<h1>Fixture account</h1>'
+        if host == "archive.ph":
+            if path == "/":
+                body = '<h1>Fixture archive</h1>'
+            elif path == "/submit/":
+                body = '<h1>Fixture verification</h1><p>Complete verification on this page.</p><a href="/AbC12">Complete fixture verification</a>'
+            elif path == "/AbC12":
+                body = '''<title>Example Domain</title>
+                    <link rel="canonical" href="https://archive.ph/2026.09.20-000000/https://example.com/">
+                    <meta property="og:title" content="Example Domain">
+                    <meta property="og:url" content="https://archive.ph/AbC12">
+                    <meta property="article:published_time" content="2026-09-20T00:00:00Z">
+                    <meta property="og:image" content="https://archive.ph/AbC12/screenshot.png">
+                    <h1>Fixture verification completed</h1>'''
         if host == "my.pacificsciencecenter.org":
             if path in ["/events", "/cart/details"]:
                 body = '<h1>Fixture ticket cart</h1>'

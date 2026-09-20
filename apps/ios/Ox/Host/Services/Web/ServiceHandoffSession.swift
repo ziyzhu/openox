@@ -53,9 +53,14 @@ final class ServiceHandoffSession {
     let page: WebPage
     private(set) var phase: Phase = .ready
 
-    private let initialURL: URL
     private let completionProbe: @MainActor (URL?) async -> Bool
     private let navigationObserver: @MainActor (WebPage.NavigationEvent, URL?) -> Void
+    private let loadInitialPage: @MainActor () -> Void
+    private let navigatePage: @MainActor (URL) -> Bool
+    private let goBackPage: @MainActor () -> Void
+    private let goForwardPage: @MainActor () -> Void
+    private let reloadPage: @MainActor () -> Void
+    private let observesNavigations: Bool
     private var completion: CheckedContinuation<Outcome, Never>?
     private var navigationTask: Task<Void, Never>?
     private var periodicProbeTask: Task<Void, Never>?
@@ -74,15 +79,68 @@ final class ServiceHandoffSession {
         self.serviceDomain = serviceDomain
         self.title = title
         self.navigationTitle = navigationTitle
-        self.initialURL = initialURL
         self.completionProbe = completionProbe
         self.navigationObserver = navigationObserver
-        self.page = WebPage(configuration: configuration, navigationDecider: NavigationDecider(router: router))
+        let page = WebPage(configuration: configuration, navigationDecider: NavigationDecider(router: router))
+        self.page = page
+        loadInitialPage = { page.load(initialURL) }
+        navigatePage = { url in
+            page.load(url)
+            return true
+        }
+        goBackPage = {
+            guard let item = page.backForwardList.backList.last else { return }
+            page.load(item)
+        }
+        goForwardPage = {
+            guard let item = page.backForwardList.forwardList.first else { return }
+            page.load(item)
+        }
+        reloadPage = { page.reload() }
+        observesNavigations = true
         router.openPopup = { [weak self] request in self?.loadPopup(request) }
         router.recordDecision = { [weak self] host, allowed in self?.recordDecision(host: host, allowed: allowed) }
         #if targetEnvironment(simulator)
         page.isInspectable = true
         #endif
+    }
+
+    init(
+        service: Service,
+        servicePage: Service.ServiceWebPage,
+        title: String,
+        navigationTitle: String,
+        initialURL: URL,
+        completionProbe: @escaping @MainActor (URL?) async -> Bool
+    ) {
+        serviceDomain = service.domain
+        self.title = title
+        self.navigationTitle = navigationTitle
+        self.completionProbe = completionProbe
+        navigationObserver = { _, _ in }
+        page = servicePage.page
+        loadInitialPage = { [weak service, weak servicePage] in
+            guard let service, let servicePage, servicePage.page.url != initialURL else { return }
+            Task { await service.navigate(initialURL, in: servicePage) }
+        }
+        navigatePage = { [weak service, weak servicePage] url in
+            guard let service, let servicePage else { return false }
+            Task { await service.navigate(url, in: servicePage) }
+            return true
+        }
+        goBackPage = { [weak service, weak servicePage] in
+            guard let service, let servicePage else { return }
+            Task { await service.goBack(servicePage) }
+        }
+        goForwardPage = { [weak service, weak servicePage] in
+            guard let service, let servicePage else { return }
+            Task { await service.goForward(servicePage) }
+        }
+        reloadPage = { [weak service, weak servicePage] in
+            guard let service, let servicePage else { return }
+            Task { await service.reload(servicePage) }
+        }
+        observesNavigations = false
     }
 
     func run() async -> Outcome {
@@ -122,17 +180,15 @@ final class ServiceHandoffSession {
     }
 
     func goBack() {
-        guard let item = page.backForwardList.backList.last else { return }
-        page.load(item)
+        goBackPage()
     }
 
     func goForward() {
-        guard let item = page.backForwardList.forwardList.first else { return }
-        page.load(item)
+        goForwardPage()
     }
 
     func reload() {
-        page.reload()
+        reloadPage()
     }
 
     func navigate(to url: URL) -> Bool {
@@ -141,17 +197,18 @@ final class ServiceHandoffSession {
             Log.service.warning("ServiceHandoffSession address rejected domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(url.host ?? "?") phase=\(phase.rawValue)")
             return false
         }
-        page.load(url)
-        return true
+        return navigatePage(url)
     }
 
     private func start() {
         phase = .running
         let attempt = id.uuidString.prefix(8)
         Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(attempt) phase=running")
-        navigationTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            await observeNavigations()
+        if observesNavigations {
+            navigationTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                await observeNavigations()
+            }
         }
         periodicProbeTask = Task { @MainActor [weak self] in
             while let self, !Task.isCancelled {
@@ -160,7 +217,7 @@ final class ServiceHandoffSession {
                 requestProbe(reason: "periodic")
             }
         }
-        page.load(initialURL)
+        loadInitialPage()
     }
 
     private func observeNavigations() async {

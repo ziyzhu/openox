@@ -46,8 +46,11 @@ sim run ai.oxcraft.bot --device ox-qa-2 --app <built-app> \
 Open Canvas Integration from Artifacts → All. Verify:
 
 - Sign-in shows a native control and then the fixture page. Completing it resolves
-  to `signedIn: true`; dismissing with Done rejects the promise.
-- Checkout shows a native Pay control and fixture page; Done cancels. Completion
+  to `signedIn: true`; cancelling rejects the promise.
+- Bot control shows the Archive.ph fixture page used by the standard actions.
+  Completing verification navigates that same page to `AbC12`, resolves the native
+  handoff, and returns `null` to Canvas without creating a public snapshot.
+- Checkout shows a native Pay control and fixture page; Cancel rejects the promise. Completion
   currently exposes the Often Dining base-URL mismatch described below. The
   fixture supplies receipt `424242`, with a timestamp one minute ahead to fit
   its minute-resolution parser, for retesting after that contract is repaired.

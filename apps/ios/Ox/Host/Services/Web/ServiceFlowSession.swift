@@ -93,6 +93,26 @@ final class ServiceFlowSession {
         return session
     }
 
+    func makeActionPageHandoff(
+        title: String,
+        navigationTitle: String,
+        initialURL: URL,
+        completionProbe: @escaping @MainActor (URL?) async -> Bool
+    ) -> ServiceHandoffSession {
+        precondition(handoffSession == nil)
+        let session = ServiceHandoffSession(
+            service: service,
+            servicePage: actionPage,
+            title: title,
+            navigationTitle: navigationTitle,
+            initialURL: initialURL,
+            completionProbe: completionProbe
+        )
+        handoffSession = session
+        handoffPage = actionPage.page
+        return session
+    }
+
     func close() {
         handoffSession?.cancel()
         handoffSession = nil

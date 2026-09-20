@@ -159,8 +159,9 @@ Add bot control when an action can encounter human verification and resume after
 1. Add `getBotControlUrl(args): {url}` for the verification page.
 2. Add `getBotControlState({...args, pageUrl}): {ok}`. iOS supplies the current `pageUrl` while probing.
 3. Align operation-identifying inputs and make `pageUrl` required only by the state action.
-4. Preserve approval on the originating mutation.
-5. Call `await ox.service.solve({ domain, args, purpose })`. When iOS resolves after `{ok: true}`, retry the originating action.
+4. Keep the verification interaction and completion probe on the bot-control action page. iOS surfaces that same page to the user, so `getBotControlUrl` must leave it at the returned verification URL and `getBotControlState` must inspect fresh state on that page rather than assume a second page shares DOM or challenge state.
+5. Preserve approval on the originating mutation.
+6. Call `await ox.service.solve({ domain, args, purpose })`. When iOS resolves after `{ok: true}`, retry the originating action.
 
 ### Payment
 

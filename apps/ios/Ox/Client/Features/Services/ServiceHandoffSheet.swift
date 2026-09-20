@@ -41,7 +41,7 @@ private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
+                        Button("Cancel", role: .cancel) {
                             session.cancel()
                             dismiss()
                         }

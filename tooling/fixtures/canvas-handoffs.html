@@ -6,6 +6,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </style>
 <h1>Canvas integration</h1>
 <button id="signin">Test sign-in</button>
+<button id="verify">Test bot control</button>
 <button id="pay">Test checkout</button>
 <button id="export">Export test file</button>
 <button id="missing">Missing file error</button>
@@ -19,6 +20,7 @@ const run = async operation => {
   catch (error) { result.textContent = "ERROR: " + error.message; }
 };
 document.getElementById("signin").onclick = () => run(() => ox.service.signIn({domain:"github.com", purpose:"Test canvas sign-in"}));
+document.getElementById("verify").onclick = () => run(() => ox.service.solve({domain:"archive.ph", args:{url:"https://example.com/"}, purpose:"Test canvas bot control"}));
 document.getElementById("pay").onclick = () => run(() => ox.service.pay({domain:"oftendining.com", args:{storeId:"canvas-fixture"}, purpose:"Test canvas checkout"}));
 document.getElementById("receipt-error").onclick = () => run(() => ox.service.pay({domain:"my.pacificsciencecenter.org", args:{}, purpose:"Reproduce service receipt error"}));
 const exportFile = path => ox.service.invoke({name:"mcp:__MCP_DOMAIN__:agent_artifact_get", input:{target:"canvas-fixture", path}, purpose:"Export canvas test file"});
