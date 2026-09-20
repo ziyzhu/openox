@@ -85,11 +85,13 @@ page Web visits until the user revokes the qualified
 The model invokes a money-moving, posting, or sending action the user didn't
 intend. **Mitigation:** the native runtime resolves every built-in and service
 Action against the user's Ask, Allow, or Block policy independent of how the model
-names or chains the call. Ask is the initial global default. The user may set a
-global, service, or qualified-Action policy in Settings; more specific choices
-override broader defaults. A prompt can also persist Always allow for that Action.
-Service `requireApproval` metadata does not override user policy. API services
-still use it to declare that an action may send mutating HTTP methods. Authenticated
+names or chains the call. Automatic is the initial global setting: bounded,
+non-consequential reads default to Allow, while consequential and unknown Actions
+default to Ask. The user may set a global, service, or qualified-Action policy in
+Settings; more specific choices override broader defaults and Action defaults. A
+prompt can also persist Always allow for that Action. Service `requireApproval`
+metadata supplies a service Action's default but never overrides user policy. API
+services also use it to declare that an action may send mutating HTTP methods. Authenticated
 actions re-probe auth at invoke time rather than
 trusting a cached signal. Payment completion stays on the merchant's
 user-operated review surface rather than becoming an agent action.
@@ -102,10 +104,10 @@ consent to that control across pages Web visits, not merely consent to one
 kind of website mutation.
 
 Settings → Actions is the user-owned policy surface for all chats and Profiles on
-the device. The global default, service defaults, and Action overrides persist
-across launches. Block overrides inherited Allow; unknown, malformed, and future
-policy formats fail closed to Ask. Policy decisions and automatic Allow or Block
-resolutions are logged. These policies do not bypass authentication, iOS
+the device. The optional global override, service defaults, and Action overrides
+persist across launches. Block overrides inherited Allow; unknown, malformed, and
+future policy formats fail closed to Ask. Policy decisions and automatic Allow or
+Block resolutions are logged. These policies do not bypass authentication, iOS
 permissions, selected-folder boundaries, private-data storage and disclosure
 consent, or ordinary questions to the user.
 

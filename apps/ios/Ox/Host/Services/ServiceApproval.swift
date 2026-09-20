@@ -25,12 +25,13 @@ struct ActionApproval {
 
     func request(
         action: String,
+        defaultPolicy: ActionPolicy,
         args: Any? = nil,
         prompt override: String? = nil,
         choose: (Request) async -> String?
     ) async -> Outcome {
         guard !Task.isCancelled else { return .stopped }
-        switch serviceManager.actionPolicy(for: action) {
+        switch serviceManager.actionPolicy(for: action, default: defaultPolicy) {
         case .allow:
             Log.service.info("ActionApproval.allow action=\(action) caller=\(ownerID)")
             return .approved

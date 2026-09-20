@@ -9,16 +9,17 @@ nonisolated enum ActionPolicy: String, Codable, CaseIterable, Identifiable, Send
 }
 
 nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
-    static let currentFormat = 1
+    static let currentFormat = 2
+    static let legacyFormat = 1
 
     let format: Int
-    var defaultPolicy: ActionPolicy
+    var defaultPolicy: ActionPolicy?
     var sources: [String: ActionPolicy]
     var actions: [String: ActionPolicy]
 
     init(
         format: Int = currentFormat,
-        defaultPolicy: ActionPolicy = .ask,
+        defaultPolicy: ActionPolicy? = nil,
         sources: [String: ActionPolicy] = [:],
         actions: [String: ActionPolicy] = [:]
     ) {
@@ -28,8 +29,8 @@ nonisolated struct ActionPolicyConfiguration: Codable, Equatable, Sendable {
         self.actions = actions
     }
 
-    func policy(for action: String) -> ActionPolicy {
-        actions[action] ?? sources[Self.sourceID(for: action)] ?? defaultPolicy
+    func policy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {
+        actions[action] ?? sources[Self.sourceID(for: action)] ?? defaultPolicy ?? actionDefault
     }
 
     static func sourceID(for action: String) -> String {

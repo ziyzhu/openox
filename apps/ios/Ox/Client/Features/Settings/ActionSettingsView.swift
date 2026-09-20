@@ -13,7 +13,7 @@ extension ActionPolicy {
 struct ActionPolicyPicker: View {
     let title: LocalizedStringKey?
     let selection: ActionPolicy?
-    let resolved: ActionPolicy
+    let resolved: ActionPolicy?
     let inheritLabel: LocalizedStringKey?
     let onChange: (ActionPolicy?) -> Void
 
@@ -43,7 +43,7 @@ struct ActionPolicyPicker: View {
                 }
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
-                    Text(resolved.title)
+                    Text(resolved?.title ?? "Automatic")
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
                 }
@@ -69,16 +69,14 @@ struct ActionSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
                     "Default",
-                    footer: "Ask shows a confirmation before an Action runs. Allow runs it automatically. Block prevents it from running. More specific choices override this default."
+                    footer: "Automatic allows non-consequential reads and asks before consequential or unknown Actions. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
                 ) {
                     ActionPolicyPicker(
                         title: "All Actions",
                         selection: serviceManager.defaultActionPolicy,
                         resolved: serviceManager.defaultActionPolicy,
-                        inheritLabel: nil,
-                        onChange: { policy in
-                            if let policy { serviceManager.defaultActionPolicy = policy }
-                        }
+                        inheritLabel: "Automatic",
+                        onChange: { serviceManager.defaultActionPolicy = $0 }
                     )
                 }
 
@@ -123,7 +121,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
-            Text(serviceManager.resolvedSourcePolicy(for: "ox").title)
+            Text(serviceManager.resolvedSourcePolicy(for: "ox")?.title ?? "Automatic")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
@@ -141,7 +139,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
-            Text(serviceManager.resolvedSourcePolicy(for: ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace)).title)
+            Text(serviceManager.resolvedSourcePolicy(for: ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace))?.title ?? "Automatic")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
@@ -200,7 +198,7 @@ struct BuiltInActionSettingsView: View {
             ActionPolicyPicker(
                 title: nil,
                 selection: explicit,
-                resolved: serviceManager.actionPolicy(for: action),
+                resolved: serviceManager.actionPolicy(for: action, default: Actions.defaultPolicy(for: action)),
                 inheritLabel: "Use Default",
                 onChange: { serviceManager.setActionPolicy($0, for: action) }
             )
@@ -235,19 +233,25 @@ struct ServiceActionSettingsView: View {
                     VStack(spacing: 0) {
                         serviceActionRow(
                             title: String(localized: "Attach to a chat"),
-                            actionID: Chat.attachApproveKey(service.domain)
+                            actionID: Chat.attachApproveKey(service.domain),
+                            defaultPolicy: .ask
                         )
                         if service.detailCapabilities.supportsFolderAccess {
                             ForEach(OxFileSystem.actions, id: \.self) { action in
                                 Divider().settingsContentInset()
-                                serviceActionRow(title: Actions.label(for: action) ?? action, actionID: action)
+                                serviceActionRow(
+                                    title: Actions.label(for: action) ?? action,
+                                    actionID: action,
+                                    defaultPolicy: Actions.defaultPolicy(for: action)
+                                )
                             }
                         } else {
                             ForEach(actions) { action in
                                 Divider().settingsContentInset()
                                 serviceActionRow(
                                     title: action.label,
-                                    actionID: service.definition.qualifiedActionName(action.id)
+                                    actionID: service.definition.qualifiedActionName(action.id),
+                                    defaultPolicy: action.requireApproval ? .ask : .allow
                                 )
                             }
                         }
@@ -265,7 +269,7 @@ struct ServiceActionSettingsView: View {
         }
     }
 
-    private func serviceActionRow(title: String, actionID: String) -> some View {
+    private func serviceActionRow(title: String, actionID: String, defaultPolicy: ActionPolicy) -> some View {
         let explicit = serviceManager.explicitActionPolicy(for: actionID)
         return VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             HStack(spacing: Theme.Spacing.sm) {
@@ -276,7 +280,7 @@ struct ServiceActionSettingsView: View {
                 ActionPolicyPicker(
                     title: nil,
                     selection: explicit,
-                    resolved: serviceManager.actionPolicy(for: actionID),
+                    resolved: serviceManager.actionPolicy(for: actionID, default: defaultPolicy),
                     inheritLabel: "Use Service Default",
                     onChange: { serviceManager.setActionPolicy($0, for: actionID) }
                 )

@@ -1724,7 +1724,7 @@ extension Scenario {
             assert(voice.effective === null || ["id", "name", "language"].every(key => typeof voice.effective[key] === "string" && voice.effective[key].length > 0), "Invalid effective voice");
             assert(voiceOptions.options.length <= 100 && voiceOptions.options.every(item => ["id", "name", "language", "quality", "selected", "effective"].every(key => key in item)), "Invalid voice options");
             assert(typeof defaultModel.configured === "boolean" && ["global", "china"].includes(defaultModel.region) && typeof defaultModel.provider.name === "string" && typeof defaultModel.model.name === "string", "Invalid default model");
-            assert(["ask", "allow", "block"].includes(actionPolicies.defaultPolicy) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
+            assert((actionPolicies.defaultPolicy === null || ["ask", "allow", "block"].includes(actionPolicies.defaultPolicy)) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default", "actionDefault"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
             assert(["idle", "syncing", "ready", "failed"].includes(serviceRepositories.status) && serviceRepositories.repositories.length <= 50 && serviceRepositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,name,provenance,serviceCount,state"), "Invalid service repositories");
             assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateServiceRepository === "undefined", "Human-controlled settings must not expose mutations");
             for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["voiceOptions", { limit: 1 }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["serviceRepositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
@@ -1772,6 +1772,13 @@ extension Scenario {
         try expect(resolved?["resolved"]?.objectValue?["inheritedFrom"] == .string("source"), "Policy inheritance source failed")
         let filtered = try AppActionPolicyQuery(options: .object(["source": .string("example.com"), "limit": .int(1)])).read(fixture).objectValue
         try expect(filtered?["overrides"]?.arrayValue?.count == 1 && filtered?["truncated"] == .bool(true), "Policy source filter or limit failed")
+        let automatic = try AppActionPolicyQuery(options: .object(["action": .string("ox.app.info")])).read(
+            ActionPolicyConfiguration(),
+            actionDefaultPolicy: .allow
+        ).objectValue
+        try expect(automatic?["defaultPolicy"] == .null, "Automatic policy must not report a global override")
+        try expect(automatic?["resolved"]?.objectValue?["policy"] == .string("allow"), "Action default resolution failed")
+        try expect(automatic?["resolved"]?.objectValue?["inheritedFrom"] == .string("actionDefault"), "Action default inheritance failed")
         let invalidOptions: [[String: JSONValue]] = [["limit": .int(0)], ["limit": .int(101)], ["limit": .double(1.5)], ["action": .string("")], ["unknown": .bool(true)]]
         for options in invalidOptions {
             var rejected = false

@@ -64,6 +64,7 @@ final class Chat: Identifiable {
     struct PendingPrompt: Identifiable, Equatable {
         struct AutoApproval: Equatable {
             let action: String
+            let defaultPolicy: ActionPolicy
             let approve: String
             let alwaysApprove: String
             let deny: String
@@ -454,8 +455,8 @@ final class Chat: Identifiable {
             },
             resolveAction: { [unowned self] name in try resolveTarget(name, label: "ox.service.invoke") },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
-            approve: { [unowned self] action, args, prompt in
-                try await requireApproval(action: action, args: args, prompt: prompt)
+            approve: { [unowned self] action, defaultPolicy, args, prompt in
+                try await requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt)
             },
             presentControl: { [unowned self] control, _ in
                 let pending = embedServiceControl(control)
@@ -1237,7 +1238,7 @@ final class Chat: Identifiable {
         guard case .prompt(let prompt, _) = interactionWaiter,
               let approval = prompt.autoApproval else { return }
         let policy = withObservationTracking {
-            serviceManager.actionPolicy(for: approval.action)
+            serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy)
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.interactionWaiter?.id == prompt.id else { return }
@@ -1261,7 +1262,7 @@ final class Chat: Identifiable {
             let waiter = interactionQueue.removeFirst()
             if case .prompt(let prompt, let continuation) = waiter,
                let approval = prompt.autoApproval {
-                switch serviceManager.actionPolicy(for: approval.action) {
+                switch serviceManager.actionPolicy(for: approval.action, default: approval.defaultPolicy) {
                 case .allow:
                     Log.session.info("Chat.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
                     continuation.resume(returning: .answered(approval.approve))
@@ -1570,7 +1571,7 @@ final class Chat: Identifiable {
         let standalone = ensureExecutionContext()
         let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
-            try await requireApproval(action: action, args: args.toAny())
+            try await requireApproval(action: action, defaultPolicy: Actions.defaultPolicy(for: action), args: args.toAny())
             let value = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
@@ -1592,7 +1593,7 @@ final class Chat: Identifiable {
         let standalone = ensureExecutionContext()
         let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
-            try await requireApproval(action: action, args: args.toAny())
+            try await requireApproval(action: action, defaultPolicy: Actions.defaultPolicy(for: action), args: args.toAny())
             let (value, effect) = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             apply(effect)
@@ -1626,6 +1627,7 @@ final class Chat: Identifiable {
         }
         switch await requestApproval(
             action: Self.attachApproveKey(service.domain),
+            defaultPolicy: .ask,
             prompt: "\(title)\n\(message)"
         ) {
         case .approved: return
@@ -1637,8 +1639,13 @@ final class Chat: Identifiable {
 
     private typealias ApprovalOutcome = ActionApproval.Outcome
 
-    func requireApproval(action: String, args: Any? = nil, prompt: String? = nil) async throws {
-        switch await requestApproval(action: action, args: args, prompt: prompt) {
+    func requireApproval(
+        action: String,
+        defaultPolicy: ActionPolicy,
+        args: Any? = nil,
+        prompt: String? = nil
+    ) async throws {
+        switch await requestApproval(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt) {
         case .approved: return
         case .denied: throw RuntimeError.bridge("\(action): the user declined.")
         case .blocked: throw RuntimeError.bridge("\(action): the user blocked this Action in Settings.")
@@ -1668,8 +1675,13 @@ final class Chat: Identifiable {
         }
     }
 
-    private func requestApproval(action: String, args: Any? = nil, prompt: String? = nil) async -> ApprovalOutcome {
-        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, args: args, prompt: prompt) { request in
+    private func requestApproval(
+        action: String,
+        defaultPolicy: ActionPolicy,
+        args: Any? = nil,
+        prompt: String? = nil
+    ) async -> ApprovalOutcome {
+        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt) { request in
             runState.backgroundExecution?.updatePhase(.permissionNeeded)
             let answer = await awaitPrompt(
                 prompt: request.prompt,
@@ -1678,6 +1690,7 @@ final class Chat: Identifiable {
                 presentation: .application,
                 autoApproval: PendingPrompt.AutoApproval(
                     action: request.action,
+                    defaultPolicy: defaultPolicy,
                     approve: request.approve,
                     alwaysApprove: request.alwaysApprove,
                     deny: request.deny

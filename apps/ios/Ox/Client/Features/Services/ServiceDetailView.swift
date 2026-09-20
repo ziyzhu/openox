@@ -544,7 +544,7 @@ struct ServiceDetailView: View {
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .fixedSize(horizontal: false, vertical: true)
-                approvalControl(actionID: Chat.attachApproveKey(service.domain))
+                approvalControl(actionID: Chat.attachApproveKey(service.domain), defaultPolicy: .ask)
             }
         }
     }
@@ -710,7 +710,10 @@ struct ServiceDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                approvalControl(actionID: service.definition.qualifiedActionName(action.id))
+                approvalControl(
+                    actionID: service.definition.qualifiedActionName(action.id),
+                    defaultPolicy: action.requireApproval ? .ask : .allow
+                )
             }
         }
     }
@@ -722,19 +725,19 @@ struct ServiceDetailView: View {
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .accessibilityIdentifier(A11yID.Chat.Attach.action(action))
-                approvalControl(actionID: action)
+                approvalControl(actionID: action, defaultPolicy: Actions.defaultPolicy(for: action))
             }
         }
     }
 
     @ViewBuilder
-    private func approvalControl(actionID: String) -> some View {
+    private func approvalControl(actionID: String, defaultPolicy: ActionPolicy) -> some View {
         let explicit = serviceManager.explicitActionPolicy(for: actionID)
         Divider().padding(.vertical, 4)
         ActionPolicyPicker(
             title: "Permission",
             selection: explicit,
-            resolved: serviceManager.actionPolicy(for: actionID),
+            resolved: serviceManager.actionPolicy(for: actionID, default: defaultPolicy),
             inheritLabel: "Use Service Default",
             onChange: { serviceManager.setActionPolicy($0, for: actionID) }
         )

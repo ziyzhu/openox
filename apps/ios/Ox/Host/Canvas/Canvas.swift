@@ -166,9 +166,9 @@ final class OxCanvas {
             serviceManager: serviceManager,
             resolveService: { [unowned self] in try await resolveService($0) },
             resolveAction: { [unowned self] in try await resolveAction($0) },
-            approve: { [unowned self] action, args, prompt in
+            approve: { [unowned self] action, defaultPolicy, args, prompt in
                 let outcome = await ActionApproval(serviceManager: serviceManager, ownerID: id, callerName: title, resolveService: { self.services[$0] })
-                    .request(action: action, args: args, prompt: prompt) { request in
+                    .request(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt) { request in
                         await self.waitForInteraction(.approval(request))?.stringValue
                     }
                 guard outcome.isApproved else { throw RuntimeError.bridge("\(action): the user declined or stopped") }

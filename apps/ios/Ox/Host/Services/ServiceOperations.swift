@@ -8,7 +8,7 @@ final class ServiceOperations {
     let resolveService: (String) async throws -> Service
     let resolveAction: (String) async throws -> (Service, String)
     let attachedDomains: () -> Set<String>
-    let requireApproval: (String, Any?, String?) async throws -> Void
+    let requireApproval: (String, ActionPolicy, Any?, String?) async throws -> Void
     let presentControl: (ServiceControl, Service) async -> JSONValue?
     let receiveArtifacts: @MainActor ([RemoteMCPArtifact]) async throws -> Void
     let serviceChanged: (String) -> Void
@@ -21,7 +21,7 @@ final class ServiceOperations {
         resolveService: @escaping (String) async throws -> Service,
         resolveAction: @escaping (String) async throws -> (Service, String),
         attachedDomains: @escaping () -> Set<String> = { [] },
-        approve: @escaping (String, Any?, String?) async throws -> Void,
+        approve: @escaping (String, ActionPolicy, Any?, String?) async throws -> Void,
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
         receiveArtifacts: @escaping @MainActor ([RemoteMCPArtifact]) async throws -> Void,
         serviceChanged: @escaping (String) -> Void,
@@ -49,7 +49,7 @@ final class ServiceOperations {
 
     private func tracked(_ action: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
         try await recorded(action, args, purpose: purpose) {
-            try await requireApproval(action: action, args: args.toAny())
+            try await requireApproval(action: action, defaultPolicy: Actions.defaultPolicy(for: action), args: args.toAny())
             return try await body()
         }
     }
@@ -67,8 +67,13 @@ final class ServiceOperations {
         }
     }
 
-    private func requireApproval(action: String, args: Any? = nil, prompt: String? = nil) async throws {
-        try await requireApproval(action, args, prompt)
+    private func requireApproval(
+        action: String,
+        defaultPolicy: ActionPolicy,
+        args: Any? = nil,
+        prompt: String? = nil
+    ) async throws {
+        try await requireApproval(action, defaultPolicy, args, prompt)
     }
 
     func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue? {
@@ -90,7 +95,11 @@ final class ServiceOperations {
             throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
         }
         return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
-            try await self.requireApproval(action: qualifiedName, args: input.toAny())
+            try await self.requireApproval(
+                action: qualifiedName,
+                defaultPolicy: action.requireApproval ? .ask : .allow,
+                args: input.toAny()
+            )
             let approve: @MainActor (String, Any?) async -> Bool = { _, _ in true }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {

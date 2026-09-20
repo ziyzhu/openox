@@ -183,7 +183,10 @@ extension Chat {
     public func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue? {
         let query = try AppActionPolicyQuery(options: options)
         return try await tracked(Actions.appActionPolicies, options ?? .object([:]), purpose: purpose) {
-            query.read(serviceManager.actionPolicies)
+            query.read(
+                serviceManager.actionPolicies,
+                actionDefaultPolicy: query.action.map(serviceManager.defaultPolicy(for:))
+            )
         }
     }
 
@@ -292,7 +295,10 @@ nonisolated struct AppActionPolicyQuery {
         }
     }
 
-    func read(_ configuration: ActionPolicyConfiguration) -> JSONValue {
+    func read(
+        _ configuration: ActionPolicyConfiguration,
+        actionDefaultPolicy: ActionPolicy? = nil
+    ) -> JSONValue {
         let sourceOverrides = configuration.sources
             .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
             .compactMap { name, policy -> JSONValue? in
@@ -322,17 +328,18 @@ nonisolated struct AppActionPolicyQuery {
             }
         let matches = sourceOverrides + actionOverrides
         return .object([
-            "defaultPolicy": .string(configuration.defaultPolicy.rawValue),
+            "defaultPolicy": configuration.defaultPolicy.map { .string($0.rawValue) } ?? .null,
             "resolved": action.map { name in
                 let sourceID = ActionPolicyConfiguration.sourceID(for: name)
                 let inheritedFrom: String
                 if configuration.actions[name] != nil { inheritedFrom = "action" }
                 else if configuration.sources[sourceID] != nil { inheritedFrom = "source" }
-                else { inheritedFrom = "default" }
+                else if configuration.defaultPolicy != nil { inheritedFrom = "default" }
+                else { inheritedFrom = "actionDefault" }
                 return .object([
                     "action": .string(name),
                     "source": .string(sourceID),
-                    "policy": .string(configuration.policy(for: name).rawValue),
+                    "policy": .string(configuration.policy(for: name, default: actionDefaultPolicy ?? .ask).rawValue),
                     "inheritedFrom": .string(inheritedFrom),
                 ])
             } ?? .null,

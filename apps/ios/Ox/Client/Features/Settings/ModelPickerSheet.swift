@@ -402,7 +402,7 @@ struct SettingsSheet: View {
                 } label: {
                     SettingsDisclosureRow(
                         title: "Actions",
-                        value: Text(serverManager.defaultActionPolicy.title)
+                        value: Text(serverManager.defaultActionPolicy?.title ?? "Automatic")
                     )
                 }
                 .buttonStyle(.plain)

@@ -194,12 +194,12 @@ final class ServiceManager {
             let configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
             guard configuration.format == ActionPolicyConfiguration.currentFormat else {
                 Log.service.error("ServiceManager.actionPolicies unsupported format=\(configuration.format)")
-                return ActionPolicyConfiguration()
+                return ActionPolicyConfiguration(defaultPolicy: .ask)
             }
             return configuration
         } catch {
             Log.service.error("ServiceManager.actionPolicies decode failed error=\(error.localizedDescription)")
-            return ActionPolicyConfiguration()
+            return ActionPolicyConfiguration(defaultPolicy: .ask)
         }
     }
 
@@ -241,16 +241,29 @@ final class ServiceManager {
         Log.service.info("ServiceManager.setSaved domain=\(service.domain) saved=\(saved)")
     }
 
-    var defaultActionPolicy: ActionPolicy {
+    var defaultActionPolicy: ActionPolicy? {
         get { actionPolicies.defaultPolicy }
         set {
             guard actionPolicies.defaultPolicy != newValue else { return }
             actionPolicies.defaultPolicy = newValue
-            Log.service.info("ServiceManager.actionPolicy default=\(newValue.rawValue)")
+            Log.service.info("ServiceManager.actionPolicy default=\(newValue?.rawValue ?? "automatic")")
         }
     }
 
-    func actionPolicy(for action: String) -> ActionPolicy { actionPolicies.policy(for: action) }
+    func actionPolicy(for action: String, default actionDefault: ActionPolicy) -> ActionPolicy {
+        actionPolicies.policy(for: action, default: actionDefault)
+    }
+
+    func defaultPolicy(for action: String) -> ActionPolicy {
+        if Actions.builtIn.contains(action) { return Actions.defaultPolicy(for: action) }
+        for service in services {
+            guard let serviceAction = service.definition.exposedActions.first(where: {
+                service.definition.qualifiedActionName($0.id) == action
+            }) else { continue }
+            return serviceAction.requireApproval ? .ask : .allow
+        }
+        return .ask
+    }
 
     func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }
 
@@ -262,7 +275,7 @@ final class ServiceManager {
 
     func sourcePolicy(for source: String) -> ActionPolicy? { actionPolicies.sources[source] }
 
-    func resolvedSourcePolicy(for source: String) -> ActionPolicy {
+    func resolvedSourcePolicy(for source: String) -> ActionPolicy? {
         actionPolicies.sources[source] ?? actionPolicies.defaultPolicy
     }
 

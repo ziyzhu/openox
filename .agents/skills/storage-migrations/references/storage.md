@@ -12,7 +12,7 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Preferences/                         UserDefaults
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── savedServices                    attached service domains
-│   │   ├── actionApprovalPolicies           versioned Ask, Allow, or Block policies for Actions
+│   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
 │   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
 │   │   ├── api.url                          Ox service API override
 │   │   ├── llm.defaultModel                 new-chat provider/model/thinking selection
@@ -120,12 +120,15 @@ UserDefaults value into the app group and removes the legacy value.
 
 Application migration converts the legacy `autoApproveActions` allow-list and
 `autoApproveAll` preference into `actionApprovalPolicies`. The versioned JSON value
-stores a global default plus optional source and Action overrides. Missing,
-malformed, and unknown future formats fail closed to Ask without discarding the
-stored bytes. Migration removes standing approvals for retired Action identifiers,
-including `ox.app.inspect` and `ios:browser:screenshot`, and does not transfer
-approval to replacement Actions, so a replacement that can expose user data
-requires fresh consent.
+stores an optional global override plus optional source and Action overrides. No
+global override means Automatic: bounded, non-consequential reads default to Allow,
+while consequential and unknown Actions default to Ask. The version-one Ask default
+migrates to Automatic; explicit source and Action policies remain unchanged.
+Missing state uses Automatic, while malformed and unknown future formats fail
+closed to Ask without discarding the stored bytes. Migration removes standing
+approvals for retired Action identifiers, including `ox.app.inspect` and
+`ios:browser:screenshot`, and does not transfer approval to replacement Actions,
+so a replacement that can expose user data requires fresh consent.
 
 ## Profiles
 

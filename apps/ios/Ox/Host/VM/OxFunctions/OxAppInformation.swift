@@ -128,7 +128,7 @@ nonisolated enum OxAppInformation {
             ), (
                 "ox.app.actionPolicies",
                 .object([
-                    "description": .string("Read Ox's Action approval policy without changing it: `await ox.app.actionPolicies({ source?, action?, query?, limit?, purpose })`. Returns the global default, bounded explicit overrides, and the resolved policy for an exact action when requested. Results are capped at 100."),
+                    "description": .string("Read Ox's Action approval policy without changing it: `await ox.app.actionPolicies({ source?, action?, query?, limit?, purpose })`. Returns the optional global override, bounded explicit overrides, and the resolved policy for an exact action when requested. A null global override uses each Action's default: non-consequential reads run automatically while consequential or unknown Actions ask. Results are capped at 100."),
                     "inputSchema": object([
                         "source": boundedString(maximum: 500, description: "Exact Action source identifier."),
                         "action": boundedString(maximum: 500, description: "Exact Action identifier to filter and resolve."),
@@ -136,12 +136,12 @@ nonisolated enum OxAppInformation {
                         "limit": integer(minimum: 1, maximum: 100, description: "Maximum overrides; defaults to 50."),
                     ]),
                     "outputSchema": object([
-                        "defaultPolicy": actionPolicy,
+                        "defaultPolicy": nullable(actionPolicy),
                         "resolved": nullable(object([
                             "action": string,
                             "source": string,
                             "policy": actionPolicy,
-                            "inheritedFrom": enumeration(["action", "source", "default"]),
+                            "inheritedFrom": enumeration(["action", "source", "default", "actionDefault"]),
                         ], required: ["action", "source", "policy", "inheritedFrom"])),
                         "overrides": array(object([
                             "scope": enumeration(["source", "action"]),

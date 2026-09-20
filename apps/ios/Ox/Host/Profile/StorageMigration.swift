@@ -205,11 +205,19 @@ nonisolated enum StorageMigrator {
         let retired = Set(["ios:browser:screenshot", "ox.app.inspect"])
         if let data = defaults.data(forKey: ServiceManager.actionPoliciesKey) {
             do {
-                var configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
-                guard configuration.format == ActionPolicyConfiguration.currentFormat else {
-                    Log.app.error("StorageMigrator.actionPolicies deferred format=\(configuration.format)")
+                let stored = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
+                let migratedFormat = stored.format == ActionPolicyConfiguration.legacyFormat
+                guard stored.format == ActionPolicyConfiguration.currentFormat || migratedFormat else {
+                    Log.app.error("StorageMigrator.actionPolicies deferred format=\(stored.format)")
                     return
                 }
+                var configuration = migratedFormat
+                    ? ActionPolicyConfiguration(
+                        defaultPolicy: stored.defaultPolicy == .ask ? nil : stored.defaultPolicy,
+                        sources: stored.sources,
+                        actions: stored.actions
+                    )
+                    : stored
                 let originalCount = configuration.actions.count
                 let storedActions = configuration.actions
                 var migratedActions = storedActions.reduce(into: [String: ActionPolicy]()) { actions, entry in
@@ -224,14 +232,14 @@ nonisolated enum StorageMigrator {
                     if migratedActions[action] == nil { migratedActions[action] = entry.value }
                 }
                 configuration.actions = migratedActions
-                if configuration.actions != storedActions,
+                if migratedFormat || configuration.actions != storedActions,
                    let updated = try? JSONEncoder().encode(configuration) {
                     defaults.set(updated, forKey: ServiceManager.actionPoliciesKey)
                 }
                 defaults.removeObject(forKey: ServiceManager.legacyAutoApproveActionsKey)
                 defaults.removeObject(forKey: ServiceManager.legacyAutoApproveAllKey)
                 defaults.synchronize()
-                Log.app.info("StorageMigrator.actionPolicies current actions=\(configuration.actions.count) removed=\(originalCount - configuration.actions.count)")
+                Log.app.info("StorageMigrator.actionPolicies current format=\(configuration.format) migrated=\(migratedFormat) actions=\(configuration.actions.count) removed=\(originalCount - configuration.actions.count)")
             } catch {
                 Log.app.error("StorageMigrator.actionPolicies invalid preserved=true error=\(error.localizedDescription)")
             }
@@ -245,7 +253,7 @@ nonisolated enum StorageMigrator {
         }
         let allowsAll = defaults.bool(forKey: ServiceManager.legacyAutoApproveAllKey)
         let configuration = ActionPolicyConfiguration(
-            defaultPolicy: allowsAll ? .allow : .ask,
+            defaultPolicy: allowsAll ? .allow : nil,
             actions: actions
         )
         do {
@@ -258,7 +266,7 @@ nonisolated enum StorageMigrator {
             defaults.removeObject(forKey: ServiceManager.legacyAutoApproveActionsKey)
             defaults.removeObject(forKey: ServiceManager.legacyAutoApproveAllKey)
             defaults.synchronize()
-            Log.app.info("StorageMigrator.actionPolicies migrated actions=\(configuration.actions.count) retired=\(legacy.count - retained.count) default=\(configuration.defaultPolicy.rawValue)")
+            Log.app.info("StorageMigrator.actionPolicies migrated actions=\(configuration.actions.count) retired=\(legacy.count - retained.count) default=\(configuration.defaultPolicy?.rawValue ?? "automatic")")
         } catch {
             Log.app.error("StorageMigrator.actionPolicies encode failed legacyPreserved=true error=\(error.localizedDescription)")
         }
@@ -1421,16 +1429,34 @@ nonisolated enum StorageMigrator {
             && defaults.data(forKey: ServiceManager.actionPoliciesKey) == firstActionPolicies
             && defaults.object(forKey: ServiceManager.legacyAutoApproveActionsKey) == nil
             && defaults.object(forKey: ServiceManager.legacyAutoApproveAllKey) == nil
-        let currentActionPolicies = try JSONEncoder().encode(ActionPolicyConfiguration(
+        let legacyConfiguration = ActionPolicyConfiguration(
+            format: ActionPolicyConfiguration.legacyFormat,
+            defaultPolicy: .ask,
+            sources: ["example.com": .block],
             actions: ["ox.app.inspect": .allow, "ox.app.info": .block]
-        ))
+        )
+        let currentActionPolicies = try JSONEncoder().encode(legacyConfiguration)
         defaults.set(currentActionPolicies, forKey: ServiceManager.actionPoliciesKey)
         migrateActionApprovalPolicies(defaults: defaults)
         let migratedCurrentActionPolicies = defaults.data(forKey: ServiceManager.actionPoliciesKey).flatMap {
             try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
         }
         let actionPoliciesMigrated = legacyActionPoliciesMigrated
+            && migratedCurrentActionPolicies?.format == ActionPolicyConfiguration.currentFormat
+            && migratedCurrentActionPolicies?.defaultPolicy == nil
+            && migratedCurrentActionPolicies?.sources == legacyConfiguration.sources
             && migratedCurrentActionPolicies?.actions == ["ox.app.info": .block]
+        let legacyBlockConfiguration = ActionPolicyConfiguration(
+            format: ActionPolicyConfiguration.legacyFormat,
+            defaultPolicy: .block
+        )
+        defaults.set(try JSONEncoder().encode(legacyBlockConfiguration), forKey: ServiceManager.actionPoliciesKey)
+        migrateActionApprovalPolicies(defaults: defaults)
+        let migratedBlockPolicy = defaults.data(forKey: ServiceManager.actionPoliciesKey).flatMap {
+            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
+        }
+        let globalBlockPreserved = migratedBlockPolicy?.format == ActionPolicyConfiguration.currentFormat
+            && migratedBlockPolicy?.defaultPolicy == .block
         let futureActionPolicies = try JSONEncoder().encode(ActionPolicyConfiguration(
             format: ActionPolicyConfiguration.currentFormat + 1,
             defaultPolicy: .block
@@ -1443,9 +1469,17 @@ nonisolated enum StorageMigrator {
             sources: ["example.com": .allow],
             actions: ["web:example.com:read": .ask]
         )
-        let actionPolicyResolutionValid = policyFixture.policy(for: "web:example.com:read") == .ask
-            && policyFixture.policy(for: "api:example.com:write") == .allow
-            && policyFixture.policy(for: "ox.app.info") == .block
+        let automaticPolicyFixture = ActionPolicyConfiguration()
+        let actionPolicyResolutionValid = globalBlockPreserved
+            && policyFixture.policy(for: "web:example.com:read", default: .allow) == .ask
+            && policyFixture.policy(for: "api:example.com:write", default: .ask) == .allow
+            && policyFixture.policy(for: "ox.app.info", default: .allow) == .block
+            && automaticPolicyFixture.policy(for: "ox.app.info", default: .allow) == .allow
+            && automaticPolicyFixture.policy(for: "ox.app.logs", default: .ask) == .ask
+            && Actions.defaultPolicy(for: Actions.appInfo) == .allow
+            && Actions.defaultPolicy(for: Actions.fsRead) == .allow
+            && Actions.defaultPolicy(for: Actions.appLogs) == .ask
+            && Actions.defaultPolicy(for: Actions.fsWrite) == .ask
             && ActionPolicyConfiguration.sourceID(for: "ox.service.attach:example.com") == "example.com"
             && ActionPolicyConfiguration.sourceID(for: "ox.fs.read") == "ios:files"
         let migratedDefault = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)

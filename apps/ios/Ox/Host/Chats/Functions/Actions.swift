@@ -99,6 +99,23 @@ nonisolated enum Actions {
         widgetShoveler, widgetVideo, userChoose, userReportProgress,
     ]
 
+    private static let allowedByDefault = Set([
+        providerDefault, providerList, providerGet, providerValidate,
+        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appVoice,
+        appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appServiceRepositories,
+        webSearch, webFetch,
+        fsList, fsRead, outputRead, fsGlob, fsGrep,
+        artifactAttach, artifactList, artifactPresent,
+        serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceGitStatus,
+        serviceGitLog, serviceGitShow, serviceGitDiff,
+        scheduleList, memoryRead,
+        widgetShoveler, widgetVideo, userChoose, userReportProgress,
+    ])
+
+    static func defaultPolicy(for action: String) -> ActionPolicy {
+        allowedByDefault.contains(action) ? .allow : .ask
+    }
+
     static func label(for action: String) -> String? {
         switch action {
         case providerDefault: L10n.string("Default model")
