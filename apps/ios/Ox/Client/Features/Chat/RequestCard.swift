@@ -176,10 +176,16 @@ struct PermissionRequestCard: View {
     private func select(_ option: String) {
         guard submittedSelection == nil else { return }
         Haptics.impact(.selectionConfirmed)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.24, extraBounce: 0.04)) {
+        guard !reduceMotion else {
             submittedSelection = option
+            onSelect(option)
+            return
         }
-        onSelect(option)
+        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+            submittedSelection = option
+        } completion: {
+            onSelect(option)
+        }
     }
 }
 
@@ -465,10 +471,16 @@ struct RequestCardOptions: View {
     private func select(_ option: String) {
         guard effectiveSelection == nil else { return }
         Haptics.impact(.selectionConfirmed)
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.24, extraBounce: 0.04)) {
+        guard !reduceMotion else {
             submittedSelection = option
+            onSelect(option)
+            return
         }
-        onSelect(option)
+        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+            submittedSelection = option
+        } completion: {
+            onSelect(option)
+        }
     }
 }
 
