@@ -12,8 +12,8 @@ coordinates and keep screenshots, logs, mock servers, and other diagnostics
 outside the repository.
 
 Use prompt E2E cases for behavior that crosses visible UI, app lifecycle,
-persisted state, and Host integration. The neighboring `tests/llm` suite remains
-responsible for provider-neutral behavioral evaluation, real-model acceptance,
-and latency. LLM-related prompt cases belong here when the behavior under test is
-the app experience, such as provider setup, authentication, model switching, or
-persistence across relaunch.
+persisted state, and Host integration. The neighboring `tests/llm` suite covers
+one live tool-call smoke test for each supported LLM wire protocol, optionally
+focused on a configured provider. LLM-related prompt cases belong here when the
+behavior under test is the app experience, such as provider setup,
+authentication, model switching, or persistence across relaunch.

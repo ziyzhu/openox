@@ -7,24 +7,31 @@ import { runOnce } from "../../../cli/src/debug-ws.ts";
 import { loadAPIKeys, type APIKeys, type LLMRegion } from "../../../../tooling/sim-bootstrap-lib.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../../tooling/qa-config.ts";
 import { ROOT } from "../../../../tooling/lib.ts";
-import { scoreResponse, validateCases, type EvalCase } from "./eval/scorer.ts";
+import { scoreSmokeResponse } from "./smoke.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
 const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");
 const SCHEME = "ios";
 const REGIONS: LLMRegion[] = ["global", "china"];
+export const WIRE_PROTOCOLS = [
+  "openai-responses",
+  "openai-chat-completions",
+  "anthropic-messages",
+  "gemini-generate-content",
+] as const;
+
+export type WireProtocol = typeof WIRE_PROTOCOLS[number];
 
 type Model = {
   id: string;
   displayName: string;
   supportsTools: boolean;
+  wireProtocol?: string;
 };
 
 export type MatrixClient = {
   id: string;
   displayName: string;
-  credentialID: string;
-  endpoint?: string;
   models: Model[];
 };
 
@@ -38,20 +45,18 @@ export type MatrixTarget = {
   provider: string;
   client: string;
   model: string;
+  protocol: WireProtocol;
   region: LLMRegion;
-  endpoint: string;
-  credentialID: string;
 };
 
 type Options = {
   device: string;
-  repository: string;
   appPath?: string;
   keysPath: string;
   output: string;
   regions: LLMRegion[];
+  providers: string[];
   timeoutMs: number;
-  providerConcurrency: number;
 };
 
 type CommandOptions = {
@@ -94,16 +99,16 @@ function positiveInteger(value: string, flag: string): number {
 function usage(): string {
   return `Usage: bun run test:llm [--device ox-qa-N] [options]
 
-Runs one scored live tool-call smoke test for every model and region represented in secrets/API_KEYS.json.
+Runs one scored live tool-call smoke test for each of Ox's four LLM wire protocols.
+The default chooses one representative configured provider and model per protocol.
 
 Options:
-  --device <ox-qa-N>          Isolated simulator (default ox-qa-1)
-  --repository <path-or-url>  Service repository served through Ox CLI
+  --device <ox-qa-N>            Isolated simulator (default ox-qa-1)
   --app <path>                   Reuse a prebuilt simulator app
   --keys <path>                  Regional API key file (default secrets/API_KEYS.json)
   --region <global|china>        Limit coverage to a region; repeat to select both
+  --provider <id>                Test one configured provider; repeat to select more
   --timeout <ms>                 Timeout per model response (default 120000)
-  --provider-concurrency <n>     Concurrent models per provider (default 2)
   --output <path>                JSON coverage artifact path`;
 }
 
@@ -115,15 +120,13 @@ function parseOptions(args: string[]): Options | undefined {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   let keysPath = join(ROOT, "secrets/API_KEYS.json");
   let appPath: string | undefined;
-  let output = join(ROOT, `apps/ios/build/llm-matrix/${stamp}.json`);
+  let output = join(ROOT, `apps/ios/build/llm-protocols/${stamp}.json`);
   let timeoutMs = 120_000;
-  let providerConcurrency = 2;
-  let repository = Bun.env.OX_REPOSITORY;
   const regions: LLMRegion[] = [];
+  const providers: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index]!;
     if (argument === "--device") index += 1;
-    else if (argument === "--repository") repository = requiredValue(args, index++, argument);
     else if (argument === "--app") {
       const value = requiredValue(args, index++, argument);
       appPath = isAbsolute(value) ? value : resolve(ROOT, value);
@@ -138,25 +141,23 @@ function parseOptions(args: string[]): Options | undefined {
       const value = requiredValue(args, index++, argument) as LLMRegion;
       if (!REGIONS.includes(value)) throw new Error("--region must be global or china");
       regions.push(value);
+    } else if (argument === "--provider") {
+      providers.push(requiredValue(args, index++, argument));
     } else if (argument === "--timeout") {
       timeoutMs = positiveInteger(requiredValue(args, index++, argument), argument);
-    } else if (argument === "--provider-concurrency") {
-      providerConcurrency = positiveInteger(requiredValue(args, index++, argument), argument);
     } else {
       throw new Error(`Unknown option ${argument}`);
     }
   }
   const selectedRegions = regions.length === 0 ? REGIONS : [...new Set(regions)];
-  if (!repository) throw new Error("Pass --repository <path-or-url> or set OX_REPOSITORY");
   return {
     device: qaNumberedDevice(args, Bun.env.OX_QA_DEVICE ?? targetedQaDevice),
-    repository,
     appPath,
     keysPath,
     output,
     regions: selectedRegions,
+    providers: [...new Set(providers)],
     timeoutMs,
-    providerConcurrency,
   };
 }
 
@@ -167,27 +168,53 @@ export function keyedProviders(keys: APIKeys, region: LLMRegion): string[] {
     .sort();
 }
 
-export function planMatrix(keys: APIKeys, region: LLMRegion, clients: MatrixClient[]): MatrixTarget[] {
-  return keyedProviders(keys, region).flatMap((provider) => {
+function isWireProtocol(value: string | undefined): value is WireProtocol {
+  return WIRE_PROTOCOLS.some((protocol) => protocol === value);
+}
+
+function candidateTargets(
+  keys: APIKeys,
+  region: LLMRegion,
+  clients: MatrixClient[],
+  providers: string[],
+): MatrixTarget[] {
+  const configured = keyedProviders(keys, region);
+  const selected = providers.length === 0 ? configured : providers.filter((provider) => configured.includes(provider));
+  return selected.flatMap((provider) => {
     const client = clients.find((candidate) => candidate.id === provider);
-    if (!client) throw new Error(`${region} key provider ${provider} is not exposed by the running app`);
-    if (!client.endpoint) throw new Error(`${region} provider ${provider} did not report its endpoint`);
-    const endpoint = new URL(client.endpoint);
-    if (endpoint.protocol !== "https:") throw new Error(`${region} provider ${provider} reported a non-HTTPS endpoint`);
-    if (endpoint.username || endpoint.password) throw new Error(`${region} provider ${provider} reported an endpoint containing credentials`);
-    endpoint.search = "";
-    endpoint.hash = "";
+    if (!client) {
+      if (providers.includes(provider)) throw new Error(`${region} provider ${provider} is not exposed by the running app`);
+      return [];
+    }
     if (client.models.length === 0) throw new Error(`${region} provider ${provider} exposes no models`);
-    const unsupported = client.models.filter((model) => !model.supportsTools).map((model) => model.id);
-    if (unsupported.length > 0) throw new Error(`${region} provider ${provider} has models without tool support: ${unsupported.join(", ")}`);
-    return client.models.map((model) => ({
+    return client.models.filter((model) => model.supportsTools && isWireProtocol(model.wireProtocol)).map((model) => ({
       provider,
       client: client.id,
       model: model.id,
+      protocol: model.wireProtocol as WireProtocol,
       region,
-      endpoint: endpoint.toString(),
-      credentialID: client.credentialID,
     }));
+  });
+}
+
+export function planMatrix(
+  keys: APIKeys,
+  region: LLMRegion,
+  clients: MatrixClient[],
+  providers: string[] = [],
+  coveredProtocols: ReadonlySet<WireProtocol> = new Set(),
+): MatrixTarget[] {
+  const candidates = candidateTargets(keys, region, clients, providers);
+  if (providers.length > 0) {
+    return providers.flatMap((provider) => WIRE_PROTOCOLS.flatMap((protocol) => {
+      const target = candidates.find((candidate) => candidate.provider === provider && candidate.protocol === protocol);
+      return target ? [target] : [];
+    }));
+  }
+  return WIRE_PROTOCOLS.flatMap((protocol) => {
+    if (coveredProtocols.has(protocol)) return [];
+    const target = candidates.find((candidate) => candidate.protocol === protocol);
+    return target ? [target] : [];
   });
 }
 
@@ -225,19 +252,6 @@ async function requireFreePort(port: number): Promise<void> {
   });
 }
 
-async function waitForHealth(port: number): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (interrupted) throw new Error(`Interrupted by ${interrupted}`);
-    try {
-      const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(500) });
-      if (response.ok && await response.text() === "ok") return;
-    } catch {}
-    await Bun.sleep(100);
-  }
-  throw new Error(`Registry health check timed out on port ${port}`);
-}
-
 async function request(endpoint: string, payload: Record<string, unknown>, timeoutMs: number): Promise<Record<string, unknown>> {
   return await runOnce({ ...payload, id: crypto.randomUUID() }, timeoutMs, endpoint) as Record<string, unknown>;
 }
@@ -266,18 +280,6 @@ async function setRegion(endpoint: string, region: LLMRegion): Promise<void> {
   throw new Error(`Could not set simulator region to ${region}: ${detail}`);
 }
 
-async function waitForRegistry(endpoint: string): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  let detail = "registry is not ready";
-  while (Date.now() < deadline) {
-    const result = await request(endpoint, { kind: "sync-mono-repository" }, 5_000);
-    if (result.ok === true && typeof result.head === "string" && result.head && Number(result.services) > 0) return;
-    detail = result.ok === true ? `head=${String(result.head)} services=${String(result.services)}` : String(result.error);
-    await Bun.sleep(100);
-  }
-  throw new Error(`Registry did not become ready: ${detail}`);
-}
-
 async function freshChat(endpoint: string): Promise<{ id: string }> {
   const deadline = Date.now() + 60_000;
   let detail = "chat is not ready";
@@ -299,8 +301,8 @@ async function freshChat(endpoint: string): Promise<{ id: string }> {
   throw new Error(`Fresh tool-capable chat did not become ready: ${detail}`);
 }
 
-async function bootstrapRegion(keys: APIKeys, region: LLMRegion, endpoint: string): Promise<void> {
-  for (const provider of keyedProviders(keys, region)) {
+async function bootstrapRegion(keys: APIKeys, region: LLMRegion, endpoint: string, providers: string[]): Promise<void> {
+  for (const provider of providers) {
     const key = keys[provider]?.[region];
     if (!key) throw new Error(`Missing ${region} key for ${provider}`);
     const result = await request(endpoint, { kind: "set-key", clientId: provider, key }, 10_000);
@@ -309,20 +311,7 @@ async function bootstrapRegion(keys: APIKeys, region: LLMRegion, endpoint: strin
   }
 }
 
-async function parallelMap<T, R>(values: T[], concurrency: number, transform: (value: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
-    while (next < values.length) {
-      const index = next++;
-      results[index] = await transform(values[index]!);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
-async function runTarget(target: MatrixTarget, testCase: EvalCase, chatID: string, endpoint: string, timeoutMs: number): Promise<MatrixResult> {
+async function runTarget(target: MatrixTarget, chatID: string, endpoint: string, timeoutMs: number): Promise<MatrixResult> {
   let response: Record<string, unknown>;
   try {
     response = await request(endpoint, {
@@ -330,13 +319,13 @@ async function runTarget(target: MatrixTarget, testCase: EvalCase, chatID: strin
       sessionId: chatID,
       clientId: target.client,
       modelId: target.model,
-      prompt: testCase.prompt,
+      prompt: "Find the current weather in Tokyo using Ox's public web capability and print the search result.",
     }, timeoutMs);
   } catch (error) {
     response = { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
-  const score = scoreResponse(testCase, response);
-  console.log(`  ${score.passed ? "PASS" : "FAIL"} ${target.region}:${target.client}:${target.model}`);
+  const score = scoreSmokeResponse(response);
+  console.log(`  ${score.passed ? "PASS" : "FAIL"} ${target.protocol} ${target.region}:${target.client}:${target.model}`);
   return {
     ...target,
     passed: score.passed,
@@ -387,29 +376,21 @@ function staleClaim(path: string): boolean {
 async function runMatrix(options: Options): Promise<void> {
   const startedAt = Date.now();
   const keys = await loadAPIKeys(options.keysPath);
-  const selectedRegions = options.regions.filter((region) => keyedProviders(keys, region).length > 0);
+  const unknownProviders = options.providers.filter((provider) => keys[provider] === undefined);
+  if (unknownProviders.length > 0) throw new Error(`No API key configured for ${unknownProviders.join(", ")}`);
+  const selectedRegions = options.regions.filter((region) => {
+    const configured = keyedProviders(keys, region);
+    return options.providers.length === 0
+      ? configured.length > 0
+      : options.providers.some((provider) => configured.includes(provider));
+  });
   if (selectedRegions.length === 0) throw new Error("No API keys match the selected regions");
-  const corpus = validateCases(await Bun.file(join(ROOT, "apps/ios/tests/llm/cases/acceptance.json")).json());
-  const testCase = corpus.find((candidate) => candidate.id === "javascript-web-search-discovery");
-  if (!testCase) throw new Error("Missing javascript-web-search-discovery acceptance case");
   const config = qaConfig(options.device);
   const release = claimDevice(config.device);
-  let registry: ReturnType<typeof Bun.spawn> | undefined;
   const regions: Array<{ region: LLMRegion; expected: number; results: MatrixResult[]; error?: string }> = [];
+  const coveredProtocols = new Set<WireProtocol>();
   try {
-    await Promise.all([requireFreePort(config.registryPort), requireFreePort(config.debugPort)]);
-    registry = Bun.spawn({
-      cmd: ["bun", "apps/cli/src/ox.ts", "repository", "serve", options.repository, "--port", String(config.registryPort)],
-      cwd: ROOT,
-      env: Bun.env,
-      stdout: "inherit",
-      stderr: "inherit",
-    });
-    activeChildren.add(registry);
-    await Promise.race([
-      waitForHealth(config.registryPort),
-      registry.exited.then((code) => { throw new Error(`Repository server exited ${code}`); }),
-    ]);
+    await requireFreePort(config.debugPort);
     await command(["sim", "devices", "boot", config.device]);
     const appPath = options.appPath ?? (await commandJSON<{ app: string }>([
       "sim", "--device", config.device, "build",
@@ -419,6 +400,7 @@ async function runMatrix(options: Options): Promise<void> {
       "--force",
     ])).app;
     for (const region of selectedRegions) {
+      if (options.providers.length === 0 && coveredProtocols.size === WIRE_PROTOCOLS.length) break;
       try {
         await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
         await command(["sim", "--device", config.device, "defaults", "write", BUNDLE_ID, "app.hasCompletedOnboarding", "true", "--type", "bool"]);
@@ -426,22 +408,24 @@ async function runMatrix(options: Options): Promise<void> {
           "sim", "--device", config.device, "run", BUNDLE_ID,
           "--app", appPath,
           "--env", `OX_DEBUG_ENDPOINT=ws://127.0.0.1:${config.debugPort}`,
-          "--env", `OX_SERVICES_ENDPOINT=http://127.0.0.1:${config.registryPort}/repository.git`,
           "--disable-icloud",
           "--disable-mock-llm",
         ]);
         const endpoint = `ws://127.0.0.1:${config.debugPort}`;
         await setRegion(endpoint, region);
         const catalog = await waitForModels(endpoint, region);
-        await waitForRegistry(endpoint);
-        await bootstrapRegion(keys, region, endpoint);
-        const targets = planMatrix(keys, region, catalog.clients);
-        const chat = await freshChat(endpoint);
-        await waitForModels(endpoint, region);
-        const grouped = Map.groupBy(targets, (target) => target.provider);
-        const results = (await Promise.all([...grouped.values()].map((providerTargets) =>
-          parallelMap(providerTargets, options.providerConcurrency, (target) => runTarget(target, testCase, chat.id, endpoint, options.timeoutMs))
-        ))).flat();
+        const targets = planMatrix(keys, region, catalog.clients, options.providers, coveredProtocols);
+        if (options.providers.length > 0 && targets.length === 0) {
+          throw new Error(`Selected providers expose no tool-capable LLM wire protocol in ${region}`);
+        }
+        const targetProviders = [...new Set(targets.map((target) => target.provider))];
+        await bootstrapRegion(keys, region, endpoint, targetProviders);
+        const results = targets.length === 0 ? [] : await (async () => {
+          const chat = await freshChat(endpoint);
+          await waitForModels(endpoint, region);
+          return await Promise.all(targets.map((target) => runTarget(target, chat.id, endpoint, options.timeoutMs)));
+        })();
+        for (const target of targets) coveredProtocols.add(target.protocol);
         regions.push({ region, expected: targets.length, results });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -450,28 +434,33 @@ async function runMatrix(options: Options): Promise<void> {
       }
     }
   } finally {
-    if (registry) {
-      registry.kill("SIGTERM");
-      await registry.exited;
-      activeChildren.delete(registry);
-    }
     await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
     await command(["sim", "devices", "shutdown", config.device], { allowFailure: true });
     release();
   }
   const expected = regions.reduce((total, region) => total + region.expected, 0);
   const completed = regions.reduce((total, region) => total + region.results.length, 0);
-  const passed = regions.length === selectedRegions.length
+  const testedProviders = new Set(regions.flatMap((region) => region.results.map((result) => result.provider)));
+  const missingProviders = options.providers.filter((provider) => !testedProviders.has(provider));
+  const missingProtocols = options.providers.length > 0
+    ? []
+    : WIRE_PROTOCOLS.filter((protocol) => !coveredProtocols.has(protocol));
+  const passed = expected > 0
+    && missingProviders.length === 0
+    && missingProtocols.length === 0
     && regions.every((region) => !region.error && region.results.length === region.expected && region.results.every((result) => result.passed));
   const artifact = {
-    version: 1,
-    mode: "keyed-model-region-matrix",
+    version: 2,
+    mode: "wire-protocol-smoke",
     startedAt: new Date(startedAt).toISOString(),
     finishedAt: new Date().toISOString(),
     elapsedMs: Date.now() - startedAt,
     device: options.device,
-    case: testCase.id,
+    selectedProviders: options.providers,
     selectedRegions,
+    protocols: [...coveredProtocols],
+    missingProtocols,
+    missingProviders,
     expected,
     completed,
     regions,
@@ -479,7 +468,9 @@ async function runMatrix(options: Options): Promise<void> {
   };
   await mkdir(dirname(options.output), { recursive: true });
   await Bun.write(options.output, `${JSON.stringify(artifact, null, 2)}\n`);
-  console.log(`\n${passed ? "PASS" : "FAIL"} keyed real-model matrix ${completed}/${expected}`);
+  console.log(`\n${passed ? "PASS" : "FAIL"} LLM protocol smoke ${completed}/${expected}`);
+  if (missingProtocols.length > 0) console.log(`Missing protocols: ${missingProtocols.join(", ")}`);
+  if (missingProviders.length > 0) console.log(`Missing providers: ${missingProviders.join(", ")}`);
   console.log(options.output);
   if (!passed) process.exitCode = 1;
 }

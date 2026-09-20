@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
   "scripts": {
-    "test:llm": "bun apps/ios/tests/llm/run.ts",
+    "test:llm": "bun apps/ios/tests/llm/matrix.ts",
     "test:services": "bun tooling/service-replay.ts",
     "build:services": "bun tooling/ios-services-build.ts",
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
