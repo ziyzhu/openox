@@ -381,7 +381,6 @@ struct ChatPage: View {
 
     private var page: some View {
         let interaction = activeInteraction
-        let activeInteractionID = interactionID(for: interaction)
         let showsComposer = interaction == nil && isModelConfigured
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ChatViewportLayout.responseComposerSpacing
@@ -397,7 +396,6 @@ struct ChatPage: View {
         ) { projection in
             projectedPage(
                 projection,
-                activeInteractionID: activeInteractionID,
                 showsComposer: showsComposer,
                 floatsTopStrip: floatsTopStrip,
                 dockClearance: dockClearance,
@@ -408,7 +406,6 @@ struct ChatPage: View {
 
     private func projectedPage(
         _ projection: ChatTranscriptProjectionSnapshot,
-        activeInteractionID: UUID?,
         showsComposer: Bool,
         floatsTopStrip: Bool,
         dockClearance: CGFloat,
@@ -561,14 +558,6 @@ struct ChatPage: View {
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
-        }
-        .task(id: activeInteractionID) {
-            guard let activeInteractionID else { return }
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            transcriptWindow.showLatest(total: totalBlockCount)
-            scroller.rideToBottom()
-            Log.ui.info("ChatPage.interactionPresent chat=\(chat.id) interaction=\(activeInteractionID)")
         }
         .task(id: DelayedActivityKey(
             chatID: chat.id,
@@ -1496,14 +1485,6 @@ struct ChatPage: View {
 
     private var activeInteraction: Chat.Interaction? {
         chat.interaction
-    }
-
-    private func interactionID(for interaction: Chat.Interaction?) -> UUID? {
-        switch interaction {
-        case .prompt(let prompt): prompt.id
-        case .serviceControl(let control): control.id
-        case nil: nil
-        }
     }
 
     private func isAttached(_ control: ServiceControl) -> Bool {
