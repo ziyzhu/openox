@@ -8,14 +8,6 @@ extension ActionPolicy {
         case .block: "Block"
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .ask: "questionmark.circle"
-        case .allow: "checkmark.circle"
-        case .block: "nosign"
-        }
-    }
 }
 
 struct ActionPolicyPicker: View {
@@ -23,7 +15,6 @@ struct ActionPolicyPicker: View {
     let selection: ActionPolicy?
     let resolved: ActionPolicy
     let inheritLabel: LocalizedStringKey?
-    var showsPolicyIcon = true
     let onChange: (ActionPolicy?) -> Void
 
     var body: some View {
@@ -52,15 +43,12 @@ struct ActionPolicyPicker: View {
                 }
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
-                    if showsPolicyIcon {
-                        Image(systemName: resolved.systemImage)
-                    }
                     Text(resolved.title)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.primary)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
     }
@@ -88,7 +76,6 @@ struct ActionSettingsView: View {
                         selection: serviceManager.defaultActionPolicy,
                         resolved: serviceManager.defaultActionPolicy,
                         inheritLabel: nil,
-                        showsPolicyIcon: false,
                         onChange: { policy in
                             if let policy { serviceManager.defaultActionPolicy = policy }
                         }
