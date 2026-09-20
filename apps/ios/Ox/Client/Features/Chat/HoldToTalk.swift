@@ -3,6 +3,7 @@ import UIKit
 
 struct HoldToTalkArea: UIViewRepresentable {
     let canBegin: Bool
+    let onTap: () -> Void
     let onBegin: () -> Void
     let onMove: (CGPoint, CGFloat) -> Void
     let onRelease: () -> Void
@@ -14,6 +15,7 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     func updateUIView(_ view: Probe, context: Context) {
         view.canBegin = canBegin
+        view.onTap = onTap
         view.onBegin = onBegin
         view.onMove = onMove
         view.onRelease = onRelease
@@ -26,12 +28,14 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     final class Probe: UIView, UIGestureRecognizerDelegate {
         var canBegin = true
+        var onTap: (() -> Void)?
         var onBegin: (() -> Void)?
         var onMove: ((CGPoint, CGFloat) -> Void)?
         var onRelease: (() -> Void)?
         var onCancel: (() -> Void)?
         private var origin = CGPoint.zero
         private lazy var hold = UILongPressGestureRecognizer(target: self, action: #selector(holdChanged(_:)))
+        private lazy var tap = UITapGestureRecognizer(target: self, action: #selector(tapRecognized(_:)))
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -39,6 +43,8 @@ struct HoldToTalkArea: UIViewRepresentable {
             isAccessibilityElement = false
             hold.minimumPressDuration = 0.35
             hold.delegate = self
+            tap.delegate = self
+            tap.require(toFail: hold)
         }
 
         required init?(coder: NSCoder) { nil }
@@ -48,11 +54,13 @@ struct HoldToTalkArea: UIViewRepresentable {
             detach()
             guard let window else { return }
             window.addGestureRecognizer(hold)
+            window.addGestureRecognizer(tap)
             Log.ui.info("HoldToTalk.gesture attached")
         }
 
         func detach() {
             hold.view?.removeGestureRecognizer(hold)
+            tap.view?.removeGestureRecognizer(tap)
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -88,6 +96,11 @@ struct HoldToTalkArea: UIViewRepresentable {
             case .cancelled: onCancel?()
             default: break
             }
+        }
+
+        @objc private func tapRecognized(_ gesture: UITapGestureRecognizer) {
+            guard gesture.state == .ended else { return }
+            onTap?()
         }
     }
 }

@@ -12,6 +12,4 @@ nonisolated public enum AgentEvent: Sendable {
     case toolExecutionEnd(toolCall: ToolCall, result: ToolResultMessage)
     case reasoning(String)
     case compacted(beforeMessages: Int, afterMessages: Int, summaryChars: Int, tokensBefore: Int)
-    case paused
-    case resumed
 }

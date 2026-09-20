@@ -18,8 +18,6 @@ public actor Agent {
     public enum RunState: Sendable, Equatable {
         case idle
         case running
-        case pausePending
-        case paused
     }
 
     public private(set) var configuration: AgentConfiguration
@@ -34,13 +32,11 @@ public actor Agent {
     nonisolated private let eventsContinuation: AsyncStream<AgentEvent>.Continuation
 
     private var lastTurnTokens = 0
-    private var resumeContinuation: CheckedContinuation<Void, Never>?
     private var activeRun: (id: UUID, task: Task<AgentRunResult, Never>)?
     private var steeringQueue = PendingMessageQueue()
     private var followUpQueue = PendingMessageQueue()
 
     public var isStreaming: Bool { runState != .idle }
-    public var isPaused: Bool { runState == .paused }
 
     public var steeringMode: AgentQueueMode {
         get { steeringQueue.mode }
@@ -110,40 +106,14 @@ public actor Agent {
     }
 
     public func abort() {
-        let continuation = resumeContinuation
-        resumeContinuation = nil
-        if runState == .pausePending || runState == .paused { runState = .running }
         steeringQueue.clear()
         followUpQueue.clear()
         activeRun?.task.cancel()
-        continuation?.resume()
     }
 
     private func abort(runID: UUID) {
         guard activeRun?.id == runID else { return }
         abort()
-    }
-
-    public func pause() {
-        guard runState == .running else { return }
-        runState = .pausePending
-        Log.agent.info("Agent.pause requested")
-    }
-
-    public func resume() {
-        switch runState {
-        case .paused:
-            let continuation = resumeContinuation
-            resumeContinuation = nil
-            runState = .running
-            Log.agent.info("Agent.resume")
-            continuation?.resume()
-        case .pausePending:
-            runState = .running
-            Log.agent.info("Agent.resume cleared pending pause request")
-        case .idle, .running:
-            break
-        }
     }
 
     public func run(_ request: AgentRunRequest) async throws -> AgentRunResult {
@@ -227,12 +197,6 @@ public actor Agent {
         let config = AgentRunConfig(
             turnID: request.turnID,
             snapshot: snapshot,
-            shouldPause: { [weak self] in
-                await self?.claimPause() ?? false
-            },
-            waitForResume: { [weak self] in
-                await self?.waitUntilResumed()
-            },
             getSteeringMessages: { [weak self] in
                 await self?.drainSteeringMessages() ?? []
             },
@@ -265,19 +229,6 @@ public actor Agent {
         activeRun = nil
         emit(.runFinished(result))
         return result
-    }
-
-    private func claimPause() -> Bool {
-        guard runState == .pausePending else { return false }
-        runState = .paused
-        return true
-    }
-
-    private func waitUntilResumed() async {
-        guard runState == .paused else { return }
-        await withCheckedContinuation { continuation in
-            resumeContinuation = continuation
-        }
     }
 
     private func drainSteeringMessages() -> [Message] {
@@ -327,9 +278,7 @@ public actor Agent {
         case .runStarted(turnID: _),
              .generationStarted(model: _, turnID: _),
              .reasoning,
-             .compacted,
-             .paused,
-             .resumed:
+             .compacted:
             break
         }
     }

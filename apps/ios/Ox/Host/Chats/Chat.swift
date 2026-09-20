@@ -852,6 +852,13 @@ final class Chat: Identifiable {
     private var runState: RunState = .idle
     private var submissions: [Submission] = []
     var isBusy: Bool { runState.isRunning }
+    var showsStoppedTurn: Bool {
+        guard !isBusy,
+              submissions.isEmpty,
+              case let .agent(turn, _) = document.turns.last,
+              case .cancelled = turn.outcome else { return false }
+        return true
+    }
     var hasPendingInteraction: Bool {
         guard case .running(let run) = runState else { return false }
         if case .awaiting = run.phase { return true }
@@ -965,11 +972,6 @@ final class Chat: Identifiable {
                         self.document.apply(.appendContextCompaction(compaction))
                     }
                     Log.session.info("Chat compacted id=\(self.id) msgs \(before)->\(after) summaryChars=\(chars) tokensBefore=\(tokensBefore)")
-                case .paused:
-                    Log.session.info("Chat.agentPaused id=\(self.id)")
-                    self.requestPersistence(.paused)
-                case .resumed:
-                    Log.session.info("Chat.resumed id=\(self.id)")
                 case .toolExecutionStart:
                     self.runState.backgroundExecution?.updatePhase(.working)
                 case .toolExecutionEnd(let toolCall, let result):
@@ -1095,7 +1097,6 @@ final class Chat: Identifiable {
     private enum PersistenceCheckpoint: String {
         case generationFinished
         case agentTurnFinished
-        case paused
     }
 
     private func requestPersistence(_ checkpoint: PersistenceCheckpoint) {
@@ -2004,6 +2005,10 @@ final class Chat: Identifiable {
     }
 
     func stopCurrentTurn() {
+        guard isBusy else {
+            Log.session.info("Chat.stopCurrentTurn ignored id=\(id) reason=idle")
+            return
+        }
         Log.session.info("Chat.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
         notice = .none
         agentEventCycle.cancel()

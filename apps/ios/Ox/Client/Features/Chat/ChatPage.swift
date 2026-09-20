@@ -1101,6 +1101,15 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
+    private var stoppedRow: some View {
+        if chat.showsStoppedTurn {
+            StoppedTurnDivider()
+                .id("__stopped")
+                .padding(.top, ChatTranscriptMetrics.blockSpacing)
+        }
+    }
+
+    @ViewBuilder
     private func queuedRow(_ queued: Chat.QueuedMessage, identified: Bool = true) -> some View {
         let row = QueuedBubble(
             message: queued,
@@ -1250,6 +1259,7 @@ struct ChatPage: View {
                     blockRow(block)
                 }
                 activityRow(blocks: renderedBlocks)
+                stoppedRow
                 ForEach(chat.queuedMessages.filter { $0.id != anchor.id }) { queued in
                     queuedRow(queued)
                 }
@@ -1281,6 +1291,7 @@ struct ChatPage: View {
                         blockRow(block, identified: false)
                     }
                     activityRow(blocks: renderedBlocks)
+                    stoppedRow
                     queuedRows
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
@@ -1297,6 +1308,7 @@ struct ChatPage: View {
                     blockRow(block)
                 }
                 activityRow(blocks: renderedBlocks)
+                stoppedRow
                 queuedRows
             }
         }

@@ -212,15 +212,6 @@ nonisolated enum AgentRunner {
                 break loop
             }
 
-            if await config.shouldPause() {
-                Log.agent.info("Agent.run paused at iter=\(iter) msgs=\(messages.count)")
-                await emit(.paused)
-                await config.waitForResume()
-                Log.agent.info("Agent.run resumed at iter=\(iter)")
-                await emit(.resumed)
-                if Task.isCancelled { Log.agent.info("Agent.run terminating after resume: cancelled"); break loop }
-            }
-
             if !steeringMessages.isEmpty {
                 pendingMessages = steeringMessages
             }

@@ -1,266 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "All Built-in Actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有内置操作"
-          }
-        }
-      }
-    },
-    "Default for Ox Actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 内置操作的默认设置"
-          }
-        }
-      }
-    },
-    "Delete a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除模型提供商"
-          }
-        }
-      }
-    },
-    "List model providers" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列出模型提供商"
-          }
-        }
-      }
-    },
-    "Save a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存模型提供商"
-          }
-        }
-      }
-    },
-    "Sign in to a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登录模型提供商"
-          }
-        }
-      }
-    },
-    "Sign out of a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "退出模型提供商"
-          }
-        }
-      }
-    },
-    "Validate a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "验证模型提供商"
-          }
-        }
-      }
-    },
-    "View a model provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看模型提供商"
-          }
-        }
-      }
-    },
-    "All Actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有操作"
-          }
-        }
-      }
-    },
-    "All Service Actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有服务操作"
-          }
-        }
-      }
-    },
-    "Ask" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "询问"
-          }
-        }
-      }
-    },
-    "Ask shows a confirmation before an Action runs. Allow runs it automatically. Block prevents it from running. More specific choices override this default." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“询问”会在操作运行前显示确认。“允许”会自动运行操作。“阻止”会阻止其运行。更具体的选择会覆盖此默认设置。"
-          }
-        }
-      }
-    },
-    "Block" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阻止"
-          }
-        }
-      }
-    },
-    "Built into Ox" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 内置"
-          }
-        }
-      }
-    },
-    "Default for This Service" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此服务的默认设置"
-          }
-        }
-      }
-    },
-    "Permission" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "权限"
-          }
-        }
-      }
-    },
-    "Use Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用默认设置"
-          }
-        }
-      }
-    },
-    "Use Global Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用全局默认设置"
-          }
-        }
-      }
-    },
-    "Use Service Default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用服务默认设置"
-          }
-        }
-      }
-    },
-    "API" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "API"
-          }
-        }
-      }
-    },
-    "Password" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密码"
-          }
-        }
-      }
-    },
-    "Token" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "令牌"
-          }
-        }
-      }
-    },
-    "Username" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户名"
-          }
-        }
-      }
-    },
     "" : {
       "shouldTranslate" : false
     },
@@ -695,6 +435,17 @@
         }
       }
     },
+    "Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        }
+      }
+    },
     "Active %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1100,6 +851,7 @@
       }
     },
     "Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending requests and future use of capabilities in all chats and profiles until turned off. System permissions and private-data consent still apply." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1120,6 +872,28 @@
         }
       }
     },
+    "All Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有操作"
+          }
+        }
+      }
+    },
+    "All Built-in Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有内置操作"
+          }
+        }
+      }
+    },
     "All files" : {
       "comment" : "Title of the filter option that shows all artifacts, regardless of type.",
       "extractionState" : "stale",
@@ -1129,6 +903,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有文件"
+          }
+        }
+      }
+    },
+    "All Service Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有服务操作"
           }
         }
       }
@@ -1222,6 +1007,7 @@
       }
     },
     "Always allow all capabilities?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1292,6 +1078,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "并将其发送给%@来回答此请求。"
+          }
+        }
+      }
+    },
+    "API" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API"
           }
         }
       }
@@ -1479,6 +1275,17 @@
         }
       }
     },
+    "Ask" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "询问"
+          }
+        }
+      }
+    },
     "Ask a question" : {
       "comment" : "Label for an approval prompt when the invocation name is `userChoose`.",
       "isCommentAutoGenerated" : true,
@@ -1566,6 +1373,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免动手提问并听取 Ox 的完整回复。现在说出下面的短语；首次使用时，Siri 会询问是否启用 Ox 快捷指令。"
+          }
+        }
+      }
+    },
+    "Ask shows a confirmation before an Action runs. Allow runs it automatically. Block prevents it from running. More specific choices override this default." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“询问”会在操作运行前显示确认。“允许”会自动运行操作。“阻止”会阻止其运行。更具体的选择会覆盖此默认设置。"
           }
         }
       }
@@ -1896,6 +1714,17 @@
         }
       }
     },
+    "Block" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止"
+          }
+        }
+      }
+    },
     "body measurements" : {
       "comment" : "Name of the private health data object that stores body measurements.",
       "extractionState" : "stale",
@@ -2109,6 +1938,17 @@
         }
       }
     },
+    "Built into Ox" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 内置"
+          }
+        }
+      }
+    },
     "By 8 PM" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2268,17 +2108,6 @@
         }
       }
     },
-    "Actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "操作"
-          }
-        }
-      }
-    },
     "Change a scheduled skill" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2301,6 +2130,7 @@
       }
     },
     "Character and Memory are stored with this Profile." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3098,6 +2928,17 @@
         }
       }
     },
+    "Couldn’t open this address in this session." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法在此次会话中打开此地址。"
+          }
+        }
+      }
+    },
     "Couldn't read the PDF." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3387,6 +3228,28 @@
         }
       }
     },
+    "Default for Ox Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 内置操作的默认设置"
+          }
+        }
+      }
+    },
+    "Default for This Service" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务的默认设置"
+          }
+        }
+      }
+    },
     "Default model" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3454,6 +3317,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除本地服务"
+          }
+        }
+      }
+    },
+    "Delete a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除模型提供商"
           }
         }
       }
@@ -4247,6 +4121,17 @@
         }
       }
     },
+    "Enter a valid website address." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入有效的网站地址。"
+          }
+        }
+      }
+    },
     "Erases this reply and everything after it, then runs the prompt again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4751,6 +4636,7 @@
       }
     },
     "Give agents permission to use all available capabilities without asking in any chat. Mistakes may cause data loss or unwanted charges." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5515,6 +5401,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列出文件"
+          }
+        }
+      }
+    },
+    "List model providers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出模型提供商"
           }
         }
       }
@@ -6880,6 +6777,17 @@
         }
       }
     },
+    "Open in Safari" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Safari 中打开"
+          }
+        }
+      }
+    },
     "Open Messages" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7021,17 +6929,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ox 会在执行任何敏感操作前征求你的同意，隔离存放你的凭据，并让你随时停止它。"
-          }
-        }
-      }
-    },
-    "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ox 可以代你使用网站和应用，让你摆脱争夺注意力的界面和缓慢的旧式服务。Ox 还会把学到的内容转化为可复用的能力，让之后的交互更快、更可靠。"
           }
         }
       }
@@ -7279,6 +7176,17 @@
         }
       }
     },
+    "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 可以代你使用网站和应用，让你摆脱争夺注意力的界面和缓慢的旧式服务。Ox 还会把学到的内容转化为可复用的能力，让之后的交互更快、更可靠。"
+          }
+        }
+      }
+    },
     "Ox will notify you when longer requests and background tasks finish." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7364,6 +7272,16 @@
         }
       }
     },
+    "Password" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
+    },
     "Paste your own %@ API key to bill against your account. Leave it empty to use Ox's built-in key." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7429,6 +7347,17 @@
         }
       }
     },
+    "Permission" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权限"
+          }
+        }
+      }
+    },
     "Permission granted" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7486,6 +7415,7 @@
       }
     },
     "Personalization" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7647,6 +7577,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已展示资料"
+          }
+        }
+      }
+    },
+    "Press and hold to talk." : {
+      "comment" : "Hint shown when the user taps instead of holding the microphone button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住即可说话。"
           }
         }
       }
@@ -8906,6 +8847,17 @@
         }
       }
     },
+    "Save a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存模型提供商"
+          }
+        }
+      }
+    },
     "Save Local services" : {
       "localizations" : {
         "zh-Hans" : {
@@ -9598,6 +9550,17 @@
         }
       }
     },
+    "Sign in to a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录模型提供商"
+          }
+        }
+      }
+    },
     "Sign in to continue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9662,6 +9625,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出 %@ 登录？"
+          }
+        }
+      }
+    },
+    "Sign out of a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出模型提供商"
           }
         }
       }
@@ -10231,11 +10205,22 @@
       }
     },
     "Tap to type, or hold to talk and release to send." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "轻点输入，或按住说话、松开发送。"
+          }
+        }
+      }
+    },
+    "Tap to type." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点输入。"
           }
         }
       }
@@ -10770,6 +10755,16 @@
         }
       }
     },
+    "Token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "令牌"
+          }
+        }
+      }
+    },
     "Tool help" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10976,7 +10971,18 @@
         }
       }
     },
+    "Type a message" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入消息"
+          }
+        }
+      }
+    },
     "Type or hold to talk" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11160,6 +11166,28 @@
         }
       }
     },
+    "Use Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用默认设置"
+          }
+        }
+      }
+    },
+    "Use Global Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用全局默认设置"
+          }
+        }
+      }
+    },
     "Use Ox with Siri" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11167,6 +11195,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通过 Siri 使用 Ox"
+          }
+        }
+      }
+    },
+    "Use Service Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用服务默认设置"
           }
         }
       }
@@ -11204,6 +11243,16 @@
         }
       }
     },
+    "Username" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名"
+          }
+        }
+      }
+    },
     "Using a custom server" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11233,6 +11282,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在使用默认服务器"
+          }
+        }
+      }
+    },
+    "Validate a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证模型提供商"
           }
         }
       }
@@ -11314,6 +11374,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看 %@ 的实时页面"
+          }
+        }
+      }
+    },
+    "View a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看模型提供商"
           }
         }
       }
@@ -11427,39 +11498,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网页"
-          }
-        }
-      }
-    },
-    "Enter a valid website address." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请输入有效的网站地址。"
-          }
-        }
-      }
-    },
-    "Couldn’t open this address in this session." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法在此次会话中打开此地址。"
-          }
-        }
-      }
-    },
-    "Open in Safari" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Safari 中打开"
           }
         }
       }
@@ -11786,17 +11824,6 @@
         }
       }
     },
-    "Works across the internet" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用整个互联网"
-          }
-        }
-      }
-    },
     "workout data" : {
       "comment" : "Name for the data type that is requested when fetching workout data from HealthKit.",
       "extractionState" : "stale",
@@ -11806,6 +11833,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "训练数据"
+          }
+        }
+      }
+    },
+    "Works across the internet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用整个互联网"
           }
         }
       }

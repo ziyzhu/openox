@@ -11,8 +11,6 @@ nonisolated struct AgentTurnSnapshot: Sendable {
 nonisolated struct AgentRunConfig: Sendable {
     var turnID: UUID?
     var snapshot: AgentTurnSnapshot
-    var shouldPause: @Sendable () async -> Bool
-    var waitForResume: @Sendable () async -> Void
     var getSteeringMessages: @Sendable () async -> [Message]
     var getFollowUpMessages: @Sendable () async -> [Message]
     var transformContext: TransformContextHook?

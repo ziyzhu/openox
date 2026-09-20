@@ -163,6 +163,43 @@ private struct ChatInteractiveRowSurface: ViewModifier {
     }
 }
 
+struct StoppedTurnDivider: View {
+    var body: some View {
+        TranscriptStatusDivider(
+            label: Text("Stopped"),
+            systemImage: "stop.circle.fill",
+            accessibilityIdentifier: "chat.stopped"
+        )
+    }
+}
+
+private struct TranscriptStatusDivider: View {
+    let label: Text
+    let systemImage: String
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            line
+            Label { label } icon: { Image(systemName: systemImage) }
+                .fixedSize()
+            line
+        }
+        .font(Theme.Fonts.caption)
+        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var line: some View {
+        Rectangle()
+            .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
+            .frame(height: 1)
+    }
+}
+
 private struct ServiceInspectorRow: View {
     let link: ServiceInspectorLink
     let chatID: UUID
@@ -1305,26 +1342,11 @@ struct BlockView: View, Equatable {
     }
 
     private var contextCompactionDivider: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Rectangle()
-                .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
-                .frame(height: 1)
-            Label {
-                Text("Context compacted", comment: "Divider shown in a chat where earlier model context was summarized.")
-            } icon: {
-                Image(systemName: "arrow.down.right.and.arrow.up.left")
-            }
-            .fixedSize()
-            Rectangle()
-                .fill(Theme.Colors.onSurfaceMuted.opacity(0.2))
-                .frame(height: 1)
-        }
-        .font(Theme.Fonts.caption)
-        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Context compacted", comment: "Accessibility label for the context-compaction divider in a chat."))
-        .accessibilityIdentifier(A11yID.Chat.Message.contextCompaction)
+        TranscriptStatusDivider(
+            label: Text("Context compacted", comment: "Divider shown in a chat where earlier model context was summarized."),
+            systemImage: "arrow.down.right.and.arrow.up.left",
+            accessibilityIdentifier: A11yID.Chat.Message.contextCompaction
+        )
     }
 
     private func userTextBubble(_ text: String, attachments: [Artifact], createdAt: Date) -> some View {

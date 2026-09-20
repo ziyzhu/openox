@@ -482,7 +482,9 @@ struct ChatComposer: View, Equatable {
     }
 
     private var trailingControlsWidth: CGFloat {
-        composer.canSubmit || composer.isImporting || isBusy ? trailingControlSize + 2 : Theme.Spacing.lg
+        composer.canSubmit || composer.isImporting || isBusy || composer.isEmpty
+            ? trailingControlSize + 2
+            : Theme.Spacing.lg
     }
 
     var body: some View {
@@ -883,7 +885,7 @@ struct ChatComposer: View, Equatable {
     private var composerRow: some View {
         ZStack(alignment: .leading) {
             if composer.draft.isEmpty {
-                Text("Type or hold to talk")
+                Text("Type a message")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.leading, textLineFragmentPadding)
@@ -901,9 +903,8 @@ struct ChatComposer: View, Equatable {
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
                 .accessibilityIdentifier(A11yID.Chat.input)
-                .accessibilityValue(composer.draft.isEmpty ? Text("Type or hold to talk") : Text(verbatim: composer.draft))
-                .accessibilityHint("Tap to type, or hold to talk and release to send.")
-                .accessibilityAction(named: Text("Hold to talk")) { onSpeechBegin(true) }
+                .accessibilityValue(composer.draft.isEmpty ? Text("Type a message") : Text(verbatim: composer.draft))
+                .accessibilityHint("Tap to type.")
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .tint(Theme.Colors.primary.dynamic)
@@ -928,16 +929,6 @@ struct ChatComposer: View, Equatable {
                 .accessibilityHidden(true)
         }
         .padding(.vertical, 12)
-        .overlay {
-            HoldToTalkArea(
-                canBegin: !composer.isImporting && !speech.isPresented,
-                onBegin: { onSpeechBegin(false) },
-                onMove: { speech.move(to: $0, distance: $1) },
-                onRelease: { speech.release() },
-                onCancel: { speech.interrupt() }
-            )
-            .accessibilityHidden(true)
-        }
         .excludesCompactPageSwitch()
         .padding(.leading, iconButtonSize - textLineFragmentPadding)
         .padding(.trailing, trailingControlsWidth)
@@ -965,7 +956,47 @@ struct ChatComposer: View, Equatable {
             composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, event: .send, action: submit)
         } else if isBusy, !composer.suppressesStopControl {
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.Chat.stop, event: .stop, action: onStop)
+        } else if composer.isEmpty {
+            speechControl
         }
+    }
+
+    private var speechControl: some View {
+        Image(systemName: "mic.fill")
+            .font(.system(.subheadline, weight: .bold))
+            .foregroundStyle(Theme.Colors.onSurface)
+            .frame(width: composerButtonSize, height: composerButtonSize)
+            .padding(.leading, 4)
+            .padding(.trailing, 6)
+            .padding(.vertical, 5)
+            .minimumTouchTarget()
+            .contentShape(Circle())
+            .overlay {
+                HoldToTalkArea(
+                    canBegin: !composer.isImporting && !speech.isPresented,
+                    onTap: showHoldToTalkHint,
+                    onBegin: { onSpeechBegin(false) },
+                    onMove: { speech.move(to: $0, distance: $1) },
+                    onRelease: { speech.release() },
+                    onCancel: { speech.interrupt() }
+                )
+                .accessibilityHidden(true)
+            }
+            .accessibilityElement()
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Hold to talk")
+            .accessibilityHint("Press and hold to talk.")
+            .accessibilityIdentifier(A11yID.Chat.speechHold)
+            .accessibilityAction { onSpeechBegin(true) }
+    }
+
+    private func showHoldToTalkHint() {
+        Haptics.impact(.selectionConfirmed)
+        speech.notice = L10n.string(
+            "Press and hold to talk.",
+            comment: "Hint shown when the user taps instead of holding the microphone button."
+        )
+        Log.ui.info("ChatComposer.speechHint chat=\(sessionID)")
     }
 
     private func setMenu(_ visible: Bool) {
