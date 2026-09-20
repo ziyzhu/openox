@@ -145,19 +145,14 @@ struct ChatSidebar: View {
             : summaries.filter { $0.displayTitle.localizedStandardContains(query) }
         let sorted = matching.sorted { $0.activityDate > $1.activityDate }
         let pinned = sorted.filter(\.isFavorite)
-        let scheduled = sorted.filter { !$0.isFavorite && $0.scheduledSkillID != nil }
-        let recents = sorted.filter { !$0.isFavorite && $0.scheduledSkillID == nil }
+        let recents = sorted.filter { !$0.isFavorite }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 if !pinned.isEmpty {
                     sectionHeader("Pinned")
                     ForEach(pinned) { row($0) }
                 }
-                if !scheduled.isEmpty {
-                    sectionHeader("Scheduled")
-                    ForEach(scheduled) { row($0) }
-                }
-                if !recents.isEmpty || (pinned.isEmpty && scheduled.isEmpty) {
+                if !recents.isEmpty || pinned.isEmpty {
                     sectionHeader("Recents")
                     if recents.isEmpty {
                         Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
@@ -231,7 +226,6 @@ struct ChatSidebar: View {
 
     private func rowSectionSuffix(_ meta: ChatMeta) -> String {
         if meta.isFavorite { return ".pinned" }
-        if meta.scheduledSkillID != nil { return ".scheduled" }
         return ".recent"
     }
 
@@ -261,7 +255,15 @@ private struct SidebarRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                activityIndicator
+                HStack(spacing: Theme.Spacing.sm) {
+                    activityIndicator
+                    if meta.scheduledSkillID != nil {
+                        Image(systemName: "clock")
+                            .font(.system(.body, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
             }
         }
         .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset))
@@ -302,7 +304,13 @@ private struct SidebarRow: View {
     private var accessibilityValue: String {
         let activity = activityAccessibilityValue
         let lastModified = lastModifiedText(relativeTo: Date())
-        return activity.isEmpty ? lastModified : "\(lastModified), \(activity)"
+        return [lastModified, scheduledAccessibilityValue, activity]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+
+    private var scheduledAccessibilityValue: String {
+        meta.scheduledSkillID == nil ? "" : L10n.string("Scheduled")
     }
 
     @ViewBuilder
