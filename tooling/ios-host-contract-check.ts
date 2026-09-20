@@ -14,7 +14,6 @@ async function swiftFiles(path: string): Promise<string[]> {
 
 const clientRoots = [
   join(ROOT, "apps/ios/Ox/Client/Features"),
-  join(ROOT, "apps/ios/Ox/Client/Intents"),
   join(ROOT, "apps/ios/Ox/Client/UI"),
 ];
 const files = (await Promise.all(clientRoots.map(swiftFiles))).flat();
