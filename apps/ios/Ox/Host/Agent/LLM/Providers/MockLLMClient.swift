@@ -1693,21 +1693,28 @@ extension Scenario {
         guard let output = ctx.resultText("execute") else {
             do {
                 try checkAppLogQuery()
+                try checkAppActionPolicyQuery()
             } catch {
-                return [.say("App log checks failed: \(error.localizedDescription)"), .stop(.stop)]
+                return [.say("App information checks failed: \(error.localizedDescription)"), .stop(.stop)]
             }
             return [execute("""
             const info = await ox.app.info({ purpose: "Read app identity" });
             const profile = await ox.app.profile({ purpose: "Read active Profile" });
+            const profiles = await ox.app.profiles({ purpose: "List Profile summaries" });
             const notifications = await ox.app.notifications({ purpose: "Read notification permission" });
             const language = await ox.app.language({ purpose: "Read language" });
             const theme = await ox.app.theme({ purpose: "Read theme" });
             const voice = await ox.app.voice({ purpose: "Read voice" });
+            const voiceOptions = await ox.app.voiceOptions({ purpose: "List voice options" });
             const model = await ox.app.model({ purpose: "Read model" });
+            const defaultModel = await ox.app.defaultModel({ purpose: "Read default model" });
+            const actionPolicies = await ox.app.actionPolicies({ action: "ox.app.info", limit: 2, purpose: "Read Action policy" });
+            const serviceRepositories = await ox.app.serviceRepositories({ purpose: "Read service repositories" });
             const assert = (ok, message) => { if (!ok) throw new Error(message); };
             assert(typeof ox.app.inspect === "undefined", "Aggregate inspection must not be callable");
             assert(Object.keys(info).sort().join(",") === "build,name,region,version" && info.name === "Ox" && info.version.length > 0 && info.build.length > 0, "App info must contain identity only");
             assert(profile === null || (Object.keys(profile).sort().join(",") === "name,storage" && profile.name.length > 0 && ["local", "iCloud", "external"].includes(profile.storage)), "Invalid Profile information");
+            assert(profiles.profiles.length <= 100 && profiles.profiles.every(item => Object.keys(item).sort().join(",") === "active,name,storage" && typeof item.name === "string" && ["local", "iCloud", "external"].includes(item.storage) && typeof item.active === "boolean"), "Invalid Profile summaries");
             assert(Object.keys(notifications).join(",") === "status" && ["granted", "denied", "notDetermined"].includes(notifications.status), "Invalid notification permission");
             assert(typeof language.locale === "string" && language.locale.length > 0, "Missing language locale");
             assert(["system", "en", "zh-Hans"].includes(language.selection), "Invalid language selection");
@@ -1715,13 +1722,18 @@ extension Scenario {
             assert(theme.appearance === (theme.selection === "dark" ? "dark" : "light"), "Incorrect theme appearance");
             assert(voice.selection === null || typeof voice.selection === "string", "Invalid voice selection");
             assert(voice.effective === null || ["id", "name", "language"].every(key => typeof voice.effective[key] === "string" && voice.effective[key].length > 0), "Invalid effective voice");
-            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["model", { modelId: "test" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
+            assert(voiceOptions.options.length <= 100 && voiceOptions.options.every(item => ["id", "name", "language", "quality", "selected", "effective"].every(key => key in item)), "Invalid voice options");
+            assert(typeof defaultModel.configured === "boolean" && ["global", "china"].includes(defaultModel.region) && typeof defaultModel.provider.name === "string" && typeof defaultModel.model.name === "string", "Invalid default model");
+            assert(["ask", "allow", "block"].includes(actionPolicies.defaultPolicy) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
+            assert(["idle", "syncing", "ready", "failed"].includes(serviceRepositories.status) && serviceRepositories.repositories.length <= 50 && serviceRepositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,name,provenance,serviceCount,state"), "Invalid service repositories");
+            assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateServiceRepository === "undefined", "Human-controlled settings must not expose mutations");
+            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["voiceOptions", { limit: 1 }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["serviceRepositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
               let rejected = false;
               try { await ox.app[name]({ ...options, purpose: "Reject invalid input" }); }
               catch { rejected = true; }
               assert(rejected, name + " must reject invalid input");
             }
-            console.log(JSON.stringify({ info, profile, notifications, model }));
+            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, voiceOptionCount: voiceOptions.options.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: serviceRepositories.repositories.length }));
             """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
@@ -1733,12 +1745,39 @@ extension Scenario {
               authentication["status"]?.stringValue != nil,
               authentication["method"]?.stringValue != nil,
               result["notifications"]?.objectValue?["status"]?.stringValue != nil,
+              result["defaultModel"]?.objectValue?["configured"]?.boolValue != nil,
+              result["actionPolicy"]?.objectValue?["action"]?.stringValue == "ox.app.info",
+              result["profileCount"]?.intValue != nil,
+              result["voiceOptionCount"]?.intValue != nil,
+              result["repositoryCount"]?.intValue != nil,
               !output.contains("credential"),
               !output.contains("accountLabel"),
               !output.contains("filesystem") else {
             return [.say("App information was incomplete or exposed private configuration."), .stop(.stop)]
         }
-        return [.say("Ox read its identity, Profile, notification permission, language, theme, voice, and model without changing settings. Aggregate inspection is removed. Log filtering, limits, and credential redaction passed."), .stop(.stop)]
+        return [.say("Ox read its identity, Profiles, notification permission, language, theme, voices, current and default models, Action policies, and service repositories without changing settings. Aggregate inspection is removed. Bounds, filtering, and credential redaction passed."), .stop(.stop)]
+    }
+
+    private static func checkAppActionPolicyQuery() throws {
+        func expect(_ condition: Bool, _ message: String) throws {
+            if !condition { throw RuntimeError.bridge(message) }
+        }
+        let fixture = ActionPolicyConfiguration(
+            defaultPolicy: .ask,
+            sources: ["example.com": .block],
+            actions: ["web:example.com:read": .allow, "ox.app.info": .block]
+        )
+        let resolved = try AppActionPolicyQuery(options: .object(["action": .string("web:example.com:write")])).read(fixture).objectValue
+        try expect(resolved?["resolved"]?.objectValue?["policy"] == .string("block"), "Source policy resolution failed")
+        try expect(resolved?["resolved"]?.objectValue?["inheritedFrom"] == .string("source"), "Policy inheritance source failed")
+        let filtered = try AppActionPolicyQuery(options: .object(["source": .string("example.com"), "limit": .int(1)])).read(fixture).objectValue
+        try expect(filtered?["overrides"]?.arrayValue?.count == 1 && filtered?["truncated"] == .bool(true), "Policy source filter or limit failed")
+        let invalidOptions: [[String: JSONValue]] = [["limit": .int(0)], ["limit": .int(101)], ["limit": .double(1.5)], ["action": .string("")], ["unknown": .bool(true)]]
+        for options in invalidOptions {
+            var rejected = false
+            do { _ = try AppActionPolicyQuery(options: .object(options)) } catch { rejected = true }
+            try expect(rejected, "Invalid policy filter accepted")
+        }
     }
 
     private static func checkAppLogQuery() throws {

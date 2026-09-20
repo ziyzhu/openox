@@ -56,6 +56,23 @@ extension Chat {
         }
     }
 
+    public func appProfiles(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appProfiles, .object([:]), purpose: purpose) {
+            let storage = StorageRoot.shared
+            let limit = 100
+            return .object([
+                "profiles": .array(storage.profiles.prefix(limit).map { profile in
+                    .object([
+                        "name": .string(profile.name),
+                        "storage": .string(profile.location.rawValue),
+                        "active": .bool(profile.id == storage.activeId),
+                    ])
+                }),
+                "truncated": .bool(storage.profiles.count > limit),
+            ])
+        }
+    }
+
     public func appNotifications(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appNotifications, .object([:]), purpose: purpose) {
             let status = await NativePermission.notifications.state()
@@ -101,6 +118,27 @@ extension Chat {
         }
     }
 
+    public func appVoiceOptions(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appVoiceOptions, .object([:]), purpose: purpose) {
+            let settings = SpeechVoiceSettings.shared
+            let locale = AppLocale.shared.locale
+            let voices = settings.availableVoices(for: locale)
+            let effective = settings.preferredVoice(for: locale)
+            let limit = 100
+            return .object([
+                "selection": settings.selectedVoiceIdentifier.map(JSONValue.string) ?? .null,
+                "effective": effective.map(Self.voiceInformation) ?? .null,
+                "options": .array(voices.prefix(limit).map { voice in
+                    var information = Self.voiceInformation(voice).objectValue ?? [:]
+                    information["selected"] = .bool(voice.identifier == settings.selectedVoiceIdentifier)
+                    information["effective"] = .bool(voice.identifier == effective?.identifier)
+                    return .object(information)
+                }),
+                "truncated": .bool(voices.count > limit),
+            ])
+        }
+    }
+
     public func appModel(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appModel, .object([:]), purpose: purpose) {
             .object([
@@ -113,7 +151,58 @@ extension Chat {
                     "name": .string(model.displayName),
                 ]),
                 "supportsTools": .bool(client.supportsTools(for: model)),
-                "authentication": currentModelAuthentication(),
+                "authentication": modelAuthentication(for: client),
+            ])
+        }
+    }
+
+    public func appDefaultModel(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appDefaultModel, .object([:]), purpose: purpose) {
+            let registry = ProviderRegistry.shared
+            let selection = registry.sessionModel
+            let defaultClient = registry.client(for: selection)
+            let defaultModel = registry.model(for: selection, client: defaultClient)
+            return .object([
+                "configured": .bool(registry.defaultModel != nil),
+                "region": .string(selection.region.rawValue),
+                "provider": .object([
+                    "id": .string(defaultClient.id),
+                    "name": .string(defaultClient.displayName),
+                ]),
+                "model": .object([
+                    "id": .string(defaultModel.id),
+                    "name": .string(defaultModel.displayName),
+                ]),
+                "thinkingLevel": defaultModel.selectedReasoningEffort.map(JSONValue.string) ?? .null,
+                "supportsTools": .bool(defaultClient.supportsTools(for: defaultModel)),
+                "authentication": modelAuthentication(for: defaultClient),
+            ])
+        }
+    }
+
+    public func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let query = try AppActionPolicyQuery(options: options)
+        return try await tracked(Actions.appActionPolicies, options ?? .object([:]), purpose: purpose) {
+            query.read(serviceManager.actionPolicies)
+        }
+    }
+
+    public func appServiceRepositories(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appServiceRepositories, .object([:]), purpose: purpose) {
+            let repositories = serviceManager.repositories
+            let limit = 50
+            return .object([
+                "status": .string(serviceManager.repositoryState.appInformationValue),
+                "repositories": .array(repositories.prefix(limit).map { repository in
+                    .object([
+                        "name": .string(repository.name),
+                        "provenance": .string(repository.provenance.rawValue),
+                        "enabled": .bool(repository.isEnabled),
+                        "state": .string(repository.state.appInformationValue),
+                        "serviceCount": .int(repository.serviceCount),
+                    ])
+                }),
+                "truncated": .bool(repositories.count > limit),
             ])
         }
     }
@@ -128,7 +217,7 @@ extension Chat {
         }
     }
 
-    private func currentModelAuthentication() -> JSONValue {
+    private func modelAuthentication(for client: any ProviderClient) -> JSONValue {
         let account = client.subscriptionAccount
         let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
         let method: String
@@ -153,6 +242,102 @@ extension Chat {
             "method": .string(method),
             "status": .string(status),
             "settingsPath": .string("Settings > Model"),
+        ])
+    }
+
+    private static func voiceInformation(_ voice: AVSpeechSynthesisVoice) -> JSONValue {
+        let quality = switch voice.quality {
+        case .default: "basic"
+        case .enhanced: "enhanced"
+        case .premium: "premium"
+        @unknown default: "unknown"
+        }
+        return .object([
+            "id": .string(voice.identifier),
+            "name": .string(voice.name),
+            "language": .string(voice.language),
+            "quality": .string(quality),
+        ])
+    }
+}
+
+nonisolated struct AppActionPolicyQuery {
+    let source: String?
+    let action: String?
+    let query: String?
+    let limit: Int
+
+    init(options: JSONValue?) throws {
+        guard let fields = options?.objectValue,
+              Set(fields.keys).isSubset(of: ["source", "action", "query", "limit"]) else {
+            throw RuntimeError.bridge("ox.app.actionPolicies: expected policy filters.")
+        }
+        func string(_ key: String, maximum: Int) throws -> String? {
+            guard let value = fields[key] else { return nil }
+            guard let text = value.stringValue, !text.isEmpty, text.count <= maximum else {
+                throw RuntimeError.bridge("ox.app.actionPolicies: invalid \(key).")
+            }
+            return text
+        }
+        source = try string("source", maximum: 500)
+        action = try string("action", maximum: 500)
+        query = try string("query", maximum: 200)
+        if let value = fields["limit"] {
+            guard case .int(let count) = value, (1...100).contains(count) else {
+                throw RuntimeError.bridge("ox.app.actionPolicies: limit must be an integer from 1 to 100.")
+            }
+            limit = count
+        } else {
+            limit = 50
+        }
+    }
+
+    func read(_ configuration: ActionPolicyConfiguration) -> JSONValue {
+        let sourceOverrides = configuration.sources
+            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .compactMap { name, policy -> JSONValue? in
+                guard source == nil || source == name,
+                      action == nil,
+                      query.map({ name.localizedCaseInsensitiveContains($0) }) ?? true else { return nil }
+                return .object([
+                    "scope": .string("source"),
+                    "id": .string(name),
+                    "source": .string(name),
+                    "policy": .string(policy.rawValue),
+                ])
+            }
+        let actionOverrides = configuration.actions
+            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .compactMap { name, policy -> JSONValue? in
+                let sourceID = ActionPolicyConfiguration.sourceID(for: name)
+                guard source == nil || source == sourceID,
+                      action == nil || action == name,
+                      query.map({ name.localizedCaseInsensitiveContains($0) || sourceID.localizedCaseInsensitiveContains($0) }) ?? true else { return nil }
+                return .object([
+                    "scope": .string("action"),
+                    "id": .string(name),
+                    "source": .string(sourceID),
+                    "policy": .string(policy.rawValue),
+                ])
+            }
+        let matches = sourceOverrides + actionOverrides
+        return .object([
+            "defaultPolicy": .string(configuration.defaultPolicy.rawValue),
+            "resolved": action.map { name in
+                let sourceID = ActionPolicyConfiguration.sourceID(for: name)
+                let inheritedFrom: String
+                if configuration.actions[name] != nil { inheritedFrom = "action" }
+                else if configuration.sources[sourceID] != nil { inheritedFrom = "source" }
+                else { inheritedFrom = "default" }
+                return .object([
+                    "action": .string(name),
+                    "source": .string(sourceID),
+                    "policy": .string(configuration.policy(for: name).rawValue),
+                    "inheritedFrom": .string(inheritedFrom),
+                ])
+            } ?? .null,
+            "overrides": .array(Array(matches.prefix(limit))),
+            "truncated": .bool(matches.count > limit),
         ])
     }
 }
@@ -256,6 +441,26 @@ private extension NativePermissionState {
         case .granted: "granted"
         case .denied: "denied"
         case .notDetermined: "notDetermined"
+        }
+    }
+}
+
+private extension ServiceManager.RepositoryState {
+    var appInformationValue: String {
+        switch self {
+        case .idle: "idle"
+        case .syncing: "syncing"
+        case .ready: "ready"
+        case .failed: "failed"
+        }
+    }
+}
+
+private extension ServiceRepository.Repository.State {
+    var appInformationValue: String {
+        switch self {
+        case .ready: "ready"
+        case .failed: "failed"
         }
     }
 }

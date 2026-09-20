@@ -6,11 +6,16 @@ public protocol OxFunctionBridge: AnyObject {
     func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue?
     func appInfo(purpose: String) async throws -> JSONValue?
     func appProfile(purpose: String) async throws -> JSONValue?
+    func appProfiles(purpose: String) async throws -> JSONValue?
     func appNotifications(purpose: String) async throws -> JSONValue?
     func appLanguage(purpose: String) async throws -> JSONValue?
     func appTheme(purpose: String) async throws -> JSONValue?
     func appVoice(purpose: String) async throws -> JSONValue?
+    func appVoiceOptions(purpose: String) async throws -> JSONValue?
     func appModel(purpose: String) async throws -> JSONValue?
+    func appDefaultModel(purpose: String) async throws -> JSONValue?
+    func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue?
+    func appServiceRepositories(purpose: String) async throws -> JSONValue?
     func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func renameChat(title: String, purpose: String) async throws -> JSONValue?
     func invokeAction(name: String, args: JSONValue?, purpose: String) async throws -> JSONValue?

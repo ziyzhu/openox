@@ -28,6 +28,20 @@ nonisolated enum OxAppInformation {
                     ], required: ["name", "storage"])),
                 ])
             ), (
+                "ox.app.profiles",
+                .object([
+                    "description": .string("List the saved Profiles visible to Ox: `await ox.app.profiles({ purpose })`. Returns only each Profile's name, storage type, and whether it is active. Results are capped at 100 and never include identifiers, filesystem paths, or mutation controls."),
+                    "inputSchema": object([:]),
+                    "outputSchema": object([
+                        "profiles": array(object([
+                            "name": string,
+                            "storage": enumeration(["local", "iCloud", "external"]),
+                            "active": boolean,
+                        ], required: ["name", "storage", "active"]), maximum: 100),
+                        "truncated": boolean,
+                    ], required: ["profiles", "truncated"]),
+                ])
+            ), (
                 "ox.app.notifications",
                 .object([
                     "description": .string("Read Ox's current notification permission status: `await ox.app.notifications({ purpose })`. Does not request permission, schedule notifications, or change settings. Granted includes provisional or ephemeral authorization."),
@@ -71,11 +85,89 @@ nonisolated enum OxAppInformation {
                     ], required: ["selection", "effective"]),
                 ])
             ), (
+                "ox.app.voiceOptions",
+                .object([
+                    "description": .string("List the speech voices shown by Ox for its current locale: `await ox.app.voiceOptions({ purpose })`. Returns the selected identifier, effective voice, and at most 100 filtered voice options in Settings order. Does not change the selection or speak."),
+                    "inputSchema": object([:]),
+                    "outputSchema": object([
+                        "selection": nullable(string),
+                        "effective": nullable(voiceInformation),
+                        "options": array(object([
+                            "id": string,
+                            "name": string,
+                            "language": string,
+                            "quality": enumeration(["basic", "enhanced", "premium", "unknown"]),
+                            "selected": boolean,
+                            "effective": boolean,
+                        ], required: ["id", "name", "language", "quality", "selected", "effective"]), maximum: 100),
+                        "truncated": boolean,
+                    ], required: ["selection", "effective", "options", "truncated"]),
+                ])
+            ), (
                 "ox.app.model",
                 .object([
                     "description": .string("Read this chat's current model, provider, tool support, and authentication readiness: `await ox.app.model({ purpose })`. Returns status only, never credentials or account labels. Does not change the model."),
                     "inputSchema": object([:]),
                     "outputSchema": modelInformation,
+                ])
+            ), (
+                "ox.app.defaultModel",
+                .object([
+                    "description": .string("Read the effective default model used for new chats: `await ox.app.defaultModel({ purpose })`. Distinguishes an explicit selection from Ox's automatic fallback and returns region, thinking level, tool support, and authentication readiness without credentials. Does not change the default."),
+                    "inputSchema": object([:]),
+                    "outputSchema": object([
+                        "configured": boolean,
+                        "region": enumeration(["global", "china"]),
+                        "provider": namedValue,
+                        "model": namedValue,
+                        "thinkingLevel": nullable(string),
+                        "supportsTools": boolean,
+                        "authentication": authenticationInformation,
+                    ], required: ["configured", "region", "provider", "model", "thinkingLevel", "supportsTools", "authentication"]),
+                ])
+            ), (
+                "ox.app.actionPolicies",
+                .object([
+                    "description": .string("Read Ox's Action approval policy without changing it: `await ox.app.actionPolicies({ source?, action?, query?, limit?, purpose })`. Returns the global default, bounded explicit overrides, and the resolved policy for an exact action when requested. Results are capped at 100."),
+                    "inputSchema": object([
+                        "source": boundedString(maximum: 500, description: "Exact Action source identifier."),
+                        "action": boundedString(maximum: 500, description: "Exact Action identifier to filter and resolve."),
+                        "query": boundedString(maximum: 200, description: "Case-insensitive substring of an Action or source identifier."),
+                        "limit": integer(minimum: 1, maximum: 100, description: "Maximum overrides; defaults to 50."),
+                    ]),
+                    "outputSchema": object([
+                        "defaultPolicy": actionPolicy,
+                        "resolved": nullable(object([
+                            "action": string,
+                            "source": string,
+                            "policy": actionPolicy,
+                            "inheritedFrom": enumeration(["action", "source", "default"]),
+                        ], required: ["action", "source", "policy", "inheritedFrom"])),
+                        "overrides": array(object([
+                            "scope": enumeration(["source", "action"]),
+                            "id": string,
+                            "source": string,
+                            "policy": actionPolicy,
+                        ], required: ["scope", "id", "source", "policy"]), maximum: 100),
+                        "truncated": boolean,
+                    ], required: ["defaultPolicy", "resolved", "overrides", "truncated"]),
+                ])
+            ), (
+                "ox.app.serviceRepositories",
+                .object([
+                    "description": .string("Read sanitized summaries of Ox's service repositories: `await ox.app.serviceRepositories({ purpose })`. Returns at most 50 names, provenance, enabled state, load state, and service counts. Never returns origins, filesystem paths, Git details, or credentials, and cannot change repositories."),
+                    "inputSchema": object([:]),
+                    "outputSchema": object([
+                        "status": enumeration(["idle", "syncing", "ready", "failed"]),
+                        "repositories": array(object([
+                            "name": string,
+                            "provenance": enumeration(["bundled", "local", "development", "remote"]),
+                            "enabled": boolean,
+                            "state": enumeration(["ready", "failed"]),
+                            "serviceCount": integer(minimum: 0),
+                        ], required: ["name", "provenance", "enabled", "state", "serviceCount"]), maximum: 50),
+                        "truncated": boolean,
+                    ], required: ["status", "repositories", "truncated"]),
                 ])
             ), (
                 "ox.app.logs",
@@ -153,6 +245,9 @@ nonisolated enum OxAppInformation {
             let profile: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appProfile(purpose: purpose) }
             }
+            let profiles: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appProfiles(purpose: purpose) }
+            }
             let notifications: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appNotifications(purpose: purpose) }
             }
@@ -165,8 +260,21 @@ nonisolated enum OxAppInformation {
             let voice: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appVoice(purpose: purpose) }
             }
+            let voiceOptions: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appVoiceOptions(purpose: purpose) }
+            }
             let model: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appModel(purpose: purpose) }
+            }
+            let defaultModel: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appDefaultModel(purpose: purpose) }
+            }
+            let actionPolicies: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
+                let value = jsValueToJSON(options)
+                return env.call { try await $0.appActionPolicies(options: value, purpose: purpose) }
+            }
+            let serviceRepositories: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appServiceRepositories(purpose: purpose) }
             }
             let logs: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
                 let value = jsValueToJSON(options)
@@ -177,22 +285,32 @@ nonisolated enum OxAppInformation {
             }
             context.setObject(info as AnyObject, forKeyedSubscript: "__nativeAppInfo" as NSString)
             context.setObject(profile as AnyObject, forKeyedSubscript: "__nativeAppProfile" as NSString)
+            context.setObject(profiles as AnyObject, forKeyedSubscript: "__nativeAppProfiles" as NSString)
             context.setObject(notifications as AnyObject, forKeyedSubscript: "__nativeAppNotifications" as NSString)
             context.setObject(language as AnyObject, forKeyedSubscript: "__nativeAppLanguage" as NSString)
             context.setObject(theme as AnyObject, forKeyedSubscript: "__nativeAppTheme" as NSString)
             context.setObject(voice as AnyObject, forKeyedSubscript: "__nativeAppVoice" as NSString)
+            context.setObject(voiceOptions as AnyObject, forKeyedSubscript: "__nativeAppVoiceOptions" as NSString)
             context.setObject(model as AnyObject, forKeyedSubscript: "__nativeAppModel" as NSString)
+            context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
+            context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
+            context.setObject(serviceRepositories as AnyObject, forKeyedSubscript: "__nativeAppServiceRepositories" as NSString)
             context.setObject(logs as AnyObject, forKeyedSubscript: "__nativeAppLogs" as NSString)
             context.setObject(renameChat as AnyObject, forKeyedSubscript: "__nativeAppRenameChat" as NSString)
         },
         jsFragment: """
           info: (value) => { const options = __oxOptions(value, 'ox.app.info'); return __nativeAppInfo(String(options.purpose)); },
           profile: (value) => { const options = __oxOptions(value, 'ox.app.profile'); return __nativeAppProfile(String(options.purpose)); },
+          profiles: (value) => { const options = __oxOptions(value, 'ox.app.profiles'); return __nativeAppProfiles(String(options.purpose)); },
           notifications: (value) => { const options = __oxOptions(value, 'ox.app.notifications'); return __nativeAppNotifications(String(options.purpose)); },
           language: (value) => { const options = __oxOptions(value, 'ox.app.language'); return __nativeAppLanguage(String(options.purpose)); },
           theme: (value) => { const options = __oxOptions(value, 'ox.app.theme'); return __nativeAppTheme(String(options.purpose)); },
           voice: (value) => { const options = __oxOptions(value, 'ox.app.voice'); return __nativeAppVoice(String(options.purpose)); },
+          voiceOptions: (value) => { const options = __oxOptions(value, 'ox.app.voiceOptions'); return __nativeAppVoiceOptions(String(options.purpose)); },
           model: (value) => { const options = __oxOptions(value, 'ox.app.model'); return __nativeAppModel(String(options.purpose)); },
+          defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
+          actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },
+          serviceRepositories: (value) => { const options = __oxOptions(value, 'ox.app.serviceRepositories'); return __nativeAppServiceRepositories(String(options.purpose)); },
           logs: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.logs'); return __nativeAppLogs(options, String(purpose)); },
           renameChat: (value) => { const options = __oxOptions(value, 'ox.app.renameChat'); return __nativeAppRenameChat(String(options.title), String(options.purpose)); }
         """
@@ -204,16 +322,24 @@ nonisolated enum OxAppInformation {
         "id": string,
         "name": string,
     ], required: ["id", "name"])
+    private static let actionPolicy = enumeration(["ask", "allow", "block"])
+    private static let authenticationInformation = object([
+        "method": enumeration(["apiKey", "subscriptionKey", "bearerToken", "subscription", "none"]),
+        "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired"]),
+        "settingsPath": string,
+    ], required: ["method", "status", "settingsPath"])
+    private static let voiceInformation = object([
+        "id": string,
+        "name": string,
+        "language": string,
+        "quality": enumeration(["basic", "enhanced", "premium", "unknown"]),
+    ], required: ["id", "name", "language", "quality"])
 
     private static let modelInformation = object([
         "provider": namedValue,
         "model": namedValue,
         "supportsTools": boolean,
-        "authentication": object([
-            "method": enumeration(["apiKey", "subscriptionKey", "bearerToken", "subscription", "none"]),
-            "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired"]),
-            "settingsPath": string,
-        ], required: ["method", "status", "settingsPath"]),
+        "authentication": authenticationInformation,
     ], required: ["provider", "model", "supportsTools", "authentication"])
 
     private static func nullable(_ value: JSONValue) -> JSONValue {
@@ -226,6 +352,33 @@ nonisolated enum OxAppInformation {
         .object([
             "type": .string("string"),
             "enum": .array(values.map(JSONValue.string)),
+        ])
+    }
+
+    private static func boundedString(maximum: Int, description: String) -> JSONValue {
+        .object([
+            "type": .string("string"),
+            "minLength": .int(1),
+            "maxLength": .int(maximum),
+            "description": .string(description),
+        ])
+    }
+
+    private static func integer(minimum: Int, maximum: Int? = nil, description: String? = nil) -> JSONValue {
+        var schema: [String: JSONValue] = [
+            "type": .string("integer"),
+            "minimum": .int(minimum),
+        ]
+        if let maximum { schema["maximum"] = .int(maximum) }
+        if let description { schema["description"] = .string(description) }
+        return .object(schema)
+    }
+
+    private static func array(_ items: JSONValue, maximum: Int) -> JSONValue {
+        .object([
+            "type": .string("array"),
+            "items": items,
+            "maxItems": .int(maximum),
         ])
     }
 
