@@ -84,4 +84,3 @@ Related:
 1. After updating an `.xcstrings` catalog, immediately run `bun run check:localizations` and resolve every missing, incomplete, or placeholder-mismatched required translation before committing it.
 1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/Ox/Resources/OxServices.bundle` changes.
 1. Use `ox` for chats, logs, agent replay, and Server IR verification.
-1. Use `bun run test:chat-projection` to replay the committed projection fixtures through a running DEBUG app; pass `--update` only to accept a reviewed projection change.

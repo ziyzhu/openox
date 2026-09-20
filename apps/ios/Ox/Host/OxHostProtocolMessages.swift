@@ -3,11 +3,6 @@ import Foundation
 import UIKit
 
 extension OxHostProtocol {
-    struct ReducerFixtureInput: Decodable {
-        let name: String
-        let turns: [Turn]
-    }
-
     enum Kind: String, Decodable {
         case invokeAction = "invoke-action"
         case evaluate
@@ -22,7 +17,6 @@ extension OxHostProtocol {
         case getLatestResponse = "get-latest-response"
         case getComposerFormatting = "get-composer-formatting"
         case repositoryGate = "repository-gate"
-        case replayReducer = "replay-reducer"
         case replayStorageMigration = "replay-storage-migration"
         case checkAPIServices = "check-api-services"
         case runAgent = "run-agent"
@@ -188,11 +182,6 @@ extension OxHostProtocol {
         let script: String
     }
 
-    struct ReplayReducerRequest: Decodable {
-        let id: String
-        let fixtures: [ReducerFixtureInput]
-    }
-
     struct ReplayStorageMigrationRequest: Decodable {
         let id: String
         let turns: [Turn]
@@ -213,7 +202,6 @@ extension OxHostProtocol {
         case getLatestResponse(IDRequest)
         case getComposerFormatting(IDRequest)
         case repositoryGate(RepositoryGateRequest)
-        case replayReducer(ReplayReducerRequest)
         case replayStorageMigration(ReplayStorageMigrationRequest)
         case checkAPIServices(IDRequest)
         case runAgent(RunAgentRequest)
@@ -252,7 +240,6 @@ extension OxHostProtocol {
             case .getLatestResponse: self = .getLatestResponse(try IDRequest(from: decoder))
             case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
             case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
-            case .replayReducer: self = .replayReducer(try ReplayReducerRequest(from: decoder))
             case .replayStorageMigration: self = .replayStorageMigration(try ReplayStorageMigrationRequest(from: decoder))
             case .checkAPIServices: self = .checkAPIServices(try IDRequest(from: decoder))
             case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
@@ -443,32 +430,6 @@ extension OxHostProtocol {
         let id: String
         let ok: Bool
         let entered: Bool?
-        let error: String?
-    }
-
-    struct ReducerReplaySnapshot: Encodable {
-        let turns: [Turn]
-        let blocks: [Block]
-        let blockTurns: [Int]
-        let blockSources: [ReducerBlockSource]
-        let wireMessages: [Message]
-    }
-
-    struct ReducerBlockSource: Encodable {
-        let blockID: String
-        let turnID: String
-    }
-
-    struct ReducerReplayFixture: Encodable {
-        let name: String
-        let snapshot: ReducerReplaySnapshot
-    }
-
-    struct ReducerReplayResult: Encodable {
-        let kind = "replay-reducer-result"
-        let id: String
-        let ok: Bool
-        let fixtures: [ReducerReplayFixture]?
         let error: String?
     }
 

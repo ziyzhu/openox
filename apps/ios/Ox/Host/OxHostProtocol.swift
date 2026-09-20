@@ -28,7 +28,6 @@ enum OxHostProtocol {
         case .getLatestResponse(let request): handleGetLatestResponse(request, chatManager: chats, reply: reply)
         case .getComposerFormatting(let request): DebugUIAPI.handleGetComposerFormatting(request, reply: reply)
         case .repositoryGate(let request): handleRepositorySaveGate(request, chatManager: chats, reply: reply)
-        case .replayReducer(let request): handleReplayReducer(request, reply: reply)
         case .replayStorageMigration(let request): handleReplayStorageMigration(request, reply: reply)
         case .checkAPIServices(let request):
             Task { @MainActor in

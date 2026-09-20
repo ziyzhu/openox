@@ -70,7 +70,7 @@ async function readFixtures() {
 }
 
 const input = JSON.parse(await readFile(
-  join(ROOT, "apps/ios/fixtures/chatlogs/short.input.json"),
+  join(ROOT, "apps/ios/fixtures/storage-migrations/chat-turns.json"),
   "utf8",
 )) as { turns: unknown[] };
 const fixtures = await readFixtures();

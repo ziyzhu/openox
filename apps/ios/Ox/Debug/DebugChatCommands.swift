@@ -213,51 +213,6 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleReplayReducer(_ command: ReplayReducerRequest, reply: @escaping @MainActor (Data) -> Void) {
-        let presentationFailures = ChatBlockProjectionChecks.failures()
-        guard presentationFailures.isEmpty else {
-            reply(encode(ReducerReplayResult(
-                id: command.id, ok: false, fixtures: nil,
-                error: presentationFailures.joined(separator: "; ")
-            )))
-            return
-        }
-        guard !command.fixtures.isEmpty else {
-            reply(encode(ReducerReplayResult(
-                id: command.id,
-                ok: false,
-                fixtures: nil,
-                error: "No reducer fixtures were provided."
-            )))
-            return
-        }
-        let results = command.fixtures.map { fixture in
-            let state = ChatDocument.replaying(fixture.turns)
-            let projection = state.blocksWithTurn()
-            let sources = state.projection.compactMap { block -> ReducerBlockSource? in
-                guard let turn = state.sourceTurnIDs[RenderBlockID(block.id)] else { return nil }
-                return ReducerBlockSource(blockID: block.id.uuidString, turnID: turn.rawValue.uuidString)
-            }
-            return ReducerReplayFixture(
-                name: fixture.name,
-                snapshot: ReducerReplaySnapshot(
-                    turns: state.turns,
-                    blocks: state.projection,
-                    blockTurns: projection.map(\.1),
-                    blockSources: sources,
-                    wireMessages: state.toWire()
-                )
-            )
-        }
-        reply(encode(ReducerReplayResult(
-            id: command.id,
-            ok: true,
-            fixtures: results,
-            error: nil
-        )))
-    }
-
-    @MainActor
     static func handleReplayStorageMigration(
         _ command: ReplayStorageMigrationRequest,
         reply: @escaping @MainActor (Data) -> Void
