@@ -233,10 +233,6 @@ final class ChatManager {
         return chat
     }
 
-    func askAndWait(_ prompt: String, attachments: [Artifact] = []) async -> ChatSubmissionOutcome {
-        await startNewChat().submitAndWait(prompt, attachments: attachments)
-    }
-
     func runScheduledSkill(
         _ schedule: ScheduledSkill,
         executionLease: Chat.ExecutionLease
@@ -274,81 +270,6 @@ final class ChatManager {
         _ = await flushAllNow()
         Log.session.info("ChatManager.scheduled finished schedule=\(schedule.id) chat=\(chat.id) outcome=\(outcome.logLabel)")
         return (outcome, chat.id)
-    }
-
-    func continueAndWait(
-        _ rawID: UUID,
-        prompt: String,
-        replyStyle: Chat.ReplyStyle = .standard
-    ) async -> ChatSubmissionOutcome {
-        ensureRepositoryScope()
-        let id = ChatID(rawID)
-        if let chat = records[id]?.hydration.chat {
-            touch(id)
-            setCurrent(chat)
-            return await chat.submitAndWait(prompt, replyStyle: replyStyle)
-        }
-        guard let record = records[id] else {
-            return .failed("That Ox chat is no longer available.")
-        }
-        switch record.persistence {
-        case .deleting, .deleted:
-            return .failed("That Ox chat is no longer available.")
-        case .clean, .debouncing, .saving:
-            break
-        }
-        let scopedRepository = repository
-        let storageScope = repositoryScope
-        guard let loaded = await scopedRepository.loadChat(id, in: storageScope),
-              repositoryScope == storageScope else {
-            return .failed("That Ox chat could not be opened.")
-        }
-        if let chat = records[id]?.hydration.chat {
-            touch(id)
-            setCurrent(chat)
-            return await chat.submitAndWait(prompt, replyStyle: replyStyle)
-        }
-        guard var currentRecord = records[id] else {
-            return .failed("That Ox chat is no longer available.")
-        }
-        switch currentRecord.persistence {
-        case .deleting, .deleted:
-            return .failed("That Ox chat is no longer available.")
-        case .clean, .debouncing, .saving:
-            break
-        }
-        let chat = restoredChat(from: loaded, in: storageScope)
-        hydrationOrdinal &+= 1
-        currentRecord.hydration = .loaded(chat)
-        currentRecord.accessOrdinal = hydrationOrdinal
-        records[id] = currentRecord
-        if loaded.needsPersistence || chat.state != loaded.state { persist(chat) }
-        setCurrent(chat)
-        return await chat.submitAndWait(prompt, replyStyle: replyStyle)
-    }
-
-    func latestCompletedResponse() async -> String? {
-        ensureRepositoryScope()
-        let scope = repositoryScope
-        for meta in orderedSummaries {
-            guard repositoryScope == scope else { return nil }
-            let id = ChatID(meta.id)
-            if let response = records[id]?.hydration.chat?.state.turns.latestCompletedResponse {
-                return response
-            }
-            if let loaded = await repository.loadChat(id, in: scope),
-               let response = loaded.state.turns.latestCompletedResponse {
-                return response
-            }
-        }
-        return nil
-    }
-
-    func stopActiveResponses() -> Int {
-        let active = records.values.compactMap(\.hydration.chat).filter(\.isBusy)
-        for chat in active { chat.cancelAll() }
-        Log.session.info("ChatManager.stopActiveResponses count=\(active.count)")
-        return active.count
     }
 
     func toggleTemporaryChat() {

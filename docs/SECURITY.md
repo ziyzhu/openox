@@ -322,9 +322,8 @@ remains trusted input rather than a transport attack.
 ### T7 — Infrastructure secret disclosure
 **LLM keys:** held in the Keychain, attached only to the
 correct provider host, and never logged or exposed to the virtual machine. They use
-After First Unlock accessibility so user-invoked background Siri and CarPlay
-requests can run while the phone is locked, but remain unavailable until the
-first unlock after each restart.
+After First Unlock accessibility so scheduled background work can run while the
+phone is locked, but remain unavailable until the first unlock after each restart.
 
 **User-hosted LLM endpoints:** custom provider URLs and model capabilities are
 local configuration; optional bearer tokens remain in the LLM Keychain. Ox

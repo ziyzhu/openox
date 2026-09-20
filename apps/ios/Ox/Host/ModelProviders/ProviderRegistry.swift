@@ -216,7 +216,7 @@ final class ProviderRegistry {
         definitions.compactMap { definition in
             guard definition.id.hasPrefix("custom:"), let id = UUID(uuidString: String(definition.id.dropFirst(7))) else { return nil }
             return CustomLLMProvider(id: id, name: definition.name, baseURL: definition.url,
-                                     models: definition.models.map { CustomLLMModel(id: $0.id, displayName: $0.name, maxTokens: $0.outputTokens ?? 4_096, maxContext: $0.contextTokens ?? 32_768, supportsTools: true) })
+                                     models: definition.models.map { CustomLLMModel(id: $0.id, displayName: $0.name, maxTokens: $0.outputTokens ?? 4_096, maxContext: $0.contextTokens ?? 32_768) })
         }
     }
     var customProviderLoading: Set<UUID> { [] }

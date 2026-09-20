@@ -10,7 +10,6 @@
 		ACDABBE62FDF74C400F5BDCA /* SwiftGitX in Frameworks */ = {isa = PBXBuildFile; productRef = ACDABBE52FDF74C400F5BDCA /* SwiftGitX */; };
 		ACDABBE92FDF74C400F5BDCA /* PublicSuffixList in Frameworks */ = {isa = PBXBuildFile; productRef = ACDABBE82FDF74C400F5BDCA /* PublicSuffixList */; };
 		AE0000010000000000000001 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AE0000020000000000000002 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		AE1000010000000000000001 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1000020000000000000002 /* AppIntents.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,7 +40,6 @@
 		AA0000010000000000000001 /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
 		ACA969332FA332BC00D0412F /* Ox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE0000020000000000000002 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		AE1000020000000000000002 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -62,7 +60,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE1000010000000000000001 /* AppIntents.framework in Frameworks */,
 				ACDABBE92FDF74C400F5BDCA /* PublicSuffixList in Frameworks */,
 				ACDABBE62FDF74C400F5BDCA /* SwiftGitX in Frameworks */,
 			);
@@ -84,7 +81,6 @@
 				AA0000010000000000000001 /* Local.xcconfig */,
 				ACA969352FA332BC00D0412F /* Ox */,
 				AE0000030000000000000003 /* ShareExtension */,
-				AE1000030000000000000003 /* Frameworks */,
 				ACA969342FA332BC00D0412F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -96,14 +92,6 @@
 				AE0000020000000000000002 /* ShareExtension.appex */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		AE1000030000000000000003 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				AE1000020000000000000002 /* AppIntents.framework */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

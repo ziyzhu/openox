@@ -95,20 +95,6 @@ nonisolated extension Collection where Element == Turn {
 
     var requiresContextCheckpoint: Bool { latestContextCompaction != nil }
 
-    var latestCompletedResponse: String? {
-        for turn in reversed() {
-            guard case let .agent(agent, _) = turn,
-                  case .completed = agent.outcome else { continue }
-            let response = agent.steps.compactMap { step in
-                if case let .text(text) = step.kind { return text }
-                return nil
-            }
-            .joined(separator: "\n\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !response.isEmpty { return response }
-        }
-        return nil
-    }
 }
 
 nonisolated struct Step: Equatable, Identifiable, Sendable {

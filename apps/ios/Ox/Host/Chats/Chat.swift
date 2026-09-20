@@ -622,7 +622,6 @@ final class Chat: Identifiable {
         let text: String
         let attachments: [Artifact]
         let skillInvocation: UserSkillInvocation?
-        let replyStyle: ReplyStyle
         let latency: TurnLatencyTrace
         var state: State
 
@@ -1826,7 +1825,6 @@ final class Chat: Identifiable {
             intent,
             attachments: attachments,
             skillInvocation: skillInvocation,
-            replyStyle: .standard,
             submissionID: SubmissionID()
         )
     }
@@ -1834,8 +1832,7 @@ final class Chat: Identifiable {
     func submitAndWait(
         _ intent: String,
         attachments: [Artifact] = [],
-        skillInvocation: UserSkillInvocation? = nil,
-        replyStyle: ReplyStyle = .standard
+        skillInvocation: UserSkillInvocation? = nil
     ) async -> ChatSubmissionOutcome {
         let submissionID = SubmissionID()
         return await withTaskCancellationHandler {
@@ -1849,7 +1846,6 @@ final class Chat: Identifiable {
                     intent,
                     attachments: attachments,
                     skillInvocation: skillInvocation,
-                    replyStyle: replyStyle,
                     submissionID: submissionID
                 )
             }
@@ -1865,7 +1861,6 @@ final class Chat: Identifiable {
         _ intent: String,
         attachments: [Artifact],
         skillInvocation: UserSkillInvocation?,
-        replyStyle: ReplyStyle,
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
         let posting = !isBusy
@@ -1889,13 +1884,12 @@ final class Chat: Identifiable {
             text: intent,
             attachments: attachments,
             skillInvocation: skillInvocation,
-            replyStyle: replyStyle,
             latency: latency,
             state: posting ? .posted : .queued
         ))
         if !isBusy { startWorker() }
         let receipt = SubmissionReceipt(id: submissionID.rawValue, disposition: posting ? .posted : .queued)
-        Log.session.info("Chat.enqueue id=\(id) submission=\(submissionID.rawValue) disposition=\(receipt.disposition.rawValue) queueDepth=\(submissions.count) attachments=\(attachments.count) replyStyle=\(replyStyle.rawValue)")
+        Log.session.info("Chat.enqueue id=\(id) submission=\(submissionID.rawValue) disposition=\(receipt.disposition.rawValue) queueDepth=\(submissions.count) attachments=\(attachments.count)")
         return receipt
     }
 
@@ -1932,7 +1926,6 @@ final class Chat: Identifiable {
             text: note,
             attachments: [],
             skillInvocation: nil,
-            replyStyle: .standard,
             latency: latency,
             state: .posted
         ))
@@ -2329,10 +2322,8 @@ final class Chat: Identifiable {
                 fileMountPaths: fileMountPaths,
                 artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
                 storageMode: retention == .persisted ? .persisted : .temporary,
-                languageDirective: AppLocale.shared.responseDirective,
-                replyStyle: submission.replyStyle
-            ),
-            toolsAvailable: client.supportsTools(for: model)
+                languageDirective: AppLocale.shared.responseDirective
+            )
         )
         submission.latency.mark(.promptReady)
         let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
@@ -2705,43 +2696,37 @@ final class Chat: Identifiable {
     // MARK: - Helpers
 
     typealias TurnContext = ChatPromptComposer.TurnContext
-    typealias ReplyStyle = ChatPromptComposer.ReplyStyle
     typealias SystemPromptBreakdown = ChatPromptComposer.SystemPromptBreakdown
 
     static func composeSystemPrompt(
         memory: String,
-        userSkills: [Skill] = [],
-        toolsAvailable: Bool = true
+        userSkills: [Skill] = []
     ) -> String {
         ChatPromptComposer.composeSystemPrompt(
             memory: memory,
-            userSkills: userSkills,
-            toolsAvailable: toolsAvailable
+            userSkills: userSkills
         )
     }
 
     static func systemPromptBreakdown(
         memory: String,
-        userSkills: [Skill] = [],
-        toolsAvailable: Bool = true
+        userSkills: [Skill] = []
     ) -> SystemPromptBreakdown {
         ChatPromptComposer.systemPromptBreakdown(
             memory: memory,
-            userSkills: userSkills,
-            toolsAvailable: toolsAvailable
+            userSkills: userSkills
         )
     }
 
-    static func composeTurnState(_ state: TurnContext, toolsAvailable: Bool = true) -> String {
-        ChatPromptComposer.composeTurnState(state, toolsAvailable: toolsAvailable)
+    static func composeTurnState(_ state: TurnContext) -> String {
+        ChatPromptComposer.composeTurnState(state)
     }
 
-    static func turnContext(_ state: TurnContext, toolsAvailable: Bool = true) -> String? {
-        ChatPromptComposer.turnContext(state, toolsAvailable: toolsAvailable)
+    static func turnContext(_ state: TurnContext) -> String? {
+        ChatPromptComposer.turnContext(state)
     }
 
     private func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
-        let supportsJavaScript = client.supportsTools(for: model)
         let serviceManager = serviceManager
         let chatID = id
         return AgentConfiguration(
@@ -2749,10 +2734,9 @@ final class Chat: Identifiable {
             model: model,
             systemPrompt: Self.composeSystemPrompt(
                 memory: UserMemory.shared.text,
-                userSkills: Skills.shared.all,
-                toolsAvailable: supportsJavaScript
+                userSkills: Skills.shared.all
             ),
-            tools: supportsJavaScript ? [ChatJavaScriptTool(chat: self)] : [],
+            tools: [ChatJavaScriptTool(chat: self)],
             streamOptions: StreamOptions(sessionID: chatID.uuidString),
             transformContext: { request in
                 let messages = await ChatURLServiceContext.transform(

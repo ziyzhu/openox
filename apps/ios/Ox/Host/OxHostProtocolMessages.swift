@@ -14,7 +14,6 @@ extension OxHostProtocol {
         case getChat = "get-chat"
         case listModels = "list-models"
         case getLogs = "get-logs"
-        case getLatestResponse = "get-latest-response"
         case getComposerFormatting = "get-composer-formatting"
         case repositoryGate = "repository-gate"
         case replayStorageMigration = "replay-storage-migration"
@@ -24,7 +23,6 @@ extension OxHostProtocol {
         case vmFunctions = "vm-functions"
         case vmCall = "vm-call"
         case vmEval = "vm-eval"
-        case runDeadlineChat = "run-deadline-chat"
         case bootstrapArtifacts = "bootstrap-artifacts"
         case writeArtifact = "write-artifact"
         case exportWebsiteData = "export-website-data"
@@ -133,15 +131,6 @@ extension OxHostProtocol {
         let prompt: String
     }
 
-    struct RunDeadlineChatRequest: Decodable {
-        let id: String
-        let prompt: String
-        let delayMilliseconds: Int
-        let setupDelayMilliseconds: Int?
-        let answerDelayMilliseconds: Int?
-        let answers: [String]?
-    }
-
     struct RepositoryGateRequest: Decodable {
         let id: String
         let domain: String
@@ -198,7 +187,6 @@ extension OxHostProtocol {
         case getChat(SessionRequest)
         case listModels(IDRequest)
         case getLogs(IDRequest)
-        case getLatestResponse(IDRequest)
         case getComposerFormatting(IDRequest)
         case repositoryGate(RepositoryGateRequest)
         case replayStorageMigration(ReplayStorageMigrationRequest)
@@ -208,7 +196,6 @@ extension OxHostProtocol {
         case vmFunctions(VMFunctionsRequest)
         case vmCall(VMCallRequest)
         case vmEval(VMEvalRequest)
-        case runDeadlineChat(RunDeadlineChatRequest)
         case bootstrapArtifacts(BootstrapArtifactsRequest)
         case writeArtifact(WriteArtifactRequest)
         case exportWebsiteData(IDRequest)
@@ -235,7 +222,6 @@ extension OxHostProtocol {
             case .getChat: self = .getChat(try SessionRequest(from: decoder))
             case .listModels: self = .listModels(try IDRequest(from: decoder))
             case .getLogs: self = .getLogs(try IDRequest(from: decoder))
-            case .getLatestResponse: self = .getLatestResponse(try IDRequest(from: decoder))
             case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
             case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
             case .replayStorageMigration: self = .replayStorageMigration(try ReplayStorageMigrationRequest(from: decoder))
@@ -245,7 +231,6 @@ extension OxHostProtocol {
             case .vmFunctions: self = .vmFunctions(try VMFunctionsRequest(from: decoder))
             case .vmCall: self = .vmCall(try VMCallRequest(from: decoder))
             case .vmEval: self = .vmEval(try VMEvalRequest(from: decoder))
-            case .runDeadlineChat: self = .runDeadlineChat(try RunDeadlineChatRequest(from: decoder))
             case .bootstrapArtifacts: self = .bootstrapArtifacts(try BootstrapArtifactsRequest(from: decoder))
             case .writeArtifact: self = .writeArtifact(try WriteArtifactRequest(from: decoder))
             case .exportWebsiteData: self = .exportWebsiteData(try IDRequest(from: decoder))
@@ -308,47 +293,6 @@ extension OxHostProtocol {
         let data: Data?
         let bytes: Int?
         let error: String?
-    }
-
-    struct RunDeadlineChatResult: Encodable {
-        let kind = "run-deadline-chat-result"
-        let id: String
-        let ok: Bool
-        let outcome: String
-        let busy: Bool
-        let prompts: [String]
-        let elapsedMilliseconds: Int64
-        let error: String?
-    }
-
-    struct GetLatestResponseResult: Encodable {
-        let kind = "get-latest-response-result"
-        let id: String
-        let ok: Bool
-        let response: String?
-    }
-
-    @MainActor
-    final class DeadlineChatInteraction {
-        private let answers: [String]
-        private let delay: Duration
-        private var index = 0
-        private(set) var prompts: [String] = []
-
-        init(answers: [String], delayMilliseconds: Int) {
-            self.answers = answers
-            delay = .milliseconds(max(0, delayMilliseconds))
-        }
-
-        func respond(to request: ChatPendingPrompt) async throws -> String {
-            prompts.append(request.prompt)
-            try await Task.sleep(for: delay)
-            let configured = answers.indices.contains(index) ? answers[index] : nil
-            index += 1
-            return configured.flatMap { request.options.contains($0) ? $0 : nil }
-                ?? request.options.first
-                ?? ""
-        }
     }
 
     struct ChatRow: Encodable {

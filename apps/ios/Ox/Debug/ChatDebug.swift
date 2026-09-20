@@ -30,19 +30,16 @@ struct DebugSnapshot: Encodable {
         let agent = chat.agentSnapshot
         id = chat.id.uuidString
         model = agent?.model ?? chat.model
-        let toolsAvailable = chat.client.supportsTools(for: chat.model)
         let currentMemory = UserMemory.shared.text
         let userSkills = Skills.shared.all
         let breakdown = Chat.systemPromptBreakdown(
             memory: currentMemory,
-            userSkills: userSkills,
-            toolsAvailable: toolsAvailable
+            userSkills: userSkills
         )
         systemPrompt = breakdown.scaffold
         renderedSystemPrompt = agent?.systemPrompt ?? Chat.composeSystemPrompt(
             memory: currentMemory,
-            userSkills: userSkills,
-            toolsAvailable: toolsAvailable
+            userSkills: userSkills
         )
         soul = breakdown.soul
         memory = breakdown.memory

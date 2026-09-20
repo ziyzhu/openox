@@ -5,20 +5,17 @@ nonisolated struct CustomLLMModel: Equatable, Identifiable, Sendable {
     var displayName: String
     var maxTokens: Int
     var maxContext: Int
-    var supportsTools: Bool
 
     init(
         id: String,
         displayName: String? = nil,
         maxTokens: Int = 4_096,
-        maxContext: Int = 32_768,
-        supportsTools: Bool = false
+        maxContext: Int = 32_768
     ) {
         self.id = id
         self.displayName = displayName ?? id
         self.maxTokens = maxTokens
         self.maxContext = maxContext
-        self.supportsTools = supportsTools
     }
 
     var modelInfo: ProviderModel {
@@ -27,7 +24,7 @@ nonisolated struct CustomLLMModel: Equatable, Identifiable, Sendable {
             displayName: displayName,
             maxTokens: maxTokens,
             maxContext: maxContext,
-            supportsTools: supportsTools
+            supportsTools: true
         )
     }
 }
@@ -69,7 +66,7 @@ nonisolated struct CustomLLMProvider: Codable, Equatable, Identifiable, Sendable
     var definition: ProviderDefinition {
         ProviderDefinition(id: clientID, name: name, url: baseURL, api: .openAIChatCompletions,
                            auth: .init(kind: .bearer, optional: true),
-                           models: models.filter(\.supportsTools).map { ProviderDefinition.Model($0.modelInfo) })
+                           models: models.map { ProviderDefinition.Model($0.modelInfo) })
     }
 
     var profile: OpenAICompatibleProvider {
@@ -180,8 +177,7 @@ nonisolated enum CustomLLMProviderDiscovery {
                 id: id,
                 displayName: entry.name,
                 maxTokens: min(maxTokens, maxContext),
-                maxContext: maxContext,
-                supportsTools: true
+                maxContext: maxContext
             )
         }
         let unique = Dictionary(discovered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })

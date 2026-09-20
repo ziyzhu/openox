@@ -27,10 +27,6 @@ nonisolated enum A11yID {
         static let add = "chatImport.add"
     }
 
-    enum SiriSetup {
-        static let guide = "siri.guide"
-    }
-
     enum Sidebar {
         static let panel = "sidebar.panel"
         static let resizer = "sidebar.resizer"
@@ -132,7 +128,6 @@ nonisolated enum A11yID {
         static let discord = "settings.discord"
         static let github = "settings.github"
         static let howItWorks = "settings.howItWorks"
-        static let siri = "settings.siri"
         static let notifications = "settings.notifications"
         static let serverField = "settings.serverField"
         static let serverSync = "settings.serverSync"

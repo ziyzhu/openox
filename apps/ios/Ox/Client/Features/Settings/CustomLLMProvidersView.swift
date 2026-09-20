@@ -258,13 +258,6 @@ struct CustomLLMProviderEditor: View {
                 numericField("Context", value: model.maxContext)
                 numericField("Maximum output", value: model.maxTokens)
             }
-
-            Toggle("Agent tools", isOn: model.supportsTools)
-                .font(Theme.Fonts.bodyMd)
-                .tint(Theme.Colors.primary)
-            Text("Enable tools only when this model and server are configured for OpenAI function calling.")
-                .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .padding(Theme.Spacing.md)
         .settingsSurface()
@@ -300,7 +293,6 @@ struct CustomLLMProviderEditor: View {
                 let refreshedModels = discovered.map { discoveredModel in
                     var model = existing[discoveredModel.id] ?? discoveredModel
                     model.id = discoveredModel.id
-                    if discoveredModel.supportsTools { model.supportsTools = true }
                     model.displayName = model.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
                     if model.displayName.isEmpty { model.displayName = discoveredModel.id }
                     return model

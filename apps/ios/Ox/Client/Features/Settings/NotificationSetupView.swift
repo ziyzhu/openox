@@ -48,9 +48,23 @@ struct NotificationSetupContent: View {
     private var permissionControl: some View {
         switch permissionState {
         case .notDetermined, nil:
-            SetupPromptGuide {
+            VStack(spacing: Theme.Spacing.lg) {
                 NotificationPermissionCard(updating: updating, onAllow: updatePermission)
+
+                HStack(spacing: Theme.Spacing.md) {
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+
+                    Image(systemName: "chevron.up")
+                        .font(Theme.Icons.sm)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .frame(maxWidth: .infinity)
+                }
+                .frame(height: Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.md)
+                .accessibilityHidden(true)
             }
+            .frame(maxWidth: .infinity)
         case .granted:
             Text("Notifications are already on")
                 .font(Theme.Fonts.bodyMd)
@@ -124,7 +138,7 @@ private struct NotificationPermissionCard: View {
                 .padding(.bottom, Theme.Spacing.lg)
 
             HStack(spacing: Theme.Spacing.md) {
-                SetupPromptControl(title: "Don’t Allow", isPrimary: false, compact: true)
+                NotificationPromptControl(title: "Don’t Allow", isPrimary: false)
 
                 Button(action: onAllow) {
                     if updating {
@@ -132,7 +146,7 @@ private struct NotificationPermissionCard: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
                     } else {
-                        SetupPromptControl(title: "Allow", isPrimary: true, compact: true)
+                        NotificationPromptControl(title: "Allow", isPrimary: true)
                     }
                 }
                 .buttonStyle(.plain)
@@ -149,5 +163,22 @@ private struct NotificationPermissionCard: View {
                 in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
             )
         }
+    }
+}
+
+private struct NotificationPromptControl: View {
+    let title: LocalizedStringKey
+    let isPrimary: Bool
+
+    var body: some View {
+        Text(title)
+            .font(Theme.Fonts.title)
+            .foregroundStyle(isPrimary ? .white : Theme.Colors.onSurface.dynamic)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .background(
+                isPrimary ? Color(uiColor: .systemBlue) : Theme.Colors.surfaceSunken.dynamic,
+                in: Capsule()
+            )
     }
 }

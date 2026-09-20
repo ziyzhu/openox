@@ -221,16 +221,6 @@ struct SettingsSheet: View {
                     SettingsSection("Features", insetContent: false) {
                         VStack(spacing: 0) {
                             NavigationLink {
-                                SiriSetupView()
-                            } label: {
-                                SettingsDisclosureRow(title: "Siri", value: Text("Set Up"))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(A11yID.Settings.siri)
-
-                            Divider().settingsContentInset()
-
-                            NavigationLink {
                                 NotificationSetupView()
                             } label: {
                                 SettingsDisclosureRow(title: "Notifications", value: Text("Set Up"))
