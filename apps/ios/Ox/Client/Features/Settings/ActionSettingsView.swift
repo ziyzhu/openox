@@ -23,6 +23,7 @@ struct ActionPolicyPicker: View {
     let selection: ActionPolicy?
     let resolved: ActionPolicy
     let inheritLabel: LocalizedStringKey?
+    var showsPolicyIcon = true
     let onChange: (ActionPolicy?) -> Void
 
     var body: some View {
@@ -51,7 +52,9 @@ struct ActionPolicyPicker: View {
                 }
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: resolved.systemImage)
+                    if showsPolicyIcon {
+                        Image(systemName: resolved.systemImage)
+                    }
                     Text(resolved.title)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
@@ -85,6 +88,7 @@ struct ActionSettingsView: View {
                         selection: serviceManager.defaultActionPolicy,
                         resolved: serviceManager.defaultActionPolicy,
                         inheritLabel: nil,
+                        showsPolicyIcon: false,
                         onChange: { policy in
                             if let policy { serviceManager.defaultActionPolicy = policy }
                         }
