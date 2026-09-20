@@ -15,6 +15,49 @@ protocol ServiceSheetSession: AnyObject {
 
 extension ServiceHandoffSession: ServiceSheetSession {}
 
+struct BotControlSheetView: View {
+    let session: ServiceHandoffSession
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            WebBrowserView(
+                page: session.page,
+                mode: .handoff,
+                fallbackHost: session.serviceDomain,
+                navigate: { session.navigate(to: $0) },
+                goBack: { session.goBack() },
+                goForward: { session.goForward() },
+                reloadOrStop: {
+                    if session.page.isLoading {
+                        session.page.stopLoading()
+                    } else {
+                        session.reload()
+                    }
+                }
+            )
+            .navigationTitle(session.navigationTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) {
+                        session.cancel()
+                        dismiss()
+                    }
+                    .accessibilityIdentifier(A11yID.Chat.Attach.botControlCancel(session.serviceDomain))
+                }
+            }
+        }
+        .interactiveDismissDisabled()
+        .onAppear {
+            Log.ui.info("BotControlSheet visible domain=\(session.serviceDomain) title=\(session.navigationTitle)")
+        }
+        .onDisappear {
+            Log.ui.info("BotControlSheet hidden domain=\(session.serviceDomain) title=\(session.navigationTitle)")
+        }
+    }
+}
+
 private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
     let session: Session
     let mode: WebBrowserView.Mode
@@ -27,8 +70,8 @@ private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 mode: mode,
                 fallbackHost: session.serviceDomain,
                 navigate: { session.navigate(to: $0) },
-                goBack: session.goBack,
-                goForward: session.goForward,
+                goBack: { session.goBack() },
+                goForward: { session.goForward() },
                 reloadOrStop: {
                     if session.page.isLoading {
                         session.page.stopLoading()

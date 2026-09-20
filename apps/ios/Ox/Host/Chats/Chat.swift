@@ -1951,12 +1951,20 @@ final class Chat: Identifiable {
         return ok
     }
 
-    func completeBotControl(domain: String, args: JSONValue, resumeAgent: Bool = true) async -> Bool {
+    func completeBotControl(
+        domain: String,
+        args: JSONValue,
+        resumeAgent: Bool = true,
+        using presenter: (any ServiceHandoffPresenting)? = nil
+    ) async -> Bool {
         guard let service = attachedService(domain: domain) else {
             Log.session.error("Chat.completeBotControl no service domain=\(domain)")
             return false
         }
-        let ok = await service.completeBotControl(args: args, using: presentations.serviceHandoff)
+        let ok = await service.completeBotControl(
+            args: args,
+            using: presenter ?? presentations.serviceHandoff
+        )
         Log.session.info("Chat.completeBotControl domain=\(domain) ok=\(ok)")
         if ok, resumeAgent {
             let data = try? JSONEncoder().encode(args)

@@ -5,6 +5,27 @@ import WebKit
 import PhotosUI
 import QuickLook
 import UniformTypeIdentifiers
+import Observation
+
+@MainActor
+@Observable
+private final class ChatBotControlPresenter: ServiceHandoffPresenting {
+    private(set) var session: ServiceHandoffSession?
+
+    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
+        guard self.session == nil else {
+            Log.ui.warning("ChatBotControlPresenter rejected domain=\(session.serviceDomain) reason=occupied")
+            session.presentationFailed()
+            return .failed
+        }
+        self.session = session
+        Log.ui.info("ChatBotControlPresenter present domain=\(session.serviceDomain)")
+        let outcome = await session.run()
+        if self.session === session { self.session = nil }
+        Log.ui.info("ChatBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+        return outcome
+    }
+}
 
 private struct SidebarScrollLockModifier: ViewModifier {
     @Environment(\.sidebarInteraction) private var sidebarInteraction
@@ -222,6 +243,7 @@ struct ChatPage: View {
         case attachment(URL)
         case artifacts
         case artifactPicker
+        case botControl(ServiceHandoffSession)
 
         var id: String {
             switch self {
@@ -233,6 +255,7 @@ struct ChatPage: View {
             case .attachment(let url): "attachment:\(url.absoluteString)"
             case .artifacts: "artifacts"
             case .artifactPicker: "artifactPicker"
+            case .botControl(let session): "botControl:\(session.id)"
             }
         }
     }
@@ -261,6 +284,8 @@ struct ChatPage: View {
 
     @State private var viewportLayout = ChatViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
+    @State private var botControlPresenter = ChatBotControlPresenter()
+    @State private var expandedBotControlSessionID: UUID?
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -290,7 +315,7 @@ struct ChatPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker: modalPresentation
+                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker, .botControl: modalPresentation
                 default: nil
                 }
             },
@@ -389,6 +414,10 @@ struct ChatPage: View {
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
         }
+        let botControlProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
+            guard case .botControl = item.control else { return nil }
+            return item
+        }
         return ChatTranscriptProjection(
             chat: chat,
             transcriptWindow: transcriptWindow,
@@ -399,7 +428,8 @@ struct ChatPage: View {
                 showsComposer: showsComposer,
                 floatsTopStrip: floatsTopStrip,
                 dockClearance: dockClearance,
-                authProbe: authProbe
+                authProbe: authProbe,
+                botControlProbe: botControlProbe
             )
         }
     }
@@ -409,7 +439,8 @@ struct ChatPage: View {
         showsComposer: Bool,
         floatsTopStrip: Bool,
         dockClearance: CGFloat,
-        authProbe: Chat.PendingServiceControl?
+        authProbe: Chat.PendingServiceControl?,
+        botControlProbe: Chat.PendingServiceControl?
     ) -> some View {
         let totalBlockCount = projection.totalBlockCount
         let requestedSourceRange = projection.sourceRange
@@ -559,6 +590,13 @@ struct ChatPage: View {
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
         }
+        .task(id: botControlProbe?.id) {
+            await resolveBotControl(botControlProbe)
+        }
+        .onChange(of: botControlPresenter.session?.id) { _, sessionID in
+            guard sessionID == nil, case .botControl = modalPresentation else { return }
+            modalPresentation = nil
+        }
         .task(id: DelayedActivityKey(
             chatID: chat.id,
             activity: chat.activity,
@@ -567,7 +605,7 @@ struct ChatPage: View {
             await updateDelayedActivity()
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(item: sheetModal, onDismiss: presentPendingArtifactPreview) { presented in
+        .sheet(item: sheetModal, onDismiss: sheetDidDismiss) { presented in
             Group {
                 switch presented {
                 case .modelPicker:
@@ -600,6 +638,8 @@ struct ChatPage: View {
                         Log.ui.info("ChatPage.attachArtifacts chat=\(chat.id) count=\(picked.count)")
                     }
                     .presentationDetents([.medium, .large])
+                case .botControl(let session):
+                    BotControlSheetView(session: session)
                 case .camera, .photos, .files, .attachment:
                     EmptyView()
                 }
@@ -614,7 +654,7 @@ struct ChatPage: View {
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker:
+            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker, .botControl:
                 EmptyView()
             }
         }
@@ -708,6 +748,11 @@ struct ChatPage: View {
         guard let artifact = pendingArtifactPreview else { return }
         pendingArtifactPreview = nil
         navigationArtifact = artifact
+    }
+
+    private func sheetDidDismiss() {
+        expandedBotControlSessionID = nil
+        presentPendingArtifactPreview()
     }
 
     private var artifactNavigationPresented: Binding<Bool> {
@@ -966,27 +1011,71 @@ struct ChatPage: View {
     }
 
     private func serviceControlBlock(_ control: ServiceControl, interactionID: UUID?) -> some View {
-        ServiceControlView(
-            control: control,
-            isActive: interactionID != nil,
-            reflectsAuthentication: false,
-            signIn: { domain in
-                guard prepareServiceControl(control) else { return false }
-                return await chat.signInService(domain: domain, resumeAgent: false)
-            },
-            completeBotControl: { domain, args in
-                guard prepareServiceControl(control) else { return false }
-                return await chat.completeBotControl(domain: domain, args: args, resumeAgent: false)
-            },
-            completePayment: { domain, args in
-                guard prepareServiceControl(control) else { return nil }
-                return await chat.completePayment(domain: domain, args: args)
-            },
-            onResolved: { result in
-                guard let interactionID else { return }
-                chat.resolveServiceControl(id: interactionID, result: result)
+        Group {
+            if case .botControl = control, interactionID != nil {
+                InlineBotControlView(
+                    control: control,
+                    session: botControlPresenter.session,
+                    isPresentedInSheet: isBotControlPresentedInSheet,
+                    expand: expandBotControl,
+                    cancel: { $0.cancel() }
+                )
+            } else {
+                ServiceControlView(
+                    control: control,
+                    isActive: interactionID != nil,
+                    reflectsAuthentication: false,
+                    signIn: { domain in
+                        guard prepareServiceControl(control) else { return false }
+                        return await chat.signInService(domain: domain, resumeAgent: false)
+                    },
+                    completeBotControl: { domain, args in
+                        guard prepareServiceControl(control) else { return false }
+                        return await chat.completeBotControl(domain: domain, args: args, resumeAgent: false)
+                    },
+                    completePayment: { domain, args in
+                        guard prepareServiceControl(control) else { return nil }
+                        return await chat.completePayment(domain: domain, args: args)
+                    },
+                    onResolved: { result in
+                        guard let interactionID else { return }
+                        chat.resolveServiceControl(id: interactionID, result: result)
+                    }
+                )
             }
+        }
+    }
+
+    private var isBotControlPresentedInSheet: Bool {
+        expandedBotControlSessionID != nil
+    }
+
+    private func expandBotControl(_ session: ServiceHandoffSession) {
+        expandedBotControlSessionID = session.id
+        Task { @MainActor in
+            await Task.yield()
+            guard botControlPresenter.session === session else {
+                expandedBotControlSessionID = nil
+                return
+            }
+            modalPresentation = .botControl(session)
+        }
+    }
+
+    private func resolveBotControl(_ pending: Chat.PendingServiceControl?) async {
+        guard let pending,
+              case .botControl(let domain, _, let args) = pending.control else { return }
+        guard prepareServiceControl(pending.control) else {
+            chat.resolveServiceControl(id: pending.id, result: nil)
+            return
+        }
+        let completed = await chat.completeBotControl(
+            domain: domain,
+            args: args,
+            resumeAgent: false,
+            using: botControlPresenter
         )
+        chat.resolveServiceControl(id: pending.id, result: completed ? .null : nil)
     }
 
     private func prepareServiceControl(_ control: ServiceControl) -> Bool {

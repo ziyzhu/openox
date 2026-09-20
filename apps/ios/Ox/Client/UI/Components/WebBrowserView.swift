@@ -167,9 +167,9 @@ struct WebBrowserView: View {
                 expandedBar
             }
         }
-        .padding(.horizontal, addressFocused ? 8 : 34)
+        .padding(.horizontal, Theme.Spacing.md)
         .padding(.top, 8)
-        .padding(.bottom, addressFocused ? 12 : 0)
+        .padding(.bottom, Theme.Spacing.sm)
     }
 
     private var expandedBar: some View {

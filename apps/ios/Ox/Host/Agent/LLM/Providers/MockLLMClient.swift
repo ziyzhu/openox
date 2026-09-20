@@ -747,14 +747,10 @@ extension Scenario {
             guard !result.isError else { return [.stop(.stop)] }
             return [.say("Verification completed."), .stop(.stop)]
         }
-        #if targetEnvironment(simulator)
-        let domain = SimEnv.servicesEndpoint == nil ? "archive.ph" : "127.0.0.1"
-        #else
         let domain = "archive.ph"
-        #endif
         return [
             .say("Complete the human-verification card in this chat.\n"),
-            execute("await ox.service.solve({ domain: \"\(domain)\", args: { requestId: \"req-7\" }, purpose: \"Complete verification\" }); console.log({ verified: true });"),
+            execute("await ox.service.solve({ domain: \"\(domain)\", args: { url: \"https://example.com/\" }, purpose: \"Complete verification\" }); console.log({ verified: true });"),
         ]
     }
 
