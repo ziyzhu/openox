@@ -828,7 +828,7 @@ nonisolated struct ChatDocument {
         generation: AgentGenerationID,
         steps: [Step]
     ) -> Materialization? {
-        guard let name = InvocationName(rawValue: invocation.name) else { return nil }
+        guard Actions.builtIn.contains(invocation.name) else { return nil }
         let filename = invocation.args.objectValue?["filename"]?.stringValue
         let domain = invocation.args.objectValue?["domain"]?.stringValue
         for index in stepIndex..<steps.count where steps[index].generation == generation {
@@ -837,7 +837,7 @@ nonisolated struct ChatDocument {
             for effect in execution.effects.dropFirst(start) {
                 switch effect {
                 case let .artifact(artifact):
-                    guard name == .artifactPresent,
+                    guard invocation.name == Actions.artifactPresent,
                           let filename,
                           artifact.fileName.caseInsensitiveCompare(filename) == .orderedSame else { continue }
                     let completed: Bool
@@ -849,22 +849,22 @@ nonisolated struct ChatDocument {
                     return Materialization(completesExecution: completed)
                 case let .serviceControl(control):
                     guard let domain else { continue }
-                    if name == .serviceSignIn, case .signIn(let controlDomain, _) = control, controlDomain == domain {
+                    if invocation.name == Actions.serviceSignIn, case .signIn(let controlDomain, _) = control, controlDomain == domain {
                         return Materialization(completesExecution: true)
                     }
-                    if name == .serviceSolve, case .botControl(let controlDomain, _, _) = control, controlDomain == domain {
+                    if invocation.name == Actions.serviceSolve, case .botControl(let controlDomain, _, _) = control, controlDomain == domain {
                         return Materialization(completesExecution: true)
                     }
-                    if name == .servicePayment, case .payment(let controlDomain, _, _) = control, controlDomain == domain {
+                    if invocation.name == Actions.servicePayment, case .payment(let controlDomain, _, _) = control, controlDomain == domain {
                         return Materialization(completesExecution: true)
                     }
                 case .serviceInspector:
                     continue
                 case .shoveler:
-                    guard name == .widgetShoveler else { continue }
+                    guard invocation.name == Actions.widgetShoveler else { continue }
                     return Materialization(completesExecution: true)
                 case .video:
-                    guard name == .widgetVideo else { continue }
+                    guard invocation.name == Actions.widgetVideo else { continue }
                     return Materialization(completesExecution: true)
                 case .invocation:
                     return nil

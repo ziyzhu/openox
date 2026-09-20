@@ -12,8 +12,7 @@ types remain authoritative in their `Codable` implementations.
 │   ├── Preferences/                         UserDefaults
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── savedServices                    attached service domains
-│   │   ├── autoApproveActions               standing per-action approvals
-│   │   ├── autoApproveAll                   global Always approve setting, off by default
+│   │   ├── actionApprovalPolicies           versioned Ask, Allow, or Block policies for Actions
 │   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
 │   │   ├── api.url                          Ox service API override
 │   │   ├── llm.defaultModel                 new-chat provider/model/thinking selection
@@ -119,9 +118,14 @@ The app-group `app.theme` value is the single theme source shared by the app and
 ShareExtension. On first launch after upgrading, the app copies a legacy standard
 UserDefaults value into the app group and removes the legacy value.
 
-Application migration removes standing approvals for retired action identifiers.
-It does not transfer approval to replacement actions, so a replacement that can
-expose user data requires fresh consent.
+Application migration converts the legacy `autoApproveActions` allow-list and
+`autoApproveAll` preference into `actionApprovalPolicies`. The versioned JSON value
+stores a global default plus optional source and Action overrides. Missing,
+malformed, and unknown future formats fail closed to Ask without discarding the
+stored bytes. Migration removes standing approvals for retired Action identifiers,
+including `ox.app.inspect` and `ios:browser:screenshot`, and does not transfer
+approval to replacement Actions, so a replacement that can expose user data
+requires fresh consent.
 
 ## Profiles
 

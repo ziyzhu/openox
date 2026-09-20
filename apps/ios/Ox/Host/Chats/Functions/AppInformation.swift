@@ -16,7 +16,7 @@ extension Chat {
         }
         let previousAgentTitle = latestAgentChatTitle
         let args = JSONValue.object(["title": .string(trimmed)])
-        return try await tracked(.appRenameChat, args, purpose: purpose) {
+        return try await tracked(Actions.appRenameChat, args, purpose: purpose) {
             if let customTitle, !customTitle.isEmpty, customTitle != previousAgentTitle {
                 Log.session.info("bridge.app.renameChat preserved user title")
                 return .object([
@@ -35,7 +35,7 @@ extension Chat {
     }
 
     public func appInfo(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appInfo, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appInfo, .object([:]), purpose: purpose) {
             .object([
                 "name": .string("Ox"),
                 "version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"),
@@ -46,7 +46,7 @@ extension Chat {
     }
 
     public func appProfile(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appProfile, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appProfile, .object([:]), purpose: purpose) {
             StorageRoot.shared.active.map { active in
                 JSONValue.object([
                     "name": .string(active.name),
@@ -57,7 +57,7 @@ extension Chat {
     }
 
     public func appNotifications(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appNotifications, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appNotifications, .object([:]), purpose: purpose) {
             let status = await NativePermission.notifications.state()
             return .object([
                 "status": .string(status.appInformationValue),
@@ -66,7 +66,7 @@ extension Chat {
     }
 
     public func appLanguage(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appLanguage, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appLanguage, .object([:]), purpose: purpose) {
             .object([
                 "selection": .string(AppLocale.shared.language.rawValue),
                 "locale": .string(AppLocale.shared.locale.identifier),
@@ -75,7 +75,7 @@ extension Chat {
     }
 
     public func appTheme(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appTheme, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appTheme, .object([:]), purpose: purpose) {
             let theme = ThemeManager.shared.theme
             return .object([
                 "selection": .string(theme.rawValue),
@@ -85,7 +85,7 @@ extension Chat {
     }
 
     public func appVoice(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appVoice, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appVoice, .object([:]), purpose: purpose) {
             let settings = SpeechVoiceSettings.shared
             let voice = settings.preferredVoice(for: AppLocale.shared.locale)
             return .object([
@@ -102,7 +102,7 @@ extension Chat {
     }
 
     public func appModel(purpose: String) async throws -> JSONValue? {
-        try await tracked(.appModel, .object([:]), purpose: purpose) {
+        try await tracked(Actions.appModel, .object([:]), purpose: purpose) {
             .object([
                 "provider": .object([
                     "id": .string(client.id),
@@ -120,11 +120,7 @@ extension Chat {
 
     public func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue? {
         let query = try AppLogQuery(options: options)
-        return try await tracked(.appLogs, options ?? .object([:]), purpose: purpose) {
-            try await requireApproval(
-                action: InvocationName.appLogs.rawValue,
-                prompt: "\(L10n.string("Logs"))\n\(L10n.string("Logs may include private data from other chats and Profiles and become available to the current model. Always approve applies to all app logs."))"
-            )
+        return try await tracked(Actions.appLogs, options ?? .object([:]), purpose: purpose) {
             try Task.checkCancellation()
             let result = query.read(LogStore.shared.snapshot())
             Log.session.info("bridge.app.logs entries=\(result.objectValue?["entries"]?.arrayValue?.count ?? 0) truncated=\(result.objectValue?["truncated"]?.boolValue ?? false)")

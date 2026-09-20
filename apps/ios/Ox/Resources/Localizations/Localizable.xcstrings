@@ -1,6 +1,226 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "All Built-in Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有内置操作"
+          }
+        }
+      }
+    },
+    "Default for Ox Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 内置操作的默认设置"
+          }
+        }
+      }
+    },
+    "Delete a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除模型提供商"
+          }
+        }
+      }
+    },
+    "List model providers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出模型提供商"
+          }
+        }
+      }
+    },
+    "Save a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存模型提供商"
+          }
+        }
+      }
+    },
+    "Sign in to a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录模型提供商"
+          }
+        }
+      }
+    },
+    "Sign out of a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出模型提供商"
+          }
+        }
+      }
+    },
+    "Validate a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证模型提供商"
+          }
+        }
+      }
+    },
+    "View a model provider" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看模型提供商"
+          }
+        }
+      }
+    },
+    "All Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有操作"
+          }
+        }
+      }
+    },
+    "All Service Actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有服务操作"
+          }
+        }
+      }
+    },
+    "Ask" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "询问"
+          }
+        }
+      }
+    },
+    "Ask shows a confirmation before an Action runs. Allow runs it automatically. Block prevents it from running. More specific choices override this default." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“询问”会在操作运行前显示确认。“允许”会自动运行操作。“阻止”会阻止其运行。更具体的选择会覆盖此默认设置。"
+          }
+        }
+      }
+    },
+    "Block" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止"
+          }
+        }
+      }
+    },
+    "Built into Ox" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ox 内置"
+          }
+        }
+      }
+    },
+    "Default for This Service" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务的默认设置"
+          }
+        }
+      }
+    },
+    "Permission" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权限"
+          }
+        }
+      }
+    },
+    "Use Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用默认设置"
+          }
+        }
+      }
+    },
+    "Use Global Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用全局默认设置"
+          }
+        }
+      }
+    },
+    "Use Service Default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用服务默认设置"
+          }
+        }
+      }
+    },
     "API" : {
       "localizations" : {
         "zh-Hans" : {
@@ -856,13 +1076,13 @@
         }
       }
     },
-    "Adds this service to a chat, giving Ox its capabilities, skills, and your signed-in data." : {
+    "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将此服务添加到对话，让 Ox 可以使用其能力、技能以及你的登录数据。"
+            "value" : "将此服务添加到对话，让 Ox 可以使用其操作、技能以及你的登录数据。"
           }
         }
       }
@@ -3068,7 +3288,7 @@
       }
     },
     "Current page" : {
-      "comment" : "Name of the current page in the \"Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always approve applies to every page Web visits.\" prompt.",
+      "comment" : "Name of the current page in the \"Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always allow applies to every page Web visits.\" prompt.",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "zh-Hans" : {
@@ -3113,12 +3333,12 @@
         }
       }
     },
-    "Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always approve applies to every page Web visits." : {
+    "Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always allow applies to every page Web visits." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "危险模式会赋予代理对此网站的完全控制权，包括已登录数据和网络访问。“始终批准”适用于“网页”访问的每个页面。"
+            "value" : "危险模式会赋予代理对此网站的完全控制权，包括已登录数据和网络访问。“始终允许”适用于“网页”访问的每个页面。"
           }
         }
       }
@@ -4938,25 +5158,25 @@
         }
       }
     },
-    "Its capabilities and permitted device data become available to this chat." : {
+    "Its actions and permitted device data become available to this chat." : {
       "comment" : "Description of a feature that allows a user to share their device data with a chat.",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此服务的能力和获准访问的设备数据将可用于此对话。"
+            "value" : "此服务的操作和获准访问的设备数据将可用于此对话。"
           }
         }
       }
     },
-    "Its capabilities and your signed-in data become available to this chat." : {
+    "Its actions and your signed-in data become available to this chat." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "其能力和你的登录数据将对本对话可用。"
+            "value" : "其操作和你的登录数据将对本对话可用。"
           }
         }
       }
@@ -4973,14 +5193,14 @@
         }
       }
     },
-    "Its remote tools can receive arguments from this chat and return data to Ox." : {
+    "Its remote Actions can receive arguments from this chat and return data to Ox." : {
       "comment" : "Description of a service that can be attached to a chat, specifically one that is a Message Control Protocol (MCP) service.",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "其远程工具可以接收此对话中的参数，并将数据返回给 Ox。"
+            "value" : "其远程操作可以接收此对话中的参数，并将数据返回给 Ox。"
           }
         }
       }
@@ -5552,7 +5772,7 @@
         }
       }
     },
-    "Logs may include private data from other chats and Profiles and become available to the current model. Always approve applies to all app logs." : {
+    "Logs may include private data from other chats and Profiles and become available to the current model. Always allow applies to all app logs." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
@@ -7613,7 +7833,7 @@
       }
     },
     "Read %@" : {
-      "comment" : "Generated automatically from `InvocationName.fs*` cases.",
+      "comment" : "Generated automatically from `Actions.fs*` identifiers.",
       "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
@@ -10144,22 +10364,22 @@
         }
       }
     },
-    "The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always approve applies to every page Browser visits." : {
+    "The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always allow applies to every page Browser visits." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，并会提供给当前模型。“始终批准”适用于“浏览器”访问的每个页面。"
+            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，并会提供给当前模型。“始终允许”适用于“浏览器”访问的每个页面。"
           }
         }
       }
     },
-    "The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always approve applies to every page Browser visits." : {
+    "The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always allow applies to every page Browser visits." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，会作为资料保存到当前配置档案中，并会提供给当前模型。“始终批准”适用于“浏览器”访问的每个页面。"
+            "value" : "导出的 PDF 可能包含可见区域之外的已登录信息或敏感信息，会作为资料保存到当前配置档案中，并会提供给当前模型。“始终允许”适用于“浏览器”访问的每个页面。"
           }
         }
       }

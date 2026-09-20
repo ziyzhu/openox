@@ -241,6 +241,9 @@ extension OxHostProtocol {
                     chatModelMigrated: replay.chatModelMigrated,
                     unsupportedVersionRejected: replay.unsupportedVersionRejected,
                     providerCatalogMigrated: replay.providerCatalogMigrated,
+                    actionPoliciesMigrated: replay.actionPoliciesMigrated,
+                    futureActionPoliciesPreserved: replay.futureActionPoliciesPreserved,
+                    actionPolicyResolutionValid: replay.actionPolicyResolutionValid,
                     fixtureResults: replay.fixtureResults,
                     error: nil
                 )))
@@ -263,6 +266,9 @@ extension OxHostProtocol {
                     chatModelMigrated: nil,
                     unsupportedVersionRejected: nil,
                     providerCatalogMigrated: nil,
+                    actionPoliciesMigrated: nil,
+                    futureActionPoliciesPreserved: nil,
+                    actionPolicyResolutionValid: nil,
                     fixtureResults: nil,
                     error: error.localizedDescription
                 )))

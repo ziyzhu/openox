@@ -12,7 +12,7 @@ extension Chat {
     public func listFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
         let location = try virtualMachine.fileSystem.location(path, defaultRoot: true)
         let args = fileSystemArgs(path: location.path, options: options)
-        return try await tracked(.fsList, args, purpose: purpose) {
+        return try await tracked(Actions.fsList, args, purpose: purpose) {
             try await self.authorizeFileAccess(location, operation: .list)
             guard try await self.fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.notDirectory(location.path) }
             let items: [JSONValue]
@@ -111,7 +111,7 @@ extension Chat {
     public func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
         let location = try virtualMachine.fileSystem.location(path)
         let args = fileSystemArgs(path: location.path, options: options)
-        return try await tracked(.fsRead, args, purpose: purpose) {
+        return try await tracked(Actions.fsRead, args, purpose: purpose) {
             try await self.authorizeFileAccess(location, operation: .read)
             let result = try await fileSystemRead(location, options: options)
             Log.session.info("bridge.fs.read path=\(location.path) text=\(result.text?.count ?? 0) truncated=\(result.truncated)")
@@ -122,9 +122,9 @@ extension Chat {
     public func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue? {
         let location = try virtualMachine.fileSystem.location(path)
         let args: JSONValue = .object(["path": .string(location.path), "bytes": .int(content.utf8.count)])
-        return try await tracked(.fsWrite, args, purpose: purpose) {
-            try await self.requireWritableFileContext(location, action: .fsWrite)
-            try await self.authorizeFileAccess(location, operation: .write, args: args)
+        return try await tracked(Actions.fsWrite, args, purpose: purpose) {
+            try await self.requireWritableFileContext(location, action: Actions.fsWrite)
+            try await self.authorizeFileAccess(location, operation: .write)
             let item = try await self.fileMutationCoordinator.perform(key: self.fileMutationKey(location)) {
                 try await self.writeFileSystem(location, content: content)
             }
@@ -140,9 +140,9 @@ extension Chat {
             "path": .string(location.path),
             "edits": .array(edits.map { .object(["oldText": .string($0.oldText), "newText": .string($0.newText)]) }),
         ])
-        return try await tracked(.fsEdit, args, purpose: purpose) {
-            try await self.requireWritableFileContext(location, action: .fsEdit)
-            try await self.authorizeFileAccess(location, operation: .edit, args: args)
+        return try await tracked(Actions.fsEdit, args, purpose: purpose) {
+            try await self.requireWritableFileContext(location, action: Actions.fsEdit)
+            try await self.authorizeFileAccess(location, operation: .edit)
             return try await self.fileMutationCoordinator.perform(key: self.fileMutationKey(location)) {
                 let original = try await self.fileSystemUTF8Text(location)
                 let content = try self.virtualMachine.fileSystem.apply(edits, to: original)
@@ -156,12 +156,11 @@ extension Chat {
     public func deleteFileSystem(path: String, purpose: String) async throws -> JSONValue? {
         let location = try virtualMachine.fileSystem.location(path)
         let args: JSONValue = .object(["path": .string(location.path)])
-        return try await tracked(.fsDelete, args, purpose: purpose) {
-            try await self.requireWritableFileContext(location, action: .fsDelete)
-            try await self.authorizeFileAccess(location, operation: .delete, args: args)
+        return try await tracked(Actions.fsDelete, args, purpose: purpose) {
+            try await self.requireWritableFileContext(location, action: Actions.fsDelete)
+            try await self.authorizeFileAccess(location, operation: .delete)
             switch location {
             case .artifact(let name):
-                try await requireApproval(action: InvocationName.fsDelete.rawValue, args: args.toAny())
                 _ = try await repository.deleteArtifact(named: name, in: scope)
             case .skill(let name), .skillFile(let name):
                 _ = try await repository.deleteSkill(named: name, in: scope)
@@ -186,7 +185,7 @@ extension Chat {
     ) async throws -> JSONValue? {
         let base = try virtualMachine.fileSystem.location(path, defaultRoot: true)
         let args = fileSystemSearchArgs(pattern: pattern, path: base.path, options: options)
-        return try await tracked(.fsGlob, args, purpose: purpose) {
+        return try await tracked(Actions.fsGlob, args, purpose: purpose) {
             try await self.authorizeFileAccess(base, operation: .search)
             guard try await self.fileSystemIsDirectory(base) else { throw VirtualFileSystem.Error.notDirectory(base.path) }
             let limit = fileSystemInt(options, key: "limit", default: 100, minimum: 1, maximum: 1_000)
@@ -215,7 +214,7 @@ extension Chat {
         guard !pattern.isEmpty else { throw RuntimeError.bridge("ox.fs.grep: pattern cannot be empty.") }
         let base = try virtualMachine.fileSystem.location(path, defaultRoot: true)
         let args = fileSystemSearchArgs(pattern: pattern, path: base.path, options: options)
-        return try await tracked(.fsGrep, args, purpose: purpose) {
+        return try await tracked(Actions.fsGrep, args, purpose: purpose) {
             try await self.authorizeFileAccess(base, operation: .search)
             let values = options?.objectValue ?? [:]
             let literal = values["literal"]?.boolValue == true
@@ -310,20 +309,11 @@ extension Chat {
         case edit
         case delete
 
-        var approvalInvocation: InvocationName? {
-            switch self {
-            case .write: .fsWrite
-            case .edit: .fsEdit
-            case .delete: .fsDelete
-            case .list, .read, .search: nil
-            }
-        }
     }
 
     private func authorizeFileAccess(
         _ location: VirtualFileSystem.Location,
-        operation: FileAccessOperation,
-        args: JSONValue? = nil
+        operation: FileAccessOperation
     ) async throws {
         switch location.area {
         case .files:
@@ -335,15 +325,9 @@ extension Chat {
         }
         try requireIOSService("ios:files")
         Log.session.info("Chat.fileAccess service=ios:files operation=\(operation.rawValue) path=\(location.path)")
-        guard let action = operation.approvalInvocation else { return }
-        try await requireApproval(
-            action: Self.fileApproveKey(action),
-            args: args?.toAny(),
-            prompt: "\(action.approvalLabel)\n\(location.path)"
-        )
     }
 
-    private func requireWritableFileContext(_ location: VirtualFileSystem.Location, action: InvocationName) async throws {
+    private func requireWritableFileContext(_ location: VirtualFileSystem.Location, action: String) async throws {
         switch location {
         case .skill(let name), .skillFile(let name):
             try await skillsMount.requireWritable(name: name, path: location.path)

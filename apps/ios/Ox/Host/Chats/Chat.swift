@@ -66,6 +66,7 @@ final class Chat: Identifiable {
             let action: String
             let approve: String
             let alwaysApprove: String
+            let deny: String
         }
 
         let id: UUID
@@ -354,7 +355,7 @@ final class Chat: Identifiable {
                 guard case let .execute(execution) = step.kind else { continue }
                 for effect in execution.effects.reversed() {
                     guard case let .invocation(invocation) = effect,
-                          invocation.name == InvocationName.appRenameChat.rawValue,
+                          invocation.name == Actions.appRenameChat,
                           case let .succeeded(value) = invocation.outcome,
                           value?.objectValue?["renamed"]?.boolValue == true else { continue }
                     return value?.objectValue?["title"]?.stringValue
@@ -513,7 +514,7 @@ final class Chat: Identifiable {
                 try appendTransientAttachment(attachment)
             },
             importArtifact: { [unowned self] attachment, filename in
-                try requireProfileMutation(.artifactImport)
+                try requireProfileMutation(Actions.artifactImport)
                 let fileExtension = URL(fileURLWithPath: attachment.displayName).pathExtension
                 let suggestedName = URL(fileURLWithPath: filename).pathExtension.isEmpty
                     ? "\(filename).\(fileExtension)"
@@ -1228,34 +1229,49 @@ final class Chat: Identifiable {
         runState.backgroundExecution?.finish(success: true)
         runState.setBackgroundExecution(nil)
         Log.session.info("Chat.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
-        observeAutoApproval()
+        observeActionPolicy()
     }
 
-    private func observeAutoApproval() {
+    private func observeActionPolicy() {
         guard case .prompt(let prompt, _) = interactionWaiter,
               let approval = prompt.autoApproval else { return }
-        let approved = withObservationTracking {
-            serviceManager.shouldAutoApprove(approval.action)
+        let policy = withObservationTracking {
+            serviceManager.actionPolicy(for: approval.action)
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.interactionWaiter?.id == prompt.id else { return }
-                self.observeAutoApproval()
+                self.observeActionPolicy()
             }
         }
-        guard approved else { return }
-        Log.session.info("Chat.interaction autoApproved id=\(prompt.id) action=\(approval.action) global=\(serviceManager.autoApproveAll)")
-        resolvePrompt(blockId: prompt.id, answer: approval.approve)
+        switch policy {
+        case .allow:
+            Log.session.info("Chat.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
+            resolvePrompt(blockId: prompt.id, answer: approval.approve)
+        case .block:
+            Log.session.info("Chat.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
+            resolvePrompt(blockId: prompt.id, answer: approval.deny)
+        case .ask:
+            break
+        }
     }
 
     private func advanceInteraction() {
         while !interactionQueue.isEmpty {
             let waiter = interactionQueue.removeFirst()
             if case .prompt(let prompt, let continuation) = waiter,
-               let approval = prompt.autoApproval,
-               serviceManager.shouldAutoApprove(approval.action) {
-                Log.session.info("Chat.interaction autoApproved id=\(prompt.id) action=\(approval.action) global=\(serviceManager.autoApproveAll)")
-                continuation.resume(returning: .answered(approval.approve))
-                continue
+               let approval = prompt.autoApproval {
+                switch serviceManager.actionPolicy(for: approval.action) {
+                case .allow:
+                    Log.session.info("Chat.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=allow")
+                    continuation.resume(returning: .answered(approval.approve))
+                    continue
+                case .block:
+                    Log.session.info("Chat.interaction policyResolved id=\(prompt.id) action=\(approval.action) policy=block")
+                    continuation.resume(returning: .answered(approval.deny))
+                    continue
+                case .ask:
+                    break
+                }
             }
             activateInteraction(waiter)
             return
@@ -1451,7 +1467,7 @@ final class Chat: Identifiable {
               prompt.id == blockId else { return }
         if let approval = prompt.autoApproval,
            answer == approval.alwaysApprove {
-            serviceManager.setAutoApprove(approval.action, true)
+            serviceManager.setActionPolicy(.allow, for: approval.action)
         }
         interactionWaiter = nil
         advanceInteraction()
@@ -1549,10 +1565,11 @@ final class Chat: Identifiable {
         document.apply(.resolveInvocation(id: invocationID, outcome: outcome))
     }
 
-    func tracked<T>(_ name: InvocationName, _ args: JSONValue, purpose: String, _ body: () async throws -> T) async throws -> T {
+    func tracked<T>(_ action: String, _ args: JSONValue, purpose: String, _ body: () async throws -> T) async throws -> T {
         let standalone = ensureExecutionContext()
-        let invocationID = appendInvocation(name: name.rawValue, purpose: purpose, args: args)
+        let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
+            try await requireApproval(action: action, args: args.toAny())
             let value = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
@@ -1565,15 +1582,16 @@ final class Chat: Identifiable {
     }
 
     func trackedEffect<T, Effect>(
-        _ name: InvocationName,
+        _ action: String,
         _ args: JSONValue,
         purpose: String,
         apply: (Effect) -> Void,
         _ body: () async throws -> (T, Effect)
     ) async throws -> T {
         let standalone = ensureExecutionContext()
-        let invocationID = appendInvocation(name: name.rawValue, purpose: purpose, args: args)
+        let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
+            try await requireApproval(action: action, args: args.toAny())
             let (value, effect) = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             apply(effect)
@@ -1595,16 +1613,15 @@ final class Chat: Identifiable {
     // MARK: - Approval gate
 
     static func attachApproveKey(_ domain: String) -> String { "ox.service.attach:\(domain)" }
-    static func fileApproveKey(_ action: InvocationName) -> String { "ios:files:\(action.rawValue)" }
 
     func gateServiceAttach(_ service: Service) async throws {
         let title = "\(service.title) - \(L10n.string( "Attach"))"
         let message = if service.isIOSService {
-            L10n.string("Its capabilities and permitted device data become available to this chat.")
+            L10n.string("Its actions and permitted device data become available to this chat.")
         } else if service.isMCPService {
-            L10n.string("Its remote tools can receive arguments from this chat and return data to Ox.")
+            L10n.string("Its remote Actions can receive arguments from this chat and return data to Ox.")
         } else {
-            L10n.string("Its capabilities and your signed-in data become available to this chat.")
+            L10n.string("Its actions and your signed-in data become available to this chat.")
         }
         switch await requestApproval(
             action: Self.attachApproveKey(service.domain),
@@ -1612,24 +1629,26 @@ final class Chat: Identifiable {
         ) {
         case .approved: return
         case .denied: throw RuntimeError.bridge("ox.service.attach: the user declined to attach \(service.title).")
+        case .blocked: throw RuntimeError.bridge("ox.service.attach: the user blocked this Action in Settings.")
         case .stopped: throw RuntimeError.bridge("ox.service.attach: the user stopped before attaching \(service.title).")
         }
     }
 
-    private typealias ApprovalOutcome = ServiceApproval.Outcome
+    private typealias ApprovalOutcome = ActionApproval.Outcome
 
     func requireApproval(action: String, args: Any? = nil, prompt: String? = nil) async throws {
         switch await requestApproval(action: action, args: args, prompt: prompt) {
         case .approved: return
         case .denied: throw RuntimeError.bridge("\(action): the user declined.")
+        case .blocked: throw RuntimeError.bridge("\(action): the user blocked this Action in Settings.")
         case .stopped: throw RuntimeError.bridge("\(action): the user stopped before answering.")
         }
     }
 
-    func requireProfileMutation(_ action: InvocationName) throws {
+    func requireProfileMutation(_ action: String) throws {
         guard retention == .persisted else {
-            Log.session.info("Chat.temporary blocked action=\(action.rawValue)")
-            throw RuntimeError.bridge("\(action.rawValue): Temporary chats can't save changes. Continue in a Profile stored on this device to keep this result.")
+            Log.session.info("Chat.temporary blocked action=\(action)")
+            throw RuntimeError.bridge("\(action): Temporary chats can't save changes. Continue in a Profile stored on this device to keep this result.")
         }
     }
 
@@ -1649,7 +1668,7 @@ final class Chat: Identifiable {
     }
 
     private func requestApproval(action: String, args: Any? = nil, prompt: String? = nil) async -> ApprovalOutcome {
-        await ServiceApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, args: args, prompt: prompt) { request in
+        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, args: args, prompt: prompt) { request in
             runState.backgroundExecution?.updatePhase(.permissionNeeded)
             let answer = await awaitPrompt(
                 prompt: request.prompt,
@@ -1659,7 +1678,8 @@ final class Chat: Identifiable {
                 autoApproval: PendingPrompt.AutoApproval(
                     action: request.action,
                     approve: request.approve,
-                    alwaysApprove: request.alwaysApprove
+                    alwaysApprove: request.alwaysApprove,
+                    deny: request.deny
                 )
             )
             return answer == Self.abortedAnswer ? nil : answer

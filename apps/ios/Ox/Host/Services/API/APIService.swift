@@ -67,9 +67,7 @@ final class APIService {
                   let output = action.outputSchema else { throw Service.InvokeError.unknown(name) }
             let violations = JSONSchemaValidator.validate(args, against: input, definitions: definition.definitions)
             guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
-            if action.requireApproval {
-                guard await approve(name, args.toAny()) else { throw Service.InvokeError.denied(name) }
-            }
+            guard await approve(name, args.toAny()) else { throw Service.InvokeError.denied(name) }
             try Task.checkCancellation()
             if action.requireAuth && !authorization.isConfigured { throw APIServiceError.authorizationRequired }
             if source == nil, let fetched = await service.manager.fetch(domain: definition.domain) {

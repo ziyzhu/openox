@@ -92,6 +92,9 @@ nonisolated struct StorageMigrationReplay: Sendable {
     let chatModelMigrated: Bool
     let unsupportedVersionRejected: Bool
     let providerCatalogMigrated: Bool
+    let actionPoliciesMigrated: Bool
+    let futureActionPoliciesPreserved: Bool
+    let actionPolicyResolutionValid: Bool
     let fixtureResults: [StorageMigrationFixtureReplay]
 }
 
@@ -150,7 +153,7 @@ nonisolated enum StorageMigrator {
         _ = migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
         do { try migrateProviderCatalog(defaults: .standard) }
         catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
-        removeRetiredAutoApproveActions()
+        migrateActionApprovalPolicies()
         migrateTheme()
         Log.app.info("StorageMigrator.application done")
     }
@@ -198,16 +201,76 @@ nonisolated enum StorageMigrator {
         Log.app.info("StorageMigrator.theme migrated saved=\(saved)")
     }
 
-    private static func removeRetiredAutoApproveActions(
-        defaults: UserDefaults = .standard,
-        key: String = ServiceManager.autoApproveKey
-    ) {
-        let retired = Set(["ios:browser:screenshot"])
-        let stored = defaults.stringArray(forKey: key) ?? []
-        let retained = stored.filter { !retired.contains($0) }
-        guard retained.count != stored.count else { return }
-        defaults.set(retained, forKey: key)
-        Log.app.info("StorageMigrator.autoApproveActions retired=\(stored.count - retained.count)")
+    private static func migrateActionApprovalPolicies(defaults: UserDefaults = .standard) {
+        let retired = Set(["ios:browser:screenshot", "ox.app.inspect"])
+        if let data = defaults.data(forKey: ServiceManager.actionPoliciesKey) {
+            do {
+                var configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
+                guard configuration.format == ActionPolicyConfiguration.currentFormat else {
+                    Log.app.error("StorageMigrator.actionPolicies deferred format=\(configuration.format)")
+                    return
+                }
+                let originalCount = configuration.actions.count
+                let storedActions = configuration.actions
+                var migratedActions = storedActions.reduce(into: [String: ActionPolicy]()) { actions, entry in
+                    guard !retired.contains(entry.key), !entry.key.hasPrefix("ios:files:") else { return }
+                    let action = canonicalApprovalAction(entry.key)
+                    guard action == entry.key else { return }
+                    actions[action] = entry.value
+                }
+                for entry in storedActions.sorted(by: { $0.key < $1.key }) {
+                    guard !retired.contains(entry.key), !entry.key.hasPrefix("ios:files:") else { continue }
+                    let action = canonicalApprovalAction(entry.key)
+                    if migratedActions[action] == nil { migratedActions[action] = entry.value }
+                }
+                configuration.actions = migratedActions
+                if configuration.actions != storedActions,
+                   let updated = try? JSONEncoder().encode(configuration) {
+                    defaults.set(updated, forKey: ServiceManager.actionPoliciesKey)
+                }
+                defaults.removeObject(forKey: ServiceManager.legacyAutoApproveActionsKey)
+                defaults.removeObject(forKey: ServiceManager.legacyAutoApproveAllKey)
+                defaults.synchronize()
+                Log.app.info("StorageMigrator.actionPolicies current actions=\(configuration.actions.count) removed=\(originalCount - configuration.actions.count)")
+            } catch {
+                Log.app.error("StorageMigrator.actionPolicies invalid preserved=true error=\(error.localizedDescription)")
+            }
+            return
+        }
+
+        let legacy = defaults.stringArray(forKey: ServiceManager.legacyAutoApproveActionsKey) ?? []
+        let retained = Set(legacy).filter { !retired.contains($0) && !$0.hasPrefix("ios:files:") }
+        let actions = retained.sorted().reduce(into: [String: ActionPolicy]()) { actions, action in
+            actions[canonicalApprovalAction(action)] = .allow
+        }
+        let allowsAll = defaults.bool(forKey: ServiceManager.legacyAutoApproveAllKey)
+        let configuration = ActionPolicyConfiguration(
+            defaultPolicy: allowsAll ? .allow : .ask,
+            actions: actions
+        )
+        do {
+            let encoded = try JSONEncoder().encode(configuration)
+            defaults.set(encoded, forKey: ServiceManager.actionPoliciesKey)
+            guard defaults.synchronize(), defaults.data(forKey: ServiceManager.actionPoliciesKey) == encoded else {
+                Log.app.error("StorageMigrator.actionPolicies write failed legacyPreserved=true")
+                return
+            }
+            defaults.removeObject(forKey: ServiceManager.legacyAutoApproveActionsKey)
+            defaults.removeObject(forKey: ServiceManager.legacyAutoApproveAllKey)
+            defaults.synchronize()
+            Log.app.info("StorageMigrator.actionPolicies migrated actions=\(configuration.actions.count) retired=\(legacy.count - retained.count) default=\(configuration.defaultPolicy.rawValue)")
+        } catch {
+            Log.app.error("StorageMigrator.actionPolicies encode failed legacyPreserved=true error=\(error.localizedDescription)")
+        }
+    }
+
+    private static func canonicalApprovalAction(_ action: String) -> String {
+        if action.hasPrefix("ox.") || action.hasPrefix("web:") || action.hasPrefix("api:")
+            || action.hasPrefix("ios:") || action.hasPrefix("mcp:") {
+            return action
+        }
+        guard let separator = action.lastIndex(of: ":"), action[..<separator].contains(".") else { return action }
+        return "web:\(action)"
     }
 
     private static func validateApplicationStorage() throws {
@@ -1342,6 +1405,49 @@ nonisolated enum StorageMigrator {
         defaults.set(LLMRegion.china.rawValue, forKey: "llm.defaultRegion")
         defaults.set(["china\u{1F}mock": "mock-model"], forKey: "llm.selectedModels")
         defaults.set(["mock\u{1F}mock-model": "high"], forKey: "llm.selectedReasoningEfforts")
+        defaults.set(
+            ["ox.app.inspect", "ox.app.logs", "example.com:read", "ios:files:ox.fs.write", "ios:browser:screenshot"],
+            forKey: ServiceManager.legacyAutoApproveActionsKey
+        )
+        defaults.set(true, forKey: ServiceManager.legacyAutoApproveAllKey)
+        migrateActionApprovalPolicies(defaults: defaults)
+        let firstActionPolicies = defaults.data(forKey: ServiceManager.actionPoliciesKey)
+        migrateActionApprovalPolicies(defaults: defaults)
+        let migratedActionPolicies = firstActionPolicies.flatMap {
+            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
+        }
+        let legacyActionPoliciesMigrated = migratedActionPolicies?.defaultPolicy == .allow
+            && migratedActionPolicies?.actions == ["ox.app.logs": .allow, "web:example.com:read": .allow]
+            && defaults.data(forKey: ServiceManager.actionPoliciesKey) == firstActionPolicies
+            && defaults.object(forKey: ServiceManager.legacyAutoApproveActionsKey) == nil
+            && defaults.object(forKey: ServiceManager.legacyAutoApproveAllKey) == nil
+        let currentActionPolicies = try JSONEncoder().encode(ActionPolicyConfiguration(
+            actions: ["ox.app.inspect": .allow, "ox.app.info": .block]
+        ))
+        defaults.set(currentActionPolicies, forKey: ServiceManager.actionPoliciesKey)
+        migrateActionApprovalPolicies(defaults: defaults)
+        let migratedCurrentActionPolicies = defaults.data(forKey: ServiceManager.actionPoliciesKey).flatMap {
+            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
+        }
+        let actionPoliciesMigrated = legacyActionPoliciesMigrated
+            && migratedCurrentActionPolicies?.actions == ["ox.app.info": .block]
+        let futureActionPolicies = try JSONEncoder().encode(ActionPolicyConfiguration(
+            format: ActionPolicyConfiguration.currentFormat + 1,
+            defaultPolicy: .block
+        ))
+        defaults.set(futureActionPolicies, forKey: ServiceManager.actionPoliciesKey)
+        migrateActionApprovalPolicies(defaults: defaults)
+        let futureActionPoliciesPreserved = defaults.data(forKey: ServiceManager.actionPoliciesKey) == futureActionPolicies
+        let policyFixture = ActionPolicyConfiguration(
+            defaultPolicy: .block,
+            sources: ["example.com": .allow],
+            actions: ["web:example.com:read": .ask]
+        )
+        let actionPolicyResolutionValid = policyFixture.policy(for: "web:example.com:read") == .ask
+            && policyFixture.policy(for: "api:example.com:write") == .allow
+            && policyFixture.policy(for: "ox.app.info") == .block
+            && ActionPolicyConfiguration.sourceID(for: "ox.service.attach:example.com") == "example.com"
+            && ActionPolicyConfiguration.sourceID(for: "ox.fs.read") == "ios:files"
         let migratedDefault = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
         let migratedDefaultAgain = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
         let defaultModelMigrated = migratedDefault == ModelSelection(
@@ -1529,6 +1635,9 @@ nonisolated enum StorageMigrator {
             chatModelMigrated: decodedMeta.model == selection,
             unsupportedVersionRejected: unsupportedVersionRejected,
             providerCatalogMigrated: providerCatalogMigrated,
+            actionPoliciesMigrated: actionPoliciesMigrated,
+            futureActionPoliciesPreserved: futureActionPoliciesPreserved,
+            actionPolicyResolutionValid: actionPolicyResolutionValid,
             fixtureResults: fixtureResults
         )
     }

@@ -13,8 +13,8 @@ extension Chat {
         purpose: String
     ) async throws -> JSONValue? {
         let args = scheduleArgs(skillName: skillName, frequency: frequency)
-        return try await tracked(.scheduleCreate, args, purpose: purpose) {
-            try requireProfileMutation(.scheduleCreate)
+        return try await tracked(Actions.scheduleCreate, args, purpose: purpose) {
+            try requireProfileMutation(Actions.scheduleCreate)
             let skill = try await repository.skill(named: skillName, in: scope)
             let recurrence = try scheduledRecurrence(
                 frequency: frequency,
@@ -41,15 +41,15 @@ extension Chat {
     }
 
     func listScheduledSkills(purpose: String) async throws -> JSONValue? {
-        try await tracked(.scheduleList, .object([:]), purpose: purpose) {
+        try await tracked(Actions.scheduleList, .object([:]), purpose: purpose) {
             .array(ScheduledSkills.shared.schedules(profileID: scope.profileID).map(scheduleResult))
         }
     }
 
     func deleteScheduledSkill(id: String, purpose: String) async throws -> JSONValue? {
         let schedule = try ownedSchedule(id)
-        return try await tracked(.scheduleDelete, .object(["id": .string(id)]), purpose: purpose) {
-            try requireProfileMutation(.scheduleDelete)
+        return try await tracked(Actions.scheduleDelete, .object(["id": .string(id)]), purpose: purpose) {
+            try requireProfileMutation(Actions.scheduleDelete)
             try await confirmScheduledSkillChange(
                 action: L10n.string("Delete Schedule"),
                 prompt: "Delete the schedule for /\(schedule.skill.displayName)?"
@@ -64,11 +64,11 @@ extension Chat {
         let schedule = try ownedSchedule(id)
         let verb = enabled ? L10n.string("Resume") : L10n.string("Pause")
         return try await tracked(
-            .scheduleEnable,
+            Actions.scheduleEnable,
             .object(["id": .string(id), "enabled": .bool(enabled)]),
             purpose: purpose
         ) {
-            try requireProfileMutation(.scheduleEnable)
+            try requireProfileMutation(Actions.scheduleEnable)
             try await confirmScheduledSkillChange(
                 action: verb,
                 prompt: "\(verb) the schedule for /\(schedule.skill.displayName)?"
@@ -83,8 +83,8 @@ extension Chat {
 
     func runScheduledSkill(id: String, purpose: String) async throws -> JSONValue? {
         let schedule = try ownedSchedule(id)
-        return try await tracked(.scheduleRun, .object(["id": .string(id)]), purpose: purpose) {
-            try requireProfileMutation(.scheduleRun)
+        return try await tracked(Actions.scheduleRun, .object(["id": .string(id)]), purpose: purpose) {
+            try requireProfileMutation(Actions.scheduleRun)
             try await confirmScheduledSkillChange(
                 action: L10n.string("Run Now"),
                 prompt: "Run the scheduled snapshot of /\(schedule.skill.displayName) now?"

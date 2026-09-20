@@ -442,13 +442,16 @@ struct ServiceDetailView: View {
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .padding(.horizontal, Theme.Spacing.md)
 
+            servicePolicyContent
+            attachActionContent
+
             if loadingManifest {
                 CellularAutomatonLoader.small
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Spacing.lg)
             } else if capabilities.supportsFolderAccess {
                 VStack(spacing: Theme.Spacing.sm) {
-                    ForEach(OxFileSystem.invocations, id: \.rawValue) { action in
+                    ForEach(OxFileSystem.actions, id: \.self) { action in
                         fileSystemActionRow(action)
                     }
                 }
@@ -498,41 +501,14 @@ struct ServiceDetailView: View {
 
     // MARK: - Manage
 
-    private func autoApprove(_ action: Manifest.Action) -> Binding<Bool> {
-        let name = "\(service.domain):\(action.id)"
-        return Binding(
-            get: { serviceManager.isAutoApproved(name) },
-            set: { serviceManager.setAutoApprove(name, $0) }
-        )
-    }
-
-    private func autoApproveFileAction(_ action: InvocationName) -> Binding<Bool> {
-        let name = Chat.fileApproveKey(action)
-        return Binding(
-            get: { serviceManager.isAutoApproved(name) },
-            set: { serviceManager.setAutoApprove(name, $0) }
-        )
-    }
-
-    private var autoApproveAttach: Binding<Bool> {
-        let name = Chat.attachApproveKey(service.domain)
-        return Binding(
-            get: { serviceManager.isAutoApproved(name) },
-            set: { serviceManager.setAutoApprove(name, $0) }
-        )
-    }
-
+    @ViewBuilder
     private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Permissions")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .padding(.horizontal, Theme.Spacing.md)
-            attachPermissionContent
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.Spacing.md)
-                .settingsSurface()
-            if capabilities.supportsFolderAccess {
+        if capabilities.supportsFolderAccess {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Folders")
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(.horizontal, Theme.Spacing.md)
                 filesPermissionContent
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Theme.Spacing.md)
@@ -541,38 +517,48 @@ struct ServiceDetailView: View {
         }
     }
 
-    private var attachPermissionContent: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Attach to a chat")
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-            Text(attachPermissionDescription)
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .fixedSize(horizontal: false, vertical: true)
-            Divider().padding(.vertical, 4)
-            Toggle(isOn: autoApproveAttach) {
-                Text("Attach without asking for approval")
+    private var actionPolicySource: String {
+        ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace)
+    }
+
+    private var servicePolicyContent: some View {
+        ActionPolicyPicker(
+            title: "Default for This Service",
+            selection: serviceManager.sourcePolicy(for: actionPolicySource),
+            resolved: serviceManager.resolvedSourcePolicy(for: actionPolicySource),
+            inheritLabel: "Use Global Default",
+            onChange: { serviceManager.setSourcePolicy($0, for: actionPolicySource) }
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Spacing.md)
+        .settingsSurface()
+    }
+
+    private var attachActionContent: some View {
+        actionCard {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Attach to a chat")
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                Text(attachPermissionDescription)
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                approvalControl(actionID: Chat.attachApproveKey(service.domain))
             }
-            .tint(Theme.Colors.primary)
         }
     }
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a chat, giving Ox its capabilities, skills, and your signed-in data."
-        case .onDevice: "Its capabilities and permitted device data become available to this chat."
-        case .remote: "Its remote tools can receive arguments from this chat and return data to Ox."
+        case .signedIn: "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data."
+        case .onDevice: "Its actions and permitted device data become available to this chat."
+        case .remote: "Its remote Actions can receive arguments from this chat and return data to Ox."
         }
     }
 
     private var filesPermissionContent: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Folders")
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
             Text("Ox can only access folders you add here.")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -724,36 +710,34 @@ struct ServiceDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if action.requireApproval {
-                    approvalControl(isOn: autoApprove(action), actionID: action.id)
-                }
+                approvalControl(actionID: service.definition.qualifiedActionName(action.id))
             }
         }
     }
 
-    private func fileSystemActionRow(_ action: InvocationName) -> some View {
+    private func fileSystemActionRow(_ action: String) -> some View {
         actionCard {
             VStack(alignment: .leading, spacing: 4) {
-                Text(action.approvalLabel)
+                Text(Actions.label(for: action) ?? action)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                    .accessibilityIdentifier(A11yID.Chat.Attach.action(action.rawValue))
-                if OxFileSystem.approvalInvocations.contains(action) {
-                    approvalControl(isOn: autoApproveFileAction(action), actionID: action.rawValue)
-                }
+                    .accessibilityIdentifier(A11yID.Chat.Attach.action(action))
+                approvalControl(actionID: action)
             }
         }
     }
 
     @ViewBuilder
-    private func approvalControl(isOn: Binding<Bool>, actionID: String) -> some View {
+    private func approvalControl(actionID: String) -> some View {
+        let explicit = serviceManager.explicitActionPolicy(for: actionID)
         Divider().padding(.vertical, 4)
-        Toggle(isOn: isOn) {
-            Text("Always approve")
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        }
-        .tint(Theme.Colors.primary)
+        ActionPolicyPicker(
+            title: "Permission",
+            selection: explicit,
+            resolved: serviceManager.actionPolicy(for: actionID),
+            inheritLabel: "Use Service Default",
+            onChange: { serviceManager.setActionPolicy($0, for: actionID) }
+        )
         .accessibilityIdentifier(A11yID.Chat.Attach.actionApproval(actionID))
     }
 

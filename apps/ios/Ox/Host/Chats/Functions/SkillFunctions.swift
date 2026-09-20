@@ -9,8 +9,8 @@ extension Chat {
         purpose: String
     ) async throws -> JSONValue? {
         let args = skillMutationArgs(name: name, services: services)
-        return try await tracked(.skillCreate, args, purpose: purpose) {
-            try self.requireProfileMutation(.skillCreate)
+        return try await tracked(Actions.skillCreate, args, purpose: purpose) {
+            try self.requireProfileMutation(Actions.skillCreate)
             let skill = try await self.repository.createSkill(
                 name: name,
                 description: description,
@@ -26,8 +26,8 @@ extension Chat {
 
     public func copySkill(source: String, name: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["source": .string(source), "name": .string(name)])
-        return try await tracked(.skillCopy, args, purpose: purpose) {
-            try self.requireProfileMutation(.skillCopy)
+        return try await tracked(Actions.skillCopy, args, purpose: purpose) {
+            try self.requireProfileMutation(Actions.skillCopy)
             let entry = try await self.skillsMount.entry(named: source)
             let sourceName = switch entry.source {
             case .user, .system: entry.name
@@ -55,8 +55,8 @@ extension Chat {
 
     public func deleteSkill(name: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["name": .string(name)])
-        return try await tracked(.skillDelete, args, purpose: purpose) {
-            try self.requireProfileMutation(.skillDelete)
+        return try await tracked(Actions.skillDelete, args, purpose: purpose) {
+            try self.requireProfileMutation(Actions.skillDelete)
             let skill = try await self.repository.deleteSkill(named: name, in: self.scope)
             self.refreshUserSkills()
             Log.session.info("bridge.skill.delete name=\(skill.name)")

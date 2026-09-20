@@ -77,49 +77,46 @@ approval-gated artifact import; fetching alone does neither. URL provenance and
 DNS rebinding protection remain deferred and must be addressed before the public
 web contract expands. **Web exception:** after approval, the model may
 read page-visible credentials and authenticated data and use Web's current
-page to transmit them. Always approve makes that exception standing across every
+page to transmit them. Always allow makes that exception standing across every
 page Web visits until the user revokes the qualified
 `device.browser:executeScript` approval.
 
 ### T2 — Adversarial model triggers a harmful state change
 The model invokes a money-moving, posting, or sending action the user didn't
-intend. **Mitigation:** service definitions must mark state-changing actions
-`requireApproval`, and the native runtime enforces that policy independent of
-how the model names or chains the call. The default is a per-invocation prompt;
-the user may deliberately persist “Always approve” for one qualified action, which
-turns that decision into standing consent until revoked. Importing a public
-resource and renaming or deleting an artifact are approval-gated. Writing or
-editing Profile-owned artifact content is treated like generating chat content and
-does not prompt; Files-folder mutations use the separate device-service policy
-described below. Authenticated actions re-probe auth at invoke time rather than
+intend. **Mitigation:** the native runtime resolves every built-in and service
+Action against the user's Ask, Allow, or Block policy independent of how the model
+names or chains the call. Ask is the initial global default. The user may set a
+global, service, or qualified-Action policy in Settings; more specific choices
+override broader defaults. A prompt can also persist Always allow for that Action.
+Service `requireApproval` metadata does not override user policy. API services
+still use it to declare that an action may send mutating HTTP methods. Authenticated
+actions re-probe auth at invoke time rather than
 trusting a cached signal. Payment completion stays on the merchant's
 user-operated review surface rather than becoming an agent action.
 
 Web cannot preserve per-operation mutation policy: one script may
 invoke page APIs, dispatch UI events, call installed service handlers, or
 schedule later work. Its action approval therefore authorizes all website reads
-and mutations performed by that script. Persisting Always approve is standing
+and mutations performed by that script. Persisting Always allow is standing
 consent to that control across pages Web visits, not merely consent to one
 kind of website mutation.
 
-Settings offers an explicit, off-by-default **Always approve** switch for
-all chats and Profiles on the device. Settings and the enable confirmation warn
-about data loss and unwanted charges. Enabling it requires confirmation and
-approves both pending and future ordinary action prompts, including service
-attachment and Browser control. It persists across launches until disabled.
-Per-action standing approvals remain separate and take effect again when the
-global switch is off. Auto-approved actions and changes to the switch are logged.
-This does not bypass authentication, iOS permissions, selected-folder boundaries,
-private-data storage and disclosure consent, or ordinary questions to the user.
+Settings → Actions is the user-owned policy surface for all chats and Profiles on
+the device. The global default, service defaults, and Action overrides persist
+across launches. Block overrides inherited Allow; unknown, malformed, and future
+policy formats fail closed to Ask. Policy decisions and automatic Allow or Block
+resolutions are logged. These policies do not bypass authentication, iOS
+permissions, selected-folder boundaries, private-data storage and disclosure
+consent, or ordinary questions to the user.
 
 Device capabilities follow the same attachment boundary as registry services but
 execute locally. A device service must be attached to the chat before its actions
 are disclosed or callable; the applicable iOS permission remains an independent
 OS-controlled gate. Files adds a third boundary: the folders chosen in the system
 picker are the Files service's scope. Once that service is attached, `ox.fs`
-can operate only inside those virtual mounts. Write, edit, and delete additionally
-require per-action approval unless the user explicitly allows that action without
-asking. Profile-owned memory, soul, artifact, and skill paths are not part of the
+can operate only inside those virtual mounts. Every `ox.fs` Action follows its
+resolved user policy. Profile-owned memory, soul, artifact, and skill paths are
+not part of the
 Files service scope. Security-scoped bookmarks expose neither an unrestricted
 Files root nor an ambient iCloud Documents directory.
 
@@ -250,7 +247,7 @@ world. No domain selector is exposed, and only a JSON-compatible result crosses
 back to the agent. Web uses the shared website data store, so visiting an
 origin can use the same signed-in session as that origin's registry service.
 
-The approval UI intentionally offers Always approve and stores it under the
+The approval UI intentionally offers Always allow and stores it under the
 qualified `device.browser:executeScript` action name. While enabled, the model
 can inspect or mutate the current DOM, origin storage, page JavaScript state, and
 authenticated responses; initiate network requests; and leave timers, listeners,

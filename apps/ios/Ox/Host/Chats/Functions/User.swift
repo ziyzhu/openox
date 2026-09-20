@@ -7,7 +7,7 @@ extension Chat {
               Set(options).count == options.count else {
             throw RuntimeError.bridge("ox.user.choose: options must contain 2-4 unique labels")
         }
-        return try await tracked(.userChoose, .object([
+        return try await tracked(Actions.userChoose, .object([
             "body": .string(body),
             "options": .array(options.map(JSONValue.string)),
         ]), purpose: purpose) {
@@ -24,7 +24,7 @@ extension Chat {
         guard !trimmed.isEmpty, trimmed.count <= 2_000 else {
             throw RuntimeError.bridge("ox.user.reportProgress: message must contain 1-2000 characters")
         }
-        return try await tracked(.userReportProgress, .object(["message": .string(trimmed)]), purpose: purpose) {
+        return try await tracked(Actions.userReportProgress, .object(["message": .string(trimmed)]), purpose: purpose) {
             try appendReportedProgress(trimmed)
             Log.session.info("Chat.reportProgress id=\(id) chars=\(trimmed.count)")
             return nil

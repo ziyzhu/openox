@@ -9,7 +9,7 @@ final class OxCanvas {
     }
 
     enum Interaction: Identifiable {
-        case approval(ServiceApproval.Request)
+        case approval(ActionApproval.Request)
         case choice(UUID, String, [String])
         case control(UUID, ServiceControl, Service)
 
@@ -167,7 +167,7 @@ final class OxCanvas {
             resolveService: { [unowned self] in try await resolveService($0) },
             resolveAction: { [unowned self] in try await resolveAction($0) },
             approve: { [unowned self] action, args, prompt in
-                let outcome = await ServiceApproval(serviceManager: serviceManager, ownerID: id, callerName: title, resolveService: { self.services[$0] })
+                let outcome = await ActionApproval(serviceManager: serviceManager, ownerID: id, callerName: title, resolveService: { self.services[$0] })
                     .request(action: action, args: args, prompt: prompt) { request in
                         await self.waitForInteraction(.approval(request))?.stringValue
                     }

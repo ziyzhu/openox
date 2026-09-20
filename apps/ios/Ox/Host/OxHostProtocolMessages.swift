@@ -449,6 +449,9 @@ extension OxHostProtocol {
         let chatModelMigrated: Bool?
         let unsupportedVersionRejected: Bool?
         let providerCatalogMigrated: Bool?
+        let actionPoliciesMigrated: Bool?
+        let futureActionPoliciesPreserved: Bool?
+        let actionPolicyResolutionValid: Bool?
         let fixtureResults: [StorageMigrationFixtureReplay]?
         let error: String?
     }

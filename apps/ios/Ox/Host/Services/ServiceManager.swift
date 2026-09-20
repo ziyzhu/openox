@@ -103,22 +103,22 @@ final class ServiceManager {
         didSet { UserDefaults.standard.set(savedDomains.sorted(), forKey: Self.savedKey) }
     }
 
-    private(set) var autoApproveActions: Set<String> {
-        didSet { UserDefaults.standard.set(autoApproveActions.sorted(), forKey: Self.autoApproveKey) }
-    }
-
-    var autoApproveAll: Bool {
+    private(set) var actionPolicies: ActionPolicyConfiguration {
         didSet {
-            UserDefaults.standard.set(autoApproveAll, forKey: Self.autoApproveAllKey)
-            Log.service.info("ServiceManager.autoApproveAll enabled=\(autoApproveAll)")
+            guard let data = try? JSONEncoder().encode(actionPolicies) else {
+                Log.service.error("ServiceManager.actionPolicies encode failed")
+                return
+            }
+            UserDefaults.standard.set(data, forKey: Self.actionPoliciesKey)
         }
     }
 
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
 
     private static let savedKey = "savedServices"
-    nonisolated static let autoApproveKey = "autoApproveActions"
-    private static let autoApproveAllKey = "autoApproveAll"
+    nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
+    nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
+    nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
     nonisolated static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
         websiteData.makePageConfiguration()
@@ -174,8 +174,7 @@ final class ServiceManager {
     init() {
         repository = ServiceRepository(developmentRemote: Self.launchServerURL)
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
-        autoApproveActions = Set(UserDefaults.standard.stringArray(forKey: Self.autoApproveKey) ?? [])
-        autoApproveAll = UserDefaults.standard.bool(forKey: Self.autoApproveAllKey)
+        actionPolicies = Self.loadActionPolicies()
         persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -186,6 +185,21 @@ final class ServiceManager {
                 guard let self else { return }
                 self.actionScheduler.releaseIdle(reason: .memoryWarning)
             }
+        }
+    }
+
+    private static func loadActionPolicies(defaults: UserDefaults = .standard) -> ActionPolicyConfiguration {
+        guard let data = defaults.data(forKey: actionPoliciesKey) else { return ActionPolicyConfiguration() }
+        do {
+            let configuration = try JSONDecoder().decode(ActionPolicyConfiguration.self, from: data)
+            guard configuration.format == ActionPolicyConfiguration.currentFormat else {
+                Log.service.error("ServiceManager.actionPolicies unsupported format=\(configuration.format)")
+                return ActionPolicyConfiguration()
+            }
+            return configuration
+        } catch {
+            Log.service.error("ServiceManager.actionPolicies decode failed error=\(error.localizedDescription)")
+            return ActionPolicyConfiguration()
         }
     }
 
@@ -227,18 +241,35 @@ final class ServiceManager {
         Log.service.info("ServiceManager.setSaved domain=\(service.domain) saved=\(saved)")
     }
 
-    func isAutoApproved(_ actionName: String) -> Bool { autoApproveActions.contains(actionName) }
-
-    func shouldAutoApprove(_ actionName: String) -> Bool { autoApproveAll || isAutoApproved(actionName) }
-
-    func setAutoApprove(_ actionName: String, _ on: Bool) {
-        guard isAutoApproved(actionName) != on else { return }
-        if on {
-            autoApproveActions.insert(actionName)
-        } else {
-            autoApproveActions.remove(actionName)
+    var defaultActionPolicy: ActionPolicy {
+        get { actionPolicies.defaultPolicy }
+        set {
+            guard actionPolicies.defaultPolicy != newValue else { return }
+            actionPolicies.defaultPolicy = newValue
+            Log.service.info("ServiceManager.actionPolicy default=\(newValue.rawValue)")
         }
-        Log.service.info("ServiceManager.setAutoApprove action=\(actionName) on=\(on)")
+    }
+
+    func actionPolicy(for action: String) -> ActionPolicy { actionPolicies.policy(for: action) }
+
+    func explicitActionPolicy(for action: String) -> ActionPolicy? { actionPolicies.actions[action] }
+
+    func setActionPolicy(_ policy: ActionPolicy?, for action: String) {
+        guard actionPolicies.actions[action] != policy else { return }
+        actionPolicies.actions[action] = policy
+        Log.service.info("ServiceManager.actionPolicy action=\(action) policy=\(policy?.rawValue ?? "inherited")")
+    }
+
+    func sourcePolicy(for source: String) -> ActionPolicy? { actionPolicies.sources[source] }
+
+    func resolvedSourcePolicy(for source: String) -> ActionPolicy {
+        actionPolicies.sources[source] ?? actionPolicies.defaultPolicy
+    }
+
+    func setSourcePolicy(_ policy: ActionPolicy?, for source: String) {
+        guard actionPolicies.sources[source] != policy else { return }
+        actionPolicies.sources[source] = policy
+        Log.service.info("ServiceManager.actionPolicy source=\(source) policy=\(policy?.rawValue ?? "inherited")")
     }
 
     func service(domain: String) -> Service? { byDomain[domain] }
@@ -318,9 +349,10 @@ final class ServiceManager {
     }
 
     private func clearMCPApprovals(_ service: Service) {
-        autoApproveActions = autoApproveActions.filter {
-            !$0.hasPrefix("mcp:\(service.domain):") && !$0.hasPrefix("\(service.domain):")
+        actionPolicies.actions = actionPolicies.actions.filter {
+            !$0.key.hasPrefix("mcp:\(service.domain):") && !$0.key.hasPrefix("\(service.domain):")
         }
+        actionPolicies.sources.removeValue(forKey: service.domain)
     }
 
     // An attached service whose origin owns this URL, so a tapped link can open

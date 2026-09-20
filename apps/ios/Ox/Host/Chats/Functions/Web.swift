@@ -3,7 +3,7 @@ import Foundation
 extension Chat {
     public func searchWeb(query: String, purpose: String) async throws -> JSONValue? {
         let request = try WebSearchRequest(query: query)
-        return try await tracked(.webSearch, .object(["query": .string(request.query)]), purpose: purpose) {
+        return try await tracked(Actions.webSearch, .object(["query": .string(request.query)]), purpose: purpose) {
             try await WebSearchEngine.shared.search(request).json
         }
     }
@@ -20,7 +20,7 @@ extension Chat {
             throw RuntimeError.bridge("ox.web.fetch: unknown option '\(unknown.sorted().joined(separator: ", "))'")
         }
         let request = try WebFetchRequest(url: url)
-        return try await tracked(.webFetch, .object(["url": .string(request.url.absoluteString)]), purpose: purpose) {
+        return try await tracked(Actions.webFetch, .object(["url": .string(request.url.absoluteString)]), purpose: purpose) {
             let (sequence, response) = try await fetchWebResource(request)
             let attachment = try WebAttachmentFactory.make(response: response, filename: nil)
             let read: ArtifactLibrary.Read?

@@ -1048,11 +1048,9 @@ final class RemoteMCPService {
         }
         let inputViolations = JSONSchemaValidator.validate(args, against: inputSchema, definitions: [:])
         guard inputViolations.isEmpty else { return .failure(Service.InvokeError.invalidInput(name, inputViolations)) }
-        if action.requireApproval {
-            let allowed = await approve(name, args.toAny())
-            Log.service.info("RemoteMCP.invoke approval name=\(name) allow=\(allowed)")
-            guard allowed else { return .failure(Service.InvokeError.denied(name)) }
-        }
+        let allowed = await approve(name, args.toAny())
+        Log.service.info("RemoteMCP.invoke approval name=\(name) allow=\(allowed)")
+        guard allowed else { return .failure(Service.InvokeError.denied(name)) }
         do {
             let keepActive = isActive
             let client = try await activate()

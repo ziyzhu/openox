@@ -145,11 +145,9 @@ final class IOSService {
         guard inputViolations.isEmpty else {
             return .failure(Service.InvokeError.invalidInput(name, inputViolations))
         }
-        if action.requireApproval {
-            let allow = await approve(name, args.toAny())
-            Log.service.info("IOSService.invoke approval name=\(name) allow=\(allow)")
-            guard allow else { return .failure(Service.InvokeError.denied(name)) }
-        }
+        let allow = await approve(name, args.toAny())
+        Log.service.info("IOSService.invoke approval name=\(name) allow=\(allow)")
+        guard allow else { return .failure(Service.InvokeError.denied(name)) }
         do {
             let value = try await nativeInvocation(service.domain, actionID, args, purpose) ?? .null
             let outputViolations = JSONSchemaValidator.validate(value, against: outputSchema, definitions: definitions)

@@ -2,9 +2,9 @@ import Foundation
 
 extension Chat {
     public func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
-        guard let operation = InvocationName(rawValue: "ox.provider.\(name)"),
-              OxProviders.operations.contains(where: { $0.0 == name }),
+        guard OxProviders.operations.contains(where: { $0.0 == name }),
               let fields = arguments.objectValue else { throw RuntimeError.bridge("Unknown provider operation") }
+        let operation = "ox.provider.\(name)"
         let registry = ProviderRegistry.shared
         let definition: ProviderDefinition?
         if name == "save" || name == "validate" {
@@ -27,18 +27,15 @@ extension Chat {
             case "validate": return .object(["id": .string(definition!.id), "valid": .bool(true)])
             case "save":
                 try requireProfileMutation(operation)
-                try await requireApproval(action: operation.rawValue, args: ["name": definition!.name, "url": definition!.url.absoluteString])
                 try Task.checkCancellation()
                 try registry.save(definition!)
                 return .object(["id": .string(definition!.id), "saved": .bool(true)])
             case "delete":
                 try requireProfileMutation(operation)
-                try await requireApproval(action: operation.rawValue, args: ["name": definition!.name])
                 try Task.checkCancellation()
                 try registry.delete(id: definition!.id)
                 return .object(["id": .string(definition!.id), "deleted": .bool(true)])
             case "deauthenticate":
-                try await requireApproval(action: operation.rawValue, args: ["name": definition!.name])
                 try Task.checkCancellation()
                 registry.deauthenticate(definition!)
                 return .object(["id": .string(definition!.id), "status": .string(registry.authenticationStatus(id: definition!.id))])

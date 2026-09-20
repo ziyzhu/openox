@@ -3,7 +3,7 @@ import Foundation
 extension Chat {
     public func attachArtifact(filename: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["source": .string("artifact"), "filename": .string(filename)])
-        return try await tracked(.artifactAttach, args, purpose: purpose) {
+        return try await tracked(Actions.artifactAttach, args, purpose: purpose) {
             let artifact = try await repository.artifact(named: filename, in: scope)
             let attachment = try WebAttachmentFactory.make(artifact: artifact)
             try appendTransientAttachment(attachment)
@@ -17,9 +17,8 @@ extension Chat {
             "url": .string(request.url.absoluteString),
             "filename": filename.map(JSONValue.string) ?? .null,
         ])
-        return try await tracked(.artifactImport, args, purpose: purpose) {
-            try requireProfileMutation(.artifactImport)
-            try await requireApproval(action: InvocationName.artifactImport.rawValue, args: args.toAny())
+        return try await tracked(Actions.artifactImport, args, purpose: purpose) {
+            try requireProfileMutation(Actions.artifactImport)
             let (_, response) = try await fetchWebResource(request)
             let suggestedName = filename ?? response.suggestedFilename
             let artifact = try await ArtifactImporter.importDataAsync(
@@ -34,9 +33,8 @@ extension Chat {
 
     public func renameArtifact(filename: String, newFilename: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["filename": .string(filename), "newFilename": .string(newFilename)])
-        return try await tracked(.artifactRename, args, purpose: purpose) {
-            try requireProfileMutation(.artifactRename)
-            try await requireApproval(action: InvocationName.artifactRename.rawValue, args: args.toAny())
+        return try await tracked(Actions.artifactRename, args, purpose: purpose) {
+            try requireProfileMutation(Actions.artifactRename)
             let artifact = try await repository.renameArtifact(named: filename, to: newFilename, in: scope)
             renameArtifactReferences(
                 from: filename,
@@ -51,7 +49,7 @@ extension Chat {
 
     public func presentArtifact(filename: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["filename": .string(filename)])
-        return try await trackedEffect(.artifactPresent, args, purpose: purpose, apply: embedArtifact) {
+        return try await trackedEffect(Actions.artifactPresent, args, purpose: purpose, apply: embedArtifact) {
             let artifact = try await repository.artifact(named: filename, in: scope)
             guard artifact.exists else { throw ArtifactError.missing(filename) }
             return (try Self.encodeToJSON(ArtifactLibrary.Item(artifact)), artifact)
@@ -61,7 +59,7 @@ extension Chat {
     public func presentArtifacts(filenames: [String], purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["filenames": .array(filenames.map(JSONValue.string))])
         let result = try await trackedEffect(
-            .artifactPresent,
+            Actions.artifactPresent,
             args,
             purpose: purpose,
             apply: { artifacts in artifacts.forEach(embedArtifact) }
@@ -80,7 +78,7 @@ extension Chat {
 
     func importRemoteMCPArtifacts(_ values: [RemoteMCPArtifact]) async throws {
         guard !values.isEmpty else { return }
-        try requireProfileMutation(.artifactImport)
+        try requireProfileMutation(Actions.artifactImport)
         var artifacts: [Artifact] = []
         for value in values {
             artifacts.append(try await ArtifactImporter.importDataAsync(

@@ -14,7 +14,7 @@ sim --device ox-qa-5 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme
 Send `92` in a fresh Mock chat. Leave the first approval pending for more than
 60 seconds and verify it remains answerable, then choose **Deny** for the steps named “Deny this test
 connection” and “Deny this test deletion”; choose **Approve** for the other test
-steps. Do not select Always approve. The expected answer is `PASS: 16 MCP
+steps. Do not select Always allow. The expected answer is `PASS: 16 MCP
 lifecycle checks`. The unavailable endpoint must leave the existing attachment
 intact, while a successful endpoint change must detach the old service. Removal
 must make its tools unavailable.

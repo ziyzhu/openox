@@ -14,7 +14,7 @@ nonisolated enum OxActions {
             [(
                 "ox.service.invoke",
                 .object([
-                    "description": .string("Invoke a service action: `await ox.service.invoke({ name, input?, purpose })`, where `name` is `web:<domain>:<action>`, `api:<service>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>`. Discover actions and inspect their full input/output schemas with `ox.service.inspect` before invoking them. Throws if `requireApproval` is denied, or if `requireAuth` and the user is not signed in; surface that error instead of retrying blindly."),
+                    "description": .string("Invoke a service action: `await ox.service.invoke({ name, input?, purpose })`, where `name` is `web:<domain>:<action>`, `api:<service>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>`. Discover actions and inspect their full input/output schemas with `ox.service.inspect` before invoking them. Throws if the user's Action policy blocks or denies it, or if `requireAuth` and the user is not signed in; surface that error instead of retrying blindly."),
                     "inputSchema": .object([
                         "type": .string("object"),
                         "properties": .object([

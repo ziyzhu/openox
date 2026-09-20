@@ -24,18 +24,15 @@ struct ModelPickerSheet: View {
 }
 
 struct SettingsSheet: View {
-    let ready: Bool
     let artifactRefreshEpoch: Int
     let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
     let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
-    let onSelectService: (Service) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serverManager
     @State private var profilePath: [UUID]
     @State private var pendingSkillDraft: SkillDraft?
     @State private var showOnboarding = false
-    @State private var confirmingAlwaysApprove = false
     @State private var creatingProfile = false
     @State private var openingProfile = false
     @State private var profileNameDraft = ""
@@ -51,17 +48,13 @@ struct SettingsSheet: View {
     init(
         initialProfileID: UUID?,
         initialSkillDraft: SkillDraft?,
-        ready: Bool,
         artifactRefreshEpoch: Int,
         onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
-        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void,
-        onSelectService: @escaping (Service) -> Void
+        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
     ) {
-        self.ready = ready
         self.artifactRefreshEpoch = artifactRefreshEpoch
         self.onRenameArtifact = onRenameArtifact
         self.onDeleteArtifact = onDeleteArtifact
-        self.onSelectService = onSelectService
         _profilePath = State(initialValue: initialProfileID.map { [$0] } ?? [])
         _pendingSkillDraft = State(initialValue: initialSkillDraft)
     }
@@ -72,16 +65,6 @@ struct SettingsSheet: View {
 
     private var themeBinding: Binding<AppTheme> {
         Binding(get: { theme.theme }, set: { theme.theme = $0 })
-    }
-
-    private var alwaysApproveBinding: Binding<Bool> {
-        Binding(get: { serverManager.autoApproveAll }, set: { enabled in
-            if enabled {
-                confirmingAlwaysApprove = true
-            } else {
-                serverManager.autoApproveAll = false
-            }
-        })
     }
 
     private var logsSummary: Text {
@@ -338,15 +321,6 @@ struct SettingsSheet: View {
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
         }
-        .alert("Always allow all capabilities?", isPresented: $confirmingAlwaysApprove) {
-            Button("Cancel", role: .cancel) {}
-            Button("Always approve", role: .destructive) {
-                serverManager.autoApproveAll = true
-            }
-            .accessibilityIdentifier(A11yID.Settings.autoApproveConfirm)
-        } message: {
-            Text("Agents can access signed-in data, send messages, delete data, and spend money without asking. Mistakes may cause permanent data loss or unwanted charges. This approves pending requests and future use of capabilities in all chats and profiles until turned off. System permissions and private-data consent still apply.")
-        }
         .task {
             await storage.refreshAvailability()
         }
@@ -415,38 +389,18 @@ struct SettingsSheet: View {
     private var profileNameUnavailable: Bool { profileNameIsEmpty || profileNameTaken }
 
     private var actionsSettingsSection: some View {
-        SettingsSection(
-            "Actions",
-            footer: "Give agents permission to use all available capabilities without asking in any chat. Mistakes may cause data loss or unwanted charges.",
-            insetContent: false
-        ) {
+        SettingsSection("Actions", insetContent: false) {
             VStack(spacing: 0) {
-                Toggle("Always approve", isOn: alwaysApproveBinding)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .tint(Theme.Colors.primary)
-                    .settingsRowPadding()
-                    .accessibilityIdentifier(A11yID.Settings.autoApproveAll)
-
-                Divider().settingsContentInset()
-
                 NavigationLink {
-                    ServiceExploreContent(
-                        onClose: nil,
-                        ready: ready,
-                        primaryAction: .startChat,
-                        browserSessionID: nil,
-                        isAttached: { _ in false },
-                        onSelect: onSelectService
-                    )
+                    ActionSettingsView()
                 } label: {
                     SettingsDisclosureRow(
-                        title: "Services",
-                        value: Text(verbatim: "\(serverManager.services.count)")
+                        title: "Actions",
+                        value: Text(serverManager.defaultActionPolicy.title)
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Settings.services)
+                .accessibilityIdentifier(A11yID.Settings.actions)
             }
         }
     }

@@ -612,11 +612,9 @@ struct RootView: View {
                         SettingsSheet(
                             initialProfileID: profileID,
                             initialSkillDraft: skillDraft,
-                            ready: startupPhase == .ready,
                             artifactRefreshEpoch: artifactRefreshEpoch,
                             onRenameArtifact: renameArtifact,
-                            onDeleteArtifact: deleteArtifact,
-                            onSelectService: { startChat(with: $0) }
+                            onDeleteArtifact: deleteArtifact
                         )
                     case .services(let chatID):
                         ServiceExplorePage(

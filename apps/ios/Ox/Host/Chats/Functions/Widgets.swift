@@ -35,7 +35,7 @@ extension Chat {
         let args: JSONValue = .object([
             "cards": .int(shoveler.cards.count),
         ])
-        return try await trackedEffect(.widgetShoveler, args, purpose: purpose, apply: embedShoveler) {
+        return try await trackedEffect(Actions.widgetShoveler, args, purpose: purpose, apply: embedShoveler) {
             (.null, shoveler)
         }
     }
@@ -68,7 +68,7 @@ extension Chat {
         let args: JSONValue = .object([
             "video": .string(sourceValue),
         ])
-        return try await trackedEffect(.widgetVideo, args, purpose: purpose, apply: embedVideo) {
+        return try await trackedEffect(Actions.widgetVideo, args, purpose: purpose, apply: embedVideo) {
             (.null, video)
         }
     }

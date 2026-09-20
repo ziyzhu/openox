@@ -65,8 +65,8 @@ extension Service {
             role: role,
             scripts: scripts
         )
-        if action.requireApproval {
-            let allow = await approve?(name, args.toAny()) ?? false
+        if let approve {
+            let allow = await approve(name, args.toAny())
             Log.service.info("Service.invoke approval name=\(name) allow=\(allow)")
             if !allow { return .failure(InvokeError.denied(name)) }
         }

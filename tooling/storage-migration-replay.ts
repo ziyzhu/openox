@@ -21,6 +21,9 @@ type ReplayResult = {
   chatModelMigrated?: boolean;
   unsupportedVersionRejected?: boolean;
   providerCatalogMigrated?: boolean;
+  actionPoliciesMigrated?: boolean;
+  futureActionPoliciesPreserved?: boolean;
+  actionPolicyResolutionValid?: boolean;
   fixtureResults?: Array<{
     name: string;
     migratedAsExpected: boolean;

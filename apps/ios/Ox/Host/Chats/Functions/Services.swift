@@ -79,7 +79,7 @@ extension Chat: OxFunctionBridge {
             throw RuntimeError.bridge("ox.service.listAttached: kind must be 'web', 'ios', or 'mcp'")
         }
         let args: JSONValue = .object(kind.map { ["kind": .string($0)] } ?? [:])
-        return try await tracked(.serviceListAttached, args, purpose: purpose) {
+        return try await tracked(Actions.serviceListAttached, args, purpose: purpose) {
             let snapshots = try self.attachedServices
                 .filter { kind == nil || self.serviceKind($0) == kind }
                 .sorted { $0.domain < $1.domain }
@@ -141,7 +141,7 @@ extension Chat {
         let existing = attachedService(domain: domain)
         let service = try await serviceManager.serviceForCaller(domain: domain, reason: .attach)
         if existing == nil { try await gateServiceAttach(service) }
-        return try await tracked(.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
+        return try await tracked(Actions.serviceAttach, .object(["domain": .string(domain)]), purpose: purpose) {
             serviceManager.selectServiceForAttachment(service)
             serviceManager.setSaved(service, true)
             if let existing, let index = attachedServices.firstIndex(where: { $0 === existing }) {
@@ -175,7 +175,7 @@ extension Chat {
     }
 
     public func detachService(domain: String, purpose: String) async throws -> JSONValue? {
-        try await tracked(.serviceDetach, .object(["domain": .string(domain)]), purpose: purpose) {
+        try await tracked(Actions.serviceDetach, .object(["domain": .string(domain)]), purpose: purpose) {
             guard !domain.isEmpty else {
                 throw RuntimeError.bridge("ox.service.detach: requires a non-empty domain")
             }

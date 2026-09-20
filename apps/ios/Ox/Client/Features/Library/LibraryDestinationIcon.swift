@@ -35,8 +35,8 @@ enum OxActionIconKind: String, Equatable {
     case widgets
 
     init(actionName: String) {
-        if let invocation = InvocationName(rawValue: actionName) {
-            self = invocation.actionIconKind
+        if let kind = Actions.iconKind(for: actionName) {
+            self = kind
             return
         }
         if actionName.hasPrefix("ox.service.invoke(ios:") {

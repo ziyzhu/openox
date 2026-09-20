@@ -26,7 +26,7 @@ struct PermissionRequest: Identifiable, Equatable {
             : Self.actionIconKind(for: title)
     }
 
-    @MainActor init(_ request: ServiceApproval.Request) {
+    @MainActor init(_ request: ActionApproval.Request) {
         id = request.id
         prompt = request.prompt
         approve = request.approve
@@ -38,7 +38,7 @@ struct PermissionRequest: Identifiable, Equatable {
 
     @MainActor private static func actionIconKind(for title: String) -> OxActionIconKind? {
         if let cached = actionIconKindsByTitle[title] { return cached }
-        guard let kind = InvocationName.allCases.first(where: { $0.approvalLabel == title })?.actionIconKind else {
+        guard let kind = Actions.iconKind(forLabel: title) else {
             return nil
         }
         actionIconKindsByTitle[title] = kind

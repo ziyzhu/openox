@@ -47,11 +47,14 @@ final class ServiceOperations {
         return .from(try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]))
     }
 
-    private func tracked(_ name: InvocationName, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
-        try await tracked(name.rawValue, args, purpose: purpose, body)
+    private func tracked(_ action: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
+        try await recorded(action, args, purpose: purpose) {
+            try await requireApproval(action: action, args: args.toAny())
+            return try await body()
+        }
     }
 
-    private func tracked(_ name: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
+    private func recorded(_ name: String, _ args: JSONValue, purpose: String, _ body: () async throws -> JSONValue?) async throws -> JSONValue? {
         try Task.checkCancellation()
         let id = begin(name, args, purpose)
         do {
@@ -74,13 +77,21 @@ final class ServiceOperations {
             throw RuntimeError.bridge("This MCP connection changed or was removed. Attach the current service before invoking it.")
         }
         let input = args ?? .object([:])
-        return try await tracked("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
-            let approve: @MainActor (String, Any?) async -> Bool = { action, args in
-                do {
-                    try await self.requireApproval(action, args, nil)
-                    return !Task.isCancelled
-                } catch { return false }
-            }
+        let qualifiedName = service.definition.qualifiedActionName(actionID)
+        guard let action = service.definition.action(actionID), let inputSchema = action.inputSchema else {
+            throw Service.InvokeError.unknown(qualifiedName)
+        }
+        let inputViolations = JSONSchemaValidator.validate(
+            input,
+            against: inputSchema,
+            definitions: service.definition.definitions
+        )
+        guard inputViolations.isEmpty else {
+            throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
+        }
+        return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
+            try await self.requireApproval(action: qualifiedName, args: input.toAny())
+            let approve: @MainActor (String, Any?) async -> Bool = { _, _ in true }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {
                 result = await implementation.invoke(service: service, actionID: actionID, args: input, approve: approve)
@@ -106,7 +117,7 @@ final class ServiceOperations {
 
     func validateService(domain: String, purpose: String) async throws -> JSONValue? {
         let domain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return try await tracked(.serviceValidate, .object(["domain": .string(domain)]), purpose: purpose) {
+        return try await tracked(Actions.serviceValidate, .object(["domain": .string(domain)]), purpose: purpose) {
             try await self.serviceManager.validateService(domain: domain)
             return .object(["domain": .string(domain), "valid": .bool(true)])
         }
@@ -130,8 +141,7 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.service.create: web services require domain.")
         }
         let args: JSONValue = .object(["kind": .string(kind), "domain": .string(cleanDomain)])
-        return try await tracked(.serviceCreate, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceCreate.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceCreate, args, purpose: purpose) {
             try await self.serviceManager.createService(
                 kind: serviceKind,
                 id: cleanDomain,
@@ -164,7 +174,7 @@ final class ServiceOperations {
             throw RuntimeError.bridge("MCP transport must be 'auto', 'streamable-http', or 'sse'.")
         }
         let resolvedTransport = transport.flatMap(RemoteMCPTransport.init(rawValue:))
-        let name: InvocationName = replacing == nil ? .serviceCreate : .serviceUpdate
+        let action = replacing == nil ? Actions.serviceCreate : Actions.serviceUpdate
         var fields: [String: JSONValue] = [
             "kind": .string("mcp"),
             "endpoint": .string(endpoint.absoluteString),
@@ -172,8 +182,7 @@ final class ServiceOperations {
         ]
         if let replacing { fields["domain"] = .string(replacing.domain) }
         let args: JSONValue = .object(fields)
-        return try await tracked(name, args, purpose: purpose) {
-            try await self.requireApproval(action: name.rawValue, args: args.toAny())
+        return try await tracked(action, args, purpose: purpose) {
             let service = try await self.serviceManager.connectRemoteMCP(
                 endpoint.absoluteString, transport: resolvedTransport, replacing: replacing
             )
@@ -189,8 +198,7 @@ final class ServiceOperations {
         }
         let kind = serviceKind(service)
         let args: JSONValue = .object(["domain": .string(cleanDomain)])
-        return try await tracked(.serviceCopy, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceCopy.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceCopy, args, purpose: purpose) {
             try await self.serviceManager.copyServiceToLocal(
                 domain: cleanDomain,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -211,8 +219,7 @@ final class ServiceOperations {
             fields["endpoint"] = .string(endpoint.absoluteString)
         }
         let args: JSONValue = .object(fields)
-        return try await tracked(.serviceDelete, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceDelete.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceDelete, args, purpose: purpose) {
             if let currentService, currentService.isMCPService {
                 await self.serviceManager.removeRemoteMCP(currentService)
                 serviceChanged(cleanDomain)
@@ -242,7 +249,7 @@ final class ServiceOperations {
 
     func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
         let repository = try serviceRepositoryID(repository, function: "status")
-        return try await tracked(.serviceGitStatus, .object(["repository": .string(repository)]), purpose: purpose) {
+        return try await tracked(Actions.serviceGitStatus, .object(["repository": .string(repository)]), purpose: purpose) {
             try Self.encodeToJSON(try await self.serviceManager.serviceGitStatus(repositoryID: repository))
         }
     }
@@ -262,7 +269,7 @@ final class ServiceOperations {
             "limit": .int(limit),
         ]
         if let cursor { fields["cursor"] = .string(cursor) }
-        return try await tracked(.serviceGitLog, .object(fields), purpose: purpose) {
+        return try await tracked(Actions.serviceGitLog, .object(fields), purpose: purpose) {
             try Self.encodeToJSON(try await self.serviceManager.serviceGitLog(
                 repositoryID: repository,
                 limit: limit,
@@ -283,7 +290,7 @@ final class ServiceOperations {
             "commitHash": .string(commitHash),
         ]
         if let path { fields["path"] = .string(path) }
-        return try await tracked(.serviceGitShow, .object(fields), purpose: purpose) {
+        return try await tracked(Actions.serviceGitShow, .object(fields), purpose: purpose) {
             try Self.encodeToJSON(try await self.serviceManager.serviceGitShow(
                 repositoryID: repository,
                 commitHash: commitHash,
@@ -307,7 +314,7 @@ final class ServiceOperations {
         if let commitHash { fields["commitHash"] = .string(commitHash) }
         if let baseCommitHash { fields["baseCommitHash"] = .string(baseCommitHash) }
         if let path { fields["path"] = .string(path) }
-        return try await tracked(.serviceGitDiff, .object(fields), purpose: purpose) {
+        return try await tracked(Actions.serviceGitDiff, .object(fields), purpose: purpose) {
             try Self.encodeToJSON(try await self.serviceManager.serviceGitDiff(
                 repositoryID: repository,
                 commitHash: commitHash,
@@ -323,8 +330,7 @@ final class ServiceOperations {
             "repository": .string(repository),
             "commitHash": .string(commitHash),
         ])
-        return try await tracked(.serviceGitCheckout, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceGitCheckout.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceGitCheckout, args, purpose: purpose) {
             return try Self.encodeToJSON(try await self.serviceManager.checkoutServiceRepository(
                 repositoryID: repository,
                 commitHash: commitHash,
@@ -336,8 +342,7 @@ final class ServiceOperations {
     func serviceGitCommit(message: String, purpose: String) async throws -> JSONValue? {
         let message = try serviceCommitMessage(message, function: "commit")
         let args: JSONValue = .object(["message": .string(message)])
-        return try await tracked(.serviceGitCommit, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceGitCommit.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceGitCommit, args, purpose: purpose) {
             return try Self.encodeToJSON(try await self.serviceManager.commitLocalServices(
                 message: message,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -351,8 +356,7 @@ final class ServiceOperations {
             "commitHash": .string(commitHash),
             "message": .string(message),
         ])
-        return try await tracked(.serviceGitRevert, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceGitRevert.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceGitRevert, args, purpose: purpose) {
             return try Self.encodeToJSON(try await self.serviceManager.revertLocalServices(
                 commitHash: commitHash,
                 message: message,
@@ -371,8 +375,7 @@ final class ServiceOperations {
         ]
         if let path { fields["path"] = .string(path) }
         let args: JSONValue = .object(fields)
-        return try await tracked(.serviceGitRestore, args, purpose: purpose) {
-            try await self.requireApproval(action: InvocationName.serviceGitRestore.rawValue, args: args.toAny())
+        return try await tracked(Actions.serviceGitRestore, args, purpose: purpose) {
             return try Self.encodeToJSON(try await self.serviceManager.restoreLocalServices(
                 path: path,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -398,7 +401,7 @@ final class ServiceOperations {
         }
         var fields: [String: JSONValue] = ["domain": .string(cleanDomain)]
         if let actions { fields["actions"] = .array(actions.map(JSONValue.string)) }
-        return try await tracked(.serviceInspect, .object(fields), purpose: purpose) {
+        return try await tracked(Actions.serviceInspect, .object(fields), purpose: purpose) {
             let definition = service.definition
             let details: [String: JSONValue]
             if let actions {
@@ -427,7 +430,7 @@ final class ServiceOperations {
     }
 
     func findServices(query: String, purpose: String) async throws -> JSONValue? {
-        try await tracked(.serviceFind, .object(["query": .string(query)]), purpose: purpose) {
+        try await tracked(Actions.serviceFind, .object(["query": .string(query)]), purpose: purpose) {
             guard serviceManager.monoRepositoryState == .ready else {
                 Log.session.info("bridge.service.find unavailable monoRepository=loading chars=\(query.count)")
                 throw RuntimeError.bridge("ox.service.find: Ox Server is still loading services. Continue without service discovery or try again later.")
@@ -454,7 +457,7 @@ final class ServiceOperations {
         guard service.supportsAuthentication else {
             throw RuntimeError.bridge("ox.service.signIn: \(domain) declares no sign-in handoff")
         }
-        return try await tracked(.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
+        return try await tracked(Actions.serviceSignIn, .object(["domain": .string(domain)]), purpose: purpose) {
             await service.checkAccess(policy: .current, reason: .modelSignIn)
             if service.auth.isSignedOut {
                 await service.attemptSilentSignIn(reason: .modelSignIn)
@@ -489,7 +492,7 @@ final class ServiceOperations {
         guard service.supportsBotControl else {
             throw RuntimeError.bridge("ox.service.solve: \(domain) does not support human verification")
         }
-        return try await tracked(.serviceSolve, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
+        return try await tracked(Actions.serviceSolve, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
             let control = ServiceControl.botControl(domain: domain, serviceName: service.title, args: args)
             Log.session.info("bridge.service.solve handoff domain=\(domain)")
             guard await presentControl(control, service) != nil else {
@@ -511,7 +514,7 @@ final class ServiceOperations {
               service.definition.action(Manifest.PAYMENT_STATE_ACTION_ID, includingStandard: true) != nil else {
             throw RuntimeError.bridge("ox.service.pay: \(domain) declares no payment handoff")
         }
-        return try await tracked(.servicePayment, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
+        return try await tracked(Actions.servicePayment, .object(["domain": .string(domain), "args": args]), purpose: purpose) {
             let control = ServiceControl.payment(domain: domain, serviceName: service.title, args: args)
             Log.session.info("bridge.service.payment handoff domain=\(domain)")
             guard let result = await presentControl(control, service) else {

@@ -2,20 +2,14 @@ import Foundation
 import JavaScriptCore
 
 nonisolated enum OxFileSystem {
-    static let invocations: [InvocationName] = [
-        .fsList,
-        .fsRead,
-        .fsWrite,
-        .fsEdit,
-        .fsDelete,
-        .fsGlob,
-        .fsGrep,
-    ]
-
-    static let approvalInvocations: Set<InvocationName> = [
-        .fsWrite,
-        .fsEdit,
-        .fsDelete,
+    static let actions = [
+        Actions.fsList,
+        Actions.fsRead,
+        Actions.fsWrite,
+        Actions.fsEdit,
+        Actions.fsDelete,
+        Actions.fsGlob,
+        Actions.fsGrep,
     ]
 
     static let function = OxFunction(

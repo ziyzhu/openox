@@ -911,20 +911,20 @@ private enum InvocationFormat {
 
     static func sources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
         let args = invocation.args.objectValue
-        switch InvocationName(rawValue: invocation.name) {
-        case .webSearch:
+        switch invocation.name {
+        case Actions.webSearch:
             if let sources = searchSources(invocation), !sources.isEmpty {
                 return sources
             }
             let query = args?["query"]?.stringValue ?? ""
             return query.isEmpty ? nil : [Source(label: query, icon: .none)]
-        case .webFetch:
+        case Actions.webFetch:
             guard let source = fetchSource(invocation) else { return nil }
             return [source]
-        case .serviceFind:
+        case Actions.serviceFind:
             let query = args?["query"]?.stringValue ?? ""
             return query.isEmpty ? nil : [Source(label: query, icon: .none)]
-        case .serviceAttach, .serviceValidate, .serviceSignIn, .serviceSolve, .servicePayment, .serviceDetach:
+        case Actions.serviceAttach, Actions.serviceValidate, Actions.serviceSignIn, Actions.serviceSolve, Actions.servicePayment, Actions.serviceDetach:
             guard let domain = args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
             let service = serviceManager.service(domain: domain)
             return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
