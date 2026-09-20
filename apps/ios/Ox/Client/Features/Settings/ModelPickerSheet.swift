@@ -24,9 +24,11 @@ struct ModelPickerSheet: View {
 }
 
 struct SettingsSheet: View {
+    let ready: Bool
     let artifactRefreshEpoch: Int
     let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
     let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
+    let onSelectService: (Service) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serverManager
@@ -48,13 +50,17 @@ struct SettingsSheet: View {
     init(
         initialProfileID: UUID?,
         initialSkillDraft: SkillDraft?,
+        ready: Bool,
         artifactRefreshEpoch: Int,
         onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
-        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
+        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void,
+        onSelectService: @escaping (Service) -> Void
     ) {
+        self.ready = ready
         self.artifactRefreshEpoch = artifactRefreshEpoch
         self.onRenameArtifact = onRenameArtifact
         self.onDeleteArtifact = onDeleteArtifact
+        self.onSelectService = onSelectService
         _profilePath = State(initialValue: initialProfileID.map { [$0] } ?? [])
         _pendingSkillDraft = State(initialValue: initialSkillDraft)
     }
@@ -401,6 +407,26 @@ struct SettingsSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.actions)
+
+                Divider().settingsContentInset()
+
+                NavigationLink {
+                    ServiceExploreContent(
+                        onClose: nil,
+                        ready: ready,
+                        primaryAction: .startChat,
+                        browserSessionID: nil,
+                        isAttached: { _ in false },
+                        onSelect: onSelectService
+                    )
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Services",
+                        value: Text(verbatim: "\(serverManager.services.count)")
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Settings.services)
             }
         }
     }
