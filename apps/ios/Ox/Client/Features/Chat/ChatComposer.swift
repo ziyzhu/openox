@@ -457,7 +457,6 @@ struct ChatComposer: View, Equatable {
     @State private var promptSecondaryInput = ""
 
     @Environment(\.appTheme) private var appTheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
         lhs.composer === rhs.composer
@@ -640,7 +639,7 @@ struct ChatComposer: View, Equatable {
                 .frame(height: Theme.Spacing.lg)
             }
         }
-        .animation(reduceMotion ? nil : .smooth(duration: Theme.Animation.standard), value: isResting)
+        .animation(.smooth(duration: Theme.Animation.standard), value: isResting)
     }
 
     private var inputBarTopSpacing: CGFloat {
@@ -681,7 +680,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var topStripTransition: AnyTransition {
-        reduceMotion ? .opacity : .scale(scale: 0.8).combined(with: .opacity)
+        .scale(scale: 0.8).combined(with: .opacity)
     }
 
     private var showsTopStrip: Bool {
@@ -1184,7 +1183,6 @@ struct ComposerServicePicker: View {
 
 struct ComposerSlashPicker: View {
     @Bindable var composer: ChatComposerModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isFocused: Bool
     let composerHeight: CGFloat
     let onSelect: (Skill) -> Void
@@ -1205,10 +1203,10 @@ struct ComposerSlashPicker: View {
                     .padding(.bottom, composerHeight + Theme.Spacing.xs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(reduceMotion ? nil : .smooth(duration: Theme.Animation.standard), value: suggestions.map(\.id))
+        .animation(.smooth(duration: Theme.Animation.standard), value: suggestions.map(\.id))
     }
 }
 

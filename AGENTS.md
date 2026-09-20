@@ -13,7 +13,6 @@
 1. Reference Apple development documentation for iOS changes.
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
-1. Honor Reduce Motion at each motion owner, including programmatic scrolling, composer layout, and move or scale transitions; verify gesture release and interrupted animations with video.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 
 ## Review Rules

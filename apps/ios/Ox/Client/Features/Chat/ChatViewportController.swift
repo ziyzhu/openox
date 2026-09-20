@@ -153,7 +153,7 @@ final class ChatViewportController {
         }
     }
 
-    func rideToBottom(animated: Bool) {
+    func rideToBottom() {
         guard frame?.jumpDistance ?? .infinity > 1 else {
             motion = .stationary
             position.scrollTo(edge: .bottom)
@@ -161,8 +161,8 @@ final class ChatViewportController {
             return
         }
         move(to: .bottom)
-        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=bottom disposition=\(animated ? "animated" : "immediate") \(logSnapshot)")
-        withAnimation(animated ? Theme.Animation.drop : nil) {
+        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=bottom disposition=animated \(logSnapshot)")
+        withAnimation(Theme.Animation.drop) {
             position.scrollTo(edge: .bottom)
         }
     }
