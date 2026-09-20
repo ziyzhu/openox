@@ -2,6 +2,10 @@ import SwiftUI
 
 struct ProfileSettingsView: View {
     let profileID: UUID
+    let initialSkillDraft: SkillDraft?
+    let artifactRefreshEpoch: Int
+    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
+    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var renaming = false
@@ -10,6 +14,20 @@ struct ProfileSettingsView: View {
     @State private var confirmingDelete = false
 
     private var storage: StorageRoot { .shared }
+
+    init(
+        profileID: UUID,
+        initialSkillDraft: SkillDraft?,
+        artifactRefreshEpoch: Int,
+        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
+        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
+    ) {
+        self.profileID = profileID
+        self.initialSkillDraft = initialSkillDraft
+        self.artifactRefreshEpoch = artifactRefreshEpoch
+        self.onRenameArtifact = onRenameArtifact
+        self.onDeleteArtifact = onDeleteArtifact
+    }
 
     private var profile: Profile? {
         storage.profiles.first { $0.id == profileID }
@@ -35,7 +53,13 @@ struct ProfileSettingsView: View {
                 if let profile {
                     manageSection(for: profile)
                     storageSection
-                    ProfilePersonalizationView(profile: profile)
+                    ProfileContentsView(
+                        profile: profile,
+                        initialSkillDraft: initialSkillDraft,
+                        artifactRefreshEpoch: artifactRefreshEpoch,
+                        onRenameArtifact: onRenameArtifact,
+                        onDeleteArtifact: onDeleteArtifact
+                    )
                         .id(profile.url.path)
                     deleteSection(for: profile)
                 }
@@ -262,19 +286,43 @@ struct ProfileSettingsView: View {
 
 }
 
-private struct ProfilePersonalizationView: View {
+private struct ProfileContentsView: View {
     private struct Context {
+        let scope: ProfileScope
         let memory: UserMemory
         let soul: Soul
+        let skills: Skills
+        var artifactCount: Int
 
         func waitUntilCurrent() async {
             await memory.waitUntilCurrent()
             await soul.waitUntilCurrent()
+            await skills.waitUntilCurrent()
         }
     }
 
     let profile: Profile
+    let artifactRefreshEpoch: Int
+    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
+    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
     @State private var context: Context?
+    @State private var editingSkill: SkillDraft?
+    @State private var openingImportedSkill: Bool
+
+    init(
+        profile: Profile,
+        initialSkillDraft: SkillDraft?,
+        artifactRefreshEpoch: Int,
+        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
+        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
+    ) {
+        self.profile = profile
+        self.artifactRefreshEpoch = artifactRefreshEpoch
+        self.onRenameArtifact = onRenameArtifact
+        self.onDeleteArtifact = onDeleteArtifact
+        _editingSkill = State(initialValue: initialSkillDraft)
+        _openingImportedSkill = State(initialValue: initialSkillDraft != nil)
+    }
 
     private var memorySummary: Text {
         let trimmed = context?.memory.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -288,13 +336,52 @@ private struct ProfilePersonalizationView: View {
         context?.soul.text == Soul.defaultText ? Text("Default") : Text("Custom")
     }
 
+    private var artifactsSummary: Text {
+        guard let count = context?.artifactCount, count > 0 else { return Text("None") }
+        return Text(verbatim: "\(count)")
+    }
+
+    private var skillsSummary: Text {
+        guard let count = context?.skills.all.count, count > 0 else { return Text("None") }
+        return Text(verbatim: "\(count)")
+    }
+
     var body: some View {
         SettingsSection(
-            "Personalization",
-            footer: "Character and Memory are stored with this Profile.",
+            "Profile",
             insetContent: false
         ) {
             VStack(spacing: 0) {
+                NavigationLink {
+                    if let context { artifactsView(context) }
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Artifacts",
+                        value: artifactsSummary,
+                        isLoading: context == nil
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(context == nil)
+                .accessibilityIdentifier(A11yID.Settings.artifacts)
+
+                Divider().settingsContentInset()
+
+                NavigationLink {
+                    if let context { skillsView(context) }
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Skills",
+                        value: skillsSummary,
+                        isLoading: context?.skills.isLoaded != true
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(context?.skills.isLoaded != true)
+                .accessibilityIdentifier(A11yID.Settings.skills)
+
+                Divider().settingsContentInset()
+
                 NavigationLink {
                     if let context { CharacterEditorView(soul: context.soul) }
                 } label: {
@@ -325,13 +412,66 @@ private struct ProfilePersonalizationView: View {
             }
         }
         .task(id: profile.url.path) {
-            context = nil
-            let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
-            let loaded = Context(memory: UserMemory(scope: scope), soul: Soul(scope: scope))
-            await loaded.waitUntilCurrent()
-            guard !Task.isCancelled else { return }
-            context = loaded
+            await load()
         }
+        .task(id: artifactRefreshEpoch) {
+            await refreshArtifactCount()
+        }
+        .onAppear {
+            Task { await refreshArtifactCount() }
+        }
+        .navigationDestination(isPresented: $openingImportedSkill) {
+            if let context { skillsView(context) }
+        }
+    }
+
+    private func artifactsView(_ context: Context) -> some View {
+        ArtifactsView(
+            scope: context.scope,
+            emptyStateReady: true,
+            refreshEpoch: artifactRefreshEpoch,
+            onRename: { artifact, newFilename in
+                try await onRenameArtifact(artifact, newFilename, context.scope)
+            },
+            onDelete: { artifact in
+                try await onDeleteArtifact(artifact, context.scope)
+            }
+        )
+    }
+
+    private func skillsView(_ context: Context) -> some View {
+        SkillsListView(
+            skills: context.skills,
+            editing: $editingSkill,
+            ready: true,
+            profileID: profile.id
+        )
+    }
+
+    private func load() async {
+        context = nil
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        let loaded = Context(
+            scope: scope,
+            memory: UserMemory(scope: scope),
+            soul: Soul(scope: scope),
+            skills: Skills(scope: scope),
+            artifactCount: 0
+        )
+        await loaded.waitUntilCurrent()
+        let artifacts = await ProfileRepository.shared.artifacts(in: scope)
+        guard !Task.isCancelled else { return }
+        var complete = loaded
+        complete.artifactCount = artifacts.count
+        context = complete
+    }
+
+    private func refreshArtifactCount() async {
+        guard var current = context else { return }
+        let artifacts = await ProfileRepository.shared.artifacts(in: current.scope)
+        guard !Task.isCancelled, context?.scope == current.scope else { return }
+        current.artifactCount = artifacts.count
+        context = current
     }
 
 }

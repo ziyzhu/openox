@@ -41,9 +41,9 @@ private struct SidebarSafeArtifactButton<Label: View>: View {
 }
 
 struct ArtifactsView: View {
+    let scope: ProfileScope
     let emptyStateReady: Bool
     let refreshEpoch: Int
-    let onClose: () -> Void
     let onRename: (Artifact, String) async throws -> Artifact
     let onDelete: (Artifact) async throws -> Void
 
@@ -117,7 +117,7 @@ struct ArtifactsView: View {
     @State private var downloadingIDs: Set<String> = []
 
     var body: some View {
-        NavigationStack {
+        Group {
             VStack(spacing: 0) {
                 Group {
                     if loading {
@@ -220,9 +220,6 @@ struct ArtifactsView: View {
             .navigationTitle("Artifacts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SheetDismissToolbarButton(action: onClose)
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     addMenu
                 }
@@ -322,12 +319,10 @@ struct ArtifactsView: View {
 
     private func open(_ artifact: Artifact) {
         Task {
-            guard let scope = StorageRoot.currentScope else { return }
             downloadingIDs.insert(artifact.id)
             defer { downloadingIDs.remove(artifact.id) }
             do {
                 let available = try await ProfileRepository.shared.materializeArtifact(artifact, in: scope)
-                guard StorageRoot.currentScope == scope else { return }
                 Log.ui.info("ArtifactsView.preview present file=\(available.fileName)")
                 if available.usesDedicatedPreview {
                     dedicatedPreview = available
@@ -484,12 +479,6 @@ struct ArtifactsView: View {
     }
 
     private func load() async {
-        guard let scope = StorageRoot.currentScope else {
-            records = []
-            displayedRecords = []
-            loading = false
-            return
-        }
         let repository = ProfileRepository.shared
         let savedNames = await repository.savedArtifactNames(in: scope)
         records = await repository.artifacts(in: scope)
@@ -507,7 +496,6 @@ struct ArtifactsView: View {
     private func toggleSaved(_ record: ArtifactRecord) {
         Task {
             do {
-                guard let scope = StorageRoot.currentScope else { return }
                 try await ProfileRepository.shared.setArtifactSaved(
                     !record.isSaved,
                     named: record.artifact.fileName,
@@ -528,7 +516,11 @@ struct ArtifactsView: View {
                     guard let data = try await item.loadTransferable(type: Data.self) else {
                         throw ArtifactError.imageDecodeFailed
                     }
-                    _ = try await ArtifactImporter.importImageDataAsync(data, suggestedName: "Photo \(index + 1).jpg")
+                    _ = try await ArtifactImporter.importImageDataAsync(
+                        data,
+                        suggestedName: "Photo \(index + 1).jpg",
+                        in: scope
+                    )
                 }
                 await load()
             } catch {
@@ -544,7 +536,7 @@ struct ArtifactsView: View {
                 for url in urls {
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                    _ = try await ArtifactImporter.importFileAsync(at: url)
+                    _ = try await ArtifactImporter.importFileAsync(at: url, in: scope)
                 }
                 await load()
             } catch {
@@ -557,7 +549,11 @@ struct ArtifactsView: View {
     private func importCamera(_ image: UIImage) {
         Task {
             do {
-                _ = try await ArtifactImporter.importImageAsync(image, suggestedName: "Camera.jpg")
+                _ = try await ArtifactImporter.importImageAsync(
+                    image,
+                    suggestedName: "Camera.jpg",
+                    in: scope
+                )
                 await load()
             } catch {
                 Log.ui.error("ArtifactsView.camera error=\(error.localizedDescription)")

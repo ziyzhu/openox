@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SkillSchedulesSection: View {
     let skill: Skill
+    let profileID: UUID?
 
     @State private var scheduledSkills = ScheduledSkills.shared
     @State private var editor: ScheduledSkillEditorTarget?
@@ -27,7 +28,7 @@ struct SkillSchedulesSection: View {
             }
 
             Button {
-                editor = ScheduledSkillEditorTarget(skill: skill)
+                editor = ScheduledSkillEditorTarget(skill: skill, profileID: profileID)
             } label: {
                 Chip(fill: Theme.Colors.chipOnBackground) {
                     Image(systemName: "plus")
@@ -77,7 +78,7 @@ struct SkillSchedulesSection: View {
     }
 
     private var schedules: [ScheduledSkill] {
-        scheduledSkills.schedules(profileID: StorageRoot.shared.activeId).filter {
+        scheduledSkills.schedules(profileID: profileID).filter {
             $0.skill.name == skill.name
         }
     }
@@ -85,7 +86,11 @@ struct SkillSchedulesSection: View {
     private func scheduleRow(_ schedule: ScheduledSkill) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             Button {
-                editor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
+                editor = ScheduledSkillEditorTarget(
+                    skill: schedule.skill,
+                    profileID: schedule.profileID,
+                    schedule: schedule
+                )
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(schedule.recurrence.displaySummary)
@@ -125,7 +130,11 @@ struct SkillSchedulesSection: View {
                 Label("Run Now", systemImage: "play")
             }
             Button {
-                editor = ScheduledSkillEditorTarget(skill: schedule.skill, schedule: schedule)
+                editor = ScheduledSkillEditorTarget(
+                    skill: schedule.skill,
+                    profileID: schedule.profileID,
+                    schedule: schedule
+                )
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
@@ -154,10 +163,12 @@ struct SkillSchedulesSection: View {
 struct ScheduledSkillEditorTarget: Identifiable {
     let id = UUID()
     let skill: Skill
+    let profileID: UUID?
     let schedule: ScheduledSkill?
 
-    init(skill: Skill, schedule: ScheduledSkill? = nil) {
+    init(skill: Skill, profileID: UUID?, schedule: ScheduledSkill? = nil) {
         self.skill = skill
+        self.profileID = profileID
         self.schedule = schedule
     }
 }
@@ -259,7 +270,7 @@ struct ScheduledSkillEditorView: View {
                     skill: target.skill,
                     argument: "",
                     recurrence: recurrence,
-                    profileID: StorageRoot.shared.activeId
+                    profileID: target.profileID
                 )
             }
             dismiss()

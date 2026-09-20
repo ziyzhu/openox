@@ -360,7 +360,11 @@ struct ChatPage: View {
                     }
                 }
                 .navigationDestination(item: $navigationSkill) { draft in
-                    SkillEditorView(draft: draft, skills: .shared)
+                    SkillEditorView(
+                        draft: draft,
+                        skills: .shared,
+                        profileID: StorageRoot.shared.activeId
+                    )
                         .onAppear {
                             Log.ui.info("ChatPage.skillNavigation present chat=\(chat.id) name=\(draft.name)")
                             onArtifactNavigationChange(true)

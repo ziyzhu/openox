@@ -481,58 +481,17 @@ struct RootView: View {
         case content
     }
 
-    private enum ServicesOrigin: Equatable {
-        case sidebar
-        case chat(UUID)
-
-        var primaryAction: ServiceDetailPrimaryAction {
-            switch self {
-            case .sidebar: .startChat
-            case .chat: .attach
-            }
-        }
-
-        var logValue: String {
-            switch self {
-            case .sidebar: "sidebar"
-            case .chat(let id): "chat:\(id)"
-            }
-        }
-
-        var browserSessionID: UUID? {
-            if case .chat(let id) = self { id } else { nil }
-        }
-    }
-
     private enum Presentation: Identifiable {
-        case settings
-        case services(ServicesOrigin)
-        case artifacts
-        case skills
+        case settings(profileID: UUID?, skillDraft: SkillDraft?)
+        case services(chatID: UUID)
 
         var id: String {
             switch self {
             case .settings: "settings"
             case .services: "services"
-            case .artifacts: "artifacts"
-            case .skills: "skills"
             }
         }
 
-        var isArtifacts: Bool {
-            if case .artifacts = self { return true }
-            return false
-        }
-
-        var isServices: Bool {
-            if case .services = self { return true }
-            return false
-        }
-
-        var isSkills: Bool {
-            if case .skills = self { return true }
-            return false
-        }
     }
 
     private let client: OxClient
@@ -559,7 +518,6 @@ struct RootView: View {
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var artifactRefreshEpoch = 0
     @State private var childNavigationActive = false
-    @State private var importedSkillDraft: SkillDraft?
     @State private var sharedNoteImporting = false
     @State private var sharedNoteImportError: String?
     @State private var sharedNoteToast: Toast?
@@ -647,39 +605,27 @@ struct RootView: View {
 
     private var presentedRoot: some View {
         rootLayout
-            .sheet(item: $presentation, onDismiss: {
-                importedSkillDraft = nil
-            }) { presented in
+            .sheet(item: $presentation) { presented in
                 Group {
                     switch presented {
-                    case .settings:
-                        SettingsSheet()
-                    case .services(let origin):
+                    case let .settings(profileID, skillDraft):
+                        SettingsSheet(
+                            initialProfileID: profileID,
+                            initialSkillDraft: skillDraft,
+                            ready: startupPhase == .ready,
+                            artifactRefreshEpoch: artifactRefreshEpoch,
+                            onRenameArtifact: renameArtifact,
+                            onDeleteArtifact: deleteArtifact,
+                            onSelectService: { startChat(with: $0) }
+                        )
+                    case .services(let chatID):
                         ServiceExplorePage(
                             onClose: dismissPresentation,
                             ready: startupPhase == .ready,
-                            primaryAction: origin.primaryAction,
-                            browserSessionID: origin.browserSessionID,
-                            isAttached: { service in isServiceAttached(service, to: origin) },
-                            onSelect: { selectService($0, from: origin) }
-                        )
-                    case .artifacts:
-                        ArtifactsView(
-                            emptyStateReady: startupPhase == .ready,
-                            refreshEpoch: artifactRefreshEpoch,
-                            onClose: dismissPresentation,
-                            onRename: { artifact, newFilename in
-                                try await chats.renameArtifact(artifact, to: newFilename)
-                            },
-                            onDelete: { artifact in
-                                try await chats.deleteArtifact(artifact)
-                            }
-                        )
-                    case .skills:
-                        SkillsPage(
-                            onClose: dismissPresentation,
-                            ready: startupPhase == .ready,
-                            initialDraft: importedSkillDraft
+                            primaryAction: .attach,
+                            browserSessionID: chatID,
+                            isAttached: { service in isServiceAttached(service, to: chatID) },
+                            onSelect: { selectService($0, for: chatID) }
                         )
                     }
                 }
@@ -735,8 +681,10 @@ struct RootView: View {
     }
 
     private func handleImportedSkill(_ skill: Skill) {
-        importedSkillDraft = SkillDraft(skill)
-        presentation = .skills
+        presentation = .settings(
+            profileID: storage.activeId,
+            skillDraft: SkillDraft(skill)
+        )
     }
 
     private func handleImportedChat(_ id: UUID) {
@@ -819,9 +767,6 @@ struct RootView: View {
             summaries: summaries,
             activities: chats.activities,
             currentId: currentId,
-            servicesActive: presentation?.isServices == true,
-            artifactsActive: presentation?.isArtifacts == true,
-            skillsActive: presentation?.isSkills == true,
             showsCloseButton: !isSplitLayout,
             onClose: { setSidebar(false) },
             onNewChat: {
@@ -854,10 +799,9 @@ struct RootView: View {
                     refreshCompactSidebar()
                 }
             },
-            onExplore: { sidebarAction("services") { showServices(from: .sidebar) } },
-            onArtifacts: { sidebarAction("artifacts", perform: showArtifacts) },
-            onSkills: { sidebarAction("skills", perform: showSkills) },
-            onSettings: { sidebarAction("settings") { presentation = .settings } }
+            onSettings: { sidebarAction("settings") {
+                presentation = .settings(profileID: nil, skillDraft: nil)
+            } }
         )
     }
 
@@ -904,7 +848,7 @@ struct RootView: View {
                          onDeleteArtifact: { artifact in
                              try await chats.deleteArtifact(artifact)
                          },
-                         onExploreServices: { showServices(from: .chat(chat.id)) },
+                         onExploreServices: { showServices(for: chat.id) },
                          onArtifactNavigationChange: setChildNavigationActive,
                          onInitialTranscriptPresented: { finishChatOpening(chat.id) })
                     .onAppear {
@@ -1003,48 +947,30 @@ struct RootView: View {
         chats.open(id)
     }
 
-    private func showArtifacts() {
-        presentation = .artifacts
-        Log.ui.info("RootView.presentation show=artifacts")
+    private func showServices(for chatID: UUID) {
+        presentation = .services(chatID: chatID)
+        Log.ui.info("RootView.presentation show=services origin=chat:\(chatID)")
     }
 
-    private func showSkills() {
-        Skills.shared.refresh()
-        presentation = .skills
-        Log.ui.info("RootView.presentation show=skills")
-    }
-
-    private func showServices(from origin: ServicesOrigin) {
-        presentation = .services(origin)
-        Log.ui.info("RootView.presentation show=services origin=\(origin.logValue)")
-    }
-
-    private func selectService(_ service: Service, from origin: ServicesOrigin) {
-        switch origin {
-        case .sidebar:
-            startChat(with: service)
-        case .chat(let id):
-            guard chats.contains(id), let chat = chats.current, chat.id == id else {
-                Log.ui.error("RootView.servicesAttach missingChat id=\(id) service=\(service.domain)")
-                returnToChat(id)
-                return
-            }
-            if chat.attachedServices.contains(where: { $0.domain == service.domain }) {
-                chat.setAttachedServices(chat.attachedServices.filter { $0.domain != service.domain })
-                Log.ui.info("RootView.servicesRemove chat=\(id) service=\(service.domain)")
-            } else {
-                chat.attachService(service)
-                Haptics.impact(.serviceAttached)
-                Log.ui.info("RootView.servicesAttach chat=\(id) service=\(service.domain)")
-            }
-            returnToChat(id)
+    private func selectService(_ service: Service, for chatID: UUID) {
+        guard chats.contains(chatID), let chat = chats.current, chat.id == chatID else {
+            Log.ui.error("RootView.servicesAttach missingChat id=\(chatID) service=\(service.domain)")
+            returnToChat(chatID)
+            return
         }
+        if chat.attachedServices.contains(where: { $0.domain == service.domain }) {
+            chat.setAttachedServices(chat.attachedServices.filter { $0.domain != service.domain })
+            Log.ui.info("RootView.servicesRemove chat=\(chatID) service=\(service.domain)")
+        } else {
+            chat.attachService(service)
+            Haptics.impact(.serviceAttached)
+            Log.ui.info("RootView.servicesAttach chat=\(chatID) service=\(service.domain)")
+        }
+        returnToChat(chatID)
     }
 
-    private func isServiceAttached(_ service: Service, to origin: ServicesOrigin) -> Bool {
-        guard case .chat(let id) = origin,
-              let chat = chats.current,
-              chat.id == id else { return false }
+    private func isServiceAttached(_ service: Service, to chatID: UUID) -> Bool {
+        guard let chat = chats.current, chat.id == chatID else { return false }
         return chat.attachedServices.contains { $0.domain == service.domain }
     }
 
@@ -1086,11 +1012,34 @@ struct RootView: View {
 
     private func dismissLibraryPresentation() {
         switch presentation {
-        case .services(_), .artifacts, .skills:
+        case .services(_):
             dismissPresentation()
         case .settings, nil:
             return
         }
+    }
+
+    private func renameArtifact(
+        _ artifact: Artifact,
+        to newFilename: String,
+        in scope: ProfileScope
+    ) async throws -> Artifact {
+        if scope.profileID == storage.activeId {
+            return try await chats.renameArtifact(artifact, to: newFilename)
+        }
+        return try await ProfileRepository.shared.renameArtifact(
+            named: artifact.fileName,
+            to: newFilename,
+            in: scope
+        )
+    }
+
+    private func deleteArtifact(_ artifact: Artifact, in scope: ProfileScope) async throws {
+        if scope.profileID == storage.activeId {
+            try await chats.deleteArtifact(artifact)
+            return
+        }
+        _ = try await ProfileRepository.shared.deleteArtifact(named: artifact.fileName, in: scope)
     }
 
     private func setChildNavigationActive(_ active: Bool) {
@@ -1255,7 +1204,7 @@ struct RootView: View {
         if areas.contains(.skills) {
             Skills.shared.refresh()
         }
-        if areas.contains(.artifacts), presentation?.isArtifacts == true {
+        if areas.contains(.artifacts) {
             artifactRefreshEpoch &+= 1
         }
         if areas.contains(.chats), reason != "filesystem" || showSidebar {
@@ -1282,9 +1231,6 @@ extension ChatSidebar: Equatable {
         lhs.summaries == rhs.summaries
             && lhs.activities == rhs.activities
             && lhs.currentId == rhs.currentId
-            && lhs.servicesActive == rhs.servicesActive
-            && lhs.artifactsActive == rhs.artifactsActive
-            && lhs.skillsActive == rhs.skillsActive
             && lhs.showsCloseButton == rhs.showsCloseButton
     }
 }

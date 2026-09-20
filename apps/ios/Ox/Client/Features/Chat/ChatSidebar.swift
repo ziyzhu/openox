@@ -4,9 +4,6 @@ struct ChatSidebar: View {
     let summaries: [ChatMeta]
     let activities: [UUID: Chat.Activity]
     let currentId: UUID?
-    let servicesActive: Bool
-    let artifactsActive: Bool
-    let skillsActive: Bool
     let showsCloseButton: Bool
     let onClose: () -> Void
     let onNewChat: () -> Void
@@ -14,9 +11,6 @@ struct ChatSidebar: View {
     let onDelete: (ChatMeta) -> Void
     let onRename: (ChatMeta, String) -> Void
     let onToggleFavorite: (ChatMeta) -> Void
-    let onExplore: () -> Void
-    let onArtifacts: () -> Void
-    let onSkills: () -> Void
     let onSettings: () -> Void
 
     private let edgeInset = Theme.Spacing.lg
@@ -155,10 +149,6 @@ struct ChatSidebar: View {
         let recents = sorted.filter { !$0.isFavorite && $0.scheduledSkillID == nil }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                servicesRow
-                artifactsRow
-                skillsRow
-                Color.clear.frame(height: Theme.Spacing.sm)
                 if !pinned.isEmpty {
                     sectionHeader("Pinned")
                     ForEach(pinned) { row($0) }
@@ -185,40 +175,6 @@ struct ChatSidebar: View {
         }
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
-    }
-
-    private var servicesRow: some View {
-        destinationRow(.services, isActive: servicesActive, action: onExplore)
-    }
-
-    private var artifactsRow: some View {
-        destinationRow(.artifacts, isActive: artifactsActive, action: onArtifacts)
-    }
-
-    private var skillsRow: some View {
-        destinationRow(.skills, isActive: skillsActive, action: onSkills)
-    }
-
-    private func destinationRow(
-        _ destination: LibraryDestination,
-        isActive: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            searchPresented = false
-            action()
-        } label: {
-            HStack(spacing: Theme.Spacing.md) {
-                LibraryDestinationIcon(destination)
-                Text(destination.title)
-                    .font(Theme.Fonts.bodyMd)
-            }
-            .foregroundStyle(Theme.Colors.onSurface)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset))
-        .accessibilityLabel(destination.accessibilityLabel)
-        .accessibilityIdentifier(destination.accessibilityIdentifier)
     }
 
     private func sectionHeader(_ title: LocalizedStringKey) -> some View {
@@ -279,24 +235,6 @@ struct ChatSidebar: View {
         return ".recent"
     }
 
-}
-
-private extension LibraryDestination {
-    var accessibilityLabel: String {
-        switch self {
-        case .services: A11yLabel.services
-        case .artifacts: A11yLabel.artifacts
-        case .skills: A11yLabel.skills
-        }
-    }
-
-    var accessibilityIdentifier: String {
-        switch self {
-        case .services: A11yID.Sidebar.services
-        case .artifacts: A11yID.Sidebar.artifacts
-        case .skills: A11yID.Sidebar.skills
-        }
-    }
 }
 
 private struct SidebarRow: View {

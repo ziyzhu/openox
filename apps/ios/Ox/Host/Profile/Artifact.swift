@@ -862,6 +862,14 @@ nonisolated public enum ArtifactImporter {
 
     public static func importImageAsync(_ image: UIImage, suggestedName: String?) async throws -> Artifact {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
+        return try await importImageAsync(image, suggestedName: suggestedName, in: scope)
+    }
+
+    static func importImageAsync(
+        _ image: UIImage,
+        suggestedName: String?,
+        in scope: ProfileScope
+    ) async throws -> Artifact {
         let draft = try await Task.detached(priority: .userInitiated) {
             try imageDraft(image, suggestedName: suggestedName)
         }.value
@@ -870,6 +878,14 @@ nonisolated public enum ArtifactImporter {
 
     public static func importImageDataAsync(_ data: Data, suggestedName: String?) async throws -> Artifact {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
+        return try await importImageDataAsync(data, suggestedName: suggestedName, in: scope)
+    }
+
+    static func importImageDataAsync(
+        _ data: Data,
+        suggestedName: String?,
+        in scope: ProfileScope
+    ) async throws -> Artifact {
         let draft = try await Task.detached(priority: .userInitiated) {
             try imageDataDraft(data, suggestedName: suggestedName)
         }.value
@@ -878,6 +894,10 @@ nonisolated public enum ArtifactImporter {
 
     public static func importFileAsync(at url: URL) async throws -> Artifact {
         guard let scope = StorageRoot.currentScope else { throw CocoaError(.fileNoSuchFile) }
+        return try await importFileAsync(at: url, in: scope)
+    }
+
+    static func importFileAsync(at url: URL, in scope: ProfileScope) async throws -> Artifact {
         let draft = try await Task.detached(priority: .userInitiated) {
             try fileDraft(at: url)
         }.value

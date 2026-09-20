@@ -30,46 +30,65 @@ struct ServiceExplorePage: View {
     let browserSessionID: UUID?
     let isAttached: (Service) -> Bool
     let onSelect: (Service) -> Void
-    @Environment(ServiceManager.self) private var serviceManager
-    @State private var path: [ServiceExploreDestination] = []
-
     var body: some View {
-        NavigationStack(path: $path) {
-            ServiceExplorerView(
-                services: serviceManager.services,
+        NavigationStack {
+            ServiceExploreContent(
                 onClose: onClose,
                 ready: ready,
-                onOpen: { path.append(.service($0)) },
-                onConnectMCP: { path.append(.remoteMCP($0)) }
+                primaryAction: primaryAction,
+                browserSessionID: browserSessionID,
+                isAttached: isAttached,
+                onSelect: onSelect
             )
-                .navigationDestination(for: ServiceExploreDestination.self) { destination in
-                    switch destination {
-                    case .service(let service):
-                        ServiceDetailView(
-                            initialService: service,
-                            primaryAction: primaryAction,
-                            isAttached: isAttached(service),
-                            onPrimaryAction: { onSelect(service) },
-                            browserSessionID: browserSessionID
-                        )
-                        .toolbar(removing: .search)
-                    case .remoteMCP(let request):
-                        RemoteMCPDetailView(
-                            request: request,
-                            primaryAction: primaryAction,
-                            isAttached: isAttached,
-                            onPrimaryAction: onSelect
-                        )
-                        .toolbar(removing: .search)
-                    }
-                }
+        }
+    }
+}
+
+struct ServiceExploreContent: View {
+    let onClose: (() -> Void)?
+    let ready: Bool
+    let primaryAction: ServiceDetailPrimaryAction
+    let browserSessionID: UUID?
+    let isAttached: (Service) -> Bool
+    let onSelect: (Service) -> Void
+    @Environment(ServiceManager.self) private var serviceManager
+    @State private var destination: ServiceExploreDestination?
+
+    var body: some View {
+        ServiceExplorerView(
+            services: serviceManager.services,
+            onClose: onClose,
+            ready: ready,
+            onOpen: { destination = .service($0) },
+            onConnectMCP: { destination = .remoteMCP($0) }
+        )
+        .navigationDestination(item: $destination) { destination in
+            switch destination {
+            case .service(let service):
+                ServiceDetailView(
+                    initialService: service,
+                    primaryAction: primaryAction,
+                    isAttached: isAttached(service),
+                    onPrimaryAction: { onSelect(service) },
+                    browserSessionID: browserSessionID
+                )
+                .toolbar(removing: .search)
+            case .remoteMCP(let request):
+                RemoteMCPDetailView(
+                    request: request,
+                    primaryAction: primaryAction,
+                    isAttached: isAttached,
+                    onPrimaryAction: onSelect
+                )
+                .toolbar(removing: .search)
+            }
         }
     }
 }
 
 struct ServiceExplorerView: View {
     let services: [Service]
-    let onClose: () -> Void
+    let onClose: (() -> Void)?
     let ready: Bool
     let onOpen: (Service) -> Void
     let onConnectMCP: (RemoteMCPDetailRequest) -> Void
@@ -144,10 +163,12 @@ struct ServiceExplorerView: View {
         .navigationTitle("Services")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                SheetDismissToolbarButton {
-                    endSearch()
-                    onClose()
+            if let onClose {
+                ToolbarItem(placement: .topBarLeading) {
+                    SheetDismissToolbarButton {
+                        endSearch()
+                        onClose()
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {

@@ -24,8 +24,16 @@ struct ModelPickerSheet: View {
 }
 
 struct SettingsSheet: View {
+    let ready: Bool
+    let artifactRefreshEpoch: Int
+    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
+    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
+    let onSelectService: (Service) -> Void
+
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serverManager
+    @State private var profilePath: [UUID]
+    @State private var pendingSkillDraft: SkillDraft?
     @State private var showOnboarding = false
     @State private var confirmingAlwaysApprove = false
     @State private var creatingProfile = false
@@ -39,6 +47,24 @@ struct SettingsSheet: View {
     private var storage: StorageRoot { .shared }
 
     private var theme: ThemeManager { .shared }
+
+    init(
+        initialProfileID: UUID?,
+        initialSkillDraft: SkillDraft?,
+        ready: Bool,
+        artifactRefreshEpoch: Int,
+        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
+        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void,
+        onSelectService: @escaping (Service) -> Void
+    ) {
+        self.ready = ready
+        self.artifactRefreshEpoch = artifactRefreshEpoch
+        self.onRenameArtifact = onRenameArtifact
+        self.onDeleteArtifact = onDeleteArtifact
+        self.onSelectService = onSelectService
+        _profilePath = State(initialValue: initialProfileID.map { [$0] } ?? [])
+        _pendingSkillDraft = State(initialValue: initialSkillDraft)
+    }
 
     private var languageBinding: Binding<AppLocale.Language> {
         Binding(get: { appLocale.language }, set: { appLocale.language = $0 })
@@ -71,7 +97,7 @@ struct SettingsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $profilePath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
@@ -84,9 +110,7 @@ struct SettingsSheet: View {
                                 if index > 0 {
                                     Divider().settingsContentInset()
                                 }
-                                NavigationLink {
-                                    ProfileSettingsView(profileID: profile.id)
-                                } label: {
+                                NavigationLink(value: profile.id) {
                                     profileRow(profile)
                                 }
                                 .buttonStyle(.plain)
@@ -152,16 +176,7 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
                     }
 
-                    SettingsSection(
-                        "Permissions",
-                        footer: "Give agents permission to use all available capabilities without asking in any chat. Mistakes may cause data loss or unwanted charges."
-                    ) {
-                        Toggle("Always approve", isOn: alwaysApproveBinding)
-                            .font(Theme.Fonts.bodyMd)
-                            .foregroundStyle(Theme.Colors.onSurface)
-                            .tint(Theme.Colors.primary)
-                            .accessibilityIdentifier(A11yID.Settings.autoApproveAll)
-                    }
+                    actionsSettingsSection
 
                     SettingsSection("Language") {
                         Menu {
@@ -307,6 +322,18 @@ struct SettingsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar { SheetCloseButton { dismiss() } }
+            .navigationDestination(for: UUID.self) { profileID in
+                ProfileSettingsView(
+                    profileID: profileID,
+                    initialSkillDraft: pendingSkillDraft,
+                    artifactRefreshEpoch: artifactRefreshEpoch,
+                    onRenameArtifact: onRenameArtifact,
+                    onDeleteArtifact: onDeleteArtifact
+                )
+            }
+        }
+        .onChange(of: profilePath) { _, path in
+            if path.isEmpty { pendingSkillDraft = nil }
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
@@ -386,6 +413,43 @@ struct SettingsSheet: View {
     }
 
     private var profileNameUnavailable: Bool { profileNameIsEmpty || profileNameTaken }
+
+    private var actionsSettingsSection: some View {
+        SettingsSection(
+            "Actions",
+            footer: "Give agents permission to use all available capabilities without asking in any chat. Mistakes may cause data loss or unwanted charges.",
+            insetContent: false
+        ) {
+            VStack(spacing: 0) {
+                Toggle("Always approve", isOn: alwaysApproveBinding)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .tint(Theme.Colors.primary)
+                    .settingsRowPadding()
+                    .accessibilityIdentifier(A11yID.Settings.autoApproveAll)
+
+                Divider().settingsContentInset()
+
+                NavigationLink {
+                    ServiceExploreContent(
+                        onClose: nil,
+                        ready: ready,
+                        primaryAction: .startChat,
+                        browserSessionID: nil,
+                        isAttached: { _ in false },
+                        onSelect: onSelectService
+                    )
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Services",
+                        value: Text(verbatim: "\(serverManager.services.count)")
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Settings.services)
+            }
+        }
+    }
 
     private func profileActionRow(_ title: LocalizedStringKey, systemImage: String) -> some View {
         HStack(spacing: Theme.Spacing.md) {

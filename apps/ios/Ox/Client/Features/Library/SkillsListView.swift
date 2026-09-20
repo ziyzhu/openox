@@ -30,40 +30,10 @@ private struct SidebarSafeSkillButton<Label: View>: View {
     }
 }
 
-struct SkillsPage: View {
-    let onClose: () -> Void
-    let ready: Bool
-    let initialDraft: SkillDraft?
-    @State private var editing: SkillDraft?
-
-    init(
-        onClose: @escaping () -> Void,
-        ready: Bool,
-        initialDraft: SkillDraft? = nil
-    ) {
-        self.onClose = onClose
-        self.ready = ready
-        self.initialDraft = initialDraft
-        _editing = State(initialValue: initialDraft)
-    }
-
-    var body: some View {
-        NavigationStack {
-            SkillsListView(
-                skills: .shared,
-                editing: $editing,
-                onClose: onClose,
-                ready: ready
-            )
-        }
-        .onChange(of: initialDraft) { _, draft in editing = draft }
-    }
-}
-
 struct SkillsListView: View {
     @State private var skills: Skills
-    let onClose: () -> Void
     let ready: Bool
+    let profileID: UUID
 
     @Binding private var editing: SkillDraft?
     @State private var pendingDelete: Skill?
@@ -73,13 +43,13 @@ struct SkillsListView: View {
     init(
         skills: Skills,
         editing: Binding<SkillDraft?>,
-        onClose: @escaping () -> Void,
-        ready: Bool
+        ready: Bool,
+        profileID: UUID
     ) {
         _skills = State(initialValue: skills)
         _editing = editing
-        self.onClose = onClose
         self.ready = ready
+        self.profileID = profileID
     }
 
     var body: some View {
@@ -97,9 +67,6 @@ struct SkillsListView: View {
         .navigationTitle("Skills")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                SheetDismissToolbarButton(action: onClose)
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("New Skill", systemImage: "plus") {
                     editing = SkillDraft()
@@ -111,7 +78,7 @@ struct SkillsListView: View {
         }
         .searchable(text: $query, prompt: "Search skills")
         .navigationDestination(item: $editing) { draft in
-            SkillEditorView(draft: draft, skills: skills)
+            SkillEditorView(draft: draft, skills: skills, profileID: profileID)
                 .id(draft.id)
         }
         .alert(
@@ -162,7 +129,7 @@ struct SkillsListView: View {
     }
 
     private var activeSchedules: [ScheduledSkill] {
-        scheduledSkills.schedules(profileID: StorageRoot.shared.activeId)
+        scheduledSkills.schedules(profileID: profileID)
     }
 
     private var scheduledSkillNames: Set<String> {
@@ -261,6 +228,7 @@ struct SkillEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var serviceManager
     private let skills: Skills
+    private let profileID: UUID?
 
     @State private var name: String
     @State private var description: String
@@ -271,13 +239,14 @@ struct SkillEditorView: View {
 
     @FocusState private var instructionsFocused: Bool
 
-    init(draft: SkillDraft, skills: Skills) {
+    init(draft: SkillDraft, skills: Skills, profileID: UUID?) {
         _name = State(initialValue: draft.name)
         _description = State(initialValue: draft.description)
         _instructions = State(initialValue: draft.instructions)
         _services = State(initialValue: draft.services)
         originalName = draft.originalName
         self.skills = skills
+        self.profileID = profileID
     }
 
     private var slug: String { SkillFiles.slug(name) }
@@ -357,7 +326,7 @@ struct SkillEditorView: View {
                 serviceSection
 
                 if let skill = persistedSkill {
-                    SkillSchedulesSection(skill: skill)
+                    SkillSchedulesSection(skill: skill, profileID: profileID)
                 }
             }
             .padding(Theme.Spacing.lg)
