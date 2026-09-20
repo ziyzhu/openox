@@ -419,6 +419,8 @@ struct ChatComposer: View, Equatable {
     }
 
     @Bindable var composer: ChatComposerModel
+    let isEditingMessage: Bool
+    @Binding var editDraft: AttributedString
     let speech: ChatSpeechInput
     let attachedServices: [Service]
     let chatArtifacts: [Artifact]
@@ -440,6 +442,7 @@ struct ChatComposer: View, Equatable {
     let onServices: () -> Void
     let onSubmitSkill: (Skill, String) -> Void
     let onPreparationIntent: (Bool) -> Void
+    let onCancelEdit: () -> Void
     let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
@@ -461,6 +464,8 @@ struct ChatComposer: View, Equatable {
     static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
         lhs.composer === rhs.composer
             && lhs.speech === rhs.speech
+            && lhs.isEditingMessage == rhs.isEditingMessage
+            && lhs.editDraft == rhs.editDraft
             && lhs.attachedServices.map(\.domain) == rhs.attachedServices.map(\.domain)
             && lhs.chatArtifacts == rhs.chatArtifacts
             && lhs.isFieldFocused == rhs.isFieldFocused
@@ -474,7 +479,21 @@ struct ChatComposer: View, Equatable {
     }
 
     private var empty: Bool {
-        composer.isEmpty
+        isEditingMessage ? inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty : composer.isEmpty
+    }
+
+    private var canSubmit: Bool {
+        isEditingMessage ? !empty : composer.canSubmit
+    }
+
+    private var inputText: String {
+        isEditingMessage ? String(editDraft.characters) : composer.draft
+    }
+
+    private var inputAccessibilityValue: Text {
+        if !inputText.isEmpty { return Text(verbatim: inputText) }
+        if isEditingMessage { return Text("Edit message") }
+        return Text("Type a message")
     }
 
     private var trailingControlSize: CGFloat {
@@ -482,7 +501,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var trailingControlsWidth: CGFloat {
-        composer.canSubmit || composer.isImporting || isBusy || composer.isEmpty
+        canSubmit || composer.isImporting || isBusy || composer.isEmpty
             ? trailingControlSize + 2
             : Theme.Spacing.lg
     }
@@ -495,7 +514,7 @@ struct ChatComposer: View, Equatable {
                     containerWidth = width
                 }
             }
-            .onChange(of: composer.canSubmit, initial: true) { _, canSubmit in
+            .onChange(of: canSubmit, initial: true) { _, canSubmit in
                 if canSubmit { Haptics.prepareImpact() }
                 onPreparationIntent(canSubmit)
             }
@@ -580,7 +599,7 @@ struct ChatComposer: View, Equatable {
 
     @ViewBuilder
     private var composerDraftStrip: some View {
-        if !composer.draftAttachments.isEmpty {
+        if !isEditingMessage, !composer.draftAttachments.isEmpty {
             draftAttachmentStrip
         }
     }
@@ -686,11 +705,12 @@ struct ChatComposer: View, Equatable {
     }
 
     private var showsTopStrip: Bool {
-        showsPromptTemplates || !chatArtifacts.isEmpty || !attachedServices.isEmpty
+        isEditingMessage || showsPromptTemplates || !chatArtifacts.isEmpty || !attachedServices.isEmpty
     }
 
     private var showsPromptTemplates: Bool {
-        isChatEmpty
+        !isEditingMessage
+            && isChatEmpty
             && !isBusy
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
@@ -873,6 +893,9 @@ struct ChatComposer: View, Equatable {
                             artifactButton
                         }
                         ForEach(attachedServices) { attachedServicePill($0) }
+                        if isEditingMessage {
+                            editingMessageChip
+                        }
                     }
                 }
             }
@@ -882,10 +905,40 @@ struct ChatComposer: View, Equatable {
         }
     }
 
+    private var editingMessageChip: some View {
+        Button {
+            Haptics.impact(.selectionConfirmed)
+            onCancelEdit()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "pencil")
+                Text("Editing message", comment: "Composer status shown while a previously sent message is being edited.")
+                Image(systemName: "xmark")
+                    .padding(.leading, 2)
+            }
+            .font(Theme.Fonts.labelMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: Theme.Size.chipHeight)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .minimumTouchTarget()
+        .accessibilityLabel(L10n.string("Cancel editing", comment: "Accessibility label for the button that cancels editing a sent message."))
+        .accessibilityIdentifier(A11yID.Chat.cancelEdit)
+    }
+
     private var composerRow: some View {
         ZStack(alignment: .leading) {
-            if composer.draft.isEmpty {
-                Text("Type a message")
+            if inputText.isEmpty {
+                Group {
+                    if isEditingMessage {
+                        Text("Edit message", comment: "Placeholder shown while editing a previously sent message.")
+                    } else {
+                        Text("Type a message")
+                    }
+                }
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.leading, textLineFragmentPadding)
@@ -903,7 +956,7 @@ struct ChatComposer: View, Equatable {
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
                 .accessibilityIdentifier(A11yID.Chat.input)
-                .accessibilityValue(composer.draft.isEmpty ? Text("Type a message") : Text(verbatim: composer.draft))
+                .accessibilityValue(inputAccessibilityValue)
                 .accessibilityHint("Tap to type.")
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
@@ -944,7 +997,11 @@ struct ChatComposer: View, Equatable {
 
     @ViewBuilder
     private var trailingControl: some View {
-        if composer.isImporting, isBusy {
+        if isEditingMessage, canSubmit {
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, event: .send, action: submit)
+        } else if isEditingMessage {
+            EmptyView()
+        } else if composer.isImporting, isBusy {
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.Chat.stop, event: .stop, action: onStop)
         } else if composer.isImporting {
             CellularAutomatonLoader.small
@@ -1013,6 +1070,7 @@ struct ChatComposer: View, Equatable {
 
     private var attachButton: some View {
         Button {
+            guard !isEditingMessage else { return }
             Haptics.impact(.attachmentMenu)
             setMenu(composer.surface != .attachments)
         } label: {
@@ -1023,6 +1081,7 @@ struct ChatComposer: View, Equatable {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .disabled(isEditingMessage)
         .accessibilityLabel(A11yLabel.addAttachment)
         .accessibilityIdentifier(A11yID.Chat.attach)
         .popover(
@@ -1089,6 +1148,10 @@ struct ChatComposer: View, Equatable {
     }
 
     private func submit() {
+        if isEditingMessage {
+            onSend()
+            return
+        }
         guard let invocation = composer.slashInvocation else {
             composer.delayStopControl()
             onSend()
@@ -1098,6 +1161,19 @@ struct ChatComposer: View, Equatable {
     }
 
     private var attributedDraft: Binding<AttributedString> {
+        if isEditingMessage {
+            return Binding(
+                get: { editDraft },
+                set: { value in
+                    if textViewReference.hasMarkedText {
+                        editDraft = value
+                        return
+                    }
+                    let text = String(value.characters).replacingOccurrences(of: "\u{FFFC}", with: "")
+                    editDraft = AttributedString(text)
+                }
+            )
+        }
         let draftID = composer.draftID
         return Binding(
             get: { composer.attributedDraft },

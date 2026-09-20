@@ -3953,13 +3953,25 @@
       }
     },
     "Edit message" : {
-      "comment" : "Title of the screen for editing a previously sent message before resending it.",
+      "comment" : "Context menu action or composer placeholder for editing a previously sent message before resending it.",
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑消息"
+          }
+        }
+      }
+    },
+    "Editing message" : {
+      "comment" : "Composer status shown while a previously sent message is being edited.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在编辑消息"
           }
         }
       }

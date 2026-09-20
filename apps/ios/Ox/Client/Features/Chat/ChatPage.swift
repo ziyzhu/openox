@@ -60,6 +60,7 @@ private struct ScrollToBottomButton: View {
 private struct ScrollToBottomControl: View {
     let composer: ChatComposerModel
     let composerFocused: Bool
+    let isEditingMessage: Bool
     let isChatEmpty: Bool
     let hasArtifacts: Bool
     let hasAttachedServices: Bool
@@ -75,8 +76,9 @@ private struct ScrollToBottomControl: View {
 
     private var offset: CGFloat {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
-        let isResting = !composerFocused && composer.isEmpty
-        let showsTopStrip = hasArtifacts
+        let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
+        let showsTopStrip = isEditingMessage
+            || hasArtifacts
             || hasAttachedServices
             || isChatEmpty
                 && !isBusy
@@ -198,7 +200,8 @@ struct ChatPage: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
     @FocusState private var composerFocused: Bool
-    @State private var editDraft: String = ""
+    @State private var editedBlockID: UUID?
+    @State private var editDraft = AttributedString()
     @State private var pendingArtifactPreview: Artifact?
     @State private var navigationArtifact: Artifact?
     @State private var navigationSkill: SkillDraft?
@@ -214,7 +217,6 @@ struct ChatPage: View {
         case modelPicker
         case serviceDetail(Service)
         case camera
-        case edit(EditTarget)
         case photos
         case files
         case attachment(URL)
@@ -226,7 +228,6 @@ struct ChatPage: View {
             case .modelPicker: "modelPicker"
             case .serviceDetail(let service): "serviceDetail:\(service.domain)"
             case .camera: "camera"
-            case .edit(let target): "edit:\(target.id)"
             case .photos: "photos"
             case .files: "files"
             case .attachment(let url): "attachment:\(url.absoluteString)"
@@ -301,7 +302,7 @@ struct ChatPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .camera, .edit: modalPresentation
+                case .camera: modalPresentation
                 default: nil
                 }
             },
@@ -511,6 +512,16 @@ struct ChatPage: View {
         }
         .onChange(of: chat.id) { _, _ in
             speechInput.cancel(reason: "chatChanged")
+            cancelEditing(reason: "chatChanged", keepFocus: false)
+        }
+        .onChange(of: editedBlockID) { _, blockID in
+            #if targetEnvironment(simulator)
+            if blockID == nil {
+                DebugUIAPI.setEditDraft = nil
+            } else {
+                DebugUIAPI.setEditDraft = { editDraft = AttributedString($0) }
+            }
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
             speechInput.interrupt()
@@ -533,6 +544,9 @@ struct ChatPage: View {
         .onDisappear {
             messageSpeech.stop(reason: "pageDisappear")
             speechInput.cancel(reason: "pageDisappear")
+            #if targetEnvironment(simulator)
+            DebugUIAPI.setEditDraft = nil
+            #endif
         }
         .task(id: chat.serviceBootstrapRevision) {
             let updated = await chat.syncToMonoRepository()
@@ -597,7 +611,7 @@ struct ChatPage: View {
                         Log.ui.info("ChatPage.attachArtifacts chat=\(chat.id) count=\(picked.count)")
                     }
                     .presentationDetents([.medium, .large])
-                case .camera, .edit, .photos, .files, .attachment:
+                case .camera, .photos, .files, .attachment:
                     EmptyView()
                 }
             }
@@ -611,14 +625,6 @@ struct ChatPage: View {
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .edit(let target):
-                EditMessageView(
-                    draft: $editDraft,
-                    iconButtonSize: iconButtonSize,
-                    composerButtonSize: composerButtonSize,
-                    onCancel: { modalPresentation = nil },
-                    onSend: { commitEdit(target) }
-                )
             case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker:
                 EmptyView()
             }
@@ -732,22 +738,27 @@ struct ChatPage: View {
 
     @ViewBuilder
     private func servicePickerOverlay(floatsTopStrip: Bool) -> some View {
-        ComposerServicePicker(
-            composer: composer,
-            excludedDomains: Set(chat.attachedServices.map(\.domain)),
-            composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
-            onSelect: selectMentionService,
-            onExplore: openServiceExplorer
-        )
+        if editedBlockID == nil {
+            ComposerServicePicker(
+                composer: composer,
+                excludedDomains: Set(chat.attachedServices.map(\.domain)),
+                composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
+                onSelect: selectMentionService,
+                onExplore: openServiceExplorer
+            )
+        }
     }
 
+    @ViewBuilder
     private func slashPickerOverlay(floatsTopStrip: Bool) -> some View {
-        ComposerSlashPicker(
-            composer: composer,
-            isFocused: composerFocused,
-            composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
-            onSelect: { submitSkill($0, argument: "") }
-        )
+        if editedBlockID == nil {
+            ComposerSlashPicker(
+                composer: composer,
+                isFocused: composerFocused,
+                composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
+                onSelect: { submitSkill($0, argument: "") }
+            )
+        }
     }
 
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
@@ -862,7 +873,7 @@ struct ChatPage: View {
     }
 
     private func floatsTopStrip(showsComposer: Bool) -> Bool {
-        showsComposer && (!chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
+        showsComposer && (editedBlockID != nil || !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
@@ -1410,6 +1421,8 @@ struct ChatPage: View {
     ) -> some View {
         ChatComposer(
             composer: composer,
+            isEditingMessage: editedBlockID != nil,
+            editDraft: $editDraft,
             speech: speechInput,
             attachedServices: chat.attachedServices,
             chatArtifacts: chatArtifacts,
@@ -1431,6 +1444,7 @@ struct ChatPage: View {
             onServices: startServiceMention,
             onSubmitSkill: submitSkill,
             onPreparationIntent: chat.setModelPreparationIntent,
+            onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
             onSend: { send() },
             onStop: {
                 Log.ui.info("ChatPage.stop chat=\(chat.id)")
@@ -1460,6 +1474,7 @@ struct ChatPage: View {
                     ScrollToBottomControl(
                         composer: composer,
                         composerFocused: composerFocused,
+                        isEditingMessage: editedBlockID != nil,
                         isChatEmpty: isChatEmpty,
                         hasArtifacts: !chatArtifacts.isEmpty,
                         hasAttachedServices: !chat.attachedServices.isEmpty,
@@ -1552,6 +1567,10 @@ struct ChatPage: View {
     }
 
     private func send() {
+        if let editedBlockID {
+            commitEdit(blockID: editedBlockID)
+            return
+        }
         prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
         enqueue(message)
@@ -1617,16 +1636,37 @@ struct ChatPage: View {
         guard case let .userText(text, _) = block.kind else { return }
         Log.ui.info("ChatPage.beginEditing chat=\(chat.id) block=\(block.id) chars=\(text.count)")
         Haptics.impact(.editStarted)
-        editDraft = text
-        modalPresentation = .edit(EditTarget(id: block.id))
+        composer.setAttachmentMenuPresented(false)
+        editDraft = AttributedString(text)
+        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+            editedBlockID = block.id
+        } completion: {
+            composerFocused = true
+        }
     }
 
-    private func commitEdit(_ target: EditTarget) {
-        let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func commitEdit(blockID: UUID) {
+        let trimmed = String(editDraft.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        Log.ui.info("ChatPage.commitEdit chat=\(chat.id) block=\(target.id) chars=\(trimmed.count)")
-        modalPresentation = nil
-        latestSubmissionID = chat.editAndRerun(at: target.id, newText: trimmed)?.id
+        Log.ui.info("ChatPage.commitEdit chat=\(chat.id) block=\(blockID) chars=\(trimmed.count)")
+        prepareComposerSubmission()
+        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+            editedBlockID = nil
+            editDraft = AttributedString()
+        } completion: {
+            latestSubmissionID = chat.editAndRerun(at: blockID, newText: trimmed)?.id
+        }
+    }
+
+    private func cancelEditing(reason: String, keepFocus: Bool) {
+        guard let editedBlockID else { return }
+        Log.ui.info("ChatPage.cancelEditing chat=\(chat.id) block=\(editedBlockID) reason=\(reason)")
+        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+            self.editedBlockID = nil
+            editDraft = AttributedString()
+        } completion: {
+            if keepFocus { composerFocused = true }
+        }
     }
 
     private func openAttachment(_ att: Artifact, sourceID _: String? = nil) {

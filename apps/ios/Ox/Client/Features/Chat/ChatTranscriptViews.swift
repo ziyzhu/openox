@@ -1047,110 +1047,6 @@ private enum InvocationFormat {
     }
 }
 
-struct EditTarget: Identifiable {
-    let id: UUID
-}
-
-struct EditMessageView: View {
-    @Binding var draft: String
-    let iconButtonSize: CGFloat
-    let composerButtonSize: CGFloat
-    let onCancel: () -> Void
-    let onSend: () -> Void
-
-    @FocusState private var focused: Bool
-
-    private var empty: Bool {
-        draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Spacer(minLength: 0)
-            HStack(alignment: .bottom, spacing: 0) {
-                TextField("Edit message", text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(1...8)
-                    .focused($focused)
-                    .accessibilityIdentifier(A11yID.Chat.input)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .padding(.leading, Theme.Spacing.lg)
-                    .padding(.trailing, empty ? Theme.Spacing.lg : 6)
-                    .padding(.vertical, 12)
-
-                if !empty {
-                    Button {
-                        Haptics.impact(.send)
-                        onSend()
-                    } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.system(.subheadline, weight: .bold))
-                            .foregroundStyle(Theme.Colors.onPrimary)
-                            .frame(width: composerButtonSize, height: composerButtonSize)
-                            .background(Theme.Colors.primary, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 6)
-                    .padding(.vertical, 5)
-                    .accessibilityLabel(A11yLabel.send)
-                    .accessibilityIdentifier(A11yID.Chat.send)
-                }
-            }
-            .background {
-                Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-            }
-            .padding(Theme.Spacing.md)
-        }
-        .background(Theme.Colors.chatSurface)
-        .onAppear {
-            #if targetEnvironment(simulator)
-            let draft = $draft
-            DebugUIAPI.setEditDraft = { draft.wrappedValue = $0 }
-            #endif
-        }
-        .onDisappear {
-            #if targetEnvironment(simulator)
-            DebugUIAPI.setEditDraft = nil
-            #endif
-        }
-        .task {
-            try? await Task.sleep(for: .milliseconds(120))
-            focused = true
-            Log.ui.info("EditMessage.focus requested")
-        }
-        .onChange(of: focused) { _, value in
-            Log.ui.info("EditMessage.focus changed=\(value)")
-        }
-    }
-
-    private var header: some View {
-        ZStack {
-            Text("Edit message", comment: "Title of the screen for editing a previously sent message before resending it.")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-            HStack {
-                Button {
-                    onCancel()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(.title3, weight: .medium))
-                        .foregroundStyle(Theme.Colors.onSurface)
-                        .frame(width: iconButtonSize, height: iconButtonSize)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .accessibilityLabel(L10n.string("Cancel editing", comment: "Accessibility label for the button that closes the edit-message screen without resending."))
-                Spacer()
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm)
-    }
-}
-
 struct MessageControls {
     let onCopy: (String) -> Void
     let isCopied: Bool
@@ -1370,7 +1266,7 @@ struct BlockView: View, Equatable {
                             Button {
                                 controls.onEdit()
                             } label: {
-                                Label(L10n.string("Edit", comment: "Context menu action on a sent message that loads its text back into the composer to edit and regenerate the reply."), systemImage: "pencil")
+                                Label(L10n.string("Edit message", comment: "Context menu action on a sent message that loads its text back into the composer to edit and regenerate the reply."), systemImage: "pencil")
                             }
                         }
                     }

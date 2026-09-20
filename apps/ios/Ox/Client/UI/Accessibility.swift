@@ -156,6 +156,7 @@ nonisolated enum A11yID {
         static let more = "chat.more"
         static let attach = "chat.attach"
         static let input = "chat.input"
+        static let cancelEdit = "chat.cancelEdit"
         static let speechHold = "chat.speechHold"
         static let speechStatus = "chat.speechStatus"
         static let speechCancel = "chat.speechCancel"
