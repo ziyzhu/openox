@@ -144,25 +144,17 @@ struct ChatSidebar: View {
             ? summaries
             : summaries.filter { $0.displayTitle.localizedStandardContains(query) }
         let sorted = matching.sorted { $0.activityDate > $1.activityDate }
-        let pinned = sorted.filter(\.isFavorite)
-        let recents = sorted.filter { !$0.isFavorite }
+        let ordered = sorted.filter(\.isFavorite) + sorted.filter { !$0.isFavorite }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if !pinned.isEmpty {
-                    sectionHeader("Pinned")
-                    ForEach(pinned) { row($0) }
-                }
-                if !recents.isEmpty || pinned.isEmpty {
-                    sectionHeader("Recents")
-                    if recents.isEmpty {
-                        Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
-                            .font(Theme.Fonts.bodyMd)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .padding(.horizontal, edgeInset)
-                            .padding(.vertical, 11)
-                    } else {
-                        ForEach(recents) { row($0) }
-                    }
+                if ordered.isEmpty {
+                    Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .padding(.horizontal, edgeInset)
+                        .padding(.vertical, 11)
+                } else {
+                    ForEach(ordered) { row($0) }
                 }
                 Color.clear.frame(height: Theme.Spacing.md)
             }
@@ -170,16 +162,6 @@ struct ChatSidebar: View {
         }
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
-    }
-
-    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(.system(.subheadline, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .textCase(nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, edgeInset)
-            .padding(.vertical, Theme.Spacing.sm)
     }
 
     private func row(_ meta: ChatMeta) -> some View {
@@ -221,12 +203,7 @@ struct ChatSidebar: View {
             } preview: {
                 ChatContextMenuPreview(meta: meta)
             }
-            .id(meta.id.uuidString + rowSectionSuffix(meta))
-    }
-
-    private func rowSectionSuffix(_ meta: ChatMeta) -> String {
-        if meta.isFavorite { return ".pinned" }
-        return ".recent"
+            .id(meta.id.uuidString)
     }
 
 }
@@ -260,6 +237,12 @@ private struct SidebarRow: View {
                     if meta.scheduledSkillID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                    if meta.isFavorite {
+                        Image(systemName: "pin.fill")
+                            .font(.system(.caption, weight: .medium))
                             .foregroundStyle(.secondary)
                             .accessibilityHidden(true)
                     }
@@ -304,9 +287,13 @@ private struct SidebarRow: View {
     private var accessibilityValue: String {
         let activity = activityAccessibilityValue
         let lastModified = lastModifiedText(relativeTo: Date())
-        return [lastModified, scheduledAccessibilityValue, activity]
+        return [favoriteAccessibilityValue, lastModified, scheduledAccessibilityValue, activity]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
+    }
+
+    private var favoriteAccessibilityValue: String {
+        meta.isFavorite ? L10n.string("Pinned") : ""
     }
 
     private var scheduledAccessibilityValue: String {
