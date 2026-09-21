@@ -394,6 +394,7 @@ extension OxHostProtocol {
         let unsupportedVersionRejected: Bool?
         let providerCatalogMigrated: Bool?
         let actionPoliciesMigrated: Bool?
+        let savedServicesMigrated: Bool?
         let futureActionPoliciesPreserved: Bool?
         let actionPolicyResolutionValid: Bool?
         let fixtureResults: [StorageMigrationFixtureReplay]?

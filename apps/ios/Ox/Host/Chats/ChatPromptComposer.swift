@@ -135,6 +135,7 @@ enum ChatPromptComposer {
         """
         let toolDiscipline = """
         - Treat service data as authoritative for service-specific, private, structured, or actionable information; use public web only to supplement it.
+        - When service or web results provide useful URLs, preserve them as descriptive inline Markdown links. Link each recommended or referenced item when its URL is available so the user can inspect the original result. Prefer source-provided canonical URLs and never invent links.
         - Invoke service actions using their inspected contracts. The runtime enforces required approval; do not add approval fields that are absent from an action's input schema. Confirm first only for irreversible, destructive, or privacy-sensitive actions without a runtime gate.
         - Unless the latest turn state says this is a temporary chat, update `MEMORY.md` after a task that took real effort, a fact or insight the user teaches you, anything you learn about their life even indirectly, an event with lasting effect, or a new `intent → service domain` mapping learned from service use. Keep memories concise; never store credentials. Do not register redundant memories.
         - The system prompt includes the current `MEMORY.md` as of the latest user turn. Always read the file with `ox.fs.read` before updating it. Change it with `ox.fs.edit`, not `ox.fs.write`. Replace contradictions and remove forgotten entries with exact edits. The current user message overrides memory.

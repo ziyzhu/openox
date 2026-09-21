@@ -357,12 +357,11 @@ extension Scenario {
     static let browserPDF = Scenario(name: "browserPDF") { ctx in
         if ctx.turn == 0 {
             return [execute("""
-            const matches = await ox.service.find({ query: "browser PDF", purpose: "Find Browser" });
-            const browser = matches.find((service) => service.domain === "ios:browser");
-            if (!browser) throw new Error("Browser service not found");
-            await ox.fs.read({ path: browser.manifestPath, purpose: "Read Browser manifest" });
-            await ox.service.attach({ domain: browser.domain, purpose: "Attach Browser" });
-            console.log(await ox.service.inspect({ domain: browser.domain, actions: ["navigate", "exportPdf"], purpose: "Inspect Browser actions" }));
+            console.log({
+              navigate: ox.web.browser.navigate.help(),
+              executeScript: ox.web.browser.executeScript.help(),
+              exportPdf: ox.web.browser.exportPdf.help()
+            });
             """)]
         }
         guard let output = ctx.resultText("execute") else {
@@ -370,13 +369,12 @@ extension Scenario {
         }
         if ctx.turn == 1 {
             return [execute("""
-            await ox.service.invoke({ name: "ios:browser:navigate", input: { url: "https://example.com" }, purpose: "Open PDF fixture" });
-            await ox.service.invoke({
-              name: "ios:browser:executeScript",
-              input: { script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };" },
+            await ox.web.browser.navigate({ url: "https://example.com", purpose: "Open PDF fixture" });
+            await ox.web.browser.executeScript({
+              script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };",
               purpose: "Create tall PDF fixture"
             });
-            const pdf = await ox.service.invoke({ name: "ios:browser:exportPdf", input: { filename: "Example Page.pdf" }, purpose: "Export full browser page" });
+            const pdf = await ox.web.browser.exportPdf({ filename: "Example Page.pdf", purpose: "Export full browser page" });
             console.log({ pdf });
             """)]
         }

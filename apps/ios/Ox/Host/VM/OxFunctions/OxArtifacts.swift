@@ -17,7 +17,7 @@ nonisolated enum OxArtifacts {
                 ),
                 entry(
                     "ox.artifact.import",
-                    "Fetch and persist one public HTTP or HTTPS resource as an artifact: `await ox.artifact.import({ url, filename?, purpose })`. The user approves each import unless they enabled automatic approval.",
+                    "Fetch and persist one public HTTP or HTTPS resource as an artifact: `await ox.artifact.import({ url, filename?, purpose })`.",
                     input: object([
                         "url": string("Public HTTP or HTTPS resource URL."),
                         "filename": filename,
@@ -27,7 +27,7 @@ nonisolated enum OxArtifacts {
                 ),
                 entry(
                     "ox.artifact.rename",
-                    "Rename an artifact and rewrite Ox-controlled chat references: `await ox.artifact.rename({ filename, newFilename, purpose })`. Fails on a case-insensitive collision. The user approves each rename unless they enabled automatic approval.",
+                    "Rename an artifact and rewrite Ox-controlled chat references: `await ox.artifact.rename({ filename, newFilename, purpose })`. Fails on a case-insensitive collision.",
                     input: object(["filename": filename, "newFilename": filename, "purpose": purpose], required: ["filename", "newFilename", "purpose"]),
                     output: item
                 ),

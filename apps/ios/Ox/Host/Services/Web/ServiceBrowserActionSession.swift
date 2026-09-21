@@ -133,22 +133,22 @@ final class ServiceBrowserActionSession {
                 for try await event in webPage.navigations {
                     if event == .finished { return webPage.url }
                 }
-                throw RuntimeError.bridge("ios:browser:waitForNavigation ended before navigation finished.")
+                throw RuntimeError.bridge("ox.web.browser.waitForNavigation ended before navigation finished.")
             }
             group.addTask { @MainActor in
                 try await Task.sleep(for: .milliseconds(timeoutMilliseconds))
-                throw RuntimeError.bridge("ios:browser:waitForNavigation timed out.")
+                throw RuntimeError.bridge("ox.web.browser.waitForNavigation timed out.")
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else {
-                throw RuntimeError.bridge("ios:browser:waitForNavigation produced no result.")
+                throw RuntimeError.bridge("ox.web.browser.waitForNavigation produced no result.")
             }
             return result
         }
     }
 
     func executeScript(_ script: String) async throws -> JSONValue {
-        let name = "ios:browser:executeScript"
+        let name = "ox.web.browser.executeScript"
         try await service.awaitAuthenticationAvailability(name: name)
         guard let action = await service.resolvedAction("executeScript", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive
@@ -158,7 +158,7 @@ final class ServiceBrowserActionSession {
     }
 
     func exportPDF() async throws -> ExportedPDF {
-        let name = "ios:browser:exportPdf"
+        let name = "ox.web.browser.exportPdf"
         try await service.awaitAuthenticationAvailability(name: name)
         guard let action = await service.resolvedAction("exportPdf", role: .dangerousBrowserControl) else {
             throw Service.EvalError.notActive

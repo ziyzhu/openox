@@ -110,7 +110,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.create",
                     .object([
-                        "description": .string("Create a Local API service with kind api and a stable domain identifier, a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. Requires approval. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
+                        "description": .string("Create a Local API service with kind api and a stable domain identifier, a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -128,7 +128,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.update",
                     .object([
-                        "description": .string("Update a directly connected MCP service: `await ox.service.update({ domain, endpoint?, transport?, purpose })`. With no settings, reconnects and refreshes tools. Omitted settings are preserved; transport auto enables detection. Requires approval, validates before replacing, and saves immediately. A failed connection leaves the previous service intact. A changed endpoint gets a new domain, clears old local authorization, and must be attached separately; it never inherits old tool approvals. Repository MCP definitions are read-only. For Local web services, edit source with ox.fs instead."),
+                        "description": .string("Update a directly connected MCP service: `await ox.service.update({ domain, endpoint?, transport?, purpose })`. With no settings, reconnects and refreshes tools. Omitted settings are preserved; transport auto enables detection. Validates before replacing and saves immediately. A failed connection leaves the previous service intact. A changed endpoint gets a new domain, clears old local authorization, and must be attached separately; it never inherits old tool approvals. Repository MCP definitions are read-only. For Local web services, edit source with ox.fs instead."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -145,7 +145,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.copy",
                     .object([
-                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. The user approves the copy. Edit its expanded source under `services/` with `ox.fs`."),
+                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. Edit its expanded source under `services/` with `ox.fs`."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -242,7 +242,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.git.checkout",
                     .object([
-                        "description": .string("Temporarily visit a Local service commit without moving its linear main tip: `await ox.service.git.checkout({ commitHash, purpose })`. Historical views are read-only. Use `commitHash: \"latest\"` to return to the live tip. Requires approval and a clean worktree."),
+                        "description": .string("Temporarily visit a Local service commit without moving its linear main tip: `await ox.service.git.checkout({ commitHash, purpose })`. Historical views are read-only. Use `commitHash: \"latest\"` to return to the live tip. Requires a clean worktree."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -257,7 +257,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.git.commit",
                     .object([
-                        "description": .string("Validate, stage, and commit all Local service changes to its linear history: `await ox.service.git.commit({ message, purpose })`. Local must be at its live tip. Requires approval and fails when there are no changes."),
+                        "description": .string("Validate, stage, and commit all Local service changes to its linear history: `await ox.service.git.commit({ message, purpose })`. Local must be at its live tip and the call fails when there are no changes."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -272,7 +272,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.git.revert",
                     .object([
-                        "description": .string("Revert one Local commit by applying its inverse and creating a new commit at the live tip: `await ox.service.git.revert({ commitHash, message, purpose })`. This never rewrites history. Requires approval and a clean Local worktree."),
+                        "description": .string("Revert one Local commit by applying its inverse and creating a new commit at the live tip: `await ox.service.git.revert({ commitHash, message, purpose })`. This never rewrites history and requires a clean Local worktree."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -288,7 +288,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.git.restore",
                     .object([
-                        "description": .string("Restore Local changes from its live tip: `await ox.service.git.restore({ path?, purpose })`. With a changed file `path` from `ox.service.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. Requires approval and is unavailable in a historical checkout."),
+                        "description": .string("Restore Local changes from its live tip: `await ox.service.git.restore({ path?, purpose })`. With a changed file `path` from `ox.service.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. It is unavailable in a historical checkout."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

@@ -506,7 +506,10 @@ final class Chat: Identifiable {
                 guard isSelected else { throw RuntimeError.bridge("This device service requires the active chat.") }
             },
             showBrowser: { [unowned self] service, _ in
-                embedServiceInspector(ServiceInspectorLink(domain: service.domain, serviceName: service.title))
+                embedServiceInspector(ServiceInspectorLink(
+                    domain: BrowserFunctionCatalog.publicNamespace,
+                    serviceName: service.title
+                ))
             },
             attachTransient: { [unowned self] attachment in
                 guard document.hasOpenExecution else {
@@ -2655,9 +2658,6 @@ final class Chat: Identifiable {
         }
         let removed = attachedServices.filter { candidate in
             !services.contains { $0 === candidate }
-        }
-        if removed.contains(where: { $0.domain == "ios:browser" }) {
-            serviceManager.browserActionSessions.closeSession(for: id)
         }
         if removed.contains(where: { $0.domain == "ios:bluetooth" }) { bluetooth.close() }
         cancelServiceInteractions(domains: Set(removed.map(\.domain)))

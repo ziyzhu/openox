@@ -22,6 +22,7 @@ type ReplayResult = {
   unsupportedVersionRejected?: boolean;
   providerCatalogMigrated?: boolean;
   actionPoliciesMigrated?: boolean;
+  savedServicesMigrated?: boolean;
   futureActionPoliciesPreserved?: boolean;
   actionPolicyResolutionValid?: boolean;
   fixtureResults?: Array<{

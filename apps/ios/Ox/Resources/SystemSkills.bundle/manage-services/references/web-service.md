@@ -1,14 +1,14 @@
 # Web Service
 
-Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ios:browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service action ABI directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
+Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service action ABI directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
 
 ## Missing-service bootstrap
 
 Use when successful `ox.service.find` finds no suitable service for a website task, not when discovery fails. General public-information questions need no service.
 
-1. Attach Browser and inspect its contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
+1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
 2. Answer reads as soon as evidence supports them; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Creation, attachment, mutation, and Save approvals still apply.
+3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. First attachment, live-mutation approval, and Save confirmation still apply.
 4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is declined or blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
 Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
@@ -21,7 +21,7 @@ services/web/<domain>/
 
 ## 1. Discover the service
 
-1. Attach `ios:browser`, inspect its compact action index, then inspect the exact contracts for every Browser action the exploration expects to use, including interaction, capture, page JavaScript, document-start injection, and cleanup actions.
+1. Inspect the exact `ox.web.browser.*` contracts the exploration expects to use, including interaction, capture, page JavaScript, document-start injection, and cleanup functions.
 2. Navigate to the requested URL and wait for the top-level URL to settle.
 3. Identify the coherent product surface and the hosts needed by its actions.
 4. Search with `ox.service.find` for the requested host, final host, and plausible parent-domain candidates.
@@ -69,7 +69,7 @@ On authenticated pages, probe bounded structural facts, not broad `body.innerTex
 
 Preserve a resource-scoped URL only when it is the observed opaque identifier required to revisit that returned item and does not act as a reusable account credential. Pass it intact between actions and keep its token components out of logs and descriptions.
 
-Use `ios:browser:waitForUserInteraction` for credentials, challenges, account choices, and other human-only steps.
+Use `ox.web.browser.waitForUserInteraction` for credentials, challenges, account choices, and other human-only steps.
 
 When proposed actions require authentication, let the user complete the website's sign-in flow through Browser and collect signed-in evidence before presenting a confirmable action plan. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
 
@@ -107,11 +107,11 @@ For deliberate service authoring, present:
 
 Include only actions with an observed extraction path in every authentication state needed for their implementation. Mark hypotheses and inaccessible capabilities as provisional or exclude them from the confirmed surface.
 
-End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace creation, mutation, or Save approval.
+End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace first-attachment or live-mutation approval, or final Save confirmation.
 
 ## 4. Author service.json
 
-Inspect complete Local Git status. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`, obtaining runtime approval. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
+Inspect complete Local Git status. Create with `ox.service.create` or copy a non-Local candidate with `ox.service.copy`. Use the returned domain as the directory, manifest, and runtime identity; read the generated or copied files before editing.
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
@@ -166,12 +166,14 @@ Add authentication when useful actions depend on a signed-in browser session:
 
 Add bot control when an action can encounter human verification and resume after the user completes it:
 
-1. Add `getBotControlUrl(args): {url}` for the verification page.
-2. Add `getBotControlState({...args, pageUrl}): {ok}`. iOS supplies the current `pageUrl` while probing.
-3. Align operation-identifying inputs and make `pageUrl` required only by the state action.
-4. Keep the verification interaction and completion probe on the bot-control action page. iOS surfaces that same page to the user, so `getBotControlUrl` must leave it at the returned verification URL and `getBotControlState` must inspect fresh state on that page rather than assume a second page shares DOM or challenge state.
-5. Preserve approval on the originating mutation.
-6. Call `await ox.service.solve({ domain, args, purpose })`. When iOS resolves after `{ok: true}`, retry the originating action.
+1. Identify the exact observed response that means the originating action is blocked by human verification. Throw a clear `BOT_CONTROL_REQUIRED` error only for that state and tell the agent to call `ox.service.solve` with the same operation-identifying arguments. Do not classify generic HTTP, parsing, authentication, or application failures as bot control.
+2. Add `getBotControlUrl(args): {url}` for the verification page and `getBotControlState({...args, pageUrl}): {ok}` for completion. Align their operation-identifying inputs with the originating action and make `pageUrl` required only by the state action; iOS supplies its current value while probing.
+3. Keep the verification interaction and completion probe on the bot-control action page. iOS navigates that same page to the URL returned by `getBotControlUrl` and surfaces it to the user. Implement `getBotControlState` against fresh state available to that page rather than assuming a second page shares DOM or in-memory challenge state.
+4. Define completion as an operation-scoped postcondition, not transport success. A successful fetch, `2xx` response, completed navigation, absent challenge element, or generic authenticated page is insufficient. Verify that the requested resource or effect exists, is complete, and belongs to the supplied operation inputs. Prefer an observed same-origin server read with `credentials: "include"` and `cache: "no-store"` when server state is authoritative.
+5. Write the probe decision table from live evidence. Return `{ok: false}` for exact observed challenge, submission, or pending states; return `{ok: true}` only for the exact completed outcome; and throw for unexpected status, redirect, response shape, parsing failure, CORS failure, or network failure. Keep the probe cheap because iOS polls it about once per second.
+6. Preserve approval on the originating mutation. `ox.service.solve` authorizes no external effect beyond presenting and checking the human-verification handoff.
+7. Verify the standard pair through `ox.service.solve` while the operation is pending and after the user completes it. Confirm that a successful response which still represents a challenge, landing page, or unrelated result never returns `{ok: true}`.
+8. After `await ox.service.solve({ domain, args, purpose })` resolves, inspect the resulting state before retrying a non-idempotent originating action because the verification page may already have completed it. Retry only when the intended effect is observably absent and the existing approval still covers the attempt; reads and safely idempotent operations may be retried directly.
 
 ### Payment
 

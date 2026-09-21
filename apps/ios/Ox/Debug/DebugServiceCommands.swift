@@ -172,7 +172,6 @@ extension OxHostProtocol {
     @MainActor
     static func handleReloadService(
         _ command: ServiceRequest,
-        chatManager: ChatManager,
         serviceManager: ServiceManager,
         reply: @escaping @MainActor (Data) -> Void
     ) {
@@ -182,16 +181,7 @@ extension OxHostProtocol {
         }
         Log.agent.debug("OxHostProtocol.reload-service id=\(command.id) domain=\(command.domain)")
         withService(id: command.id, domain: command.domain, kind: "reload-service-result", serviceManager: serviceManager, reply: reply) { svc in
-            let url: URL?
-            if svc.domain == "ios:browser" {
-                guard let chat = chatManager.current,
-                      let session = serviceManager.browserActionSessions.existingSession(for: chat.id, service: svc) else {
-                    return ActionPayload(ok: false, value: nil, error: "browser session unavailable")
-                }
-                url = await session.reload()
-            } else {
-                url = await svc.reload()
-            }
+            let url = await svc.reload()
             guard let url else {
                 return ActionPayload(ok: false, value: nil, error: "service reload failed")
             }

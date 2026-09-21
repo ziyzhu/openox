@@ -22,8 +22,8 @@ Read `skills/system:manage-services/references/api-service.md` for direct HTTP A
 
 ## Remote MCP connections
 
-Create with `ox.service.create({ kind: "mcp", endpoint, transport?, purpose })`. Use a credential-free public HTTPS endpoint; omit `domain` because Ox assigns it. Transport defaults to detection; explicit values are `streamable-http` and `sse`. Ox obtains approval, discovers tools, handles sign-in, and saves. Repeated creation reuses the endpoint.
+Create with `ox.service.create({ kind: "mcp", endpoint, transport?, purpose })`. Use a credential-free public HTTPS endpoint; omit `domain` because Ox assigns it. Transport defaults to detection; explicit values are `streamable-http` and `sse`. Ox discovers tools, handles sign-in, and saves. Repeated creation reuses the endpoint.
 
-Attach the returned `domain` before inspecting or invoking in chat. Update with `ox.service.update({ domain, endpoint?, transport?, purpose })`; omit settings to refresh tools or use `transport: "auto"` to restore detection. Updates require approval and validate before saving. A changed endpoint returns a new domain requiring attachment; never transfer credentials or tool approvals across endpoints.
+Attach the returned `domain` before inspecting or invoking in chat. Update with `ox.service.update({ domain, endpoint?, transport?, purpose })`; omit settings to refresh tools or use `transport: "auto"` to restore detection. Updates validate before saving. A changed endpoint returns a new domain requiring attachment; never transfer credentials or tool approvals across endpoints.
 
 Delete with `ox.service.delete({ domain, purpose })`. This removes the connection, local authorization, and tool approvals and detaches it from this chat, but does not revoke remote authorization or delete repository-owned definitions. MCP changes save immediately; connecting does not build or host a server.

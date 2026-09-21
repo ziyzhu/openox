@@ -1,6 +1,43 @@
 import Foundation
 
 extension Chat {
+    public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
+        guard let catalogAction = BrowserFunctionCatalog.action(id: action) else {
+            throw RuntimeError.bridge("ox.web.browser: unknown action '\(action)'")
+        }
+        let service = serviceManager.browserService
+        let name = catalogAction.name
+        guard let definition = service.definition.action(action),
+              let inputSchema = definition.inputSchema else {
+            throw Service.InvokeError.unknown(name)
+        }
+        let violations = JSONSchemaValidator.validate(
+            arguments,
+            against: inputSchema,
+            definitions: service.definition.definitions
+        )
+        guard violations.isEmpty else { throw Service.InvokeError.invalidInput(name, violations) }
+        return try await tracked(name, arguments, purpose: purpose) {
+            guard let implementation = service.iOSService else { throw Service.InvokeError.unknown(name) }
+            let result = await implementation.invoke(
+                service: service,
+                actionID: action,
+                args: arguments,
+                purpose: purpose,
+                approve: { _, _ in true },
+                nativeInvocation: { [unowned self] _, id, args, purpose in
+                    try await nativeServiceOperations.invoke(
+                        service: service,
+                        actionID: id,
+                        args: args,
+                        purpose: purpose
+                    )
+                }
+            )
+            return try result.get()
+        }
+    }
+
     public func searchWeb(query: String, purpose: String) async throws -> JSONValue? {
         let request = try WebSearchRequest(query: query)
         return try await tracked(Actions.webSearch, .object(["query": .string(request.query)]), purpose: purpose) {

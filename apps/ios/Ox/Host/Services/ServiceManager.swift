@@ -80,6 +80,7 @@ final class ServiceManager {
     @ObservationIgnored let actionScheduler = ServiceActionScheduler(capacity: 5)
     @ObservationIgnored let sessionCoordinator = ServiceSessionCoordinator()
     @ObservationIgnored let browserActionSessions = ServiceBrowserActionSessionCoordinator()
+    @ObservationIgnored private var intrinsicBrowserService: Service?
     @ObservationIgnored private let websiteData = ServiceWebsiteDataCoordinator()
     private(set) var repositoryState: RepositoryState = .idle
     private(set) var monoRepositoryState: MonoRepositoryState = .idle
@@ -115,7 +116,7 @@ final class ServiceManager {
 
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
 
-    private static let savedKey = "savedServices"
+    nonisolated static let savedKey = "savedServices"
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
     nonisolated static let legacyAutoApproveActionsKey = "autoApproveActions"
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
@@ -286,6 +287,20 @@ final class ServiceManager {
     }
 
     func service(domain: String) -> Service? { byDomain[domain] }
+
+    var browserService: Service {
+        if let intrinsicBrowserService { return intrinsicBrowserService }
+        let service = Service(definition: BrowserFunctionCatalog.serviceDefinition, manager: self)
+        intrinsicBrowserService = service
+        return service
+    }
+
+    func inspectionService(domain: String) -> Service? {
+        if domain == BrowserFunctionCatalog.publicNamespace || domain == BrowserFunctionCatalog.internalDomain {
+            return browserService
+        }
+        return service(domain: domain)
+    }
 
     func connectRemoteMCP(
         _ rawEndpoint: String,

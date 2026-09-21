@@ -669,15 +669,10 @@ struct ServiceDetailView: View {
     }
 
     private var canInspectPage: Bool {
-        guard capabilities.supportsPageInspection else { return false }
-        guard service.domain == "ios:browser" else { return true }
-        return isAttached && browserSessionID != nil
+        capabilities.supportsPageInspection
     }
 
     private func inspectPage() {
-        if service.domain == "ios:browser", let browserSessionID {
-            _ = serviceManager.browserActionSessions.session(for: service, ownerID: browserSessionID)
-        }
         showPageInspector = true
     }
 

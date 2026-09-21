@@ -121,14 +121,16 @@ UserDefaults value into the app group and removes the legacy value.
 Application migration converts the legacy `autoApproveActions` allow-list and
 `autoApproveAll` preference into `actionApprovalPolicies`. The versioned JSON value
 stores an optional global override plus optional source and Action overrides. No
-global override means Automatic: bounded, non-consequential reads default to Allow,
-while consequential and unknown Actions default to Ask. The version-one Ask default
-migrates to Automatic; explicit source and Action policies remain unchanged.
-Missing state uses Automatic, while malformed and unknown future formats fail
-closed to Ask without discarding the stored bytes. Migration removes standing
-approvals for retired Action identifiers, including `ox.app.inspect` and
-`ios:browser:screenshot`, and does not transfer approval to replacement Actions,
-so a replacement that can expose user data requires fresh consent.
+global override means Automatic: registered built-in Ox Actions default to Allow
+except deletion, while unknown Actions default to Ask. Service and device Actions
+use their declared defaults. The
+version-one Ask default migrates to Automatic; explicit source and Action policies
+remain unchanged. Missing state uses Automatic, while malformed and unknown future
+formats fail closed to Ask without discarding the stored bytes. Migration removes standing
+approvals for retired Action identifiers, including `ox.app.inspect`, every
+`ios:browser:*` Action, and the legacy Browser attachment Action. It does not
+transfer approval to replacement Actions; `ox.web.browser.*` functions follow
+the current built-in Action defaults and explicit user overrides.
 
 ## Profiles
 
@@ -225,6 +227,10 @@ A temporary chat has no directory, summary, persistence callback, or
 notification preview. It is discarded when left or when the process ends and
 cannot mutate Profile-owned content.
 
+The Browser-to-built-in-function migration removes the retired `ios:browser`
+domain from persisted chat attachments. Existing Browser inspector transcript
+rows remain readable and resolve to the intrinsic Browser runtime.
+
 Chat sharing creates a transient `.chat` ZIP package whose `chat.json` stores
 the package and transcript schema versions, source metadata, content counts,
 service-domain disclosure, and SHA-256 inventory. `turns.jsonl` retains the
@@ -312,8 +318,9 @@ User-selected Files folders appear separately as `files/<grant-id>/...` after
 the Files device service is attached. Security-scoped bookmarks live in
 `Application Support/device-folder-grants.json`, outside every Profile and outside
 backup. Each operation rejects traversal and symbolic links. Writes, edits, and
-deletes require their device-service approval. Profile-owned writes and edits do
-not require approval; artifact import, rename, and delete do.
+deletes require the attached Files service and existing folder grant. Built-in
+writes and edits default to Allow, while delete defaults to Ask. Artifact import
+and rename default to Allow; artifact and filesystem deletion default to Ask.
 
 HTML artifacts remain ordinary UTF-8 files. Presentation creates a fresh
 non-persistent WebKit store and reads the current artifact plus bounded sibling

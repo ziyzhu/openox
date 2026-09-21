@@ -69,7 +69,7 @@ struct ActionSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
                     "Default",
-                    footer: "Automatic allows non-consequential reads and asks before consequential or unknown Actions. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
+                    footer: "Automatic allows built-in Ox Actions except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
                 ) {
                     ActionPolicyPicker(
                         title: "All Actions",

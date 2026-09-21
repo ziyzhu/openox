@@ -85,6 +85,7 @@ nonisolated enum Actions {
         appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appServiceRepositories,
         appLogs, appRenameChat,
         webSearch, webFetch,
+    ] + BrowserFunctionCatalog.actionNames + [
         fsList, fsRead, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach,
         serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
@@ -99,25 +100,16 @@ nonisolated enum Actions {
         widgetShoveler, widgetVideo, userChoose, userReportProgress,
     ]
 
-    private static let allowedByDefault = Set([
-        providerDefault, providerList, providerGet, providerValidate,
-        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appVoice,
-        appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appServiceRepositories,
-        webSearch, webFetch,
-        fsList, fsRead, outputRead, fsGlob, fsGrep,
-        artifactAttach, artifactList, artifactPresent,
-        serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceGitStatus,
-        serviceGitLog, serviceGitShow, serviceGitDiff,
-        scheduleList, memoryRead,
-        widgetShoveler, widgetVideo, userChoose, userReportProgress,
-    ])
-
     static func defaultPolicy(for action: String) -> ActionPolicy {
-        allowedByDefault.contains(action) ? .allow : .ask
+        guard builtIn.contains(action) else { return .ask }
+        return action.hasSuffix(".delete") ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
-        switch action {
+        if let browser = BrowserFunctionCatalog.action(named: action) {
+            return "Browser: \(browser.label)"
+        }
+        return switch action {
         case providerDefault: L10n.string("Default model")
         case providerList: L10n.string("List model providers")
         case providerGet: L10n.string("View a model provider")

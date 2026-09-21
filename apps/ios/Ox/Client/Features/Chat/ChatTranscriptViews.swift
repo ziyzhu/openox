@@ -206,10 +206,10 @@ private struct ServiceInspectorRow: View {
     @Environment(ServiceManager.self) private var serviceManager
     @State private var isPresented = false
 
-    private var service: Service? { serviceManager.service(domain: link.domain) }
+    private var service: Service? { serviceManager.inspectionService(domain: link.domain) }
     private var canInspect: Bool {
         guard let service else { return false }
-        guard service.domain == "ios:browser" else { return true }
+        guard service.domain == BrowserFunctionCatalog.internalDomain else { return true }
         return serviceManager.browserActionSessions.existingSession(for: chatID, service: service) != nil
     }
 

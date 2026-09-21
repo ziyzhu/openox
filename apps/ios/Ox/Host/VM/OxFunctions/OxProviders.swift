@@ -7,10 +7,10 @@ nonisolated enum OxProviders {
         ("list", "List provider summaries, model counts, and authentication status. Never returns credentials."),
         ("get", "Read one complete provider definition by id. Models are declared tool-capable entries."),
         ("validate", "Validate a complete provider document without saving or making network requests. Does not verify credentials or model capabilities."),
-        ("save", "Create or replace a complete provider definition. Always validates before saving. Requires approval. Models are supplied directly; no discovery is performed."),
+        ("save", "Create or replace a complete provider definition. Always validates before saving. Models are supplied directly; no discovery is performed."),
         ("delete", "Remove a saved provider definition and clear its local credentials. Removing an override restores the bundled default; removing an added provider removes it entirely. Unmodified bundled defaults cannot be deleted. Requires approval."),
         ("authenticate", "Present the same provider authentication UI used in Settings and wait for completion. Credentials are entered by the user and never passed to JavaScript. Returns status authenticated, credential-stored, or not-required; throws on cancellation or failure."),
-        ("deauthenticate", "Clear a provider's local credentials and account authentication. Requires approval. Does not revoke access at the provider."),
+        ("deauthenticate", "Clear a provider's local credentials and account authentication. Does not revoke access at the provider."),
     ]
 
     static let function = OxFunction(

@@ -1,0 +1,16 @@
+{
+  "attachedServiceDomains" : [
+    "web:example.com"
+  ],
+  "createdAt" : 811500000,
+  "hasUnreadResponse" : false,
+  "id" : "00000000-0000-4000-8000-000000000011",
+  "isFavorite" : false,
+  "lastActivity" : 811500010,
+  "model" : {
+    "modelID" : "mock",
+    "providerID" : "mock"
+  },
+  "preview" : "Browser fixture",
+  "schemaVersion" : 1
+}

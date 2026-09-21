@@ -68,7 +68,7 @@ final class NativeServiceOperations {
                   let scheme = url.scheme?.lowercased(),
                   (scheme == "http" || scheme == "https"),
                   url.host?.isEmpty == false else {
-                throw RuntimeError.bridge("ios:browser:navigate requires an absolute HTTP or HTTPS URL.")
+                throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute HTTP or HTTPS URL.")
             }
             let landed: URL
             do {
@@ -76,9 +76,9 @@ final class NativeServiceOperations {
                     .session(for: browser, ownerID: id)
                     .navigate(url)
             } catch Service.EvalError.navigationFailed(let message) {
-                throw RuntimeError.bridge("ios:browser:navigate failed to load the requested URL: \(message)")
+                throw RuntimeError.bridge("ox.web.browser.navigate failed to load the requested URL: \(message)")
             } catch {
-                throw RuntimeError.bridge("ios:browser:navigate failed to load the requested URL: \(error.localizedDescription)")
+                throw RuntimeError.bridge("ox.web.browser.navigate failed to load the requested URL: \(error.localizedDescription)")
             }
             return .object(["url": .string(landed.absoluteString)])
         case ("ios:browser", "reload"):
@@ -131,7 +131,7 @@ final class NativeServiceOperations {
             return .object(["shown": .bool(true)])
         case ("ios:browser", "executeScript"):
             guard let script = fields["script"]?.stringValue else {
-                throw RuntimeError.bridge("ios:browser:executeScript requires Browser to be available to an active caller.")
+                throw RuntimeError.bridge("ox.web.browser.executeScript requires Browser to be available to an active caller.")
             }
             return try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
@@ -167,12 +167,12 @@ final class NativeServiceOperations {
                 options: [done, L10n.string("Cancel")],
                 purpose: purpose ?? L10n.string("Wait for browser interaction")
             )?.stringValue
-            guard answer == done else { throw RuntimeError.bridge("ios:browser:waitForUserInteraction: the user cancelled.") }
+            guard answer == done else { throw RuntimeError.bridge("ox.web.browser.waitForUserInteraction: the user cancelled.") }
             return .object(["completed": .bool(true)])
         case ("ios:browser", "injectScript"):
             guard let source = fields["script"]?.stringValue,
                   let domains = fields["domains"]?.arrayValue?.compactMap(\.stringValue) else {
-                throw RuntimeError.bridge("ios:browser:injectScript requires a script, target domains, and Browser.")
+                throw RuntimeError.bridge("ox.web.browser.injectScript requires a script and target domains.")
             }
             let landed = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
@@ -190,7 +190,7 @@ final class NativeServiceOperations {
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "markCapture"):
             guard let label = fields["label"]?.stringValue else {
-                throw RuntimeError.bridge("ios:browser:markCapture requires a label and Browser.")
+                throw RuntimeError.bridge("ox.web.browser.markCapture requires a label.")
             }
             serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
             return .object(["marked": .bool(true)])
@@ -202,7 +202,7 @@ final class NativeServiceOperations {
                   let event = serviceManager.browserActionSessions
                     .session(for: browser, ownerID: id)
                     .readCapturedEvent(id: eventID) else {
-                throw RuntimeError.bridge("ios:browser:readCapturedEvent requires a valid captured event id.")
+                throw RuntimeError.bridge("ox.web.browser.readCapturedEvent requires a valid captured event id.")
             }
             return event
         case ("ios:browser", "stopCapture"):

@@ -73,25 +73,26 @@ enums; it never serializes credential values, account labels, profile identifier
 or internal filesystem paths into the virtual machine.
 Fetched bodies are bounded and held only for the active JavaScript execution.
 The virtual machine must explicitly read a body, add it to model context, or request an
-approval-gated artifact import; fetching alone does neither. URL provenance and
+artifact import permitted by the current Action policy; fetching alone does neither. URL provenance and
 DNS rebinding protection remain deferred and must be addressed before the public
-web contract expands. **Web exception:** after approval, the model may
+web contract expands. **Web exception:** when the current Action policy permits it, the model may
 read page-visible credentials and authenticated data and use Web's current
-page to transmit them. Always allow makes that exception standing across every
-page Web visits until the user revokes the qualified
-`device.browser:executeScript` approval.
+page to transmit them. An explicit Allow policy keeps that exception standing
+across every page Browser visits until the user revokes the qualified
+`ox.web.browser.executeScript` policy.
 
 ### T2 — Adversarial model triggers a harmful state change
 The model invokes a money-moving, posting, or sending action the user didn't
 intend. **Mitigation:** the native runtime resolves every built-in and service
 Action against the user's Ask, Allow, or Block policy independent of how the model
-names or chains the call. Automatic is the initial global setting: bounded,
-non-consequential reads default to Allow, while consequential and unknown Actions
-default to Ask. The user may set a global, service, or qualified-Action policy in
-Settings; more specific choices override broader defaults and Action defaults. A
-prompt can also persist Always allow for that Action. Service `requireApproval`
-metadata supplies a service Action's default but never overrides user policy. API
-services also use it to declare that an action may send mutating HTTP methods. Authenticated
+names or chains the call. Automatic is the initial global setting: registered
+built-in Ox Actions default to Allow except deletion, while unknown Actions
+default to Ask. The user may set a global,
+service, or qualified-Action policy in Settings; more specific choices override
+broader defaults and Action defaults. A prompt can also persist Always allow for
+that Action. Service `requireApproval` metadata supplies a service Action's default
+but never overrides user policy. API services also use it to declare that an action
+may send mutating HTTP methods. Authenticated
 actions re-probe auth at invoke time rather than
 trusting a cached signal. Payment completion stays on the merchant's
 user-operated review surface rather than becoming an agent action.
@@ -235,29 +236,29 @@ exposed to the page world are logging-only and return nothing to the page; the
 privileged action-invocation path is not reachable from page script, and
 message origins are validated.
 
-### Web device-service boundary
+### Browser boundary
 
-`device.browser` is a client-owned device service with `navigate`, `inspect`, and
-`executeScript` actions and one persistent primary page. `navigate` accepts
+`ox.web.browser` is a client-owned web capability with `navigate`, `showPage`, and
+`executeScript` functions and one persistent primary page per caller. `navigate` accepts
 only an absolute HTTP or HTTPS URL allowed by the web-navigation policy.
-`inspect` only materializes a persistent chat row; it does not execute page code
-or present UI. Web's live page appears in the existing inspector only after
+`showPage` only materializes a persistent chat row; it does not execute page code
+or present UI. Browser's live page appears in the existing inspector only after
 the user taps that row. `executeScript` accepts a non-empty bounded script,
 obtains the ordinary native action approval, serializes execution against page
 navigation, and runs the script as an async function body in the page content
 world. No domain selector is exposed, and only a JSON-compatible result crosses
-back to the agent. Web uses the shared website data store, so visiting an
+back to the agent. Browser uses the shared website data store, so visiting an
 origin can use the same signed-in session as that origin's registry service.
 
 The approval UI intentionally offers Always allow and stores it under the
-qualified `device.browser:executeScript` action name. While enabled, the model
+qualified `ox.web.browser.executeScript` Action name. While enabled, the model
 can inspect or mutate the current DOM, origin storage, page JavaScript state, and
 authenticated responses; initiate network requests; and leave timers, listeners,
 storage changes, or other origin-scoped state behind. Navigation changes the
 origin controlled by later invocations but does not undo work already initiated
 by a script. This mode explicitly suspends credential confidentiality and
-per-mutation integrity for Web's current origin. Provider keys, native device
-capabilities, raw files, and Ox bridges remain outside Web's page.
+per-mutation integrity for Browser's current origin. Provider keys, native device
+capabilities, raw files, and Ox bridges remain outside Browser's page.
 
 ### Interactive authentication boundary
 

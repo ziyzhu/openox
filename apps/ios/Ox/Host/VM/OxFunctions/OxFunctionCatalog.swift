@@ -6,7 +6,7 @@ nonisolated enum OxFunctionCatalog {
         ("provider", "Inspect, configure, and authenticate model providers."),
         ("service", "Discover, attach, detach, and invoke services."),
         ("user", "Keep the user informed and ask them to choose."),
-        ("web", "Search and fetch the public web."),
+        ("web", "Search, fetch, and interact with the web."),
         ("fs", "List, read, write, edit, delete, and search Ox files."),
         ("output", "Retrieve complete captured JavaScript output."),
         ("skill", "Create, copy, and delete Profile-owned skills."),

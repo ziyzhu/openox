@@ -17,7 +17,7 @@ enum OxHostProtocol {
         switch command {
         case .invokeAction(let request): handleInvokeAction(request, chatManager: chats, serviceManager: services, reply: reply)
         case .evaluate(let request): handleEvaluate(request, serviceManager: services, reply: reply)
-        case .reloadService(let request): handleReloadService(request, chatManager: chats, serviceManager: services, reply: reply)
+        case .reloadService(let request): handleReloadService(request, serviceManager: services, reply: reply)
         case .refreshServiceAuth(let request): handleRefreshServiceAuth(request, serviceManager: services, reply: reply)
         case .listServices(let request): handleListServices(request, serviceManager: services, reply: reply)
         case .syncMonoRepository(let request): handleSyncMonoRepository(request, serviceManager: services, reply: reply)
