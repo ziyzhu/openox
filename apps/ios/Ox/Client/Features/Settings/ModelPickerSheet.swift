@@ -391,8 +391,8 @@ struct SettingsSheet: View {
                     ActionSettingsView()
                 } label: {
                     SettingsDisclosureRow(
-                        title: "Actions",
-                        value: Text(serverManager.defaultActionPolicy?.title ?? "Automatic")
+                        title: "Permissions",
+                        value: Text(serverManager.defaultActionPolicy?.title ?? "Action Defaults")
                     )
                 }
                 .buttonStyle(.plain)
