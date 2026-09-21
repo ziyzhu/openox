@@ -75,20 +75,30 @@ When proposed actions require authentication, let the user complete the website'
 
 ### Choose a favicon
 
-While Browser is on the service, inventory public icon metadata in this order:
+While Browser is on the service, inventory first-party public icon metadata in this order:
 
 1. Largest square `apple-touch-icon`.
 2. Largest square icon in a same-site web-app manifest.
 3. Largest square `icon`.
 4. Same-site `/apple-touch-icon.png` or `/favicon.ico`.
 
-Resolve relative URLs and require a stable public HTTPS square SVG or raster at least 128×128. Page JavaScript may load a candidate and return its final URL and natural dimensions. Set the supported URL as `faviconUrl`, reload the service, and visually confirm the service avatar appears and remains recognizable. A customer-facing service is not complete without a visible verified icon when the product publishes a qualifying official source. Omit `faviconUrl` only after exhausting the ordered sources above and explicitly tell the user that no qualifying official icon was available.
+Resolve relative URLs and choose the first category with a stable public HTTPS square PNG or JPEG at least 128×128, selecting the largest qualifying image within that category. Page JavaScript may load a candidate and return its final URL and natural dimensions. Store the final non-redirecting URL as `faviconUrl`, reload the service, and visually confirm the service avatar appears and remains recognizable. Do not select SVG because the service image loader does not support it.
+
+When no first-party candidate qualifies, request Google's cached favicon for the product's public origin only:
+
+```text
+https://www.google.com/s2/favicons?domain_url=<percent-encoded-origin>&sz=128&alt=404
+```
+
+Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. Navigate Browser to the resolver and wait for the URL to settle. Because the service image loader does not follow redirects, save the final direct HTTPS `tN.gstatic.com/faviconV2` URL rather than the `google.com` resolver URL. Accept the result only when it returns `200`, is a square supported raster, visibly matches the product, and renders as the service avatar after reload. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at the rendered avatar size. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
+
+A customer-facing service is not complete without a visible verified icon when a qualifying first-party or Google-cached result exists. Omit `faviconUrl` only after exhausting both sources, and report whether the selected icon is first-party, a Google fallback, or unavailable.
 
 ## 3. Present the action plan
 
 For deliberate service authoring, present:
 
-- Service domain, concise product name, description, top-level base URL, and favicon evidence.
+- Service domain, concise product name, description, top-level base URL, and favicon evidence, including whether it is first-party or a Google fallback.
 - Every action ID, purpose, and action-specific base URL when needed.
 - Inputs, narrow returned data, and pagination behavior.
 - Authentication, approval, bot-control, and payment requirements.
@@ -223,7 +233,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
-13. Verify the favicon URL structurally, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying official icon exists.
+13. Verify the favicon URL is a direct supported image without redirects, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying first-party or Google-cached icon exists.
 14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting Save approval, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
