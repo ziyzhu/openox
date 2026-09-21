@@ -20,102 +20,22 @@ struct InlineBotControlView: View {
     private var name: String { suppliedName ?? service?.title ?? domain }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            content
-        }
-        .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                .stroke(Theme.Colors.onSurfaceMuted.opacity(0.18), lineWidth: 1)
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            if let service {
-                ServiceAvatar(
-                    service: service,
-                    size: 34,
-                    shape: .roundedRect(Theme.Radius.sm)
-                )
-            } else {
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.primary.dynamic)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        Theme.Colors.primary.dynamic.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    )
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .lineLimit(1)
-                    .accessibilityIdentifier(A11yID.Chat.Attach.botControl(domain))
-                Text("Complete the site's human verification to continue")
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: Theme.Spacing.sm)
-            if let session {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Button { expand(session) } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(.subheadline, weight: .semibold))
-                            .foregroundStyle(Theme.Colors.onSurface)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .accessibilityLabel("View live page")
-                    .accessibilityIdentifier(A11yID.Chat.Attach.botControlExpand(domain))
-                    Button { cancel(session) } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(.subheadline, weight: .semibold))
-                            .foregroundStyle(Theme.Colors.onSurface)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .accessibilityLabel("Cancel")
-                    .accessibilityIdentifier(A11yID.Chat.Attach.botControlCancel(domain))
-                }
-            }
-        }
-        .frame(minHeight: Theme.Size.minimumTouchTarget)
-        .padding(.leading, Theme.Spacing.md)
-        .padding(.trailing, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.sm)
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if let session, !isPresentedInSheet {
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    WebContentView(page: session.page)
-                }
-        } else {
-            VStack(spacing: Theme.Spacing.md) {
-                ProgressView()
-                Text("Complete the site's human verification to continue")
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 220)
-            .padding(.horizontal, Theme.Spacing.xl)
-        }
+        LivePageCard(
+            service: service,
+            fallbackSystemImage: "checkmark.shield.fill",
+            title: name,
+            subtitle: String(localized: "Complete the site's human verification to continue"),
+            page: session?.page,
+            inlinePageAnchorID: nil,
+            isPresented: isPresentedInSheet,
+            placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
+            activate: nil,
+            expand: session.map { session in { expand(session) } },
+            cancel: session.map { session in { cancel(session) } },
+            accessibilityIdentifier: A11yID.Chat.Attach.botControl(domain),
+            expandAccessibilityIdentifier: A11yID.Chat.Attach.botControlExpand(domain),
+            cancelAccessibilityIdentifier: A11yID.Chat.Attach.botControlCancel(domain)
+        )
     }
 }
 

@@ -319,6 +319,7 @@ nonisolated enum A11yID {
 
     enum ServiceInspector {
         static let address = "serviceInspector.address"
+        static let open = "serviceInspector.open"
         static let close = "serviceInspector.close"
     }
 }

@@ -3,6 +3,7 @@ import Observation
 import WebKit
 
 @MainActor
+@Observable
 final class ServiceBrowserActionSession {
     struct ExportedPDF {
         let url: URL?
@@ -50,7 +51,7 @@ final class ServiceBrowserActionSession {
     }
 
     var webPage: WebPage? {
-        guard let page, service.owns(page), page.isReady else { return nil }
+        guard let page, service.owns(page) else { return nil }
         return page.page
     }
 

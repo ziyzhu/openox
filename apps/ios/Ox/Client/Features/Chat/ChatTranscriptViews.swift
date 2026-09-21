@@ -1,6 +1,73 @@
 import SwiftUI
 import AVFAudio
 import Observation
+import WebKit
+
+@MainActor
+@Observable
+final class InlineServicePagePresenter {
+    enum Placement: Equatable {
+        case idle
+        case inline(UUID)
+        case detached(UUID)
+    }
+
+    private(set) var placement: Placement = .idle
+    @ObservationIgnored private var revision = 0
+    @ObservationIgnored private var preferredOwnerID: UUID?
+
+    func isInline(_ ownerID: UUID) -> Bool {
+        placement == .inline(ownerID)
+    }
+
+    var inlineOwnerID: UUID? {
+        if case .inline(let ownerID) = placement { ownerID } else { nil }
+    }
+
+    func reconcile(ownerIDs: [UUID]) {
+        let preferred = ownerIDs.last
+        let previousPreferred = preferredOwnerID
+        preferredOwnerID = preferred
+        guard let preferred else {
+            revision += 1
+            placement = .idle
+            return
+        }
+        if case .detached(let ownerID) = placement, ownerIDs.contains(ownerID) { return }
+        if case .inline(let ownerID) = placement,
+           ownerIDs.contains(ownerID),
+           preferred == previousPreferred { return }
+        activate(preferred)
+    }
+
+    func activate(_ ownerID: UUID) {
+        guard placement != .inline(ownerID) else { return }
+        revision += 1
+        let request = revision
+        placement = .idle
+        Log.webView.info("InlineServicePagePresenter.activate owner=\(ownerID)")
+        Task { @MainActor in
+            await Task.yield()
+            guard revision == request else { return }
+            placement = .inline(ownerID)
+            Log.webView.info("InlineServicePagePresenter.mounted owner=\(ownerID)")
+        }
+    }
+
+    func detach(_ ownerID: UUID) async -> Bool {
+        revision += 1
+        let request = revision
+        placement = .detached(ownerID)
+        Log.webView.info("InlineServicePagePresenter.detached owner=\(ownerID)")
+        await Task.yield()
+        return revision == request && placement == .detached(ownerID)
+    }
+
+    func restore(_ ownerID: UUID) {
+        guard placement == .detached(ownerID) else { return }
+        activate(ownerID)
+    }
+}
 
 @MainActor
 @Observable
@@ -203,64 +270,89 @@ private struct TranscriptStatusDivider: View {
 private struct ServiceInspectorRow: View {
     let link: ServiceInspectorLink
     let chatID: UUID
+    let rowID: UUID
+    let pagePresenter: InlineServicePagePresenter
     @Environment(ServiceManager.self) private var serviceManager
     @State private var isPresented = false
 
     private var service: Service? { serviceManager.inspectionService(domain: link.domain) }
+    private var browserSession: ServiceBrowserActionSession? {
+        guard let service, service.domain == BrowserFunctionCatalog.internalDomain else { return nil }
+        return serviceManager.browserActionSessions.existingSession(for: chatID, service: service)
+    }
     private var canInspect: Bool {
         guard let service else { return false }
         guard service.domain == BrowserFunctionCatalog.internalDomain else { return true }
-        return serviceManager.browserActionSessions.existingSession(for: chatID, service: service) != nil
+        return browserSession != nil
+    }
+    private var page: WebPage? {
+        browserSession?.webPage
+    }
+    private var isInline: Bool {
+        pagePresenter.isInline(rowID)
+    }
+    private var subtitle: String {
+        if let host = page?.url?.host(percentEncoded: false) { return host }
+        return canInspect ? String(localized: "View live page") : String(localized: "Page unavailable")
+    }
+    private var placeholder: LivePageCard.Placeholder {
+        if canInspect { return .invitation(String(localized: "Open to view the live page")) }
+        return .unavailable(String(localized: "Page unavailable"))
+    }
+    private var inlinePage: WebPage? {
+        isInline ? page : nil
+    }
+    private var activatePage: (() -> Void)? {
+        guard canInspect, !isInline else { return nil }
+        return { pagePresenter.activate(rowID) }
+    }
+    private var expandPageAction: (() -> Void)? {
+        canInspect ? { expandPage() } : nil
     }
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            if let service {
-                ServiceAvatar(service: service, size: 44, shape: .roundedRect(Theme.Radius.sm))
-            } else {
-                Image(systemName: "safari")
-                    .font(.title3)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.Colors.background, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-            }
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(link.serviceName)
-                    .font(Theme.Fonts.title)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                if !canInspect {
-                    Text("Page unavailable")
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                } else {
-                    Text("View live page")
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
-            }
-            Spacer(minLength: Theme.Spacing.sm)
-            Image(systemName: "safari")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(minHeight: 44)
-        .modifier(ChatInteractiveRowSurface())
-        .onTapGesture { isPresented = canInspect }
-        .accessibilityElement(children: .ignore)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { isPresented = canInspect }
-        .accessibilityLabel("View \(link.serviceName) live page")
-        .accessibilityIdentifier(A11yID.Chat.Message.serviceInspector(link.domain))
-        .fullScreenCover(isPresented: $isPresented) {
+        LivePageCard(
+            service: service,
+            fallbackSystemImage: "safari",
+            title: link.serviceName,
+            subtitle: subtitle,
+            page: nil,
+            inlinePageAnchorID: inlinePage == nil ? nil : rowID,
+            isPresented: false,
+            placeholder: placeholder,
+            activate: activatePage,
+            expand: expandPageAction,
+            cancel: nil,
+            accessibilityIdentifier: A11yID.Chat.Message.serviceInspector(link.domain),
+            expandAccessibilityIdentifier: A11yID.ServiceInspector.open,
+            cancelAccessibilityIdentifier: ""
+        )
+        .fullScreenCover(isPresented: $isPresented, onDismiss: {
+            pagePresenter.restore(rowID)
+        }) {
             if let service {
                 NavigationStack {
                     ServicePageInspector(service: service, browserSessionID: chatID)
                 }
             }
         }
+        .onAppear {
+            logInlineState(reason: "appear")
+        }
+        .onChange(of: isInline) { _, _ in
+            logInlineState(reason: "placement")
+        }
+    }
+
+    private func expandPage() {
+        Task { @MainActor in
+            guard await pagePresenter.detach(rowID) else { return }
+            isPresented = true
+        }
+    }
+
+    private func logInlineState(reason: String) {
+        Log.webView.info("ServiceInspectorRow.inline reason=\(reason) row=\(rowID) mounted=\(isInline) session=\(browserSession != nil) page=\(page != nil)")
     }
 }
 
@@ -1194,6 +1286,7 @@ struct BlockView: View, Equatable {
     let block: ChatBlock
     let isStreamingTail: Bool
     let chatID: UUID
+    let inlineServicePagePresenter: InlineServicePagePresenter
     let isThinkingTail: Bool
     let controls: MessageControls
     let artifactControls: ArtifactControls
@@ -1342,7 +1435,12 @@ struct BlockView: View, Equatable {
                     case .serviceControl:
                         EmptyView()
                     case let .serviceInspector(link):
-                        ServiceInspectorRow(link: link, chatID: chatID)
+                        ServiceInspectorRow(
+                            link: link,
+                            chatID: chatID,
+                            rowID: block.id,
+                            pagePresenter: inlineServicePagePresenter
+                        )
                             .padding(.horizontal, 4)
                     case let .shoveler(shoveler):
                         ShovelerView(

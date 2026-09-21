@@ -27,6 +27,39 @@ private final class ChatBotControlPresenter: ServiceHandoffPresenting {
     }
 }
 
+private struct InlineServicePageHost: View {
+    let anchor: Anchor<CGRect>
+    let chatID: UUID
+    @Environment(ServiceManager.self) private var serviceManager
+
+    private var page: WebPage? {
+        guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
+              let session = serviceManager.browserActionSessions.existingSession(for: chatID, service: service) else {
+            return nil
+        }
+        return session.webPage
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let page {
+                let frame = geometry[anchor]
+                WebContentView(page: page)
+                    .frame(width: frame.width, height: frame.height)
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            bottomLeadingRadius: Theme.Radius.lg,
+                            bottomTrailingRadius: Theme.Radius.lg,
+                            style: .continuous
+                        )
+                    )
+                    .position(x: frame.midX, y: frame.midY)
+            }
+        }
+        .clipped()
+    }
+}
+
 private struct SidebarScrollLockModifier: ViewModifier {
     @Environment(\.sidebarInteraction) private var sidebarInteraction
 
@@ -285,6 +318,7 @@ struct ChatPage: View {
     @State private var viewportLayout = ChatViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
     @State private var botControlPresenter = ChatBotControlPresenter()
+    @State private var inlineServicePagePresenter = InlineServicePagePresenter()
     @State private var expandedBotControlSessionID: UUID?
 
     @Environment(\.displayScale) private var displayScale
@@ -446,6 +480,10 @@ struct ChatPage: View {
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
         let blocks = projection.blocks
+        let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
+            guard case .agentContent(.serviceInspector) = block.kind else { return nil }
+            return block.id
+        }
         let transcript = transcript(
             blocks: blocks,
             totalBlockCount: totalBlockCount,
@@ -453,6 +491,9 @@ struct ChatPage: View {
             sourceBlockIDs: requestedSourceIDs,
             dockClearance: dockClearance
         )
+            .onChange(of: servicePageOwnerIDs, initial: true) { _, ownerIDs in
+                inlineServicePagePresenter.reconcile(ownerIDs: ownerIDs)
+            }
             .toast($toast)
             .safeAreaBar(edge: .top, spacing: 0) {
                 pageTopBar(blockCount: totalBlockCount)
@@ -1110,6 +1151,7 @@ struct ChatPage: View {
             block: block,
             isStreamingTail: chat.isBusy && isTail,
             chatID: chat.id,
+            inlineServicePagePresenter: inlineServicePagePresenter,
             isThinkingTail: chat.activity.isThinking && isTail,
             controls: messageControls(
                 sourceBlockID: block.sourceBlockID,
@@ -1246,6 +1288,12 @@ struct ChatPage: View {
                             }
                         }
                     )
+                }
+                .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
+                    if let ownerID = inlineServicePagePresenter.inlineOwnerID,
+                       let anchor = anchors[ownerID] {
+                        InlineServicePageHost(anchor: anchor, chatID: chat.id)
+                    }
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)
                 .onScrollGeometryChange(for: ChatViewportController.Frame?.self) { geo in
