@@ -11,6 +11,7 @@ import Observation
 @Observable
 private final class ChatBotControlPresenter: ServiceHandoffPresenting {
     private(set) var session: ServiceHandoffSession?
+    let pageMount = WebPageMountCoordinator()
 
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         guard self.session == nil else {
@@ -19,9 +20,13 @@ private final class ChatBotControlPresenter: ServiceHandoffPresenting {
             return .failed
         }
         self.session = session
+        pageMount.reconcile(page: session.page, ownerIDs: [session.id])
         Log.ui.info("ChatBotControlPresenter present domain=\(session.serviceDomain)")
         let outcome = await session.run()
-        if self.session === session { self.session = nil }
+        if self.session === session {
+            pageMount.clear()
+            self.session = nil
+        }
         Log.ui.info("ChatBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
         return outcome
     }
@@ -29,32 +34,21 @@ private final class ChatBotControlPresenter: ServiceHandoffPresenting {
 
 private struct InlineServicePageHost: View {
     let anchor: Anchor<CGRect>
-    let chatID: UUID
-    @Environment(ServiceManager.self) private var serviceManager
-
-    private var page: WebPage? {
-        guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
-              let session = serviceManager.browserActionSessions.existingSession(for: chatID, service: service) else {
-            return nil
-        }
-        return session.webPage
-    }
+    let mount: WebPageMount
 
     var body: some View {
         GeometryReader { geometry in
-            if let page {
-                let frame = geometry[anchor]
-                WebContentView(page: page)
-                    .frame(width: frame.width, height: frame.height)
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            bottomLeadingRadius: Theme.Radius.lg,
-                            bottomTrailingRadius: Theme.Radius.lg,
-                            style: .continuous
-                        )
+            let frame = geometry[anchor]
+            MountedWebPageView(mount: mount)
+                .frame(width: frame.width, height: frame.height)
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        bottomLeadingRadius: Theme.Radius.lg,
+                        bottomTrailingRadius: Theme.Radius.lg,
+                        style: .continuous
                     )
-                    .position(x: frame.midX, y: frame.midY)
-            }
+                )
+                .position(x: frame.midX, y: frame.midY)
         }
         .clipped()
     }
@@ -318,8 +312,16 @@ struct ChatPage: View {
     @State private var viewportLayout = ChatViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
     @State private var botControlPresenter = ChatBotControlPresenter()
-    @State private var inlineServicePagePresenter = InlineServicePagePresenter()
+    @State private var browserPageMount = WebPageMountCoordinator()
     @State private var expandedBotControlSessionID: UUID?
+
+    private var browserPage: WebPage? {
+        guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
+              let session = serviceManager.browserActionSessions.existingSession(for: chat.id, service: service) else {
+            return nil
+        }
+        return session.webPage
+    }
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -480,6 +482,7 @@ struct ChatPage: View {
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
         let blocks = projection.blocks
+        let browserPage = browserPage
         let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
             guard case .agentContent(.serviceInspector) = block.kind else { return nil }
             return block.id
@@ -492,7 +495,10 @@ struct ChatPage: View {
             dockClearance: dockClearance
         )
             .onChange(of: servicePageOwnerIDs, initial: true) { _, ownerIDs in
-                inlineServicePagePresenter.reconcile(ownerIDs: ownerIDs)
+                browserPageMount.reconcile(page: browserPage, ownerIDs: ownerIDs)
+            }
+            .onChange(of: browserPage.map(ObjectIdentifier.init), initial: true) { _, _ in
+                browserPageMount.reconcile(page: browserPage, ownerIDs: servicePageOwnerIDs)
             }
             .toast($toast)
             .safeAreaBar(edge: .top, spacing: 0) {
@@ -792,6 +798,11 @@ struct ChatPage: View {
     }
 
     private func sheetDidDismiss() {
+        if let expandedBotControlSessionID,
+           let session = botControlPresenter.session,
+           session.id == expandedBotControlSessionID {
+            botControlPresenter.pageMount.restore(page: session.page, ownerID: session.id)
+        }
         expandedBotControlSessionID = nil
         presentPendingArtifactPreview()
     }
@@ -1057,6 +1068,7 @@ struct ChatPage: View {
                 InlineBotControlView(
                     control: control,
                     session: botControlPresenter.session,
+                    pageMount: botControlPresenter.pageMount,
                     isPresentedInSheet: isBotControlPresentedInSheet,
                     expand: expandBotControl,
                     cancel: { $0.cancel() }
@@ -1092,13 +1104,10 @@ struct ChatPage: View {
     }
 
     private func expandBotControl(_ session: ServiceHandoffSession) {
-        expandedBotControlSessionID = session.id
         Task { @MainActor in
-            await Task.yield()
-            guard botControlPresenter.session === session else {
-                expandedBotControlSessionID = nil
-                return
-            }
+            guard await botControlPresenter.pageMount.detach(page: session.page, ownerID: session.id),
+                  botControlPresenter.session === session else { return }
+            expandedBotControlSessionID = session.id
             modalPresentation = .botControl(session)
         }
     }
@@ -1151,7 +1160,7 @@ struct ChatPage: View {
             block: block,
             isStreamingTail: chat.isBusy && isTail,
             chatID: chat.id,
-            inlineServicePagePresenter: inlineServicePagePresenter,
+            browserPageMount: browserPageMount,
             isThinkingTail: chat.activity.isThinking && isTail,
             controls: messageControls(
                 sourceBlockID: block.sourceBlockID,
@@ -1290,9 +1299,13 @@ struct ChatPage: View {
                     )
                 }
                 .overlayPreferenceValue(LivePageCardAnchorKey.self) { anchors in
-                    if let ownerID = inlineServicePagePresenter.inlineOwnerID,
+                    if let page = browserPage,
+                       let ownerID = browserPageMount.inlineOwnerID(for: page),
                        let anchor = anchors[ownerID] {
-                        InlineServicePageHost(anchor: anchor, chatID: chat.id)
+                        InlineServicePageHost(
+                            anchor: anchor,
+                            mount: WebPageMount(page: page, ownerID: ownerID, coordinator: browserPageMount)
+                        )
                     }
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)

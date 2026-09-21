@@ -9,12 +9,16 @@ struct PastedComposerImage {
     let suggestedName: String
 }
 
-private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
+private struct ComposerTextViewInstaller: UIViewRepresentable {
     let textViewReference: ComposerTextViewReference
     let allowsSelection: Bool
+    let onHeightChange: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(textViewReference: textViewReference)
+        Coordinator(
+            textViewReference: textViewReference,
+            onHeightChange: onHeightChange
+        )
     }
 
     func makeUIView(context: Context) -> ProbeView {
@@ -27,9 +31,11 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
     }
 
     func updateUIView(_ view: ProbeView, context: Context) {
+        context.coordinator.onHeightChange = onHeightChange
         context.coordinator.allowsSelection = allowsSelection
         context.coordinator.installedTextView?.isSelectable = allowsSelection
         context.coordinator.installedTextView?.isEditable = allowsSelection
+        context.coordinator.scheduleHeightUpdate()
         view.scheduleInstallation()
     }
 
@@ -54,11 +60,17 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UITextPasteDelegate {
         private let textViewReference: ComposerTextViewReference
+        var onHeightChange: (CGFloat) -> Void
         weak var installedTextView: UITextView?
         var allowsSelection = true
+        private var heightUpdateScheduled = false
 
-        init(textViewReference: ComposerTextViewReference) {
+        init(
+            textViewReference: ComposerTextViewReference,
+            onHeightChange: @escaping (CGFloat) -> Void
+        ) {
             self.textViewReference = textViewReference
+            self.onHeightChange = onHeightChange
         }
 
         func install(from probe: UIView) {
@@ -71,13 +83,57 @@ private struct ComposerPasteDelegateInstaller: UIViewRepresentable {
             guard let textView,
                   frameDistance(textView.convert(textView.bounds, to: window), targetFrame) < 2 else { return }
             if installedTextView !== textView {
-                installedTextView?.pasteDelegate = nil
+                if let installedTextView {
+                    installedTextView.pasteDelegate = nil
+                    NotificationCenter.default.removeObserver(
+                        self,
+                        name: UITextView.textDidChangeNotification,
+                        object: installedTextView
+                    )
+                }
                 installedTextView = textView
                 textViewReference.textView = textView
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(textDidChange),
+                    name: UITextView.textDidChangeNotification,
+                    object: textView
+                )
             }
             textView.pasteDelegate = self
             textView.isSelectable = allowsSelection
             textView.isEditable = allowsSelection
+            scheduleHeightUpdate()
+        }
+
+        func scheduleHeightUpdate() {
+            guard !heightUpdateScheduled else { return }
+            heightUpdateScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                heightUpdateScheduled = false
+                updateHeight()
+            }
+        }
+
+        @objc private func textDidChange(_: Notification) {
+            scheduleHeightUpdate()
+        }
+
+        private func updateHeight() {
+            guard let textView = installedTextView,
+                  textView.bounds.width > 0 else { return }
+            let fittedHeight = textView.sizeThatFits(CGSize(
+                width: textView.bounds.width,
+                height: .greatestFiniteMagnitude
+            )).height
+            let lineHeight = textView.font?.lineHeight ?? 22
+            let textInsets = textView.textContainerInset.top + textView.textContainerInset.bottom
+            let minimumHeight = max(40, lineHeight + textInsets)
+            let maximumHeight = minimumHeight + lineHeight * 5
+            let clampedHeight = min(max(fittedHeight, minimumHeight), maximumHeight)
+            let scale = textView.window?.screen.scale ?? 1
+            onHeightChange(ceil(clampedHeight * scale) / scale)
         }
 
         func textPasteConfigurationSupporting(
@@ -452,7 +508,7 @@ struct ChatComposer: View, Equatable {
     private let textEditorOpticalOffset: CGFloat = 1
 
     @State private var containerWidth: CGFloat = 0
-    @State private var composerTextHeight: CGFloat = 22
+    @State private var composerTextEditorHeight: CGFloat = 40
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
     @State private var promptTemplate: PromptTemplate?
@@ -951,7 +1007,7 @@ struct ChatComposer: View, Equatable {
                 .textEditorStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .contentMargins(0, for: .scrollContent)
-                .frame(height: composerTextHeight + textEditorVerticalInset * 2)
+                .frame(height: composerTextEditorHeight)
                 .padding(.top, -textEditorVerticalInset + textEditorOpticalOffset)
                 .padding(.bottom, -textEditorVerticalInset - textEditorOpticalOffset)
                 .focused(fieldFocused)
@@ -961,25 +1017,16 @@ struct ChatComposer: View, Equatable {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .tint(Theme.Colors.primary.dynamic)
-                .background(ComposerPasteDelegateInstaller(textViewReference: textViewReference, allowsSelection: !speech.isPresented))
+                .background(ComposerTextViewInstaller(
+                    textViewReference: textViewReference,
+                    allowsSelection: !speech.isPresented
+                ) { height in
+                    guard abs(composerTextEditorHeight - height) > 0.5 else { return }
+                    composerTextEditorHeight = height
+                })
                 .onChange(of: composer.caretEndRequest) { _, _ in
                     composerSelection = AttributedTextSelection(insertionPoint: composer.attributedDraft.endIndex)
                 }
-            Text(attributedDraft.wrappedValue)
-                .font(Theme.Fonts.bodyMd)
-                .lineLimit(1...6)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .hidden()
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                    DispatchQueue.main.async {
-                        let measuredHeight = max(height, 22)
-                        guard abs(composerTextHeight - measuredHeight) > 0.5 else { return }
-                        composerTextHeight = measuredHeight
-                    }
-                }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
         }
         .padding(.vertical, 12)
         .excludesCompactPageSwitch()

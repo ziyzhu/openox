@@ -5,72 +5,6 @@ import WebKit
 
 @MainActor
 @Observable
-final class InlineServicePagePresenter {
-    enum Placement: Equatable {
-        case idle
-        case inline(UUID)
-        case detached(UUID)
-    }
-
-    private(set) var placement: Placement = .idle
-    @ObservationIgnored private var revision = 0
-    @ObservationIgnored private var preferredOwnerID: UUID?
-
-    func isInline(_ ownerID: UUID) -> Bool {
-        placement == .inline(ownerID)
-    }
-
-    var inlineOwnerID: UUID? {
-        if case .inline(let ownerID) = placement { ownerID } else { nil }
-    }
-
-    func reconcile(ownerIDs: [UUID]) {
-        let preferred = ownerIDs.last
-        let previousPreferred = preferredOwnerID
-        preferredOwnerID = preferred
-        guard let preferred else {
-            revision += 1
-            placement = .idle
-            return
-        }
-        if case .detached(let ownerID) = placement, ownerIDs.contains(ownerID) { return }
-        if case .inline(let ownerID) = placement,
-           ownerIDs.contains(ownerID),
-           preferred == previousPreferred { return }
-        activate(preferred)
-    }
-
-    func activate(_ ownerID: UUID) {
-        guard placement != .inline(ownerID) else { return }
-        revision += 1
-        let request = revision
-        placement = .idle
-        Log.webView.info("InlineServicePagePresenter.activate owner=\(ownerID)")
-        Task { @MainActor in
-            await Task.yield()
-            guard revision == request else { return }
-            placement = .inline(ownerID)
-            Log.webView.info("InlineServicePagePresenter.mounted owner=\(ownerID)")
-        }
-    }
-
-    func detach(_ ownerID: UUID) async -> Bool {
-        revision += 1
-        let request = revision
-        placement = .detached(ownerID)
-        Log.webView.info("InlineServicePagePresenter.detached owner=\(ownerID)")
-        await Task.yield()
-        return revision == request && placement == .detached(ownerID)
-    }
-
-    func restore(_ ownerID: UUID) {
-        guard placement == .detached(ownerID) else { return }
-        activate(ownerID)
-    }
-}
-
-@MainActor
-@Observable
 final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizerDelegate {
     private(set) var speakingBlockID: UUID?
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
@@ -271,7 +205,7 @@ private struct ServiceInspectorRow: View {
     let link: ServiceInspectorLink
     let chatID: UUID
     let rowID: UUID
-    let pagePresenter: InlineServicePagePresenter
+    let pageMount: WebPageMountCoordinator
     @Environment(ServiceManager.self) private var serviceManager
     @State private var isPresented = false
 
@@ -289,7 +223,7 @@ private struct ServiceInspectorRow: View {
         browserSession?.webPage
     }
     private var isInline: Bool {
-        pagePresenter.isInline(rowID)
+        pageMount.isInline(page: page, ownerID: rowID)
     }
     private var subtitle: String {
         if let host = page?.url?.host(percentEncoded: false) { return host }
@@ -304,7 +238,8 @@ private struct ServiceInspectorRow: View {
     }
     private var activatePage: (() -> Void)? {
         guard canInspect, !isInline else { return nil }
-        return { pagePresenter.activate(rowID) }
+        guard let page else { return nil }
+        return { pageMount.activate(page: page, ownerID: rowID) }
     }
     private var expandPageAction: (() -> Void)? {
         canInspect ? { expandPage() } : nil
@@ -316,7 +251,7 @@ private struct ServiceInspectorRow: View {
             fallbackSystemImage: "safari",
             title: link.serviceName,
             subtitle: subtitle,
-            page: nil,
+            mount: nil,
             inlinePageAnchorID: inlinePage == nil ? nil : rowID,
             isPresented: false,
             placeholder: placeholder,
@@ -328,7 +263,7 @@ private struct ServiceInspectorRow: View {
             cancelAccessibilityIdentifier: ""
         )
         .fullScreenCover(isPresented: $isPresented, onDismiss: {
-            pagePresenter.restore(rowID)
+            if let page { pageMount.restore(page: page, ownerID: rowID) }
         }) {
             if let service {
                 NavigationStack {
@@ -346,7 +281,9 @@ private struct ServiceInspectorRow: View {
 
     private func expandPage() {
         Task { @MainActor in
-            guard await pagePresenter.detach(rowID) else { return }
+            if let page {
+                guard await pageMount.detach(page: page, ownerID: rowID) else { return }
+            }
             isPresented = true
         }
     }
@@ -1286,7 +1223,7 @@ struct BlockView: View, Equatable {
     let block: ChatBlock
     let isStreamingTail: Bool
     let chatID: UUID
-    let inlineServicePagePresenter: InlineServicePagePresenter
+    let browserPageMount: WebPageMountCoordinator
     let isThinkingTail: Bool
     let controls: MessageControls
     let artifactControls: ArtifactControls
@@ -1439,7 +1376,7 @@ struct BlockView: View, Equatable {
                             link: link,
                             chatID: chatID,
                             rowID: block.id,
-                            pagePresenter: inlineServicePagePresenter
+                            pageMount: browserPageMount
                         )
                             .padding(.horizontal, 4)
                     case let .shoveler(shoveler):

@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 
 struct LivePageCardAnchorKey: PreferenceKey {
     static let defaultValue: [UUID: Anchor<CGRect>] = [:]
@@ -20,7 +19,7 @@ struct LivePageCard: View {
     let fallbackSystemImage: String
     let title: String
     let subtitle: String
-    let page: WebPage?
+    let mount: WebPageMount?
     let inlinePageAnchorID: UUID?
     let isPresented: Bool
     let placeholder: Placeholder
@@ -135,11 +134,11 @@ struct LivePageCard: View {
                 .anchorPreference(key: LivePageCardAnchorKey.self, value: .bounds) {
                     [inlinePageAnchorID: $0]
                 }
-        } else if let page, !isPresented {
+        } else if let mount, !isPresented {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    WebContentView(page: page)
+                    MountedWebPageView(mount: mount)
                 }
         } else {
             placeholderView

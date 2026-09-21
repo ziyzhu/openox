@@ -3,6 +3,7 @@ import SwiftUI
 struct InlineBotControlView: View {
     let control: ServiceControl
     let session: ServiceHandoffSession?
+    let pageMount: WebPageMountCoordinator
     let isPresentedInSheet: Bool
     let expand: (ServiceHandoffSession) -> Void
     let cancel: (ServiceHandoffSession) -> Void
@@ -25,7 +26,11 @@ struct InlineBotControlView: View {
             fallbackSystemImage: "checkmark.shield.fill",
             title: name,
             subtitle: String(localized: "Complete the site's human verification to continue"),
-            page: session?.page,
+            mount: session.flatMap { session in
+                pageMount.isInline(page: session.page, ownerID: session.id)
+                    ? WebPageMount(page: session.page, ownerID: session.id, coordinator: pageMount)
+                    : nil
+            },
             inlinePageAnchorID: nil,
             isPresented: isPresentedInSheet,
             placeholder: .progress(String(localized: "Complete the site's human verification to continue")),
