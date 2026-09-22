@@ -126,7 +126,11 @@ struct PermissionRequestCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(spacing: 6) {
-                PermissionSourceIcon(sourceName: request.sourceName, actionIconKind: request.actionIconKind)
+                PermissionSourceIcon(
+                    sourceName: request.sourceName,
+                    actionIconKind: request.actionIconKind,
+                    isServiceAttach: copy.title.hasSuffix(" - \(L10n.string("Attach"))")
+                )
                     .accessibilityHidden(true)
                 Text(verbatim: request.actionName)
                     .font(Theme.Fonts.captionMd)
@@ -192,6 +196,7 @@ struct PermissionRequestCard: View {
 private struct PermissionSourceIcon: View {
     let sourceName: String
     let actionIconKind: OxActionIconKind?
+    let isServiceAttach: Bool
 
     @Environment(ServiceManager.self) private var serviceManager
 
@@ -205,19 +210,23 @@ private struct PermissionSourceIcon: View {
         Group {
             if let service {
                 ServiceAvatar(service: service, size: 18, shape: .roundedRect(4))
+            } else if isServiceAttach {
+                EmptyView()
             } else if sourceName == "Ox", let actionIconKind {
                 OxActionIcon(actionIconKind, size: 16)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 18, height: 18)
             } else if sourceName == "Ox" {
                 Image(.oxIcon)
                     .resizable()
                     .scaledToFill()
+                    .frame(width: 18, height: 18)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             } else {
                 nativeIcon
+                    .frame(width: 18, height: 18)
             }
         }
-        .frame(width: 18, height: 18)
     }
 
     private var nativeIcon: some View {
