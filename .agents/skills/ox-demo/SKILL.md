@@ -30,3 +30,15 @@ Use the `sim-cli` skill for visible iOS interaction and the `ox-cli` skill to ve
 - Review the simulator recording for identifying details in the live UI. Redact the saved response text before loading the replay server; the chat transcript receives the redacted text.
 - Verify that the video shows three distinct chats with their assigned service chips, the requested model, each exact prompt, and public inline links in the first reply. The second and third chats should show only typing. Disclose the prerecorded Luna source when sharing the recording.
 - Deliver the simulator recording without composited cards or overlays. Report the output path and any service limits visible in the recording.
+
+## Publish on openox.ai
+
+Use this flow only when the user asks to publish the finished demo on the website.
+
+1. Work in the adjacent `openox-dev` checkout and follow its `AGENTS.md`. Keep the source recording and encoded video outside tracked website files. Use its ignored `.work/media/` directory for staging.
+2. Convert the portrait source to a browser-compatible H.264 MP4 with `yuv420p`, `+faststart`, and no audio when the recording is silent. Use 1080 × 1920 for a 9:16 source. Decode the complete result with `ffmpeg -v error -i <encoded.mp4> -f null -` and inspect its codec, dimensions, and duration with `ffprobe`.
+3. Name the asset with a stable content-derived suffix and propose its final URL before upload: `https://openox.ai/assets/media/ox-demo-<suffix>.mp4`. Do not upload until the user approves that path.
+4. Keep the MP4 out of Git. A small reviewed poster image may live in `openox-dev/web/assets/`. Reference the video from a native `<video controls playsinline preload="none">` element. Keep its layout responsive at 9:16.
+5. Confirm the `Ox-Web` CloudFront distribution routes `/assets/media/*` to the retained `openox-service-assets-prod` bucket. Reuse the existing service-assets origin. Run `bun run typecheck` and inspect `bun run cdk diff Ox-Web` before deployment.
+6. Upload the approved file to `s3://openox-service-assets-prod/assets/media/<filename>` with `Content-Type: video/mp4` and `Cache-Control: public,max-age=31536000,immutable`. Then deploy `Ox-Web` from `openox-dev/cdk`.
+7. Verify the public page, poster, and video return successfully. Confirm the live MP4 checksum matches the staged file and a byte-range request returns `206`, which verifies seeking through CloudFront. Confirm no video file is tracked by Git.
