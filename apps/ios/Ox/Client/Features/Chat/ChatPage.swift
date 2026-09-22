@@ -1472,6 +1472,10 @@ struct ChatPage: View {
                 stoppedRow
                 queuedRows
             }
+            Color.clear
+                .frame(height: 1)
+                .onScrollVisibilityChange(threshold: 0.5, scroller.bottomVisibilityChanged)
+                .onDisappear { scroller.bottomVisibilityChanged(false) }
         }
         .scrollTargetLayout()
         .padding(.horizontal, Theme.Spacing.md)

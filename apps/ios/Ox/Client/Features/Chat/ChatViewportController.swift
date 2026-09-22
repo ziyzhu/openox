@@ -122,6 +122,7 @@ final class ChatViewportController {
     @ObservationIgnored private var visibleTargetID: UUID?
     @ObservationIgnored private var pendingFrame: Frame?
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
+    @ObservationIgnored private var bottomVisible = false
     @ObservationIgnored private var layoutLogStart: Frame?
     @ObservationIgnored private var layoutLogEnd: Frame?
     @ObservationIgnored private var layoutLogTask: Task<Void, Never>?
@@ -142,6 +143,22 @@ final class ChatViewportController {
         showsJumpButton = false
         move(to: .bottom)
         position.scrollTo(edge: .bottom)
+        if bottomVisible { bottomBecameVisible() }
+    }
+
+    func bottomVisibilityChanged(_ visible: Bool) {
+        bottomVisible = visible
+        guard visible else { return }
+        bottomBecameVisible()
+    }
+
+    private func bottomBecameVisible() {
+        guard let completion = pendingOpenCompletion else { return }
+        pendingOpenCompletion = nil
+        showsJumpButton = false
+        motion = .stationary
+        completion()
+        Log.ui.info("ChatUX.lifecycle chat=\(chatID) phase=bottomVisible \(logSnapshot)")
     }
 
     func rideToTurn(_ id: UUID, animated: Bool, scroll: () -> Void) {
@@ -229,6 +246,9 @@ final class ChatViewportController {
     private func commitGeometry(_ new: Frame) {
         let old = frame
         frame = new
+        if old == nil {
+            Log.ui.info("ChatUX.geometry chat=\(chatID) source=scroll \(new.summary) owner=\(motion.label)")
+        }
         stageLayoutLog(from: old, to: new)
         updateJumpButton(new)
         applyViewportHold()
