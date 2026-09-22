@@ -2,7 +2,7 @@
   "domain": "www.facebook.com",
   "name": "Facebook",
   "description": "A social network for communities and local commerce. Read group posts, friend suggestions, and Marketplace listings; sign-in required.",
-  "baseUrl": "https://www.facebook.com/",
+  "baseUrl": "https://www.facebook.com/robots.txt",
   "$defs": {
     "post": {
       "type": "object",
@@ -117,7 +117,8 @@
       },
       "outputSchema": { "$ref": "#/$defs/postPage" },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listFriendSuggestions",
@@ -133,7 +134,8 @@
       },
       "outputSchema": { "$ref": "#/$defs/personPage" },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listMarketplace",
@@ -153,7 +155,8 @@
       },
       "outputSchema": { "$ref": "#/$defs/listingPage" },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "searchMarketplace",
@@ -174,7 +177,8 @@
       },
       "outputSchema": { "$ref": "#/$defs/listingPage" },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     }
   ]
 }

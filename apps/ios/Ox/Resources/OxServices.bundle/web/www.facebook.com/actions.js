@@ -521,9 +521,31 @@ window.ox.install(2, ({ action }) => {
     action("getSignInUrl", { async invoke() { return { url: "https://www.facebook.com/login/" }; } });
     action("getSignInState", {
         async invoke() {
-            const signedOut = Boolean(document.querySelector('form[action*="login"], input[name="email"], input[name="pass"]'));
-            const signedIn = Boolean(token("fb_dtsg", ["DTSGInitialData", "DTSG"]));
-            return { signedIn: signedIn && !signedOut };
+            let response;
+            try {
+                response = await fetch("/me", {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                    redirect: "follow",
+                });
+            }
+            catch (error) {
+                throw new Error(`Facebook sign-in check failed: ${String(error?.message || error)}`);
+            }
+            const expectedOrigin = "https://www.facebook.com";
+            const final = new URL(response.url);
+            if (final.origin !== expectedOrigin)
+                throw new Error("Facebook sign-in check left the trusted origin");
+            if (response.status !== 200)
+                throw new Error(`Facebook sign-in check returned unexpected status ${response.status}`);
+            if (!response.headers.get("content-type")?.toLowerCase().includes("text/html"))
+                throw new Error("Facebook sign-in check returned unexpected content");
+            if (response.redirected && final.pathname === "/")
+                return { signedIn: false };
+            if (response.redirected && /^\/[A-Za-z0-9.]+\/$/.test(final.pathname))
+                return { signedIn: true };
+            throw new Error(`Facebook sign-in check returned unexpected route ${final.pathname}`);
         },
     });
     action("listGroupPosts", {

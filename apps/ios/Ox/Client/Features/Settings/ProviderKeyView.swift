@@ -219,8 +219,9 @@ struct ProviderAuthenticationView: View {
     }
 
     private func signIn(_ account: any SubscriptionAccount) {
+        guard !busy else { return }
+        busy = true
         Task {
-            busy = true
             signInError = nil
             let signedInSuccessfully: Bool
             do {

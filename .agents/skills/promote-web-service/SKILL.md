@@ -21,7 +21,7 @@ If any precondition is missing, return to Ox on the requested simulator. Do not 
 
 ## Export the Local source
 
-Read `manifest.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.
+Read `service.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 
@@ -37,6 +37,7 @@ Replay verification may exercise already declared actions, but must not become e
 - Keep raw authenticated captures in a private temporary directory outside the repository.
 - Sanitize cookies, authorization values, CSRF values, signed URLs, identities, account identifiers, and user-authored content before import.
 - Retain success, empty, terminal pagination, safe error, and authentication cases that apply to the committed contracts.
+- Include the authentication probe's request and response in each authenticated Action case; the Host checks sign-in before invoking the Action.
 - Inspect every retained request and response after automated redaction.
 
 Import each sanitized case through the current replay tooling and run it fail-closed through the authoritative iOS harness.
@@ -58,6 +59,6 @@ bun run build:services
 bun run typecheck
 ```
 
-Verify the generated `apps/ios/OpenOx/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, replay cases, authentication boundaries, icon evidence, checks run, and any remaining limitation.
+Set `OX_BUNDLE_ID` to the configured iOS bundle identifier when it differs from the replay harness default. Verify the generated `apps/ios/Ox/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, replay cases, authentication boundaries, icon evidence, checks run, and any remaining limitation.
 
 Do not commit repository changes unless the user separately requests it.

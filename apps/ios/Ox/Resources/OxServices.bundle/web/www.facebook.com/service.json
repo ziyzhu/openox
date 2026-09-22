@@ -2,7 +2,7 @@
   "domain": "www.facebook.com",
   "name": "Facebook",
   "description": "A social network for communities and local commerce. Read group posts, friend suggestions, and Marketplace listings; sign-in required.",
-  "baseUrl": "https://www.facebook.com/",
+  "baseUrl": "https://www.facebook.com/robots.txt",
   "$defs": {
     "post": {
       "type": "object",
@@ -258,7 +258,8 @@
         "$ref": "#/$defs/postPage"
       },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listFriendSuggestions",
@@ -286,7 +287,8 @@
         "$ref": "#/$defs/personPage"
       },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "listMarketplace",
@@ -337,7 +339,8 @@
         "$ref": "#/$defs/listingPage"
       },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     },
     {
       "id": "searchMarketplace",
@@ -394,7 +397,8 @@
         "$ref": "#/$defs/listingPage"
       },
       "requireApproval": false,
-      "requireAuth": true
+      "requireAuth": true,
+      "baseUrl": "https://www.facebook.com/"
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/www.facebook.com/favicon.png"

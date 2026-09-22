@@ -11,6 +11,7 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
     let providerName = "ChatGPT"
 
     private let store = SubscriptionTokenStore<ChatGPTTokens>(key: "oauth:chatgpt")
+    @MainActor private var signingIn = false
 
     private init() {}
 
@@ -75,6 +76,12 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
     }
 
     @MainActor func signIn(using presenter: SubscriptionAuthorizationPresenter) async throws -> Bool {
+        guard !signingIn else {
+            Log.network.info("ChatGPTAccount.signIn already running")
+            return false
+        }
+        signingIn = true
+        defer { signingIn = false }
         let generation = store.beginSignIn()
         let pkce = OAuthSupport.makePKCE()
         let state = UUID().uuidString

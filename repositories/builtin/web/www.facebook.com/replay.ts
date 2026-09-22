@@ -16,6 +16,20 @@ export const replayCases = [
     }
   },
   {
+    "action": "getSignInState",
+    "name": "signedOut",
+    "args": {},
+    "output": {
+      "signedIn": false
+    }
+  },
+  {
+    "action": "getSignInState",
+    "name": "unexpectedStatus",
+    "args": {},
+    "error": "Facebook sign-in check returned unexpected status 503"
+  },
+  {
     "action": "listGroupPosts",
     "name": "default",
     "args": {

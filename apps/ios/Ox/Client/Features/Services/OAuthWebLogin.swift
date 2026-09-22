@@ -137,21 +137,38 @@ private final class LoopbackOAuthSession: NSObject, SFSafariViewControllerDelega
         self.onResult = onResult
         retain = self
 
-        guard let listener, let presenter = Self.topViewController() else {
-            Log.ui.error("OAuthWebLogin: no listener/presenter")
+        guard let listener else {
+            Log.ui.error("OAuthWebLogin: no listener")
             finish(nil)
             return
         }
         do {
-            try listener.start { [weak self] url in
-                Task { @MainActor in self?.finish(url) }
-            }
+            try listener.start(
+                onReady: { [weak self] in
+                    Task { @MainActor in self?.openSafari(authorizeURL) }
+                },
+                onFailure: { [weak self] error in
+                    Task { @MainActor in
+                        Log.ui.error("OAuthWebLogin: loopback listener failed: \(error.localizedDescription)")
+                        self?.finish(nil)
+                    }
+                },
+                onResult: { [weak self] url in
+                    Task { @MainActor in self?.finish(url) }
+                }
+            )
         } catch {
             Log.ui.error("OAuthWebLogin: loopback listener failed: \(error.localizedDescription)")
             finish(nil)
             return
         }
+    }
 
+    private func openSafari(_ authorizeURL: URL) {
+        guard onResult != nil, let presenter = Self.topViewController() else {
+            finish(nil)
+            return
+        }
         let safari = SFSafariViewController(url: authorizeURL)
         safari.delegate = self
         safari.modalPresentationStyle = .pageSheet
@@ -196,6 +213,7 @@ private final class LoopbackRedirectListener {
     private let queue = DispatchQueue(label: "ai.openox.oauth.loopback")
     private var listener: NWListener?
     private var resultHandler: ((URL?) -> Void)?
+    private var ready = false
     private var finished = false
 
     init?(redirectURI: String) {
@@ -208,28 +226,42 @@ private final class LoopbackRedirectListener {
         callbackPath = comps.path
     }
 
-    func start(onResult: @escaping (URL?) -> Void) throws {
+    func start(
+        onReady: @escaping () -> Void,
+        onFailure: @escaping (NWError) -> Void,
+        onResult: @escaping (URL?) -> Void
+    ) throws {
         resultHandler = onResult
         let params = NWParameters.tcp
-        params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
 
         let listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] in self?.accept($0) }
-        listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state {
+        listener.stateUpdateHandler = { [weak self] state in
+            guard let self, !self.finished else { return }
+            switch state {
+            case .ready where !self.ready:
+                self.ready = true
+                Log.network.info("Loopback listener ready on 127.0.0.1:\(self.port.rawValue)")
+                onReady()
+            case .failed(let error):
+                self.finished = true
                 Log.network.error("Loopback listener failed: \(error.localizedDescription)")
+                onFailure(error)
+            default:
+                break
             }
         }
         self.listener = listener
         listener.start(queue: queue)
-        Log.network.info("Loopback listener started on 127.0.0.1:\(port.rawValue)")
     }
 
     func stop() {
-        queue.async { [weak self] in
-            self?.listener?.cancel()
-            self?.listener = nil
+        queue.sync {
+            finished = true
+            listener?.cancel()
+            listener = nil
+            resultHandler = nil
         }
     }
 

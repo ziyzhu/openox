@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "Built-in",
-  "contentHash": "686a66569708f2f40490513b828358acaaa02045cf41906b3d30b235d4f3101e",
+  "contentHash": "5908ba909ed00d68f94cfaeb70e03de7797cea7086eec65c43a20d54363893c7",
   "services": [
     "ios:bluetooth",
     "ios:calendar",
