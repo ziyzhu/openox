@@ -29,12 +29,12 @@ struct OnboardingView: View {
                         )
                         OnboardingDisclosureRow(
                             symbol: "chevron.left.forwardslash.chevron.right",
-                            title: "Free software",
+                            title: "Free to use",
                             description: "Ox is completely free and open source. You can use any model provider while keeping all your data on device."
                         )
                         OnboardingDisclosureRow(
                             symbol: "hand.raised",
-                            title: "Guaranteed safety",
+                            title: "Peace of mind",
                             description: "Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time."
                         )
                     }

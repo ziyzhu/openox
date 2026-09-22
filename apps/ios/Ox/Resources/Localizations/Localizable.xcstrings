@@ -4441,13 +4441,13 @@
         }
       }
     },
-    "Free software" : {
+    "Free to use" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自由软件"
+            "value" : "免费使用"
           }
         }
       }
@@ -4580,17 +4580,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GLM-4.7 Flash 可免费使用。其他 Z.AI 模型可能会产生费用。受用量和速率限制。"
-          }
-        }
-      }
-    },
-    "Guaranteed safety" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全保障"
           }
         }
       }
@@ -7233,6 +7222,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PDF 文件过大（%1$lld 字节；上限 %2$lld 字节）。"
+          }
+        }
+      }
+    },
+    "Peace of mind" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安心使用"
           }
         }
       }
