@@ -21,7 +21,7 @@ Ox is a local agent that uses the internet for you.
 
 ## Features
 
-1. **Works across the internet** — Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable.
+1. **Intelligent proxy** — Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable.
 2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
 3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
 

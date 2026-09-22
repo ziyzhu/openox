@@ -24,7 +24,7 @@ struct OnboardingView: View {
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
                             symbol: "hammer",
-                            title: "Works across the internet",
+                            title: "Intelligent proxy",
                             description: "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable."
                         )
                         OnboardingDisclosureRow(
