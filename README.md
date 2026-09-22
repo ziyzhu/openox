@@ -25,7 +25,12 @@ Ox is a local agent that uses the internet for you.
 2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
 3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
 
-## Ox CLI
+## Ox Clients and Hosts
+
+| Implementation | Client | Host |
+| --- | --- | --- |
+| [iOS app](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) ([source](apps/ios)) | On-device app | Embedded on the device |
+| [CLI](apps/cli/README.md) | Terminal app for macOS and Linux | Connects to a running Ox Host |
 
 Install the standalone terminal Client on macOS or Linux:
 
@@ -42,7 +47,7 @@ Live commands connect to a running Ox Host; the reference control endpoint is
 provided by a DEBUG iOS Simulator app. See the [CLI guide](apps/cli/README.md)
 for Host connections, offline commands, and package-manager alternatives.
 
-## Components
+## Architecture
 
 An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.
 
@@ -64,7 +69,7 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 
   Anyone can publish compatible web and MCP services in a public Git repository containing a `repository.json` manifest. Any compatible Host can install that repository. Device services remain part of the Host implementation.
 
-## Distributed evolution
+## Distributed Evolution
 
 Each Ox can self-evolve locally and, optionally, co-evolve with others. An Ox self-evolves through the VM, which lets it invoke an existing service while creating another one.
 
