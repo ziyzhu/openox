@@ -734,7 +734,7 @@ struct ModelPickerContent: View {
     private var reasoningEffortMenu: some View {
         NavigationLink {
             SettingsSelectionPickerView(
-                title: L10n.string("Thinking level"),
+                title: "Thinking level",
                 options: reasoningEfforts.map { effort in
                     SettingsSelectionOption(
                         id: effort,
@@ -1069,7 +1069,7 @@ private struct ProviderPickerView: View {
         let customOption = SettingsSelectionOption<String?>(
             id: "custom",
             value: nil,
-            title: "Custom provider",
+            title: L10n.string("Custom provider"),
             systemImage: "plus",
             accessibilityIdentifier: A11yID.Chat.modelCustomProviders
         )
@@ -1111,7 +1111,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
 }
 
 private struct SettingsSelectionPickerView<Value: Hashable>: View {
-    let title: String
+    let title: LocalizedStringKey
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value
     var separatesFirstOption = false
