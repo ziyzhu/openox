@@ -1356,6 +1356,7 @@ struct ChatPage: View {
                 }
                 .onChange(of: submissionAnchor) { old, new in
                     guard old != new, let new else { return }
+                    transcriptWindow.showLatest(total: totalBlockCount)
                     transcriptWindow.anchor(
                         on: new.id,
                         in: sourceBlockIDs,

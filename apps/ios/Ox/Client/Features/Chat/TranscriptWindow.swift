@@ -16,9 +16,6 @@ struct TranscriptWindow: Equatable {
 
     func resolvedRange(total: Int) -> Range<Int> {
         guard !range.isEmpty, range.lowerBound < total else { return Self.tailRange(total: total) }
-        if range.count <= Self.batchSize, range.upperBound != total {
-            return Self.tailRange(total: total)
-        }
         return range.lowerBound..<total
     }
 
@@ -31,10 +28,6 @@ struct TranscriptWindow: Equatable {
     mutating func reconcile(total: Int) {
         guard total > 0 else {
             range = 0..<0
-            return
-        }
-        if range.count <= Self.batchSize {
-            range = Self.tailRange(total: total)
             return
         }
         guard range.lowerBound < total else {
