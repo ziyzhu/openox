@@ -4,7 +4,7 @@
 
 <h1>OpenOx</h1>
 
-Ox is a mobile agent that uses the internet for you.
+Ox is a local agent that uses the internet for you.
 
 <h3>
 
