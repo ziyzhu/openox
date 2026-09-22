@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ox Demo"
+  short_description: "Record the eight-service Ox chat demo"
+  default_prompt: "Use $ox-demo to prepare and record the Ox services demo on the selected simulator."

@@ -122,9 +122,7 @@ final class ServiceManager {
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
     nonisolated static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
-        var configuration = websiteData.makePageConfiguration()
-        configuration.defaultNavigationPreferences.preferredContentMode = .recommended
-        return configuration
+        websiteData.makePageConfiguration()
     }
 
     func makeServicePageConfiguration(for _: String) -> WebPage.Configuration {
