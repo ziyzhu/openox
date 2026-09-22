@@ -12,6 +12,7 @@ final class ServiceOperations {
     let presentControl: (ServiceControl, Service) async -> JSONValue?
     let receiveArtifacts: @MainActor ([RemoteMCPArtifact]) async throws -> Void
     let serviceChanged: (String) -> Void
+    let botControlRequired: (Service, JSONValue, Service.ServiceWebPage) -> Void
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
@@ -25,6 +26,7 @@ final class ServiceOperations {
         presentControl: @escaping (ServiceControl, Service) async -> JSONValue?,
         receiveArtifacts: @escaping @MainActor ([RemoteMCPArtifact]) async throws -> Void,
         serviceChanged: @escaping (String) -> Void,
+        botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
         native: NativeServiceOperations
@@ -37,6 +39,7 @@ final class ServiceOperations {
         self.presentControl = presentControl
         self.receiveArtifacts = receiveArtifacts
         self.serviceChanged = serviceChanged
+        self.botControlRequired = botControlRequired
         self.begin = begin
         self.finish = finish
         self.native = native
@@ -118,7 +121,14 @@ final class ServiceOperations {
                     approve: approve, receiveArtifacts: receiveArtifacts
                 )
             } else {
-                result = await service.invokeAction(actionID, args: input, approve: approve)
+                result = await service.invokeAction(
+                    actionID,
+                    args: input,
+                    onBotControlRequired: { page in
+                        self.botControlRequired(service, input, page)
+                    },
+                    approve: approve
+                )
             }
             return try result.get()
         }

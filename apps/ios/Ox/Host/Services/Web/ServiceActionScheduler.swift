@@ -2,6 +2,26 @@ import Foundation
 
 @MainActor
 final class ServiceActionScheduler {
+    final class BotControlLease {
+        let page: Service.ServiceWebPage
+        let baseURL: URL
+        let id: UUID
+        private weak var scheduler: ServiceActionScheduler?
+
+        fileprivate init(page: Service.ServiceWebPage, baseURL: URL, id: UUID, scheduler: ServiceActionScheduler) {
+            self.page = page
+            self.baseURL = baseURL
+            self.id = id
+            self.scheduler = scheduler
+        }
+
+        var isActive: Bool { scheduler?.isReserved(page, for: id) == true }
+
+        func release(discardPage: Bool = false) {
+            scheduler?.release(page, reservation: id, discardPage: discardPage)
+        }
+    }
+
     enum WorkKind {
         case invocation
         case navigation
@@ -50,6 +70,7 @@ final class ServiceActionScheduler {
         let role: Service.InvocationRole
         let kind: WorkKind
         let exclusive: Bool
+        let reservation: UUID?
         let submittedAt = Date()
         let perform: @MainActor (Service.ServiceWebPage) async -> Void
         let fail: @MainActor (any Error) -> Void
@@ -60,6 +81,7 @@ final class ServiceActionScheduler {
             name: String,
             role: Service.InvocationRole,
             kind: WorkKind,
+            reservation: UUID?,
             continuation: CheckedContinuation<Value, any Error>,
             operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
         ) {
@@ -69,6 +91,7 @@ final class ServiceActionScheduler {
             self.role = role
             self.kind = kind
             self.exclusive = role.requiresExclusiveAccess
+            self.reservation = reservation
             self.perform = { page in
                 await resolution.perform(on: page, operation: operation)
             }
@@ -133,6 +156,12 @@ final class ServiceActionScheduler {
         }
     }
 
+    private enum BotControlState: Equatable {
+        case available
+        case reserved(UUID)
+        case replacing
+    }
+
     private final class ActionQueue {
         let key: QueueKey
         let service: Service
@@ -144,6 +173,7 @@ final class ServiceActionScheduler {
         var occupancy = PageOccupancy.idle
         var loadingTask: Task<Void, Never>?
         var invalidated = false
+        var botControlState = BotControlState.available
         var lastUsed: UInt64 = 0
 
         init(
@@ -163,7 +193,7 @@ final class ServiceActionScheduler {
         }
 
         var isLoading: Bool { loadingTask != nil }
-        var isIdle: Bool { pending.isEmpty && occupancy.isIdle && !isLoading }
+        var isIdle: Bool { pending.isEmpty && occupancy.isIdle && !isLoading && botControlState == .available }
     }
 
     private let capacity: Int
@@ -196,16 +226,26 @@ final class ServiceActionScheduler {
     func schedule<Value>(
         _ action: Service.Action,
         on page: Service.ServiceWebPage,
+        reservation: UUID? = nil,
         kind: WorkKind = .invocation,
         name: String? = nil,
         operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
     ) async throws -> Value {
         guard action.service.owns(page), page.isReady else { throw Service.EvalError.notReady }
-        let key = QueueKey.owned(ObjectIdentifier(page))
+        let key: QueueKey
+        if let reservation {
+            guard let queue = queue(for: page), queue.pooled,
+                  queue.botControlState == .reserved(reservation) else { throw Service.EvalError.contextInvalidated }
+            key = queue.key
+        } else {
+            guard queue(for: page)?.pooled != true else { throw Service.EvalError.contextInvalidated }
+            key = .owned(ObjectIdentifier(page))
+        }
         return try await enqueue(
             action,
             key: key,
             page: page,
+            reservation: reservation,
             kind: kind,
             name: name,
             operation: operation
@@ -214,6 +254,46 @@ final class ServiceActionScheduler {
 
     func owns(_ page: Service.ServiceWebPage) -> Bool {
         pooledQueues.contains { $0.page === page }
+    }
+
+    func reserveForBotControl(_ page: Service.ServiceWebPage) -> BotControlLease? {
+        guard let queue = queue(for: page), queue.pooled, !queue.invalidated, page.isReady,
+              queue.botControlState == .available else { return nil }
+        let id = UUID()
+        queue.botControlState = .reserved(id)
+        Log.service.info("ServiceActionScheduler bot-control-reserved domain=\(queue.service.domain) session=\(page.logLabel) id=\(id.uuidString.prefix(8))")
+        return BotControlLease(page: page, baseURL: queue.baseURL, id: id, scheduler: self)
+    }
+
+    private func isReserved(_ page: Service.ServiceWebPage, for id: UUID) -> Bool {
+        guard let queue = queue(for: page) else { return false }
+        return !queue.invalidated && queue.botControlState == .reserved(id)
+    }
+
+    private func release(_ page: Service.ServiceWebPage, reservation id: UUID, discardPage: Bool) {
+        guard let queue = queue(for: page), queue.botControlState == .reserved(id) else { return }
+        queue.botControlState = discardPage ? .replacing : .available
+        let abandoned = queue.pending.filter { $0.reservation == id }
+        queue.pending.removeAll { $0.reservation == id }
+        abandoned.forEach { $0.fail(Service.EvalError.contextInvalidated) }
+        Log.service.info("ServiceActionScheduler bot-control-released domain=\(queue.service.domain) session=\(page.logLabel) id=\(id.uuidString.prefix(8)) discard=\(discardPage)")
+        if discardPage {
+            if queue.occupancy.isIdle { replacePage(in: queue) }
+        } else {
+            pump(queue)
+            assignPages()
+        }
+    }
+
+    private func replacePage(in queue: ActionQueue) {
+        guard let page = queue.page, queue.pooled else { return }
+        queue.page = nil
+        queue.botControlState = .available
+        queue.service.closeServiceWebPage(page)
+        if !queue.pending.isEmpty, !waitingQueues.contains(queue.key) {
+            waitingQueues.append(queue.key)
+        }
+        assignPages()
     }
 
     func pages(for service: Service) -> [Service.ServiceWebPage] {
@@ -291,6 +371,7 @@ final class ServiceActionScheduler {
         _ action: Service.Action,
         key: QueueKey,
         page: Service.ServiceWebPage?,
+        reservation: UUID? = nil,
         kind: WorkKind,
         name: String?,
         operation: @escaping @MainActor @Sendable (Service.ServiceWebPage) async throws -> Value
@@ -312,6 +393,7 @@ final class ServiceActionScheduler {
                     name: name ?? "\(action.service.domain):\(action.definition.id)",
                     role: action.role,
                     kind: kind,
+                    reservation: reservation,
                     continuation: continuation,
                     operation: operation
                 )
@@ -399,6 +481,17 @@ final class ServiceActionScheduler {
               !queue.isLoading,
               let page = queue.page,
               page.isReady else { return }
+        switch queue.botControlState {
+        case .reserved(let reservation):
+            guard queue.occupancy.isIdle,
+                  let index = queue.pending.firstIndex(where: { $0.reservation == reservation }) else { return }
+            start(queue.pending.remove(at: index), in: queue, on: page)
+            return
+        case .replacing:
+            return
+        case .available:
+            break
+        }
         if queue.service.auth.isSigningIn {
             guard let index = queue.pending.firstIndex(where: { $0.role.isAuthenticationProbe }),
                   queue.occupancy.isIdle else { return }
@@ -438,6 +531,8 @@ final class ServiceActionScheduler {
         Log.service.info("ServiceActionScheduler released id=\(action.id.uuidString.prefix(8)) name=\(action.name) queue=\(queueLabel(queue)) session=\(page.logLabel) active=\(queue.occupancy.count) pending=\(queue.pending.count)")
         if queue.invalidated, queue.occupancy.isIdle {
             discard(queue, error: Service.EvalError.contextInvalidated, closePage: true)
+        } else if queue.botControlState == .replacing, queue.occupancy.isIdle {
+            replacePage(in: queue)
         } else {
             queue.service.advancePage(page)
         }

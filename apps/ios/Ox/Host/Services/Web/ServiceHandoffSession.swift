@@ -61,6 +61,8 @@ final class ServiceHandoffSession {
     private let goForwardPage: @MainActor () -> Void
     private let reloadPage: @MainActor () -> Void
     private let observesNavigations: Bool
+    private var recoveryURL: URL
+    private var hasRecoveredWebContent = false
     private var completion: CheckedContinuation<Outcome, Never>?
     private var navigationTask: Task<Void, Never>?
     private var periodicProbeTask: Task<Void, Never>?
@@ -81,6 +83,7 @@ final class ServiceHandoffSession {
         self.navigationTitle = navigationTitle
         self.completionProbe = completionProbe
         self.navigationObserver = navigationObserver
+        recoveryURL = initialURL
         let page = WebPage(configuration: configuration, navigationDecider: NavigationDecider(router: router))
         self.page = page
         loadInitialPage = { page.load(initialURL) }
@@ -118,6 +121,7 @@ final class ServiceHandoffSession {
         self.navigationTitle = navigationTitle
         self.completionProbe = completionProbe
         navigationObserver = { _, _ in }
+        recoveryURL = initialURL
         page = servicePage.page
         loadInitialPage = { [weak service, weak servicePage] in
             guard let service, let servicePage, servicePage.page.url != initialURL else { return }
@@ -231,6 +235,10 @@ final class ServiceHandoffSession {
             } catch is CancellationError {
                 return
             } catch {
+                if case WebPage.NavigationError.webContentProcessTerminated = error {
+                    recoverWebContent()
+                    continue
+                }
                 let currentURL = LogPrivacy.url(page.url?.absoluteString ?? "?")
                 let details = LogPrivacy.text(Self.failureDetails(error), limit: 1_024)
                 Log.service.warning("ServiceHandoffSession navigation error domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) current=\(currentURL) disposition=continue \(details)")
@@ -241,6 +249,7 @@ final class ServiceHandoffSession {
     private func receive(_ event: WebPage.NavigationEvent) {
         let attempt = id.uuidString.prefix(8)
         let host = page.url?.host?.lowercased() ?? "?"
+        if event == .committed, let url = page.url { recoveryURL = url }
         Log.service.info("ServiceHandoffSession navigation domain=\(serviceDomain) attempt=\(attempt) event=\(String(describing: event)) host=\(host)")
         navigationObserver(event, page.url)
         if event == .finished, isServiceHost(host) {
@@ -257,6 +266,19 @@ final class ServiceHandoffSession {
 
     private func recordDecision(host: String, allowed: Bool) {
         Log.service.info("ServiceHandoffSession policy domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) host=\(host) allowed=\(allowed)")
+    }
+
+    private func recoverWebContent() {
+        guard phase == .running || phase == .verifying else { return }
+        let attempt = id.uuidString.prefix(8)
+        guard !hasRecoveredWebContent else {
+            Log.service.error("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=failed")
+            finish(.failed)
+            return
+        }
+        hasRecoveredWebContent = true
+        Log.service.warning("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=reload host=\(recoveryURL.host ?? "?")")
+        page.load(recoveryURL)
     }
 
     private func requestProbe(reason: String) {

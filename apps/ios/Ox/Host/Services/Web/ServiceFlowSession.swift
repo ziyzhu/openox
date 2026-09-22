@@ -11,19 +11,23 @@ final class ServiceFlowSession {
     private(set) var handoffPage: WebPage?
 
     private var handoffSession: ServiceHandoffSession?
+    private let source: ServiceActionScheduler.BotControlLease?
+    private var closed = false
 
     private init(
         id: UUID,
         kind: ServiceFlowKind,
         service: Service,
         baseURL: URL,
-        actionPage: Service.ServiceWebPage
+        actionPage: Service.ServiceWebPage,
+        source: ServiceActionScheduler.BotControlLease? = nil
     ) {
         self.id = id
         self.kind = kind
         self.service = service
         self.baseURL = baseURL
         self.actionPage = actionPage
+        self.source = source
     }
 
     static func open(
@@ -58,6 +62,40 @@ final class ServiceFlowSession {
         return session
     }
 
+    static func adopt(
+        id: UUID,
+        kind: ServiceFlowKind,
+        service: Service,
+        actionID: String,
+        args: JSONValue,
+        role: Service.InvocationRole,
+        source: ServiceActionScheduler.BotControlLease
+    ) async throws -> ServiceFlowSession {
+        guard let action = await service.resolvedAction(actionID, args: args, role: role),
+              source.isActive,
+              service.owns(source.page) else {
+            throw Service.EvalError.contextInvalidated
+        }
+        guard source.baseURL == action.baseURL else {
+            Log.service.error("ServiceFlowSession source-base-url-mismatch domain=\(service.domain) flow=\(id.uuidString.prefix(8)) kind=\(kind.rawValue) action=\(actionID)")
+            throw Service.InvokeError.invalidContract("\(service.domain):\(actionID)")
+        }
+        try Task.checkCancellation()
+        let session = ServiceFlowSession(
+            id: id,
+            kind: kind,
+            service: service,
+            baseURL: action.baseURL,
+            actionPage: source.page,
+            source: source
+        )
+        guard service.manager.sessionCoordinator.attach(session) else {
+            session.close()
+            throw Service.EvalError.contextInvalidated
+        }
+        return session
+    }
+
     func invoke(
         _ actionID: String,
         args: JSONValue,
@@ -68,7 +106,7 @@ final class ServiceFlowSession {
             Log.service.error("ServiceFlowSession base-url-mismatch domain=\(service.domain) flow=\(id.uuidString.prefix(8)) kind=\(kind.rawValue) action=\(actionID)")
             return .failure(Service.InvokeError.invalidContract("\(service.domain):\(actionID)"))
         }
-        return await service.invokeAction(actionID, args: args, role: role, in: actionPage)
+        return await service.invokeAction(actionID, args: args, role: role, in: actionPage, reservation: source?.id)
     }
 
     func makeHandoff(
@@ -114,9 +152,15 @@ final class ServiceFlowSession {
     }
 
     func close() {
+        guard !closed else { return }
+        closed = true
         handoffSession?.cancel()
         handoffSession = nil
         handoffPage = nil
-        service.closeOwnedPage(actionPage)
+        if let source {
+            source.release(discardPage: true)
+        } else {
+            service.closeOwnedPage(actionPage)
+        }
     }
 }

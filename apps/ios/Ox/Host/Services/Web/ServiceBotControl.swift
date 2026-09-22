@@ -1,10 +1,14 @@
 import Foundation
 
 extension Service {
-    func completeBotControl(args: JSONValue, using presenter: any ServiceHandoffPresenting) async -> Bool {
+    func completeBotControl(
+        args: JSONValue,
+        using presenter: any ServiceHandoffPresenting,
+        source: ServiceActionScheduler.BotControlLease? = nil
+    ) async -> Bool {
         let outcome = await manager.sessionCoordinator.run(for: self, kind: .botControl) { [weak self] flowID in
             guard let self else { return .cancelled }
-            let completed = await self.performBotControl(args: args, using: presenter, flowID: flowID)
+            let completed = await self.performBotControl(args: args, using: presenter, flowID: flowID, source: source)
             return .botControl(completed)
         }
         if case .botControl(let completed) = outcome {
@@ -16,7 +20,8 @@ extension Service {
     private func performBotControl(
         args: JSONValue,
         using presenter: any ServiceHandoffPresenting,
-        flowID: UUID
+        flowID: UUID,
+        source: ServiceActionScheduler.BotControlLease?
     ) async -> Bool {
         guard definition.action(Manifest.BOT_CONTROL_URL_ACTION_ID, includingStandard: true) != nil,
               definition.action(Manifest.BOT_CONTROL_STATE_ACTION_ID, includingStandard: true) != nil,
@@ -24,15 +29,30 @@ extension Service {
             Log.service.error("Service.completeBotControl unavailable domain=\(domain)")
             return false
         }
-        guard let flowSession = try? await ServiceFlowSession.open(
-            id: flowID,
-            kind: .botControl,
-            service: self,
-            actionID: Manifest.BOT_CONTROL_URL_ACTION_ID,
-            args: args,
-            role: .blockingAction
-        ) else {
-            Log.service.error("Service.completeBotControl action page unavailable domain=\(domain)")
+        let flowSession: ServiceFlowSession
+        do {
+            if let source {
+                flowSession = try await ServiceFlowSession.adopt(
+                    id: flowID,
+                    kind: .botControl,
+                    service: self,
+                    actionID: Manifest.BOT_CONTROL_URL_ACTION_ID,
+                    args: args,
+                    role: .blockingAction,
+                    source: source
+                )
+            } else {
+                flowSession = try await ServiceFlowSession.open(
+                    id: flowID,
+                    kind: .botControl,
+                    service: self,
+                    actionID: Manifest.BOT_CONTROL_URL_ACTION_ID,
+                    args: args,
+                    role: .blockingAction
+                )
+            }
+        } catch {
+            Log.service.error("Service.completeBotControl action page unavailable domain=\(domain) source=\(source == nil ? "fresh" : "action-page") error=\(LogPrivacy.text(error.localizedDescription))")
             return false
         }
         defer { flowSession.close() }
@@ -54,7 +74,7 @@ extension Service {
             args: episodeArgs,
             flowSession: flowSession
         )
-        Log.service.info("Service.completeBotControl presenting domain=\(domain) attempt=\(session.handoff.id.uuidString.prefix(8))")
+        Log.service.info("Service.completeBotControl presenting domain=\(domain) attempt=\(session.handoff.id.uuidString.prefix(8)) source=\(source == nil ? "fresh" : "action-page") session=\(flowSession.actionPage.logLabel)")
         let outcome = await session.present(using: presenter)
         Log.service.info("Service.completeBotControl done domain=\(domain) outcome=\(outcome.rawValue)")
         return outcome == .completed
@@ -113,5 +133,64 @@ final class ServiceBotControlSession {
         case .failed:
             return .failed
         }
+    }
+}
+
+@MainActor
+final class ServiceBotControlSourceStore {
+    enum Claim {
+        case none
+        case mismatch
+        case matched(ServiceActionScheduler.BotControlLease)
+    }
+
+    private struct Pending {
+        let service: Service
+        let args: JSONValue
+        let lease: ServiceActionScheduler.BotControlLease
+    }
+
+    private var pending: Pending?
+    private var expiry: Task<Void, Never>?
+
+    func retain(service: Service, args: JSONValue, page: Service.ServiceWebPage) {
+        guard let lease = service.manager.actionScheduler.reserveForBotControl(page) else {
+            Log.service.warning("ServiceBotControlSourceStore unavailable domain=\(service.domain) session=\(page.logLabel)")
+            return
+        }
+        release()
+        pending = Pending(service: service, args: args, lease: lease)
+        expiry = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(300))
+            guard !Task.isCancelled else { return }
+            guard let self else {
+                lease.release(discardPage: true)
+                return
+            }
+            guard self.pending?.lease === lease else { return }
+            Log.service.info("ServiceBotControlSourceStore expired domain=\(service.domain) session=\(page.logLabel)")
+            self.release()
+        }
+        Log.service.info("ServiceBotControlSourceStore retained domain=\(service.domain) session=\(page.logLabel)")
+    }
+
+    func claim(service: Service, args: JSONValue) -> Claim {
+        guard let pending, pending.service === service else { return .none }
+        guard pending.args == args else { return .mismatch }
+        guard pending.lease.isActive else {
+            release()
+            return .none
+        }
+        expiry?.cancel()
+        expiry = nil
+        self.pending = nil
+        return .matched(pending.lease)
+    }
+
+    func release() {
+        expiry?.cancel()
+        expiry = nil
+        pending?.lease.release(discardPage: true)
+        pending = nil
     }
 }

@@ -43,6 +43,7 @@ final class OxCanvas {
     @ObservationIgnored private var requestTimes: [Date] = []
     @ObservationIgnored private var activeAuth: ServiceAuthSession?
     @ObservationIgnored private var activeHandoff: ServiceHandoffSession?
+    @ObservationIgnored private let botControlSource = ServiceBotControlSourceStore()
     @ObservationIgnored private var messagePresentationID: UUID?
     @ObservationIgnored private var outputBytes = 0
     @ObservationIgnored private var repositoryRevision: UInt64
@@ -114,6 +115,7 @@ final class OxCanvas {
 
     private func cancelWork() {
         bluetooth.close()
+        botControlSource.release()
         pending.values.forEach { $0.cancel() }
         loading.values.forEach { $0.cancel() }
         resolveInteraction(id: interaction?.id, value: nil)
@@ -180,6 +182,10 @@ final class OxCanvas {
             serviceChanged: { [unowned self] domain in
                 if let service = services.removeValue(forKey: domain), service.isWebService { service.discardPages() }
             },
+            botControlRequired: { [unowned self] service, args, page in
+                guard state == .running else { return }
+                botControlSource.retain(service: service, args: args, page: page)
+            },
             begin: { [unowned self] function, _, purpose in
                 let invocation = UUID()
                 Log.service.info("Canvas.invoke caller=\(id) request=\(invocation) function=\(function) purpose=\(purpose)")
@@ -244,7 +250,22 @@ final class OxCanvas {
             try? await service.requestAccess(using: CanvasAuthPresenter(canvas: self), source: .canvas)
             return service.signInState.isAuthenticated ? .null : nil
         case .botControl(_, _, let args):
-            return await service.completeBotControl(args: args, using: CanvasHandoffPresenter(canvas: self)) ? .null : nil
+            let source: ServiceActionScheduler.BotControlLease?
+            switch botControlSource.claim(service: service, args: args) {
+            case .none:
+                source = nil
+            case .mismatch:
+                Log.service.warning("Canvas.botControl source-args-mismatch caller=\(id) domain=\(service.domain)")
+                return nil
+            case .matched(let lease):
+                source = lease
+            }
+            defer { source?.release(discardPage: true) }
+            return await service.completeBotControl(
+                args: args,
+                using: CanvasHandoffPresenter(canvas: self),
+                source: source
+            ) ? .null : nil
         case .payment(_, _, let args):
             return await service.completePayment(args: args, using: CanvasHandoffPresenter(canvas: self))
         }

@@ -33,6 +33,8 @@ extension Service {
         args: JSONValue,
         role: InvocationRole = .standard,
         in ownedPage: ServiceWebPage? = nil,
+        reservation: UUID? = nil,
+        onBotControlRequired: (@MainActor (ServiceWebPage) -> Void)? = nil,
         approve: (@MainActor (_ action: String, _ args: Any?) async -> Bool)? = nil
     ) async -> Result<JSONValue, Error> {
         let name = "\(domain):\(actionId)"
@@ -131,6 +133,12 @@ extension Service {
                 Log.service.warning("Service.invoke interrupted-navigation id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs())")
                 return .failure(EvalError.contextInvalidated)
             } catch {
+                if ownedPage == nil,
+                   supportsBotControl,
+                   case EvalError.js(let message) = error,
+                   message.contains("BOT_CONTROL_REQUIRED:") {
+                    onBotControlRequired?(session)
+                }
                 Log.service.error("Service.invoke error id=\(invocation) name=\(name) session=\(session.logLabel) nav=\(startingNavigation)->\(session.navigationGeneration)/\(session.finishedNavigationGeneration) state=\(resolutionState.logLabel) ms=\(elapsedMs()) error=\(LogPrivacy.text(error.localizedDescription))")
                 return .failure(error)
             }
@@ -138,7 +146,7 @@ extension Service {
 
         do {
             if let ownedPage {
-                return try await manager.actionScheduler.schedule(pageAction, on: ownedPage) { page in
+                return try await manager.actionScheduler.schedule(pageAction, on: ownedPage, reservation: reservation) { page in
                     await evaluate(in: page, startingNavigation: page.navigationGeneration)
                 }
             }

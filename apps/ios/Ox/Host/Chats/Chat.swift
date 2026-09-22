@@ -443,6 +443,7 @@ final class Chat: Identifiable {
     }
 
     @ObservationIgnored private var standaloneServiceInvocations: Set<UUID> = []
+    @ObservationIgnored private let botControlSource = ServiceBotControlSourceStore()
 
     var serviceOperations: ServiceOperations {
         ServiceOperations(
@@ -466,6 +467,10 @@ final class Chat: Identifiable {
             serviceChanged: { [unowned self] domain in
                 let replacement = serviceManager.service(domain: domain)
                 setAttachedServices(attachedServices.compactMap { $0.domain == domain ? replacement : $0 })
+            },
+            botControlRequired: { [unowned self] service, args, page in
+                guard isBusy else { return }
+                botControlSource.retain(service: service, args: args, page: page)
             },
             begin: { [unowned self] name, args, purpose in
                 let standalone = ensureExecutionContext()
@@ -1393,6 +1398,7 @@ final class Chat: Identifiable {
     private func finishStandaloneExecution(output: String = "", isError: Bool = false) {
         document.apply(.finishExecution(output: output, isError: isError))
         guard !isBusy else { return }
+        botControlSource.release()
         let outcome: TurnOutcome = isError
             ? .failed(at: Date(), message: output)
             : .completed(at: Date())
@@ -1964,9 +1970,21 @@ final class Chat: Identifiable {
             Log.session.error("Chat.completeBotControl no service domain=\(domain)")
             return false
         }
+        let source: ServiceActionScheduler.BotControlLease?
+        switch botControlSource.claim(service: service, args: args) {
+        case .none:
+            source = nil
+        case .mismatch:
+            Log.session.warning("Chat.completeBotControl source-args-mismatch id=\(id) domain=\(domain)")
+            return false
+        case .matched(let lease):
+            source = lease
+        }
+        defer { source?.release(discardPage: true) }
         let ok = await service.completeBotControl(
             args: args,
-            using: presenter ?? presentations.serviceHandoff
+            using: presenter ?? presentations.serviceHandoff,
+            source: source
         )
         Log.session.info("Chat.completeBotControl domain=\(domain) ok=\(ok)")
         if ok, resumeAgent {
@@ -1999,6 +2017,7 @@ final class Chat: Identifiable {
 
     func cancelAll() {
         bluetooth.close()
+        botControlSource.release()
         let cancelled = drainSubmissions()
         for submission in cancelled {
             submission.latency.finish(outcome: "cancelledQueued", client: client.id, model: model.id)
@@ -2026,6 +2045,7 @@ final class Chat: Identifiable {
             Log.session.info("Chat.stopCurrentTurn ignored id=\(id) reason=idle")
             return
         }
+        botControlSource.release()
         Log.session.info("Chat.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
         notice = .none
         agentEventCycle.cancel()
@@ -2093,6 +2113,7 @@ final class Chat: Identifiable {
     }
 
     private func finishAgentTurnFromEvents(error: String?) {
+        botControlSource.release()
         let at = Date()
         let outcome: TurnOutcome
         if runState.backgroundExecutionExpired {
