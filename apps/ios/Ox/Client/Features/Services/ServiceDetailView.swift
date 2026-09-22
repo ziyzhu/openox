@@ -48,6 +48,7 @@ struct ServiceDetailView: View {
     private var actions: [Manifest.Action] { service.definition.exposedActions }
     private var skills: [Manifest.Skill] { service.definition.skills }
     private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
+    @State private var signInRequestActive = false
     @State private var signingOut = false
     @State private var descriptionExpanded = false
     @State private var descriptionFullHeight: CGFloat = 0
@@ -211,7 +212,7 @@ struct ServiceDetailView: View {
         case .systemPermission:
             permissionButton
         case .service:
-            if service.auth == .unknown || service.auth.isChecking {
+            if signInRequestActive || service.auth == .unknown || service.auth.isChecking {
                 signInButton(signingIn: true)
                     .accessibilityIdentifier(A11yID.Chat.Attach.signInProgress(service.domain))
             } else {
@@ -276,7 +277,12 @@ struct ServiceDetailView: View {
             isDisabled: signingIn,
             layout: .compact
         ) {
-            Task { try? await service.requestAccess(using: presentations, source: .serviceDetail) }
+            guard !signInRequestActive else { return }
+            signInRequestActive = true
+            Task { @MainActor in
+                defer { signInRequestActive = false }
+                try? await service.requestAccess(using: presentations, source: .serviceDetail)
+            }
         }
     }
 
