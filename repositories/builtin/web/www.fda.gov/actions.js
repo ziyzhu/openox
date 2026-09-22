@@ -1,3 +1,31 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.fda.gov";
 const API_ORIGIN = "https://api.fda.gov";
 const RECALLS_PATH = "/safety/recalls-market-withdrawals-safety-alerts";
@@ -58,8 +86,7 @@ const SORT_VALUES = {
     newest: "date_DESC",
     oldest: "date_ASC",
 };
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText, pageCursor } = lib;
+window.ox.install(2, ({ action }) => {
     const strings = (value) => (Array.isArray(value) ? value : value === undefined || value === null ? [] : [value])
         .map(cleanText)
         .filter(Boolean);
@@ -231,7 +258,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const nextCursor = nextLink
                 ? new URL(nextLink.getAttribute("href") ?? "", ORIGIN).searchParams.get("page")
                 : null;
-            log(`fda site search page ${page} returned ${items.length} results`);
+            console.log(`fda site search page ${page} returned ${items.length} results`);
             return { items, nextCursor };
         },
     });
@@ -266,7 +293,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const total = Number(payload.recordsFiltered ?? items.length);
             const nextOffset = start + payload.data.length;
             const nextCursor = nextOffset < total ? String(nextOffset) : null;
-            log(`fda recalls offset ${start} returned ${items.length} of ${total} results`);
+            console.log(`fda recalls offset ${start} returned ${items.length} of ${total} results`);
             return { items, nextCursor };
         },
     });
@@ -334,7 +361,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             if (!record)
                 throw new Error(`No FDA drug label found for ${query}`);
             const openfda = record.openfda ?? {};
-            log(`openFDA drug label search matched ${payload.meta?.results?.total ?? 1} records`);
+            console.log(`openFDA drug label search matched ${payload.meta?.results?.total ?? 1} records`);
             return {
                 id: cleanText(record.id),
                 setId: cleanText(record.set_id),
@@ -388,7 +415,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 changeDate: cleanText(record?.change_date),
                 initialPostingDate: cleanText(record?.initial_posting_date),
             }));
-            log(`openFDA drug shortages offset ${offset} returned ${items.length} results`);
+            console.log(`openFDA drug shortages offset ${offset} returned ${items.length} results`);
             return { items, ...pageResult(payload, offset, items.length), sourceUrl: url };
         },
     });
@@ -403,7 +430,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const params = new URLSearchParams({ search, skip: String(offset), limit: String(limit) });
             const { url, payload } = await openFda("drug/ndc", params);
             const items = payload.results.map(drugProduct);
-            log(`openFDA drug products offset ${offset} returned ${items.length} results`);
+            console.log(`openFDA drug products offset ${offset} returned ${items.length} results`);
             return {
                 items,
                 ...pageResult(payload, offset, items.length),
@@ -423,7 +450,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const params = new URLSearchParams({ search, skip: String(offset), limit: String(limit) });
             const { url, payload } = await openFda("device/udi", params);
             const items = payload.results.map(medicalDevice);
-            log(`openFDA medical devices offset ${offset} returned ${items.length} results`);
+            console.log(`openFDA medical devices offset ${offset} returned ${items.length} results`);
             return { items, ...pageResult(payload, offset, items.length), sourceUrl: url };
         },
     });

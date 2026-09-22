@@ -1,3 +1,5 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
 const ORIGIN = "https://www.google.com";
 const cleanMapText = (value) => cleanText(value)
     .replace(/[\uE000-\uF8FF]/g, " ")
@@ -275,8 +277,7 @@ function directionsUrl({ origin, destination, originPlaceId, destinationPlaceId,
         params.set("destination_place_id", cleanText(destinationPlaceId));
     return `${ORIGIN}/maps/dir/?${params}`;
 }
-window.ox.install(1, ({ action, log, lib }) => {
-    const { cleanText } = lib;
+window.ox.install(2, ({ action }) => {
     action("searchPlaces", {
         async invoke({ query, limit = 10, cursor = "" } = {}) {
             if (!cleanText(query))
@@ -286,7 +287,7 @@ window.ox.install(1, ({ action, log, lib }) => {
             const current = decodedSearchCursor(cursor, normalizedQuery);
             const loaded = await loadPlaceResults(location.href, new Set(current.ids), maximum);
             const result = placeResultPage(loaded, cursor, maximum, normalizedQuery);
-            log(`searchPlaces queryChars=${normalizedQuery.length} seen=${current.ids.length} items=${result.items.length} next=${result.nextCursor ?? "end"}`);
+            console.log(`searchPlaces queryChars=${normalizedQuery.length} seen=${current.ids.length} items=${result.items.length} next=${result.nextCursor ?? "end"}`);
             return result;
         },
     });
@@ -295,7 +296,7 @@ window.ox.install(1, ({ action, log, lib }) => {
             if (!cleanText(query))
                 throw new Error("getPlace requires a query");
             const details = await waitFor(() => parsePlaceDetails(document, location.href, cleanText(placeId)));
-            log(`getPlace queryChars=${String(query).length} hasPlaceId=${Boolean(placeId)}`);
+            console.log(`getPlace queryChars=${String(query).length} hasPlaceId=${Boolean(placeId)}`);
             return details;
         },
     });

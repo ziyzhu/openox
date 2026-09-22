@@ -1,4 +1,27 @@
-window.ox.install(1, ({ action, retryFetch, log }) => {
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://www.americanexpress.com";
     const START_URL = `${ORIGIN}/en-us/travel`;
     const LOGIN_URL = `${ORIGIN}/en-us/account/login`;
@@ -93,14 +116,14 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     body: JSON.stringify({}),
                 });
                 const signedIn = r.ok;
-                log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
+                console.log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
                 if (!signedIn && r.status !== 401 && r.status !== 403) {
                     throw new Error(`getSignInState HTTP ${r.status}`);
                 }
                 return { signedIn };
             }
             catch (e) {
-                log("getSignInState: " + (e?.message ?? String(e)));
+                console.log("getSignInState: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -115,7 +138,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     : j?.name?.full_name ?? j?.name?.fullName
                         ?? [j?.name?.first_name ?? j?.name?.firstName, j?.name?.last_name ?? j?.name?.lastName]
                             .filter(Boolean).join(" ");
-                log(`getProfile: profileId=${j?.profile_id ?? "?"} cards=${cards.length}`);
+                console.log(`getProfile: profileId=${j?.profile_id ?? "?"} cards=${cards.length}`);
                 return {
                     profileId: j?.profile_id ?? null,
                     name: name || null,
@@ -123,7 +146,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 };
             }
             catch (e) {
-                log("getProfile: " + (e?.message ?? String(e)));
+                console.log("getProfile: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -136,11 +159,11 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     throw new Error("no profileId available");
                 const j = await call(`/profile_mgmt/profiles/${id}/primary_traveler/loyalties`, profileHeaders());
                 const items = firstArray(j, ["loyalties"]).map(loyalty);
-                log(`listLoyalties: ${items.length} programs`);
+                console.log(`listLoyalties: ${items.length} programs`);
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listLoyalties: " + (e?.message ?? String(e)));
+                console.log("listLoyalties: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -155,11 +178,11 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     body: JSON.stringify({}),
                 });
                 const items = firstArray(j, ["bookings", "trips", "summary", "items", "results"]).map(trip);
-                log(`listTrips: ${items.length} trips (${type})`);
+                console.log(`listTrips: ${items.length} trips (${type})`);
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listTrips: " + (e?.message ?? String(e)));
+                console.log("listTrips: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -172,7 +195,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ tripId, bookingDate }),
                 });
-                log(`getTrip: tripId=${tripId} keys=${Object.keys(j ?? {}).join(",")}`);
+                console.log(`getTrip: tripId=${tripId} keys=${Object.keys(j ?? {}).join(",")}`);
                 return {
                     ...trip({ ...j, tripId, bookingDate }),
                     travelers: firstArray(j, ["travelers", "passengers"]).map((traveler) => text(traveler?.fullName, traveler?.name, traveler?.travelerName)).filter((name) => name !== null),
@@ -180,7 +203,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 };
             }
             catch (e) {
-                log("getTrip: " + (e?.message ?? String(e)));
+                console.log("getTrip: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

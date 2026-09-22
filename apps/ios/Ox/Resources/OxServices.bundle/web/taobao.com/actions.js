@@ -1,5 +1,15 @@
-window.ox.install(1, ({ action, log, lib }) => {
-    const { cookie } = lib;
+const cookie = name => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://www.taobao.com";
     const cleanText = (v) => String(v ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
     const httpsUrl = (u) => {
@@ -38,7 +48,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { signedIn: !!cookie("unb") || !!cookie("tracknick") };
             }
             catch (e) {
-                log("getSignInState: " + (e?.message ?? String(e)));
+                console.log("getSignInState: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -94,7 +104,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items, nextCursor };
             }
             catch (e) {
-                log("searchItems: " + (e?.message ?? String(e)));
+                console.log("searchItems: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -128,7 +138,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getItem: " + (e?.message ?? String(e)));
+                console.log("getItem: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -144,7 +154,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getMe: " + (e?.message ?? String(e)));
+                console.log("getMe: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -156,7 +166,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { count: parseInt(String(d.count ?? "0"), 10) || 0 };
             }
             catch (e) {
-                log("getCartCount: " + (e?.message ?? String(e)));
+                console.log("getCartCount: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -171,7 +181,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { id: itemId, favorited: !!d.result?.[itemId] };
             }
             catch (e) {
-                log("isFavorited: " + (e?.message ?? String(e)));
+                console.log("isFavorited: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -200,7 +210,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items, nextCursor };
             }
             catch (e) {
-                log("listItemQuestions: " + (e?.message ?? String(e)));
+                console.log("listItemQuestions: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

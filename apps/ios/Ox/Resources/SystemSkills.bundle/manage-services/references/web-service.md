@@ -60,7 +60,7 @@ Cover applicable success, empty, terminal pagination, safe missing-resource, sig
 
 1. Same-origin structured `fetch` with the observed request shape.
 2. Fetched stable HTML parsed with `DOMParser`.
-3. One-shot `window.oxFetchCapture` when the page must generate an inherited signature: register the capture before triggering the request and register a fresh capture for every page.
+3. A service-local one-shot fetch capture when the page must generate an inherited signature: install it at document start, register before triggering the request, and register a fresh capture for every page.
 4. Stable SPA store or DOM state: navigate within the SPA, invalidate stale state, wait for target-specific identity and freshness, and collect bounded results.
 
 Keep authoring evidence compact: field names, types, counts, pagination facts, and a safe sample. Exclude private bodies, cookies, authorization and CSRF values, reusable tokens, and raw signatures.
@@ -168,7 +168,7 @@ Add bot control when an action can encounter human verification and resume after
 
 1. Identify the exact observed response that means the originating action is blocked by human verification. Throw a clear `BOT_CONTROL_REQUIRED` error only for that state and tell the agent to call `ox.service.solve` with the same operation-identifying arguments. Do not classify generic HTTP, parsing, authentication, or application failures as bot control.
 2. Add `getBotControlUrl(args): {url}` for the verification page and `getBotControlState({...args, pageUrl}): {ok}` for completion. Align their operation-identifying inputs with the originating action and make `pageUrl` required only by the state action; iOS supplies its current value while probing.
-3. Keep the verification interaction and completion probe on the bot-control action page. iOS navigates that same page to the URL returned by `getBotControlUrl` and surfaces it to the user. Implement `getBotControlState` against fresh state available to that page rather than assuming a second page shares DOM or in-memory challenge state.
+3. Keep the verification interaction and completion probe on the bot-control action page. A challenge returned to `fetch` or XHR does not appear in that page's visible document; verify that `getBotControlUrl` returns a browser-navigable page where the user can solve it without an unsafe repeat of the originating operation. iOS navigates the action page to that URL and surfaces the same page to the user. Implement `getBotControlState` against fresh state available to that page rather than assuming a second page shares DOM or in-memory challenge state.
 4. Define completion as an operation-scoped postcondition, not transport success. A successful fetch, `2xx` response, completed navigation, absent challenge element, or generic authenticated page is insufficient. Verify that the requested resource or effect exists, is complete, and belongs to the supplied operation inputs. Prefer an observed same-origin server read with `credentials: "include"` and `cache: "no-store"` when server state is authoritative.
 5. Write the probe decision table from live evidence. Return `{ok: false}` for exact observed challenge, submission, or pending states; return `{ok: true}` only for the exact completed outcome; and throw for unexpected status, redirect, response shape, parsing failure, CORS failure, or network failure. Keep the probe cheap because iOS polls it about once per second.
 6. Preserve approval on the originating mutation. `ox.service.solve` authorizes no external effect beyond presenting and checking the human-verification handoff.
@@ -189,12 +189,12 @@ Add payment when an approved action prepares a cart, booking, or order while fin
 
 ## 6. Author actions.js
 
-Install exactly once against service action ABI version 1:
+Install exactly once against service action ABI version 2:
 
 ```js
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-  const { cleanText, pageCursor, cookie } = lib;
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
+window.ox.install(2, ({ action }) => {
   action("example", {
     async invoke(args) {
       return { value: cleanText(args.value) };
@@ -203,7 +203,9 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
 });
 ```
 
-Register every declared action ID exactly once and no undeclared IDs. The shared runtime supplies dispatch, missing-argument normalization, duplicate and unknown-action rejection, retries, structured logging, fetch capture, and `lib` helpers. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
+Register every declared action ID exactly once and no undeclared IDs. The runtime supplies dispatch, missing-argument normalization, and duplicate and unknown-action rejection. The installer passes only `action`. Read `skills/system:manage-services/references/helpers.js` for copyable `cleanText`, `pageCursor`, `cookie`, `retryFetch`, and `createFetchCapture` implementations; copy only what the service needs into `actions.js`. Do not import, fetch, or reference the skill file at runtime. Use `console.log` for concise diagnostics. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
+
+Retries are not appropriate for an operation that may have caused a non-idempotent effect. Before copying `retryFetch`, decide whether the request is safe to repeat; otherwise use one `fetch` and inspect outcome before any retry. Install `createFetchCapture(window)` at document start and retain its returned function locally. It observes page fetch/XHR traffic, so use it only when direct requests cannot reproduce required page-owned signing or state.
 
 Use observed same-origin `fetch` shapes with `credentials: "include"`, stable HTML, one-shot inherited response capture, or stable page-owned state. Keep direct-request state invocation-local.
 

@@ -1,3 +1,31 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.nejm.org";
 const START_URL = `${ORIGIN}/action/autoCompleteSearchService?partialQuery=zzzzunlikelyqueryzzzz`;
 const inputValue = (element, selector) => element.querySelector(selector)?.value?.trim() ?? "";
@@ -41,8 +69,7 @@ const totalCount = (doc) => {
     return Number.parseInt(value.replace(/\D/g, ""), 10) || 0;
 };
 const nextCursor = (doc) => doc.querySelector(".ng-pagination_next[aria-disabled='false']")?.dataset.startpage ?? null;
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText, pageCursor } = lib;
+window.ox.install(2, ({ action }) => {
     const fetchDocument = async (url) => {
         const response = await retryFetch(url, { credentials: "include" });
         if (!response.ok)
@@ -87,7 +114,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const items = articleItems(doc);
             const total = totalCount(doc);
             const next = nextCursor(doc);
-            log(`searchArticles "${query}" page ${page}: ${items.length}/${total}`);
+            console.log(`searchArticles "${query}" page ${page}: ${items.length}/${total}`);
             return { items, totalCount: total, nextCursor: next };
         },
     });
@@ -108,7 +135,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const items = articleItems(doc);
             const total = totalCount(doc);
             const next = nextCursor(doc);
-            log(`listSpecialtyArticles ${specialty} page ${page}: ${items.length}/${total}`);
+            console.log(`listSpecialtyArticles ${specialty} page ${page}: ${items.length}/${total}`);
             return { name, items, totalCount: total, nextCursor: next };
         },
     });
@@ -143,7 +170,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 .map((element) => readableText(element))
                 .filter(Boolean);
             const pdfUrl = absoluteUrl(doc.querySelector("a.btn--pdf")?.getAttribute("href") ?? null);
-            log(`getArticle ${id}: ${authors.length} authors, ${sections.length} sections`);
+            console.log(`getArticle ${id}: ${authors.length} authors, ${sections.length} sections`);
             return {
                 id,
                 title,

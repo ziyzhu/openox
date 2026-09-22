@@ -1,4 +1,6 @@
-window.ox.install(1, ({ action, log }) => {
+
+
+window.ox.install(2, ({ action }) => {
     const BASE_URL = "https://www.ctrip.com/";
     const LOGIN_URL = "https://passport.ctrip.com/user/login";
     const API = "https://m.ctrip.com/restapi/soa2";
@@ -133,11 +135,11 @@ window.ox.install(1, ({ action, log }) => {
         async invoke() {
             try {
                 const signedIn = !!cookie("login_uid");
-                log(`getSignInState: login_uid=${signedIn ? "present" : "absent"}`);
+                console.log(`getSignInState: login_uid=${signedIn ? "present" : "absent"}`);
                 return { signedIn };
             }
             catch (e) {
-                log("getSignInState: " + (e?.message ?? String(e)));
+                console.log("getSignInState: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -168,7 +170,7 @@ window.ox.install(1, ({ action, log }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("searchFlightCities: " + (e?.message ?? String(e)));
+                console.log("searchFlightCities: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -192,7 +194,7 @@ window.ox.install(1, ({ action, log }) => {
                 return { fromCity, toCity, currency: "CNY", prices };
             }
             catch (e) {
-                log("getFlightPriceCalendar: " + (e?.message ?? String(e)));
+                console.log("getFlightPriceCalendar: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -225,7 +227,7 @@ window.ox.install(1, ({ action, log }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listFlightDeals: " + (e?.message ?? String(e)));
+                console.log("listFlightDeals: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -266,11 +268,11 @@ window.ox.install(1, ({ action, log }) => {
                     };
                 }).filter((it) => it.hotelId);
                 const nextCursor = items.length >= 10 ? String(pageIndex + 1) : null;
-                log(`searchHotels: city=${cityId} page=${pageIndex} -> ${items.length}`);
+                console.log(`searchHotels: city=${cityId} page=${pageIndex} -> ${items.length}`);
                 return { items, nextCursor };
             }
             catch (e) {
-                log("searchHotels: " + (e?.message ?? String(e)));
+                console.log("searchHotels: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -287,11 +289,11 @@ window.ox.install(1, ({ action, log }) => {
                     vipGradeName: gbk(field("VipGradeName")),
                     unreadMessages: Number(field("NoReadMessageCount") || "0"),
                 };
-                log(`getMemberInfo: grade=${info.vipGrade} signedIn=${info.signedIn}`);
+                console.log(`getMemberInfo: grade=${info.vipGrade} signedIn=${info.signedIn}`);
                 return info;
             }
             catch (e) {
-                log("getMemberInfo: " + (e?.message ?? String(e)));
+                console.log("getMemberInfo: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -307,7 +309,7 @@ window.ox.install(1, ({ action, log }) => {
                 }
                 const onTarget = router.asPath?.includes(`oneway-${f}-${t}`) && router.asPath?.includes(`depdate=${date}`);
                 if (!onTarget) {
-                    log(`searchFlights: router.push ${f}-${t} ${date}`);
+                    console.log(`searchFlights: router.push ${f}-${t} ${date}`);
                     setTimeout(() => { try {
                         router.push(flightSpaPath(f, t, date));
                     }
@@ -329,11 +331,11 @@ window.ox.install(1, ({ action, log }) => {
                     return { items: [], pending: true, note: "still loading" };
                 }
                 const items = scrapeFlights();
-                log(`searchFlights: ${f}-${t} ${date} -> ${items.length} flights`);
+                console.log(`searchFlights: ${f}-${t} ${date} -> ${items.length} flights`);
                 return { items, pending: false, note: "" };
             }
             catch (e) {
-                log("searchFlights: " + (e?.message ?? String(e)));
+                console.log("searchFlights: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -372,7 +374,7 @@ window.ox.install(1, ({ action, log }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("searchHotelCities: " + (e?.message ?? String(e)));
+                console.log("searchHotelCities: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

@@ -1,5 +1,38 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cookie } = lib;
+const cookie = name => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+};
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     // LinkedIn's CSRF token is the JSESSIONID cookie value with its surrounding
     // quotes stripped (e.g. cookie `"ajax:123"` -> header `ajax:123`). The cookie
     // is JS-readable; li_at (the real session credential) is httpOnly and never
@@ -284,7 +317,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 return { signedIn: Boolean(json?.data?.plainId) };
             }
             catch (e) {
-                log(`linkedin getSignInState probe failed: ${String(e?.message ?? e)}`);
+                console.log(`linkedin getSignInState probe failed: ${String(e?.message ?? e)}`);
                 throw e;
             }
         },

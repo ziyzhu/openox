@@ -1,5 +1,32 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText, pageCursor } = lib;
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://developer.apple.com";
     const DATA = `${ORIGIN}/tutorials/data`;
     const normalizePath = (path, namespace) => {
@@ -260,7 +287,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     }
                 }
             }
-            log(`listTechnologies: ${items.length} frameworks`);
+            console.log(`listTechnologies: ${items.length} frameworks`);
             return { items, nextCursor: null };
         },
     });
@@ -331,7 +358,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     url: tile.action?.destination ?? "",
                 }));
             });
-            log(`listTutorials: ${items.length} tutorials`);
+            console.log(`listTutorials: ${items.length} tutorials`);
             return {
                 title: doc.metadata?.title ?? hero?.title ?? "",
                 abstract: hero?.content ? blockText(hero.content, refs) : null,
@@ -419,7 +446,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             };
             for (const root of roots)
                 walk(root);
-            log(`searchSymbols ${slug} "${query}": ${items.length} hits`);
+            console.log(`searchSymbols ${slug} "${query}": ${items.length} hits`);
             return { items, nextCursor: null };
         },
     });
@@ -448,7 +475,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             };
             for (const root of roots)
                 visit(root, null, 0);
-            log(`listForumTopics: ${items.length} topics and subtopics`);
+            console.log(`listForumTopics: ${items.length} topics and subtopics`);
             return { items, nextCursor: null };
         },
     });
@@ -460,7 +487,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 params.set("page", String(page));
             const doc = await fetchDocument(`${ORIGIN}/forums/allPosts?${params}`);
             const items = forumItems(doc);
-            log(`listForumPosts page ${page}: ${items.length} items`);
+            console.log(`listForumPosts page ${page}: ${items.length} items`);
             return { items, nextCursor: forumNextCursor(doc) };
         },
     });
@@ -474,7 +501,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 params.set("page", String(page));
             const doc = await fetchDocument(`${ORIGIN}/forums/search?${params}`);
             const items = forumItems(doc);
-            log(`searchForumPosts "${query}" page ${page}: ${items.length} hits`);
+            console.log(`searchForumPosts "${query}" page ${page}: ${items.length} hits`);
             return { items, nextCursor: forumNextCursor(doc) };
         },
     });

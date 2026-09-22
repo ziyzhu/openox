@@ -1,5 +1,30 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { pageCursor } = lib;
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://secure.bankofamerica.com";
     const OVERVIEW_URL = `${ORIGIN}/myaccounts/ao/accounts-overview.go`;
     const PAY_TRANSFER_URL = `${ORIGIN}/pay-transfer-pay-portal/`;
@@ -76,14 +101,14 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         async invoke() {
             const profile = (await fetchCustomer())?.profile;
             const signedIn = Boolean(profile?.name?.first || profile?.name?.full);
-            log(`bofa getSignInState signedIn=${signedIn}`);
+            console.log(`bofa getSignInState signedIn=${signedIn}`);
             return { signedIn };
         },
     });
     action("listAccounts", {
         async invoke() {
             const items = await fetchAccounts();
-            log(`bofa listAccounts count=${items.length}`);
+            console.log(`bofa listAccounts count=${items.length}`);
             if (!items.length)
                 throw new Error("No accounts found; session may be signed out");
             return { items, nextCursor: null };
@@ -95,7 +120,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const account = (await fetchAccounts()).find((candidate) => candidate.accountToken === token);
             if (!account)
                 throw new Error("Account not found for that token; rerun listAccounts");
-            log("bofa getAccount found=true");
+            console.log("bofa getAccount found=true");
             return account;
         },
     });
@@ -117,7 +142,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 ? data.toAccounts.map(mapPaymentFilterAccount).filter((account) => account.identifier)
                 : [];
             const strings = (value) => Array.isArray(value) ? value.map(String) : [];
-            log(`bofa getPaymentActivityFilters from=${fromAccounts.length} to=${toAccounts.length}`);
+            console.log(`bofa getPaymentActivityFilters from=${fromAccounts.length} to=${toAccounts.length}`);
             return {
                 fromAccounts,
                 toAccounts,
@@ -213,7 +238,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 : [];
             const numberOfPages = Number(data?.pageInfo?.numberOfPages) || page;
             const nextCursor = page < numberOfPages ? String(page + 1) : null;
-            log(`bofa listPaymentActivities page=${page} count=${items.length} next=${nextCursor != null}`);
+            console.log(`bofa listPaymentActivities page=${page} count=${items.length} next=${nextCursor != null}`);
             return { items, nextCursor };
         },
     });
@@ -245,7 +270,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 pagingRules: { pagingRequestedItemCount: count },
             });
             const items = txnsOf(data).map(mapTxn);
-            log(`bofa listTransactions count=${items.length}`);
+            console.log(`bofa listTransactions count=${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -266,7 +291,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 lang: "en-US",
             });
             const docs = Array.isArray(data?.documentList) ? data.documentList : [];
-            log(`bofa listStatements docs=${docs.length}`);
+            console.log(`bofa listStatements docs=${docs.length}`);
             return { items: docs.map(mapStatement), nextCursor: null };
         },
     });
@@ -284,7 +309,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 displayAmount: category?.amount?.displayAmount ?? category?.displayAmount ?? null,
                 percentage: category?.percentage ?? category?.percent ?? null,
             }));
-            log(`bofa getSpending categories=${categories.length}`);
+            console.log(`bofa getSpending categories=${categories.length}`);
             return { categories };
         },
     });
@@ -303,7 +328,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 expirationDate: deal?.expirationDate ?? deal?.endDate ?? null,
                 status: deal?.status ?? null,
             }));
-            log(`bofa listDeals deals=${items.length}`);
+            console.log(`bofa listDeals deals=${items.length}`);
             return { items, nextCursor: null };
         },
     });

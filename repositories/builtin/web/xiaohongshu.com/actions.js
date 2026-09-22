@@ -1,5 +1,6 @@
-window.ox.install(1, ({ action, log, lib }) => {
-    const { cleanText } = lib;
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://www.xiaohongshu.com";
     const numText = (v) => {
         const s = String(v ?? "").trim();
@@ -73,13 +74,13 @@ window.ox.install(1, ({ action, log, lib }) => {
                 const url = new URL(response.url);
                 const signedOut = response.redirected && url.origin === ORIGIN && url.pathname === "/login";
                 const signedIn = !response.redirected && url.origin === ORIGIN && url.pathname === "/notification";
-                log(`getSignInState: status=${response.status} redirected=${response.redirected} path=${url.pathname}`);
+                console.log(`getSignInState: status=${response.status} redirected=${response.redirected} path=${url.pathname}`);
                 if (!signedIn && !signedOut)
                     throw new Error("unexpected authentication response");
                 return { signedIn };
             }
             catch (e) {
-                log("getSignInState: " + (e?.message ?? String(e)));
+                console.log("getSignInState: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -131,7 +132,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listFeed: " + (e?.message ?? String(e)));
+                console.log("listFeed: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -335,7 +336,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                     return { items: collectNoteCards(limit), nextCursor: null };
                 }
                 catch (e) {
-                    log("searchNotes: " + (e?.message ?? String(e)));
+                    console.log("searchNotes: " + (e?.message ?? String(e)));
                     throw e;
                 }
             });
@@ -390,7 +391,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                     return { items, nextCursor: null };
                 }
                 catch (e) {
-                    log("searchUsers: " + (e?.message ?? String(e)));
+                    console.log("searchUsers: " + (e?.message ?? String(e)));
                     throw e;
                 }
             });
@@ -483,7 +484,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listUserNotes: " + (e?.message ?? String(e)));
+                console.log("listUserNotes: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -515,7 +516,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getUserProfile: " + (e?.message ?? String(e)));
+                console.log("getUserProfile: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -552,7 +553,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items };
             }
             catch (e) {
-                log("listTrending: " + (e?.message ?? String(e)));
+                console.log("listTrending: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -637,7 +638,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getNote: " + (e?.message ?? String(e)));
+                console.log("getNote: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -686,7 +687,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getNoteMedia: " + (e?.message ?? String(e)));
+                console.log("getNoteMedia: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -759,7 +760,7 @@ window.ox.install(1, ({ action, log, lib }) => {
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listComments: " + (e?.message ?? String(e)));
+                console.log("listComments: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

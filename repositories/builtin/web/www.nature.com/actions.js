@@ -1,3 +1,31 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.nature.com";
 const START_URL = `${ORIGIN}/search?q=zzzzunlikelyqueryzzzz`;
 const absoluteUrl = (value) => value ? new URL(value, ORIGIN).href : "";
@@ -26,8 +54,7 @@ const articleCard = (element, fallbackJournal = null) => {
         url,
     };
 };
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText, pageCursor } = lib;
+window.ox.install(2, ({ action }) => {
     const fetchDocument = async (url) => {
         const response = await retryFetch(url, {
             credentials: "include",
@@ -87,7 +114,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const totalCount = Number.parseInt(resultText.match(/([\d,]+)\s+results/i)?.[1]?.replace(/,/g, "") ?? "0", 10);
             const nextHref = doc.querySelector('[data-test="page-next"] a[href]')?.getAttribute("href");
             const nextCursor = nextHref ? new URL(nextHref, ORIGIN).searchParams.get("page") : null;
-            log(`searchArticles "${query}" page ${page}: ${items.length}/${totalCount}`);
+            console.log(`searchArticles "${query}" page ${page}: ${items.length}/${totalCount}`);
             return { items, totalCount, nextCursor };
         },
     });
@@ -140,7 +167,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 url: canonicalUrl,
                 pdfUrl: pdfUrl || null,
             };
-            log(`getArticle ${result.id}: ${result.authors.length} authors, ${sections.length} sections`);
+            console.log(`getArticle ${result.id}: ${result.authors.length} authors, ${sections.length} sections`);
             return result;
         },
     });
@@ -155,7 +182,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             })
                 .filter((item) => item.id && item.name)
                 .filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index);
-            log(`listJournals: ${items.length} journals`);
+            console.log(`listJournals: ${items.length} journals`);
             return { items, nextCursor: null };
         },
     });
@@ -186,7 +213,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 .filter(Boolean)
                 .filter((value, index, all) => all.indexOf(value) === index);
             const description = meta(doc, "description");
-            log(`getJournal ${normalizedId}: ${groups.length} content groups`);
+            console.log(`getJournal ${normalizedId}: ${groups.length} content groups`);
             return {
                 id: normalizedId,
                 name,

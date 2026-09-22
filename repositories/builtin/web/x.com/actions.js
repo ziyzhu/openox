@@ -1,3 +1,26 @@
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const extractArticleBody = (articleResults) => {
     const mediaById = new Map();
     const mediaEntities = Array.isArray(articleResults?.media_entities) ? articleResults.media_entities : [];
@@ -64,7 +87,7 @@ const extractArticleBody = (articleResults) => {
         media_urls,
     };
 };
-window.ox.install(1, ({ action, retryFetch, log }) => {
+window.ox.install(2, ({ action }) => {
     // X's public app-level bearer for the official web client — the same
     // constant shipped in x.com's own main.<hash>.js, required on every
     // /i/api/graphql call even for cookie-authed sessions. It identifies the
@@ -202,7 +225,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
         }
         const hit = opCache[operationName];
         if (hit)
-            log(`x.com: scraped ${operationName}=${hit.queryId} from live bundle`);
+            console.log(`x.com: scraped ${operationName}=${hit.queryId} from live bundle`);
         return hit ?? null;
     };
     const resolveOperation = async (operationName, baselineFeatures) => {
@@ -266,7 +289,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             const op = await resolveUserOp("Viewer");
             const d = await graphqlGet(op, "Viewer", { withCommunitiesMemberships: true }, ct0);
             if (d?.__http_error) {
-                log(`fetchOwnHandle: Viewer HTTP ${d.__http_error}`);
+                console.log(`fetchOwnHandle: Viewer HTTP ${d.__http_error}`);
                 return null;
             }
             const u = d?.data?.viewer?.user_results?.result;
@@ -274,7 +297,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             return handle || null;
         }
         catch (e) {
-            log("fetchOwnHandle: " + (e?.message ?? String(e)));
+            console.log("fetchOwnHandle: " + (e?.message ?? String(e)));
             return null;
         }
     };
@@ -729,7 +752,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 return { items: trends, nextCursor: null };
             }
             catch (e) {
-                log("listTrending: " + (e?.message ?? String(e)));
+                console.log("listTrending: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

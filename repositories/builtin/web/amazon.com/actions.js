@@ -1,3 +1,29 @@
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const clean = (v) => typeof v === "string" ? v.replace(/ /g, " ").replace(/\s+/g, " ").trim() : "";
 const NON_CONTENT_TEXT_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
 const visibleText = (root) => {
@@ -52,8 +78,7 @@ const amazonOrderPage = (orders) => ({
     items: orders.filter(amazonOrderHasData),
     consumed: orders.length,
 });
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { pageCursor } = lib;
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://www.amazon.com";
     const RANKING_ROOTS = {
         bestsellers: "/Best-Sellers/zgbs",
@@ -167,11 +192,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const route = final.origin + final.pathname;
             const title = clean(doc.title).slice(0, 120);
             const bytes = new TextEncoder().encode(html).byteLength;
-            log(`${diagnostic}: response status=${response.status} route=${route} bytes=${bytes} title=${JSON.stringify(title)}`);
+            console.log(`${diagnostic}: response status=${response.status} route=${route} bytes=${bytes} title=${JSON.stringify(title)}`);
         }
         const haystack = clean((doc.title || "") + " " + (doc.querySelector("body")?.textContent || "")).toLowerCase();
         if (ROBOT_PATTERNS.some((p) => haystack.includes(p))) {
-            log("fetchDoc: robot check served for " + url);
+            console.log("fetchDoc: robot check served for " + url);
             throw new Error("Amazon served a robot check. Open Amazon in the WebView, clear it, and retry.");
         }
         return doc;
@@ -270,7 +295,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         const doc = new DOMParser().parseFromString(await res.text(), "text/html");
         const href = clean(res.url).toLowerCase();
         const title = clean(doc.title).toLowerCase();
-        log(`probeSignedIn: href=${href} title=${title}`);
+        console.log(`probeSignedIn: href=${href} title=${title}`);
         return !href.includes("/ap/signin") && !title.includes("amazon sign-in");
     };
     action("getSignInUrl", {
@@ -337,7 +362,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     break;
             }
             if (items.length === 0)
-                log("searchProducts: no product cards for " + query + " (page " + page + ")");
+                console.log("searchProducts: no product cards for " + query + " (page " + page + ")");
             const hasNextLink = !!doc.querySelector('a.s-pagination-next:not(.s-pagination-disabled)');
             const nextCursor = (hasNextLink || items.length >= limit) && items.length > 0 ? String(page + 1) : null;
             return { items, nextCursor };
@@ -357,7 +382,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             }
             const departments = [...byId].map(([id, label]) => ({ id, label }));
             if (departments.length === 0)
-                log("listDepartments: no department options found");
+                console.log("listDepartments: no department options found");
             return { departments };
         },
     });
@@ -369,7 +394,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const doc = await fetchDoc(`/dp/${asin}`);
             const title = clean(doc.querySelector("#productTitle, #title span")?.textContent);
             if (!title) {
-                log("getProduct: no product title for " + asin + " — page likely gated");
+                console.log("getProduct: no product title for " + asin + " — page likely gated");
                 throw new Error(`getProduct: no product found for ${asin} (page may be gated or ASIN invalid)`);
             }
             const ratingText = doc.querySelector("#acrPopover")?.getAttribute("title") ||
@@ -412,7 +437,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 null;
             const shipsFrom = extractShipsFrom(shipsBlob) || extractShipsFrom(merchantInfo) || null;
             if (!soldBy && !shipsFrom && !merchantInfo) {
-                log("getOffer: no buy box facts for " + asin);
+                console.log("getOffer: no buy box facts for " + asin);
                 throw new Error(`getOffer: no buy box facts for ${asin} (page may be gated or ASIN invalid)`);
             }
             return {
@@ -476,7 +501,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 usedReviewsPage = false;
             }
             if (!parsed.averageText && !parsed.totalText && parsed.samples.length === 0) {
-                log("listReviews: no review summary for " + asin);
+                console.log("listReviews: no review summary for " + asin);
                 throw new Error(`listReviews: no reviews found for ${asin} (page may be gated or ASIN invalid)`);
             }
             const nextCursor = usedReviewsPage && parsed.hasNext && parsed.samples.length >= limit
@@ -570,7 +595,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 const withStatus = parsed.filter((order) => order.status || order.statusDetail).length;
                 const withItems = parsed.filter((order) => order.items.length > 0).length;
                 const hasNext = !!doc.querySelector(".a-pagination li.a-last:not(.a-disabled) a");
-                log(`${diagnostic}: cards=${cards.length} selected=${parsed.length} valid=${valid.length} empty=${parsed.length - valid.length} ` +
+                console.log(`${diagnostic}: cards=${cards.length} selected=${parsed.length} valid=${valid.length} empty=${parsed.length - valid.length} ` +
                     `coverage=id:${withId},date:${withDate},total:${withTotal},status:${withStatus},items:${withItems} ` +
                     `reportedTotal=${totalCount ?? "unknown"} hasNext=${hasNext}`);
                 if (cards.length === 0)
@@ -580,7 +605,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 pageHasMore = take.length < cards.length || hasNext;
             }
             if (items.length === 0)
-                log(`listOrders: no order cards (orderFilter ${orderFilter}, timeFilter ${timeFilter})`);
+                console.log(`listOrders: no order cards (orderFilter ${orderFilter}, timeFilter ${timeFilter})`);
             const nextStart = start + consumed;
             const more = totalCount != null ? nextStart < totalCount : pageHasMore && consumed > 0;
             return { items, totalCount, nextCursor: more && consumed > 0 ? String(nextStart) : null };
@@ -628,7 +653,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const nextPage = nextLink
                 ? new URL(nextLink.getAttribute("href") || "", ORIGIN).searchParams.get("page")
                 : null;
-            log(`searchOrders: matches=${items.length} next=${nextPage ?? "none"}`);
+            console.log(`searchOrders: matches=${items.length} next=${nextPage ?? "none"}`);
             return { items, nextCursor: nextPage };
         },
     });
@@ -761,7 +786,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 };
             });
             if (items.length === 0) {
-                log("getOrderDetails: no purchased items for " + orderId);
+                console.log("getOrderDetails: no purchased items for " + orderId);
                 throw new Error(`getOrderDetails: no details found for ${orderId} (wrong id or signed-out session?)`);
             }
             const shipments = [...doc.querySelectorAll("[data-component=shipments]")]
@@ -815,7 +840,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 [...doc.querySelectorAll("h1, h2, h3")].map((h) => clean(h.textContent))
                     .find((t) => /delivered|arriving|out for delivery|shipped|in transit/i.test(t))) || null;
             if (!status && events.length === 0) {
-                log("trackPackage: no tracking facts at " + url);
+                console.log("trackPackage: no tracking facts at " + url);
                 throw new Error("trackPackage: no tracking information found (link may be stale)");
             }
             return {
@@ -949,7 +974,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             ]);
             const text = await response.text();
             const ok = response.ok && text.includes(itemId) && /"removed"\s*:\s*"true"/.test(text);
-            log(`deleteCartItem: itemId=${itemId} asin=${asin} status=${response.status} ok=${ok}`);
+            console.log(`deleteCartItem: itemId=${itemId} asin=${asin} status=${response.status} ok=${ok}`);
             if (!ok)
                 throw new Error("deleteCartItem: Amazon did not confirm that the item was removed");
             return { ok: true, itemId, asin };
@@ -992,16 +1017,16 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     pairs.push(["merchantId", merchant]);
             }
             pairs.push(["submit.addToCart", ""]);
-            log(`addToCart: asin=${asin} cartType=${type} qty=${qty} csrf=${csrf ? "yes" : "MISSING"} path=${path.slice(0, 80)}`);
+            console.log(`addToCart: asin=${asin} cartType=${type} qty=${qty} csrf=${csrf ? "yes" : "MISSING"} path=${path.slice(0, 80)}`);
             const res = await postForm(abs(path), csrf, pairs);
             const text = await res.text();
             const count = Number.parseInt((text.match(/"cartCount"\s*:\s*"?(\d+)/) || [])[1] || "", 10);
             const ok = res.status >= 200 && res.status < 400 &&
                 /cartCount|"success"|addedToCart|Added to cart|QuantityStepperReplace/i.test(text);
-            log(`addToCart: status=${res.status} bodyLen=${text.length} cartCount=${Number.isFinite(count) ? count : "?"} ok=${ok}`);
+            console.log(`addToCart: status=${res.status} bodyLen=${text.length} cartCount=${Number.isFinite(count) ? count : "?"} ok=${ok}`);
             if (!ok) {
                 const m = new DOMParser().parseFromString(text, "text/html");
-                log("addToCart: FAIL title=" + clean(m.querySelector("title")?.textContent) + " h1=" + clean(m.querySelector("h1")?.textContent) + " body=" + clean(m.querySelector("body")?.textContent).slice(0, 240));
+                console.log("addToCart: FAIL title=" + clean(m.querySelector("title")?.textContent) + " h1=" + clean(m.querySelector("h1")?.textContent) + " body=" + clean(m.querySelector("body")?.textContent).slice(0, 240));
             }
             return { ok, asin, quantity: qty, cartCount: Number.isFinite(count) ? count : null };
         },
@@ -1013,7 +1038,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             html.match(/["'](?:obfuscatedId|purchaseId)["']\s*:\s*["'](p-[\w-]+)/)?.[1] ||
             null;
         const csrf = csrfFrom(doc);
-        log(`loadCheckout: purchaseId=${purchaseId || "MISSING"} csrf=${csrf ? "yes" : "no"}`);
+        console.log(`loadCheckout: purchaseId=${purchaseId || "MISSING"} csrf=${csrf ? "yes" : "no"}`);
         return { doc, purchaseId, csrf };
     };
     const checkoutSummary = (doc) => {
@@ -1056,7 +1081,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 ["purchasePrograms", "FRESH"],
             ]);
             const ok = res.status >= 200 && res.status < 400;
-            log(`setTip: purchaseId=${purchaseId} amount=${value} status=${res.status} ok=${ok}`);
+            console.log(`setTip: purchaseId=${purchaseId} amount=${value} status=${res.status} ok=${ok}`);
             return { ok, purchaseId, amount: value };
         },
     });
@@ -1074,7 +1099,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const text = await res.text();
             const placed = res.status === 302 || /thankyou|thank you|order placed|order-confirmation/i.test(text);
             const orderId = text.match(/order(?:Id|Number)["'\s:=]+([\dA-Z-]{10,})/i)?.[1] || null;
-            log(`placeOrder: purchaseId=${purchaseId} status=${res.status} placed=${placed} orderId=${orderId || "?"}`);
+            console.log(`placeOrder: purchaseId=${purchaseId} status=${res.status} placed=${placed} orderId=${orderId || "?"}`);
             return { ok: placed, purchaseId, orderId };
         },
     });
@@ -1106,7 +1131,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             }
             const items = [...byAsin.values()].filter((i) => i.title).slice(0, limit);
             if (items.length === 0)
-                log("listBuyAgain: no buy-again items");
+                console.log("listBuyAgain: no buy-again items");
             return { items, nextCursor: null };
         },
     });
@@ -1169,7 +1194,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const lek = doc.querySelector("input[name=lastEvaluatedKey]")?.getAttribute("value");
             const done = !!doc.querySelector("#endOfListMarker");
             if (items.length === 0 && !done)
-                log("listWishlistItems: no items parsed for " + id);
+                console.log("listWishlistItems: no items parsed for " + id);
             return { items, nextCursor: !done && lek ? lek : null };
         },
     });
@@ -1193,7 +1218,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     detailsText: clean(card.textContent),
                 };
             });
-            log("listSubscriptions: " + items.length + " cards");
+            console.log("listSubscriptions: " + items.length + " cards");
             return { items, nextCursor: null };
         },
     });
@@ -1216,7 +1241,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const renewalText = pairValue("Renewal Date");
             const lastPaymentText = pairValue("Last Payment");
             if (!plan && !renewalText) {
-                log("getPrimeMembership: no membership facts found");
+                console.log("getPrimeMembership: no membership facts found");
                 throw new Error("getPrimeMembership: no Prime membership found for this account");
             }
             return {
@@ -1247,7 +1272,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 return [{ name, url }];
             });
             if (items.length === 0)
-                log("listRankingCategories: no categories for " + list);
+                console.log("listRankingCategories: no categories for " + list);
             return { items, nextCursor: null };
         },
     });
@@ -1307,7 +1332,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     break;
             }
             if (items.length === 0)
-                log("listRankings: no ranked items for " + list);
+                console.log("listRankings: no ranked items for " + list);
             return { items: items.slice(0, limit), nextCursor: hasMore ? String(lastPage + 1) : null };
         },
     });

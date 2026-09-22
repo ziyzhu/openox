@@ -1,3 +1,28 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const normalizeGmailThreadId = (value) => {
     const normalized = cleanText(value);
     const numeric = normalized.match(/^#?thread-[A-Za-z]:(\d+)$/);
@@ -19,8 +44,7 @@ const normalizeGmailRecipients = (values) => {
     }
     return [...recipients.values()];
 };
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText } = lib;
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://mail.google.com";
     const MAIL_ROOT = `${ORIGIN}/mail/u/0/`;
     const BOOTSTRAP_URL = `${ORIGIN}/mail/_/bscframe`;
@@ -72,7 +96,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             email: String(entry[3]),
             primary: index === 0,
         }));
-        log(`listAccounts accounts=${accounts.length}`);
+        console.log(`listAccounts accounts=${accounts.length}`);
         return accounts;
     };
     const resolveAccount = async (accountId) => {
@@ -262,7 +286,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         const doc = await navigate(target, hash, context);
         const items = threadRows(doc).map((row) => threadSummary(row, accountId));
         const cursor = nextCursor(doc, hash);
-        log(`${target.kind} account=${accountId} route=${normalizedHash(hash).replace(/\/p\d+$/, "/p…")} items=${items.length} next=${cursor !== null}`);
+        console.log(`${target.kind} account=${accountId} route=${normalizedHash(hash).replace(/\/p\d+$/, "/p…")} items=${items.length} next=${cursor !== null}`);
         return { accountId, items, nextCursor: cursor };
     };
     const bodyText = (element) => String(element?.innerText || element?.textContent || "")
@@ -375,7 +399,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const messages = printableMessages(doc);
             if (messages.length === 0)
                 throw new Error("Gmail printable conversation contained no readable messages");
-            log(`getThread account=${accountId} mode=printable idLength=${id.length} messages=${messages.length}`);
+            console.log(`getThread account=${accountId} mode=printable idLength=${id.length} messages=${messages.length}`);
             return {
                 accountId,
                 id,
@@ -620,7 +644,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
     action("getSignInState", {
         async invoke() {
             const signedIn = await probeMailbox();
-            log(`getSignInState signedIn=${signedIn}`);
+            console.log(`getSignInState signedIn=${signedIn}`);
             return { signedIn };
         },
     });
@@ -669,7 +693,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 body: String(body ?? ""),
             });
             const draft = draftSnapshot(dialog, account.accountId);
-            log(`createDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
+            console.log(`createDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
             return { draft };
         },
     });
@@ -686,7 +710,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 ...(body === undefined ? {} : { body: String(body) }),
             });
             const draft = draftSnapshot(dialog, account.accountId);
-            log(`updateDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
+            console.log(`updateDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
             return { draft };
         },
     });
@@ -709,13 +733,13 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 || [...dialog.querySelectorAll('[role="button"]')].find((element) => cleanText(element.textContent) === "Send");
             if (!send)
                 throw new Error("Gmail Send button was unavailable");
-            log(`sendDraft controlVisible=${send.getClientRects().length > 0}`);
+            console.log(`sendDraft controlVisible=${send.getClientRects().length > 0}`);
             if (send.getClientRects().length > 0)
                 send.click();
             else
                 activate(send);
             await waitFor(() => !document.contains(dialog), "Gmail draft sent");
-            log(`sendDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
+            console.log(`sendDraft account=${account.accountId} idLength=${draft.id.length} recipients=${draft.to.length} subjectLength=${draft.subject.length} bodyLength=${draft.body.length}`);
             return {
                 accountId: account.accountId,
                 id: draft.id,
@@ -737,13 +761,13 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 || [...dialog.querySelectorAll('[role="button"]')].find((element) => cleanText(element.textContent) === "Discard draft");
             if (!discard)
                 throw new Error("Gmail Discard draft button was unavailable");
-            log(`discardDraft controlVisible=${discard.getClientRects().length > 0}`);
+            console.log(`discardDraft controlVisible=${discard.getClientRects().length > 0}`);
             if (discard.getClientRects().length > 0)
                 discard.click();
             else
                 activate(discard);
             await waitFor(() => !document.contains(dialog), "Gmail draft discarded");
-            log(`discardDraft account=${account.accountId} idLength=${identity.id.length}`);
+            console.log(`discardDraft account=${account.accountId} idLength=${identity.id.length}`);
             return {
                 accountId: account.accountId,
                 id: identity.id,

@@ -1,5 +1,29 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText } = lib;
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
     const eutils = async (fcgi, params) => {
         const qs = new URLSearchParams({ tool: "ox", ...params });
@@ -137,7 +161,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         async invoke() {
             const data = await eutilsJson("einfo.fcgi", {});
             const items = Array.isArray(data?.einforesult?.dblist) ? data.einforesult.dblist : [];
-            log(`listDatabases -> ${items.length}`);
+            console.log(`listDatabases -> ${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -153,7 +177,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             if (data?.code !== 0 || !Array.isArray(data?.suggestions))
                 throw new Error("suggestions returned an invalid response");
             const items = data.suggestions.filter((item) => typeof item === "string").slice(0, limit || 10);
-            log(`suggestSearchTerms "${query}" -> ${items.length}`);
+            console.log(`suggestSearchTerms "${query}" -> ${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -176,7 +200,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const items = await summarize(database, ids);
             const next = retstart + retmax;
             const nextCursor = next < count && items.length ? String(next) : null;
-            log(`search db=${database} "${query}" start=${retstart} -> ${items.length}/${count}`);
+            console.log(`search db=${database} "${query}" start=${retstart} -> ${items.length}/${count}`);
             return { items, count, nextCursor };
         },
     });
@@ -194,7 +218,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 const hasAbstract = Array.isArray(entry.attributes) && entry.attributes.includes("Has Abstract");
                 await enrichPubmedRecord(record, String(id), hasAbstract);
             }
-            log(`getRecord db=${database} id=${id}`);
+            console.log(`getRecord db=${database} id=${id}`);
             return record;
         },
     });
@@ -215,7 +239,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const links = linksetdbs.find((linkset) => linkset?.linkname === linkname)?.links;
             const ids = (Array.isArray(links) ? links.map(String) : []).filter((linkedId) => linkedId !== String(id));
             const items = await summarize("pubmed", ids);
-            log(`listRelatedArticles id=${id} kind=${relation} -> ${items.length}`);
+            console.log(`listRelatedArticles id=${id} kind=${relation} -> ${items.length}`);
             return { items, count: items.length, nextCursor: null };
         },
     });
@@ -273,12 +297,12 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     return { db, label, category, count };
                 }
                 catch (error) {
-                    log(`databaseCounts db=${db} failed: ${String(error?.message ?? error)}`);
+                    console.log(`databaseCounts db=${db} failed: ${String(error?.message ?? error)}`);
                     return { db, label, category, count: null };
                 }
             }));
             const matches = items.filter((item) => (item.count ?? 0) > 0).length;
-            log(`databaseCounts "${query}" -> ${matches}/${items.length} dbs with hits`);
+            console.log(`databaseCounts "${query}" -> ${matches}/${items.length} dbs with hits`);
             return { items, nextCursor: null };
         },
     });

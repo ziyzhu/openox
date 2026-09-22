@@ -20,7 +20,7 @@ nonisolated enum BuiltInSkills {
     }
 
     static func isReferenceName(_ name: String) -> Bool {
-        guard name.hasSuffix(".md") else { return false }
+        guard name.hasSuffix(".md") || name.hasSuffix(".js") else { return false }
         return SkillFiles.isLocalName(String(name.dropLast(3)))
     }
 

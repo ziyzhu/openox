@@ -148,17 +148,27 @@ final class APIService {
     const __handlers = new Map();
     let __installed = false;
     const window = Object.freeze({ ox: Object.freeze({ install(version, install) {
-      if (__installed || version !== 1 || typeof install !== 'function') throw new Error('Invalid API installer');
+      if (__installed || (version !== 1 && version !== 2) || typeof install !== 'function') throw new Error('Invalid API installer');
       __installed = true;
-      const result = install(Object.freeze({
-        action(name, handler) {
-          if (typeof name !== 'string' || __handlers.has(name) || typeof handler?.invoke !== 'function') throw new Error('Invalid API action');
-          __handlers.set(name, handler.invoke);
-        },
-        request: args => __apiRequest(args),
-        log: (...args) => console.log(...args),
-        lib: Object.freeze({ cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim() })
-      }));
+      const action = (name, handler) => {
+        if (typeof name !== 'string' || __handlers.has(name) || typeof handler?.invoke !== 'function') throw new Error('Invalid API action');
+        __handlers.set(name, handler.invoke);
+      };
+      const request = args => __apiRequest(args);
+      const api = version === 1
+        ? Object.freeze({
+          action,
+          request,
+          log: (...args) => console.log(...args),
+          lib: Object.freeze({ cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim() })
+        })
+        : new Proxy(Object.freeze({ action, request }), {
+          get(target, name) {
+            if (name in target) return target[name];
+            throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+          }
+        });
+      const result = install(api);
       if (result?.then) throw new Error('API installer must be synchronous');
     } }) });
     const __invokeAPI = async (name, args, declared) => {

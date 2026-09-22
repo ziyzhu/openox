@@ -1,3 +1,28 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.google.com";
 const normalizedUrl = (value) => {
     try {
@@ -129,8 +154,7 @@ function parseVideoResults(doc, limit, thumbnailFor) {
     }
     return items;
 }
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText } = lib;
+window.ox.install(2, ({ action }) => {
     const ensureSearchPage = (doc, responseUrl) => {
         const host = new URL(responseUrl, ORIGIN).hostname;
         if (host === "sorry.google.com" || doc.querySelector("form#captcha-form, form[action*='/sorry/']")) {
@@ -181,7 +205,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 throw new Error("Google news result markup was not recognized");
             const nextUrl = normalizedUrl(doc.querySelector("a#pnnext[href]")?.getAttribute("href") ?? "");
             const nextCursor = nextUrl ? new URL(nextUrl).searchParams.get("start") : null;
-            log(`searchNews queryChars=${query.length} items=${items.length}`);
+            console.log(`searchNews queryChars=${query.length} items=${items.length}`);
             return { items, nextCursor };
         },
     });
@@ -193,7 +217,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const items = parseImageResults(doc, boundedLimit(limit), thumbnailResolver());
             if (!items.length && !isExplicitlyEmpty(doc))
                 throw new Error("Google image result markup was not recognized");
-            log(`searchImages queryChars=${query.length} items=${items.length}`);
+            console.log(`searchImages queryChars=${query.length} items=${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -205,7 +229,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const items = parseVideoResults(doc, boundedLimit(limit), thumbnailResolver());
             if (!items.length && !isExplicitlyEmpty(doc))
                 throw new Error("Google video result markup was not recognized");
-            log(`searchVideos queryChars=${query.length} items=${items.length}`);
+            console.log(`searchVideos queryChars=${query.length} items=${items.length}`);
             return { items, nextCursor: null };
         },
     });

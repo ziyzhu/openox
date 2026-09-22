@@ -1,5 +1,32 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText, pageCursor } = lib;
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const token = (value) => {
         const normalized = String(value ?? "").trim();
         if (!/^[a-zA-Z0-9_-]+$/.test(normalized))
@@ -171,7 +198,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 offices: (data.offices ?? []).map(namedFilter),
                 url: String(data.board.public_url ?? ""),
             };
-            log(`greenhouse getJobBoard board=${token(board)} jobs=${result.totalJobs}`);
+            console.log(`greenhouse getJobBoard board=${token(board)} jobs=${result.totalJobs}`);
             return result;
         },
     });
@@ -179,7 +206,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         async invoke(args) {
             const data = await loadBoard(args);
             const result = jobPage(data);
-            log(`greenhouse listJobs board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
+            console.log(`greenhouse listJobs board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
             return result;
         },
     });
@@ -187,7 +214,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         async invoke(args) {
             const data = await loadBoard(args);
             const result = jobPage(data);
-            log(`greenhouse searchJobs board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
+            console.log(`greenhouse searchJobs board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
             return result;
         },
     });
@@ -219,7 +246,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 language: cleanText(post.language),
                 url: String(post.public_url ?? ""),
             };
-            log(`greenhouse getJob board=${boardName} id=${normalizedId}`);
+            console.log(`greenhouse getJob board=${boardName} id=${normalizedId}`);
             return result;
         },
     });
@@ -249,7 +276,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     }
                     : null,
             };
-            log(`greenhouse getJobQuestions board=${boardName} id=${normalizedId} questions=${result.questions.length}`);
+            console.log(`greenhouse getJobQuestions board=${boardName} id=${normalizedId} questions=${result.questions.length}`);
             return result;
         },
     });
@@ -268,7 +295,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 totalJobs: (data?.jobs ?? []).length,
                 url: url.href,
             };
-            log(`greenhouse getDepartment board=${boardName} id=${normalizedId} jobs=${result.totalJobs}`);
+            console.log(`greenhouse getDepartment board=${boardName} id=${normalizedId} jobs=${result.totalJobs}`);
             return result;
         },
     });
@@ -290,7 +317,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 totalJobs: jobs.size,
                 url: url.href,
             };
-            log(`greenhouse getOffice board=${boardName} id=${normalizedId} jobs=${result.totalJobs}`);
+            console.log(`greenhouse getOffice board=${boardName} id=${normalizedId} jobs=${result.totalJobs}`);
             return result;
         },
     });
@@ -302,7 +329,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 items: (data?.sections ?? []).map(section),
                 nextCursor: null,
             };
-            log(`greenhouse listSections board=${boardName} sections=${result.items.length}`);
+            console.log(`greenhouse listSections board=${boardName} sections=${result.items.length}`);
             return result;
         },
     });
@@ -311,7 +338,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const boardName = token(board);
             const normalizedId = resourceId(id, "section");
             const result = section(await fetchJson(apiUrl(boardName, `sections/${encodeURIComponent(normalizedId)}`).href));
-            log(`greenhouse getSection board=${boardName} id=${normalizedId} posts=${result.posts.length}`);
+            console.log(`greenhouse getSection board=${boardName} id=${normalizedId} posts=${result.posts.length}`);
             return result;
         },
     });
@@ -323,7 +350,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         action(actionId, {
             async invoke(args) {
                 const result = await educationPage(kind, args);
-                log(`greenhouse ${actionId} board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
+                console.log(`greenhouse ${actionId} board=${token(args.board)} items=${result.items.length} next=${result.nextCursor !== null}`);
                 return result;
             },
         });

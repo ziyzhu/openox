@@ -1,5 +1,38 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cookie } = lib;
+const cookie = name => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+};
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://mixpanel.com";
     const readJson = async (response, path) => {
         const text = await response.text();
@@ -122,19 +155,19 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 headers: { accept: "application/json" },
             });
             if (response.status === 401 || response.status === 403 || response.redirected || response.url.includes("/login")) {
-                log(`getSignInState: status=${response.status} signedIn=false`);
+                console.log(`getSignInState: status=${response.status} signedIn=false`);
                 return { signedIn: false };
             }
             const contentType = response.headers.get("content-type") ?? "";
             if (!contentType.includes("json")) {
-                log(`getSignInState: status=${response.status} contentType=${contentType} signedIn=false`);
+                console.log(`getSignInState: status=${response.status} contentType=${contentType} signedIn=false`);
                 return { signedIn: false };
             }
             const json = await response.json();
             if (!response.ok)
                 throw new Error(`Mixpanel sign-in check failed (HTTP ${response.status})`);
             const signedIn = json?.status === "ok" && Boolean(json?.results?.user_id);
-            log(`getSignInState: status=${response.status} signedIn=${signedIn}`);
+            console.log(`getSignInState: status=${response.status} signedIn=${signedIn}`);
             return { signedIn };
         },
     });
@@ -159,7 +192,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 role: nullableText(project?.role),
                 demo: Boolean(project?.is_demo),
             }));
-            log(`listProjects: ${items.length} projects`);
+            console.log(`listProjects: ${items.length} projects`);
             return { items, nextCursor: null };
         },
     });
@@ -177,7 +210,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 default: Boolean(workspace?.is_default),
                 restricted: Boolean(workspace?.is_restricted),
             }));
-            log(`listWorkspaces: ${items.length} workspaces`);
+            console.log(`listWorkspaces: ${items.length} workspaces`);
             return { items, nextCursor: null };
         },
     });
@@ -188,7 +221,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 projectIdForWorkspace(workspaceId),
             ]);
             const items = (Array.isArray(results) ? results : []).map((dashboard) => dashboardRow(dashboard, workspaceId, projectId));
-            log(`listDashboards: workspace=${workspaceId} dashboards=${items.length}`);
+            console.log(`listDashboards: workspace=${workspaceId} dashboards=${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -199,7 +232,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 projectIdForWorkspace(workspaceId),
             ]);
             const reports = asEntries(dashboard?.contents?.report).map(([, report]) => reportRow(report));
-            log(`getDashboard: workspace=${workspaceId} dashboard=${id} reports=${reports.length}`);
+            console.log(`getDashboard: workspace=${workspaceId} dashboard=${id} reports=${reports.length}`);
             return { ...dashboardRow(dashboard, workspaceId, projectId), reports };
         },
     });
@@ -234,7 +267,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 requestUrl,
                 headers: { "bookmark-id": id },
             });
-            log(`getReportData: project=${projectId} dashboard=${dashboardId} report=${id}`);
+            console.log(`getReportData: project=${projectId} dashboard=${dashboardId} report=${id}`);
             return {
                 id,
                 name: String(report?.name ?? ""),
@@ -263,7 +296,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 firstSeenAt: nullableText(event?.createdUTC),
                 modifiedAt: nullableText(event?.modifiedUTC ?? event?.lastModified),
             }));
-            log(`listEventDefinitions: project=${projectId} events=${items.length}`);
+            console.log(`listEventDefinitions: project=${projectId} events=${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -315,7 +348,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 })),
             }));
             const nextCursor = results?.sentinel_event ? JSON.stringify(results.sentinel_event) : null;
-            log(`searchEvents: project=${projectId} query=${JSON.stringify(query)} events=${items.length} next=${nextCursor !== null}`);
+            console.log(`searchEvents: project=${projectId} query=${JSON.stringify(query)} events=${items.length} next=${nextCursor !== null}`);
             return { items, nextCursor };
         },
     });

@@ -1,6 +1,4 @@
 (() => {
-  const abiVersion = 1;
-
   const cookie = name => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
@@ -113,7 +111,6 @@
   };
 
   window.__openOxCreateServiceRuntime = domain => {
-    installFetchCapture(window);
     const actions = new Map();
     let installed = false;
     const log = message => {
@@ -156,10 +153,19 @@
     };
     const install = (version, installer) => {
       if (installed || actions.size > 0) throw new Error("service installer may run only once");
-      if (version !== abiVersion) throw new Error(`unsupported service action ABI: ${version}`);
+      if (version !== 1 && version !== 2) throw new Error(`unsupported service action ABI: ${version}`);
       if (typeof installer !== "function") throw new Error("service installer must be a function");
       try {
-        const result = installer({ action, retryFetch, log, lib });
+        if (version === 1) installFetchCapture(window);
+        const api = version === 1
+          ? { action, retryFetch, log, lib }
+          : new Proxy(Object.freeze({ action }), {
+            get(target, name) {
+              if (name in target) return target[name];
+              throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+            },
+          });
+        const result = installer(api);
         if (result && typeof result.then === "function") throw new Error("service installer must be synchronous");
         installed = true;
       } catch (error) {

@@ -122,7 +122,9 @@ final class ServiceManager {
     nonisolated static let legacyAutoApproveAllKey = "autoApproveAll"
     nonisolated static let remoteMCPKey = "remoteMCPServers"
     func makeHandoffPageConfiguration(for _: String) -> WebPage.Configuration {
-        websiteData.makePageConfiguration()
+        var configuration = websiteData.makePageConfiguration()
+        configuration.defaultNavigationPreferences.preferredContentMode = .recommended
+        return configuration
     }
 
     func makeServicePageConfiguration(for _: String) -> WebPage.Configuration {
@@ -784,7 +786,7 @@ final class ServiceManager {
               install(version, installer) {
                 this.__installations++;
                 if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (version !== 1) throw new Error(`unsupported service action ABI: ${version}`);
+                if (version !== 1 && version !== 2) throw new Error(`unsupported service action ABI: ${version}`);
                 if (typeof installer !== "function") throw new Error("service installer must be a function");
                 const names = this.__registered;
                 const action = (name, definition) => {
@@ -794,7 +796,7 @@ final class ServiceManager {
                   names.push(name);
                 };
                 const unavailable = () => { throw new Error("not callable during registration validation"); };
-                const result = installer({
+                const legacy = {
                   action,
                   retryFetch: unavailable,
                   request: unavailable,
@@ -804,7 +806,17 @@ final class ServiceManager {
                     cleanText: value => String(value ?? "").replace(/\s+/g, " ").trim(),
                     pageCursor: (value, firstPage) => Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage),
                   },
-                });
+                };
+                const api = version === 1 ? legacy : new Proxy(
+                  Object.freeze(\#(kind == .api ? "true" : "false") ? { action, request: unavailable } : { action }),
+                  {
+                    get(target, name) {
+                      if (name in target) return target[name];
+                      throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+                    },
+                  }
+                );
+                const result = installer(api);
                 if (result && typeof result.then === "function") throw new Error("service installer must be synchronous");
               },
             };

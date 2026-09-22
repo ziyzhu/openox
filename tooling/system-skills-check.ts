@@ -7,7 +7,7 @@ const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"];
 const expectedReferences = new Map([
   ["manage-artifacts", ["canvas.md", "note.md"]],
-  ["manage-services", ["api-service.md", "web-service.md"]],
+  ["manage-services", ["api-service.md", "helpers.js", "web-service.md"]],
   ["manage-skills", ["service-skill.md", "user-skill.md"]],
 ]);
 
@@ -74,7 +74,7 @@ export async function validateSystemSkills(): Promise<number> {
         failures.push(`${directory.name}: expected references ${expected.join(", ")}; found ${references.join(", ")}`);
       }
       for (const reference of references) {
-        if (!reference.endsWith(".md") || !localName.test(reference.slice(0, -3))) {
+        if (!(reference.endsWith(".md") || reference.endsWith(".js")) || !localName.test(reference.slice(0, -3))) {
           failures.push(`${directory.name}: invalid reference name ${reference}`);
         }
         if (!(await readFile(join(referencesRoot, reference), "utf8")).trim()) {

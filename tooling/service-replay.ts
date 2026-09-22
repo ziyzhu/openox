@@ -104,11 +104,13 @@ async function waitForRegistry(endpoint: string, expectedDomain?: string): Promi
     const result = await runOnce({ kind: "sync-mono-repository", id: crypto.randomUUID() }, 5_000, endpoint);
     if (result.ok && typeof result.head === "string" && result.head && Number(result.services) > 0) {
       if (!expectedDomain) return;
-      const status = await runOnce({ kind: "list-services", id: crypto.randomUUID() }, 5_000, endpoint);
+      const status = await runOnce({ kind: "list-services", id: crypto.randomUUID() }, 30_000, endpoint);
       const services = status.ok && Array.isArray(status.services) ? status.services : [];
       if (services.some((service) => service?.domain === expectedDomain)) return;
+      detail = status.ok ? `service ${expectedDomain} is not listed` : status.error;
+    } else {
+      detail = result.ok ? `head=${String(result.head)} services=${String(result.services)}` : result.error;
     }
-    detail = result.ok ? `head=${String(result.head)} services=${String(result.services)}` : result.error;
     await Bun.sleep(100);
   }
   throw new Error(`Registry did not become ready through ${endpoint}: ${detail}`);

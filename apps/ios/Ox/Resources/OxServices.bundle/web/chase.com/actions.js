@@ -1,5 +1,30 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { pageCursor } = lib;
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const START_URL = "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase";
     const GATEWAY = "https://secure.chase.com/svc/wr/profile/l4/gateway/chase-travel/loyalty/bank-rewards/cte-app/v1";
     const uuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -120,14 +145,14 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     headers: jpmcHeaders(),
                 });
                 const signedIn = r.ok;
-                log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
+                console.log(`getSignInState: status=${r.status} signedIn=${signedIn}`);
                 if (!signedIn && r.status !== 401 && r.status !== 403) {
                     throw new Error(`getSignInState HTTP ${r.status}`);
                 }
                 return { signedIn };
             }
             catch (e) {
-                log("getSignInState: " + (e?.message ?? String(e)));
+                console.log("getSignInState: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -139,7 +164,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 const j = await get("/travel-profiles?all-accounts-hidden-indicator=true");
                 const accts = Array.isArray(j?.accounts) ? j.accounts : [];
                 accountsCache = accts;
-                log(`getTravelProfile: ${accts.length} accounts`);
+                console.log(`getTravelProfile: ${accts.length} accounts`);
                 return {
                     loyaltyProfileIdentifier: j?.loyaltyProfileIdentifier ?? null,
                     enterprisePartyIdentifier: j?.enterprisePartyIdentifier ?? null,
@@ -155,7 +180,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getTravelProfile: " + (e?.message ?? String(e)));
+                console.log("getTravelProfile: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -168,7 +193,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     throw new Error("no digitalAccountIdentifier available");
                 const j = await get(`/statement-credits?digital-account-identifier=${id}`);
                 const credits = Array.isArray(j?.statementCredits) ? j.statementCredits : [];
-                log(`getStatementCredits: account=${id} total=${j?.availableStatementCreditAmount ?? "?"} count=${credits.length}`);
+                console.log(`getStatementCredits: account=${id} total=${j?.availableStatementCreditAmount ?? "?"} count=${credits.length}`);
                 return {
                     availableStatementCreditAmount: j?.availableStatementCreditAmount ?? null,
                     rewardsAnniversaryDate: j?.rewardsAnniversaryDate ?? null,
@@ -183,7 +208,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getStatementCredits: " + (e?.message ?? String(e)));
+                console.log("getStatementCredits: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -195,11 +220,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 const ps = limit ?? 50;
                 const j = await get(`/proxy/api/mytrip/v1.0/native/trip?pagenumber=${pn}&pagesize=${ps}&tripType=${tripType ?? "Upcoming"}`);
                 const items = firstArray(j, ["trips", "items", "results"]).map(trip);
-                log(`listTrips: ${items.length} trips (${tripType ?? "Upcoming"} page ${pn})`);
+                console.log(`listTrips: ${items.length} trips (${tripType ?? "Upcoming"} page ${pn})`);
                 return { items, nextCursor: nextCursor(items, pn, ps) };
             }
             catch (e) {
-                log("listTrips: " + (e?.message ?? String(e)));
+                console.log("listTrips: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -209,11 +234,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             try {
                 const j = await get("/hotel/search/recent");
                 const items = firstArray(j, ["s", "searches", "items", "results"]).map(recentHotelSearch);
-                log(`listRecentHotelSearches: ${items.length} items`);
+                console.log(`listRecentHotelSearches: ${items.length} items`);
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listRecentHotelSearches: " + (e?.message ?? String(e)));
+                console.log("listRecentHotelSearches: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -223,11 +248,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             try {
                 const j = await get("/flight/search/recent");
                 const items = firstArray(j, ["locations", "searches", "items", "results"]).map(recentFlightSearch);
-                log(`listRecentFlightSearches: ${items.length} items`);
+                console.log(`listRecentFlightSearches: ${items.length} items`);
                 return { items, nextCursor: null };
             }
             catch (e) {
-                log("listRecentFlightSearches: " + (e?.message ?? String(e)));
+                console.log("listRecentFlightSearches: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -240,11 +265,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 const j = await get(`/proxy/api/orxe/v1.0/deals/dealFinder?searchCriteria.campaignId=blt6eba58b817284826` +
                     `&searchCriteria.identifier=dealList&pagination.pageNumber=${pn}&pagination.pageSize=${ps}`);
                 const items = firstArray(j, ["deals", "items", "results"]).map(deal);
-                log(`listDeals: ${items.length} deals (page ${pn})`);
+                console.log(`listDeals: ${items.length} deals (page ${pn})`);
                 return { items, nextCursor: nextCursor(items, pn, ps) };
             }
             catch (e) {
-                log("listDeals: " + (e?.message ?? String(e)));
+                console.log("listDeals: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -268,7 +293,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 });
                 const sid = created?.sid ?? created?.searchId ?? created?.sessionId ?? created?.id ??
                     created?.data?.sid ?? null;
-                log(`searchHotels: created sid=${sid ?? "?"} keys=${Object.keys(created ?? {}).join(",")}`);
+                console.log(`searchHotels: created sid=${sid ?? "?"} keys=${Object.keys(created ?? {}).join(",")}`);
                 if (!sid)
                     throw new Error("no search session id in create response");
                 const pn = pageCursor(cursor, 1);
@@ -286,11 +311,11 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     lm: null,
                 });
                 const items = firstArray(j, ["h", "hotels", "results", "items", "data"]).map(hotel);
-                log(`searchHotels: ${items.length} hotels (page ${pn})`);
+                console.log(`searchHotels: ${items.length} hotels (page ${pn})`);
                 return { sid, items, nextCursor: nextCursor(items, pn, ps) };
             }
             catch (e) {
-                log("searchHotels: " + (e?.message ?? String(e)));
+                console.log("searchHotels: " + (e?.message ?? String(e)));
                 throw e;
             }
         },
@@ -299,7 +324,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
         async invoke() {
             try {
                 const j = await get("/checkout/cartcount");
-                log(`getCartCount: ${j?.totalItems ?? j?.numberOfItems ?? "?"}`);
+                console.log(`getCartCount: ${j?.totalItems ?? j?.numberOfItems ?? "?"}`);
                 return {
                     numberOfItems: j?.numberOfItems ?? null,
                     numberOfAddOnItems: j?.numberOfAddOnItems ?? null,
@@ -307,7 +332,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 };
             }
             catch (e) {
-                log("getCartCount: " + (e?.message ?? String(e)));
+                console.log("getCartCount: " + (e?.message ?? String(e)));
                 throw e;
             }
         },

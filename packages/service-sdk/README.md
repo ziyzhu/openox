@@ -1,6 +1,6 @@
 # OpenOx Service SDK
 
-`@openox/service-sdk` provides the schemas, validators, action contracts, helpers, and replay tooling used by Ox services.
+`@openox/service-sdk` provides the schemas, validators, action contracts, and replay tooling used by Ox services.
 
 The SDK requires Bun 1.3 or newer.
 
@@ -11,16 +11,18 @@ bun add @openox/service-sdk
 Ox-authored web services use one plain-JavaScript installer format in Local and official repositories:
 
 ```js
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+window.ox.install(2, ({ action }) => {
   action("example", {
     async invoke(args) {
-      return { value: lib.cleanText(args.value) };
+      return { value: cleanText(args.value) };
     },
   });
 });
 ```
 
-The app injects the versioned runtime and action library before evaluating each service. The official service collection is published separately as `@openox/services`.
+The app injects the versioned dispatcher before evaluating each service. New web installers receive only `action`; convenience functions belong in each service's `actions.js`. The `action-lib` SDK export and ABI 1 installer remain available for legacy sources, but `action-lib` is not importable from a service WebView. The official service collection is published separately as `@openox/services`.
 
 ## Release
 
@@ -42,8 +44,8 @@ Supported auth types are `none`, `apiKey` (header or query), `http` (basic or be
 and `oauth2` (authorization code with S256 PKCE and a registered app callback).
 Only public configuration belongs in the manifest; the Host stores credentials.
 
-API installers use the same `window.ox.install(1, installer)` registration shape.
-They receive `action`, `request`, `log`, and `lib.cleanText`. The asynchronous
+API installers use `window.ox.install(2, installer)` and receive only `action`
+and `request`. ABI 1 remains supported for existing API sources. The asynchronous
 `request({ path, method?, query?, json? })` function performs a bounded request
 within the configured API base URL and returns parsed JSON. The Host injects
 credentials only when the action declares `requireAuth: true`. Writes require

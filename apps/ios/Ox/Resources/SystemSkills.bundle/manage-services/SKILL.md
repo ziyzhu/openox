@@ -9,6 +9,8 @@ Use existing services normally without this skill unless their definitions must 
 
 Read `skills/system:manage-services/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
+For web-service authoring, read `skills/system:manage-services/references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
+
 Read `skills/system:manage-services/references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
 ## Ownership and safeguards

@@ -61,7 +61,7 @@
     __oxRuntime.callServiceAction = __oxRuntimeCallServiceAction;
   }
   if (typeof __oxLegacyCall !== "function") throw new Error("legacy service dispatcher is unavailable");
-  window.ox.install(1, ({ action }) => {
+  window.ox.install(2, ({ action }) => {
   action("getSignInUrl", { async invoke(args) { return __oxLegacyCall("getSignInUrl", args); } });
   action("getSignInState", { async invoke(args) { return __oxLegacyCall("getSignInState", args); } });
   action("listFolders", { async invoke(args) { return __oxLegacyCall("listFolders", args); } });

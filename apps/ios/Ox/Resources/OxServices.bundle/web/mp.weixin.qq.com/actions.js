@@ -1,3 +1,28 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ARTICLE_PATH = /^\/s\/[A-Za-z0-9_-]+$/;
 const IMAGE_HOST = "mmbiz.qpic.cn";
 const BLOCK_TAGS = new Set([
@@ -68,8 +93,7 @@ const articleText = (root, indexes) => {
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 };
-window.ox.install(1, ({ action, retryFetch, lib }) => {
-    const { cleanText } = lib;
+window.ox.install(2, ({ action }) => {
     action("getArticle", {
         async invoke({ url: inputUrl }) {
             const requestedUrl = articleUrl(inputUrl);

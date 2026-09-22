@@ -22,7 +22,7 @@ Mark authenticated capabilities `requireAuth: true`; public capabilities can use
 ## Handlers
 
 ```js
-window.ox.install(1, ({ action, request }) => {
+window.ox.install(2, ({ action, request }) => {
   action("listItems", {
     async invoke({ cursor, limit = 50 }) {
       const page = await request({
@@ -42,7 +42,7 @@ window.ox.install(1, ({ action, request }) => {
 
 Declare approval for mutations. The Host rejects POST, PUT, PATCH, and DELETE from capabilities without `requireApproval: true`. It does not retry requests automatically or follow redirects. HTTP and decoding failures throw. Never blindly repeat a mutation after an uncertain result; inspect resulting state first.
 
-Install synchronously exactly once and register every declared action exactly once. Keep work inside handlers. `log` and `lib.cleanText` are available. Return narrow results matching output schemas; use actual server pagination cursors. Tokens and authorization headers are unavailable to handlers.
+Install synchronously exactly once and register every declared action exactly once. Keep work inside handlers. The installer passes only `action` and `request`; put any text helpers directly in `actions.js` and use `console.log` for diagnostics. Return narrow results matching output schemas; use actual server pagination cursors. Tokens and authorization headers are unavailable to handlers.
 
 ## Workflow
 

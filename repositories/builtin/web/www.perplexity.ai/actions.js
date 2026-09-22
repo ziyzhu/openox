@@ -1,4 +1,27 @@
-window.ox.install(1, ({ action, retryFetch, log }) => {
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://www.perplexity.ai";
     const VERSION = "2.18";
     const SUPPORTED_BLOCKS = [
@@ -168,7 +191,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
         async invoke() {
             const session = await getSession();
             const signedIn = !!session?.user?.id;
-            log(`getSignInState signedIn=${signedIn}`);
+            console.log(`getSignInState signedIn=${signedIn}`);
             return { signedIn };
         },
     });
@@ -244,7 +267,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 ? thread.entries.find((candidate) => candidate?.uuid === streamed.id) || thread.entries.at(-1)
                 : null;
             const answer = entry ? answerFrom(entry, streamed.threadId) : streamed;
-            log(`askQuestion status=${answer.status} sources=${answer.sources.length} places=${answer.places.length}`);
+            console.log(`askQuestion status=${answer.status} sources=${answer.sources.length} places=${answer.places.length}`);
             return answer;
         },
     });
@@ -265,7 +288,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 answerPreview: typeof thread.answer_preview === "string" ? thread.answer_preview : null,
                 url: `${ORIGIN}/search/${encodeURIComponent(thread.uuid)}`,
             }));
-            log(`listThreads items=${items.length}`);
+            console.log(`listThreads items=${items.length}`);
             return { items, nextCursor: null };
         },
     });
@@ -287,7 +310,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 nextCursor: data.next_cursor == null ? null : String(data.next_cursor),
                 url: `${ORIGIN}/search/${encodeURIComponent(id)}`,
             };
-            log(`getThread entries=${result.entries.length} next=${result.nextCursor !== null}`);
+            console.log(`getThread entries=${result.entries.length} next=${result.nextCursor !== null}`);
             return result;
         },
     });

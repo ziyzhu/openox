@@ -1,7 +1,10 @@
-export interface ActionInstallApi {
+export interface ActionRegistrationApi {
   action: (name: string, def: {
     invoke: (args: any) => unknown | Promise<unknown>;
   }) => void;
+}
+
+export interface LegacyActionInstallApi extends ActionRegistrationApi {
   retryFetch: (
     input: RequestInfo | string,
     init?: RequestInit,
@@ -15,4 +18,14 @@ export interface ActionInstallApi {
   };
 }
 
-export type ActionInstaller = (api: ActionInstallApi) => void;
+export type ActionInstallApi = LegacyActionInstallApi;
+export type ActionInstaller = (api: LegacyActionInstallApi) => void;
+export type WebActionInstaller = (api: ActionRegistrationApi) => void;
+export type APIActionInstaller = (api: ActionRegistrationApi & {
+  request: (args: {
+    path: string;
+    method?: string;
+    query?: Record<string, string | number | boolean | null | undefined>;
+    json?: unknown;
+  }) => Promise<unknown>;
+}) => void;

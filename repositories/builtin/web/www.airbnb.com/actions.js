@@ -1,3 +1,28 @@
+const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.airbnb.com";
 const API_KEY = "d306zoyjsyarp7ifhu67rjxn52tv0t20";
 const HASHES = {
@@ -88,8 +113,7 @@ const transactionKey = (args) => [
 ].join(":");
 const COMPLETED_RESERVATIONS_KEY = "ox.airbnb.completedReservations.v1";
 const ACTIVE_RESERVATION_KEY = "ox.airbnb.activeReservation.v1";
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { cleanText } = lib;
+window.ox.install(2, ({ action }) => {
     const requestGet = async (operationName, hash, variables) => {
         const params = new URLSearchParams({
             operationName,
@@ -267,7 +291,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const cursors = results?.paginationInfo?.pageCursors ?? [];
             const index = cursor ? cursors.indexOf(cursor) : 0;
             const nextCursor = index >= 0 && index + 1 < cursors.length ? cursors[index + 1] : null;
-            log(`searchStays ${scalarText(query)}: ${items.length} results`);
+            console.log(`searchStays ${scalarText(query)}: ${items.length} results`);
             return { items, nextCursor };
         },
     });
@@ -333,7 +357,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 longitude: Number.isFinite(Number(node?.location?.coordinate?.longitude)) ? Number(node.location.coordinate.longitude) : null,
                 imageUrls: (pdp?.heroMedia?.edges ?? []).map((edge) => scalarText(edge?.node?.image?.uri)).filter(Boolean),
             };
-            log(`getStay ${listingId}: ${output.name}`);
+            console.log(`getStay ${listingId}: ${output.name}`);
             return output;
         },
     });
@@ -369,7 +393,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     priceText: day?.price?.localPriceFormatted ? scalarText(day.price.localPriceFormatted) : null,
                 })),
             }));
-            log(`getStayAvailability ${listingId}: ${calendarMonths.length} months`);
+            console.log(`getStayAvailability ${listingId}: ${calendarMonths.length} months`);
             return { id: listingId, months: calendarMonths };
         },
     });
@@ -408,7 +432,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             const total = Number(reviews?.metadata?.reviewsCount);
             const nextOffset = offset + items.length;
             const nextCursor = items.length && Number.isFinite(total) && nextOffset < total ? String(nextOffset) : null;
-            log(`listStayReviews ${listingId} offset ${offset}: ${items.length} reviews`);
+            console.log(`listStayReviews ${listingId} offset ${offset}: ${items.length} reviews`);
             return { items, nextCursor };
         },
     });
@@ -449,7 +473,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 completed[key] = { reference, completedAt };
                 localStorage.setItem(COMPLETED_RESERVATIONS_KEY, JSON.stringify(completed));
                 localStorage.removeItem(ACTIVE_RESERVATION_KEY);
-                log(`getPaymentState: confirmed reservation ${reference}`);
+                console.log(`getPaymentState: confirmed reservation ${reference}`);
                 return { status: "completed", reference };
             }
             let completed = {};
@@ -538,7 +562,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     imageUrl: service?.picture?.picture ? String(service.picture.picture) : null,
                 };
             }).filter((service) => !needle || `${service.name} ${service.category} ${service.description}`.toLowerCase().includes(needle)).slice(0, limit);
-            log(`searchServices ${scalarText(query)}: ${items.length} results`);
+            console.log(`searchServices ${scalarText(query)}: ${items.length} results`);
             return { items, nextCursor: results?.paginationInfo?.nextPageCursor ?? null };
         },
     });
@@ -555,7 +579,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 throw new Error("Airbnb trips are unavailable. Sign in and retry.");
             const items = (trips?.edges ?? []).map((edge) => tripRow(edge?.node));
             const pageInfo = trips?.pageInfo ?? {};
-            log(`listTrips ${kind}: ${items.length} trips`);
+            console.log(`listTrips ${kind}: ${items.length} trips`);
             return {
                 items,
                 nextCursor: pageInfo?.hasNextPage ? pageInfo?.endCursor ?? null : null,
@@ -607,7 +631,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 url: `${ORIGIN}/trips/v1/${encodeURIComponent(numericId(String(trip.id)))}`,
                 messageUrl: reservation?.bookingSession?.threadId ? `${ORIGIN}/messaging/threads/${encodeURIComponent(String(reservation.bookingSession.threadId))}` : null,
             };
-            log(`getTrip ${numericId(String(trip.id))}: ${output.status}`);
+            console.log(`getTrip ${numericId(String(trip.id))}: ${output.status}`);
             return output;
         },
     });
@@ -661,7 +685,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                     imageUrl: wishlist?.xlImageUrl ? String(wishlist.xlImageUrl) : null,
                 };
             });
-            log(`listWishlists offset ${offset}: ${items.length} wishlists`);
+            console.log(`listWishlists offset ${offset}: ${items.length} wishlists`);
             return {
                 items,
                 nextCursor: items.length === limit ? String(offset + items.length) : null,

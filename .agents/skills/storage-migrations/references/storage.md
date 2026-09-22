@@ -287,6 +287,8 @@ mounts:
 skills/
 ├── <skill-name>/SKILL.md                        read-write, active Profile
 ├── system:<skill-name>/SKILL.md                 read-only, app-owned
+├── system:<skill-name>/references/<name>.md     read-only, app-owned
+├── system:<skill-name>/references/<name>.js     read-only, app-owned authoring source
 └── service:<domain>:<skill-name>/SKILL.md       read-only, attached service
 
 services/
@@ -309,6 +311,8 @@ hidden and read-only; Local exposes its additional source files at the same
 `chats/<chat-uuid>/context.json`, and unrelated vault contents are not
 addressable. The chat mount returns the canonical files already persisted by
 `ProfileRepository`; it does not introduce a second transcript representation.
+System-skill JavaScript references are readable as source by the agent, but are not installed,
+importable, or resolvable from a service action runtime.
 Unscoped root grep excludes chat files, while an explicit `chats` path searches
 JSONL records with a separate bounded byte budget and match-centered excerpts.
 Reads and searches are bounded; writes are atomic; writes and edits to the same
@@ -427,6 +431,12 @@ Their paths and encoding are unchanged. Local discovery validates repository
 metadata separately from draft contents and retains source access for repairing
 invalid drafts; incomplete services do not make the entire Local repository
 unavailable. Read-only repositories still require valid service file structure.
+Service `actions.js` installers accept ABI 1 and ABI 2. ABI 1 retains its original
+web and API helper inputs for existing Local and installed repositories; ABI 2
+accepts only `action` for web and `action` plus `request` for API. The app does not
+rewrite user-owned Local source during upgrade. A Local service explicitly saved
+with ABI 2 cannot run in an older app build that understands only ABI 1; that
+older build rejects the unsupported installer instead of interpreting it as ABI 1.
 `ox.service.validate` checks a complete Local draft, including file structure,
 manifest, action registration, declared skills, and service size limits. The same
 validator runs before Save and before loading Local source for a caller. Failed

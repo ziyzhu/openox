@@ -1,10 +1,33 @@
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
 const ORIGIN = "https://www.usta.com";
 const ACCOUNT = "https://account.usta.com";
 const IDP_CLIENT_ID = "HEXVBay49tf4e8kEksXqDCcRNrUjxTM1";
 const SERVICES = "https://services.usta.com";
 const PLAYTENNIS = "https://playtennis.usta.com";
 const SEARCH = "https://prd-usta-kube.clubspark.pro/unified-search-api/api/Search/tournaments/Query?indexSchema=tournament";
-window.ox.install(1, ({ action, retryFetch, log }) => {
+window.ox.install(2, ({ action }) => {
     const apiJson = async (url, init) => {
         const r = await retryFetch(url, { credentials: "include", ...init });
         const text = await r.text();
@@ -58,25 +81,25 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 state,
             });
             const url = `${ACCOUNT}/authorize?${params}`;
-            log(`getSignInUrl -> ${url}`);
+            console.log(`getSignInUrl -> ${url}`);
             return { url };
         },
     });
     action("getSignInState", {
         async invoke() {
             if (!accessToken()) {
-                log("getSignInState signedIn=false (no access token)");
+                console.log("getSignInState signedIn=false (no access token)");
                 return { signedIn: false };
             }
             try {
                 const profile = await meGet("/v1/customers/me");
                 const signedIn = Boolean(profile?.uaid || profile?.email);
-                log(`getSignInState signedIn=${signedIn}`);
+                console.log(`getSignInState signedIn=${signedIn}`);
                 return { signedIn };
             }
             catch (e) {
                 const message = String(e?.message ?? e);
-                log(`getSignInState failed (${message})`);
+                console.log(`getSignInState failed (${message})`);
                 if (/HTTP (?:401|403)\b/.test(message))
                     return { signedIn: false };
                 throw e;
@@ -231,5 +254,5 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             return { status: s, items: items.map(matchRow), nextCursor: null };
         },
     });
-    log("usta actions installed");
+    console.log("usta actions installed");
 });

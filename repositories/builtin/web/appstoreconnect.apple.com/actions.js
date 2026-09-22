@@ -1,4 +1,27 @@
-window.ox.install(1, ({ action, retryFetch, log }) => {
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://appstoreconnect.apple.com";
     const JSON_HEADERS = {
         Accept: "application/vnd.api+json, application/json",
@@ -181,7 +204,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             const included = includedById(body);
             const items = (body?.data ?? []).map((item) => mapApp(item, included));
             const nextCursor = cursorFrom(body);
-            log(`listApps: ${items.length} apps, next=${nextCursor ?? "end"}`);
+            console.log(`listApps: ${items.length} apps, next=${nextCursor ?? "end"}`);
             return { items, nextCursor };
         },
     });
@@ -196,7 +219,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             if (!body?.data)
                 throw new Error(`App not found: ${id}`);
             const result = mapApp(body?.data, includedById(body));
-            log(`getApp: ${result.id} ${result.name}`);
+            console.log(`getApp: ${result.id} ${result.name}`);
             return result;
         },
     });
@@ -219,7 +242,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 platform: String(item?.attributes?.platform ?? ""),
             }));
             const nextCursor = cursorFrom(body);
-            log(`listPreReleaseVersions ${appId}: ${items.length}, next=${nextCursor ?? "end"}`);
+            console.log(`listPreReleaseVersions ${appId}: ${items.length}, next=${nextCursor ?? "end"}`);
             return { items, nextCursor };
         },
     });
@@ -242,7 +265,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
             const included = includedById(body);
             const items = (body?.data ?? []).map((item) => mapBuild(item, included));
             const nextCursor = cursorFrom(body);
-            log(`listBuilds ${appId}: ${items.length}, next=${nextCursor ?? "end"}`);
+            console.log(`listBuilds ${appId}: ${items.length}, next=${nextCursor ?? "end"}`);
             return { items, nextCursor };
         },
     });
@@ -264,7 +287,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                     createdAt: attributes.createdDate == null ? null : String(attributes.createdDate),
                 };
             });
-            log(`listBetaGroups ${appId}: ${items.length}`);
+            console.log(`listBetaGroups ${appId}: ${items.length}`);
             return { items, nextCursor: cursorFrom(body) };
         },
     });
@@ -292,7 +315,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 meetsThreshold: Boolean(result?.meetsThreshold),
                 points: (result?.data ?? []).map((point) => ({ date: String(point?.date ?? ""), value: Number(point?.value ?? 0) })),
             }));
-            log(`getAppAnalytics ${appId}: ${results.length} metrics from ${startDate} to ${endDate}`);
+            console.log(`getAppAnalytics ${appId}: ${results.length} metrics from ${startDate} to ${endDate}`);
             return { results };
         },
     });
@@ -321,7 +344,7 @@ window.ox.install(1, ({ action, retryFetch, log }) => {
                 };
             });
             const nextCursor = cursorFrom(body);
-            log(`listTeamMembers: ${items.length}, next=${nextCursor ?? "end"}`);
+            console.log(`listTeamMembers: ${items.length}, next=${nextCursor ?? "end"}`);
             return { items, nextCursor };
         },
     });

@@ -1,5 +1,30 @@
-window.ox.install(1, ({ action, retryFetch, log, lib }) => {
-    const { pageCursor } = lib;
+const pageCursor = (value, firstPage) =>
+  Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage);
+
+const retryFetch = async (input, init, options) => {
+  const retries = options?.retries ?? 3;
+  const delay = options?.delay ?? 400;
+  const factor = options?.factor ?? 2;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await window.fetch(input, init);
+      const retryable = response.status === 408 || response.status === 429
+        || (response.status >= 500 && response.status <= 599);
+      if (response.ok || !retryable || attempt >= retries) return response;
+      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
+    } catch (error) {
+      const message = String(error?.message ?? "");
+      const retryable = message.includes("Load failed")
+        || message.includes("NetworkError")
+        || message.includes("Failed to fetch");
+      if (!retryable || attempt >= retries) throw error;
+      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
+  }
+};
+
+window.ox.install(2, ({ action }) => {
     const ORIGIN = "https://huggingface.co";
     const fetchJson = async (path) => {
         const response = await retryFetch(`${ORIGIN}${path}`, {
@@ -23,7 +48,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 query.set("library", library);
             const data = await fetchJson(`/models-json?${query}`);
             const models = data.models ?? [];
-            log(`listModels: page ${page}, ${models.length} models`);
+            console.log(`listModels: page ${page}, ${models.length} models`);
             return {
                 items: models.map((model) => ({
                     id: model.id,
@@ -50,7 +75,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
             });
             const data = await fetchJson(`/datasets-json?${query}`);
             const datasets = data.datasets ?? [];
-            log(`listDatasets: page ${page}, ${datasets.length} datasets`);
+            console.log(`listDatasets: page ${page}, ${datasets.length} datasets`);
             return {
                 items: datasets.map((dataset) => ({
                     id: dataset.id,
@@ -73,7 +98,7 @@ window.ox.install(1, ({ action, retryFetch, log, lib }) => {
                 includeNonRunning: "true",
             });
             const spaces = await fetchJson(`/api/spaces/semantic-search?${query}`);
-            log(`listSpaces: ${spaces.length} spaces in ${category}`);
+            console.log(`listSpaces: ${spaces.length} spaces in ${category}`);
             return {
                 items: spaces.map((space) => ({
                     id: space.id,
