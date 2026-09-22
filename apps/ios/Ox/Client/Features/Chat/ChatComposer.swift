@@ -462,14 +462,14 @@ struct ChatComposer: View, Equatable {
 
     private enum PromptTemplate: String, Identifiable {
         case actions
-        case workflows
+        case skills
 
         var id: String { rawValue }
 
         var title: LocalizedStringKey {
             switch self {
-            case .actions: "New Capabilities"
-            case .workflows: "New Workflow"
+            case .actions: "Add new actions"
+            case .skills: "Add new skills"
             }
         }
     }
@@ -485,6 +485,7 @@ struct ChatComposer: View, Equatable {
     let sessionID: UUID
     let isChatEmpty: Bool
     let isBusy: Bool
+    let followIntents: [FollowIntent]
     let floatsTopStrip: Bool
     let isEmbedded: Bool
     let iconButtonSize: CGFloat
@@ -497,6 +498,7 @@ struct ChatComposer: View, Equatable {
     let onAttachmentChoice: (AttachmentChoice) -> Void
     let onServices: () -> Void
     let onSubmitSkill: (Skill, String) -> Void
+    let onFollowSend: (String) -> Void
     let onPreparationIntent: (Bool) -> Void
     let onCancelEdit: () -> Void
     let onSend: () -> Void
@@ -528,6 +530,7 @@ struct ChatComposer: View, Equatable {
             && lhs.sessionID == rhs.sessionID
             && lhs.isChatEmpty == rhs.isChatEmpty
             && lhs.isBusy == rhs.isBusy
+            && lhs.followIntents == rhs.followIntents
             && lhs.floatsTopStrip == rhs.floatsTopStrip
             && lhs.isEmbedded == rhs.isEmbedded
             && lhs.iconButtonSize == rhs.iconButtonSize
@@ -761,17 +764,19 @@ struct ChatComposer: View, Equatable {
     }
 
     private var showsTopStrip: Bool {
-        isEditingMessage || showsPromptTemplates || !chatArtifacts.isEmpty || !attachedServices.isEmpty
+        isEditingMessage || showsFollowIntents || !chatArtifacts.isEmpty || !attachedServices.isEmpty
     }
 
-    private var showsPromptTemplates: Bool {
+    private var showsFollowIntents: Bool {
         !isEditingMessage
-            && isChatEmpty
-            && !isBusy
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
-            && attachedServices.isEmpty
-            && chatArtifacts.isEmpty
+            && (!followIntents.isEmpty
+                || isChatEmpty && !isBusy && attachedServices.isEmpty && chatArtifacts.isEmpty)
+    }
+
+    private var visibleFollowIntents: [FollowIntent] {
+        followIntents.isEmpty ? [.newActions, .newSkills] : followIntents
     }
 
     private var promptTemplatePresented: Binding<Bool> {
@@ -788,51 +793,55 @@ struct ChatComposer: View, Equatable {
             && !promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var promptTemplateStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            GlassEffectContainer(spacing: Theme.Spacing.sm) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    promptTemplateButton(
-                        "New Capabilities",
-                        systemImage: "hammer",
-                        template: .actions,
-                        accessibilityIdentifier: A11yID.Chat.newActions
-                    )
-                    promptTemplateButton(
-                        "New Workflows",
-                        systemImage: "point.topright.arrow.triangle.backward.to.point.bottomleft.scurvepath",
-                        template: .workflows,
-                        accessibilityIdentifier: A11yID.Chat.newWorkflows
-                    )
-                }
+    private var followIntentList: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            ForEach(visibleFollowIntents) { intent in
+                followIntentButton(intent)
             }
         }
-        .scrollClipDisabled()
-        .frame(minHeight: Theme.Size.minimumTouchTarget)
+        .padding(.bottom, Theme.Spacing.sm)
     }
 
-    private func promptTemplateButton(
-        _ title: LocalizedStringKey,
-        systemImage: String,
-        template: PromptTemplate,
-        accessibilityIdentifier: String
-    ) -> some View {
+    private func followIntentButton(_ intent: FollowIntent) -> some View {
         Button {
-            resetPromptTemplate()
-            promptTemplate = template
-            Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
+            switch intent {
+            case .send(_, let message):
+                onFollowSend(message)
+            case .newActions, .newSkills:
+                let template: PromptTemplate = intent == .newActions ? .actions : .skills
+                resetPromptTemplate()
+                promptTemplate = template
+                Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
+            }
         } label: {
-            Label(title, systemImage: systemImage)
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: Theme.Size.chipHeight)
-                .contentShape(Capsule())
+            HStack {
+                followIntentTitle(intent)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                Spacer(minLength: 0)
+            }
+            .font(Theme.Fonts.bodyMd)
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Capsule())
-        .minimumTouchTarget()
-        .accessibilityIdentifier(accessibilityIdentifier)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
+        .accessibilityIdentifier(followIntentIdentifier(intent))
+    }
+
+    private func followIntentTitle(_ intent: FollowIntent) -> Text {
+        switch intent {
+        case .send(let label, _): Text(verbatim: label)
+        case .newActions: Text("Add new actions")
+        case .newSkills: Text("Add new skills")
+        }
+    }
+
+    private func followIntentIdentifier(_ intent: FollowIntent) -> String {
+        switch intent {
+        case .send: A11yID.Chat.followIntent
+        case .newActions: A11yID.Chat.newActions
+        case .newSkills: A11yID.Chat.newSkills
+        }
     }
 
     @ViewBuilder
@@ -844,16 +853,16 @@ struct ChatComposer: View, Equatable {
                 .autocorrectionDisabled()
                 .accessibilityLabel("Service or domain")
                 .accessibilityIdentifier(A11yID.Chat.newActionsService)
-            TextField("Features", text: $promptSecondaryInput)
-                .accessibilityLabel("Features")
-                .accessibilityIdentifier(A11yID.Chat.newActionsFeatures)
-        case .workflows:
+            TextField("Actions to add", text: $promptSecondaryInput)
+                .accessibilityLabel("Actions to add")
+                .accessibilityIdentifier(A11yID.Chat.newActionsRequest)
+        case .skills:
             TextField("Services needed", text: $promptPrimaryInput)
                 .accessibilityLabel("Services needed")
-                .accessibilityIdentifier(A11yID.Chat.newWorkflowServices)
+                .accessibilityIdentifier(A11yID.Chat.newSkillServices)
             TextField("What should it achieve?", text: $promptSecondaryInput)
                 .accessibilityLabel("What should it achieve?")
-                .accessibilityIdentifier(A11yID.Chat.newWorkflowOutcome)
+                .accessibilityIdentifier(A11yID.Chat.newSkillOutcome)
         }
     }
 
@@ -861,8 +870,8 @@ struct ChatComposer: View, Equatable {
     private func promptMessage(_ template: PromptTemplate) -> some View {
         switch template {
         case .actions:
-            Text("Describe the service and the capabilities you want Ox to add.")
-        case .workflows:
+            Text("Describe the service and the actions you want Ox to add.")
+        case .skills:
             Text("Describe the services the skill needs and its goal.")
         }
     }
@@ -873,9 +882,9 @@ struct ChatComposer: View, Equatable {
         let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
         composer.draft = switch promptTemplate {
         case .actions:
-            String(localized: "Create a new service for \(primary), or add capabilities to the existing service if one is already available.\n\nFeatures: \(secondary)")
-        case .workflows:
-            String(localized: "Create a new workflow as a skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
+            String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nActions: \(secondary)")
+        case .skills:
+            String(localized: "Create a new skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
         }
         Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
         resetPromptTemplate()
@@ -939,25 +948,28 @@ struct ChatComposer: View, Equatable {
 
     @ViewBuilder
     private var composerTopStrip: some View {
-        if showsPromptTemplates {
-            promptTemplateStrip
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                GlassEffectContainer(spacing: Theme.Spacing.sm) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        if !chatArtifacts.isEmpty {
-                            artifactButton
-                        }
-                        ForEach(attachedServices) { attachedServicePill($0) }
-                        if isEditingMessage {
-                            editingMessageChip
+        VStack(alignment: .leading, spacing: Self.topStripSpacing) {
+            if showsFollowIntents {
+                followIntentList
+            }
+            if isEditingMessage || !chatArtifacts.isEmpty || !attachedServices.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            if !chatArtifacts.isEmpty {
+                                artifactButton
+                            }
+                            ForEach(attachedServices) { attachedServicePill($0) }
+                            if isEditingMessage {
+                                editingMessageChip
+                            }
                         }
                     }
                 }
+                .scrollClipDisabled()
+                .frame(minHeight: Theme.Size.minimumTouchTarget)
+                .excludesCompactPageSwitch()
             }
-            .scrollClipDisabled()
-            .frame(minHeight: Theme.Size.minimumTouchTarget)
-            .excludesCompactPageSwitch()
         }
     }
 

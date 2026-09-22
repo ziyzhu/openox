@@ -458,6 +458,16 @@
         }
       }
     },
+    "Actions to add" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加的操作"
+          }
+        }
+      }
+    },
     "Active %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -656,6 +666,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加文件夹"
+          }
+        }
+      }
+    },
+    "Add new actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加新操作"
+          }
+        }
+      }
+    },
+    "Add new skills" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加新技能"
           }
         }
       }
@@ -2903,22 +2933,22 @@
         }
       }
     },
-    "Create a new service for %@, or add capabilities to the existing service if one is already available.\n\nFeatures: %@" : {
+    "Create a new service for %@, or add actions to the existing service if one is already available.\n\nActions: %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为 %@ 创建新服务；如果已有可用服务，则为其添加能力。\n\n功能：%@"
+            "value" : "为 %@ 创建新服务；如果已有可用服务，则为其添加操作。\n\n操作：%@"
           }
         }
       }
     },
-    "Create a new workflow as a skill.\n\nServices needed: %@\n\nGoal: %@" : {
+    "Create a new skill.\n\nServices needed: %@\n\nGoal: %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建一个工作流技能。\n\n所需服务：%@\n\n目标：%@"
+            "value" : "创建新技能。\n\n所需服务：%@\n\n目标：%@"
           }
         }
       }
@@ -3452,12 +3482,12 @@
         }
       }
     },
-    "Describe the service and the capabilities you want Ox to add." : {
+    "Describe the service and the actions you want Ox to add." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述服务，以及你希望 Ox 添加的能力。"
+            "value" : "描述服务，以及你希望 Ox 添加的操作。"
           }
         }
       }
@@ -6105,16 +6135,6 @@
         }
       }
     },
-    "New Capabilities" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新建能力"
-          }
-        }
-      }
-    },
     "New chat" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6157,26 +6177,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建技能"
-          }
-        }
-      }
-    },
-    "New Workflow" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新建工作流"
-          }
-        }
-      }
-    },
-    "New Workflows" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新建工作流"
           }
         }
       }
@@ -9883,6 +9883,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储"
+          }
+        }
+      }
+    },
+    "Suggest next steps" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建议下一步"
           }
         }
       }

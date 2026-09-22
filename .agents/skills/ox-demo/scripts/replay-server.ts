@@ -45,10 +45,10 @@ function event(id: string, delta: Record<string, unknown>, finishReason: string 
   })}\n\n`;
 }
 
-function streamResponse(text: string, signal: AbortSignal): Response {
+function streamResponse(text: string, signal: AbortSignal, targetDuration: number): Response {
   const id = `demo-${crypto.randomUUID()}`;
   const chunks = text.match(/[\s\S]{1,20}/g) ?? [];
-  const delay = Math.min(180, Math.max(22, Math.ceil(4500 / chunks.length)));
+  const delay = Math.min(320, Math.max(22, Math.ceil(targetDuration / chunks.length)));
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (value: string) => controller.enqueue(encoder.encode(value));
@@ -59,7 +59,7 @@ function streamResponse(text: string, signal: AbortSignal): Response {
           return;
         }
         send(event(id, { content: chunk }));
-        await Bun.sleep(delay);
+        await Bun.sleep(delay + (targetDuration > 4500 && chunk.includes("\n\n") ? 350 : 0));
       }
       send(event(id, {}, "stop"));
       send("data: [DONE]\n\n");
@@ -96,12 +96,12 @@ Bun.serve({
     const payload = await request.json() as any;
     if (payload.model !== modelID) return Response.json({ error: "Unknown model" }, { status: 400 });
     const prompt = latestPrompt(payload);
-    const matches = prompts.filter(([value]) => prompt === value);
+    const matches = prompts.filter(([value]) => prompt?.includes(value));
     console.log(JSON.stringify({ event: "request", userChars: prompt?.length ?? 0, matches: matches.length }));
     const content = matches.length === 1 ? responses.get(matches[0][0]) : undefined;
     if (!content) return Response.json({ error: "No saved response for this prompt" }, { status: 422 });
     console.log(JSON.stringify({ event: "replay", prompt: prompts.findIndex(([value]) => value === matches[0][0]) + 1, stream: payload.stream === true }));
-    if (payload.stream === true) return streamResponse(content, request.signal);
+    if (payload.stream === true) return streamResponse(content, request.signal, 4500);
     return Response.json({
       id: `demo-${crypto.randomUUID()}`,
       object: "chat.completion",

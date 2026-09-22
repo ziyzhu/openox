@@ -834,6 +834,7 @@ struct RootView: View {
                !compactChatTransition.isClosing,
                pendingChatPresentationId == nil || pendingChatPresentationId == chat.id {
                 ChatPage(chat: chat,
+                         recentChats: chats.orderedSummaries,
                          composerFocusRequestID: composerFocusRequest?.chatID == chat.id
                              ? composerFocusRequest?.id
                              : nil,

@@ -8,6 +8,49 @@ enum ChatRetention: Equatable {
     case temporary
 }
 
+nonisolated enum FollowIntent: Equatable, Identifiable, Sendable {
+    case send(label: String, message: String)
+    case newActions
+    case newSkills
+
+    static func parse(_ value: JSONValue) throws -> [Self] {
+        guard let entries = value.arrayValue, entries.count <= 2 else {
+            throw RuntimeError.bridge("ox.user.follow: provide at most 2 intents")
+        }
+        let intents = try entries.map { entry -> Self in
+            guard let fields = entry.objectValue,
+                  let kind = fields["kind"]?.stringValue else {
+                throw RuntimeError.bridge("ox.user.follow: each intent needs a kind")
+            }
+            switch kind {
+            case "send":
+                let label = fields["label"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let message = fields["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !label.isEmpty, label.count <= 80,
+                      !message.isEmpty, message.count <= 1_000 else {
+                    throw RuntimeError.bridge("ox.user.follow: send needs a short label and message")
+                }
+                return .send(label: label, message: message)
+            case "actions": return .newActions
+            case "skills": return .newSkills
+            default: throw RuntimeError.bridge("ox.user.follow: unsupported intent kind")
+            }
+        }
+        guard Set(intents.map(\.id)).count == intents.count else {
+            throw RuntimeError.bridge("ox.user.follow: intents must be unique")
+        }
+        return intents
+    }
+
+    var id: String {
+        switch self {
+        case .send(let label, _): "send:\(label.lowercased())"
+        case .newActions: "actions"
+        case .newSkills: "skills"
+        }
+    }
+}
+
 struct ChatContinuation {
     let meta: ChatMeta
     let turns: [Turn]
@@ -177,6 +220,73 @@ final class Chat: Identifiable {
     private(set) var client: any ProviderClient
     private(set) var model: ProviderModel
     private(set) var modelSelection: ModelSelection
+    private(set) var followIntents: [FollowIntent] = []
+    @ObservationIgnored private var followRevision = 0
+    @ObservationIgnored private var followPredictionAttempted = false
+
+    func publishFollowIntents(_ intents: [FollowIntent]) {
+        followRevision += 1
+        followIntents = intents
+    }
+
+    func resetFollowPrediction() {
+        followPredictionAttempted = false
+    }
+
+    func predictFollowIntents(recentChats: [ChatMeta]) async {
+        guard !followPredictionAttempted, !isBusy else { return }
+        followPredictionAttempted = true
+        let revision = followRevision
+        let client = client
+        let model = model
+        await UserMemory.shared.waitUntilCurrent()
+        let memory = String(UserMemory.shared.text.prefix(2_000))
+        let recent = recentChats.prefix(5).map { meta in
+            "- \(meta.activityDate.formatted(date: .abbreviated, time: .shortened)) \(meta.title ?? "Untitled"): \(String((meta.preview ?? "").prefix(160)))"
+        }.joined(separator: "\n")
+        let context = """
+        Current time: \(Date().formatted(date: .complete, time: .shortened))
+        App language: \(AppLocale.shared.locale.identifier)
+        Selected model: \(model.id)
+        Attached services: \(attachedServices.map(\.domain).joined(separator: ", "))
+        Recent chats:\n\(recent)
+        Memory:\n\(memory)
+        """
+        let configuration = AgentConfiguration(
+            client: client,
+            model: model,
+            systemPrompt: "Suggest up to two likely next actions for this user. Return only a JSON array. Each item is {\"kind\":\"send\",\"label\":\"short action label\",\"message\":\"complete user request\"}, {\"kind\":\"actions\"}, or {\"kind\":\"skills\"}. Use send only when tapping can submit the complete request immediately. Use actions or skills when details must be entered. Write labels in the app language. Prefer specific, useful next steps based on context. An empty array is allowed.",
+            streamOptions: StreamOptions(sessionID: "\(id.uuidString)-follow"),
+            transformContext: { request in
+                await ModelAdapterPipeline.transform(messages: request.messages, model: request.model)
+            }
+        )
+        do {
+            let result = try await Agent(configuration: configuration).run(AgentRunRequest(text: context))
+            guard !Task.isCancelled, case .completed = result.outcome,
+                  followRevision == revision, self.client.id == client.id, self.model.id == model.id else { return }
+            let response = result.messages.compactMap { message -> String? in
+                guard case .assistant(let assistant) = message else { return nil }
+                return assistant.content.compactMap { block -> String? in
+                    guard case .text(let text) = block else { return nil }
+                    return text.text
+                }.joined()
+            }.last ?? ""
+            guard let start = response.firstIndex(of: "["), let end = response.lastIndex(of: "]"),
+                  start <= end,
+                  let data = String(response[start...end]).data(using: .utf8) else {
+                Log.session.info("Chat.followPrediction id=\(id) outcome=invalidResponse")
+                return
+            }
+            let intents = try FollowIntent.parse(JSONDecoder().decode(JSONValue.self, from: data))
+            publishFollowIntents(intents)
+            Log.session.info("Chat.followPrediction id=\(id) outcome=published count=\(intents.count)")
+        } catch {
+            if !Task.isCancelled {
+                Log.session.error("Chat.followPrediction id=\(id) outcome=failed error=\(error.localizedDescription)")
+            }
+        }
+    }
     var region: LLMRegion { modelSelection.region }
     let presentations: AppPresentations
     let repository: ProfileRepository
@@ -201,6 +311,7 @@ final class Chat: Identifiable {
     func switchModel(to client: any ProviderClient, model: ProviderModel, selection: ModelSelection) {
         self.client = client
         self.model = model
+        publishFollowIntents([])
         modelSelection = ModelSelection(
             region: selection.region,
             providerID: client.id,
@@ -1872,6 +1983,7 @@ final class Chat: Identifiable {
         skillInvocation: UserSkillInvocation?,
         submissionID: SubmissionID
     ) -> SubmissionReceipt {
+        publishFollowIntents([])
         let posting = !isBusy
         notice = .none
         let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, kind: "user")

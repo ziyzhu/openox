@@ -180,11 +180,12 @@ nonisolated enum A11yID {
         static let temporaryEmpty = "chat.temporaryEmpty"
         static let persistedEmpty = "chat.persistedEmpty"
         static let newActions = "chat.newActions"
+        static let followIntent = "chat.followIntent"
         static let newActionsService = "chat.newActions.service"
-        static let newActionsFeatures = "chat.newActions.features"
-        static let newWorkflows = "chat.newWorkflows"
-        static let newWorkflowServices = "chat.newWorkflow.services"
-        static let newWorkflowOutcome = "chat.newWorkflow.outcome"
+        static let newActionsRequest = "chat.newActions.request"
+        static let newSkills = "chat.newSkills"
+        static let newSkillServices = "chat.newSkill.services"
+        static let newSkillOutcome = "chat.newSkill.outcome"
         static func modelOption(_ modelId: String) -> String { "chat.modelOption.\(modelId)" }
         static func modelThinkingLevelOption(_ effort: String) -> String { "chat.modelThinkingLevelOption.\(effort)" }
         static func modelKey(_ clientId: String) -> String { "chat.modelKey.\(clientId)" }

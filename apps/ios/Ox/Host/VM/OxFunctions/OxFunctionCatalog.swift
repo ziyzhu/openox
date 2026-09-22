@@ -5,7 +5,7 @@ nonisolated enum OxFunctionCatalog {
         ("app", "Read Ox's identity, profile, notification permission, settings, and diagnostic logs, and keep the current chat named."),
         ("provider", "Inspect, configure, and authenticate model providers."),
         ("service", "Discover, attach, detach, and invoke services."),
-        ("user", "Keep the user informed and ask them to choose."),
+        ("user", "Keep the user informed, suggest next steps, and ask them to choose."),
         ("web", "Search, fetch, and interact with the web."),
         ("fs", "List, read, write, edit, delete, and search Ox files."),
         ("output", "Retrieve complete captured JavaScript output."),

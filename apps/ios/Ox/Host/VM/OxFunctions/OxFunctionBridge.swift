@@ -60,6 +60,7 @@ public protocol OxFunctionBridge: AnyObject {
     func enableScheduledSkill(id: String, enabled: Bool, purpose: String) async throws -> JSONValue?
     func runScheduledSkill(id: String, purpose: String) async throws -> JSONValue?
     func reportProgress(message: String, purpose: String) async throws -> JSONValue?
+    func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue?
     func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue?
     func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue?
     func presentVideo(value: JSONValue?, purpose: String) async throws -> JSONValue?

@@ -227,6 +227,7 @@ private struct ChatTranscriptProjection<Content: View>: View {
 
 struct ChatPage: View {
     let chat: Chat
+    let recentChats: [ChatMeta]
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -581,6 +582,13 @@ struct ChatPage: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { speechInput.interrupt() }
+        }
+        .task(id: scenePhase) {
+            if scenePhase == .active {
+                await chat.predictFollowIntents(recentChats: recentChats)
+            } else {
+                chat.resetFollowPrediction()
+            }
         }
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
@@ -959,7 +967,9 @@ struct ChatPage: View {
     }
 
     private func floatsTopStrip(showsComposer: Bool) -> Bool {
-        showsComposer && (editedBlockID != nil || !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
+        showsComposer
+            && (editedBlockID != nil || !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
+            && (!composer.draft.isEmpty || !composer.draftAttachments.isEmpty || chat.followIntents.isEmpty)
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
@@ -1571,6 +1581,7 @@ struct ChatPage: View {
             sessionID: chat.id,
             isChatEmpty: isChatEmpty,
             isBusy: chat.isBusy,
+            followIntents: chat.followIntents,
             floatsTopStrip: floatsTopStrip,
             isEmbedded: isEmbedded,
             iconButtonSize: iconButtonSize,
@@ -1583,6 +1594,7 @@ struct ChatPage: View {
             onAttachmentChoice: handleAttachChoice,
             onServices: startServiceMention,
             onSubmitSkill: submitSkill,
+            onFollowSend: sendFollowIntent,
             onPreparationIntent: chat.setModelPreparationIntent,
             onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
             onSend: { send() },
@@ -1706,6 +1718,12 @@ struct ChatPage: View {
         prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
         enqueue(message)
+    }
+
+    private func sendFollowIntent(_ message: String) {
+        guard editedBlockID == nil, composer.draft.isEmpty, composer.draftAttachments.isEmpty else { return }
+        composer.draft = message
+        send()
     }
 
     private func beginSpeech(accessible: Bool) {

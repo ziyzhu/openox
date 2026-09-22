@@ -1,6 +1,18 @@
 import Foundation
 
 extension Chat {
+    public func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue? {
+        let parsed = try FollowIntent.parse(intents)
+        try await requireApproval(
+            action: Actions.userFollow,
+            defaultPolicy: Actions.defaultPolicy(for: Actions.userFollow),
+            args: ["count": parsed.count]
+        )
+        publishFollowIntents(parsed)
+        Log.session.info("Chat.follow id=\(id) count=\(parsed.count) purposeChars=\(purpose.count)")
+        return nil
+    }
+
     public func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue? {
         guard (2...4).contains(options.count),
               options.allSatisfy({ !$0.isEmpty && $0.count <= 80 }),
