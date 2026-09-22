@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const prompts = [
-  ["Compare desks on Facebook Marketplace, Amazon, and Reddit.", "01-desks.md"],
-  ["Plan a Seattle weekend with Airbnb, Google, and Xiaohongshu.", "02-seattle.md"],
-  ["What should I catch up on in Outlook and LinkedIn?", "03-catch-up.md"],
+  ["Compare a few desks for me.", "01-desks.md"],
+  ["Plan a Seattle weekend for me.", "02-seattle.md"],
+  ["What should I catch up on?", "03-catch-up.md"],
 ] as const;
 
 const args = process.argv.slice(2);
