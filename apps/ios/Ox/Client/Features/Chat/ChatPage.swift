@@ -219,7 +219,6 @@ private struct ChatTranscriptProjection<Content: View>: View {
 
 struct ChatPage: View {
     let chat: Chat
-    let recentChats: [ChatMeta]
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -574,13 +573,6 @@ struct ChatPage: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { speechInput.interrupt() }
-        }
-        .task(id: scenePhase) {
-            if scenePhase == .active {
-                await chat.predictFollowIntents(recentChats: recentChats)
-            } else {
-                chat.resetFollowPrediction()
-            }
         }
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }

@@ -9,7 +9,7 @@ nonisolated enum OxUser {
                 (
                     "ox.user.follow",
                     .object([
-                        "description": .string("Show up to two likely next intents above the empty composer without waiting for a response: `await ox.user.follow({ intents, purpose })`. Use `send` for a complete user message, or `actions` and `skills` for the built-in input forms. A send intent submits immediately when tapped; form intents place a draft in the composer after the user supplies details."),
+                        "description": .string("Show up to two likely next intents scoped to the current conversation above the empty composer without waiting for a response: `await ox.user.follow({ intents, purpose })`. Use `send` for a complete user message, or `actions` and `skills` for the built-in input forms. A send intent fills the composer for the user to review and send when tapped; form intents place a draft in the composer after the user supplies details."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
