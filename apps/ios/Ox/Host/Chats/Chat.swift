@@ -601,6 +601,7 @@ final class Chat: Identifiable {
                     }
                 }
             },
+            repositoryAuthorization: presentations.repositoryAuthorization,
             native: nativeServiceOperations
         )
     }

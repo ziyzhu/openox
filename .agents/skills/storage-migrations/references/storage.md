@@ -493,7 +493,7 @@ legacy `llm.customProviders`, and regional selection transforms belong solely
 to `StorageMigrator`. Unknown catalog formats fail closed without overwriting
 their bytes.
 
-Provider API keys and subscription token bundles are generic-password Keychain
+Provider API keys, repository proposal authorization, and subscription token bundles are generic-password Keychain
 items under the bundle-derived `<application bundle identifier>.llm` service. They use After First Unlock accessibility
 so user-invoked background Siri and CarPlay requests can run after the device's
 first unlock following a restart. Standard provider credentials are scoped to

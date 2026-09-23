@@ -930,6 +930,40 @@ actor ServiceRepository {
         )
     }
 
+    func proposalSnapshot(commitHash: String, services requested: [String]) throws -> ServiceRepositoryProposalSnapshot {
+        let loaded = try gitRepository(Self.localID)
+        let repository = try SwiftGitX.Repository.open(at: loaded.root)
+        let commit = try Self.historyCommit(commitHash, in: repository)
+        let package = try Self.package(at: commit, in: repository)
+        let byDomain = Dictionary(uniqueKeysWithValues: package.services.map { ($0.id.runtimeID, $0) })
+        let selected = try requested.map { domain in
+            guard let service = byDomain[domain], service.id.kind == .web || service.id.kind == .api else {
+                throw Failure(message: "No publishable Local service exists for \(domain) at that commit")
+            }
+            return service
+        }
+        let blobs = try Self.gitBlobs(in: commit.tree, repository: repository)
+        let services = selected.map { service in
+            let prefix = service.id.path + "/"
+            let files = blobs.compactMap { path, blob -> ServiceRepositoryProposalSnapshot.File? in
+                guard path.hasPrefix(prefix) else { return nil }
+                return .init(path: path, data: blob.content)
+            }
+            return ServiceRepositoryProposalSnapshot.Service(
+                id: service.id.rawValue,
+                kind: service.id.kind,
+                domain: service.id.runtimeID,
+                files: files.sorted { $0.path < $1.path }
+            )
+        }
+        let fileCount = services.reduce(0) { $0 + $1.files.count }
+        let byteCount = services.flatMap(\.files).reduce(0) { $0 + $1.data.count }
+        guard fileCount <= 1_000, byteCount <= 32 * 1_024 * 1_024 else {
+            throw Failure(message: "The selected services exceed the publication size limit")
+        }
+        return ServiceRepositoryProposalSnapshot(commitHash: commit.id.hex, services: services)
+    }
+
     func gitDiff(
         repositoryID: String,
         commitHash: String?,

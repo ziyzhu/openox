@@ -56,6 +56,16 @@ extension ServiceOperations {
             return try await connectServiceRepository(origin: fields["origin"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.repository.disconnect":
             return try await disconnectServiceRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.propose":
+            return try await proposeServiceRepository(
+                target: fields["target"]?.stringValue ?? "",
+                commitHash: fields["commitHash"]?.stringValue ?? "",
+                services: fields["services"]?.arrayValue?.compactMap(\.stringValue) ?? [],
+                title: fields["title"]?.stringValue ?? "",
+                body: fields["body"]?.stringValue ?? "",
+                status: fields["status"]?.stringValue ?? "",
+                purpose: purpose
+            )
         case "ox.service.git.status":
             return try await serviceGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
         case "ox.service.git.log":

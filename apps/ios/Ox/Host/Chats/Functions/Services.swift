@@ -38,6 +38,26 @@ extension Chat: OxFunctionBridge {
         try await serviceOperations.disconnectServiceRepository(repository: repository, purpose: purpose)
     }
 
+    public func proposeServiceRepository(
+        target: String,
+        commitHash: String,
+        services: [String],
+        title: String,
+        body: String,
+        status: String,
+        purpose: String
+    ) async throws -> JSONValue? {
+        try await serviceOperations.proposeServiceRepository(
+            target: target,
+            commitHash: commitHash,
+            services: services,
+            title: title,
+            body: body,
+            status: status,
+            purpose: purpose
+        )
+    }
+
     public func serviceGitLog(
         repository: String,
         limit: Int,

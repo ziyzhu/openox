@@ -44,6 +44,7 @@ nonisolated enum Actions {
     static let serviceDelete = "ox.service.delete"
     static let serviceRepositoryConnect = "ox.service.repository.connect"
     static let serviceRepositoryDisconnect = "ox.service.repository.disconnect"
+    static let serviceRepositoryPropose = "ox.service.repository.propose"
     static let serviceGitStatus = "ox.service.git.status"
     static let serviceGitLog = "ox.service.git.log"
     static let serviceGitShow = "ox.service.git.show"
@@ -93,6 +94,7 @@ nonisolated enum Actions {
         artifactAttach,
         serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, serviceRepositoryConnect, serviceRepositoryDisconnect,
+        serviceRepositoryPropose,
         serviceGitStatus, serviceGitLog,
         serviceGitShow, serviceGitDiff, serviceGitCheckout, serviceGitCommit, serviceGitRevert,
         serviceGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
@@ -106,8 +108,8 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") ||
-            action == serviceRepositoryConnect || action == serviceRepositoryDisconnect ? .ask : .allow
+        return action.hasSuffix(".delete") || action == serviceRepositoryConnect ||
+            action == serviceRepositoryDisconnect || action == serviceRepositoryPropose ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -155,6 +157,7 @@ nonisolated enum Actions {
         case serviceDelete: L10n.string("Delete a service")
         case serviceRepositoryConnect: L10n.string("Add Repository")
         case serviceRepositoryDisconnect: L10n.string("Remove Repository")
+        case serviceRepositoryPropose: L10n.string("Propose services")
         case serviceGitStatus, serviceGitDiff: L10n.string("Check service changes")
         case serviceGitLog: L10n.string("Read service history")
         case serviceGitShow: L10n.string("Read a saved service version")

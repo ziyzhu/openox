@@ -16,6 +16,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
+    let repositoryAuthorization: SubscriptionAuthorizationPresenter?
 
     init(
         serviceManager: ServiceManager,
@@ -29,6 +30,7 @@ final class ServiceOperations {
         botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
+        repositoryAuthorization: SubscriptionAuthorizationPresenter? = nil,
         native: NativeServiceOperations
     ) {
         self.serviceManager = serviceManager
@@ -42,6 +44,7 @@ final class ServiceOperations {
         self.botControlRequired = botControlRequired
         self.begin = begin
         self.finish = finish
+        self.repositoryAuthorization = repositoryAuthorization
         self.native = native
     }
 
@@ -315,6 +318,60 @@ final class ServiceOperations {
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             )
             return .object(["id": .string(selected.id), "disconnected": .bool(true)])
+        }
+    }
+
+    func proposeServiceRepository(
+        target: String,
+        commitHash: String,
+        services: [String],
+        title: String,
+        body: String,
+        status: String,
+        purpose: String
+    ) async throws -> JSONValue? {
+        let target = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard target == ServiceRepositoryProposal.targetID else {
+            throw RuntimeError.bridge("ox.service.repository.propose: target must be openox")
+        }
+        guard commitHash.range(of: "^[a-f0-9]{40}$", options: .regularExpression) != nil else {
+            throw RuntimeError.bridge("ox.service.repository.propose: commitHash must be a full Local commit hash")
+        }
+        guard (1...20).contains(services.count), Set(services).count == services.count,
+              services.allSatisfy({ !$0.isEmpty && $0.count <= 500 }) else {
+            throw RuntimeError.bridge("ox.service.repository.propose: services must contain 1-20 unique Local service domains")
+        }
+        guard !title.isEmpty, title.count <= 200 else {
+            throw RuntimeError.bridge("ox.service.repository.propose: title must contain 1-200 characters")
+        }
+        guard body.count <= 20_000 else {
+            throw RuntimeError.bridge("ox.service.repository.propose: body must contain at most 20,000 characters")
+        }
+        guard let proposalStatus = ServiceRepositoryProposalRequest.Status(rawValue: status) else {
+            throw RuntimeError.bridge("ox.service.repository.propose: status must be draft or open")
+        }
+        let snapshot = try await serviceManager.serviceProposalSnapshot(commitHash: commitHash, services: services)
+        let args: JSONValue = .object([
+            "target": .string(target),
+            "commitHash": .string(commitHash),
+            "services": .array(services.map(JSONValue.string)),
+            "title": .string(title),
+            "body": .string(body),
+            "status": .string(status),
+        ])
+        return try await tracked(Actions.serviceRepositoryPropose, args, purpose: purpose) {
+            let result = try await ServiceRepositoryProposal.shared.propose(
+                .init(
+                    target: target,
+                    title: title,
+                    body: body,
+                    status: proposalStatus,
+                    snapshot: snapshot
+                ),
+                authorization: self.repositoryAuthorization
+            )
+            return try Self.encodeToJSON(result)
         }
     }
 

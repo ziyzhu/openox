@@ -48,6 +48,7 @@ struct AppPresentations {
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
+    var repositoryAuthorization: SubscriptionAuthorizationPresenter? = nil
 
     static let unavailable = AppPresentations(
         serviceSignIn: UnavailableServiceAuthPresenter(),
@@ -195,7 +196,15 @@ extension AppPresentations {
         serviceSignIn: AppPresentationCoordinator.shared,
         serviceHandoff: ServiceHandoffSheetPresenter(coordinator: .shared),
         messages: MessageSheetComposer(),
-        providerAuthentication: AppPresentationCoordinator.shared
+        providerAuthentication: AppPresentationCoordinator.shared,
+        repositoryAuthorization: SubscriptionAuthorizationPresenter(
+            oauth: { authorizeURL, redirectPrefix in
+                await OAuthWebLogin.present(authorizeURL: authorizeURL, redirectPrefix: redirectPrefix)
+            },
+            device: { authorizeURL, userCode, poll in
+                await OAuthWebLogin.presentDevice(authorizeURL: authorizeURL, userCode: userCode, poll: poll)
+            }
+        )
     )
 }
 

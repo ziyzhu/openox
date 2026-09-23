@@ -40,6 +40,7 @@ public protocol OxFunctionBridge: AnyObject {
     func deleteService(domain: String, purpose: String) async throws -> JSONValue?
     func connectServiceRepository(origin: String, purpose: String) async throws -> JSONValue?
     func disconnectServiceRepository(repository: String, purpose: String) async throws -> JSONValue?
+    func proposeServiceRepository(target: String, commitHash: String, services: [String], title: String, body: String, status: String, purpose: String) async throws -> JSONValue?
     func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue?
     func serviceGitLog(repository: String, limit: Int, cursor: String?, purpose: String) async throws -> JSONValue?
     func serviceGitShow(repository: String, commitHash: String, path: String?, purpose: String) async throws -> JSONValue?

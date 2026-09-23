@@ -26,6 +26,12 @@ Read `skills/system:manage-services/references/api-service.md` for direct HTTP A
 
 Use `ox.app.serviceRepositories({ purpose })` to list repository IDs and states. Connect a public HTTPS Git repository with `ox.service.repository.connect({ origin, purpose })`; it must contain `repository.json` at its root and the user approves the connection. Disconnect an installed Remote repository with `ox.service.repository.disconnect({ repository, purpose })`, using its ID from the list. Disconnect asks for user approval, removes its local snapshot and service definitions, and keeps website sign-ins and data. Bundled, Development, and Local repositories cannot be disconnected.
 
+### Share Local services
+
+Share only a saved, verified Local version. Run `ox.service.validate` for every selected service, inspect `ox.service.git.status` and `ox.service.git.diff`, then save the intended Local changes with `ox.service.git.commit`. Use the returned full commit hash with `ox.service.repository.propose({ target: "openox", commitHash, services, title, body, status, purpose })`. `services` contains Local service domains, and `status` is explicitly `draft` or `open`.
+
+The proposal action asks for approval, may ask the user to authorize the target provider, uploads the selected service files and target manifest through the provider API, and returns the change-request URL. It does not publish uncommitted work or clone the target repository. Never put credentials, session data, raw captures, or machine-specific files in a proposal.
+
 ## Remote MCP connections
 
 Create with `ox.service.create({ kind: "mcp", endpoint, transport?, purpose })`. Use a credential-free public HTTPS endpoint; omit `domain` because Ox assigns it. Transport defaults to detection; explicit values are `streamable-http` and `sse`. Ox discovers tools, handles sign-in, and saves. Repeated creation reuses the endpoint.

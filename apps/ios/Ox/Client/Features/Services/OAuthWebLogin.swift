@@ -52,7 +52,7 @@ private final class DeviceAuthorizationSession: NSObject, SFSafariViewController
             return
         }
         let prompt = UIAlertController(
-            title: "Authorize GitHub Copilot",
+            title: "Authorize with GitHub",
             message: "Enter this code on GitHub:\n\n\(userCode)\n\nContinue will copy the code and open GitHub.",
             preferredStyle: .alert
         )

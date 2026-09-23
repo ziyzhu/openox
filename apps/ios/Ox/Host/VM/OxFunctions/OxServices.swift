@@ -211,6 +211,32 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.repository.propose",
+                    .object([
+                        "description": .string("Publish selected services from one saved Local commit and create a change request in a configured target without cloning it: `await ox.service.repository.propose({ target, commitHash, services, title, body, status, purpose })`. Use target `openox`. `status` must be `draft` or `open`. The user approves publication and may be asked to authorize the target provider."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "target": .object(["type": .string("string"), "enum": .array([.string("openox")])]),
+                                "commitHash": .object(["type": .string("string"), "pattern": .string("^[a-f0-9]{40}$")]),
+                                "services": .object([
+                                    "type": .string("array"),
+                                    "items": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
+                                    "minItems": .int(1),
+                                    "maxItems": .int(20),
+                                    "uniqueItems": .bool(true),
+                                ]),
+                                "title": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)]),
+                                "body": .object(["type": .string("string"), "maxLength": .int(20_000)]),
+                                "status": .object(["type": .string("string"), "enum": .array([.string("draft"), .string("open")])]),
+                            ]),
+                            "required": .array([.string("target"), .string("commitHash"), .string("services"), .string("title"), .string("body"), .string("status")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
                     "ox.service.git.status",
                     .object([
                         "description": .string("Inspect the Local service repository's active commit, main tip, live or historical view, and staged, unstaged, and untracked paths: `await ox.service.git.status({ purpose })`. Local is the only Git-managed service repository."),
@@ -517,6 +543,23 @@ nonisolated enum OxServices {
             }
             ctx.setObject(disconnectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositoryDisconnect" as NSString)
 
+            let proposeRepositoryBlock: @convention(block) (String, String, JSValue, String, String, String, JSValue) -> JSValue = {
+                target, commitHash, servicesValue, title, body, status, purposeValue in
+                let services = servicesValue.toArray().compactMap { $0 as? String }
+                return env.call(suspendingTimeout: true) {
+                    try await $0.proposeServiceRepository(
+                        target: target,
+                        commitHash: commitHash,
+                        services: services,
+                        title: title,
+                        body: body,
+                        status: status,
+                        purpose: purposeValue.toString()!
+                    )
+                }
+            }
+            ctx.setObject(proposeRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositoryPropose" as NSString)
+
             let gitStatusBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call { try await $0.serviceGitStatus(repository: repository, purpose: purposeValue.toString()!) }
             }
@@ -647,7 +690,8 @@ nonisolated enum OxServices {
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           repository: {
             connect: (value) => { const options = __oxOptions(value, 'ox.service.repository.connect'); return __nativeServiceRepositoryConnect(String(options.origin), String(options.purpose)); },
-            disconnect: (value) => { const options = __oxOptions(value, 'ox.service.repository.disconnect'); return __nativeServiceRepositoryDisconnect(String(options.repository), String(options.purpose)); }
+            disconnect: (value) => { const options = __oxOptions(value, 'ox.service.repository.disconnect'); return __nativeServiceRepositoryDisconnect(String(options.repository), String(options.purpose)); },
+            propose: (value) => { const options = __oxOptions(value, 'ox.service.repository.propose'); return __nativeServiceRepositoryPropose(String(options.target), String(options.commitHash), options.services, String(options.title), String(options.body), String(options.status), String(options.purpose)); }
           },
           git: {
             status: (value) => { const options = __oxOptions(value, 'ox.service.git.status'); return __nativeServiceGitStatus(String(options.repository ?? 'local'), String(options.purpose)); },
