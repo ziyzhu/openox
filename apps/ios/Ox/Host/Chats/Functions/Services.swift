@@ -30,6 +30,14 @@ extension Chat: OxFunctionBridge {
         try await serviceOperations.serviceGitStatus(repository: repository, purpose: purpose)
     }
 
+    public func connectServiceRepository(origin: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.connectServiceRepository(origin: origin, purpose: purpose)
+    }
+
+    public func disconnectServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.disconnectServiceRepository(repository: repository, purpose: purpose)
+    }
+
     public func serviceGitLog(
         repository: String,
         limit: Int,

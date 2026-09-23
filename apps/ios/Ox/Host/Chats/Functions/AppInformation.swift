@@ -198,6 +198,7 @@ extension Chat {
                 "status": .string(serviceManager.repositoryState.appInformationValue),
                 "repositories": .array(repositories.prefix(limit).map { repository in
                     .object([
+                        "id": .string(repository.id),
                         "name": .string(repository.name),
                         "provenance": .string(repository.provenance.rawValue),
                         "enabled": .bool(repository.isEnabled),

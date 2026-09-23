@@ -22,6 +22,10 @@ Read `skills/system:manage-services/references/api-service.md` for direct HTTP A
 - Do not change the manifest schema. Preserve runtime approval gates and unrelated Local changes. Inspect Local status and diff before Save, revert, restore, or deletion; keep abandoned work recoverable.
 - Present Local persistence as **Save**, for example `Save Outlook service`. Keep Git and revision mechanics internal unless the user asks or recovery requires them.
 
+## Service repositories
+
+Use `ox.app.serviceRepositories({ purpose })` to list repository IDs and states. Connect a public HTTPS Git repository with `ox.service.repository.connect({ origin, purpose })`; it must contain `repository.json` at its root and the user approves the connection. Disconnect an installed Remote repository with `ox.service.repository.disconnect({ repository, purpose })`, using its ID from the list. Disconnect asks for user approval, removes its local snapshot and service definitions, and keeps website sign-ins and data. Bundled, Development, and Local repositories cannot be disconnected.
+
 ## Remote MCP connections
 
 Create with `ox.service.create({ kind: "mcp", endpoint, transport?, purpose })`. Use a credential-free public HTTPS endpoint; omit `domain` because Ox assigns it. Transport defaults to detection; explicit values are `streamable-http` and `sse`. Ox discovers tools, handles sign-in, and saves. Repeated creation reuses the endpoint.

@@ -181,6 +181,36 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.repository.connect",
+                    .object([
+                        "description": .string("Install a public HTTPS Git service repository: `await ox.service.repository.connect({ origin, purpose })`. The user approves the connection. The repository must contain repository.json at its root. Returns its ID for later disconnection; services become available after the repository loads."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "origin": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
+                            ]),
+                            "required": .array([.string("origin")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
+                    "ox.service.repository.disconnect",
+                    .object([
+                        "description": .string("Remove an installed remote service repository by ID: `await ox.service.repository.disconnect({ repository, purpose })`. Find its ID with ox.app.serviceRepositories. The user approves removal. This removes the local snapshot and service definitions; website sign-ins and data remain."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "repository": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)]),
+                            ]),
+                            "required": .array([.string("repository")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
                     "ox.service.git.status",
                     .object([
                         "description": .string("Inspect the Local service repository's active commit, main tip, live or historical view, and staged, unstaged, and untracked paths: `await ox.service.git.status({ purpose })`. Local is the only Git-managed service repository."),
@@ -477,6 +507,16 @@ nonisolated enum OxServices {
             }
             ctx.setObject(deleteBlock as AnyObject, forKeyedSubscript: "__nativeServiceDelete" as NSString)
 
+            let connectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { origin, purposeValue in
+                env.call(suspendingTimeout: true) { try await $0.connectServiceRepository(origin: origin, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(connectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositoryConnect" as NSString)
+
+            let disconnectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
+                env.call(suspendingTimeout: true) { try await $0.disconnectServiceRepository(repository: repository, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(disconnectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositoryDisconnect" as NSString)
+
             let gitStatusBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call { try await $0.serviceGitStatus(repository: repository, purpose: purposeValue.toString()!) }
             }
@@ -605,6 +645,10 @@ nonisolated enum OxServices {
           update: (value) => { const options = __oxOptions(value, 'ox.service.update'); return __nativeServiceUpdate(options, String(options.purpose)); },
           copy: (value) => { const options = __oxOptions(value, 'ox.service.copy'); return __nativeServiceCopy(String(options.domain), String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
+          repository: {
+            connect: (value) => { const options = __oxOptions(value, 'ox.service.repository.connect'); return __nativeServiceRepositoryConnect(String(options.origin), String(options.purpose)); },
+            disconnect: (value) => { const options = __oxOptions(value, 'ox.service.repository.disconnect'); return __nativeServiceRepositoryDisconnect(String(options.repository), String(options.purpose)); }
+          },
           git: {
             status: (value) => { const options = __oxOptions(value, 'ox.service.git.status'); return __nativeServiceGitStatus(String(options.repository ?? 'local'), String(options.purpose)); },
             log: (value) => { const options = __oxOptions(value, 'ox.service.git.log'); return __nativeServiceGitLog(String(options.repository ?? 'local'), Number(options.limit ?? 20), options.cursor ?? null, String(options.purpose)); },

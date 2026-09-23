@@ -52,6 +52,10 @@ extension ServiceOperations {
             return try await copyService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.delete":
             return try await deleteService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.connect":
+            return try await connectServiceRepository(origin: fields["origin"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.disconnect":
+            return try await disconnectServiceRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.git.status":
             return try await serviceGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
         case "ox.service.git.log":

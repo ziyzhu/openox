@@ -273,6 +273,51 @@ final class ServiceOperations {
         }
     }
 
+    func connectServiceRepository(origin: String, purpose: String) async throws -> JSONValue? {
+        let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
+              url.user == nil, url.password == nil, url.fragment == nil else {
+            throw RuntimeError.bridge("ox.service.repository.connect: origin must be a public HTTPS Git URL without credentials or a fragment")
+        }
+        return try await tracked(
+            Actions.serviceRepositoryConnect,
+            .object(["origin": .string(origin)]),
+            purpose: purpose
+        ) {
+            let repository = try await self.serviceManager.connectRepository(
+                from: url,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            return .object([
+                "id": .string(repository.id),
+                "name": .string(repository.name),
+                "origin": .string(origin),
+                "serviceCount": .int(repository.serviceCount),
+                "connected": .bool(true),
+            ])
+        }
+    }
+
+    func disconnectServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
+        guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }),
+              let origin = selected.origin else {
+            throw RuntimeError.bridge("ox.service.repository.disconnect: select an installed remote repository ID from ox.app.serviceRepositories")
+        }
+        let args: JSONValue = .object([
+            "id": .string(selected.id),
+            "name": .string(selected.name),
+            "origin": .string(origin.absoluteString),
+            "serviceCount": .int(selected.serviceCount),
+        ])
+        return try await tracked(Actions.serviceRepositoryDisconnect, args, purpose: purpose) {
+            try await self.serviceManager.disconnectRepository(
+                selected.id,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            return .object(["id": .string(selected.id), "disconnected": .bool(true)])
+        }
+    }
+
     func serviceGitLog(
         repository: String,
         limit: Int,

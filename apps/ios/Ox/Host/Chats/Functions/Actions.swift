@@ -42,6 +42,8 @@ nonisolated enum Actions {
     static let serviceUpdate = "ox.service.update"
     static let serviceCopy = "ox.service.copy"
     static let serviceDelete = "ox.service.delete"
+    static let serviceRepositoryConnect = "ox.service.repository.connect"
+    static let serviceRepositoryDisconnect = "ox.service.repository.disconnect"
     static let serviceGitStatus = "ox.service.git.status"
     static let serviceGitLog = "ox.service.git.log"
     static let serviceGitShow = "ox.service.git.show"
@@ -90,7 +92,8 @@ nonisolated enum Actions {
         fsList, fsRead, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach,
         serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
-        serviceUpdate, serviceCopy, serviceDelete, serviceGitStatus, serviceGitLog,
+        serviceUpdate, serviceCopy, serviceDelete, serviceRepositoryConnect, serviceRepositoryDisconnect,
+        serviceGitStatus, serviceGitLog,
         serviceGitShow, serviceGitDiff, serviceGitCheckout, serviceGitCommit, serviceGitRevert,
         serviceGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
         skillCreate, skillCopy, skillDelete,
@@ -103,7 +106,8 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") ? .ask : .allow
+        return action.hasSuffix(".delete") ||
+            action == serviceRepositoryConnect || action == serviceRepositoryDisconnect ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -149,6 +153,8 @@ nonisolated enum Actions {
         case serviceUpdate: L10n.string("Update a service")
         case serviceCopy: L10n.string("Copy a service to Local")
         case serviceDelete: L10n.string("Delete a service")
+        case serviceRepositoryConnect: L10n.string("Add Repository")
+        case serviceRepositoryDisconnect: L10n.string("Remove Repository")
         case serviceGitStatus, serviceGitDiff: L10n.string("Check service changes")
         case serviceGitLog: L10n.string("Read service history")
         case serviceGitShow: L10n.string("Read a saved service version")

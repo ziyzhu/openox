@@ -611,6 +611,23 @@ final class ServiceManager {
         }
     }
 
+    func connectRepository(from origin: URL, locale: String?) async throws -> ServiceRepository.Repository {
+        repositoryState = .syncing
+        do {
+            try await repository.install(from: origin)
+            _ = await loadRepositories(locale: locale)
+            guard case .ready = repositoryState,
+                  let installed = repositories.first(where: { $0.origin == origin }) else {
+                throw ServiceRepository.Failure(message: "The repository was installed but could not be loaded")
+            }
+            return installed
+        } catch {
+            repositoryState = .failed(error.localizedDescription)
+            Log.service.error("ServiceManager.repository connect failed=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
     @discardableResult
     func updateRepository(_ repositoryID: String, locale: String?) async -> [String] {
         await mutateRepositories(locale: locale) {
@@ -621,6 +638,21 @@ final class ServiceManager {
     func removeRepository(_ repositoryID: String, locale: String?) async {
         _ = await mutateRepositories(locale: locale) {
             try await self.repository.remove(repositoryID: repositoryID)
+        }
+    }
+
+    func disconnectRepository(_ repositoryID: String, locale: String?) async throws {
+        repositoryState = .syncing
+        do {
+            try await repository.remove(repositoryID: repositoryID)
+            _ = await loadRepositories(locale: locale)
+            guard case .ready = repositoryState else {
+                throw ServiceRepository.Failure(message: "The repository was removed but services could not be reloaded")
+            }
+        } catch {
+            repositoryState = .failed(error.localizedDescription)
+            Log.service.error("ServiceManager.repository disconnect failed=\(error.localizedDescription)")
+            throw error
         }
     }
 
