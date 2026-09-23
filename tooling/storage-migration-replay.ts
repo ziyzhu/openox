@@ -1,11 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { runOnce } from "../apps/cli/src/debug-ws.ts";
+import { callHost } from "../apps/cli/src/host-rpc.ts";
 import { ROOT } from "./lib.ts";
 
 type ReplayResult = {
-  ok: boolean;
-  error?: string;
   currentVersion?: string;
   versionUpdated?: boolean;
   ordinaryContextRemoved?: boolean;
@@ -79,15 +77,12 @@ const input = JSON.parse(await readFile(
 )) as { turns: unknown[] };
 const fixtures = await readFixtures();
 if (fixtures.length === 0) throw new Error("no storage migration fixtures found");
-const result = await runOnce({
-  kind: "replay-storage-migration",
-  id: crypto.randomUUID(),
+const result = await callHost("debug.storage.replayMigration", {
   turns: input.turns,
   fixtures,
 }, 30_000) as ReplayResult;
 
-if (!result.ok) throw new Error(result.error ?? "storage migration replay failed");
-const checks = Object.entries(result).filter(([key]) => !["ok", "kind", "id", "error", "currentVersion", "fixtureResults"].includes(key));
+const checks = Object.entries(result).filter(([key]) => !["currentVersion", "fixtureResults"].includes(key));
 const failures = checks.filter(([, value]) => value !== true).map(([name]) => name);
 for (const [name, value] of checks) console.log(`${value === true ? "PASS" : "FAIL"} ${name}`);
 for (const fixture of result.fixtureResults ?? []) {

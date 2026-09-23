@@ -4,6 +4,7 @@
   "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
   "scripts": {
+    "test:host-rpc": "bun test tooling/host-rpc.test.ts",
     "test:llm": "bun apps/ios/tests/llm/matrix.ts",
     "test:services": "bun tooling/service-replay.ts",
     "build:services": "bun tooling/ios-services-build.ts",

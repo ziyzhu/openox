@@ -3,7 +3,8 @@ import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { runOnce } from "../../../cli/src/debug-ws.ts";
+import { HostRPCError, isObject } from "../../../cli/src/host-connection.ts";
+import { callHost } from "../../../cli/src/host-rpc.ts";
 import { loadAPIKeys, type APIKeys, type LLMRegion } from "../../../../tooling/sim-bootstrap-lib.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "../../../../tooling/qa-config.ts";
 import { ROOT } from "../../../../tooling/lib.ts";
@@ -36,7 +37,6 @@ export type MatrixClient = {
 };
 
 type ListModelsResult = {
-  ok: true;
   region: LLMRegion;
   clients: MatrixClient[];
 };
@@ -253,16 +253,19 @@ async function requireFreePort(port: number): Promise<void> {
 }
 
 async function request(endpoint: string, payload: Record<string, unknown>, timeoutMs: number): Promise<Record<string, unknown>> {
-  return await runOnce({ ...payload, id: crypto.randomUUID() }, timeoutMs, endpoint) as Record<string, unknown>;
+  const { method, ...params } = payload;
+  return callHost(String(method), params, timeoutMs, endpoint);
 }
 
 async function waitForModels(endpoint: string, region: LLMRegion): Promise<ListModelsResult> {
   const deadline = Date.now() + 60_000;
   let detail = "app is not ready";
   while (Date.now() < deadline) {
-    const result = await request(endpoint, { kind: "list-models" }, 5_000);
-    if (result.ok === true && result.region === region && Array.isArray(result.clients)) return result as ListModelsResult;
-    detail = result.ok === true ? `reported region ${String(result.region)}` : String(result.error);
+    try {
+      const result = await request(endpoint, { method: "models.list" }, 5_000);
+      if (result.region === region && Array.isArray(result.clients)) return result as ListModelsResult;
+      detail = `reported region ${String(result.region)}`;
+    } catch (error) { detail = (error as Error).message; }
     await Bun.sleep(100);
   }
   throw new Error(`Model catalog did not become ready for ${region}: ${detail}`);
@@ -272,9 +275,10 @@ async function setRegion(endpoint: string, region: LLMRegion): Promise<void> {
   const deadline = Date.now() + 60_000;
   let detail = "app is not ready";
   while (Date.now() < deadline) {
-    const result = await request(endpoint, { kind: "set-region", region }, 5_000);
-    if (result.ok === true) return;
-    detail = String(result.error);
+    try {
+      await request(endpoint, { method: "debug.region.set", region }, 5_000);
+      return;
+    } catch (error) { detail = (error as Error).message; }
     await Bun.sleep(100);
   }
   throw new Error(`Could not set simulator region to ${region}: ${detail}`);
@@ -284,18 +288,20 @@ async function freshChat(endpoint: string): Promise<{ id: string }> {
   const deadline = Date.now() + 60_000;
   let detail = "chat is not ready";
   while (Date.now() < deadline) {
-    const result = await request(endpoint, { kind: "get-chat" }, 5_000);
-    if (result.ok === true && result.data && typeof result.data === "object") {
-      const data = result.data as Record<string, unknown>;
-      const messages = Array.isArray(data.messages) ? data.messages : [];
-      const tools = Array.isArray(data.tools) ? data.tools : [];
-      if (typeof data.id === "string" && messages.length === 0 && tools.some((tool) => (tool as Record<string, unknown>)?.name === "execute")) {
-        return { id: data.id };
+    try {
+      const result = await request(endpoint, { method: "chats.get" }, 5_000);
+      if (result.data && typeof result.data === "object") {
+        const data = result.data as Record<string, unknown>;
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        const tools = Array.isArray(data.tools) ? data.tools : [];
+        if (typeof data.id === "string" && messages.length === 0 && tools.some((tool) => (tool as Record<string, unknown>)?.name === "execute")) {
+          return { id: data.id };
+        }
+        detail = `chat id=${String(data.id)} messages=${messages.length} tools=${tools.length}`;
+      } else {
+        detail = "no active chat";
       }
-      detail = `chat id=${String(data.id)} messages=${messages.length} tools=${tools.length}`;
-    } else {
-      detail = String(result.error);
-    }
+    } catch (error) { detail = (error as Error).message; }
     await Bun.sleep(100);
   }
   throw new Error(`Fresh tool-capable chat did not become ready: ${detail}`);
@@ -305,26 +311,27 @@ async function bootstrapRegion(keys: APIKeys, region: LLMRegion, endpoint: strin
   for (const provider of providers) {
     const key = keys[provider]?.[region];
     if (!key) throw new Error(`Missing ${region} key for ${provider}`);
-    const result = await request(endpoint, { kind: "set-key", clientId: provider, key }, 10_000);
-    if (result.ok !== true) throw new Error(`${region} credential bootstrap failed for ${provider}: ${String(result.error)}`);
+    await request(endpoint, { method: "debug.providers.setKey", clientId: provider, key }, 10_000);
     console.log(`  credential ${region}:${provider} ready`);
   }
 }
 
 async function runTarget(target: MatrixTarget, chatID: string, endpoint: string, timeoutMs: number): Promise<MatrixResult> {
   let response: Record<string, unknown>;
+  let failure: string | undefined;
   try {
     response = await request(endpoint, {
-      kind: "run-agent",
+      method: "agents.run",
       sessionId: chatID,
       clientId: target.client,
       modelId: target.model,
       prompt: "Find the current weather in Tokyo using Ox's public web capability and print the search result.",
     }, timeoutMs);
   } catch (error) {
-    response = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    failure = error instanceof Error ? error.message : String(error);
+    response = error instanceof HostRPCError && isObject(error.data) ? error.data : {};
   }
-  const score = scoreSmokeResponse(response);
+  const score = scoreSmokeResponse(response, failure);
   console.log(`  ${score.passed ? "PASS" : "FAIL"} ${target.protocol} ${target.region}:${target.client}:${target.model}`);
   return {
     ...target,
@@ -332,7 +339,7 @@ async function runTarget(target: MatrixTarget, chatID: string, endpoint: string,
     ttftMs: typeof response.ttftMs === "number" ? response.ttftMs : undefined,
     totalMs: typeof response.totalMs === "number" ? response.totalMs : undefined,
     checks: score.checks,
-    error: typeof response.error === "string" ? response.error : undefined,
+    error: failure,
   };
 }
 

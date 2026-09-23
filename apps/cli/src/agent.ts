@@ -26,7 +26,7 @@ async function runAgent(args: string[], context: CliContext): Promise<void> {
   const options = parseOptions(args, "run");
   if (!options.prompt) fail("agent run requires --prompt <text>");
   const selected = await resolveAgent(context, options.clientId, options.modelId, options.timeoutMs);
-  const result = await requireHost("run-agent", context, options.timeoutMs, {
+  const result = await requireHost("agents.run", context, options.timeoutMs, {
     clientId: selected.client.id,
     modelId: selected.model.id,
     prompt: options.prompt,
@@ -37,7 +37,7 @@ async function runAgent(args: string[], context: CliContext): Promise<void> {
 async function replayAgent(args: string[], context: CliContext): Promise<void> {
   const options = parseOptions(args, "replay");
   const selected = await resolveAgent(context, options.clientId, options.modelId, options.timeoutMs);
-  const result = await requireHost("run-agent", context, options.timeoutMs, {
+  const result = await requireHost("agents.run", context, options.timeoutMs, {
     clientId: selected.client.id,
     modelId: selected.model.id,
   });
@@ -77,7 +77,7 @@ function parseOptions(args: string[], command: "list" | "run" | "replay"): {
 }
 
 async function fetchAgents(context: CliContext, timeoutMs: number): Promise<ClientEntry[]> {
-  const result = await requireHost("list-models", context, timeoutMs);
+  const result = await requireHost("models.list", context, timeoutMs);
   return Array.isArray(result.clients) ? result.clients as ClientEntry[] : [];
 }
 

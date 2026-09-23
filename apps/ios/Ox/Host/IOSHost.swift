@@ -42,6 +42,19 @@ final class IOSHost: OxHost {
         )
     }
 
+    func listChats() -> [HostChatSummary] {
+        chats.orderedSummaries.map { summary in
+            HostChatSummary(
+                id: summary.id,
+                title: summary.displayTitle,
+                model: summary.modelID,
+                createdAt: summary.createdAt,
+                lastActivity: summary.lastActivity,
+                active: summary.id == chats.currentId
+            )
+        }
+    }
+
     func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async throws {
         if isPrepared { return }
         if let preparationTask {

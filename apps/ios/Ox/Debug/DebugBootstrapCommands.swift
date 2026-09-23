@@ -5,24 +5,24 @@ import UniformTypeIdentifiers
 
 extension OxHostProtocol {
     @MainActor
-    static func handleSetRegion(_ command: SetRegionRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetRegion(_ command: SetRegionRequest, reply: OxHostRPC.Reply) {
         guard let region = LLMRegion(rawValue: command.region) else {
-            reply(encode(StatusResult(kind: "set-region-result", id: command.id, error: "invalid region: \(command.region)")))
+            reply.failure("invalid region: \(command.region)")
             return
         }
         AppRegion.shared.setForTesting(region)
-        reply(encode(StatusResult(kind: "set-region-result", id: command.id)))
+        reply.success()
     }
 
     @MainActor
-    static func handleSetKey(_ command: SetKeyRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetKey(_ command: SetKeyRequest, reply: OxHostRPC.Reply) {
         guard !command.clientId.isEmpty else {
-            reply(encode(StatusResult(kind: "set-key-result", id: command.id, error: "missing clientId")))
+            reply.failure("missing clientId")
             return
         }
         let clientId = command.clientId
         guard let client = ProviderRegistry.shared.client(id: clientId, in: command.region ?? ProviderRegistry.shared.defaultRegion) else {
-            reply(encode(StatusResult(kind: "set-key-result", id: command.id, error: "unknown client: \(clientId)")))
+            reply.failure("unknown client: \(clientId)")
             return
         }
         let credentialID = client.credentialID
@@ -32,31 +32,21 @@ extension OxHostProtocol {
         } else {
             Credentials.set(key, for: credentialID)
         }
-        Log.agent.info("OxHostProtocol.set-key client=\(clientId) credential=\(credentialID) chars=\(key.count)")
-        reply(encode(StatusResult(kind: "set-key-result", id: command.id)))
+        Log.agent.info("OxHostRPC.debug.providers.setKey client=\(clientId) credential=\(credentialID) chars=\(key.count)")
+        reply.success()
     }
 
     @MainActor
     static func handleBootstrapArtifacts(
         _ command: BootstrapArtifactsRequest,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         guard !command.artifacts.isEmpty else {
-            reply(encode(BootstrapArtifactsResult(
-                id: command.id,
-                ok: false,
-                artifacts: nil,
-                error: "no artifacts"
-            )))
+            reply.failure("no artifacts")
             return
         }
         guard let scope = StorageRoot.currentScope else {
-            reply(encode(BootstrapArtifactsResult(
-                id: command.id,
-                ok: false,
-                artifacts: nil,
-                error: "active Profile unavailable"
-            )))
+            reply.failure("active Profile unavailable")
             return
         }
         Task { @MainActor in
@@ -79,24 +69,14 @@ extension OxHostProtocol {
                     }
                 }
                 let names = installed.map(\.fileName)
-                Log.app.info("OxHostProtocol.bootstrap-artifacts count=\(names.count) files=\(names.joined(separator: ","))")
-                reply(encode(BootstrapArtifactsResult(
-                    id: command.id,
-                    ok: true,
-                    artifacts: names,
-                    error: nil
-                )))
+                Log.app.info("OxHostRPC.debug.artifacts.bootstrap count=\(names.count) files=\(names.joined(separator: ","))")
+                reply.success(BootstrapArtifactsResult(artifacts: names))
             } catch {
                 for artifact in created.reversed() {
                     _ = try? await ProfileRepository.shared.deleteArtifact(named: artifact.fileName, in: scope)
                 }
-                Log.app.error("OxHostProtocol.bootstrap-artifacts imported=\(created.count) failed=\(error.localizedDescription)")
-                reply(encode(BootstrapArtifactsResult(
-                    id: command.id,
-                    ok: false,
-                    artifacts: nil,
-                    error: error.localizedDescription
-                )))
+                Log.app.error("OxHostRPC.debug.artifacts.bootstrap imported=\(created.count) failed=\(error.localizedDescription)")
+                reply.failure(error.localizedDescription)
             }
         }
     }
@@ -104,10 +84,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleWriteArtifact(
         _ command: WriteArtifactRequest,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         guard let scope = StorageRoot.currentScope else {
-            reply(encode(StatusResult(kind: "write-artifact-result", id: command.id, error: "active Profile unavailable")))
+            reply.failure("active Profile unavailable")
             return
         }
         Task { @MainActor in
@@ -117,39 +97,31 @@ extension OxHostProtocol {
                     named: command.name,
                     in: scope
                 )
-                Log.app.info("OxHostProtocol.write-artifact file=\(artifact.fileName) bytes=\(command.data.count)")
-                reply(encode(StatusResult(kind: "write-artifact-result", id: command.id)))
+                Log.app.info("OxHostRPC.debug.artifacts.write file=\(artifact.fileName) bytes=\(command.data.count)")
+                reply.success()
             } catch {
-                reply(encode(StatusResult(
-                    kind: "write-artifact-result",
-                    id: command.id,
-                    error: error.localizedDescription
-                )))
+                reply.failure(error.localizedDescription)
             }
         }
     }
 
     @MainActor
     static func handleExportWebsiteData(
-        _ command: IDRequest,
+        _ command: EmptyRequest,
         serviceManager: ServiceManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        guard !command.id.isEmpty else {
-            reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: "invalid request")))
-            return
-        }
         Task { @MainActor in
             do {
                 let data = try await serviceManager.exportWebsiteData()
                 guard data.count <= 64 * 1024 * 1024 else {
-                    reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: "website data exceeds 67108864 bytes")))
+                    reply.failure("website data exceeds 67108864 bytes")
                     return
                 }
-                reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: true, data: data, bytes: data.count, error: nil)))
+                reply.success(WebsiteDataResult(data: data, bytes: data.count))
             } catch {
                 Log.service.error("OxHostProtocol.websiteData export failed scope=global error=\(error.localizedDescription)")
-                reply(encode(WebsiteDataResult(kind: "export-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: error.localizedDescription)))
+                reply.failure(error.localizedDescription)
             }
         }
     }
@@ -158,23 +130,23 @@ extension OxHostProtocol {
     static func handleRestoreWebsiteData(
         _ command: RestoreWebsiteDataRequest,
         serviceManager: ServiceManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        guard !command.id.isEmpty, !command.data.isEmpty else {
-            reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: "invalid data")))
+        guard !command.data.isEmpty else {
+            reply.failure("invalid data")
             return
         }
         guard command.data.count <= 64 * 1024 * 1024 else {
-            reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: "website data exceeds 67108864 bytes")))
+            reply.failure("website data exceeds 67108864 bytes")
             return
         }
         Task { @MainActor in
             do {
                 try await serviceManager.restoreWebsiteData(command.data)
-                reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: true, data: nil, bytes: command.data.count, error: nil)))
+                reply.success(WebsiteDataResult(data: nil, bytes: command.data.count))
             } catch {
                 Log.service.error("OxHostProtocol.websiteData restore failed scope=global error=\(error.localizedDescription)")
-                reply(encode(WebsiteDataResult(kind: "restore-website-data-result", id: command.id, ok: false, data: nil, bytes: nil, error: error.localizedDescription)))
+                reply.failure(error.localizedDescription)
             }
         }
     }

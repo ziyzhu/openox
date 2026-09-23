@@ -10,9 +10,11 @@ import { chat, SUBS as chatSubs } from "./chat.ts";
 import { agent, SUBS as agentSubs } from "./agent.ts";
 import { discover } from "./discover.ts";
 import { logs } from "./logs.ts";
+import { host, SUBS as hostSubs } from "./host.ts";
 import packageMetadata from "../package.json";
 
 const groups: Record<string, CommandGroup> = {
+  host: { fn: host, desc: "Inspect Host identity and compatibility", subs: hostSubs },
   discover: { fn: discover, desc: "Discover reachable Ox Hosts" },
   chat: { fn: chat, desc: "Inspect and watch chats through an Ox Host", subs: chatSubs },
   agent: { fn: agent, desc: "List, run, or replay Host-provided agents", subs: agentSubs },

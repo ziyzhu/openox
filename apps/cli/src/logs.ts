@@ -16,7 +16,7 @@ const LEVELS = ["debug", "info", "warning", "error"];
 export async function logs(args: string[], context: CliContext): Promise<void> {
   const options = parseOptions(args);
   if (!options.follow) {
-    const result = await requireHost("get-logs", context, options.timeoutMs);
+    const result = await requireHost("logs.list", context, options.timeoutMs);
     const rows = limitedRows(filteredRows(result.logs, options.level, options.grep), options.tail);
     printRows(rows, options.json, false);
     return;
@@ -39,17 +39,17 @@ async function followLogs(
   process.on("SIGTERM", stop);
   try {
     while (!stopping) {
-      const result = await host.request("get-logs", options.timeoutMs);
-      if (stopping) break;
-      if (!result.ok) {
-        process.stderr.write(`logs: ${result.error}; retrying\n`);
-      } else {
+      try {
+        const result = await host.request("logs.list", options.timeoutMs);
+        if (stopping) break;
         const allRows = Array.isArray(result.logs) ? result.logs as LogRow[] : [];
         const unseen = maximumSequence < 0 ? allRows : allRows.filter(row => row.seq > maximumSequence);
         const filtered = filteredRows(unseen, options.level, options.grep);
         const rows = maximumSequence < 0 ? limitedRows(filtered, options.tail) : filtered;
         maximumSequence = Math.max(maximumSequence, ...allRows.map(row => row.seq));
         printRows(rows, options.json, true);
+      } catch (error) {
+        if (!stopping) process.stderr.write(`logs: ${(error as Error).message}; retrying\n`);
       }
       if (!stopping) await Bun.sleep(options.intervalMs);
     }

@@ -50,7 +50,7 @@ async function invoke(args: string[], context: CliContext): Promise<void> {
   catch (e) { fail(`--args is not valid JSON: ${(e as Error).message}`); }
 
   const host = createHostServiceRuntime(context.host);
-  printResult(await host.invoke({ domain, action, args: parsedArgs, approved, timeoutMs }), "invoke");
+  printResult(await host.invoke({ domain, action, args: parsedArgs, approved, timeoutMs }));
 }
 
 async function evaluate(args: string[], context: CliContext): Promise<void> {
@@ -73,7 +73,7 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
   if (!script) fail("expected a script (via --script or a positional arg)");
 
   const host = createHostServiceRuntime(context.host);
-  printResult(await host.evaluate({ domain, script, timeoutMs }), "eval");
+  printResult(await host.evaluate({ domain, script, timeoutMs }));
 }
 
 async function reload(args: string[], context: CliContext): Promise<void> {
@@ -91,7 +91,7 @@ async function reload(args: string[], context: CliContext): Promise<void> {
   if (!domain) fail("expected <domain> (e.g. news.ycombinator.com)");
 
   const host = createHostServiceRuntime(context.host);
-  printResult(await host.reload({ domain, timeoutMs }), "reload");
+  printResult(await host.reload({ domain, timeoutMs }));
 }
 
 async function status(args: string[], context: CliContext): Promise<void> {
@@ -108,28 +108,24 @@ async function status(args: string[], context: CliContext): Promise<void> {
   }
   const host = createHostServiceRuntime(context.host);
   const result = await host.status(timeoutMs);
-  if (result.ok) {
-    const services = (result.services ?? []) as Array<Record<string, unknown>>;
-    if (json) {
-      console.log(JSON.stringify(services, null, 2));
-      return;
-    }
-    if (!services.length) {
-      console.log("(no services)");
-      return;
-    }
-    const width = Math.max(...services.map(service => String(service.domain ?? "").length));
-    for (const service of services) {
-      const domain = String(service.domain ?? "");
-      const phase = String(service.phase ?? "unknown");
-      const signIn = String(service.signIn ?? "unknown");
-      const pages = Number(service.pageCount ?? 0);
-      const active = Number(service.activeInvocations ?? 0);
-      const queued = Number(service.queuedInvocations ?? 0);
-      console.log(`${domain.padEnd(width + 2)}${phase} · auth ${signIn} · pages ${pages} · actions ${active} active/${queued} queued`);
-    }
-  } else {
-    failResult("status", result.error);
+  const services = (result.services ?? []) as Array<Record<string, unknown>>;
+  if (json) {
+    console.log(JSON.stringify(services, null, 2));
+    return;
+  }
+  if (!services.length) {
+    console.log("(no services)");
+    return;
+  }
+  const width = Math.max(...services.map(service => String(service.domain ?? "").length));
+  for (const service of services) {
+    const domain = String(service.domain ?? "");
+    const phase = String(service.phase ?? "unknown");
+    const signIn = String(service.signIn ?? "unknown");
+    const pages = Number(service.pageCount ?? 0);
+    const active = Number(service.activeInvocations ?? 0);
+    const queued = Number(service.queuedInvocations ?? 0);
+    console.log(`${domain.padEnd(width + 2)}${phase} · auth ${signIn} · pages ${pages} · actions ${active} active/${queued} queued`);
   }
 }
 
@@ -146,7 +142,6 @@ async function syncMonoRepository(args: string[], context: CliContext): Promise<
   }
   const host = createHostServiceRuntime(context.host);
   const result = await host.sync(timeoutMs);
-  if (!result.ok) failResult("sync", result.error);
   const changed = (result.changed as string[] | undefined) ?? [];
   console.log(`${terminalText("synced", [C.bold, C.sky])} head=${String(result.head).slice(0, 12)} services=${result.services}`);
   console.log(changed.length ? `${terminalText("reloaded:", [C.dim])} ${changed.join(", ")}` : terminalText("no service changes", [C.dim]));

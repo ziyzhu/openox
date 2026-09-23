@@ -84,16 +84,18 @@ async function replayOnHost(
   const runtime = createHostServiceRuntime(host);
   const results: CaseResult[] = [];
   for (const fixture of fixtures) {
-    const response = await runtime.invoke({
-      domain: fixture.domain,
-      action: fixture.action,
-      args: fixture.args,
-      approved: true,
-      timeoutMs,
-    });
-    results.push(response.ok
-      ? compare(fixture, { output: response.value })
-      : compare(fixture, { error: response.error }));
+    try {
+      const response = await runtime.invoke({
+        domain: fixture.domain,
+        action: fixture.action,
+        args: fixture.args,
+        approved: true,
+        timeoutMs,
+      });
+      results.push(compare(fixture, { output: response.value }));
+    } catch (error) {
+      results.push(compare(fixture, { error: (error as Error).message }));
+    }
   }
   return results;
 }

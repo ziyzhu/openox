@@ -7,6 +7,8 @@ final class OxClient {
     var chats: ChatManager { host.chats }
     var services: ServiceManager { host.services }
 
+    func listChats() -> [HostChatSummary] { host.listChats() }
+
     init(host: any OxHost) {
         self.host = host
     }

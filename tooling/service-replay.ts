@@ -2,7 +2,7 @@ import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, stat
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { runOnce } from "../apps/cli/src/debug-ws.ts";
+import { callHost } from "../apps/cli/src/host-rpc.ts";
 import { ROOT } from "./lib.ts";
 import { qaConfig, qaNumberedDevice, targetedQaDevice } from "./qa-config.ts";
 
@@ -101,16 +101,16 @@ async function waitForRegistry(endpoint: string, expectedDomain?: string): Promi
   let detail = "registry is not ready";
   while (performance.now() < deadline) {
     if (interrupted) throw new Error(`Interrupted by ${interrupted}`);
-    const result = await runOnce({ kind: "sync-mono-repository", id: crypto.randomUUID() }, 5_000, endpoint);
-    if (result.ok && typeof result.head === "string" && result.head && Number(result.services) > 0) {
-      if (!expectedDomain) return;
-      const status = await runOnce({ kind: "list-services", id: crypto.randomUUID() }, 30_000, endpoint);
-      const services = status.ok && Array.isArray(status.services) ? status.services : [];
-      if (services.some((service) => service?.domain === expectedDomain)) return;
-      detail = status.ok ? `service ${expectedDomain} is not listed` : status.error;
-    } else {
-      detail = result.ok ? `head=${String(result.head)} services=${String(result.services)}` : result.error;
-    }
+    try {
+      const result = await callHost("services.sync", {}, 5_000, endpoint);
+      if (typeof result.head === "string" && result.head && Number(result.services) > 0) {
+        if (!expectedDomain) return;
+        const status = await callHost("services.list", {}, 30_000, endpoint);
+        const services = Array.isArray(status.services) ? status.services : [];
+        if (services.some((service) => service?.domain === expectedDomain)) return;
+        detail = `service ${expectedDomain} is not listed`;
+      } else detail = `head=${String(result.head)} services=${String(result.services)}`;
+    } catch (error) { detail = (error as Error).message; }
     await Bun.sleep(100);
   }
   throw new Error(`Registry did not become ready through ${endpoint}: ${detail}`);

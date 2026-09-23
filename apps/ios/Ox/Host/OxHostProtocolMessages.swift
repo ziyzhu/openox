@@ -3,56 +3,48 @@ import Foundation
 import UIKit
 
 extension OxHostProtocol {
-    enum Kind: String, Decodable {
-        case invokeAction = "invoke-action"
-        case evaluate
-        case reloadService = "reload-service"
-        case refreshServiceAuth = "refresh-service-auth"
-        case listServices = "list-services"
-        case syncMonoRepository = "sync-mono-repository"
-        case listChats = "list-chats"
-        case getChat = "get-chat"
-        case listModels = "list-models"
-        case getLogs = "get-logs"
-        case getComposerFormatting = "get-composer-formatting"
-        case repositoryGate = "repository-gate"
-        case replayStorageMigration = "replay-storage-migration"
-        case runAgent = "run-agent"
-        case virtualMachineEval = "virtual-machine-eval"
-        case vmInspect = "vm-inspect"
-        case vmFunctions = "vm-functions"
-        case vmCall = "vm-call"
-        case vmEval = "vm-eval"
-        case bootstrapArtifacts = "bootstrap-artifacts"
-        case writeArtifact = "write-artifact"
-        case exportWebsiteData = "export-website-data"
-        case restoreWebsiteData = "restore-website-data"
-        case setKey = "set-key"
-        case setRegion = "set-region"
-        case setAttachedService = "set-attached-service"
-        case setComposerDraft = "set-composer-draft"
-        case setComposerMarkedText = "set-composer-marked-text"
-        case setPasteboardImage = "set-pasteboard-image"
-        case setPasteboardRichText = "set-pasteboard-rich-text"
-        case stageSharedNote = "stage-shared-note"
-        case setEditDraft = "set-edit-draft"
+    enum Method: String, CaseIterable {
+        case describe = "host.describe"
+        case invokeAction = "services.invoke"
+        case evaluate = "services.evaluate"
+        case reloadService = "services.reload"
+        case refreshServiceAuth = "services.refreshAuth"
+        case listServices = "services.list"
+        case syncMonoRepository = "services.sync"
+        case listChats = "chats.list"
+        case getChat = "chats.get"
+        case listModels = "models.list"
+        case getLogs = "logs.list"
+        case getComposerFormatting = "debug.composer.formatting"
+        case repositoryGate = "debug.repositories.saveGate"
+        case replayStorageMigration = "debug.storage.replayMigration"
+        case runAgent = "agents.run"
+        case vmInspect = "vm.inspect"
+        case vmFunctions = "vm.functions"
+        case vmCall = "vm.call"
+        case vmEval = "vm.eval"
+        case bootstrapArtifacts = "debug.artifacts.bootstrap"
+        case writeArtifact = "debug.artifacts.write"
+        case exportWebsiteData = "debug.websiteData.export"
+        case restoreWebsiteData = "debug.websiteData.restore"
+        case setKey = "debug.providers.setKey"
+        case setRegion = "debug.region.set"
+        case setAttachedService = "debug.chats.attachServices"
+        case setComposerDraft = "debug.composer.setDraft"
+        case setComposerMarkedText = "debug.composer.setMarkedText"
+        case setPasteboardImage = "debug.pasteboard.setImage"
+        case setPasteboardRichText = "debug.pasteboard.setRichText"
+        case stageSharedNote = "debug.share.stageNote"
+        case setEditDraft = "debug.chat.setEditDraft"
     }
 
-    struct Envelope: Decodable {
-        let kind: Kind
-    }
-
-    struct IDRequest: Decodable {
-        let id: String
-    }
+    struct EmptyRequest: Decodable {}
 
     struct SessionRequest: Decodable {
-        let id: String
         let sessionId: String?
     }
 
     struct ActionRequest: Decodable {
-        let id: String
         let domain: String
         let action: String
         let args: JSONValue?
@@ -60,13 +52,11 @@ extension OxHostProtocol {
     }
 
     struct EvaluateRequest: Decodable {
-        let id: String
         let domain: String
         let script: String
     }
 
     struct ServiceRequest: Decodable {
-        let id: String
         let domain: String
     }
 
@@ -76,7 +66,6 @@ extension OxHostProtocol {
             let assistant: AssistantMessage
         }
 
-        let id: String
         let sessionId: String?
         let clientId: String
         let modelId: String
@@ -88,14 +77,12 @@ extension OxHostProtocol {
     }
 
     struct SetKeyRequest: Decodable {
-        let id: String
         let clientId: String
         let key: String?
         let region: LLMRegion?
     }
 
     struct SetRegionRequest: Decodable {
-        let id: String
         let region: String
     }
 
@@ -105,172 +92,57 @@ extension OxHostProtocol {
     }
 
     struct BootstrapArtifactsRequest: Decodable {
-        let id: String
         let artifacts: [BootstrapArtifactInput]
     }
 
     struct WriteArtifactRequest: Decodable {
-        let id: String
         let name: String
         let data: Data
     }
 
     struct RestoreWebsiteDataRequest: Decodable {
-        let id: String
         let data: Data
     }
 
     struct SetAttachedServiceRequest: Decodable {
-        let id: String
         let domain: String?
         let domains: [String]?
     }
 
     struct PromptRequest: Decodable {
-        let id: String
         let prompt: String
     }
 
     struct RepositoryGateRequest: Decodable {
-        let id: String
         let domain: String
         let action: String
     }
 
-    struct VirtualMachineEvalRequest: Decodable {
-        let id: String
-        let sessionId: String?
-        let script: String
-    }
-
     struct VMRequest: Decodable {
-        let id: String
-        let protocolVersion: Int
         let sessionId: String?
     }
 
     struct VMFunctionsRequest: Decodable {
-        let id: String
-        let protocolVersion: Int
         let function: String?
     }
 
     struct VMCallRequest: Decodable {
-        let id: String
-        let protocolVersion: Int
         let sessionId: String?
         let function: String
         let arguments: JSONValue
     }
 
     struct VMEvalRequest: Decodable {
-        let id: String
-        let protocolVersion: Int
         let sessionId: String?
         let script: String
     }
 
     struct ReplayStorageMigrationRequest: Decodable {
-        let id: String
         let turns: [Turn]
         let fixtures: [StorageMigrationFixture]
     }
 
-    enum Command: Decodable {
-        case invokeAction(ActionRequest)
-        case evaluate(EvaluateRequest)
-        case reloadService(ServiceRequest)
-        case refreshServiceAuth(ServiceRequest)
-        case listServices(IDRequest)
-        case syncMonoRepository(IDRequest)
-        case listChats(IDRequest)
-        case getChat(SessionRequest)
-        case listModels(IDRequest)
-        case getLogs(IDRequest)
-        case getComposerFormatting(IDRequest)
-        case repositoryGate(RepositoryGateRequest)
-        case replayStorageMigration(ReplayStorageMigrationRequest)
-        case runAgent(RunAgentRequest)
-        case virtualMachineEval(VirtualMachineEvalRequest)
-        case vmInspect(VMRequest)
-        case vmFunctions(VMFunctionsRequest)
-        case vmCall(VMCallRequest)
-        case vmEval(VMEvalRequest)
-        case bootstrapArtifacts(BootstrapArtifactsRequest)
-        case writeArtifact(WriteArtifactRequest)
-        case exportWebsiteData(IDRequest)
-        case restoreWebsiteData(RestoreWebsiteDataRequest)
-        case setKey(SetKeyRequest)
-        case setRegion(SetRegionRequest)
-        case setAttachedService(SetAttachedServiceRequest)
-        case setComposerDraft(PromptRequest)
-        case setComposerMarkedText(PromptRequest)
-        case setPasteboardImage(IDRequest)
-        case setPasteboardRichText(PromptRequest)
-        case stageSharedNote(PromptRequest)
-        case setEditDraft(PromptRequest)
-
-        init(from decoder: Decoder) throws {
-            switch try Envelope(from: decoder).kind {
-            case .invokeAction: self = .invokeAction(try ActionRequest(from: decoder))
-            case .evaluate: self = .evaluate(try EvaluateRequest(from: decoder))
-            case .reloadService: self = .reloadService(try ServiceRequest(from: decoder))
-            case .refreshServiceAuth: self = .refreshServiceAuth(try ServiceRequest(from: decoder))
-            case .listServices: self = .listServices(try IDRequest(from: decoder))
-            case .syncMonoRepository: self = .syncMonoRepository(try IDRequest(from: decoder))
-            case .listChats: self = .listChats(try IDRequest(from: decoder))
-            case .getChat: self = .getChat(try SessionRequest(from: decoder))
-            case .listModels: self = .listModels(try IDRequest(from: decoder))
-            case .getLogs: self = .getLogs(try IDRequest(from: decoder))
-            case .getComposerFormatting: self = .getComposerFormatting(try IDRequest(from: decoder))
-            case .repositoryGate: self = .repositoryGate(try RepositoryGateRequest(from: decoder))
-            case .replayStorageMigration: self = .replayStorageMigration(try ReplayStorageMigrationRequest(from: decoder))
-            case .runAgent: self = .runAgent(try RunAgentRequest(from: decoder))
-            case .virtualMachineEval: self = .virtualMachineEval(try VirtualMachineEvalRequest(from: decoder))
-            case .vmInspect: self = .vmInspect(try VMRequest(from: decoder))
-            case .vmFunctions: self = .vmFunctions(try VMFunctionsRequest(from: decoder))
-            case .vmCall: self = .vmCall(try VMCallRequest(from: decoder))
-            case .vmEval: self = .vmEval(try VMEvalRequest(from: decoder))
-            case .bootstrapArtifacts: self = .bootstrapArtifacts(try BootstrapArtifactsRequest(from: decoder))
-            case .writeArtifact: self = .writeArtifact(try WriteArtifactRequest(from: decoder))
-            case .exportWebsiteData: self = .exportWebsiteData(try IDRequest(from: decoder))
-            case .restoreWebsiteData: self = .restoreWebsiteData(try RestoreWebsiteDataRequest(from: decoder))
-            case .setKey: self = .setKey(try SetKeyRequest(from: decoder))
-            case .setRegion: self = .setRegion(try SetRegionRequest(from: decoder))
-            case .setAttachedService: self = .setAttachedService(try SetAttachedServiceRequest(from: decoder))
-            case .setComposerDraft: self = .setComposerDraft(try PromptRequest(from: decoder))
-            case .setComposerMarkedText: self = .setComposerMarkedText(try PromptRequest(from: decoder))
-            case .setPasteboardImage: self = .setPasteboardImage(try IDRequest(from: decoder))
-            case .setPasteboardRichText: self = .setPasteboardRichText(try PromptRequest(from: decoder))
-            case .stageSharedNote: self = .stageSharedNote(try PromptRequest(from: decoder))
-            case .setEditDraft: self = .setEditDraft(try PromptRequest(from: decoder))
-            }
-        }
-    }
-
-    struct ErrorResult: Encodable {
-        let kind: String
-        let error: String
-    }
-
-    struct StatusResult: Encodable {
-        let kind: String
-        let id: String
-        let ok: Bool
-        let error: String?
-
-        init(kind: String, id: String, error: String? = nil) {
-            self.kind = kind
-            self.id = id
-            self.ok = error == nil
-            self.error = error
-        }
-    }
-
     struct ComposerFormattingResult: Encodable {
-        let kind = "get-composer-formatting-result"
-        let id: String
-        let ok: Bool
         let text: String
         let hasForegroundColor: Bool
         let visibleHasOrangeForeground: Bool
@@ -279,20 +151,25 @@ extension OxHostProtocol {
     }
 
     struct BootstrapArtifactsResult: Encodable {
-        let kind = "bootstrap-artifacts-result"
-        let id: String
-        let ok: Bool
         let artifacts: [String]?
-        let error: String?
     }
 
     struct WebsiteDataResult: Encodable {
-        let kind: String
-        let id: String
-        let ok: Bool
         let data: Data?
         let bytes: Int?
-        let error: String?
+    }
+
+    static func chatRows(_ summaries: [HostChatSummary]) -> [ChatRow] {
+        summaries.map { summary in
+            ChatRow(
+                id: summary.id.uuidString,
+                title: summary.title,
+                model: summary.model.map(JSONValue.string) ?? .null,
+                createdAt: iso(summary.createdAt),
+                lastActivity: summary.lastActivity.map { .string(iso($0)) } ?? .null,
+                active: summary.active
+            )
+        }
     }
 
     struct ChatRow: Encodable {
@@ -305,11 +182,7 @@ extension OxHostProtocol {
     }
 
     struct ListChatsResult: Encodable {
-        let kind = "list-chats-result"
-        let id: String
-        let ok: Bool
         let chats: [ChatRow]?
-        let error: String?
     }
 
     struct ModelRow: Encodable {
@@ -342,9 +215,6 @@ extension OxHostProtocol {
     }
 
     struct ListModelsResult: Encodable {
-        let kind = "list-models-result"
-        let id: String
-        let ok = true
         let region: String
         let clients: [ClientRow]
     }
@@ -360,24 +230,14 @@ extension OxHostProtocol {
     }
 
     struct GetLogsResult: Encodable {
-        let kind = "get-logs-result"
-        let id: String
-        let ok = true
         let logs: [DebugLogRow]
     }
 
     struct RepositorySaveGateResult: Encodable {
-        let kind = "repository-gate-result"
-        let id: String
-        let ok: Bool
         let entered: Bool?
-        let error: String?
     }
 
     struct StorageMigrationReplayResult: Encodable {
-        let kind = "replay-storage-migration-result"
-        let id: String
-        let ok: Bool
         let currentVersion: String?
         let versionUpdated: Bool?
         let ordinaryContextRemoved: Bool?
@@ -398,7 +258,6 @@ extension OxHostProtocol {
         let futureActionPoliciesPreserved: Bool?
         let actionPolicyResolutionValid: Bool?
         let fixtureResults: [StorageMigrationFixtureReplay]?
-        let error: String?
     }
 
 }

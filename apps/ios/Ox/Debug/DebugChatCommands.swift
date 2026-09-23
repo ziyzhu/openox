@@ -4,44 +4,34 @@ import Foundation
 extension OxHostProtocol {
     @MainActor
     static func handleListChats(
-        _ command: IDRequest,
-        chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        _ command: EmptyRequest,
+        host: any OxHost,
+        reply: OxHostRPC.Reply
     ) {
-        let currentId = chatManager.currentId
-        let chats = chatManager.orderedSummaries.map { summary in
-            ChatRow(
-                id: summary.id.uuidString,
-                title: summary.displayTitle,
-                model: summary.modelID.map(JSONValue.string) ?? .null,
-                createdAt: iso(summary.createdAt),
-                lastActivity: summary.lastActivity.map { .string(iso($0)) } ?? .null,
-                active: summary.id == currentId
-            )
-        }
-        Log.agent.debug("OxHostProtocol.list-chats id=\(command.id) count=\(chats.count)")
-        reply(encode(ListChatsResult(id: command.id, ok: true, chats: chats, error: nil)))
+        let chats = chatRows(host.listChats())
+        Log.agent.debug("OxHostRPC.chats.list id=\(reply.id) count=\(chats.count)")
+        reply.success(ListChatsResult(chats: chats))
     }
 
     @MainActor
     static func handleGetChat(
         _ command: SessionRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         let session: Chat?
         switch resolveSession(chatManager, command.sessionId) {
         case .found(let s): session = s
         case .error(let error):
-            reply(encode(GetChatResult(id: command.id, ok: false, data: nil, error: error)))
+            reply.failure(error)
             return
         }
         guard let session else {
-            reply(encode(GetChatResult(id: command.id, ok: true, data: nil, error: nil)))
+            reply.success(GetChatResult(data: nil))
             return
         }
-        Log.agent.debug("OxHostProtocol.get-chat id=\(command.id) session=\(session.id)")
-        reply(encode(GetChatResult(id: command.id, ok: true, data: DebugSnapshot(session), error: nil)))
+        Log.agent.debug("OxHostRPC.chats.get id=\(reply.id) session=\(session.id)")
+        reply.success(GetChatResult(data: DebugSnapshot(session)))
     }
 
     enum ChatLookup {
@@ -59,15 +49,11 @@ extension OxHostProtocol {
     }
 
     struct GetChatResult: Encodable {
-        let kind = "get-chat-result"
-        let id: String
-        let ok: Bool
         let data: DebugSnapshot?
-        let error: String?
     }
 
     @MainActor
-    static func handleListModels(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleListModels(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
         let registry = ProviderRegistry.shared
         let clients = registry.clients.map { client in
             let diagnostics = client.protocolDiagnostics
@@ -104,12 +90,12 @@ extension OxHostProtocol {
                 }
             )
         }
-        Log.agent.debug("OxHostProtocol.list-models id=\(command.id) count=\(clients.count)")
-        reply(encode(ListModelsResult(id: command.id, region: AppRegion.shared.region.rawValue, clients: clients)))
+        Log.agent.debug("OxHostRPC.models.list id=\(reply.id) count=\(clients.count)")
+        reply.success(ListModelsResult(region: AppRegion.shared.region.rawValue, clients: clients))
     }
 
     @MainActor
-    static func handleGetLogs(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleGetLogs(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
         let logs = LogStore.shared.snapshot().map {
             DebugLogRow(
                 seq: $0.id,
@@ -121,26 +107,26 @@ extension OxHostProtocol {
                 message: $0.message
             )
         }
-        reply(encode(GetLogsResult(id: command.id, logs: logs)))
+        reply.success(GetLogsResult(logs: logs))
     }
 
     @MainActor
     static func handleRepositorySaveGate(
         _ command: RepositoryGateRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         guard command.domain == "save", let entered = chatManager.debugControlRepositorySaveGate(command.action) else {
-            reply(encode(RepositorySaveGateResult(id: command.id, ok: false, entered: nil, error: "expected hold, release, or status for save")))
+            reply.failure("expected hold, release, or status for save")
             return
         }
-        reply(encode(RepositorySaveGateResult(id: command.id, ok: true, entered: entered, error: nil)))
+        reply.success(RepositorySaveGateResult(entered: entered))
     }
 
     @MainActor
     static func handleReplayStorageMigration(
         _ command: ReplayStorageMigrationRequest,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         Task {
             do {
@@ -148,9 +134,7 @@ extension OxHostProtocol {
                     turns: command.turns,
                     fixtures: command.fixtures
                 )
-                reply(encode(StorageMigrationReplayResult(
-                    id: command.id,
-                    ok: true,
+                reply.success(StorageMigrationReplayResult(
                     currentVersion: replay.currentVersion,
                     versionUpdated: replay.versionUpdated,
                     ordinaryContextRemoved: replay.ordinaryContextRemoved,
@@ -170,35 +154,10 @@ extension OxHostProtocol {
                     savedServicesMigrated: replay.savedServicesMigrated,
                     futureActionPoliciesPreserved: replay.futureActionPoliciesPreserved,
                     actionPolicyResolutionValid: replay.actionPolicyResolutionValid,
-                    fixtureResults: replay.fixtureResults,
-                    error: nil
-                )))
+                    fixtureResults: replay.fixtureResults
+                ))
             } catch {
-                reply(encode(StorageMigrationReplayResult(
-                    id: command.id,
-                    ok: false,
-                    currentVersion: nil,
-                    versionUpdated: nil,
-                    ordinaryContextRemoved: nil,
-                    unreadableContextRetained: nil,
-                    compactedContextRetained: nil,
-                    compactedContextValid: nil,
-                    noContextPreserved: nil,
-                    transcriptsUnchanged: nil,
-                    secondRunNoOp: nil,
-                    ordinaryExportOmitsContext: nil,
-                    compactedExportRetainsContext: nil,
-                    defaultModelMigrated: nil,
-                    chatModelMigrated: nil,
-                    unsupportedVersionRejected: nil,
-                    providerCatalogMigrated: nil,
-                    actionPoliciesMigrated: nil,
-                    savedServicesMigrated: nil,
-                    futureActionPoliciesPreserved: nil,
-                    actionPolicyResolutionValid: nil,
-                    fixtureResults: nil,
-                    error: error.localizedDescription
-                )))
+                reply.failure(error.localizedDescription)
             }
         }
     }

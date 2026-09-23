@@ -6,6 +6,7 @@
 1. Keep enough structured logs to diagnose production issues.
 1. Prefer composition, explicit state, and small changes.
 1. Use Action/actions consistently for Ox functionality in iOS UI copy, data models, and protocols. Preserve Apple's Shortcuts action terminology.
+1. Client-to-Host calls use JSON-RPC 2.0. Register methods in `OxHostProtocol.Method` and use the shared `HostRPCClient` in TypeScript callers; do not add alternate wire envelopes.
 1. Keep the three feature headings and descriptions identical across `README.md`, `apps/ios/Ox/Client/Features/Onboarding/OnboardingView.swift`, and the website at `../openox-dev/web/index.html`; update the onboarding translations when this copy changes.
 1. Use `.agents/skills/storage-migrations` for changes that affect persisted data or storage layout.
 1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.

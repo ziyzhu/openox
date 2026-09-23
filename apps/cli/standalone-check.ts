@@ -22,10 +22,18 @@ const server = Bun.serve({
   websocket: {
     message(socket, message) {
       const request = JSON.parse(String(message));
+      const result = request.method === "host.describe" ? {
+        implementation: { name: "Ox fixture", version: "1", build: "1" },
+        methods: { "host.describe": 1, "chats.list": 1 },
+      } : {
+        chats: [{ id: "standalone-smoke", title: "Standalone smoke test", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: false }],
+      };
       socket.send(JSON.stringify({
+        jsonrpc: "2.0",
         id: request.id,
-        ok: request.kind === "list-chats",
-        chats: [{ id: "standalone-smoke", title: "Standalone smoke test" }],
+        ...(request.jsonrpc === "2.0" && ["host.describe", "chats.list"].includes(request.method)
+          ? { result }
+          : { error: { code: -32601, message: "Method not found" } }),
       }));
     },
   },

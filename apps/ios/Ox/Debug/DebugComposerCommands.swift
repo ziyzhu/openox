@@ -5,49 +5,43 @@ import UniformTypeIdentifiers
 
 extension DebugUIAPI {
     @MainActor
-    static func handleSetComposerDraft(_ command: PromptRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetComposerDraft(_ command: PromptRequest, reply: OxHostRPC.Reply) {
         guard let composer else {
-            reply(encode(StatusResult(kind: "set-composer-draft-result", id: command.id, error: "composer unavailable")))
+            reply.failure("composer unavailable")
             return
         }
         composer.draft = command.prompt
-        reply(encode(StatusResult(kind: "set-composer-draft-result", id: command.id)))
+        reply.success()
     }
 
     @MainActor
     static func handleSetComposerMarkedText(
         _ command: PromptRequest,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         guard let textView = visibleComposerTextViews().first else {
-            reply(encode(StatusResult(
-                kind: "set-composer-marked-text-result",
-                id: command.id,
-                error: "composer text view unavailable"
-            )))
+            reply.failure("composer text view unavailable")
             return
         }
         textView.setMarkedText(
             command.prompt,
             selectedRange: NSRange(location: command.prompt.utf16.count, length: 0)
         )
-        reply(encode(StatusResult(kind: "set-composer-marked-text-result", id: command.id)))
+        reply.success()
     }
 
     @MainActor
-    static func handleGetComposerFormatting(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleGetComposerFormatting(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
         let draft = composer?.attributedDraft ?? AttributedString()
         let textViews = visibleComposerTextViews()
             .filter { $0.window != nil && !$0.isHidden && $0.alpha > 0 && $0.text == String(draft.characters) }
-        reply(encode(ComposerFormattingResult(
-            id: command.id,
-            ok: true,
+        reply.success(ComposerFormattingResult(
             text: String(draft.characters),
             hasForegroundColor: draft.runs.contains { $0.foregroundColor != nil },
             visibleHasOrangeForeground: textViews.contains(where: containsOrangeForeground),
             visibleHasPrimaryForeground: textViews.contains(where: containsPrimaryForeground),
             visibleHasMarkedText: textViews.contains { $0.markedTextRange != nil }
-        )))
+        ))
     }
 
     @MainActor
@@ -108,22 +102,22 @@ extension DebugUIAPI {
     }
 
     @MainActor
-    static func handleSetPasteboardImage(_ command: IDRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetPasteboardImage(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12))
         let image = renderer.image { context in
             UIColor.systemOrange.setFill()
             context.fill(CGRect(x: 0, y: 0, width: 12, height: 12))
         }
         guard let data = image.pngData() else {
-            reply(encode(StatusResult(kind: "set-pasteboard-image-result", id: command.id, error: "image encoding failed")))
+            reply.failure("image encoding failed")
             return
         }
         UIPasteboard.general.items = [[UTType.png.identifier: data]]
-        reply(encode(StatusResult(kind: "set-pasteboard-image-result", id: command.id)))
+        reply.success()
     }
 
     @MainActor
-    static func handleSetPasteboardRichText(_ command: PromptRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetPasteboardRichText(_ command: PromptRequest, reply: OxHostRPC.Reply) {
         let source = NSAttributedString(
             string: command.prompt,
             attributes: [.foregroundColor: UIColor.systemOrange]
@@ -132,38 +126,34 @@ extension DebugUIAPI {
             from: NSRange(location: 0, length: source.length),
             documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
         ) else {
-            reply(encode(StatusResult(kind: "set-pasteboard-rich-text-result", id: command.id, error: "RTF encoding failed")))
+            reply.failure("RTF encoding failed")
             return
         }
         UIPasteboard.general.items = [[
             UTType.rtf.identifier: data,
             UTType.plainText.identifier: command.prompt,
         ]]
-        reply(encode(StatusResult(kind: "set-pasteboard-rich-text-result", id: command.id)))
+        reply.success()
     }
 
     @MainActor
-    static func handleStageSharedNote(_ command: PromptRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleStageSharedNote(_ command: PromptRequest, reply: OxHostRPC.Reply) {
         do {
             try SharedNoteInbox.stageForTesting(title: "Shared Note Test", text: command.prompt)
-            reply(encode(StatusResult(kind: "stage-shared-note-result", id: command.id)))
+            reply.success()
         } catch {
-            reply(encode(StatusResult(
-                kind: "stage-shared-note-result",
-                id: command.id,
-                error: error.localizedDescription
-            )))
+            reply.failure(error.localizedDescription)
         }
     }
 
     @MainActor
-    static func handleSetEditDraft(_ command: PromptRequest, reply: @escaping @MainActor (Data) -> Void) {
+    static func handleSetEditDraft(_ command: PromptRequest, reply: OxHostRPC.Reply) {
         guard let setEditDraft else {
-            reply(encode(StatusResult(kind: "set-edit-draft-result", id: command.id, error: "editor unavailable")))
+            reply.failure("editor unavailable")
             return
         }
         setEditDraft(command.prompt)
-        reply(encode(StatusResult(kind: "set-edit-draft-result", id: command.id)))
+        reply.success()
     }
 
 }

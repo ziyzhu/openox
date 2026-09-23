@@ -1,4 +1,3 @@
-import { type DebugResult } from "./debug-ws.ts";
 
 export const C = {
   bold: "\x1b[1m",
@@ -150,12 +149,13 @@ export async function runCli(
     process.exitCode = 1;
     return;
   }
-  await group.fn(rest, parsed.context);
+  try { await group.fn(rest, parsed.context); }
+  catch (error) { writeError(`error: ${(error as Error).message}`); process.exitCode = 1; }
 }
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
   const profileCommands = new Set(["memory", "soul", "skills", "artifacts", "chats", "skill"]);
-  const hostCommands = new Set(["discover", "chat", "agent", "logs", "vm"]);
+  const hostCommands = new Set(["host", "discover", "chat", "agent", "logs", "vm"]);
   const chatCommands = new Set(["chat", "agent", "vm"]);
   const liveServiceCommands = new Set(["status", "invoke", "eval", "reload", "sync", "test"]);
   const repositoryServiceCommands = new Set(["list", "inspect", "actions", "skills"]);
@@ -204,12 +204,8 @@ export function failResult(label: string, error: string): never {
   process.exit(1);
 }
 
-export function printResult(result: DebugResult, label: string): void {
-  if (result.ok) {
-    console.log(JSON.stringify(result.value, null, 2));
-  } else {
-    failResult(label, result.error);
-  }
+export function printResult(result: Record<string, unknown>): void {
+  console.log(JSON.stringify(result.value ?? null, null, 2));
 }
 
 export function takeFlag(args: string[], ...names: string[]): { value: string | undefined; rest: string[] } {

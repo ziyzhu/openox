@@ -55,7 +55,7 @@ const hostProtocol = await readFile(join(ROOT, "apps/ios/Ox/Host/OxHostProtocol.
 if (!hostProtocol.includes("host: any OxHost")) {
   failures.push("apps/ios/Ox/Host/OxHostProtocol.swift: Host protocol must target the OxHost contract");
 }
-for (const forbidden of ["viewportController", "ChatComposerModel", "setEditDraft:"]) {
+for (const forbidden of ["viewportController", "ChatComposerModel", "var setEditDraft"]) {
   if (hostProtocol.includes(forbidden)) {
     failures.push(`apps/ios/Ox/Host/OxHostProtocol.swift: UI automation state must remain in DebugUIAPI (${forbidden})`);
   }

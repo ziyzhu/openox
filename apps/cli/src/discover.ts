@@ -1,4 +1,4 @@
-import { debugEndpoint } from "./debug-ws.ts";
+import { hostEndpoint } from "./host-connection.ts";
 import { fail, type CliContext } from "./lib.ts";
 
 type Listener = { port: number; pid?: number; process?: string };
@@ -18,7 +18,7 @@ export async function discover(args: string[], context: CliContext): Promise<voi
       return;
     } else fail(`unknown option: ${argument}`);
   }
-  const selected = normalizedEndpoint(context.host ?? debugEndpoint());
+  const selected = normalizedEndpoint(context.host ?? hostEndpoint());
   const candidates = new Map<string, HostCandidate>();
   candidates.set(selected, { endpoint: selected, label: "configured Host", kind: "unknown", source: "configuration" });
   const daemonPort = validPort(process.env.OX_SIM_DAEMON_PORT, 9909);

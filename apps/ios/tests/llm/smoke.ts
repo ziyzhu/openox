@@ -40,7 +40,7 @@ function callsIn(source: string): { calls: string[]; syntaxErrors: string[] } {
   };
 }
 
-export function scoreSmokeResponse(result: Record<string, unknown>): { passed: boolean; checks: SmokeCheck[] } {
+export function scoreSmokeResponse(result: Record<string, unknown>, error?: string): { passed: boolean; checks: SmokeCheck[] } {
   const message = result.message && typeof result.message === "object" ? result.message as Record<string, unknown> : undefined;
   const blocks = Array.isArray(message?.content) ? message.content as ContentBlock[] : [];
   const toolCalls = blocks.flatMap((block) => {
@@ -56,7 +56,7 @@ export function scoreSmokeResponse(result: Record<string, unknown>): { passed: b
   const trace = callsIn(source);
   const webSearchCount = trace.calls.filter((call) => call === "ox.web.search").length;
   const checks: SmokeCheck[] = [
-    { passed: result.ok === true, detail: `request succeeded${result.ok === true ? "" : `: ${String(result.error ?? "unknown error")}`}` },
+    { passed: error === undefined, detail: `request succeeded${error === undefined ? "" : `: ${error}`}` },
     { passed: execute !== undefined, detail: "uses exactly one execute tool call" },
     { passed: source.trim().length > 0, detail: "JavaScript source is nonempty" },
     { passed: trace.syntaxErrors.length === 0, detail: `JavaScript syntax is valid${trace.syntaxErrors.length > 0 ? `: ${trace.syntaxErrors.join("; ")}` : ""}` },

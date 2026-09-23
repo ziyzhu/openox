@@ -1,4 +1,5 @@
 import { connectHost, requireHost } from "./host-request.ts";
+import { HostRPCClient, type HostChatRow } from "./host-rpc.ts";
 import {
   formatTokenCount,
   oneLine,
@@ -8,15 +9,6 @@ import {
   type ChatSnapshot,
 } from "./host-snapshot.ts";
 import { C, dispatch, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
-
-type ChatRow = {
-  id: string;
-  title: string;
-  model: string;
-  createdAt: string;
-  lastActivity: string | null;
-  active: boolean;
-};
 
 type ChatOptions = {
   timeoutMs: number;
@@ -38,14 +30,20 @@ export async function chat(args: string[], context: CliContext): Promise<void> {
 
 async function listChats(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args);
-  const result = await requireHost("list-chats", context, options.timeoutMs);
-  const rows = result.chats;
-  if (!Array.isArray(rows)) fail("Host returned an invalid chat list");
+  const host = new HostRPCClient(context.host);
+  let rows: HostChatRow[];
+  try {
+    rows = await host.listChats(options.timeoutMs);
+  } catch (error) {
+    return fail((error as Error).message);
+  } finally {
+    host.close();
+  }
   if (options.json) {
     console.log(JSON.stringify(rows, null, 2));
     return;
   }
-  printChats(rows as ChatRow[]);
+  printChats(rows);
 }
 
 async function inspectChat(args: string[], context: CliContext): Promise<void> {
@@ -67,11 +65,9 @@ async function watchChat(args: string[], context: CliContext): Promise<void> {
   process.on("SIGTERM", stop);
   try {
     while (!stopping) {
-      const result = await host.request("get-chat", options.timeoutMs);
-      if (stopping) break;
-      if (!result.ok) {
-        process.stderr.write(`chat watch: ${result.error}; retrying\n`);
-      } else {
+      try {
+        const result = await host.request("chats.get", options.timeoutMs);
+        if (stopping) break;
         const snapshot = (result.data ?? null) as ChatSnapshot | null;
         const projected = projectSnapshot(snapshot, options.sections);
         const signature = JSON.stringify(sorted(projected));
@@ -80,6 +76,8 @@ async function watchChat(args: string[], context: CliContext): Promise<void> {
           if (options.json) console.log(JSON.stringify({ observedAt: new Date().toISOString(), data: projected }));
           else printSnapshotResult(snapshot, options);
         }
+      } catch (error) {
+        if (!stopping) process.stderr.write(`chat watch: ${(error as Error).message}; retrying\n`);
       }
       if (!stopping) await Bun.sleep(options.intervalMs);
     }
@@ -91,7 +89,7 @@ async function watchChat(args: string[], context: CliContext): Promise<void> {
 }
 
 async function fetchSnapshot(context: CliContext, timeoutMs: number): Promise<ChatSnapshot | null> {
-  const result = await requireHost("get-chat", context, timeoutMs);
+  const result = await requireHost("chats.get", context, timeoutMs);
   return (result.data ?? null) as ChatSnapshot | null;
 }
 
@@ -183,7 +181,7 @@ function sorted(value: unknown): unknown {
   return value;
 }
 
-function printChats(chats: ChatRow[]): void {
+function printChats(chats: HostChatRow[]): void {
   if (!chats.length) {
     console.log("(no chats)");
     return;

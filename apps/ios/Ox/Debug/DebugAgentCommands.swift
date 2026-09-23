@@ -3,16 +3,12 @@ import Foundation
 
 extension OxHostProtocol {
     struct RunAgentResult: Encodable {
-        let kind = "run-agent-result"
-        let id: String
-        let ok: Bool
         let client: ClientInfo?
         let model: ProviderModel?
         let message: AssistantMessage?
         let ttftMs: Int?
         let toolReadyMs: Int?
         let totalMs: Int?
-        let error: String?
 
         struct ClientInfo: Encodable {
             let id: String
@@ -20,39 +16,23 @@ extension OxHostProtocol {
         }
     }
 
-
     struct VirtualMachineLogRow: Encodable {
         let level: String
         let message: String
     }
 
-    struct VirtualMachineEvalResult: Encodable {
-        let kind = "virtual-machine-eval-result"
-        let id: String
-        let ok: Bool
-        let value: JSONValue?
-        let logs: [VirtualMachineLogRow]?
-        let error: String?
-    }
-
     struct VMControlResult: Encodable {
-        let kind: String
-        let id: String
-        let ok: Bool
-        let protocolVersion: Int
         let value: JSONValue?
         let logs: [VirtualMachineLogRow]?
-        let error: String?
     }
-
 
     @MainActor
     static func handleRunAgent(
         _ command: RunAgentRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        let id = command.id
+        let id = reply.id
         let sessionId = command.sessionId
         let clientId = command.clientId
         let modelId = command.modelId
@@ -61,9 +41,8 @@ extension OxHostProtocol {
         let hasSession = !(sessionId ?? "").isEmpty
 
         @MainActor func fail(_ message: String) {
-            Log.agent.error("OxHostProtocol.run-agent id=\(id) failed: \(message)")
-            reply(encode(RunAgentResult(id: id, ok: false, client: nil, model: nil,
-                                        message: nil, ttftMs: nil, toolReadyMs: nil, totalMs: nil, error: message)))
+            Log.agent.error("OxHostRPC.agents.run id=\(id) failed: \(message)")
+            reply.failure(message)
         }
 
         let registry = ProviderRegistry.shared
@@ -125,7 +104,7 @@ extension OxHostProtocol {
         }
 
         guard !messages.isEmpty else { return fail("nothing to run: provide a prompt or a chat with messages") }
-        Log.agent.debug("OxHostProtocol.run-agent id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
+        Log.agent.debug("OxHostRPC.agents.run id=\(id) client=\(client.id) model=\(model.id) session=\(sessionLabel) prompt=\(hasPrompt) msgs=\(messages.count) tools=\(tools.count) historyOverride=\(command.historyOverride?.count ?? 0) systemOverride=\(command.systemPromptOverride != nil) descriptionOverrides=\(command.toolDescriptionOverrides?.count ?? 0) parameterOverrides=\(command.toolParameterOverrides?.count ?? 0)")
 
         let start = Date()
         Task { @MainActor in
@@ -134,12 +113,15 @@ extension OxHostProtocol {
             @MainActor func finish(_ message: AssistantMessage) {
                 let totalMs = Int(Date().timeIntervalSince(start) * 1000)
                 let ok = message.stopReason != .error && message.stopReason != .aborted
-                Log.agent.debug("OxHostProtocol.run-agent id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
-                reply(encode(RunAgentResult(
-                    id: id, ok: ok,
+                Log.agent.debug("OxHostRPC.agents.run id=\(id) done stopReason=\(message.stopReason) tokens(in/out)=\(message.usage.input)/\(message.usage.output) ttftMs=\(ttftMs.map(String.init) ?? "nil") toolReadyMs=\(toolReadyMs.map(String.init) ?? "nil") totalMs=\(totalMs)")
+                reply.complete(RunAgentResult(
                     client: .init(id: client.id, displayName: client.displayName),
-                    model: model, message: message, ttftMs: ttftMs, toolReadyMs: toolReadyMs, totalMs: totalMs,
-                    error: ok ? nil : message.errorMessage)))
+                    model: model,
+                    message: message,
+                    ttftMs: ttftMs,
+                    toolReadyMs: toolReadyMs,
+                    totalMs: totalMs
+                ), error: ok ? nil : (message.errorMessage ?? "Agent run failed"))
             }
 
             let modelMessages = await ModelAdapterPipeline.transform(messages: messages, model: model)
@@ -173,65 +155,15 @@ extension OxHostProtocol {
     }
 
     @MainActor
-
-    static func handleVirtualMachineEval(
-        _ command: VirtualMachineEvalRequest,
-        chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
-    ) {
-        let script = command.script
-
-        @MainActor func fail(_ message: String) {
-            reply(encode(VirtualMachineEvalResult(id: command.id, ok: false, value: nil, logs: [], error: message)))
-        }
-
-        guard !script.isEmpty else { return fail("missing script") }
-        let session: Chat
-        switch resolveSession(chatManager, command.sessionId) {
-        case .error(let error): return fail(error)
-        case .found(nil):       return fail("no active chat")
-        case .found(let resolved?): session = resolved
-        }
-
-        Log.agent.debug("OxHostProtocol.virtual-machine-eval id=\(command.id) session=\(session.id.uuidString) bytes=\(script.utf8.count)")
-        Task { @MainActor in
-            do {
-                let result = try await session.runDebugSnippet(script)
-                reply(encode(VirtualMachineEvalResult(
-                    id: command.id,
-                    ok: true,
-                    value: jsonSafe(result.value?.toAny()),
-                    logs: result.logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) },
-                    error: nil
-                )))
-            } catch {
-                let logs = (error as? VirtualMachine.Error)?.logs ?? []
-                reply(encode(VirtualMachineEvalResult(
-                    id: command.id,
-                    ok: false,
-                    value: nil,
-                    logs: (error as? VirtualMachine.Error).map { _ in
-                        logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) }
-                    },
-                    error: error.localizedDescription
-                )))
-            }
-        }
-    }
-
-    static let vmProtocolVersion = 1
-
-    @MainActor
     static func handleVMInspect(
         _ command: VMRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-inspect-result", reply: reply) else { return }
         let session: Chat?
         switch resolveSession(chatManager, command.sessionId) {
         case .error(let error):
-            reply(vmFailure(id: command.id, kind: "vm-inspect-result", error: error))
+            reply.failure(error)
             return
         case .found(let resolved): session = resolved
         }
@@ -262,63 +194,44 @@ extension OxHostProtocol {
             "session": sessionValue,
             "vfsRoots": .array(roots.map(JSONValue.string)),
         ])
-        reply(encode(VMControlResult(
-            kind: "vm-inspect-result",
-            id: command.id,
-            ok: true,
-            protocolVersion: vmProtocolVersion,
-            value: value,
-            logs: nil,
-            error: nil
-        )))
+        reply.success(VMControlResult(value: value, logs: nil))
     }
 
     @MainActor
-    static func handleVMFunctions(_ command: VMFunctionsRequest, reply: @escaping @MainActor (Data) -> Void) {
-        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-functions-result", reply: reply) else { return }
+    static func handleVMFunctions(_ command: VMFunctionsRequest, reply: OxHostRPC.Reply) {
         let catalog = OxFunctionCatalog.build()
         let help = OxFunctionCatalog.buildHelpText()
         let value: JSONValue
         if let name = command.function {
             guard let schema = catalog.objectValue?[name], let text = help.objectValue?[name] else {
-                reply(vmFailure(id: command.id, kind: "vm-functions-result", error: "unknown VM function: \(name)"))
+                reply.failure("unknown VM function: \(name)")
                 return
             }
             value = .object(["name": .string(name), "schema": schema, "help": text])
         } else {
             value = .object(["functions": catalog])
         }
-        reply(encode(VMControlResult(
-            kind: "vm-functions-result",
-            id: command.id,
-            ok: true,
-            protocolVersion: vmProtocolVersion,
-            value: value,
-            logs: nil,
-            error: nil
-        )))
+        reply.success(VMControlResult(value: value, logs: nil))
     }
 
     @MainActor
     static func handleVMCall(
         _ command: VMCallRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-call-result", reply: reply) else { return }
         guard command.arguments.objectValue != nil else {
-            reply(vmFailure(id: command.id, kind: "vm-call-result", error: "VM function arguments must be an object"))
+            reply.failure("VM function arguments must be an object")
             return
         }
         guard OxFunctionCatalog.build().objectValue?[command.function] != nil else {
-            reply(vmFailure(id: command.id, kind: "vm-call-result", error: "unknown VM function: \(command.function)"))
+            reply.failure("unknown VM function: \(command.function)")
             return
         }
         let source = "return await \(command.function)(\(command.arguments.jsonString()));"
         executeVM(
             chatManager: chatManager,
-            id: command.id,
-            kind: "vm-call-result",
+            id: reply.id,
             sessionID: command.sessionId,
             source: source,
             logLabel: "call function=\(command.function)",
@@ -330,17 +243,15 @@ extension OxHostProtocol {
     static func handleVMEval(
         _ command: VMEvalRequest,
         chatManager: ChatManager,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
-        guard validateVMProtocol(command.protocolVersion, id: command.id, kind: "vm-eval-result", reply: reply) else { return }
         guard !command.script.isEmpty else {
-            reply(vmFailure(id: command.id, kind: "vm-eval-result", error: "missing script"))
+            reply.failure("missing script")
             return
         }
         executeVM(
             chatManager: chatManager,
-            id: command.id,
-            kind: "vm-eval-result",
+            id: reply.id,
             sessionID: command.sessionId,
             source: command.script,
             logLabel: "eval bytes=\(command.script.utf8.count)",
@@ -352,19 +263,18 @@ extension OxHostProtocol {
     static func executeVM(
         chatManager: ChatManager,
         id: String,
-        kind: String,
         sessionID: String?,
         source: String,
         logLabel: String,
-        reply: @escaping @MainActor (Data) -> Void
+        reply: OxHostRPC.Reply
     ) {
         let session: Chat
         switch resolveSession(chatManager, sessionID) {
         case .error(let error):
-            reply(vmFailure(id: id, kind: kind, error: error))
+            reply.failure(error)
             return
         case .found(nil):
-            reply(vmFailure(id: id, kind: kind, error: "no active VM session"))
+            reply.failure("no active VM session")
             return
         case .found(let resolved?): session = resolved
         }
@@ -372,59 +282,18 @@ extension OxHostProtocol {
         Task { @MainActor in
             do {
                 let result = try await session.runDebugSnippet(source)
-                reply(encode(VMControlResult(
-                    kind: kind,
-                    id: id,
-                    ok: true,
-                    protocolVersion: vmProtocolVersion,
+                reply.success(VMControlResult(
                     value: result.value,
-                    logs: result.logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) },
-                    error: nil
-                )))
+                    logs: result.logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) }
+                ))
             } catch {
                 let logs = (error as? VirtualMachine.Error)?.logs ?? []
-                reply(encode(VMControlResult(
-                    kind: kind,
-                    id: id,
-                    ok: false,
-                    protocolVersion: vmProtocolVersion,
+                reply.failure(error.localizedDescription, data: VMControlResult(
                     value: nil,
-                    logs: logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) },
-                    error: error.localizedDescription
-                )))
+                    logs: logs.map { VirtualMachineLogRow(level: $0.level, message: $0.message) }
+                ))
             }
         }
-    }
-
-    @MainActor
-    static func validateVMProtocol(
-        _ version: Int,
-        id: String,
-        kind: String,
-        reply: @escaping @MainActor (Data) -> Void
-    ) -> Bool {
-        guard version == vmProtocolVersion else {
-            reply(vmFailure(id: id, kind: kind, error: "unsupported VM protocol version \(version); expected \(vmProtocolVersion)"))
-            return false
-        }
-        return true
-    }
-
-    static func vmFailure(id: String, kind: String, error: String) -> Data {
-        encode(VMControlResult(
-            kind: kind,
-            id: id,
-            ok: false,
-            protocolVersion: vmProtocolVersion,
-            value: nil,
-            logs: nil,
-            error: error
-        ))
-    }
-
-    static func jsonSafe(_ value: Any?) -> JSONValue {
-        guard let value, !(value is NSNull) else { return .null }
-        return JSONSerialization.isValidJSONObject([value]) ? .from(value) : .string(String(describing: value))
     }
 
 }

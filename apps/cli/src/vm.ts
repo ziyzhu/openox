@@ -1,17 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { Value } from "@sinclair/typebox/value";
-import {
-  VMControlRequestSchema,
-  VMControlResponseSchema,
-  VM_PROTOCOL_VERSION,
-} from "./vm-protocol.ts";
-import { runOnce, type DebugResult } from "./debug-ws.ts";
+import { VMParamsSchemas, VMResultSchema } from "./vm-protocol.ts";
+import { callHost } from "./host-rpc.ts";
 import { dispatch, fail, failResult, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
 
-const protocolVersion = VM_PROTOCOL_VERSION;
-
-type VMResult = DebugResult & {
-  protocolVersion?: number;
+type VMResult = {
   value?: unknown;
   logs?: Array<{ level?: string; message?: string }>;
 };
@@ -32,7 +25,7 @@ export async function vm(args: string[], context: CliContext): Promise<void> {
 
 async function inspect(args: string[], context: CliContext): Promise<void> {
   const options = parseOutputOptions(args, 30000);
-  const result = await request("vm-inspect", context, options.timeoutMs);
+  const result = await request("vm.inspect", context, options.timeoutMs);
   if (options.json) {
     printVMJSON(result);
     return;
@@ -51,7 +44,7 @@ async function inspect(args: string[], context: CliContext): Promise<void> {
 
 async function functions(args: string[], context: CliContext): Promise<void> {
   const options = parseOutputOptions(args, 30000);
-  const result = await request("vm-functions", context, options.timeoutMs);
+  const result = await request("vm.functions", context, options.timeoutMs);
   const catalog = object(valueObject(result).functions);
   if (options.json) {
     console.log(JSON.stringify(catalog, null, 2));
@@ -68,7 +61,7 @@ async function help(args: string[], context: CliContext): Promise<void> {
   const options = parsePositionals(args, 30000);
   const name = options.positionals[0];
   if (!name || options.positionals.length !== 1) fail("Usage: ox vm help <ox.function> [--json] [--timeout 30000]");
-  const result = await request("vm-functions", context, options.timeoutMs, { function: name });
+  const result = await request("vm.functions", context, options.timeoutMs, { function: name });
   const value = valueObject(result);
   if (options.json) {
     console.log(JSON.stringify(value, null, 2));
@@ -109,7 +102,7 @@ async function call(args: string[], context: CliContext): Promise<void> {
     fail(`invalid VM arguments JSON: ${(error as Error).message}`);
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) fail("VM function arguments must be a JSON object");
-  const result = await request("vm-call", context, timeoutMs, { function: positionals[0], arguments: parsed });
+  const result = await request("vm.call", context, timeoutMs, { function: positionals[0], arguments: parsed });
   printExecution(result, json);
 }
 
@@ -140,13 +133,13 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
   }
   const source = scriptFile !== undefined ? await inputText(scriptFile) : script ?? positionals[0];
   if (!source) fail("ox vm eval requires a script");
-  const result = await request("vm-eval", context, timeoutMs, { script: source });
+  const result = await request("vm.eval", context, timeoutMs, { script: source });
   printExecution(result, json);
 }
 
 async function skills(args: string[], context: CliContext): Promise<void> {
   const options = parseOutputOptions(args, 60000);
-  const result = await request("vm-call", context, options.timeoutMs, {
+  const result = await request("vm.call", context, options.timeoutMs, {
     function: "ox.fs.list",
     arguments: { path: "skills", purpose: "List VM skills" },
   });
@@ -168,7 +161,7 @@ async function skill(args: string[], context: CliContext): Promise<void> {
   }
   if (subcommand !== "read" || !name) fail("Usage: ox vm skill read <name> [--json] [--timeout 60000]");
   const options = parseOutputOptions(rest, 60000);
-  const result = await request("vm-call", context, options.timeoutMs, {
+  const result = await request("vm.call", context, options.timeoutMs, {
     function: "ox.fs.read",
     arguments: { path: `skills/${name}/SKILL.md`, purpose: "Read VM skill" },
   });
@@ -182,25 +175,18 @@ async function skill(args: string[], context: CliContext): Promise<void> {
 }
 
 async function request(
-  kind: string,
+  method: keyof typeof VMParamsSchemas,
   context: CliContext,
   timeoutMs: number,
   fields: Record<string, unknown> = {},
 ): Promise<VMResult> {
-  const envelope = {
-    kind,
-    id: crypto.randomUUID(),
-    protocolVersion,
-    ...(context.chat && kind !== "vm-functions" ? { sessionId: context.chat } : {}),
+  const params = {
+    ...(context.chat && method !== "vm.functions" ? { sessionId: context.chat } : {}),
     ...fields,
   };
-  if (!Value.Check(VMControlRequestSchema, envelope)) fail(`invalid ${kind} request`);
-  const result = await runOnce(envelope, timeoutMs, context.host) as VMResult;
-  if (result.protocolVersion !== undefined && !Value.Check(VMControlResponseSchema, result)) {
-    fail(`Host returned an invalid ${kind} response`);
-  }
-  if (!result.ok) failResult(kind, result.error);
-  if (!Value.Check(VMControlResponseSchema, result)) fail(`Host omitted the ${kind} protocol envelope`);
+  if (!Value.Check(VMParamsSchemas[method], params)) fail(`invalid ${method} parameters`);
+  const result = await callHost(method, params, timeoutMs, context.host);
+  if (!Value.Check(VMResultSchema, result)) fail(`Host returned an invalid ${method} result`);
   return result;
 }
 
@@ -218,7 +204,6 @@ function printExecution(result: VMResult, json: boolean): void {
 
 function printVMJSON(result: VMResult): void {
   console.log(JSON.stringify({
-    protocolVersion: result.protocolVersion,
     value: result.value ?? null,
     ...(result.logs ? { logs: result.logs } : {}),
   }, null, 2));

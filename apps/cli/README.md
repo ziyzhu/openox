@@ -378,3 +378,10 @@ After npm Trusted Publishing is configured, push the matching tag:
 git tag ox-cli-v0.1.0
 git push origin ox-cli-v0.1.0
 ```
+
+## Host compatibility
+
+All live Host commands use JSON-RPC 2.0. Update the Host and CLI together;
+older wire formats are not supported. `ox host describe --json` reports Host
+identity and supported method contracts. See [Host contracts](../../docs/HOST_PROTOCOL.md)
+for method names, errors, and versioning rules.

@@ -1,4 +1,4 @@
-import { runOnce, type DebugResult } from "./debug-ws.ts";
+import { callHost } from "./host-rpc.ts";
 
 export type InvokeRequest = {
   domain: string;
@@ -20,52 +20,31 @@ export type ReloadRequest = {
 };
 
 export interface HostServiceRuntime {
-  status(timeoutMs: number): Promise<DebugResult>;
-  invoke(request: InvokeRequest): Promise<DebugResult>;
-  evaluate(request: EvaluateRequest): Promise<DebugResult>;
-  reload(request: ReloadRequest): Promise<DebugResult>;
-  sync(timeoutMs: number): Promise<DebugResult>;
+  status(timeoutMs: number): Promise<Record<string, unknown>>;
+  invoke(request: InvokeRequest): Promise<Record<string, unknown>>;
+  evaluate(request: EvaluateRequest): Promise<Record<string, unknown>>;
+  reload(request: ReloadRequest): Promise<Record<string, unknown>>;
+  sync(timeoutMs: number): Promise<Record<string, unknown>>;
 }
 
 class WebSocketHostServiceRuntime implements HostServiceRuntime {
   constructor(private readonly endpoint?: string) {}
 
-  status(timeoutMs: number): Promise<DebugResult> {
-    return runOnce({ kind: "list-services", id: crypto.randomUUID() }, timeoutMs, this.endpoint);
-  }
+  status(timeoutMs: number) { return callHost("services.list", {}, timeoutMs, this.endpoint); }
 
-  invoke(request: InvokeRequest): Promise<DebugResult> {
-    const envelope: Record<string, unknown> & { id: string } = {
-      kind: "invoke-action",
-      id: crypto.randomUUID(),
-      domain: request.domain,
-      action: request.action,
-      args: request.args,
-    };
-    if (request.approved !== undefined) envelope.approve = request.approved;
-    return runOnce(envelope, request.timeoutMs, this.endpoint);
-  }
-
-  evaluate(request: EvaluateRequest): Promise<DebugResult> {
-    return runOnce({
-      kind: "evaluate",
-      id: crypto.randomUUID(),
-      domain: request.domain,
-      script: request.script,
+  invoke(request: InvokeRequest) {
+    return callHost("services.invoke", { domain: request.domain, action: request.action, args: request.args,
+      ...(request.approved === undefined ? {} : { approve: request.approved }),
     }, request.timeoutMs, this.endpoint);
   }
 
-  reload(request: ReloadRequest): Promise<DebugResult> {
-    return runOnce({
-      kind: "reload-service",
-      id: crypto.randomUUID(),
-      domain: request.domain,
-    }, request.timeoutMs, this.endpoint);
+  evaluate(request: EvaluateRequest) {
+    return callHost("services.evaluate", { domain: request.domain, script: request.script }, request.timeoutMs, this.endpoint);
   }
 
-  sync(timeoutMs: number): Promise<DebugResult> {
-    return runOnce({ kind: "sync-mono-repository", id: crypto.randomUUID() }, timeoutMs, this.endpoint);
-  }
+  reload(request: ReloadRequest) { return callHost("services.reload", { domain: request.domain }, request.timeoutMs, this.endpoint); }
+
+  sync(timeoutMs: number) { return callHost("services.sync", {}, timeoutMs, this.endpoint); }
 }
 
 export function createHostServiceRuntime(endpoint?: string): HostServiceRuntime {

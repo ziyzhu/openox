@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "apps/cli/**"
+      - "apps/ios/Ox/Host/OxHost*.swift"
+      - "apps/ios/Ox/Debug/**"
       - "tooling/**"
       - "packages/service-sdk/**"
       - "packages/services/**"
@@ -24,6 +26,8 @@ on:
     branches: [main]
     paths:
       - "apps/cli/**"
+      - "apps/ios/Ox/Host/OxHost*.swift"
+      - "apps/ios/Ox/Debug/**"
       - "tooling/**"
       - "packages/service-sdk/**"
       - "packages/services/**"
@@ -66,6 +70,9 @@ jobs:
 
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
+
+      - name: Verify Host RPC client
+        run: bun run test:host-rpc
 
       - name: Verify npm packages
         run: |

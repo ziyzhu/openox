@@ -1,5 +1,5 @@
 import { ROOT } from "./lib.ts";
-import { runOnce } from "../apps/cli/src/debug-ws.ts";
+import { callHost } from "../apps/cli/src/host-rpc.ts";
 import {
   type BootstrapProfile,
   type LLMRegion,
@@ -24,7 +24,8 @@ Options:
 }
 
 function runDebug(port: number, payload: Record<string, unknown>, timeoutMs: number) {
-  return runOnce({ ...payload, id: crypto.randomUUID() }, timeoutMs, `ws://127.0.0.1:${port}`);
+  const { method, ...params } = payload;
+  return callHost(String(method), params, timeoutMs, `ws://127.0.0.1:${port}`);
 }
 
 async function command(cmd: string[]): Promise<string> {
@@ -51,8 +52,7 @@ async function requireBooted(requested: string[]): Promise<void> {
 }
 
 async function simulatorRegion(debugPort: number): Promise<LLMRegion> {
-  const result = await runDebug(debugPort, { kind: "list-models" }, 10_000);
-  if (!result.ok) throw new Error(`simulator region lookup failed: ${result.error}`);
+  const result = await runDebug(debugPort, { method: "models.list" }, 10_000);
   if (result.region !== "global" && result.region !== "china") {
     throw new Error("simulator region lookup returned an invalid result");
   }
@@ -85,25 +85,22 @@ async function bootstrap(args: string[]): Promise<void> {
   );
   if (prepared.websiteData) {
     const exported = await runDebug(options.websiteDataSourceDebugPort!, {
-      kind: "export-website-data",
+      method: "debug.websiteData.export",
     }, 60_000);
-    if (!exported.ok || typeof exported.data !== "string" || typeof exported.bytes !== "number") {
-      const error = "error" in exported ? exported.error : "invalid result";
-      throw new Error(`website data export failed: ${error}`);
+    if (typeof exported.data !== "string" || typeof exported.bytes !== "number") {
+      throw new Error("website data export returned an invalid result");
     }
-    const restored = await runDebug(options.debugPort, {
-      kind: "restore-website-data",
+    await runDebug(options.debugPort, {
+      method: "debug.websiteData.restore",
       data: exported.data,
     }, 60_000);
-    if (!restored.ok) throw new Error(`website data restore failed: ${restored.error}`);
     console.log(`Website data: restored ${exported.bytes} bytes from ${options.websiteDataSource}`);
   }
   if (prepared.artifacts.length > 0) {
     const result = await runDebug(options.debugPort, {
-      kind: "bootstrap-artifacts",
+      method: "debug.artifacts.bootstrap",
       artifacts: prepared.artifacts.map(({ name, data }) => ({ name, data })),
     }, 60_000);
-    if (!result.ok) throw new Error(`artifact bootstrap failed: ${result.error}`);
     const installed = result.artifacts as string[] | undefined;
     if (!installed || installed.length !== prepared.artifacts.length) throw new Error("artifact bootstrap returned an invalid result");
     prepared.artifacts.forEach((artifact, index) => {
@@ -111,13 +108,12 @@ async function bootstrap(args: string[]): Promise<void> {
     });
   }
   for (const credential of prepared.credentials) {
-    const result = await runDebug(options.debugPort, {
-      kind: "set-key",
+    await runDebug(options.debugPort, {
+      method: "debug.providers.setKey",
       clientId: credential.clientId,
       key: credential.key,
       region,
     }, 10_000);
-    if (!result.ok) throw new Error(`provider ${credential.clientId} bootstrap failed: ${result.error}`);
     console.log(`Provider ${credential.clientId}: ready`);
   }
   console.log(`BOOTSTRAPPED ${options.device} region=${region ?? "none"} providers=${prepared.credentials.length}`);
