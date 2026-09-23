@@ -27,7 +27,7 @@ Use the `sim-cli` skill for visible iOS interaction and the `ox-cli` skill to ve
 
 1. Begin with the desk chat showing its three service chips. Move to a fresh chat for each later prompt, with only its assigned three chips. The earlier eight-chip swipe sequence does not apply to this three-chat version.
 2. Type and send these prompts in order:
-   - “Compare a few desks for me.”
+   - “Find a desk people love and add the best deal to my cart.”
    - “Plan a Seattle weekend for me.”
    - “What should I catch up on?”
 3. Focus the composer with a brief tap, without pressing and holding or selecting text. Type each complete prompt in one input action. Verify the completed field and hold it on screen for about one second before tapping Send or ending a typing-only scene. Cut around paste menus, autocorrect flashes, and any unsynchronized keyboard dismissal and composer movement. In the final cut, show the first prompt's reply. End the Seattle and catch-up scenes on their completed typed prompts, before either agent reply appears.
