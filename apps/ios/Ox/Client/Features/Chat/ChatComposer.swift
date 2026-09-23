@@ -820,17 +820,13 @@ struct ChatComposer: View, Equatable {
                 Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
             }
         } label: {
-            Label {
-                followIntentTitle(intent)
-            } icon: {
-                Image(systemName: "warninglight")
-            }
-            .font(Theme.Fonts.labelMd)
-            .foregroundStyle(Theme.Colors.onSurface)
-            .lineLimit(1)
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: Theme.Size.chipHeight)
-            .contentShape(Capsule())
+            followIntentTitle(intent)
+                .font(Theme.Fonts.labelMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+                .lineLimit(1)
+                .padding(.horizontal, Theme.Spacing.md)
+                .frame(height: Theme.Size.chipHeight)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Capsule())
