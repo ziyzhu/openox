@@ -635,6 +635,24 @@ final class ServiceManager {
         }
     }
 
+    func syncRepository(_ repositoryID: String, locale: String?) async throws -> ServiceRepository.Repository {
+        repositoryState = .syncing
+        do {
+            try await repository.update(repositoryID: repositoryID)
+            _ = await loadRepositories(locale: locale)
+            guard case .ready = repositoryState,
+                  let synced = repositories.first(where: { $0.id == repositoryID }),
+                  case .ready = synced.state else {
+                throw ServiceRepository.Failure(message: "The repository was updated but could not be loaded")
+            }
+            return synced
+        } catch {
+            repositoryState = .failed(error.localizedDescription)
+            Log.service.error("ServiceManager.repository sync failed id=\(repositoryID) error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
     func removeRepository(_ repositoryID: String, locale: String?) async {
         _ = await mutateRepositories(locale: locale) {
             try await self.repository.remove(repositoryID: repositoryID)

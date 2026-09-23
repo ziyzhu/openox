@@ -43,6 +43,7 @@ nonisolated enum Actions {
     static let serviceCopy = "ox.service.copy"
     static let serviceDelete = "ox.service.delete"
     static let serviceRepositoryConnect = "ox.service.repository.connect"
+    static let serviceRepositorySync = "ox.service.repository.sync"
     static let serviceRepositoryDisconnect = "ox.service.repository.disconnect"
     static let serviceRepositoryPropose = "ox.service.repository.propose"
     static let serviceGitStatus = "ox.service.git.status"
@@ -93,7 +94,7 @@ nonisolated enum Actions {
         fsList, fsRead, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach,
         serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
-        serviceUpdate, serviceCopy, serviceDelete, serviceRepositoryConnect, serviceRepositoryDisconnect,
+        serviceUpdate, serviceCopy, serviceDelete, serviceRepositoryConnect, serviceRepositorySync, serviceRepositoryDisconnect,
         serviceRepositoryPropose,
         serviceGitStatus, serviceGitLog,
         serviceGitShow, serviceGitDiff, serviceGitCheckout, serviceGitCommit, serviceGitRevert,
@@ -108,7 +109,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") || action == serviceRepositoryConnect ||
+        return action.hasSuffix(".delete") || action == serviceRepositoryConnect || action == serviceRepositorySync ||
             action == serviceRepositoryDisconnect || action == serviceRepositoryPropose ? .ask : .allow
     }
 
@@ -156,6 +157,7 @@ nonisolated enum Actions {
         case serviceCopy: L10n.string("Copy a service to Local")
         case serviceDelete: L10n.string("Delete a service")
         case serviceRepositoryConnect: L10n.string("Add Repository")
+        case serviceRepositorySync: L10n.string("Sync")
         case serviceRepositoryDisconnect: L10n.string("Remove Repository")
         case serviceRepositoryPropose: L10n.string("Share Service")
         case serviceGitStatus, serviceGitDiff: L10n.string("Check service changes")

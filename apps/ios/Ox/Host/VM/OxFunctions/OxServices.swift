@@ -196,6 +196,21 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.repository.sync",
+                    .object([
+                        "description": .string("Refresh an installed Remote service repository in place: `await ox.service.repository.sync({ repository, purpose })`. Find its ID with ox.app.serviceRepositories. The user approves the sync. Returns the refreshed service count."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "repository": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)]),
+                            ]),
+                            "required": .array([.string("repository")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
                     "ox.service.repository.disconnect",
                     .object([
                         "description": .string("Remove an installed remote service repository by ID: `await ox.service.repository.disconnect({ repository, purpose })`. Find its ID with ox.app.serviceRepositories. The user approves removal. This removes the local snapshot and service definitions; website sign-ins and data remain."),
@@ -538,6 +553,11 @@ nonisolated enum OxServices {
             }
             ctx.setObject(connectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositoryConnect" as NSString)
 
+            let syncRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
+                env.call(suspendingTimeout: true) { try await $0.syncServiceRepository(repository: repository, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(syncRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeServiceRepositorySync" as NSString)
+
             let disconnectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call(suspendingTimeout: true) { try await $0.disconnectServiceRepository(repository: repository, purpose: purposeValue.toString()!) }
             }
@@ -690,6 +710,7 @@ nonisolated enum OxServices {
           delete: (value) => { const options = __oxOptions(value, 'ox.service.delete'); return __nativeServiceDelete(String(options.domain), String(options.purpose)); },
           repository: {
             connect: (value) => { const options = __oxOptions(value, 'ox.service.repository.connect'); return __nativeServiceRepositoryConnect(String(options.origin), String(options.purpose)); },
+            sync: (value) => { const options = __oxOptions(value, 'ox.service.repository.sync'); return __nativeServiceRepositorySync(String(options.repository), String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.service.repository.disconnect'); return __nativeServiceRepositoryDisconnect(String(options.repository), String(options.purpose)); },
             propose: (value) => { const options = __oxOptions(value, 'ox.service.repository.propose'); return __nativeServiceRepositoryPropose(String(options.target), String(options.commitHash), options.services, String(options.title), String(options.body), String(options.status), String(options.purpose)); }
           },

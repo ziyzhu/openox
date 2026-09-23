@@ -321,6 +321,29 @@ final class ServiceOperations {
         }
     }
 
+    func syncServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
+        guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }) else {
+            throw RuntimeError.bridge("ox.service.repository.sync: select an installed remote repository ID from ox.app.serviceRepositories")
+        }
+        let args: JSONValue = .object([
+            "id": .string(selected.id),
+            "name": .string(selected.name),
+            "serviceCount": .int(selected.serviceCount),
+        ])
+        return try await tracked(Actions.serviceRepositorySync, args, purpose: purpose) {
+            let synced = try await self.serviceManager.syncRepository(
+                selected.id,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            return .object([
+                "id": .string(synced.id),
+                "name": .string(synced.name),
+                "serviceCount": .int(synced.serviceCount),
+                "synced": .bool(true),
+            ])
+        }
+    }
+
     func proposeServiceRepository(
         target: String,
         commitHash: String,

@@ -155,7 +155,7 @@ nonisolated enum OxAppInformation {
             ), (
                 "ox.app.serviceRepositories",
                 .object([
-                    "description": .string("Read sanitized summaries of Ox's service repositories: `await ox.app.serviceRepositories({ purpose })`. Returns at most 50 IDs, names, provenance, enabled state, load state, and service counts. Use a remote repository ID with ox.service.repository.disconnect. Never returns origins, filesystem paths, Git details, or credentials, and cannot change repositories."),
+                    "description": .string("Read sanitized summaries of Ox's service repositories: `await ox.app.serviceRepositories({ purpose })`. Returns at most 50 IDs, names, provenance, enabled state, load state, and service counts. Use a remote repository ID with ox.service.repository.sync or ox.service.repository.disconnect. Never returns origins, filesystem paths, Git details, or credentials, and cannot change repositories."),
                     "inputSchema": object([:]),
                     "outputSchema": object([
                         "status": enumeration(["idle", "syncing", "ready", "failed"]),

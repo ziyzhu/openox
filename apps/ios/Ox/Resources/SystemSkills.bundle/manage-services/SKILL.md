@@ -24,7 +24,7 @@ Read `skills/system:manage-services/references/api-service.md` for direct HTTP A
 
 ## Service repositories
 
-Use `ox.app.serviceRepositories({ purpose })` to list repository IDs and states. Connect a public HTTPS Git repository with `ox.service.repository.connect({ origin, purpose })`; it must contain `repository.json` at its root and the user approves the connection. Disconnect an installed Remote repository with `ox.service.repository.disconnect({ repository, purpose })`, using its ID from the list. Disconnect asks for user approval, removes its local snapshot and service definitions, and keeps website sign-ins and data. Bundled, Development, and Local repositories cannot be disconnected.
+Use `ox.app.serviceRepositories({ purpose })` to list repository IDs and states. Connect a public HTTPS Git repository with `ox.service.repository.connect({ origin, purpose })`; it must contain `repository.json` at its root and the user approves the connection. Sync an installed Remote repository with `ox.service.repository.sync({ repository, purpose })`, using its ID from the list; syncing refreshes the existing connection and asks for user approval. Do not reconnect a repository to get newer services. Disconnect an installed Remote repository with `ox.service.repository.disconnect({ repository, purpose })`, using its ID from the list. Disconnect asks for user approval, removes its local snapshot and service definitions, and keeps website sign-ins and data. Bundled, Development, and Local repositories cannot be disconnected.
 
 ### Share Local services
 
