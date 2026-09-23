@@ -9,10 +9,19 @@ Use the `sim-cli` skill for visible iOS interaction and the `ox-cli` skill to ve
 
 ## Prepare
 
-1. Start the repository server and verify `/health` before simulator interaction. Use the requested simulator, normally `ox-qa-1`, and confirm the existing Ox app is ready.
-2. Prepare three fresh chats. Attach Amazon, Facebook, and Reddit to the desk chat; Airbnb, Google, and Xiaohongshu to the Seattle chat; Outlook, LinkedIn, and 1Point3Acres to the catch-up chat. Each chat has three services, with nine distinct services across the demo.
+1. Reuse a healthy repository server or start one, and verify `/health` before simulator interaction. Use the requested simulator, normally `ox-qa-1`, and confirm the existing Ox app is ready.
+2. Reuse prepared empty chats when their service attachments match; create missing chats as needed. Attach Amazon, Facebook, and Reddit to the desk chat; Airbnb, Google, and Xiaohongshu to the Seattle chat; Outlook, LinkedIn, and 1Point3Acres to the catch-up chat. Each chat has three services, with nine distinct services across the demo.
 3. Start `bun run .agents/skills/ox-demo/scripts/replay-server.ts --responses <sanitized-response-directory> --port 8082` and verify `http://127.0.0.1:8082/health`. The directory must contain `01-desks.md`, `02-seattle.md`, and `03-catch-up.md`, each prepared from a saved GPT-5.6 Luna · Fast response with private details removed. The replay server exposes `Bonsai 2 27B` as a local OpenAI-compatible model. In Ox, configure its custom provider URL as `http://127.0.0.1:8082/v1`, select that model, and tap **Save**. Verify the chat header shows Bonsai. Disclose outside the recording that the replayed answers were prepared with Luna.
 4. Check service sign-in states before recording. If an attached service cannot be used, report the limit and avoid presenting its reply as a successful service result.
+
+## Iterate efficiently
+
+- Reuse sanitized response files, the configured provider, and a healthy replay server when they match the requested demo. Check existing state before repeating setup.
+- Keep a small run manifest outside the repository with the simulator, chat IDs, response directory, raw scene paths, source trim timestamps, and final export command. Preserve each scene separately so later edits can reuse verified footage.
+- Before a full take, capture and review a short sample covering typing, cursor blinking, Send, and keyboard dismissal. Check that the text and composer move together and that export timing matches the source. If the sample can serve as the finished scene, reuse it.
+- For a revision, record only scenes whose visible content changed. For a timing or trimming correction, re-export from the existing raw capture. Verify changed scenes and the final joins without repeating completed setup or unrelated checks.
+- Trim using source timestamps, reset each trimmed clip to start at zero, and only then convert to a constant frame rate. Preserve pauses and cursor cadence on the first export.
+- For a commit-only follow-up, review the current diff, complete repository-required commit checks, and commit. Reuse completed demo validation unless the files changed in a way that invalidates it.
 
 ## Record
 
