@@ -793,13 +793,18 @@ struct ChatComposer: View, Equatable {
             && !promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var followIntentList: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            ForEach(visibleFollowIntents) { intent in
-                followIntentButton(intent)
+    private var followIntentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    ForEach(visibleFollowIntents) { intent in
+                        followIntentButton(intent)
+                    }
+                }
             }
         }
-        .padding(.bottom, Theme.Spacing.sm)
+        .scrollClipDisabled()
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
     }
 
     private func followIntentButton(_ intent: FollowIntent) -> some View {
@@ -814,17 +819,21 @@ struct ChatComposer: View, Equatable {
                 Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
             }
         } label: {
-            HStack {
+            Label {
                 followIntentTitle(intent)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                Spacer(minLength: 0)
+            } icon: {
+                Image(systemName: "warninglight")
             }
-            .font(Theme.Fonts.bodyMd)
+            .font(Theme.Fonts.labelMd)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .lineLimit(1)
             .padding(.horizontal, Theme.Spacing.md)
-            .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget, alignment: .leading)
-            .contentShape(Rectangle())
+            .frame(height: Theme.Size.chipHeight)
+            .contentShape(Capsule())
         }
-        .buttonStyle(OxPressedSurfaceButtonStyle())
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .minimumTouchTarget()
         .accessibilityIdentifier(followIntentIdentifier(intent))
     }
 
@@ -950,7 +959,7 @@ struct ChatComposer: View, Equatable {
     private var composerTopStrip: some View {
         VStack(alignment: .leading, spacing: Self.topStripSpacing) {
             if showsFollowIntents {
-                followIntentList
+                followIntentStrip
             }
             if isEditingMessage || !chatArtifacts.isEmpty || !attachedServices.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
