@@ -47,7 +47,7 @@ function event(id: string, delta: Record<string, unknown>, finishReason: string 
 
 function streamResponse(text: string, signal: AbortSignal, targetDuration: number): Response {
   const id = `demo-${crypto.randomUUID()}`;
-  const chunks = text.match(/[\s\S]{1,20}/g) ?? [];
+  const chunks = text.match(/[\s\S]{1,6}/g) ?? [];
   const delay = Math.min(320, Math.max(22, Math.ceil(targetDuration / chunks.length)));
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -101,7 +101,7 @@ Bun.serve({
     const content = matches.length === 1 ? responses.get(matches[0][0]) : undefined;
     if (!content) return Response.json({ error: "No saved response for this prompt" }, { status: 422 });
     console.log(JSON.stringify({ event: "replay", prompt: prompts.findIndex(([value]) => value === matches[0][0]) + 1, stream: payload.stream === true }));
-    if (payload.stream === true) return streamResponse(content, request.signal, 4500);
+    if (payload.stream === true) return streamResponse(content, request.signal, 2500);
     return Response.json({
       id: `demo-${crypto.randomUUID()}`,
       object: "chat.completion",
