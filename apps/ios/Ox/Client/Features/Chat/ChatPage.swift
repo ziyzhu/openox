@@ -109,10 +109,8 @@ private struct ScrollToBottomControl: View {
     let composer: ChatComposerModel
     let composerFocused: Bool
     let isEditingMessage: Bool
-    let isChatEmpty: Bool
     let hasArtifacts: Bool
     let hasAttachedServices: Bool
-    let isBusy: Bool
     let floatsTopStrip: Bool
     let composerButtonSize: CGFloat
     let action: () -> Void
@@ -125,13 +123,7 @@ private struct ScrollToBottomControl: View {
     private var offset: CGFloat {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
         let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
-        let showsTopStrip = isEditingMessage
-            || hasArtifacts
-            || hasAttachedServices
-            || isChatEmpty
-                && !isBusy
-                && composer.draft.isEmpty
-                && composer.draftAttachments.isEmpty
+        let showsTopStrip = isEditingMessage || hasArtifacts || hasAttachedServices
         let firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
             isResting: isResting,
             showsTopStrip: showsTopStrip,
@@ -969,7 +961,6 @@ struct ChatPage: View {
     private func floatsTopStrip(showsComposer: Bool) -> Bool {
         showsComposer
             && (editedBlockID != nil || !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
-            && (!composer.draft.isEmpty || !composer.draftAttachments.isEmpty || chat.followIntents.isEmpty)
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
@@ -1598,7 +1589,6 @@ struct ChatPage: View {
             onAttachmentChoice: handleAttachChoice,
             onServices: startServiceMention,
             onSubmitSkill: submitSkill,
-            onFollowSend: sendFollowIntent,
             onPreparationIntent: chat.setModelPreparationIntent,
             onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
             onSend: { send() },
@@ -1631,10 +1621,8 @@ struct ChatPage: View {
                         composer: composer,
                         composerFocused: composerFocused,
                         isEditingMessage: editedBlockID != nil,
-                        isChatEmpty: isChatEmpty,
                         hasArtifacts: !chatArtifacts.isEmpty,
                         hasAttachedServices: !chat.attachedServices.isEmpty,
-                        isBusy: chat.isBusy,
                         floatsTopStrip: floatsTopStrip,
                         composerButtonSize: composerButtonSize
                     ) {
@@ -1722,12 +1710,6 @@ struct ChatPage: View {
         prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
         enqueue(message)
-    }
-
-    private func sendFollowIntent(_ message: String) {
-        guard editedBlockID == nil, composer.draft.isEmpty, composer.draftAttachments.isEmpty else { return }
-        composer.draft = message
-        send()
     }
 
     private func beginSpeech(accessible: Bool) {

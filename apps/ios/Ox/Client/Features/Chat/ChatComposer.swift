@@ -498,7 +498,6 @@ struct ChatComposer: View, Equatable {
     let onAttachmentChoice: (AttachmentChoice) -> Void
     let onServices: () -> Void
     let onSubmitSkill: (Skill, String) -> Void
-    let onFollowSend: (String) -> Void
     let onPreparationIntent: (Bool) -> Void
     let onCancelEdit: () -> Void
     let onSend: () -> Void
@@ -737,6 +736,7 @@ struct ChatComposer: View, Equatable {
 
             VStack(alignment: .leading, spacing: 0) {
                 composerDraftStrip
+                followIntentStrip
                 composerRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -765,7 +765,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var showsTopStrip: Bool {
-        isEditingMessage || showsFollowIntents || !chatArtifacts.isEmpty || !attachedServices.isEmpty
+        isEditingMessage || !chatArtifacts.isEmpty || !attachedServices.isEmpty
     }
 
     private var showsFollowIntents: Bool {
@@ -794,25 +794,28 @@ struct ChatComposer: View, Equatable {
             && !promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    @ViewBuilder
     private var followIntentStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            GlassEffectContainer(spacing: Theme.Spacing.sm) {
+        if showsFollowIntents {
+            ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Spacing.sm) {
                     ForEach(visibleFollowIntents) { intent in
                         followIntentButton(intent)
                     }
                 }
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.xs)
             }
+            .excludesCompactPageSwitch()
         }
-        .scrollClipDisabled()
-        .frame(minHeight: Theme.Size.minimumTouchTarget)
     }
 
     private func followIntentButton(_ intent: FollowIntent) -> some View {
         Button {
             switch intent {
             case .send(_, let message):
-                onFollowSend(message)
+                fillDraft(message)
+                Log.ui.info("ChatComposer.followIntent fill chat=\(sessionID) chars=\(message.count)")
             case .newActions, .newSkills:
                 let template: PromptTemplate = intent == .newActions ? .actions : .skills
                 resetPromptTemplate()
@@ -822,14 +825,16 @@ struct ChatComposer: View, Equatable {
         } label: {
             followIntentTitle(intent)
                 .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurface)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .lineLimit(1)
                 .padding(.horizontal, Theme.Spacing.md)
                 .frame(height: Theme.Size.chipHeight)
+                .overlay {
+                    Capsule().strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.4), lineWidth: 1)
+                }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Capsule())
         .minimumTouchTarget()
         .accessibilityIdentifier(followIntentIdentifier(intent))
     }
@@ -886,14 +891,19 @@ struct ChatComposer: View, Equatable {
         guard let promptTemplate, promptTemplateIsComplete else { return }
         let primary = promptPrimaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
         let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        composer.draft = switch promptTemplate {
+        let prompt = switch promptTemplate {
         case .actions:
             String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nActions: \(secondary)")
         case .skills:
             String(localized: "Create a new skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
         }
+        fillDraft(prompt)
         Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
         resetPromptTemplate()
+    }
+
+    private func fillDraft(_ text: String) {
+        composer.draft = text
         DispatchQueue.main.async { fieldFocused.wrappedValue = true }
     }
 
@@ -952,30 +962,22 @@ struct ChatComposer: View, Equatable {
         }
     }
 
-    @ViewBuilder
     private var composerTopStrip: some View {
-        VStack(alignment: .leading, spacing: Self.topStripSpacing) {
-            if showsFollowIntents {
-                followIntentStrip
-            }
-            if isEditingMessage || !chatArtifacts.isEmpty || !attachedServices.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    GlassEffectContainer(spacing: Theme.Spacing.sm) {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            if !chatArtifacts.isEmpty {
-                                artifactButton
-                            }
-                            ForEach(attachedServices) { attachedServicePill($0) }
-                            if isEditingMessage {
-                                editingMessageChip
-                            }
-                        }
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if !chatArtifacts.isEmpty {
+                        artifactButton
+                    }
+                    ForEach(attachedServices) { attachedServicePill($0) }
+                    if isEditingMessage {
+                        editingMessageChip
                     }
                 }
-                .scrollClipDisabled()
-                .frame(minHeight: Theme.Size.minimumTouchTarget)
             }
         }
+        .scrollClipDisabled()
+        .frame(minHeight: Theme.Size.minimumTouchTarget)
         .excludesCompactPageSwitch(includingAreaBelow: true)
     }
 
