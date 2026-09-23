@@ -16,7 +16,7 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
-    let repositoryAuthorization: SubscriptionAuthorizationPresenter?
+    let repositoryAuthorization: RepositoryTokenPresenter?
 
     init(
         serviceManager: ServiceManager,
@@ -30,7 +30,7 @@ final class ServiceOperations {
         botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
-        repositoryAuthorization: SubscriptionAuthorizationPresenter? = nil,
+        repositoryAuthorization: RepositoryTokenPresenter? = nil,
         native: NativeServiceOperations
     ) {
         self.serviceManager = serviceManager

@@ -1,6 +1,7 @@
 ## General Rules
 
 1. The app must remain neutral to LLM provider.
+1. When OpenOx functionality uses OAuth, use apps registered as OpenOx. Never reuse another product's OAuth client identity or share provider authentication with repository publication. Personal access tokens must be entered through secure UI, never chat or model inputs.
 1. Logs are user-owned on-device diagnostics.
 1. User data is allowed in logs; credentials and reusable secrets are not.
 1. Keep enough structured logs to diagnose production issues.

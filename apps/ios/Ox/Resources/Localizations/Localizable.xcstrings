@@ -11786,6 +11786,36 @@
           }
         }
       }
+    },
+    "GitHub personal access token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 个人访问令牌"
+          }
+        }
+      }
+    },
+    "Create token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建令牌"
+          }
+        }
+      }
+    },
+    "Use a classic token with public_repo access. It is saved in Keychain and never sent to the model. After creating a token, return to Ox and propose again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请使用具有 public_repo 权限的经典令牌。令牌保存在钥匙串中，绝不会发送给模型。创建令牌后，请返回 Ox 再次提交提案。"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

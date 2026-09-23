@@ -159,7 +159,15 @@ nonisolated enum StorageMigrator {
         migrateActionApprovalPolicies()
         migrateSavedServices()
         migrateTheme()
+        removeLegacyRepositoryAuthorization()
         Log.app.info("StorageMigrator.application done")
+    }
+
+    private static func removeLegacyRepositoryAuthorization() {
+        let account = "oauth:service-repository:github"
+        guard Credentials.secret(for: account) != nil else { return }
+        Credentials.clearSecret(for: account)
+        Log.app.info("StorageMigrator.repositoryAuthorization removedLegacy=true reauthorizationRequired=true")
     }
 
     @MainActor

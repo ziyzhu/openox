@@ -55,7 +55,7 @@ final class ServiceRepositoryProposal {
 
     func propose(
         _ request: ServiceRepositoryProposalRequest,
-        authorization: SubscriptionAuthorizationPresenter?
+        authorization: RepositoryTokenPresenter?
     ) async throws -> ServiceRepositoryProposalResult {
         guard request.target == Self.targetID else {
             throw RuntimeError.bridge("Unknown service publication target: \(request.target)")
@@ -64,111 +64,62 @@ final class ServiceRepositoryProposal {
     }
 }
 
-nonisolated private final class GitHubServiceRepositoryAccount: @unchecked Sendable {
-    struct Tokens: Codable, Sendable {
+typealias RepositoryTokenValidation = @Sendable (String) async throws -> Void
+typealias RepositoryTokenPresenter = @MainActor @Sendable (@escaping RepositoryTokenValidation) async -> Bool
+
+nonisolated private final class GitHubServiceRepositoryAccount: Sendable {
+    struct Tokens: Sendable {
         let accessToken: String
         let login: String
     }
 
-    private let store = SubscriptionTokenStore<Tokens>(key: "oauth:service-repository:github")
+    private let key = "pat:service-repository:github"
 
-    func credential(authorization: SubscriptionAuthorizationPresenter?) async throws -> Tokens {
-        if let current = store.current() { return current }
+    func credential(authorization: RepositoryTokenPresenter?) async throws -> Tokens {
+        if let token = Credentials.secret(for: key) {
+            do {
+                return try await validate(token)
+            } catch GitHubRepositoryError.unauthorized {
+                Credentials.clearSecret(for: key)
+            } catch GitHubRepositoryError.missingScope {
+                Credentials.clearSecret(for: key)
+            }
+        }
         guard let authorization else {
-            throw RuntimeError.bridge("GitHub authorization UI is unavailable. Open this chat in the Ox app and try again.")
+            throw RuntimeError.bridge("Open this chat in the Ox app to enter a GitHub personal access token.")
         }
-        let generation = store.beginSignIn()
-        let grant = try await GitHubRepositoryOAuth.requestDeviceGrant()
-        let accepted = await authorization.device(grant.verificationURL, grant.userCode) {
-            let tokens = try await GitHubRepositoryOAuth.poll(grant)
-            return self.store.persist(tokens, expectedGeneration: generation)
-        }
-        guard accepted, let current = store.current() else {
-            store.cancelSignIn(expectedGeneration: generation)
-            throw RuntimeError.bridge("GitHub authorization was cancelled.")
-        }
-        return current
-    }
-}
-
-nonisolated private struct GitHubRepositoryDeviceGrant: Sendable {
-    let deviceCode: String
-    let userCode: String
-    let verificationURL: URL
-    let interval: TimeInterval
-    let expiresAt: Date
-}
-
-nonisolated private enum GitHubRepositoryOAuth {
-    private static let deviceCodeURL = URL(string: "https://github.com/login/device/code")!
-    private static let accessTokenURL = URL(string: "https://github.com/login/oauth/access_token")!
-
-    static func requestDeviceGrant() async throws -> GitHubRepositoryDeviceGrant {
-        let object = try await post(deviceCodeURL, body: [
-            "client_id": GitHubCopilotOAuth.clientID,
-            "scope": "public_repo",
-        ])
-        guard let deviceCode = object["device_code"] as? String,
-              let userCode = object["user_code"] as? String,
-              let verification = object["verification_uri"] as? String,
-              let verificationURL = URL(string: verification)
-        else { throw RuntimeError.bridge("GitHub returned an invalid authorization response.") }
-        let interval = (object["interval"] as? NSNumber)?.doubleValue ?? 5
-        let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue ?? 900
-        return GitHubRepositoryDeviceGrant(
-            deviceCode: deviceCode,
-            userCode: userCode,
-            verificationURL: verificationURL,
-            interval: max(interval, 1),
-            expiresAt: Date().addingTimeInterval(expiresIn)
-        )
-    }
-
-    static func poll(_ grant: GitHubRepositoryDeviceGrant) async throws -> GitHubServiceRepositoryAccount.Tokens {
-        var interval = grant.interval
-        while Date() < grant.expiresAt {
+        let accepted = await authorization { token in
+            _ = try await self.validate(token)
             try Task.checkCancellation()
-            let object = try await post(accessTokenURL, body: [
-                "client_id": GitHubCopilotOAuth.clientID,
-                "device_code": grant.deviceCode,
-                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-            ])
-            if let accessToken = object["access_token"] as? String, !accessToken.isEmpty {
-                let api = GitHubRepositoryAPI(accessToken: accessToken)
-                let user = try await api.object(method: "GET", path: "/user")
-                guard let login = user["login"] as? String, !login.isEmpty else {
-                    throw RuntimeError.bridge("GitHub did not return the authorized account.")
-                }
-                return .init(accessToken: accessToken, login: login)
-            }
-            switch object["error"] as? String {
-            case "authorization_pending": break
-            case "slow_down": interval += 5
-            case "access_denied": throw RuntimeError.bridge("GitHub authorization was denied.")
-            case "expired_token": throw RuntimeError.bridge("GitHub authorization expired.")
-            case let error?: throw RuntimeError.bridge("GitHub authorization failed: \(error)")
-            case nil: break
-            }
-            try await Task.sleep(for: .seconds(interval))
+            try Credentials.setSecretChecked(token, for: self.key)
         }
-        throw RuntimeError.bridge("GitHub authorization expired.")
+        guard accepted, let token = Credentials.secret(for: key) else {
+            try Task.checkCancellation()
+            throw RuntimeError.bridge("GitHub token entry was cancelled.")
+        }
+        return try await validate(token)
     }
 
-    private static func post(_ url: URL, body: [String: String]) async throws -> [String: Any] {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Ox/iOS", forHTTPHeaderField: "User-Agent")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard (200..<300).contains(status),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            Log.network.error("ServiceRepositoryProposal OAuth status=\(status)")
-            throw RuntimeError.bridge("GitHub authorization returned HTTP \(status).")
+    private func validate(_ token: String) async throws -> Tokens {
+        guard token.hasPrefix("ghp_"), token.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }) else {
+            throw GitHubRepositoryError.invalidToken
         }
-        return object
+        let login = try await GitHubRepositoryAPI(accessToken: token).tokenLogin()
+        return Tokens(accessToken: token, login: login)
+    }
+}
+
+nonisolated private enum GitHubRepositoryError: LocalizedError {
+    case invalidToken
+    case unauthorized
+    case missingScope
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidToken: "Enter a GitHub personal access token (classic), beginning with ghp_."
+        case .unauthorized: "This GitHub token is invalid, expired, or revoked. Create a new token and try again."
+        case .missingScope: "This GitHub token needs the public_repo scope to propose services."
+        }
     }
 }
 
@@ -181,7 +132,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
 
     func propose(
         _ request: ServiceRepositoryProposalRequest,
-        authorization: SubscriptionAuthorizationPresenter?
+        authorization: RepositoryTokenPresenter?
     ) async throws -> ServiceRepositoryProposalResult {
         let credential = try await account.credential(authorization: authorization)
         let api = GitHubRepositoryAPI(accessToken: credential.accessToken)
@@ -406,6 +357,14 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         self.accessToken = accessToken
     }
 
+    func tokenLogin() async throws -> String {
+        let value = try await request(method: "GET", path: "/user", body: nil, allowNotFound: false, validateScope: true)
+        guard let object = value as? [String: Any], let login = object["login"] as? String, !login.isEmpty else {
+            throw RuntimeError.bridge("GitHub did not return the token's account.")
+        }
+        return login
+    }
+
     func object(method: String, path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
         guard let value = try await request(method: method, path: path, body: body, allowNotFound: false) else {
             throw RuntimeError.bridge("GitHub resource was not found.")
@@ -434,7 +393,7 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         return array
     }
 
-    private func request(method: String, path: String, body: [String: Any]?, allowNotFound: Bool) async throws -> Any? {
+    private func request(method: String, path: String, body: [String: Any]?, allowNotFound: Bool, validateScope: Bool = false) async throws -> Any? {
         guard let url = URL(string: path, relativeTo: root)?.absoluteURL,
               url.host == root.host else { throw RuntimeError.bridge("GitHub request URL is invalid.") }
         var request = URLRequest(url: url)
@@ -449,11 +408,17 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        if status == 401 { throw GitHubRepositoryError.unauthorized }
         if allowNotFound && status == 404 { return nil }
         guard (200..<300).contains(status) else {
             let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
             Log.network.error("ServiceRepositoryProposal GitHub method=\(method) path=\(url.path) status=\(status)")
             throw RuntimeError.bridge("GitHub returned HTTP \(status)\(message.map { ": \($0)" } ?? ".")")
+        }
+        if validateScope {
+            let scopes = Set(((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-OAuth-Scopes") ?? "")
+                .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+            guard scopes.contains("public_repo") || scopes.contains("repo") else { throw GitHubRepositoryError.missingScope }
         }
         return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
     }

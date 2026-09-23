@@ -505,6 +505,19 @@ separate provider IDs. Deauthenticating removes the corresponding Keychain item.
 The compatibility gate copies legacy API keys to their destination-scoped items
 before publishing the new catalog; it preserves the source during migration.
 
+Repository proposals store a validated classic GitHub personal access token as a
+raw secret under `pat:service-repository:github`. The account login is fetched
+from GitHub, not persisted. Invalid or revoked saved tokens and tokens missing
+public-repository scope are removed before prompting for replacement. Transient
+network failures preserve the token. Tokens never enter chat transcripts or
+model inputs. Users can revoke the token in GitHub Settings.
+
+The application compatibility gate deletes the former
+`oauth:service-repository:github` item before consumers start. OAuth tokens are
+never copied to the PAT account, and provider credentials remain separate.
+Deletion is retryable; the PAT flow never reads the legacy item, even if cleanup
+is deferred by Keychain availability. Local deletion does not revoke GitHub grants.
+
 Built-in provider keys in `apps/ios/Ox/Host/ModelProviders/Secrets.swift` are compile-time binary
 contents rather than device storage.
 

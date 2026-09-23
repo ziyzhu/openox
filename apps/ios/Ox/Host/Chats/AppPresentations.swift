@@ -48,7 +48,7 @@ struct AppPresentations {
     let serviceHandoff: any ServiceHandoffPresenting
     let messages: any MessageComposing
     var providerAuthentication: (any ProviderAuthenticating)? = nil
-    var repositoryAuthorization: SubscriptionAuthorizationPresenter? = nil
+    var repositoryAuthorization: RepositoryTokenPresenter? = nil
 
     static let unavailable = AppPresentations(
         serviceSignIn: UnavailableServiceAuthPresenter(),
@@ -192,15 +192,8 @@ private struct UnavailableMessageComposer: MessageComposing {
 }
 
 extension AppPresentations {
-    static var liveRepositoryAuthorization: SubscriptionAuthorizationPresenter {
-        SubscriptionAuthorizationPresenter(
-            oauth: { authorizeURL, redirectPrefix in
-                await OAuthWebLogin.present(authorizeURL: authorizeURL, redirectPrefix: redirectPrefix)
-            },
-            device: { authorizeURL, userCode, poll in
-                await OAuthWebLogin.presentDevice(authorizeURL: authorizeURL, userCode: userCode, poll: poll)
-            }
-        )
+    static var liveRepositoryAuthorization: RepositoryTokenPresenter {
+        { validate in await RepositoryTokenPrompt.present(validate: validate) }
     }
 
     static let live = AppPresentations(
