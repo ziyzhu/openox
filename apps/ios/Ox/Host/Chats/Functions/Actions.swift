@@ -157,7 +157,7 @@ nonisolated enum Actions {
         case serviceDelete: L10n.string("Delete a service")
         case serviceRepositoryConnect: L10n.string("Add Repository")
         case serviceRepositoryDisconnect: L10n.string("Remove Repository")
-        case serviceRepositoryPropose: L10n.string("Propose services")
+        case serviceRepositoryPropose: L10n.string("Share Service")
         case serviceGitStatus, serviceGitDiff: L10n.string("Check service changes")
         case serviceGitLog: L10n.string("Read service history")
         case serviceGitShow: L10n.string("Read a saved service version")

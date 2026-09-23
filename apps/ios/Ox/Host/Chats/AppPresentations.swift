@@ -192,12 +192,8 @@ private struct UnavailableMessageComposer: MessageComposing {
 }
 
 extension AppPresentations {
-    static let live = AppPresentations(
-        serviceSignIn: AppPresentationCoordinator.shared,
-        serviceHandoff: ServiceHandoffSheetPresenter(coordinator: .shared),
-        messages: MessageSheetComposer(),
-        providerAuthentication: AppPresentationCoordinator.shared,
-        repositoryAuthorization: SubscriptionAuthorizationPresenter(
+    static var liveRepositoryAuthorization: SubscriptionAuthorizationPresenter {
+        SubscriptionAuthorizationPresenter(
             oauth: { authorizeURL, redirectPrefix in
                 await OAuthWebLogin.present(authorizeURL: authorizeURL, redirectPrefix: redirectPrefix)
             },
@@ -205,6 +201,14 @@ extension AppPresentations {
                 await OAuthWebLogin.presentDevice(authorizeURL: authorizeURL, userCode: userCode, poll: poll)
             }
         )
+    }
+
+    static let live = AppPresentations(
+        serviceSignIn: AppPresentationCoordinator.shared,
+        serviceHandoff: ServiceHandoffSheetPresenter(coordinator: .shared),
+        messages: MessageSheetComposer(),
+        providerAuthentication: AppPresentationCoordinator.shared,
+        repositoryAuthorization: liveRepositoryAuthorization
     )
 }
 

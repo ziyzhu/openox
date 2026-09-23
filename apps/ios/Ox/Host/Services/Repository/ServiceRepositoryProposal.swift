@@ -228,7 +228,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
 
     private func publishingOwner(api: GitHubRepositoryAPI, login: String, canPush: Bool) async throws -> String {
         if canPush { return owner }
-        if let existing = try? await api.object(method: "GET", path: "/repos/\(login)/\(repository)"),
+        if let existing = try await api.objectIfFound(path: "/repos/\(login)/\(repository)"),
            existing["fork"] as? Bool == true,
            ((existing["parent"] as? [String: Any])?["full_name"] as? String)?.lowercased() == "\(owner)/\(repository)".lowercased() {
             return login
@@ -236,7 +236,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
         _ = try await api.object(method: "POST", path: "/repos/\(owner)/\(repository)/forks", body: [:])
         for _ in 0..<12 {
             try await Task.sleep(for: .seconds(2))
-            if let fork = try? await api.object(method: "GET", path: "/repos/\(login)/\(repository)"),
+            if let fork = try await api.objectIfFound(path: "/repos/\(login)/\(repository)"),
                fork["fork"] as? Bool == true {
                 return login
             }
@@ -275,7 +275,9 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
         guard tree["truncated"] as? Bool != true, let entries = tree["tree"] as? [[String: Any]] else {
             throw RuntimeError.bridge("GitHub could not return the complete target tree.")
         }
-        for path in entries.compactMap({ $0["path"] as? String }) where serviceRoots.contains(where: { path.hasPrefix($0 + "/") }) {
+        for entry in entries where entry["type"] as? String == "blob" {
+            guard let path = entry["path"] as? String,
+                  serviceRoots.contains(where: { path.hasPrefix($0 + "/") }) else { continue }
             if files[path] == nil { files[path] = .some(nil) }
         }
         let manifestPath = "\(rootPath)/repository.json"
@@ -339,7 +341,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
             throw RuntimeError.bridge("GitHub did not return the proposal commit.")
         }
         let refPath = "/repos/\(publishingOwner)/\(repository)/git/refs/heads/\(branch)"
-        if (try? await api.object(method: "GET", path: refPath)) != nil {
+        if try await api.objectIfFound(path: refPath) != nil {
             _ = try await api.object(method: "PATCH", path: refPath, body: ["sha": commitSHA, "force": true])
         } else {
             _ = try await api.object(
@@ -405,7 +407,17 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
     }
 
     func object(method: String, path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
-        let value = try await request(method: method, path: path, body: body)
+        guard let value = try await request(method: method, path: path, body: body, allowNotFound: false) else {
+            throw RuntimeError.bridge("GitHub resource was not found.")
+        }
+        guard let object = value as? [String: Any] else {
+            throw RuntimeError.bridge("GitHub returned an unexpected response.")
+        }
+        return object
+    }
+
+    func objectIfFound(path: String) async throws -> [String: Any]? {
+        guard let value = try await request(method: "GET", path: path, body: nil, allowNotFound: true) else { return nil }
         guard let object = value as? [String: Any] else {
             throw RuntimeError.bridge("GitHub returned an unexpected response.")
         }
@@ -413,14 +425,16 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
     }
 
     func array(method: String, path: String) async throws -> [[String: Any]] {
-        let value = try await request(method: method, path: path, body: nil)
+        guard let value = try await request(method: method, path: path, body: nil, allowNotFound: false) else {
+            throw RuntimeError.bridge("GitHub resource was not found.")
+        }
         guard let array = value as? [[String: Any]] else {
             throw RuntimeError.bridge("GitHub returned an unexpected response.")
         }
         return array
     }
 
-    private func request(method: String, path: String, body: [String: Any]?) async throws -> Any {
+    private func request(method: String, path: String, body: [String: Any]?, allowNotFound: Bool) async throws -> Any? {
         guard let url = URL(string: path, relativeTo: root)?.absoluteURL,
               url.host == root.host else { throw RuntimeError.bridge("GitHub request URL is invalid.") }
         var request = URLRequest(url: url)
@@ -435,6 +449,7 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        if allowNotFound && status == 404 { return nil }
         guard (200..<300).contains(status) else {
             let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
             Log.network.error("ServiceRepositoryProposal GitHub method=\(method) path=\(url.path) status=\(status)")
