@@ -1,0 +1,200 @@
+{
+  "domain": "redfin.com",
+  "name": "Redfin",
+  "description": "Browse public Redfin home results by URL and read property details, descriptions, and photos. Read-only; no account changes.",
+  "baseUrl": "https://www.redfin.com/",
+  "faviconUrl": "https://ssl.cdn-redfin.com/v646.4.0/images/logos/Touch-icon-152.png",
+  "actions": [
+    {
+      "id": "listHomes",
+      "label": "List homes",
+      "description": "Read a public Redfin results page and follow its next-page URL. Not free-text search.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https://www\\.redfin\\.com/",
+            "maxLength": 8192
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^https://www\\.redfin\\.com/",
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "beds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "baths": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "address",
+                "price",
+                "beds",
+                "baths",
+                "area"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "url": "https://www.redfin.com/city/16163/WA/Seattle"
+      }
+    },
+    {
+      "id": "getProperty",
+      "label": "Get property",
+      "description": "Read public property details and up to 50 photos from a returned Redfin listing URL.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https://www\\.redfin\\.com/",
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "beds": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "baths": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "area": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "homeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "yearBuilt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "address",
+          "price",
+          "beds",
+          "baths",
+          "area",
+          "description",
+          "homeType",
+          "yearBuilt",
+          "photos"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

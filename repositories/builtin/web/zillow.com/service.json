@@ -1,0 +1,304 @@
+{
+  "domain": "zillow.com",
+  "name": "Zillow",
+  "description": "Browse public Zillow home results by results URL and read property details, photos, price history, and estimates. Read-only; no account changes.",
+  "baseUrl": "https://www.zillow.com/",
+  "faviconUrl": "https://www.zillow.com/apple-touch-icon.png",
+  "actions": [
+    {
+      "id": "listHomes",
+      "label": "List homes",
+      "description": "Read one complete Zillow results page. Pass nextCursor unchanged for the next page; accepts public results URLs, not free-text searches.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https://www\\.zillow\\.com/",
+            "maxLength": 8192
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^https://www\\.zillow\\.com/",
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "priceText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "beds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "baths": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "thumbnail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "url",
+                "address",
+                "price",
+                "priceText",
+                "beds",
+                "baths",
+                "area",
+                "status",
+                "thumbnail"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totalResults": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "totalResults"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "url": "https://www.zillow.com/seattle-wa/"
+      }
+    },
+    {
+      "id": "getProperty",
+      "label": "Get property",
+      "description": "Read a property using a listing URL returned by List homes. Estimates are Zillow estimates, not appraisals. Photos and history are bounded.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https://www\\.zillow\\.com/",
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "beds": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "baths": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "area": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "homeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "yearBuilt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lotArea": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lotAreaUnits": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zestimate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "rentZestimate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priceHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "price": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "date",
+                "price"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "openHouses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "address",
+          "price",
+          "beds",
+          "baths",
+          "area",
+          "status",
+          "description",
+          "homeType",
+          "yearBuilt",
+          "lotArea",
+          "lotAreaUnits",
+          "zestimate",
+          "rentZestimate",
+          "photos",
+          "priceHistory",
+          "openHouses"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

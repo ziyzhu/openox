@@ -1,0 +1,306 @@
+{
+  "domain": "amctheatres.com",
+  "name": "AMC Theatres",
+  "description": "Find AMC theaters, movies, and official showtimes with ticket links.",
+  "baseUrl": "https://www.amctheatres.com/",
+  "faviconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://amctheatres.com&size=128",
+  "actions": [
+    {
+      "id": "searchTheatres",
+      "label": "Search Theatres",
+      "description": "Search AMC theatres listed for a market by name.",
+      "baseUrl": "https://www.amctheatres.com/movie-theatres/seattle-tacoma",
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "marketSlug": "seattle-tacoma",
+        "query": "Seattle",
+        "limit": 10
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "marketSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "AMC market slug, such as seattle-tacoma."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "marketSlug",
+          "query"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "theaterId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "marketSlug": {
+                  "type": "string"
+                },
+                "theaterSlug": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "theaterId",
+                "name",
+                "marketSlug",
+                "theaterSlug",
+                "url"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      }
+    },
+    {
+      "id": "searchMovies",
+      "label": "Search Movies",
+      "description": "Search movies currently listed at an AMC theatre.",
+      "baseUrl": "https://www.amctheatres.com/movie-theatres/seattle-tacoma/amc-pacific-place-11/showtimes",
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "marketSlug": "seattle-tacoma",
+        "theaterSlug": "amc-pacific-place-11",
+        "query": "Dear You",
+        "limit": 10
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "marketSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "theaterSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "marketSlug",
+          "theaterSlug",
+          "query"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "movieId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "movieSlug": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "movieId",
+                "name",
+                "movieSlug",
+                "url"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      }
+    },
+    {
+      "id": "listMovieShowtimes",
+      "label": "List Movie Showtimes",
+      "description": "List official showtimes for a movie at one AMC theatre.",
+      "baseUrl": "https://www.amctheatres.com/movie-theatres/seattle-tacoma/amc-pacific-place-11/showtimes",
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "marketSlug": "seattle-tacoma",
+        "theaterSlug": "amc-pacific-place-11",
+        "movieSlug": "dear-you-84200"
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "marketSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "theaterSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "movieSlug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        },
+        "required": [
+          "marketSlug",
+          "theaterSlug",
+          "movieSlug"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "movie": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "movieSlug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "movieSlug"
+            ]
+          },
+          "theater": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "marketSlug": {
+                "type": "string"
+              },
+              "theaterSlug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "marketSlug",
+              "theaterSlug"
+            ]
+          },
+          "showtimes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "showtimeId": {
+                  "type": "integer"
+                },
+                "time": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attributes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ticketUrl": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "showtimeId",
+                "time",
+                "format",
+                "attributes",
+                "ticketUrl"
+              ]
+            }
+          },
+          "sourceUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "movie",
+          "theater",
+          "showtimes",
+          "sourceUrl"
+        ]
+      }
+    }
+  ]
+}

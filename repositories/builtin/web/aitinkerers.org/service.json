@@ -1,0 +1,189 @@
+{
+  "domain": "aitinkerers.org",
+  "name": "AI Tinkerers",
+  "description": "Browse public AI Tinkerers events and posts, search listings, and use the site sign-in handoff.",
+  "baseUrl": "https://aitinkerers.org/",
+  "faviconUrl": "https://images.aitinkerers.org/ai_tinkerers/logos/ai-tinkerers-large-transparent.svg",
+  "actions": [
+    {
+      "id": "readPost",
+      "label": "Read post",
+      "description": "Read a public AI Tinkerers post or event page.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://aitinkerers.org/",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Absolute AI Tinkerers post URL."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "author",
+          "publishedAt",
+          "description",
+          "text"
+        ]
+      }
+    },
+    {
+      "id": "searchPosts",
+      "label": "Search posts",
+      "description": "Search public AI Tinkerers event and post listings by text.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "baseUrl": "https://aitinkerers.org/events",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25,
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "excerpt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "title",
+                "excerpt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      }
+    },
+    {
+      "id": "getSignInUrl",
+      "label": "Get sign-in URL",
+      "description": "Return the AI Tinkerers email-code sign-in page.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "id": "getSignInState",
+      "label": "Get sign-in state",
+      "description": "Check the current AI Tinkerers session with a fresh server request.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ]
+      }
+    }
+  ]
+}

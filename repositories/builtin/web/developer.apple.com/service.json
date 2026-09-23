@@ -499,7 +499,7 @@
     {
       "id": "getDocumentation",
       "label": "Get documentation page",
-      "description": "Shows a framework, symbol, or article reference page, including its summary, availability, declaration, discussion, parameters, and related topics. Accepts a documentation path or full Apple Developer URL.",
+      "description": "Reads Apple’s Markdown documentation page and also returns structured metadata such as availability, declaration, parameters, and related topics. Accepts a documentation path or full Apple Developer URL.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -518,6 +518,10 @@
         "properties": {
           "title": {
             "type": "string"
+          },
+          "markdown": {
+            "type": "string",
+            "description": "Apple’s published Markdown representation of the documentation page."
           },
           "kind": {
             "type": "string",
@@ -595,6 +599,7 @@
         },
         "required": [
           "title",
+          "markdown",
           "kind",
           "abstract",
           "platforms",
@@ -1134,5 +1139,6 @@
         }
       }
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/developer.apple.com/favicon.png"
 }

@@ -1,0 +1,714 @@
+{
+  "domain": "reddit.com",
+  "name": "Reddit",
+  "description": "Search and browse public Reddit posts, comments, communities, and user activity. Read-only.",
+  "baseUrl": "https://www.reddit.com/",
+  "faviconUrl": "https://www.redditstatic.com/shreddit/assets/favicon/180x180.png",
+  "actions": [
+    {
+      "id": "searchPosts",
+      "label": "Search posts",
+      "description": "Search public Reddit posts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "hot",
+              "top",
+              "new",
+              "comments"
+            ],
+            "default": "relevance"
+          },
+          "time": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "all"
+            ],
+            "default": "all"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/post"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "query": "artificial intelligence",
+        "limit": 10
+      }
+    },
+    {
+      "id": "listSubredditPosts",
+      "label": "List subreddit posts",
+      "description": "Browse posts in a subreddit by ranking.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "new",
+              "top",
+              "rising"
+            ],
+            "default": "hot"
+          },
+          "time": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "all"
+            ],
+            "default": "all"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "subreddit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/post"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "subreddit": "technology",
+        "sort": "hot",
+        "limit": 10
+      }
+    },
+    {
+      "id": "getPost",
+      "label": "Get post",
+      "description": "Read one Reddit post by ID or permalink.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "post"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "$ref": "#/$defs/post"
+          }
+        },
+        "required": [
+          "post"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "post": "1wbcclc"
+      }
+    },
+    {
+      "id": "listPostComments",
+      "label": "List post comments",
+      "description": "Read comments and bounded nested replies for a post.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 3
+          }
+        },
+        "required": [
+          "post"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/comment"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "post": "1wbcclc",
+        "limit": 10,
+        "depth": 3
+      }
+    },
+    {
+      "id": "searchSubreddits",
+      "label": "Search communities",
+      "description": "Search public Reddit communities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/community"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "query": "technology",
+        "limit": 10
+      }
+    },
+    {
+      "id": "getSubreddit",
+      "label": "Get community",
+      "description": "Read public metadata for a subreddit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "subreddit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "community": {
+            "$ref": "#/$defs/community"
+          }
+        },
+        "required": [
+          "community"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "subreddit": "technology"
+      }
+    },
+    {
+      "id": "getUserProfile",
+      "label": "Get user profile",
+      "description": "Read public Reddit user profile metadata.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/$defs/profile"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "username": "spez"
+      }
+    },
+    {
+      "id": "listUserPosts",
+      "label": "List user posts",
+      "description": "Read a user’s public submitted posts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/post"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "username": "spez",
+        "limit": 10
+      }
+    },
+    {
+      "id": "listUserComments",
+      "label": "List user comments",
+      "description": "Read a user’s public comment history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/comment"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "username": "spez",
+        "limit": 10
+      }
+    }
+  ],
+  "$defs": {
+    "post": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fullname": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subreddit": {
+          "type": "string"
+        },
+        "selfText": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "permalink": {
+          "type": "string"
+        },
+        "score": {
+          "type": "integer"
+        },
+        "numComments": {
+          "type": "integer"
+        },
+        "createdUtc": {
+          "type": "number"
+        },
+        "isSelf": {
+          "type": "boolean"
+        },
+        "over18": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "fullname",
+        "title",
+        "author",
+        "subreddit",
+        "selfText",
+        "url",
+        "permalink",
+        "score",
+        "numComments",
+        "createdUtc",
+        "isSelf",
+        "over18"
+      ],
+      "additionalProperties": false
+    },
+    "comment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fullname": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "score": {
+          "type": "integer"
+        },
+        "createdUtc": {
+          "type": "number"
+        },
+        "permalink": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "integer"
+        },
+        "replies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/comment"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "fullname",
+        "author",
+        "body",
+        "score",
+        "createdUtc",
+        "permalink",
+        "depth",
+        "replies"
+      ],
+      "additionalProperties": false
+    },
+    "community": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "publicDescription": {
+          "type": "string"
+        },
+        "subscribers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "createdUtc": {
+          "type": "number"
+        },
+        "over18": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "publicDescription",
+        "subscribers",
+        "createdUtc",
+        "over18",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "createdUtc": {
+          "type": "number"
+        },
+        "commentKarma": {
+          "type": "integer"
+        },
+        "linkKarma": {
+          "type": "integer"
+        },
+        "isEmployee": {
+          "type": "boolean"
+        },
+        "isGold": {
+          "type": "boolean"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "iconUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "id",
+        "createdUtc",
+        "commentKarma",
+        "linkKarma",
+        "isEmployee",
+        "isGold",
+        "verified",
+        "iconUrl"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

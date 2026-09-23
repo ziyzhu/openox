@@ -1,0 +1,384 @@
+{
+  "domain": "suitz.co",
+  "name": "Suitz",
+  "description": "Research public class-action settlements. Browse and search the catalog, inspect eligibility, deadlines and proof requirements, and find official filing links. Read-only; no sign-in required.",
+  "baseUrl": "https://www.suitz.co/",
+  "faviconUrl": "https://www.suitz.co/suitz-logo-white-black-bg.png",
+  "actions": [
+    {
+      "id": "listSettlements",
+      "label": "List settlements",
+      "description": "Browse the public available-settlements catalog using source pagination. Payout figures are not guaranteed.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "deadline": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payout": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "Source payout figure, not a guaranteed payment; zero may mean variable."
+                },
+                "proof": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "claimIdRequired": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "states": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "settlementType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "industry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "url",
+                "deadline",
+                "payout",
+                "proof",
+                "claimIdRequired",
+                "states",
+                "settlementType",
+                "industry"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "limit": 5
+      }
+    },
+    {
+      "id": "searchSettlements",
+      "label": "Search settlements",
+      "description": "Search public catalog text locally across source pages. Continue using the returned cursor with the same query.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "default": 25
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "deadline": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payout": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "Source payout figure, not a guaranteed payment; zero may mean variable."
+                },
+                "proof": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "claimIdRequired": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "states": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "settlementType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "industry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "url",
+                "deadline",
+                "payout",
+                "proof",
+                "claimIdRequired",
+                "states",
+                "settlementType",
+                "industry"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "query": "Toyota",
+        "limit": 5
+      }
+    },
+    {
+      "id": "getSettlement",
+      "label": "Get settlement",
+      "description": "Read public settlement eligibility, deadlines, proof requirements and official filing links. Verify terms with the settlement administrator.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payout": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Source payout figure, not a guaranteed payment; zero may mean variable."
+          },
+          "proof": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claimIdRequired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "settlementType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "industry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eligibility": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "officialUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claimFormUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "company",
+          "url",
+          "deadline",
+          "payout",
+          "proof",
+          "claimIdRequired",
+          "states",
+          "settlementType",
+          "industry",
+          "description",
+          "eligibility",
+          "officialUrl",
+          "claimFormUrl",
+          "expired",
+          "updatedAt"
+        ]
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    }
+  ]
+}

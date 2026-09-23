@@ -1,7 +1,6 @@
 {
-  "version": 1,
-  "name": "Built-in",
-  "services": [
+  "name" : "Built-in",
+  "services" : [
     "ios:bluetooth",
     "ios:calendar",
     "ios:contacts",
@@ -11,11 +10,14 @@
     "ios:notifications",
     "ios:photos",
     "ios:reminders",
+    "web:aitinkerers.org",
     "web:amazon.com",
+    "web:amctheatres.com",
     "web:americanexpress.com",
     "web:appstoreconnect.apple.com",
     "web:archive.ph",
     "web:chase.com",
+    "web:cinemark.com",
     "web:creator.xiaohongshu.com",
     "web:ctrip.com",
     "web:developer.apple.com",
@@ -32,8 +34,11 @@
     "web:news.ycombinator.com",
     "web:ourworldindata.org",
     "web:outlook.live.com",
+    "web:reddit.com",
+    "web:redfin.com",
     "web:secure.bankofamerica.com",
     "web:secure.chase.com",
+    "web:suitz.co",
     "web:taobao.com",
     "web:www.1point3acres.com",
     "web:www.airbnb.com",
@@ -51,6 +56,8 @@
     "web:www.uscis.gov",
     "web:www.usta.com",
     "web:x.com",
-    "web:xiaohongshu.com"
-  ]
+    "web:xiaohongshu.com",
+    "web:zillow.com"
+  ],
+  "version" : 1
 }
