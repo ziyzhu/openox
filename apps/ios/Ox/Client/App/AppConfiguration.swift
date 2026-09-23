@@ -7,6 +7,7 @@ nonisolated enum AppConfiguration {
     static let websiteDataNamespace = required("OXWebsiteDataNamespace")
     static let agentSkillTypeIdentifier = required("OXAgentSkillTypeIdentifier")
     static let chatTypeIdentifier = required("OXChatTypeIdentifier")
+    static let serviceTypeIdentifier = required("OXServiceTypeIdentifier")
 
     private static func required(_ key: String) -> String {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,

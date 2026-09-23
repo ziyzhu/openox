@@ -672,6 +672,25 @@ final class ServiceManager {
         }
     }
 
+    func exportServicePackage(domain: String) async throws -> Data {
+        try await validateService(domain: domain)
+        return try await repository.exportLocalService(id: domain)
+    }
+
+    func importServicePackage(_ payload: ServicePackagePayload, replacing: Bool, locale: String?) async throws {
+        guard let kind = ServicesMount.Kind(rawValue: payload.kind.rawValue) else {
+            throw ServicePackageError.invalidPackage
+        }
+        try await validateServiceSource(kind: kind, domain: payload.domain) { path in
+            try payload.read(path.joined(separator: "/"))
+        }
+        try await repository.importLocalService(payload, replacing: replacing)
+        _ = await loadRepositories(locale: locale)
+        guard case .ready = repositoryState else {
+            throw ServiceRepository.Failure(message: "The service was imported but the repository could not be reloaded.")
+        }
+    }
+
     func deleteLocalService(domain: String, locale: String?) async throws -> ServiceRepository.ServiceKind {
         let kind = try await repository.deleteLocalService(id: domain)
         _ = await loadRepositories(locale: locale)
@@ -783,19 +802,25 @@ final class ServiceManager {
 
     private func validateLocalService(kind: ServicesMount.Kind, domain: String) async throws {
         try await repository.validateLocalSource(kind: kind.repositoryKind, id: domain)
+        try await validateServiceSource(kind: kind, domain: domain) { path in
+            try await self.repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: path)
+        }
+    }
+
+    private func validateServiceSource(
+        kind: ServicesMount.Kind,
+        domain: String,
+        read: ([String]) async throws -> Data
+    ) async throws {
         switch kind {
         case .web, .api:
-            let manifestData = try await repository.readLocalSource(
-                kind: kind.repositoryKind,
-                id: domain,
-                path: ["service.json"]
-            )
+            let manifestData = try await read(["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
             let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local)
             guard definition.domain == domain, definition.isAPI == (kind == .api) else {
                 throw ServiceRepository.Failure(message: "manifest identity does not match its directory")
             }
-            let actionsData = try await repository.readLocalSource(kind: kind.repositoryKind, id: domain, path: ["actions.js"])
+            let actionsData = try await read(["actions.js"])
             guard let source = String(data: actionsData, encoding: .utf8) else {
                 throw ServiceRepository.Failure(message: "actions.js is not UTF-8")
             }
@@ -876,18 +901,14 @@ final class ServiceManager {
                 throw ServiceRepository.Failure(message: "actions.js registration mismatch; \(details)")
             }
             for skill in definition.skills {
-                let data = try await repository.readLocalSource(
-                    kind: kind.repositoryKind,
-                    id: domain,
-                    path: ["skills", skill.name, "SKILL.md"]
-                )
+                let data = try await read(["skills", skill.name, "SKILL.md"])
                 guard let content = String(data: data, encoding: .utf8),
                       SkillFiles.parse(content, directoryName: skill.name) != nil else {
                     throw ServiceRepository.Failure(message: "invalid skill \(skill.name)")
                 }
             }
         case .mcp:
-            let data = try await repository.readLocalSource(kind: .mcp, id: domain, path: ["service.json"])
+            let data = try await read(["service.json"])
             let manifest = try JSONDecoder().decode(MCPCatalogManifest.self, from: data)
             guard manifest.id == domain, manifest.isValid else {
                 throw ServiceRepository.Failure(message: "invalid MCP manifest")

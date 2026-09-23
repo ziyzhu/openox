@@ -663,6 +663,20 @@ struct ServiceDetailView: View {
                         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
                             Divider().padding(.horizontal, Theme.Spacing.md)
                         }
+                        ShareLink(
+                            item: ServicePackageDocument(domain: service.domain, manager: serviceManager),
+                            preview: SharePreview(Text(verbatim: service.title))
+                        ) {
+                            Text("Share Service")
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.onSurface)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(Theme.Spacing.md)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier(A11yID.Chat.Attach.shareLocalService(service.domain))
+                        Divider().padding(.horizontal, Theme.Spacing.md)
                         manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmDeleteLocalService = true
                         }

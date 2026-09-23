@@ -620,6 +620,99 @@ actor ServiceRepository {
         Log.service.info("ServiceRepository.local copy id=\(id) source=\(source.repositoryID)")
     }
 
+    func exportLocalService(id: String) throws -> Data {
+        let package = try Self.loadPackage(at: localRoot, provenance: .local)
+        guard let service = package.services.first(where: { $0.id.runtimeID == id }),
+              service.id.kind == .web || service.id.kind == .api else {
+            throw Failure(message: "Only Local web and API services can be shared.")
+        }
+        let source = try localSource(kind: service.id.kind, id: id)
+        try Self.validateService(service, root: localRoot)
+        guard let enumerator = FileManager.default.enumerator(
+            at: source.root,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        ) else { throw Failure(message: "Local service source is unavailable.") }
+        var files: [ZipArchiveCodec.File] = []
+        while let url = enumerator.nextObject() as? URL {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isSymbolicLink != true else { throw Failure(message: "Service source contains a symbolic link.") }
+            guard values.isRegularFile == true else { continue }
+            let path = String(url.path.dropFirst(source.root.path.count + 1))
+            files.append(.init(path: "services/\(service.id.path)/\(path)", data: try Data(contentsOf: url)))
+        }
+        let data = try ServicePackageCodec.encode(kind: service.id.kind, domain: id, files: files.sorted { $0.path < $1.path })
+        Log.service.info("ServiceRepository.export id=\(service.id.rawValue) files=\(files.count) bytes=\(data.count)")
+        return data
+    }
+
+    func importLocalService(_ payload: ServicePackagePayload, replacing: Bool) throws {
+        _ = try editableLocalRepository()
+        let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)
+        let service = Package.Service(id: try ServiceID(kind: payload.kind, runtimeID: payload.domain))
+        let existing = originalPackage.services.first(where: { $0.id.runtimeID == payload.domain })
+        guard existing == nil || replacing else {
+            throw Failure(message: "A Local service already exists for \(payload.domain).")
+        }
+        guard existing == nil || existing?.id.kind == payload.kind else {
+            throw Failure(message: "A different Local service already uses \(payload.domain).")
+        }
+        guard existing != nil || !replacing else {
+            throw Failure(message: "There is no Local service to replace.")
+        }
+        if existing != nil {
+            let status = try Self.gitStatus(repositoryID: Self.localID, provenance: .local, root: localRoot)
+            let prefix = service.id.path + "/"
+            guard !(status.staged + status.unstaged + status.untracked).contains(where: {
+                $0 == service.id.path || $0.hasPrefix(prefix)
+            }) else { throw Failure(message: "Save or discard this Local service's changes before replacing it.") }
+        }
+        let destination = localRoot.appendingPathComponent(service.id.path, isDirectory: true)
+        guard existing != nil || !FileManager.default.fileExists(atPath: destination.path) else {
+            throw Failure(message: "Local source already exists for \(payload.domain).")
+        }
+        let staging = repositoriesRoot.appendingPathComponent(".importing-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        let stagedService = staging.appendingPathComponent(service.id.path, isDirectory: true)
+        let backup = repositoriesRoot.appendingPathComponent(".replaced-\(UUID().uuidString)", isDirectory: true)
+        let originalConfiguration = configuration
+        var updatedPackage = originalPackage
+        if existing == nil {
+            updatedPackage.services.append(service)
+            updatedPackage.services.sort { $0.id.rawValue < $1.id.rawValue }
+        }
+        do {
+            for file in payload.files {
+                guard file.path.hasPrefix(payload.sourcePrefix) else { throw ServicePackageError.invalidSource }
+                let path = String(file.path.dropFirst("services/".count))
+                let target = staging.appendingPathComponent(path)
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try file.data.write(to: target, options: .atomic)
+            }
+            try Self.validateService(service, root: staging)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if existing != nil { try FileManager.default.moveItem(at: destination, to: backup) }
+            try FileManager.default.moveItem(at: stagedService, to: destination)
+            if existing == nil { try Self.writePackage(updatedPackage, at: localRoot) }
+            _ = try Self.loadPackage(at: localRoot, provenance: .local)
+            configuration.resolutions[payload.domain] = Self.localID
+            try saveConfiguration()
+            if existing != nil { try FileManager.default.removeItem(at: backup) }
+            Log.service.info("ServiceRepository.import id=\(service.id.rawValue) files=\(payload.files.count) replaced=\(existing != nil)")
+        } catch {
+            configuration = originalConfiguration
+            try? saveConfiguration()
+            if existing == nil { try? Self.writePackage(originalPackage, at: localRoot) }
+            if FileManager.default.fileExists(atPath: backup.path) {
+                try? FileManager.default.removeItem(at: destination)
+                try? FileManager.default.moveItem(at: backup, to: destination)
+            } else if existing == nil {
+                try? FileManager.default.removeItem(at: destination)
+            }
+            throw error
+        }
+    }
+
     func deleteLocalService(id: String) throws -> ServiceKind {
         _ = try editableLocalRepository()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)

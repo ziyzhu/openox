@@ -32,6 +32,8 @@
 	<string>ai.openox.agent-skill</string>
 	<key>OXChatTypeIdentifier</key>
 	<string>ai.openox.chat</string>
+	<key>OXServiceTypeIdentifier</key>
+	<string>ai.openox.service</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Ziyuan Zhu</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -131,6 +133,25 @@
 				<string>application/vnd.ox.chat+zip</string>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Ox Service</string>
+			<key>UTTypeIdentifier</key>
+			<string>ai.openox.service</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>service</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.ox.service+zip</string>
+			</dict>
+		</dict>
 	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
@@ -199,6 +220,18 @@
 			<array>
 				<string>ai.openox.chat</string>
 				<string>$(OX_BUNDLE_IDENTIFIER).chat</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Ox Service</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>ai.openox.service</string>
 			</array>
 		</dict>
 	</array>

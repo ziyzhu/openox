@@ -101,7 +101,8 @@ nonisolated enum ZipArchiveCodec {
         _ data: Data,
         maximumArchiveBytes: Int,
         maximumEntryBytes: Int,
-        maximumEntries: Int
+        maximumEntries: Int,
+        maximumTotalBytes: Int = .max
     ) throws -> [File] {
         guard data.count <= maximumArchiveBytes else { throw ZipArchiveError.tooLarge }
         let end = try endRecord(in: data)
@@ -118,6 +119,7 @@ nonisolated enum ZipArchiveCodec {
 
         var entries: [Entry] = []
         var paths = Set<String>()
+        var totalBytes = 0
         var cursor = centralOffset
         let centralEnd = centralOffset + centralSize
         for _ in 0..<entryCount {
@@ -140,9 +142,11 @@ nonisolated enum ZipArchiveCodec {
                   nameLength > 0,
                   next <= centralEnd,
                   compressedSize <= maximumArchiveBytes,
-                  uncompressedSize <= maximumEntryBytes else {
+                  uncompressedSize <= maximumEntryBytes,
+                  uncompressedSize <= maximumTotalBytes - totalBytes else {
                 throw ZipArchiveError.tooLarge
             }
+            totalBytes += uncompressedSize
             let nameData = data.subdata(in: cursor + 46..<cursor + 46 + nameLength)
             guard let path = String(data: nameData, encoding: .utf8) else {
                 throw ZipArchiveError.unsafePath

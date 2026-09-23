@@ -6,6 +6,7 @@ struct OxApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
     @State private var chatImports = ChatImportCoordinator()
+    @State private var serviceImports = ServiceImportCoordinator(manager: IOSHost.shared.services)
     @State private var presentations = AppPresentationCoordinator.shared
     private let client: OxClient
     #if targetEnvironment(simulator)
@@ -50,8 +51,36 @@ struct OxApp: App {
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)
                 case "chat": chatImports.receive(url)
+                case "service": serviceImports.receive(url)
                 default: Log.ui.info("DocumentImport.ignored source=\(url.lastPathComponent)")
                 }
+            }
+            .sheet(isPresented: Binding(
+                get: { serviceImports.proposal != nil && client.services.repositoryState == .ready },
+                set: { if !$0 { serviceImports.dismissProposal() } }
+            )) {
+                if let proposal = serviceImports.proposal {
+                    ServiceImportView(proposal: proposal, coordinator: serviceImports)
+                        .themed()
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
+            }
+            .alert("Couldn't import service", isPresented: Binding(
+                get: { serviceImports.errorMessage != nil },
+                set: { if !$0 { serviceImports.dismissError() } }
+            )) {
+                Button("OK", role: .cancel) { serviceImports.dismissError() }
+            } message: {
+                Text(serviceImports.errorMessage ?? "")
+            }
+            .alert("Service imported", isPresented: Binding(
+                get: { serviceImports.importedDomain != nil },
+                set: { if !$0 { serviceImports.dismissSuccess() } }
+            )) {
+                Button("OK", role: .cancel) { serviceImports.dismissSuccess() }
+            } message: {
+                Text(verbatim: serviceImports.importedDomain ?? "")
             }
             .task { await AppRegion.shared.refresh() }
             .onChange(of: scenePhase) { _, phase in
