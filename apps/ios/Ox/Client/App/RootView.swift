@@ -4,12 +4,21 @@ import WebKit
 
 @Observable
 final class SidebarInteraction {
+    private struct PageSwitchExclusion {
+        let bounds: CGRect
+        let includesAreaBelow: Bool
+
+        func contains(_ point: CGPoint) -> Bool {
+            includesAreaBelow ? point.y >= bounds.minY : bounds.contains(point)
+        }
+    }
+
     var dragActive = false
     var actionsSuppressed = false
-    private var pageSwitchExclusions: [UUID: CGRect] = [:]
+    private var pageSwitchExclusions: [UUID: PageSwitchExclusion] = [:]
 
-    func setPageSwitchExclusion(owner: UUID, bounds: CGRect) {
-        pageSwitchExclusions[owner] = bounds
+    func setPageSwitchExclusion(owner: UUID, bounds: CGRect, includesAreaBelow: Bool) {
+        pageSwitchExclusions[owner] = PageSwitchExclusion(bounds: bounds, includesAreaBelow: includesAreaBelow)
     }
 
     func clearPageSwitchExclusion(owner: UUID) {
@@ -26,13 +35,14 @@ extension EnvironmentValues {
 }
 
 private struct PageSwitchExclusionModifier: ViewModifier {
+    let includesAreaBelow: Bool
     @Environment(\.sidebarInteraction) private var sidebarInteraction
     @State private var owner = UUID()
 
     func body(content: Content) -> some View {
         content
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-                sidebarInteraction.setPageSwitchExclusion(owner: owner, bounds: bounds)
+                sidebarInteraction.setPageSwitchExclusion(owner: owner, bounds: bounds, includesAreaBelow: includesAreaBelow)
             }
             .onDisappear {
                 sidebarInteraction.clearPageSwitchExclusion(owner: owner)
@@ -41,8 +51,8 @@ private struct PageSwitchExclusionModifier: ViewModifier {
 }
 
 extension View {
-    func excludesCompactPageSwitch() -> some View {
-        modifier(PageSwitchExclusionModifier())
+    func excludesCompactPageSwitch(includingAreaBelow: Bool = false) -> some View {
+        modifier(PageSwitchExclusionModifier(includesAreaBelow: includingAreaBelow))
     }
 }
 
@@ -160,7 +170,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                         Log.ui.info("RootView.sidebarDrag phase=rejected reason=textSelection")
                         return
                     }
-                    guard !interaction.excludesPageSwitch(at: value.startLocation) else {
+                    guard page != .workspace || !interaction.excludesPageSwitch(at: value.startLocation) else {
                         dragPhase = .rejected
                         Log.ui.info("RootView.sidebarDrag phase=rejected reason=pageSwitchExclusion")
                         return

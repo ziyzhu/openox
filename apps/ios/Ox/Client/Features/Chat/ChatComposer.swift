@@ -567,6 +567,7 @@ struct ChatComposer: View, Equatable {
 
     var body: some View {
         inputBar
+            .excludesCompactPageSwitch(includingAreaBelow: true)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                 DispatchQueue.main.async {
                     guard abs(containerWidth - width) > 0.5 else { return }
@@ -977,9 +978,9 @@ struct ChatComposer: View, Equatable {
                 }
                 .scrollClipDisabled()
                 .frame(minHeight: Theme.Size.minimumTouchTarget)
-                .excludesCompactPageSwitch()
             }
         }
+        .excludesCompactPageSwitch(includingAreaBelow: true)
     }
 
     private var editingMessageChip: some View {
