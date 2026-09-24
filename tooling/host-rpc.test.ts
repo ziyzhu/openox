@@ -36,7 +36,8 @@ function transport(endpoint: string) {
 
 const description = {
   implementation: { name: "Ox", version: "1.0.7", build: "1" },
-  methods: { "host.describe": 1, "chats.list": 1 },
+  protocols: { rpc: [1] },
+  methods: ["host.describe", "chats.list"],
 };
 const row = { id: "chat", title: "Example", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: true };
 
@@ -46,17 +47,19 @@ test("chat listing discovers compatibility and preserves nullable fields", async
     methods.push(request.method);
     send({ jsonrpc: "2.0", id: request.id, result: request.method === "host.describe" ? description : { chats: [row] } });
   });
-  expect(await client(endpoint).listChats(1000)).toEqual([row]);
-  expect(methods).toEqual(["host.describe", "chats.list"]);
+  const host = client(endpoint);
+  expect(await host.listChats(1000)).toEqual([row]);
+  expect(await host.listChats(1000)).toEqual([row]);
+  expect(methods).toEqual(["host.describe", "chats.list", "chats.list"]);
 });
 
-test("incompatible chat contract fails before the operation is sent", async () => {
+test("incompatible RPC version fails before the operation is sent", async () => {
   const methods: string[] = [];
   const endpoint = serve((request, send) => {
     methods.push(request.method);
-    send({ jsonrpc: "2.0", id: request.id, result: { ...description, methods: { "host.describe": 1, "chats.list": 2 } } });
+    send({ jsonrpc: "2.0", id: request.id, result: { ...description, protocols: { rpc: [2, 3] } } });
   });
-  await expect(client(endpoint).listChats(1000)).rejects.toThrow("chats.list contract 1");
+  await expect(client(endpoint).listChats(1000)).rejects.toThrow("Host supports RPC versions 2, 3; this client uses RPC 1");
   expect(methods).toEqual(["host.describe"]);
 });
 
@@ -134,7 +137,7 @@ const liveEndpoint = process.env.OX_RPC_TEST_ENDPOINT;
 test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches and rejection of the old protocol", async () => {
   const endpoint = liveEndpoint!;
   const host = client(endpoint);
-  expect((await host.describe(5000)).methods).toMatchObject(description.methods);
+  expect(await host.describe(5000)).toMatchObject({ protocols: description.protocols, methods: expect.arrayContaining(description.methods) });
   const chats = await host.listChats(5000);
   expect((await host.call("vm.inspect", 5000)).value).toBeDefined();
   expect((await host.call("models.list", 5000)).clients).toBeArray();
@@ -168,7 +171,7 @@ test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches an
   expect(responses[0].id).toBe(12);
   expect(responses[0].result.chats).toEqual(chats);
   expect(responses[1].id).toBeNull();
-  expect(responses[1].result.methods).toMatchObject(description.methods);
+  expect(responses[1].result.protocols).toEqual(description.protocols);
   expect(responses[2].error.code).toBe(-32600);
   socket.send(JSON.stringify([{ jsonrpc: "2.0", method: "host.describe" }]));
   const next = await exchange(JSON.stringify({ jsonrpc: "2.0", method: "host.describe", id: "after-notification" }));

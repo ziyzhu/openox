@@ -35,17 +35,25 @@ sequentially. Separate WebSocket messages can have concurrent operations.
 
 ### Discovery and versions
 
-`host.describe` returns `implementation` (`name`, `version`, `build`) and `methods`,
-a map from method name to supported contract version. It is derived from the
-same `OxHostProtocol.Method` enum used for dispatch. All current methods have
-contract version 1, independently of the JSON-RPC envelope version and software
-release versions.
+Each compatibility boundary has its own version line. The Host advertises the
+set of versions it supports; each consumer declares the single version it
+targets. Boundaries advance independently because their support windows differ:
+lockstep clients can drop old RPC versions immediately, while persisted services
+may need old versions for much longer.
 
-The shared TypeScript `HostRPCClient` checks discovery before each operation.
-A missing or incompatible method fails before invocation. Additive response
-fields are allowed. Changes to required fields, field types, or established
-behavior require an explicit contract change. Parallel support for different
-contracts can be designed when needed; it is not part of the current protocol.
+`host.describe` returns `implementation` (`name`, `version`, `build`),
+`protocols.rpc`, the RPC versions the Host supports, and `methods`, the method
+names derived from the same `OxHostProtocol.Method` enum used for dispatch. The
+current RPC version is 1, independent of the JSON-RPC envelope version and
+software release versions.
+
+The shared TypeScript `HostRPCClient` declares `RPC_VERSION` and checks it
+against `protocols.rpc` once per connection, before its first operation. An
+incompatible Host fails before any operation is sent. Unknown methods fail with
+`-32601`. Additive response fields and new methods do not change the version.
+Changes to required fields, field types, or established behavior of any method
+require a new RPC version. The Host may support several RPC versions while
+clients migrate.
 
 | Area | Methods |
 | --- | --- |
@@ -60,7 +68,7 @@ contracts can be designed when needed; it is not part of the current protocol.
 | UI automation | `debug.composer.formatting`, `debug.composer.setDraft`, `debug.composer.setMarkedText`, `debug.chat.setEditDraft`, `debug.pasteboard.setImage`, `debug.pasteboard.setRichText`, `debug.share.stageNote` |
 
 The redundant older VM evaluator has been removed; `vm.eval` is the single
-snippet execution method. VM method compatibility is reported through discovery
+snippet execution method. VM method compatibility is covered by the RPC version
 rather than a second `protocolVersion` field on each request and response.
 
 `OxHost.listChats()` returns typed snapshots shared with the local `OxClient`.
@@ -70,8 +78,8 @@ serialization and dispatch without routing in-process UI calls through JSON.
 ### Client behavior
 
 One `HostConnection` implementation owns WebSocket lifecycle, request IDs,
-response validation, timeouts, and pending calls. `HostRPCClient` adds compatibility
-checks and typed chat/discovery validation. CLI commands and test harnesses use
+response validation, timeouts, and pending calls. `HostRPCClient` adds the RPC
+version check and typed chat/discovery validation. CLI commands and test harnesses use
 these helpers. Errors are exceptions carrying an RPC code and optional data;
 there is no second success/failure envelope inside method results.
 
