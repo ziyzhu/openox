@@ -35,20 +35,17 @@ sequentially. Separate WebSocket messages can have concurrent operations.
 
 ### Discovery and versions
 
-Each compatibility boundary has its own version line. The Host advertises the
-set of versions it supports; each consumer declares the single version it
-targets. Boundaries advance independently because their support windows differ:
-lockstep clients can drop old RPC versions immediately, while persisted services
-may need old versions for much longer.
+Only persisted content declares versions. The Host advertises the set of
+versions it supports; each manifest declares the single version it targets.
+The Client ↔ Host RPC is unversioned: it exists only in simulator builds, and
+the Host and CLI are updated together.
 
 `HostProtocols` is the single Host-side list of supported versions:
 
 | Line | Consumer declares | Host supports | Checked |
 | --- | --- | --- | --- |
-| `rpc` | `RPC_VERSION` in `HostRPCClient` | 1 | once per connection, by the client |
 | `repository` | `version` in `repository.json` | 1 | when a repository loads |
 | `service` | `version` in `service.json` | 1, 2 | when a service loads and installs |
-| `skill` | nothing yet; undeclared means 1 | 1 | not checked |
 
 `host.describe` returns `implementation` (`name`, `version`, `build`),
 `protocols`, the lists above, and `methods`, the method names derived from the
@@ -56,13 +53,10 @@ same `OxHostProtocol.Method` enum used for dispatch. These versions are
 independent of the JSON-RPC envelope version and software release versions.
 Unsupported versions fail with both the declared and supported versions named.
 
-The shared TypeScript `HostRPCClient` declares `RPC_VERSION` and checks it
-against `protocols.rpc` once per connection, before its first operation. An
-incompatible Host fails before any operation is sent. Unknown methods fail with
-`-32601`. Additive response fields and new methods do not change the version.
-Changes to required fields, field types, or established behavior of any method
-require a new RPC version. The Host may support several RPC versions while
-clients migrate.
+Unknown methods fail with `-32601`, and the shared TypeScript `HostRPCClient`
+validates typed results, so a mismatched Host and CLI fail explicitly. Prefer
+additive response fields and new methods; change required fields, field types,
+or established behavior only together with every client.
 
 | Area | Methods |
 | --- | --- |
@@ -77,8 +71,8 @@ clients migrate.
 | UI automation | `debug.composer.formatting`, `debug.composer.setDraft`, `debug.composer.setMarkedText`, `debug.chat.setEditDraft`, `debug.pasteboard.setImage`, `debug.pasteboard.setRichText`, `debug.share.stageNote` |
 
 The redundant older VM evaluator has been removed; `vm.eval` is the single
-snippet execution method. VM method compatibility is covered by the RPC version
-rather than a second `protocolVersion` field on each request and response.
+snippet execution method. VM methods carry no separate `protocolVersion` field on
+requests or responses.
 
 `OxHost.listChats()` returns typed snapshots shared with the local `OxClient`.
 Other Host operations still use their existing managers internally. RPC changes
@@ -87,8 +81,8 @@ serialization and dispatch without routing in-process UI calls through JSON.
 ### Client behavior
 
 One `HostConnection` implementation owns WebSocket lifecycle, request IDs,
-response validation, timeouts, and pending calls. `HostRPCClient` adds the RPC
-version check and typed chat/discovery validation. CLI commands and test harnesses use
+response validation, timeouts, and pending calls. `HostRPCClient` adds typed
+chat/discovery validation. CLI commands and test harnesses use
 these helpers. Errors are exceptions carrying an RPC code and optional data;
 there is no second success/failure envelope inside method results.
 
@@ -122,11 +116,8 @@ to implement it. Repository content hashes and Git commits identify exact
 contents independently of format compatibility. These content interfaces are
 not converted into RPC by this change.
 
-Skills contain instructions whose tool assumptions can change even when their
-Markdown remains readable. Skills do not declare a version yet; the Host treats
-every skill as version 1. Introduce a declared skill version together with the
-first incompatible skill change. No repository, skill, or service manifest
-schema changes are introduced.
+Skills are not versioned. They follow the Agent Skills specification, which has
+no format version; `SKILL.md` frontmatter carries no Ox version.
 
 ## References
 

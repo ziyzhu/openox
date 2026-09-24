@@ -1,4 +1,4 @@
-import { HostRPCClient, RPC_VERSION } from "./host-rpc.ts";
+import { HostRPCClient } from "./host-rpc.ts";
 import { dispatch, fail, type CliContext, type SubCommand } from "./lib.ts";
 
 export const SUBS: Record<string, SubCommand> = {
@@ -31,7 +31,6 @@ async function describe(args: string[], context: CliContext): Promise<void> {
       const { name, version, build } = description.implementation;
       console.log(`${name} ${version} (${build})`);
       for (const [name, versions] of Object.entries(description.protocols).sort(([a], [b]) => a.localeCompare(b))) console.log(`${name}: ${versions.join(", ")}`);
-      console.log(`client rpc: ${RPC_VERSION}`);
       for (const method of description.methods) console.log(method);
     }
   } catch (error) {

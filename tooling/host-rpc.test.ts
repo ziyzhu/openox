@@ -36,12 +36,12 @@ function transport(endpoint: string) {
 
 const description = {
   implementation: { name: "Ox", version: "1.0.7", build: "1" },
-  protocols: { rpc: [1], repository: [1], service: [1, 2], skill: [1] },
+  protocols: { repository: [1], service: [1, 2] },
   methods: ["host.describe", "chats.list"],
 };
 const row = { id: "chat", title: "Example", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: true };
 
-test("chat listing discovers compatibility and preserves nullable fields", async () => {
+test("chat listing preserves nullable fields without a discovery round trip", async () => {
   const methods: string[] = [];
   const endpoint = serve((request, send) => {
     methods.push(request.method);
@@ -50,17 +50,7 @@ test("chat listing discovers compatibility and preserves nullable fields", async
   const host = client(endpoint);
   expect(await host.listChats(1000)).toEqual([row]);
   expect(await host.listChats(1000)).toEqual([row]);
-  expect(methods).toEqual(["host.describe", "chats.list", "chats.list"]);
-});
-
-test("incompatible RPC version fails before the operation is sent", async () => {
-  const methods: string[] = [];
-  const endpoint = serve((request, send) => {
-    methods.push(request.method);
-    send({ jsonrpc: "2.0", id: request.id, result: { ...description, protocols: { rpc: [2, 3] } } });
-  });
-  await expect(client(endpoint).listChats(1000)).rejects.toThrow("Host supports RPC versions 2, 3; this client uses RPC 1");
-  expect(methods).toEqual(["host.describe"]);
+  expect(methods).toEqual(["chats.list", "chats.list"]);
 });
 
 test("invalid chat payload is rejected", async () => {

@@ -11,10 +11,8 @@ enum OxHostRPC {
                 "build": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"),
             ]),
             "protocols": .object([
-                "rpc": versions(HostProtocols.rpc),
                 "repository": versions(HostProtocols.repository),
                 "service": versions(HostProtocols.service),
-                "skill": versions(HostProtocols.skill),
             ]),
             "methods": .array(OxHostProtocol.Method.allCases.map { .string($0.rawValue) }),
         ])
