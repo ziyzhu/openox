@@ -99,13 +99,13 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     @State private var dragPhase = DragPhase.idle
     @State private var settlingBlurRadius: CGFloat = 0
-    @State private var settlingBlurTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let minimumDistance: CGFloat = 8
     private let horizontalIntentRatio: CGFloat = 1.2
     private let maximumBlurRadius: CGFloat = 5
+    private let blurRamp = Animation.smooth(duration: 0.07)
 
     private var travel: CGFloat {
         let settled = page == .sidebar ? size.width : 0
@@ -153,10 +153,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         .contentShape(Rectangle())
         .simultaneousGesture(pageDrag, isEnabled: gestureEnabled)
         .onChange(of: blurAllowed) { _, allowed in
-            if !allowed { clearBlur() }
-        }
-        .onDisappear {
-            settlingBlurTask?.cancel()
+            if !allowed { settlingBlurRadius = 0 }
         }
     }
 
@@ -184,7 +181,6 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                         return
                     }
                     if page == .workspace { onOpeningDrag() }
-                    settlingBlurTask?.cancel()
                     settlingBlurRadius = 0
                     interaction.dragActive = true
                     interaction.actionsSuppressed = true
@@ -232,7 +228,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private func settle(on target: CompactPage) {
-        let animation = reduceMotion ? Animation.easeOut(duration: 0.12) : RootView.sidebarSettleAnimation
+        let animation = reduceMotion ? Theme.Animation.press : RootView.sidebarSettleAnimation
         let returnsToOrigin = target == page
         withAnimation(animation, completionCriteria: .logicallyComplete) {
             page = target
@@ -249,25 +245,11 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 
     private func beginSettlingBlur() {
         guard blurAllowed else { return }
-        settlingBlurTask?.cancel()
-        settlingBlurTask = Task { @MainActor in
-            withAnimation(.easeIn(duration: 0.07)) {
-                settlingBlurRadius = maximumBlurRadius
-            }
-            do {
-                try await Task.sleep(for: .milliseconds(70))
-            } catch {
-                return
-            }
-            withAnimation(.easeOut(duration: 0.14)) {
-                settlingBlurRadius = 0
-            }
+        withAnimation(blurRamp, completionCriteria: .logicallyComplete) {
+            settlingBlurRadius = maximumBlurRadius
+        } completion: {
+            withAnimation(Theme.Animation.quick) { settlingBlurRadius = 0 }
         }
-    }
-
-    private func clearBlur() {
-        settlingBlurTask?.cancel()
-        settlingBlurRadius = 0
     }
 }
 
@@ -474,21 +456,28 @@ struct RootView: View {
         case opening
         case updating
         case loadingChats
-        case ready
 
         var label: LocalizedStringKey {
             switch self {
             case .opening: "Opening your Profile…"
             case .updating: "Updating your Profile…"
             case .loadingChats: "Loading your chats…"
-            case .ready: ""
             }
         }
     }
 
-    private enum StartupPresentation: Equatable {
-        case loading
-        case content
+    private enum Startup: Equatable {
+        case idle
+        case loading(StartupPhase)
+        case failed(String)
+        case ready
+
+        var canBegin: Bool {
+            switch self {
+            case .idle, .failed: true
+            case .loading, .ready: false
+            }
+        }
     }
 
     private enum Presentation: Identifiable {
@@ -519,12 +508,7 @@ struct RootView: View {
     @State private var pendingChatPresentationId: UUID?
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
-    @State private var loaded: Bool = false
-    @State private var startupPhase: StartupPhase = .opening
-    @State private var startupPresentation: StartupPresentation = .loading
-    @State private var startupError: String?
-    @State private var visibleStartupPhase: StartupPhase?
-    @State private var startupLabelTask: Task<Void, Never>?
+    @State private var startup = Startup.idle
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var artifactRefreshEpoch = 0
     @State private var childNavigationActive = false
@@ -622,7 +606,7 @@ struct RootView: View {
                         SettingsSheet(
                             initialProfileID: profileID,
                             initialSkillDraft: skillDraft,
-                            ready: startupPhase == .ready,
+                            ready: startup == .ready,
                             artifactRefreshEpoch: artifactRefreshEpoch,
                             onRenameArtifact: renameArtifact,
                             onDeleteArtifact: deleteArtifact,
@@ -631,7 +615,7 @@ struct RootView: View {
                     case .services(let chatID):
                         ServiceExplorePage(
                             onClose: dismissPresentation,
-                            ready: startupPhase == .ready,
+                            ready: startup == .ready,
                             primaryAction: .attach,
                             browserSessionID: chatID,
                             isAttached: { service in isServiceAttached(service, to: chatID) },
@@ -645,14 +629,14 @@ struct RootView: View {
             }
             .skillImport(
                 coordinator: skillImports,
-                ready: startupPhase == .ready,
+                ready: startup == .ready,
                 onProposalPresented: { presentation = nil },
                 onImportedSkill: handleImportedSkill
             )
         .chatImport(
             coordinator: chatImports,
             chats: chats,
-            ready: startupPhase == .ready,
+            ready: startup == .ready,
             onProposalPresented: { presentation = nil },
             onImportedChat: handleImportedChat
         )
@@ -825,11 +809,11 @@ struct RootView: View {
     @ViewBuilder
     private var chatLayer: some View {
         ZStack {
-            if startupPresentation == .loading {
-                startupLoadingView
+            if startup == .ready {
+                readyChatLayer
                     .transition(.opacity)
             } else {
-                readyChatLayer
+                startupLoadingView
                     .transition(.opacity)
             }
         }
@@ -882,26 +866,28 @@ struct RootView: View {
 
     private var startupLoadingView: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            if let startupError {
+            switch startup {
+            case .failed(let message):
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 28, weight: .medium))
+                    .font(.title.weight(.medium))
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 Text("Ox couldn’t update your data")
                     .font(Theme.Fonts.headline)
-                Text(startupError)
+                Text(message)
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .multilineTextAlignment(.center)
                 Button("Try Again") { bootstrap() }
                     .buttonStyle(.borderedProminent)
-            } else {
+            case .loading(let phase):
                 CellularAutomatonLoader()
-                Text(startupPhase.label)
+                Text(phase.label)
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .opacity(visibleStartupPhase == startupPhase ? 1 : 0)
-                    .accessibilityHidden(visibleStartupPhase != startupPhase)
+                    .revealed(after: .milliseconds(500), id: phase)
                     .accessibilityIdentifier(A11yID.Startup.status)
+            case .idle, .ready:
+                CellularAutomatonLoader()
             }
         }
         .padding(Theme.Spacing.xl)
@@ -942,7 +928,7 @@ struct RootView: View {
         guard pendingChatPresentationId == visibleId, chats.openingId == nil else { return }
         DispatchQueue.main.async {
             guard pendingChatPresentationId == visibleId, chats.openingId == nil else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: Theme.Animation.quick)) {
+            withAnimation(reduceMotion ? nil : Theme.Animation.quick) {
                 pendingChatPresentationId = nil
                 compactChatTransition = .idle
             }
@@ -1057,11 +1043,11 @@ struct RootView: View {
         Log.ui.info("RootView.childNavigation active=\(active)")
     }
 
-    private static let sidebarSpring: Animation = .smooth(duration: 0.3, extraBounce: 0)
+    private static let sidebarSpring: Animation = .smooth(duration: 0.3)
     fileprivate static let sidebarSettleAnimation: Animation = .smooth(duration: 0.25)
 
     private var sidebarAnimation: Animation {
-        reduceMotion ? .easeOut(duration: 0.15) : Self.sidebarSpring
+        reduceMotion ? Theme.Animation.quick : Self.sidebarSpring
     }
 
     private func setSidebar(_ open: Bool, completion: @escaping () -> Void = {}) {
@@ -1092,9 +1078,7 @@ struct RootView: View {
     }
 
     private func bootstrap() {
-        guard !loaded else { return }
-        loaded = true
-        startupError = nil
+        guard startup.canBegin else { return }
         transitionStartup(to: .opening)
         loadProfile()
     }
@@ -1121,24 +1105,23 @@ struct RootView: View {
                 await manager.refreshServices(locale: serviceLocale)
                 let chat = chats.current ?? chats.startNewChat()
                 refreshCompactSidebar()
-                transitionStartup(to: .ready)
-                withAnimation(.easeOut(duration: reduceMotion ? 0.1 : 0.18), completionCriteria: .logicallyComplete) {
-                    startupPresentation = .content
+                Log.ui.info("RootView.startup phase=ready")
+                withAnimation(reduceMotion ? Theme.Animation.press : Theme.Animation.standard, completionCriteria: .logicallyComplete) {
+                    startup = .ready
                 } completion: {
                     requestComposerFocus(for: chat, reason: "appEntry")
                 }
                 monitorActiveProfile()
                 importSharedNotes()
             } catch {
-                loaded = false
-                startupError = error.localizedDescription
+                startup = .failed(error.localizedDescription)
                 Log.app.error("RootView.startup failed: \(error.localizedDescription)")
             }
         }
     }
 
     private func importSharedNotes() {
-        guard startupPhase == .ready, !sharedNoteImporting else { return }
+        guard startup == .ready, !sharedNoteImporting else { return }
         sharedNoteImporting = true
         let scope = storage.scope
         Task {
@@ -1146,9 +1129,7 @@ struct RootView: View {
             sharedNoteImporting = false
             if !outcome.imported.isEmpty {
                 artifactRefreshEpoch &+= 1
-                withAnimation(.easeOut(duration: 0.2)) {
-                    sharedNoteToast = Toast(message: L10n.string("Note added to Artifacts", comment: ""))
-                }
+                sharedNoteToast = Toast(message: L10n.string("Note added to Artifacts", comment: ""))
                 Log.ui.info("ShareImport.imported count=\(outcome.imported.count) scope=\(scope.generation)")
             }
             if !outcome.failures.isEmpty {
@@ -1159,18 +1140,8 @@ struct RootView: View {
     }
 
     private func transitionStartup(to phase: StartupPhase) {
-        startupPhase = phase
-        visibleStartupPhase = nil
-        startupLabelTask?.cancel()
+        startup = .loading(phase)
         Log.ui.info("RootView.startup phase=\(phase.rawValue)")
-        guard phase != .ready else { return }
-        startupLabelTask = Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled, startupPhase == phase else { return }
-            withAnimation(.easeIn(duration: Theme.Animation.standard)) {
-                visibleStartupPhase = phase
-            }
-        }
     }
 
     private func refreshCompactSidebar() {
@@ -1189,7 +1160,7 @@ struct RootView: View {
     }
 
     private func monitorActiveProfile() {
-        guard startupPhase == .ready, scenePhase != .background else { return }
+        guard startup == .ready, scenePhase != .background else { return }
         let scope = storage.scope
         activeProfileMonitor.activate(scope: scope) { areas in
             Task { await reconcileActiveProfile(areas, reason: "filesystem") }
@@ -1197,7 +1168,7 @@ struct RootView: View {
     }
 
     private func reconcileActiveProfile(_ areas: Set<ProfileContentArea>, reason: String) async {
-        guard startupPhase == .ready else { return }
+        guard startup == .ready else { return }
         let startedAt = Date()
         let scope = storage.scope
         if areas.contains(.configuration) {

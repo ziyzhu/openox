@@ -55,7 +55,7 @@ struct ChatPageTopBar: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.Icons.xs)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             .padding(.horizontal, 14)

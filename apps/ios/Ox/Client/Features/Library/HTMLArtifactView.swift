@@ -136,7 +136,7 @@ private struct HTMLArtifactLoadingView: View {
         .task {
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(Theme.Animation.standard) {
                 labelVisibility = .visible
             }
         }

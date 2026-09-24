@@ -478,7 +478,7 @@ struct SettingsSheet: View {
                     .foregroundStyle(Theme.Colors.primary)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(Theme.Icons.xs)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()
@@ -830,7 +830,7 @@ struct ModelPickerContent: View {
                         .font(Theme.Fonts.bodyMd)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                 }
                 .foregroundStyle(customModelsCanLoad ? Theme.Colors.onSurface : Theme.Colors.onSurfaceMuted)
                 .settingsRowPadding()
@@ -896,7 +896,7 @@ struct ModelPickerContent: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
             Image(systemName: indicator)
-                .font(.system(size: 11, weight: .semibold))
+                .font(Theme.Icons.xs)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()

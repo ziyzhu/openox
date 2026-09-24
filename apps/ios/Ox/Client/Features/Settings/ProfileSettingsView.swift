@@ -202,7 +202,7 @@ struct ProfileSettingsView: View {
                 .truncationMode(.middle)
             if profile.location != .external {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.Icons.xs)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }

@@ -238,7 +238,7 @@ struct HoldToTalkOverlay: View {
                         .strokeBorder(selected ? color.opacity(0.5) : .clear, lineWidth: 1.5)
                 }
                 .scaleEffect(selected ? 1.03 : 1)
-                .animation(reduceMotion ? nil : .easeOut(duration: Theme.Animation.quick), value: selected)
+                .animation(reduceMotion ? nil : Theme.Animation.quick, value: selected)
         }
         .buttonStyle(.plain)
         .disabled(action == .edit && !speech.isRecording)

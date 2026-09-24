@@ -47,7 +47,7 @@ struct ServiceAvatar: View {
                 faviconState = .unavailable
                 return
             }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: Theme.Animation.quick)) {
+            withAnimation(reduceMotion ? nil : Theme.Animation.quick) {
                 faviconState = .loaded(image)
             }
         }

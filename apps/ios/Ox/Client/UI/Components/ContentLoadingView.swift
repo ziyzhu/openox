@@ -3,26 +3,17 @@ import SwiftUI
 struct ContentLoadingView: View {
     let label: LocalizedStringKey
 
-    @State private var showsLabel = false
-
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             CellularAutomatonLoader()
             Text(label)
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .opacity(showsLabel ? 1 : 0)
+                .revealed(after: .milliseconds(700))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(label))
-        .task {
-            try? await Task.sleep(for: .milliseconds(700))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: Theme.Animation.standard)) {
-                showsLabel = true
-            }
-        }
     }
 }
 

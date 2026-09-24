@@ -140,7 +140,7 @@ struct ServiceRepositoriesView: View {
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Icons.xs)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.trailing, Theme.Spacing.lg)
                 }
@@ -449,7 +449,7 @@ struct ServiceRepositoryDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurface)
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Icons.xs)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
                 .contentShape(Rectangle())

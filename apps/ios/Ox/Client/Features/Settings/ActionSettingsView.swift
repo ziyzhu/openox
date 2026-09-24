@@ -125,7 +125,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(Theme.Icons.xs)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()
@@ -143,7 +143,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(Theme.Icons.xs)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .settingsRowPadding()

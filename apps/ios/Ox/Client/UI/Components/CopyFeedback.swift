@@ -13,11 +13,11 @@ final class CopyFeedback {
         Log.ui.info("\(logMessage)")
         Haptics.impact(.copy)
         resetTask?.cancel()
-        withAnimation(.easeOut(duration: Theme.Animation.quick)) { didCopy = true }
+        withAnimation(Theme.Animation.quick) { didCopy = true }
         resetTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, let self else { return }
-            withAnimation(.easeOut(duration: Theme.Animation.quick)) { self.didCopy = false }
+            withAnimation(Theme.Animation.quick) { self.didCopy = false }
         }
     }
 }

@@ -59,6 +59,7 @@ enum Theme {
     }
 
     enum Icons {
+        static let xs: Font = .caption2.weight(.semibold)
         static let sm: Font = .caption.weight(.bold)
         static let md: Font = .title3
         static let lg: Font = .title2
@@ -70,15 +71,16 @@ enum Theme {
     }
 
     enum Animation {
-        static let quick: Double = 0.15
-        static let standard: Double = 0.2
-        static let entrance: Double = 0.3
-        static let ride = SwiftUI.Animation.smooth(duration: 0.45)
+        static let press = SwiftUI.Animation.smooth(duration: 0.12)
+        static let quick = SwiftUI.Animation.smooth(duration: 0.15)
+        static let standard = SwiftUI.Animation.smooth(duration: 0.2)
+        static let handoff = SwiftUI.Animation.smooth(duration: 0.24)
+        static let entrance = SwiftUI.Animation.smooth(duration: 0.3)
         static let drop = SwiftUI.Animation.smooth(duration: 0.35)
+        static let ride = SwiftUI.Animation.smooth(duration: 0.45)
         static let streamFade: Double = 0.2
         static let thinkingHold: Double = 1.2
         static let sequenceHold: Double = 1.5
-        static let glassMorph = SwiftUI.Animation.spring(response: 0.35, dampingFraction: 0.85)
     }
 }
 
@@ -128,7 +130,7 @@ struct OxChipButton: ButtonStyle {
             )
             .minimumTouchTarget()
             .animation(nil, value: filled)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : Theme.Animation.press, value: configuration.isPressed)
     }
 }
 

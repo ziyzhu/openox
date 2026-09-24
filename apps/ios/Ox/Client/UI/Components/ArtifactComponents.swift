@@ -40,11 +40,11 @@ struct ArtifactLibraryRow: View {
                 EmptyView()
             case .disclosure:
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.Icons.xs)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             case .selection(let selected):
                 Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 20, weight: .regular))
+                    .font(Theme.Icons.md)
                     .foregroundStyle(selected ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
             }
         }
@@ -155,62 +155,88 @@ private struct ArtifactZoomPreviewCover: ViewModifier {
     }
 }
 
+enum ArtifactMutation: Equatable {
+    case renaming(Artifact, draft: String)
+    case renameFailed(String)
+    case deleting(Artifact)
+    case deleteFailed(String)
+
+    static func rename(_ artifact: Artifact) -> ArtifactMutation {
+        .renaming(artifact, draft: artifact.userFacingName)
+    }
+}
+
 private struct ArtifactMutationAlerts: ViewModifier {
-    @Binding var renaming: Artifact?
-    @Binding var renameDraft: String
-    @Binding var renameError: String?
-    @Binding var deleting: Artifact?
-    @Binding var deleteError: String?
+    @Binding var mutation: ArtifactMutation?
     let onRename: (Artifact, String) -> Void
     let onDelete: (Artifact) -> Void
 
     func body(content: Content) -> some View {
         content
-            .alert("Rename an artifact", isPresented: Binding(
-                get: { renaming != nil },
-                set: { if !$0 { renaming = nil } }
-            )) {
-                TextField("Name", text: $renameDraft)
-                Button("Cancel", role: .cancel) { renaming = nil }
+            .alert("Rename an artifact", isPresented: presented { if case .renaming = $0 { true } else { false } }) {
+                TextField("Name", text: renameDraft)
+                Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Rename") {
-                    guard let artifact = renaming else { return }
-                    let newFilename = artifact.fileName(forUserFacingName: renameDraft)
-                    renaming = nil
-                    onRename(artifact, newFilename)
+                    guard case .renaming(let artifact, let draft) = mutation else { return }
+                    mutation = nil
+                    onRename(artifact, artifact.fileName(forUserFacingName: draft))
                 }
-                .disabled(renameDraft.isEmpty || renameDraft == renaming?.userFacingName)
+                .disabled(!canSubmitRename)
                 .accessibilityIdentifier(A11yID.Artifacts.renameSubmit)
             }
-            .alert("Rename an artifact", isPresented: Binding(
-                get: { renameError != nil },
-                set: { if !$0 { renameError = nil } }
-            )) {
-                Button("OK", role: .cancel) { renameError = nil }
+            .alert("Rename an artifact", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
+                Button("OK", role: .cancel) { mutation = nil }
             } message: {
-                Text(renameError ?? "")
+                Text(failureMessage)
             }
-            .alert("Delete this artifact?", isPresented: Binding(
-                get: { deleting != nil },
-                set: { if !$0 { deleting = nil } }
-            )) {
-                Button("Cancel", role: .cancel) { deleting = nil }
+            .alert("Delete this artifact?", isPresented: presented { if case .deleting = $0 { true } else { false } }) {
+                Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Delete", role: .destructive) {
-                    guard let artifact = deleting else { return }
-                    deleting = nil
+                    guard case .deleting(let artifact) = mutation else { return }
+                    mutation = nil
                     onDelete(artifact)
                 }
                 .accessibilityIdentifier(A11yID.Artifacts.deleteConfirm)
             } message: {
                 Text("This removes the artifact from this Profile. Existing chat references will show a deleted placeholder. This can't be undone.")
             }
-            .alert("Couldn't delete artifact", isPresented: Binding(
-                get: { deleteError != nil },
-                set: { if !$0 { deleteError = nil } }
-            )) {
-                Button("OK", role: .cancel) { deleteError = nil }
+            .alert("Couldn't delete artifact", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
+                Button("OK", role: .cancel) { mutation = nil }
             } message: {
-                Text(deleteError ?? "")
+                Text(failureMessage)
             }
+    }
+
+    private func presented(_ matches: @escaping (ArtifactMutation) -> Bool) -> Binding<Bool> {
+        Binding(
+            get: { mutation.map(matches) ?? false },
+            set: { if !$0, mutation.map(matches) == true { mutation = nil } }
+        )
+    }
+
+    private var renameDraft: Binding<String> {
+        Binding(
+            get: {
+                guard case .renaming(_, let draft) = mutation else { return "" }
+                return draft
+            },
+            set: {
+                guard case .renaming(let artifact, _) = mutation else { return }
+                mutation = .renaming(artifact, draft: $0)
+            }
+        )
+    }
+
+    private var canSubmitRename: Bool {
+        guard case .renaming(let artifact, let draft) = mutation else { return false }
+        return !draft.isEmpty && draft != artifact.userFacingName
+    }
+
+    private var failureMessage: String {
+        switch mutation {
+        case .renameFailed(let message), .deleteFailed(let message): message
+        case .renaming, .deleting, nil: ""
+        }
     }
 }
 
@@ -228,22 +254,10 @@ extension View {
     }
 
     func artifactMutationAlerts(
-        renaming: Binding<Artifact?>,
-        renameDraft: Binding<String>,
-        renameError: Binding<String?>,
-        deleting: Binding<Artifact?>,
-        deleteError: Binding<String?>,
+        _ mutation: Binding<ArtifactMutation?>,
         onRename: @escaping (Artifact, String) -> Void,
         onDelete: @escaping (Artifact) -> Void
     ) -> some View {
-        modifier(ArtifactMutationAlerts(
-            renaming: renaming,
-            renameDraft: renameDraft,
-            renameError: renameError,
-            deleting: deleting,
-            deleteError: deleteError,
-            onRename: onRename,
-            onDelete: onDelete
-        ))
+        modifier(ArtifactMutationAlerts(mutation: mutation, onRename: onRename, onDelete: onDelete))
     }
 }

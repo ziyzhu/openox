@@ -104,7 +104,7 @@ struct SettingsDisclosureRow: View {
                     .minimumScaleFactor(0.8)
                     .truncationMode(.middle)
                 Image(systemName: indicator)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.Icons.xs)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
@@ -127,7 +127,7 @@ struct SettingsValueRow: View {
                 .truncationMode(.middle)
             Spacer(minLength: 0)
             Image(systemName: indicator)
-                .font(.system(size: 11, weight: .semibold))
+                .font(Theme.Icons.xs)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
         .contentShape(Rectangle())

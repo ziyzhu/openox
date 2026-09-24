@@ -348,7 +348,7 @@ struct ServiceDetailView: View {
                     .background(heightProbe(lineLimit: 4) { descriptionLimitedHeight = $0 })
                 if descriptionTruncated {
                     Button(descriptionExpanded ? "Less" : "More") {
-                        withAnimation(.easeInOut(duration: 0.15)) { descriptionExpanded.toggle() }
+                        withAnimation(Theme.Animation.quick) { descriptionExpanded.toggle() }
                     }
                     .font(Theme.Fonts.labelMd)
                     .foregroundStyle(Theme.Colors.primary)
@@ -418,7 +418,7 @@ struct ServiceDetailView: View {
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(Theme.Icons.xs)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
                     .padding(Theme.Spacing.md)
@@ -584,7 +584,7 @@ struct ServiceDetailView: View {
         } label: {
             Chip {
                 Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.Icons.xs)
                 Text("Add folder")
                     .font(Theme.Fonts.labelMd)
             }

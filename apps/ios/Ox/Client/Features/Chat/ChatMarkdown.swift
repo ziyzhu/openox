@@ -793,26 +793,20 @@ private struct MarkdownListView: View {
 
 private struct CodeBlockCopyButton: View {
     let code: String
-    @State private var copied = false
+    @State private var feedback = CopyFeedback()
 
     var body: some View {
         Button {
-            UIPasteboard.general.string = code
-            Haptics.impact(.copy)
-            Log.ui.info("MarkdownText.copyCodeBlock chars=\(code.count)")
-            withAnimation(.easeOut(duration: 0.2)) { copied = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(.easeOut(duration: 0.2)) { copied = false }
-            }
+            feedback.copy(code, logMessage: "MarkdownText.copyCodeBlock chars=\(code.count)")
         } label: {
-            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+            Image(systemName: feedback.didCopy ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(width: 22, height: 22)
                 .minimumTouchTarget(alignment: .topTrailing)
         }
         .buttonStyle(.plain)
-        .disabled(copied)
+        .disabled(feedback.didCopy)
         .accessibilityLabel(A11yLabel.copyCode)
     }
 }

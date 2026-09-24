@@ -125,7 +125,7 @@ struct ProviderAuthenticationView: View {
                 SettingsActionButtonLabel {
                     Text("Get API Key")
                     Image(systemName: "arrow.up.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Icons.xs)
                 }
             }
             .buttonStyle(.plain)

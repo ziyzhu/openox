@@ -32,7 +32,7 @@ struct SkillSchedulesSection: View {
             } label: {
                 Chip(fill: Theme.Colors.chipOnBackground) {
                     Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Icons.xs)
                     Text("Add schedule")
                         .font(Theme.Fonts.labelMd)
                 }

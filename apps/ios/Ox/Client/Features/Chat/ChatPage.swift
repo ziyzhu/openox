@@ -246,11 +246,7 @@ struct ChatPage: View {
     @State private var navigationArtifact: Artifact?
     @State private var navigationSkill: SkillDraft?
     @State private var photoPickerItems: [PhotosPickerItem] = []
-    @State private var renamingArtifact: Artifact?
-    @State private var artifactRenameDraft = ""
-    @State private var deletingArtifact: Artifact?
-    @State private var artifactRenameError: String?
-    @State private var artifactDeleteError: String?
+    @State private var artifactMutation: ArtifactMutation?
     @State private var artifactRevision = 0
 
     private enum ModalPresentation: Identifiable {
@@ -503,26 +499,22 @@ struct ChatPage: View {
                 }
             }
             .onChange(of: chat.notice, initial: true) { previous, notice in
-                withAnimation(.easeOut(duration: 0.2)) {
-                    if let message = notice.errorMessage {
-                        toast = Toast(message: message, role: .error)
-                    } else if previous.errorMessage != nil, toast?.role == .error {
-                        toast = nil
-                    }
+                if let message = notice.errorMessage {
+                    toast = Toast(message: message, role: .error)
+                } else if previous.errorMessage != nil, toast?.role == .error {
+                    toast = nil
                 }
             }
             .onChange(of: serviceManager.repositoryState, initial: true) { _, state in
                 guard case .failed(let failure) = state else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    let message = String(
-                        format: L10n.string(
-                            "Ox Server: %@",
-                            comment: "Error shown on chat when the configured Ox Server cannot be reached."
-                        ),
-                        failure
-                    )
-                    toast = Toast(message: message, role: .error, duration: 4)
-                }
+                let message = String(
+                    format: L10n.string(
+                        "Ox Server: %@",
+                        comment: "Error shown on chat when the configured Ox Server cannot be reached."
+                    ),
+                    failure
+                )
+                toast = Toast(message: message, role: .error, duration: 4)
             }
         return transcript
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -622,7 +614,7 @@ struct ChatPage: View {
                 let msg = updated.count == 1
                     ? "\(updated[0]) updated"
                     : "\(updated.count) services updated"
-                withAnimation(.easeOut(duration: 0.2)) { toast = Toast(message: msg) }
+                toast = Toast(message: msg)
             }
             await refreshAttachedServiceAuth()
         }
@@ -733,11 +725,7 @@ struct ChatPage: View {
             }
         }
         .artifactMutationAlerts(
-            renaming: $renamingArtifact,
-            renameDraft: $artifactRenameDraft,
-            renameError: $artifactRenameError,
-            deleting: $deletingArtifact,
-            deleteError: $artifactDeleteError,
+            $artifactMutation,
             onRename: renameArtifact,
             onDelete: deleteArtifact
         )
@@ -924,7 +912,7 @@ struct ChatPage: View {
             return
         }
         guard !Task.isCancelled, chat.activity == .running(.streaming) else { return }
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(Theme.Animation.standard) {
             showsDelayedActivity = true
         }
     }
@@ -975,7 +963,7 @@ struct ChatPage: View {
             revision: artifactRevision,
             canMutate: !chat.isTemporary,
             onRename: { beginRenamingArtifact($0) },
-            onDelete: { deletingArtifact = $0 }
+            onDelete: { artifactMutation = .deleting($0) }
         )
     }
 
@@ -1222,7 +1210,7 @@ struct ChatPage: View {
                 .opacity(!enabled || entered ? 1 : 0)
                 .onAppear {
                     guard enabled, !entered else { return }
-                    withAnimation(.easeOut(duration: Theme.Animation.entrance)) { entered = true }
+                    withAnimation(Theme.Animation.entrance) { entered = true }
                 }
         }
     }
@@ -1633,7 +1621,7 @@ struct ChatPage: View {
                 }
             }
             .animation(
-                reduceMotion ? nil : .easeOut(duration: Theme.Animation.standard),
+                reduceMotion ? nil : Theme.Animation.standard,
                 value: scroller.showsJumpButton
             )
     }
@@ -1697,9 +1685,7 @@ struct ChatPage: View {
     }
 
     private func showCopiedToast() {
-        withAnimation(.easeOut(duration: 0.2)) {
-            toast = Toast(message: L10n.string("Message copied", comment: "Toast shown after the user copies a chat message to the clipboard."))
-        }
+        toast = Toast(message: L10n.string("Message copied", comment: "Toast shown after the user copies a chat message to the clipboard."))
     }
 
     private func send() {
@@ -1774,7 +1760,7 @@ struct ChatPage: View {
         Haptics.impact(.editStarted)
         composer.setAttachmentMenuPresented(false)
         editDraft = AttributedString(text)
-        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             editedBlockID = block.id
         } completion: {
             composerFocused = true
@@ -1786,7 +1772,7 @@ struct ChatPage: View {
         guard !trimmed.isEmpty else { return }
         Log.ui.info("ChatPage.commitEdit chat=\(chat.id) block=\(blockID) chars=\(trimmed.count)")
         prepareComposerSubmission()
-        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
@@ -1797,7 +1783,7 @@ struct ChatPage: View {
     private func cancelEditing(reason: String, keepFocus: Bool) {
         guard let editedBlockID else { return }
         Log.ui.info("ChatPage.cancelEditing chat=\(chat.id) block=\(editedBlockID) reason=\(reason)")
-        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             self.editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
@@ -1836,8 +1822,7 @@ struct ChatPage: View {
     }
 
     private func beginRenamingArtifact(_ artifact: Artifact) {
-        artifactRenameDraft = artifact.userFacingName
-        renamingArtifact = artifact
+        artifactMutation = .rename(artifact)
     }
 
     private func renameArtifact(_ artifact: Artifact, to newFilename: String) {
@@ -1848,7 +1833,7 @@ struct ChatPage: View {
                 Log.ui.info("ChatPage.renameArtifact chat=\(chat.id) from=\(artifact.fileName) to=\(renamed.fileName)")
             } catch {
                 Log.ui.error("ChatPage.renameArtifact chat=\(chat.id) from=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactRenameError = artifact.userFacingErrorDescription(error)
+                artifactMutation = .renameFailed(artifact.userFacingErrorDescription(error))
             }
         }
     }
@@ -1861,7 +1846,7 @@ struct ChatPage: View {
                 Log.ui.info("ChatPage.deleteArtifact chat=\(chat.id) file=\(artifact.fileName)")
             } catch {
                 Log.ui.error("ChatPage.deleteArtifact chat=\(chat.id) file=\(artifact.fileName) error=\(error.localizedDescription)")
-                artifactDeleteError = artifact.userFacingErrorDescription(error)
+                artifactMutation = .deleteFailed(artifact.userFacingErrorDescription(error))
             }
         }
     }
@@ -1919,8 +1904,6 @@ struct ChatPage: View {
     }
 
     private func showAttachmentError(_ message: String) {
-        withAnimation(.easeOut(duration: 0.2)) {
-            toast = Toast(message: message, role: .error)
-        }
+        toast = Toast(message: message, role: .error)
     }
 }

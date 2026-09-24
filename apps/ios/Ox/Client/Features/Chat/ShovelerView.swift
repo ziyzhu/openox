@@ -149,7 +149,7 @@ private struct ShovelerImage: View {
     let url: URL
 
     var body: some View {
-        AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: Theme.Animation.standard))) { phase in
+        AsyncImage(url: url, transaction: Transaction(animation: Theme.Animation.standard)) { phase in
             switch phase {
             case let .success(image):
                 image

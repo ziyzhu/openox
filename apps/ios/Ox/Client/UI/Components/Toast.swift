@@ -108,21 +108,22 @@ private struct ToastModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
-                if let t = toast {
-                    ToastPill(toast: t) {
-                        withAnimation(.easeOut(duration: 0.2)) { toast = nil }
+                ZStack {
+                    if let t = toast {
+                        ToastPill(toast: t) { toast = nil }
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .padding(.top, 4)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityElement(children: .contain)
                     }
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .accessibilityElement(children: .contain)
                 }
+                .animation(Theme.Animation.standard, value: toast?.id)
             }
             .task(id: toast?.id) {
                 guard let current = toast, current.role == .info else { return }
                 try? await Task.sleep(for: .seconds(current.duration))
                 guard !Task.isCancelled, toast?.id == current.id else { return }
-                withAnimation(.easeOut(duration: 0.2)) { toast = nil }
+                toast = nil
             }
     }
 }

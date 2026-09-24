@@ -110,8 +110,8 @@ struct WebBrowserView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     browserBar
                         .offset(y: scrollChrome.isCompact && !addressFocused ? max(0, geometry.safeAreaInsets.bottom - 16) : 0)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0), value: addressFocused)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0), value: scrollChrome.isCompact)
+                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: addressFocused)
+                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: scrollChrome.isCompact)
                 }
                 .onChange(of: currentURL, initial: true) { _, _ in
                     scrollChrome = .expanded(anchor: 0)

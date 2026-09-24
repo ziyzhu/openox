@@ -138,7 +138,7 @@ private struct ChatArtifactRow: View {
             Spacer(minLength: Theme.Spacing.sm)
             if artifact.exists {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
@@ -415,7 +415,7 @@ private struct ThinkingRow: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.Colors.background)
         }
-        .animation(.easeOut(duration: Theme.Animation.standard), value: isLive)
+        .animation(Theme.Animation.standard, value: isLive)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             let now = Date()
@@ -490,11 +490,11 @@ private struct ThinkingRow: View {
         switch animationPhase {
         case .settled(let label):
             guard label != next else { return }
-            withAnimation(.easeInOut(duration: 0.16)) { animationPhase = .settled(next) }
+            withAnimation(Theme.Animation.quick) { animationPhase = .settled(next) }
         case .live(var animation):
             guard next != animation.label, next != animation.pending.last else { return }
             if animation.label == L10n.string("Plowing…"), animation.pending.isEmpty {
-                withAnimation(.easeInOut(duration: 0.16)) {
+                withAnimation(Theme.Animation.quick) {
                     animation.label = next
                     animation.lastAdvance = Date()
                     animationPhase = .live(animation)
@@ -538,7 +538,7 @@ private struct ThinkingRow: View {
                     if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
                     guard !Task.isCancelled, case .live(var current) = animationPhase else { return }
                     guard !current.pending.isEmpty else { continue }
-                    withAnimation(.easeInOut(duration: 0.16)) {
+                    withAnimation(Theme.Animation.quick) {
                         current.label = current.pending.removeFirst()
                         current.lastAdvance = Date()
                         animationPhase = .live(current)
@@ -552,7 +552,7 @@ private struct ThinkingRow: View {
                 if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
                 guard !Task.isCancelled, case .live(let current) = animationPhase else { return }
                 guard !current.sourceLive, current.pending.isEmpty else { continue }
-                withAnimation(.easeOut(duration: Theme.Animation.standard)) {
+                withAnimation(Theme.Animation.standard) {
                     animationPhase = .settled(settledTargetLabel)
                 }
                 return
@@ -606,7 +606,7 @@ private struct ThinkingSheet: View {
                 updated[idx] = latest
             }
         }
-        withAnimation(.easeInOut(duration: 0.16)) {
+        withAnimation(Theme.Animation.quick) {
             displayedEntries = updated
         }
 
@@ -616,7 +616,7 @@ private struct ThinkingSheet: View {
             for entry in pending {
                 try? await Task.sleep(for: .milliseconds(90))
                 guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.18)) {
+                withAnimation(Theme.Animation.standard) {
                     displayedEntries.append(entry)
                 }
             }
@@ -689,7 +689,7 @@ private struct TraceRow: View {
                     minHeight: isLast ? Theme.Size.minimumTouchTarget : nil,
                     alignment: .topLeading
                 )
-                .animation(.easeInOut(duration: 0.16), value: invocation)
+                .animation(Theme.Animation.quick, value: invocation)
             }
             .accessibilityIdentifier(A11yID.Chat.step(InvocationFormat.iconKind(invocation).rawValue))
         }
@@ -752,7 +752,7 @@ private struct InvocationNode: View {
         }
         .frame(width: 22, height: 22)
         .contentTransition(.opacity)
-        .animation(.easeInOut(duration: 0.16), value: invocation)
+        .animation(Theme.Animation.quick, value: invocation)
     }
 }
 
@@ -827,7 +827,7 @@ private struct DomainFavicon: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: faviconURL, transaction: Transaction(animation: .easeOut(duration: Theme.Animation.quick))) { phase in
+        AsyncImage(url: faviconURL, transaction: Transaction(animation: Theme.Animation.quick)) { phase in
             if case .success(let image) = phase {
                 image
                     .resizable()
@@ -1430,7 +1430,7 @@ struct BlockView: View, Equatable {
                     }
                 }
             }
-            .animation(.easeOut(duration: Theme.Animation.standard), value: isStreamingTail)
+            .animation(Theme.Animation.standard, value: isStreamingTail)
             .onChange(of: isStreamingTail, initial: true) { _, streaming in
                 if streaming { hasStreamed = true }
             }

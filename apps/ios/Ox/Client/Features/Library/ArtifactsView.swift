@@ -107,11 +107,7 @@ struct ArtifactsView: View {
     @State private var filesPresented = false
     @State private var cameraPresented = false
     @State private var errorMessage: String?
-    @State private var renaming: Artifact?
-    @State private var renameDraft = ""
-    @State private var renameErrorMessage: String?
-    @State private var pendingDelete: Artifact?
-    @State private var deleteErrorMessage: String?
+    @State private var mutation: ArtifactMutation?
     @State private var savedErrorMessage: String?
     @State private var downloadErrorMessage: String?
     @State private var downloadingIDs: Set<String> = []
@@ -186,11 +182,8 @@ struct ArtifactsView: View {
                                         ArtifactContextMenu(
                                             artifact: artifact,
                                             canMutate: artifact.availability == .local,
-                                            onRename: {
-                                                renameDraft = record.artifact.userFacingName
-                                                renaming = record.artifact
-                                            },
-                                            onDelete: { pendingDelete = record.artifact },
+                                            onRename: { mutation = .rename(record.artifact) },
+                                            onDelete: { mutation = .deleting(record.artifact) },
                                             isSaved: record.isSaved,
                                             onToggleSaved: { toggleSaved(record) }
                                         )
@@ -282,11 +275,7 @@ struct ArtifactsView: View {
             Text(errorMessage ?? "")
         }
         .artifactMutationAlerts(
-            renaming: $renaming,
-            renameDraft: $renameDraft,
-            renameError: $renameErrorMessage,
-            deleting: $pendingDelete,
-            deleteError: $deleteErrorMessage,
+            $mutation,
             onRename: rename,
             onDelete: delete
         )
@@ -570,7 +559,7 @@ struct ArtifactsView: View {
                 Log.ui.info("ArtifactsView.rename from=\(artifact.fileName) to=\(renamed.fileName)")
             } catch {
                 Log.ui.error("ArtifactsView.rename from=\(artifact.fileName) error=\(error.localizedDescription)")
-                renameErrorMessage = artifact.userFacingErrorDescription(error)
+                mutation = .renameFailed(artifact.userFacingErrorDescription(error))
             }
         }
     }
@@ -583,7 +572,7 @@ struct ArtifactsView: View {
                 Log.ui.info("ArtifactsView.delete file=\(artifact.fileName)")
             } catch {
                 Log.ui.error("ArtifactsView.delete file=\(artifact.fileName) error=\(error.localizedDescription)")
-                deleteErrorMessage = artifact.userFacingErrorDescription(error)
+                mutation = .deleteFailed(artifact.userFacingErrorDescription(error))
             }
         }
     }

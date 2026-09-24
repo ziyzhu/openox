@@ -185,7 +185,7 @@ struct PermissionRequestCard: View {
             onSelect(option)
             return
         }
-        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             submittedSelection = option
         } completion: {
             onSelect(option)
@@ -485,7 +485,7 @@ struct RequestCardOptions: View {
             onSelect(option)
             return
         }
-        withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+        withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             submittedSelection = option
         } completion: {
             onSelect(option)
@@ -612,7 +612,7 @@ struct RequestButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(reduceMotion || !configuration.isPressed ? 1 : 0.98)
             .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : Theme.Animation.press, value: configuration.isPressed)
     }
 }
 
