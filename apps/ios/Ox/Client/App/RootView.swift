@@ -705,7 +705,6 @@ struct RootView: View {
 
     private func handleAwaitingUser() {
         dismissLibraryPresentation()
-        Haptics.impact(.userActionNeeded)
         Log.ui.info("RootView.awaitingUser chat=\(chats.currentId?.uuidString ?? "none") split=\(isSplitLayout)")
         autoCloseSidebar()
     }

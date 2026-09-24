@@ -19,7 +19,6 @@ enum Haptics {
         case settingsSaved
         case sidebarSettled
         case stop
-        case userActionNeeded
     }
 
     private static let driver = Driver()
@@ -31,7 +30,7 @@ enum Haptics {
     static func impact(_ event: Event) {
         Log.ui.debug("Haptics.impact event=\(event.rawValue)")
         switch event {
-        case .agentDeltaReceived, .artifactTabSelected, .chatOpened, .sidebarSettled, .userActionNeeded:
+        case .agentDeltaReceived, .artifactTabSelected, .chatOpened, .sidebarSettled:
             driver.impact(.medium)
         default:
             driver.impact(.light)
