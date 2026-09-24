@@ -1222,6 +1222,17 @@
         }
       }
     },
+    "App" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用"
+          }
+        }
+      }
+    },
     "App info" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2041,6 +2052,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已取消提醒"
+          }
+        }
+      }
+    },
+    "Capabilities" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "能力"
           }
         }
       }

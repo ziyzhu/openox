@@ -165,7 +165,7 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
                     }
 
-                    actionsSettingsSection
+                    capabilitiesSettingsSection
 
                     SettingsSection("Language") {
                         Menu {
@@ -218,7 +218,7 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.theme)
                     }
 
-                    SettingsSection("Features", insetContent: false) {
+                    SettingsSection("App", insetContent: false) {
                         VStack(spacing: 0) {
                             NavigationLink {
                                 NotificationSetupView()
@@ -227,19 +227,6 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier(A11yID.Settings.notifications)
-
-                            Divider().settingsContentInset()
-
-                            NavigationLink {
-                                RepositoriesView()
-                            } label: {
-                                SettingsDisclosureRow(
-                                    title: "Repositories",
-                                    value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(A11yID.Settings.server)
 
                             Divider().settingsContentInset()
 
@@ -384,8 +371,8 @@ struct SettingsSheet: View {
 
     private var profileNameUnavailable: Bool { profileNameIsEmpty || profileNameTaken }
 
-    private var actionsSettingsSection: some View {
-        SettingsSection("Actions", insetContent: false) {
+    private var capabilitiesSettingsSection: some View {
+        SettingsSection("Capabilities", insetContent: false) {
             VStack(spacing: 0) {
                 NavigationLink {
                     ActionSettingsView()
@@ -417,6 +404,19 @@ struct SettingsSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.services)
+
+                Divider().settingsContentInset()
+
+                NavigationLink {
+                    RepositoriesView()
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Repositories",
+                        value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Settings.server)
             }
         }
     }
