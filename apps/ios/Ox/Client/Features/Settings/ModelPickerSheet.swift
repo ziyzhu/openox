@@ -408,15 +408,24 @@ struct SettingsSheet: View {
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    RepositoriesView()
+                    ServiceRepositoriesView()
                 } label: {
                     SettingsDisclosureRow(
-                        title: "Repositories",
+                        title: "Service Repositories",
                         value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
                     )
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.server)
+
+                Divider().settingsContentInset()
+
+                NavigationLink {
+                    SecretSettingsView()
+                } label: {
+                    SettingsDisclosureRow(title: "Secrets", value: Text(""))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -530,6 +539,7 @@ struct ModelPickerContent: View {
     @State private var customModelID = ""
     @State private var customModelsLoading = false
     @State private var customError: String?
+    @State private var providerCredentialError: String?
 
     private var registry: ProviderRegistry { ProviderRegistry.shared }
 
@@ -909,6 +919,9 @@ struct ModelPickerContent: View {
                 onChange: { authRevision &+= 1 }
             )
             .id(client.id)
+            if let providerCredentialError {
+                SettingsErrorMessage(message: providerCredentialError, systemImage: "exclamationmark.circle.fill")
+            }
         }
     }
 
@@ -927,6 +940,7 @@ struct ModelPickerContent: View {
     private func providerDidChange() {
         dismissKeyboard()
         customError = nil
+        providerCredentialError = nil
         loadCredentialDraft()
         selectAvailableModel()
         selectDefaultReasoningEffort()
@@ -1000,7 +1014,15 @@ struct ModelPickerContent: View {
         guard let selectedClient, let selectedModel else { return }
         if selectedClient.acceptsAPIKey {
             let key = apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !key.isEmpty { Credentials.set(key, for: selectedClient.credentialID) }
+            if !key.isEmpty {
+                do {
+                    let definition = try registry.definition(id: selectedClient.id)
+                    try Secret.saveProviderKey(key, definition: definition)
+                } catch {
+                    providerCredentialError = error.localizedDescription
+                    return
+                }
+            }
         }
         Log.ui.info("ModelPicker.save client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
         onSelect(
@@ -1026,7 +1048,15 @@ struct ModelPickerContent: View {
         )
         registry.upsert(provider)
         let key = customAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !key.isEmpty { Credentials.set(key, for: provider.clientID) }
+        if !key.isEmpty {
+            do {
+                let definition = try registry.definition(id: provider.clientID)
+                try Secret.saveProviderKey(key, definition: definition)
+            } catch {
+                customError = error.localizedDescription
+                return
+            }
+        }
         Log.ui.info("ModelPicker.save custom client=\(provider.clientID) model=\(model.id)")
         onSelect(
             provider.client,

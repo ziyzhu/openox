@@ -29,13 +29,22 @@ extension Chat {
         return try await tracked(Actions.skillCopy, args, purpose: purpose) {
             try self.requireProfileMutation(Actions.skillCopy)
             let entry = try await self.skillsMount.entry(named: source)
-            let sourceSkill = entry.skill
-            let skill = try await self.repository.saveSkill(
+            let sourceName = switch entry.source {
+            case .user, .system: entry.name
+            case .service: entry.name.split(separator: ":").last.map(String.init) ?? entry.name
+            }
+            guard let sourceSkill = SkillFiles.parse(entry.content, directoryName: sourceName) else {
+                throw RuntimeError.bridge("ox.skill.copy: source '\(source)' is invalid.")
+            }
+            var services = sourceSkill.services
+            if case .service(let domain) = entry.source, !services.contains(domain) {
+                services.append(domain)
+            }
+            let skill = try await self.repository.createSkill(
                 name: name,
                 description: sourceSkill.description,
                 instructions: sourceSkill.instructions,
-                services: sourceSkill.services,
-                resources: sourceSkill.resources,
+                services: services,
                 in: self.scope
             )
             self.refreshUserSkills()
@@ -48,8 +57,7 @@ extension Chat {
         let args: JSONValue = .object(["name": .string(name)])
         return try await tracked(Actions.skillDelete, args, purpose: purpose) {
             try self.requireProfileMutation(Actions.skillDelete)
-            let skill = try await self.skillsMount.entry(named: name).skill
-            try await self.skillsMount.delete(name: name)
+            let skill = try await self.repository.deleteSkill(named: name, in: self.scope)
             self.refreshUserSkills()
             Log.session.info("bridge.skill.delete name=\(skill.name)")
             return .object([
@@ -57,16 +65,6 @@ extension Chat {
                 "path": .string("skills/\(skill.name)/SKILL.md"),
                 "deleted": .bool(true),
             ])
-        }
-    }
-
-    public func shareSkill(name: String, purpose: String) async throws -> JSONValue? {
-        let args: JSONValue = .object(["name": .string(name)])
-        return try await tracked(Actions.skillShare, args, purpose: purpose) {
-            try self.requireProfileMutation("ox.skill.share")
-            let skill = try await self.skillsMount.entry(named: name).skill
-            let saved = try await self.serviceManager.saveLocalSkill(skill, createOnly: true)
-            return self.skillResult(saved, source: saved.owner.id)
         }
     }
 

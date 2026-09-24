@@ -4,7 +4,7 @@ nonisolated final class XAISubscriptionAccount: SubscriptionAccount, @unchecked 
     static let shared = XAISubscriptionAccount()
 
     private static let refreshSkew: TimeInterval = 2 * 60
-    private let store = SubscriptionTokenStore<XAITokens>(key: "oauth:xai")
+    private let store = SubscriptionTokenStore<XAITokens>(key: ManagedOAuthAccount.modelProvider("xai"))
 
     let providerName = "xAI"
 

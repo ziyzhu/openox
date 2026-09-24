@@ -38,12 +38,12 @@ digraph OpenOx {
     model_adapter [label="Model adapter\nProvider-neutral agent loop"];
     profile [label="Ox Profile\nIdentity · Memory · Skills\nArtifacts · Conversations"];
     vm [label="Ox VM\nSandboxed JavaScript · ox.*\nSkills · Virtual filesystem"];
-    local_repository [label="Local Repository\nServices · Skills\nEditable Git + repository.json"];
-    services [label="Catalog\nServices · Skills\nResolved sources"];
+    local_repository [label="Local Service Repository\nEditable Git + repository.json"];
+    services [label="Installed services\nAvailable to Host\nActions · Skills"];
   }
 
   model [label="Ox Model Provider\nAny model · Any provider"];
-  remote_repositories [label="Remote Repositories\nPublic Git + repository.json"];
+  remote_repositories [label="Remote Service Repositories\nPublic Git + repository.json"];
 
   subgraph cluster_interfaces {
     label="Service interfaces";

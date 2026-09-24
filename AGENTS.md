@@ -49,7 +49,7 @@ Related:
 1. This repository must build without private repositories or production credentials.
 1. Built-in service sources, sanitized replay fixtures, and the generated runtime bundle belong in this repository.
 1. Do not add deployment infrastructure, official signing configuration, raw captures, or unsanitized service data.
-1. Select external repositories explicitly with `--repository <path-or-url>`.
+1. Select external service repositories explicitly with `--repository <path-or-url>`.
 1. Repository URLs must not contain credentials.
 1. Local provider keys belong in the gitignored `secrets/API_KEYS.json` and must never be printed, logged, committed, or passed through command-line arguments.
 

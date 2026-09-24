@@ -458,7 +458,7 @@ enum RemoteMCPOAuth {
 
     private static func account(endpoint: URL) -> String {
         let digest = SHA256.hash(data: Data(endpoint.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
-        return "oauth:mcp:\(digest)"
+        return ManagedOAuthAccount.mcpService(digest)
     }
 
     private static func unique(_ urls: [URL]) -> [URL] {

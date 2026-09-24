@@ -44,7 +44,7 @@ Consult one existing service only when it clarifies the implementation. Choose t
 - `oftendining.com`: approved preparation and user-owned payment.
 - `matchatennis.com`: nested schemas.
 
-Inspect the selected manifest and relevant available source; Bundled `actions.js` is readable without copying. Read `skills/manage-skills/SKILL.md` only when reusable guidance must be authored around verified actions.
+Inspect the selected manifest and relevant available source; Bundled `actions.js` is readable without copying. Read `skills/system:manage-skills/SKILL.md` only when reusable guidance must be authored around verified actions.
 
 ## 2. Observe the website
 
@@ -115,7 +115,7 @@ Inspect complete Local Git status. Create with `ox.service.create` or copy a non
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/manage-skills/SKILL.md` after actions are verified.
+Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
 
 Every action has:
 
@@ -203,7 +203,7 @@ window.ox.install(({ action }) => {
 });
 ```
 
-Register every declared action ID exactly once and no undeclared IDs. The runtime supplies dispatch, missing-argument normalization, and duplicate and unknown-action rejection. The installer passes only `action`. Read `skills/manage-services/references/helpers.js` for copyable `cleanText`, `pageCursor`, `cookie`, `retryFetch`, and `createFetchCapture` implementations; copy only what the service needs into `actions.js`. Do not import, fetch, or reference the skill file at runtime. Use `console.log` for concise diagnostics. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
+Register every declared action ID exactly once and no undeclared IDs. The runtime supplies dispatch, missing-argument normalization, and duplicate and unknown-action rejection. The installer passes only `action`. Read `skills/system:manage-services/references/helpers.js` for copyable `cleanText`, `pageCursor`, `cookie`, `retryFetch`, and `createFetchCapture` implementations; copy only what the service needs into `actions.js`. Do not import, fetch, or reference the skill file at runtime. Use `console.log` for concise diagnostics. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
 
 Retries are not appropriate for an operation that may have caused a non-idempotent effect. Before copying `retryFetch`, decide whether the request is safe to repeat; otherwise use one `fetch` and inspect outcome before any retry. Install `createFetchCapture(window)` at document start and retain its returned function locally. It observes page fetch/XHR traffic, so use it only when direct requests cannot reproduce required page-owned signing or state.
 
@@ -235,7 +235,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 8. Exercise applicable empty, terminal pagination, missing-resource, stale-state, concurrency, and authentication boundaries. A paginated action must advance a source cursor or another deterministic continuation; never expose a fabricated numeric cursor over only the currently rendered DOM snapshot.
 9. Request separate approval before invoking a live mutation; follow the bootstrap single-execution rule.
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
-11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/manage-skills/SKILL.md`.
+11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/system:manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
 13. Verify the favicon URL is a direct supported image without redirects, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying first-party or Google-cached icon exists.
 14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting Save approval, saving, or ending an abandoned or blocked run.
@@ -255,5 +255,5 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 
 - After an activation failure, inspect Git status once and search once for the exact domain; creation may already have written the draft. Continue from discovered Local state or report the repository blocker.
 - If Local is showing history, check out `latest` before authoring.
-- Restore one mistakenly deleted source file by passing its `services/` path to `ox.repository.git.restore`. Correct a mistaken identity by showing every pending path and requesting approval for a pathless restore, which erases all uncommitted Local work.
+- Restore one mistakenly deleted source file by passing its `services/` path to `ox.service.git.restore`. Correct a mistaken identity by showing every pending path and requesting approval for a pathless restore, which erases all uncommitted Local work.
 - Use Git `diff`, `log`, and `show` for inspection, `revert` for a committed inverse change, and `restore` only for an intentionally abandoned draft.

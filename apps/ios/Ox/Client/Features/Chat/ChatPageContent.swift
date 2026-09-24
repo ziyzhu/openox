@@ -8,6 +8,7 @@ struct ChatPromptBlock: Equatable {
     let resolution: String?
     let allowsCustomAnswer: Bool
     let isActive: Bool
+    let secretKey: String?
 }
 
 struct ChatBlock: Identifiable, Equatable {
@@ -119,7 +120,8 @@ extension ChatBlock {
                         answer: answer,
                         resolution: resolution,
                         allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
-                        isActive: activePrompt != nil
+                        isActive: activePrompt != nil,
+                        secretKey: activePrompt?.secretKey
                     )),
                     spacingBefore: ChatTranscriptMetrics.blockSpacing
                 ))

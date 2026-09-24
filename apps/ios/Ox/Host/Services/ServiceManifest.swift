@@ -33,7 +33,7 @@ nonisolated enum ServiceIcon: Equatable, Sendable {
 
 nonisolated struct ServiceDefinition: Sendable {
     enum Source: Equatable, Sendable {
-        case repository(id: String, provenance: Repository.Descriptor.Provenance)
+        case repository(id: String, provenance: ServiceRepository.Repository.Provenance)
         case iOS(icon: ServiceIcon?, permission: NativePermission?)
         case mcp(endpoint: URL, transport: RemoteMCPTransport?, icon: ServiceIcon)
     }
@@ -42,12 +42,14 @@ nonisolated struct ServiceDefinition: Sendable {
         case missing(String)
         case invalid(String)
         case duplicateAction(String)
+        case duplicateSkill(String)
 
         var errorDescription: String? {
             switch self {
             case let .missing(field): "missing \(field)"
             case let .invalid(field): "invalid \(field)"
             case let .duplicateAction(id): "duplicate action \(id)"
+            case let .duplicateSkill(name): "duplicate skill \(name)"
             }
         }
     }
@@ -63,12 +65,13 @@ nonisolated struct ServiceDefinition: Sendable {
     let actions: [Manifest.Action]
     let actionIndex: [String: Manifest.Action]
     let definitions: [String: JSONValue]
+    let skills: [Manifest.Skill]
     let remoteMCPIcons: [RemoteMCPIcon]
 
     init(
         manifest: JSONValue,
-        repositoryID: String = Repository.bundledID,
-        provenance: Repository.Descriptor.Provenance = .bundled
+        repositoryID: String = ServiceRepository.bundledID,
+        provenance: ServiceRepository.Repository.Provenance = .bundled
     ) throws {
         guard let object = manifest.objectValue else { throw ValidationError.invalid("root") }
         guard let domain = object["domain"]?.stringValue?.lowercased(), !domain.isEmpty else {
@@ -120,7 +123,18 @@ nonisolated struct ServiceDefinition: Sendable {
             }
             actionIndex[action.id] = action
         }
-        guard object["skills"] == nil else { throw ValidationError.invalid("skills belong in the repository") }
+        let rawSkills = object["skills"]?.arrayValue ?? []
+        let skills = try rawSkills.map { value in
+            guard let skill = Manifest.Skill(value),
+                  skill.name.range(of: #"^[a-z0-9]+(?:-[a-z0-9]+)*$"#, options: .regularExpression) != nil else {
+                throw ValidationError.invalid("skill")
+            }
+            return skill
+        }
+        var skillNames = Set<String>()
+        for skill in skills {
+            guard skillNames.insert(skill.name).inserted else { throw ValidationError.duplicateSkill(skill.name) }
+        }
         self.manifest = manifest
         self.source = .repository(id: repositoryID, provenance: provenance)
         self.repositoryID = repositoryID
@@ -132,6 +146,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actions = actions
         self.actionIndex = actionIndex
         self.definitions = object["$defs"]?.objectValue ?? [:]
+        self.skills = skills
         self.remoteMCPIcons = []
     }
 
@@ -165,6 +180,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actions = resolvedActions
         self.actionIndex = actionIndex
         self.definitions = [:]
+        self.skills = []
         self.remoteMCPIcons = []
     }
 
@@ -207,6 +223,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actions = []
         self.actionIndex = [:]
         self.definitions = [:]
+        self.skills = []
         self.remoteMCPIcons = []
     }
 
@@ -242,6 +259,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.actions = actions
         self.actionIndex = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, $0) })
         self.definitions = [:]
+        self.skills = []
         self.remoteMCPIcons = descriptor.icons
     }
 
@@ -403,6 +421,18 @@ nonisolated enum Manifest {
                       properties[inputName]?.objectValue?["type"]?.stringValue == "string" else { return false }
             }
             return true
+        }
+    }
+
+    nonisolated struct Skill: Encodable, Sendable {
+        let name: String
+        let description: String
+
+        init?(_ value: JSONValue) {
+            guard let name = value.objectValue?["name"]?.stringValue,
+                  let description = value.objectValue?["description"]?.stringValue else { return nil }
+            self.name = name
+            self.description = description
         }
     }
 

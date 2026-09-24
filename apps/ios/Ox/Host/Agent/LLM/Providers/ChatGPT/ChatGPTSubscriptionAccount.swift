@@ -10,7 +10,7 @@ final class ChatGPTSubscriptionAccount: SubscriptionAccount, @unchecked Sendable
 
     let providerName = "ChatGPT"
 
-    private let store = SubscriptionTokenStore<ChatGPTTokens>(key: "oauth:chatgpt")
+    private let store = SubscriptionTokenStore<ChatGPTTokens>(key: ManagedOAuthAccount.modelProvider("chatgpt"))
     @MainActor private var signingIn = false
 
     private init() {}

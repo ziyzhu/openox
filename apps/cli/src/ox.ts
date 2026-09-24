@@ -26,7 +26,7 @@ const groups: Record<string, CommandGroup> = {
   artifacts: { fn: artifacts, desc: "List artifacts, or print one artifact" },
   chats: { fn: chats, desc: "List chats, or print one transcript" },
   herdr: { fn: herdr, desc: "Expose local Herdr agents through a loopback MCP server" },
-  repository: { fn: repository, desc: "Inspect, validate, or serve repositories", subs: repositorySubs },
+  repository: { fn: repository, desc: "Inspect, validate, or serve service repositories", subs: repositorySubs },
   skill: { fn: skill, desc: "Create and manage user skills", subs: skillSubs },
   service: { fn: service, desc: "Inspect and exercise services", subs: serviceSubs },
   vm: { fn: vm, desc: "Connect to an Ox Host and use its agent VM", subs: vmSubs },

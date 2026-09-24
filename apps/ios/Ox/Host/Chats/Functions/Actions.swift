@@ -9,6 +9,10 @@ nonisolated enum Actions {
     static let providerDelete = "ox.provider.delete"
     static let providerAuthenticate = "ox.provider.authenticate"
     static let providerDeauthenticate = "ox.provider.deauthenticate"
+    static let providerConnect = "ox.provider.connect"
+    static let secretList = "ox.secret.list"
+    static let secretAdd = "ox.secret.add"
+    static let secretDelete = "ox.secret.delete"
     static let appInfo = "ox.app.info"
     static let appProfile = "ox.app.profile"
     static let appProfiles = "ox.app.profiles"
@@ -20,7 +24,7 @@ nonisolated enum Actions {
     static let appModel = "ox.app.model"
     static let appDefaultModel = "ox.app.defaultModel"
     static let appActionPolicies = "ox.app.actionPolicies"
-    static let appRepositories = "ox.app.repositories"
+    static let appServiceRepositories = "ox.app.serviceRepositories"
     static let appLogs = "ox.app.logs"
     static let appRenameChat = "ox.app.renameChat"
     static let webSearch = "ox.web.search"
@@ -42,24 +46,23 @@ nonisolated enum Actions {
     static let serviceUpdate = "ox.service.update"
     static let serviceCopy = "ox.service.copy"
     static let serviceDelete = "ox.service.delete"
-    static let repositoryConnect = "ox.repository.connect"
-    static let repositorySync = "ox.repository.sync"
-    static let repositoryDisconnect = "ox.repository.disconnect"
-    static let repositoryPropose = "ox.repository.propose"
-    static let repositoryGitStatus = "ox.repository.git.status"
-    static let repositoryGitLog = "ox.repository.git.log"
-    static let repositoryGitShow = "ox.repository.git.show"
-    static let repositoryGitDiff = "ox.repository.git.diff"
-    static let repositoryGitCheckout = "ox.repository.git.checkout"
-    static let repositoryGitCommit = "ox.repository.git.commit"
-    static let repositoryGitRevert = "ox.repository.git.revert"
-    static let repositoryGitRestore = "ox.repository.git.restore"
+    static let serviceRepositoryConnect = "ox.service.repository.connect"
+    static let serviceRepositorySync = "ox.service.repository.sync"
+    static let serviceRepositoryDisconnect = "ox.service.repository.disconnect"
+    static let serviceRepositoryPropose = "ox.service.repository.propose"
+    static let serviceGitStatus = "ox.service.git.status"
+    static let serviceGitLog = "ox.service.git.log"
+    static let serviceGitShow = "ox.service.git.show"
+    static let serviceGitDiff = "ox.service.git.diff"
+    static let serviceGitCheckout = "ox.service.git.checkout"
+    static let serviceGitCommit = "ox.service.git.commit"
+    static let serviceGitRevert = "ox.service.git.revert"
+    static let serviceGitRestore = "ox.service.git.restore"
     static let serviceAttach = "ox.service.attach"
     static let serviceSignIn = "ox.service.signIn"
     static let serviceSolve = "ox.service.solve"
     static let servicePayment = "ox.service.pay"
     static let serviceDetach = "ox.service.detach"
-    static let skillShare = "ox.skill.share"
     static let skillCreate = "ox.skill.create"
     static let skillCopy = "ox.skill.copy"
     static let skillDelete = "ox.skill.delete"
@@ -86,21 +89,21 @@ nonisolated enum Actions {
 
     static let builtIn = [
         providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
-        providerAuthenticate, providerDeauthenticate,
+        providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appVoice,
-        appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appRepositories,
+        appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appServiceRepositories,
         appLogs, appRenameChat,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
         fsList, fsRead, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach,
         serviceFind, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
-        serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryDisconnect,
-        repositoryPropose,
-        repositoryGitStatus, repositoryGitLog,
-        repositoryGitShow, repositoryGitDiff, repositoryGitCheckout, repositoryGitCommit, repositoryGitRevert,
-        repositoryGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
-        skillCreate, skillCopy, skillDelete, skillShare,
+        serviceUpdate, serviceCopy, serviceDelete, serviceRepositoryConnect, serviceRepositorySync, serviceRepositoryDisconnect,
+        serviceRepositoryPropose,
+        serviceGitStatus, serviceGitLog,
+        serviceGitShow, serviceGitDiff, serviceGitCheckout, serviceGitCommit, serviceGitRevert,
+        serviceGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
+        skillCreate, skillCopy, skillDelete,
         scheduleCreate, scheduleList, scheduleDelete, scheduleEnable, scheduleRun,
         memoryRead, memoryWrite, memoryReplaceText,
         artifactList, artifactImport, artifactWrite, artifactReplaceText, artifactRename,
@@ -110,7 +113,8 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") ? .ask : .allow
+        return action.hasSuffix(".delete") || action == serviceRepositoryConnect || action == serviceRepositorySync ||
+            action == serviceRepositoryDisconnect || action == serviceRepositoryPropose ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -126,6 +130,10 @@ nonisolated enum Actions {
         case providerDelete: L10n.string("Delete a model provider")
         case providerAuthenticate: L10n.string("Sign in to a model provider")
         case providerDeauthenticate: L10n.string("Sign out of a model provider")
+        case providerConnect: L10n.string("Connect a model provider")
+        case secretList: L10n.string("List secrets")
+        case secretAdd: L10n.string("Add a secret")
+        case secretDelete: L10n.string("Delete a secret")
         case appInfo: L10n.string("App info")
         case appProfile, appProfiles: L10n.string("Profiles")
         case appNotifications: L10n.string("Notifications")
@@ -135,7 +143,7 @@ nonisolated enum Actions {
         case appModel: L10n.string("Model")
         case appDefaultModel: L10n.string("Default model")
         case appActionPolicies: L10n.string("Actions")
-        case appRepositories: L10n.string("Repositories")
+        case appServiceRepositories: L10n.string("Repositories")
         case appLogs: L10n.string("Logs")
         case appRenameChat: L10n.string("Rename chat")
         case webSearch: L10n.string("Search the web")
@@ -156,23 +164,22 @@ nonisolated enum Actions {
         case serviceUpdate: L10n.string("Update a service")
         case serviceCopy: L10n.string("Copy a service to Local")
         case serviceDelete: L10n.string("Delete a service")
-        case repositoryConnect: L10n.string("Add Repository")
-        case repositorySync: L10n.string("Sync")
-        case repositoryDisconnect: L10n.string("Remove Repository")
-        case repositoryPropose: L10n.string("Share Service")
-        case repositoryGitStatus, repositoryGitDiff: L10n.string("Check repository changes")
-        case repositoryGitLog: L10n.string("Read repository history")
-        case repositoryGitShow: L10n.string("Read a saved repository version")
-        case repositoryGitCheckout: L10n.string("View a saved repository version")
-        case repositoryGitCommit: L10n.string("Save Local repository")
-        case repositoryGitRevert: L10n.string("Undo a saved Local version")
-        case repositoryGitRestore: L10n.string("Discard Local changes")
+        case serviceRepositoryConnect: L10n.string("Add Repository")
+        case serviceRepositorySync: L10n.string("Sync")
+        case serviceRepositoryDisconnect: L10n.string("Remove Repository")
+        case serviceRepositoryPropose: L10n.string("Share Service")
+        case serviceGitStatus, serviceGitDiff: L10n.string("Check service changes")
+        case serviceGitLog: L10n.string("Read service history")
+        case serviceGitShow: L10n.string("Read a saved service version")
+        case serviceGitCheckout: L10n.string("View a saved service version")
+        case serviceGitCommit: L10n.string("Save Local services")
+        case serviceGitRevert: L10n.string("Undo a saved Local version")
+        case serviceGitRestore: L10n.string("Discard Local changes")
         case serviceAttach: L10n.string("Attach a service")
         case serviceSignIn: L10n.string("Service sign-in")
         case serviceSolve: L10n.string("Service verification")
         case servicePayment: L10n.string("Service checkout")
         case serviceDetach: L10n.string("Detach a service")
-        case skillShare: L10n.string("Add to Local Repository")
         case skillCreate: L10n.string("Create a skill")
         case skillCopy: L10n.string("Copy a skill")
         case skillDelete: L10n.string("Delete a skill")
@@ -202,7 +209,7 @@ nonisolated enum Actions {
     static func iconKind(for action: String) -> OxActionIconKind? {
         guard builtIn.contains(action) else { return nil }
         if action == appRenameChat || action.hasPrefix("ox.user.") { return .chats }
-        if action.hasPrefix("ox.provider.") || action.hasPrefix("ox.app.") { return .device }
+        if action.hasPrefix("ox.provider.") || action.hasPrefix("ox.app.") || action.hasPrefix("ox.secret.") { return .device }
         if action.hasPrefix("ox.service.") { return .services }
         if action.hasPrefix("ox.artifact.") { return .artifacts }
         if action.hasPrefix("ox.skill.") || action.hasPrefix("ox.schedule.") { return .skills }

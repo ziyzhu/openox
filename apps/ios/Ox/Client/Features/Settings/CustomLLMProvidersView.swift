@@ -305,7 +305,10 @@ struct CustomLLMProviderEditor: View {
                 )
                 models = refreshedModels
                 ProviderRegistry.shared.upsert(saved)
-                if !trimmedKey.isEmpty { Credentials.set(trimmedKey, for: saved.clientID) }
+                if !trimmedKey.isEmpty {
+                    let definition = try ProviderRegistry.shared.definition(id: saved.clientID)
+                    try Secret.saveProviderKey(trimmedKey, definition: definition)
+                }
                 Haptics.success(.settingsSaved)
                 dismiss()
             } catch {

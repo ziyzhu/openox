@@ -71,7 +71,7 @@ final class APIService {
             try Task.checkCancellation()
             if action.requireAuth && !authorization.isConfigured { throw APIServiceError.authorizationRequired }
             if source == nil, let fetched = await service.manager.fetch(domain: definition.domain) {
-                source = Service.Resolved(actions: fetched.actions)
+                source = Service.Resolved(actions: fetched.actions, skills: fetched.skills)
             }
             guard let source else {
                 throw Service.InvokeError.invalidContract(name)

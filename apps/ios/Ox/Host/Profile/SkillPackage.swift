@@ -56,12 +56,11 @@ nonisolated enum SkillPackageCodec {
     private static let maximumEntries = 64
 
     static func encode(_ skill: Skill) throws -> Data {
-        try SkillFiles.validate(skill)
-        var resources = skill.resources ?? [:]
-        resources[SkillFiles.fileName] = SkillFiles.serialize(skill)
+        let body = Data(SkillFiles.serialize(skill).utf8)
+        guard body.count <= maximumSkillBytes else { throw SkillPackageError.tooLarge }
         return try zip {
             try ZipArchiveCodec.encode(
-                resources.sorted { $0.key < $1.key }.map { .init(path: "\(skill.name)/\($0.key)", data: Data($0.value.utf8)) },
+                [.init(path: "\(skill.name)/\(SkillFiles.fileName)", data: body)],
                 maximumArchiveBytes: maximumPackageBytes
             )
         }
@@ -76,22 +75,18 @@ nonisolated enum SkillPackageCodec {
                 maximumEntries: maximumEntries
             )
         }
-        guard let main = files.first(where: { $0.path.hasSuffix("/SKILL.md") }),
-              let name = main.path.split(separator: "/").first.map(String.init),
-              main.path == "\(name)/SKILL.md", SkillFiles.isUserName(name),
-              !SkillFiles.reservedNames.contains(name),
-              let text = String(data: main.data, encoding: .utf8),
-              var skill = SkillFiles.parse(text, directoryName: name) else { throw SkillPackageError.invalidSkill }
-        var resources: [String: String] = [:]
-        for file in files where file.path != main.path {
-            guard file.path.hasPrefix(name + "/") else { throw SkillPackageError.unsafePath }
-            let relative = String(file.path.dropFirst(name.count + 1))
-            guard SkillFiles.isResourcePath(relative), resources[relative] == nil,
-                  let content = String(data: file.data, encoding: .utf8) else { throw SkillPackageError.invalidSkill }
-            resources[relative] = content
+        guard files.count == 1, let file = files.first else {
+            if files.isEmpty { throw SkillPackageError.invalidSkill }
+            throw SkillPackageError.unsupportedResources
         }
-        skill.resources = resources.isEmpty ? nil : resources
-        try SkillFiles.validate(skill)
+        let parts = file.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 2,
+              parts[1] == SkillFiles.fileName,
+              SkillFiles.isUserName(parts[0]),
+              let text = String(data: file.data, encoding: .utf8),
+              let skill = SkillFiles.parse(text, directoryName: parts[0]) else {
+            throw SkillPackageError.invalidSkill
+        }
         return SkillImportProposal(skill: skill, sourceName: sourceName)
     }
 
@@ -196,7 +191,6 @@ final class SkillImportCoordinator {
                     instructions: skill.instructions,
                     services: skill.services,
                     replacing: replacing,
-                    resources: proposal.skill.resources,
                     in: scope
                 )
                 guard !Task.isCancelled else { return }

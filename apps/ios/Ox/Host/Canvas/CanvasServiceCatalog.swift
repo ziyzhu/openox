@@ -52,39 +52,38 @@ extension ServiceOperations {
             return try await copyService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.delete":
             return try await deleteService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.connect":
-            return try await connectRepository(origin: fields["origin"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.sync":
-            return try await syncRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.disconnect":
-            return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.propose":
-            return try await proposeRepository(
+        case "ox.service.repository.connect":
+            return try await connectServiceRepository(origin: fields["origin"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.sync":
+            return try await syncServiceRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.disconnect":
+            return try await disconnectServiceRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.repository.propose":
+            return try await proposeServiceRepository(
                 target: fields["target"]?.stringValue ?? "",
                 commitHash: fields["commitHash"]?.stringValue ?? "",
                 services: fields["services"]?.arrayValue?.compactMap(\.stringValue) ?? [],
-                skills: fields["skills"]?.arrayValue?.compactMap(\.stringValue) ?? [],
                 title: fields["title"]?.stringValue ?? "",
                 body: fields["body"]?.stringValue ?? "",
                 status: fields["status"]?.stringValue ?? "",
                 purpose: purpose
             )
-        case "ox.repository.git.status":
-            return try await repositoryGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
-        case "ox.repository.git.log":
-            return try await repositoryGitLog(repository: fields["repository"]?.stringValue ?? "local", limit: fields["limit"]?.intValue ?? 20, cursor: fields["cursor"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.show":
-            return try await repositoryGitShow(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", path: fields["path"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.diff":
-            return try await repositoryGitDiff(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue, baseCommitHash: fields["baseCommitHash"]?.stringValue, path: fields["path"]?.stringValue, purpose: purpose)
-        case "ox.repository.git.checkout":
-            return try await repositoryGitCheckout(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.commit":
-            return try await repositoryGitCommit(message: fields["message"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.revert":
-            return try await repositoryGitRevert(commitHash: fields["commitHash"]?.stringValue ?? "", message: fields["message"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.git.restore":
-            return try await repositoryGitRestore(path: fields["path"]?.stringValue, purpose: purpose)
+        case "ox.service.git.status":
+            return try await serviceGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
+        case "ox.service.git.log":
+            return try await serviceGitLog(repository: fields["repository"]?.stringValue ?? "local", limit: fields["limit"]?.intValue ?? 20, cursor: fields["cursor"]?.stringValue, purpose: purpose)
+        case "ox.service.git.show":
+            return try await serviceGitShow(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", path: fields["path"]?.stringValue, purpose: purpose)
+        case "ox.service.git.diff":
+            return try await serviceGitDiff(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue, baseCommitHash: fields["baseCommitHash"]?.stringValue, path: fields["path"]?.stringValue, purpose: purpose)
+        case "ox.service.git.checkout":
+            return try await serviceGitCheckout(repository: fields["repository"]?.stringValue ?? "local", commitHash: fields["commitHash"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.git.commit":
+            return try await serviceGitCommit(message: fields["message"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.git.revert":
+            return try await serviceGitRevert(commitHash: fields["commitHash"]?.stringValue ?? "", message: fields["message"]?.stringValue ?? "", purpose: purpose)
+        case "ox.service.git.restore":
+            return try await serviceGitRestore(path: fields["path"]?.stringValue, purpose: purpose)
         case "ox.service.signIn":
             return try await signInService(domain: fields["domain"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.solve":

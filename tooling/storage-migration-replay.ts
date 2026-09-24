@@ -5,7 +5,6 @@ import { ROOT } from "./lib.ts";
 
 type ReplayResult = {
   currentVersion?: string;
-  skillChecks?: Record<string, boolean>;
   versionUpdated?: boolean;
   ordinaryContextRemoved?: boolean;
   unreadableContextRetained?: boolean;
@@ -24,6 +23,7 @@ type ReplayResult = {
   savedServicesMigrated?: boolean;
   futureActionPoliciesPreserved?: boolean;
   actionPolicyResolutionValid?: boolean;
+  secretsIndexRenamed?: boolean;
   fixtureResults?: Array<{
     name: string;
     migratedAsExpected: boolean;
@@ -83,9 +83,7 @@ const result = await callHost("debug.storage.replayMigration", {
   fixtures,
 }, 30_000) as ReplayResult;
 
-const checks = Object.entries(result).filter(([key]) => !["currentVersion", "fixtureResults", "skillChecks"].includes(key));
-checks.push(...Object.entries(result.skillChecks ?? {}));
-if (!result.skillChecks || Object.keys(result.skillChecks).length < 10) throw new Error("skill regression checks missing");
+const checks = Object.entries(result).filter(([key]) => !["currentVersion", "fixtureResults"].includes(key));
 const failures = checks.filter(([, value]) => value !== true).map(([name]) => name);
 for (const [name, value] of checks) console.log(`${value === true ? "PASS" : "FAIL"} ${name}`);
 for (const fixture of result.fixtureResults ?? []) {

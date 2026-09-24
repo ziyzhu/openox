@@ -9,7 +9,7 @@
 
 Ox CLI is an Ox Client for the terminal. It can discover and connect to an Ox
 Host, inspect chats, logs, agents, and VMs, administer Profile
-content directly, inspect repositories, and ask a Host to exercise
+content directly, inspect service repositories, and ask a Host to exercise
 live services.
 
 The CLI never selects a web-page runtime. The Host owns service adapters and
@@ -84,7 +84,7 @@ ox
 ├── --host <ws-url>              Ox Host control endpoint
 ├── --chat <chat-id>             Chat-bound VM on that Host
 ├── --profile <profile-path>     Profile directory for direct administration
-└── --repository <path-or-url>   Repository for offline inspection
+└── --repository <path-or-url>   Service repository for offline inspection
 ```
 
 - `--host` applies to live chat, log, agent, VM, and service commands. It defaults to
@@ -123,7 +123,7 @@ target:
 ox --chat <chat-id> chat inspect
 ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read \
-  --args '{"path":"skills/manage-skills/SKILL.md","purpose":"Read skill"}'
+  --args '{"path":"skills/system:manage-skills/SKILL.md","purpose":"Read skill"}'
 ```
 
 `vm call` invokes a catalogued `ox.*` function with structured JSON
@@ -222,7 +222,7 @@ instructions from stdin.
 on any supported platform. Artifact JSON listings report cloud-only iCloud
 placeholders without downloading them.
 
-## Inspect repositories
+## Inspect service repositories
 
 Repository inspection is offline and does not contact a Host:
 
@@ -234,7 +234,7 @@ ox repository serve /path/to/repository --port 8101
 ox --repository /path/to/repository service list
 ox --repository /path/to/repository service inspect -s mail.google.com
 ox --repository /path/to/repository service actions -s mail.google.com --json
-ox --repository /path/to/repository skills --json
+ox --repository /path/to/repository service skills -s mail.google.com --json
 ```
 
 `validate` and `serve` check `repository.json` and every web and API service:
@@ -252,9 +252,9 @@ before being served; credentials are never embedded in the URL.
 The repository harness owns the complete iOS replay lifecycle:
 
 ```sh
-bun run test:services --repository /path/to/repository --device ox-qa-1
+bun run test:services --repository /path/to/service-repository --device ox-qa-1
 bun run test:services <domain>:<action>:<case> \
-  --repository /path/to/repository \
+  --repository /path/to/service-repository \
   --device ox-qa-1
 ```
 
@@ -315,7 +315,7 @@ ox repository serve <path-or-url> [--port 8100]
 ox --repository <path-or-url> service list [--json]
 ox --repository <path-or-url> service inspect -s <domain>
 ox --repository <path-or-url> service actions -s <domain> [--json]
-ox --repository <path-or-url> skills [name] [--json]
+ox --repository <path-or-url> service skills -s <domain> [--json]
 ox [--host <ws-url>] service test [<domain>[:<action>[:<case>]]] --source <directory> --proxy-port <port> [--timeout 30000] [--allow-partial]
 ox [--host <ws-url>] service status [--json] [--timeout 30000]
 ox [--host <ws-url>] service invoke <domain>:<action> [--args '{}'] [--approve] [--timeout 30000]

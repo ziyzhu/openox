@@ -3,7 +3,7 @@ import Foundation
 nonisolated final class OpenRouterSubscriptionAccount: SubscriptionAccount, @unchecked Sendable {
     static let shared = OpenRouterSubscriptionAccount()
 
-    private let store = SubscriptionTokenStore<OpenRouterCredential>(key: "oauth:openrouter")
+    private let store = SubscriptionTokenStore<OpenRouterCredential>(key: ManagedOAuthAccount.modelProvider("openrouter"))
 
     let providerName = "OpenRouter"
 

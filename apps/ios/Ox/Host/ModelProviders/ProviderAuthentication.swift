@@ -63,7 +63,7 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
 
     init(_ definition: ProviderDefinition) {
         self.definition = definition
-        store = SubscriptionTokenStore(key: "oauth:\(definition.credentialID)")
+        store = SubscriptionTokenStore(key: ManagedOAuthAccount.modelProvider(definition.credentialID))
     }
 
     var providerName: String { definition.name }

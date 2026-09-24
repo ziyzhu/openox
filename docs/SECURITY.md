@@ -40,7 +40,7 @@ boundaries do not line up one-to-one with the layers — the important ones cut
 - **Remote MCP servers** — user-configured network peers that supply untrusted
   tool metadata and receive approved, schema-validated arguments directly from
   the device. They receive no ambient website or provider credentials.
-- **Repositories** — the signed app bundle and user-enabled public git
+- **Service repositories** — the signed app bundle and user-enabled public git
   repositories that publish service definitions. A git host sees only git
   verbs; it never learns which actions ran or what data crossed the firewall.
   Repositories *supply the code* that runs inside service pages, which makes
@@ -350,7 +350,7 @@ only beneath the immutable active-Profile scope, bound reads and writes, and nev
 expose local URLs. Import, rename, and delete use the native approval policy.
 Writes and edits within the active Profile do not prompt; they are confined to the
 artifact, memory, soul, and user-skill namespaces and cannot reach chats,
-manifests, host paths, system skills or installed repository skills, or
+manifests, host paths, app-owned `system:` skills, attached `service:` skills, or
 unrelated vault contents. The virtual skill mount derives mutability from the
 resolved source rather than skill frontmatter. Registry manifests are readable
 through `services/`, but that mount is read-only and exposes neither service

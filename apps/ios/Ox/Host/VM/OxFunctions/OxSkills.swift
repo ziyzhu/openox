@@ -19,18 +19,16 @@ nonisolated enum OxSkills {
                 ),
                 entry(
                     "ox.skill.copy",
-                    "Copy one resolved skill, including references and helpers into a new Profile-owned skill: `await ox.skill.copy({ source, name, purpose })`. The destination name is normalized to lowercase kebab-case and must not already exist. Service dependencies are retained.",
+                    "Copy one readable Profile, `system:`, or `service:` skill into a new Profile-owned skill: `await ox.skill.copy({ source, name, purpose })`. The destination name is normalized to lowercase kebab-case and must not already exist. A copied service skill retains its owning service dependency.",
                     input: object([
                         "source": source,
                         "name": name,
                     ], required: ["source", "name"]),
                     output: skill
                 ),
-                entry("ox.skill.share", "Copy the complete resolved skill into the Local repository for review and publication. Fails if Local already contains the name.", input: object(["name": name], required: ["name"]), output: skill),
-                entry("ox.skill.run", "Run a packaged JavaScript helper in this Ox VM. The script is an async function body with ox and args parameters. It uses normal Action permissions. Read the skill instructions first.", input: object(["name": name, "script": source, "args": .object([:])], required: ["name", "script"]), output: .object([:])),
                 entry(
                     "ox.skill.delete",
-                    "Delete one writable skill: `await ox.skill.delete({ name, purpose })`. System and installed repository skills cannot be deleted.",
+                    "Delete one Profile-owned skill: `await ox.skill.delete({ name, purpose })`. Read-only `system:` and `service:` skills cannot be deleted.",
                     input: object(["name": name], required: ["name"]),
                     output: deletion
                 ),
@@ -57,10 +55,6 @@ nonisolated enum OxSkills {
             }
             context.setObject(copy as AnyObject, forKeyedSubscript: "__nativeSkillCopy" as NSString)
 
-            let share: @convention(block) (String, JSValue) -> JSValue = { name, purpose in
-                env.call { try await $0.shareSkill(name: name, purpose: purpose.toString()!) }
-            }
-            context.setObject(share as AnyObject, forKeyedSubscript: "__nativeSkillShare" as NSString)
             let delete: @convention(block) (String, JSValue) -> JSValue = { name, purposeValue in
                 env.call { try await $0.deleteSkill(name: name, purpose: purposeValue.toString()!) }
             }
@@ -69,15 +63,6 @@ nonisolated enum OxSkills {
         jsFragment: """
           create: (value) => { const options = __oxOptions(value, 'ox.skill.create'); return __nativeSkillCreate(String(options.name), String(options.description), String(options.instructions), options.services ?? [], String(options.purpose)); },
           copy: (value) => { const options = __oxOptions(value, 'ox.skill.copy'); return __nativeSkillCopy(String(options.source), String(options.name), String(options.purpose)); },
-          share: (value) => { const options = __oxOptions(value, 'ox.skill.share'); return __nativeSkillShare(String(options.name), String(options.purpose)); },
-          run: async (value) => {
-            const options = __oxOptions(value, 'ox.skill.run');
-            const script = String(options.script);
-            if (!script.endsWith('.js') || script.split('/').some(part => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part))) throw new Error('Invalid skill script path');
-            const file = await ox.fs.read({path: 'skills/' + String(options.name) + '/scripts/' + script, options: {maxBytes: 524288}, purpose: String(options.purpose)});
-            if (file.truncated || typeof file.text !== 'string') throw new Error('Skill script could not be read completely');
-            return await new (Object.getPrototypeOf(async function(){}).constructor)('ox', 'args', file.text)(ox, options.args ?? null);
-          },
           delete: (value) => { const options = __oxOptions(value, 'ox.skill.delete'); return __nativeSkillDelete(String(options.name), String(options.purpose)); }
         """
     )

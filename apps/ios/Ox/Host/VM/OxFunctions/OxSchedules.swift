@@ -8,7 +8,7 @@ nonisolated enum OxSchedules {
             [
                 entry(
                     "ox.schedule.create",
-                    "Schedule a frozen snapshot of one resolved skill package after explicit user confirmation: `await ox.schedule.create({ skill, argument?, frequency, fireAt?, hour?, minute?, weekday?, timeZone?, purpose })`. Use `fireAt` for `once`; use `hour` and `minute` for `daily`; add a weekday name for `weekly`. Times are best-effort on iOS.",
+                    "Schedule a frozen snapshot of one Profile-owned skill after explicit user confirmation: `await ox.schedule.create({ skill, argument?, frequency, fireAt?, hour?, minute?, weekday?, timeZone?, purpose })`. Use `fireAt` for `once`; use `hour` and `minute` for `daily`; add a weekday name for `weekly`. Times are best-effort on iOS.",
                     input: object([
                         "skill": text,
                         "argument": longText,

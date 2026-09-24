@@ -439,5 +439,11 @@
       }
     }
   },
-  "faviconUrl": "https://openox.ai/assets/services/news.ycombinator.com/favicon.png"
+  "faviconUrl": "https://openox.ai/assets/services/news.ycombinator.com/favicon.png",
+  "skills": [
+    {
+      "name": "display",
+      "description": "How to present Hacker News story feeds, discussions, and profiles clearly."
+    }
+  ]
 }

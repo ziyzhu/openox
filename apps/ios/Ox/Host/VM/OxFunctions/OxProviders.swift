@@ -10,6 +10,7 @@ nonisolated enum OxProviders {
         ("save", "Create or replace a complete provider definition. Always validates before saving. Models are supplied directly; no discovery is performed."),
         ("delete", "Remove a saved provider definition and clear its local credentials. Removing an override restores the bundled default; removing an added provider removes it entirely. Unmodified bundled defaults cannot be deleted. Requires approval."),
         ("authenticate", "Present the same provider authentication UI used in Settings and wait for completion. Credentials are entered by the user and never passed to JavaScript. Returns status authenticated, credential-stored, or not-required; throws on cancellation or failure."),
+        ("connect", "Connect a provider to an existing Secret entry or its managed OAuth flow: `await ox.provider.connect({ id, credential: { kind: 'secret', secretKey } | { kind: 'oauth' }, purpose })`. The agent never receives credential values. A Secret binding requires native destination confirmation."),
         ("deauthenticate", "Clear a provider's local credentials and account authentication. Does not revoke access at the provider."),
     ]
 
@@ -19,6 +20,21 @@ nonisolated enum OxProviders {
             operations.map { operation, description in
                 let fields: [String: JSONValue]
                 if ["save", "validate"].contains(operation) { fields = ["provider": ProviderDefinition.schema] }
+                else if operation == "connect" {
+                    fields = [
+                        "id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)]),
+                        "credential": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "kind": .object(["type": .string("string"),
+                                                 "enum": .array([.string("secret"), .string("oauth")])]),
+                                "secretKey": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
+                            ]),
+                            "required": .array([.string("kind")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                    ]
+                }
                 else if operation == "list" || operation == "default" { fields = [:] }
                 else { fields = ["id": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)])] }
                 return ("ox.provider.\(operation)", .object([

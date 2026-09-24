@@ -63,7 +63,7 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 For `ox-qa-1`, the standard commands are:
 
 ```sh
-ox repository serve examples/repository --port 8101
+ox repository serve repositories/builtin --port 8101
 curl -fsS http://127.0.0.1:8101/health
 sim --device ox-qa-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_SERVICES_ENDPOINT=http://localhost:8101/repository.git --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
 OX_HOST_ENDPOINT=ws://127.0.0.1:9101 bun run test:storage-migration

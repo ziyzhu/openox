@@ -8,7 +8,7 @@ struct ServicesMount {
         case iOS = "ios"
         case mcp
 
-        var repositoryKind: Repository.ServiceKind {
+        var repositoryKind: ServiceRepository.ServiceKind {
             switch self {
             case .web: .web
             case .api: .api
@@ -80,7 +80,7 @@ struct ServicesMount {
     func sourceText(kind: Kind, domain: String, path: [String]) async throws -> String {
         let data = try await manager.readServiceSource(kind: kind, domain: domain, path: path)
         guard let value = String(data: data, encoding: .utf8) else {
-            throw Repository.Failure(message: "Service file is not UTF-8 text.")
+            throw ServiceRepository.Failure(message: "Service file is not UTF-8 text.")
         }
         return value
     }

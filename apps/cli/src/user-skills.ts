@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { dispatch, fail, type CliContext, type SubCommand } from "./lib.ts";
-import { MAXIMUM_SKILL_BYTES, parseSkill, SYSTEM_SKILL_NAMES } from "@openox/service-sdk/skills";
 import { profileRoot } from "./ox-content.ts";
 
 const SERVICE_DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -41,11 +40,7 @@ export function serializeUserSkill(request: Omit<CreateRequest, "json">): string
   if (!instructions) fail("skill instructions cannot be empty");
   const services = normalizedServices(request.services);
   const serviceField = services.length ? `\nservices: ${services.join(", ")}` : "";
-  if (SYSTEM_SKILL_NAMES.some(name => name === request.name)) fail(`reserved system skill name: ${request.name}`);
-  const content = `---\nname: ${request.name}\ndescription: ${JSON.stringify(description)}${serviceField}\n---\n\n${instructions}\n`;
-  parseSkill(content, request.name);
-  if (Buffer.byteLength(content) > MAXIMUM_SKILL_BYTES) fail("skill package is too large");
-  return content;
+  return `---\nname: ${request.name}\ndescription: ${JSON.stringify(description)}${serviceField}\n---\n\n${instructions}\n`;
 }
 
 async function createSkill(args: string[], context: CliContext): Promise<void> {

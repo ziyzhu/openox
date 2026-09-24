@@ -16,8 +16,8 @@
 </g>
 <g id="clust2" class="cluster">
 <title>cluster_interfaces</title>
-<polygon fill="white" stroke="#222222" points="537.46,-8 537.46,-123.41 1057.46,-123.41 1057.46,-8 537.46,-8"/>
-<text xml:space="preserve" text-anchor="middle" x="609.96" y="-104.21" font-family="Arial" font-size="16.00">Service interfaces</text>
+<polygon fill="white" stroke="#222222" points="536.46,-8 536.46,-123.41 1056.46,-123.41 1056.46,-8 536.46,-8"/>
+<text xml:space="preserve" text-anchor="middle" x="608.96" y="-104.21" font-family="Arial" font-size="16.00">Service interfaces</text>
 </g>
 <!-- client -->
 <g id="node1" class="node">
@@ -120,95 +120,94 @@
 <!-- local_repository -->
 <g id="node7" class="node">
 <title>local_repository</title>
-<polygon fill="white" stroke="#222222" points="634.55,-224.32 456.38,-224.32 456.38,-161.41 634.55,-161.41 634.55,-224.32"/>
-<text xml:space="preserve" text-anchor="middle" x="545.46" y="-202.84" font-family="Arial" font-size="12.00" fill="#171717">Local Repository</text>
-<text xml:space="preserve" text-anchor="middle" x="545.46" y="-188.59" font-family="Arial" font-size="12.00" fill="#171717">Services · Skills</text>
-<text xml:space="preserve" text-anchor="middle" x="545.46" y="-174.34" font-family="Arial" font-size="12.00" fill="#171717">Editable Git + repository.json</text>
+<polygon fill="white" stroke="#222222" points="635.55,-217.2 457.38,-217.2 457.38,-168.53 635.55,-168.53 635.55,-217.2"/>
+<text xml:space="preserve" text-anchor="middle" x="546.46" y="-195.72" font-family="Arial" font-size="12.00" fill="#171717">Local Service Repository</text>
+<text xml:space="preserve" text-anchor="middle" x="546.46" y="-181.47" font-family="Arial" font-size="12.00" fill="#171717">Editable Git + repository.json</text>
 </g>
 <!-- vm&#45;&gt;local_repository -->
 <g id="edge9" class="edge">
 <title>vm&#45;&gt;local_repository</title>
-<path fill="none" stroke="#111111" d="M651.5,-306.12C630.5,-283.89 602.02,-253.74 579.86,-230.28"/>
-<polygon fill="#111111" stroke="#111111" points="581.53,-228.74 575.41,-225.57 578.22,-231.86 581.53,-228.74"/>
-<text xml:space="preserve" text-anchor="middle" x="660.04" y="-267.82" font-family="Arial" font-size="10.00">creates or revises</text>
-<text xml:space="preserve" text-anchor="middle" x="660.04" y="-255.82" font-family="Arial" font-size="10.00">via ox.fs</text>
+<path fill="none" stroke="#111111" d="M651.71,-306.12C628.65,-281.52 596.48,-247.21 573.8,-223.02"/>
+<polygon fill="#111111" stroke="#111111" points="575.67,-221.7 569.57,-218.51 572.36,-224.81 575.67,-221.7"/>
+<text xml:space="preserve" text-anchor="middle" x="660.48" y="-267.82" font-family="Arial" font-size="10.00">creates or revises</text>
+<text xml:space="preserve" text-anchor="middle" x="660.48" y="-255.82" font-family="Arial" font-size="10.00">via ox.fs</text>
 </g>
 <!-- services -->
 <g id="node8" class="node">
 <title>services</title>
-<polygon fill="white" stroke="#222222" points="880.42,-224.32 758.5,-224.32 758.5,-161.41 880.42,-161.41 880.42,-224.32"/>
-<text xml:space="preserve" text-anchor="middle" x="819.46" y="-202.84" font-family="Arial" font-size="12.00" fill="#171717">Catalog</text>
-<text xml:space="preserve" text-anchor="middle" x="819.46" y="-188.59" font-family="Arial" font-size="12.00" fill="#171717">Services · Skills</text>
-<text xml:space="preserve" text-anchor="middle" x="819.46" y="-174.34" font-family="Arial" font-size="12.00" fill="#171717">Resolved sources</text>
+<polygon fill="white" stroke="#222222" points="877.55,-224.32 759.38,-224.32 759.38,-161.41 877.55,-161.41 877.55,-224.32"/>
+<text xml:space="preserve" text-anchor="middle" x="818.46" y="-202.84" font-family="Arial" font-size="12.00" fill="#171717">Installed services</text>
+<text xml:space="preserve" text-anchor="middle" x="818.46" y="-188.59" font-family="Arial" font-size="12.00" fill="#171717">Available to Host</text>
+<text xml:space="preserve" text-anchor="middle" x="818.46" y="-174.34" font-family="Arial" font-size="12.00" fill="#171717">Actions · Skills</text>
 </g>
 <!-- vm&#45;&gt;services -->
 <g id="edge10" class="edge">
 <title>vm&#45;&gt;services</title>
-<path fill="none" stroke="#111111" d="M715.64,-300.6C736.63,-279.02 763.2,-251.71 784.2,-230.12"/>
-<polygon fill="#111111" stroke="#111111" points="714.24,-298.79 711.33,-305.03 717.5,-301.96 714.24,-298.79"/>
-<polygon fill="#111111" stroke="#111111" points="785.73,-231.8 788.64,-225.56 782.47,-228.63 785.73,-231.8"/>
-<text xml:space="preserve" text-anchor="middle" x="792.41" y="-267.82" font-family="Arial" font-size="10.00">invokes actions</text>
-<text xml:space="preserve" text-anchor="middle" x="792.41" y="-255.82" font-family="Arial" font-size="10.00">reads skills</text>
+<path fill="none" stroke="#111111" d="M715.39,-300.6C736.23,-279.02 762.6,-251.71 783.45,-230.12"/>
+<polygon fill="#111111" stroke="#111111" points="713.99,-298.77 711.12,-305.03 717.27,-301.93 713.99,-298.77"/>
+<polygon fill="#111111" stroke="#111111" points="784.97,-231.82 787.85,-225.56 781.7,-228.66 784.97,-231.82"/>
+<text xml:space="preserve" text-anchor="middle" x="791.85" y="-267.82" font-family="Arial" font-size="10.00">invokes actions</text>
+<text xml:space="preserve" text-anchor="middle" x="791.85" y="-255.82" font-family="Arial" font-size="10.00">reads skills</text>
 </g>
 <!-- local_repository&#45;&gt;services -->
 <g id="edge11" class="edge">
 <title>local_repository&#45;&gt;services</title>
-<path fill="none" stroke="#111111" d="M634.8,-192.87C672.4,-192.87 715.48,-192.87 750.56,-192.87"/>
-<polygon fill="#111111" stroke="#111111" points="750.37,-195.14 756.87,-192.87 750.37,-190.59 750.37,-195.14"/>
-<text xml:space="preserve" text-anchor="middle" x="696.52" y="-198.37" font-family="Arial" font-size="10.00">validates and reloads</text>
+<path fill="none" stroke="#111111" d="M635.9,-192.87C673.47,-192.87 716.43,-192.87 751.24,-192.87"/>
+<polygon fill="#111111" stroke="#111111" points="750.98,-195.14 757.48,-192.87 750.98,-190.59 750.98,-195.14"/>
+<text xml:space="preserve" text-anchor="middle" x="697.46" y="-198.37" font-family="Arial" font-size="10.00">validates and reloads</text>
 </g>
 <!-- remote_repositories -->
 <g id="node10" class="node">
 <title>remote_repositories</title>
-<polygon fill="white" stroke="#222222" points="1175.3,-217.2 1007.62,-217.2 1007.62,-168.53 1175.3,-168.53 1175.3,-217.2"/>
-<text xml:space="preserve" text-anchor="middle" x="1091.46" y="-195.72" font-family="Arial" font-size="12.00" fill="#171717">Remote Repositories</text>
-<text xml:space="preserve" text-anchor="middle" x="1091.46" y="-181.47" font-family="Arial" font-size="12.00" fill="#171717">Public Git + repository.json</text>
+<polygon fill="white" stroke="#222222" points="1187.42,-217.2 1005.5,-217.2 1005.5,-168.53 1187.42,-168.53 1187.42,-217.2"/>
+<text xml:space="preserve" text-anchor="middle" x="1096.46" y="-195.72" font-family="Arial" font-size="12.00" fill="#171717">Remote Service Repositories</text>
+<text xml:space="preserve" text-anchor="middle" x="1096.46" y="-181.47" font-family="Arial" font-size="12.00" fill="#171717">Public Git + repository.json</text>
 </g>
 <!-- services&#45;&gt;remote_repositories -->
 <g id="edge12" class="edge">
 <title>services&#45;&gt;remote_repositories</title>
-<path fill="none" stroke="#111111" d="M888.42,-192.87C924.59,-192.87 969.18,-192.87 1007.36,-192.87"/>
-<polygon fill="#111111" stroke="#111111" points="888.85,-190.59 882.35,-192.87 888.85,-195.14 888.85,-190.59"/>
-<text xml:space="preserve" text-anchor="middle" x="944.02" y="-198.37" font-family="Arial" font-size="10.00">installs</text>
+<path fill="none" stroke="#111111" d="M885.74,-192.87C921.62,-192.87 966.28,-192.87 1005.24,-192.87"/>
+<polygon fill="#111111" stroke="#111111" points="885.77,-190.59 879.27,-192.87 885.77,-195.14 885.77,-190.59"/>
+<text xml:space="preserve" text-anchor="middle" x="941.52" y="-198.37" font-family="Arial" font-size="10.00">installs</text>
 </g>
 <!-- device -->
 <g id="node11" class="node">
 <title>device</title>
-<polygon fill="white" stroke="#222222" points="705.55,-76.66 557.38,-76.66 557.38,-28 705.55,-28 705.55,-76.66"/>
-<text xml:space="preserve" text-anchor="middle" x="631.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">Device&#45;native interface</text>
-<text xml:space="preserve" text-anchor="middle" x="631.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(Device Service)</text>
+<polygon fill="white" stroke="#222222" points="704.55,-76.66 556.38,-76.66 556.38,-28 704.55,-28 704.55,-76.66"/>
+<text xml:space="preserve" text-anchor="middle" x="630.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">Device&#45;native interface</text>
+<text xml:space="preserve" text-anchor="middle" x="630.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(Device Service)</text>
 </g>
 <!-- services&#45;&gt;device -->
 <g id="edge13" class="edge">
 <title>services&#45;&gt;device</title>
-<path fill="none" stroke="#111111" d="M777.74,-161.12C745.49,-137.35 701.2,-104.72 669.83,-81.6"/>
-<polygon fill="#111111" stroke="#111111" points="671.53,-80.03 664.95,-78.01 668.83,-83.7 671.53,-80.03"/>
+<path fill="none" stroke="#111111" d="M776.74,-161.12C744.49,-137.35 700.2,-104.72 668.83,-81.6"/>
+<polygon fill="#111111" stroke="#111111" points="670.53,-80.03 663.95,-78.01 667.83,-83.7 670.53,-80.03"/>
 </g>
 <!-- web -->
 <g id="node12" class="node">
 <title>web</title>
-<polygon fill="white" stroke="#222222" points="870.3,-76.66 768.62,-76.66 768.62,-28 870.3,-28 870.3,-76.66"/>
-<text xml:space="preserve" text-anchor="middle" x="819.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">Web page</text>
-<text xml:space="preserve" text-anchor="middle" x="819.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(Web Service)</text>
+<polygon fill="white" stroke="#222222" points="869.3,-76.66 767.62,-76.66 767.62,-28 869.3,-28 869.3,-76.66"/>
+<text xml:space="preserve" text-anchor="middle" x="818.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">Web page</text>
+<text xml:space="preserve" text-anchor="middle" x="818.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(Web Service)</text>
 </g>
 <!-- services&#45;&gt;web -->
 <g id="edge14" class="edge">
 <title>services&#45;&gt;web</title>
-<path fill="none" stroke="#111111" d="M819.46,-161.12C819.46,-138.44 819.46,-107.69 819.46,-84.84"/>
-<polygon fill="#111111" stroke="#111111" points="821.74,-85.12 819.46,-78.62 817.19,-85.12 821.74,-85.12"/>
+<path fill="none" stroke="#111111" d="M818.46,-161.12C818.46,-138.44 818.46,-107.69 818.46,-84.84"/>
+<polygon fill="#111111" stroke="#111111" points="820.74,-85.12 818.46,-78.62 816.19,-85.12 820.74,-85.12"/>
 </g>
 <!-- mcp -->
 <g id="node13" class="node">
 <title>mcp</title>
-<polygon fill="white" stroke="#222222" points="1037.05,-76.66 933.88,-76.66 933.88,-28 1037.05,-28 1037.05,-76.66"/>
-<text xml:space="preserve" text-anchor="middle" x="985.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">MCP server</text>
-<text xml:space="preserve" text-anchor="middle" x="985.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(MCP Service)</text>
+<polygon fill="white" stroke="#222222" points="1036.05,-76.66 932.88,-76.66 932.88,-28 1036.05,-28 1036.05,-76.66"/>
+<text xml:space="preserve" text-anchor="middle" x="984.46" y="-55.18" font-family="Arial" font-size="12.00" fill="#171717">MCP server</text>
+<text xml:space="preserve" text-anchor="middle" x="984.46" y="-40.93" font-family="Arial" font-size="12.00" fill="#171717">(MCP Service)</text>
 </g>
 <!-- services&#45;&gt;mcp -->
 <g id="edge15" class="edge">
 <title>services&#45;&gt;mcp</title>
-<path fill="none" stroke="#111111" d="M856.3,-161.12C884.54,-137.55 923.23,-105.26 950.89,-82.18"/>
-<polygon fill="#111111" stroke="#111111" points="952.27,-83.99 955.8,-78.08 949.35,-80.5 952.27,-83.99"/>
+<path fill="none" stroke="#111111" d="M855.3,-161.12C883.54,-137.55 922.23,-105.26 949.89,-82.18"/>
+<polygon fill="#111111" stroke="#111111" points="951.27,-83.99 954.8,-78.08 948.35,-80.5 951.27,-83.99"/>
 </g>
 <!-- device&#45;&gt;web -->
 <!-- web&#45;&gt;mcp -->

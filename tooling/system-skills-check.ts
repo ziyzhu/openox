@@ -8,7 +8,7 @@ const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"
 const expectedReferences = new Map([
   ["manage-artifacts", ["canvas.md", "note.md"]],
   ["manage-services", ["api-service.md", "helpers.js", "web-service.md"]],
-  ["manage-skills", ["repository-skill.md", "user-skill.md"]],
+  ["manage-skills", ["service-skill.md", "user-skill.md"]],
 ]);
 
 function scalar(value: string): string {

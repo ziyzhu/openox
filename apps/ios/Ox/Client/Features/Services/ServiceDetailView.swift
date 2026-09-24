@@ -46,7 +46,7 @@ struct ServiceDetailView: View {
     private var capabilities: ServiceDetailCapabilities { service.detailCapabilities }
 
     private var actions: [Manifest.Action] { service.definition.exposedActions }
-    private var skills: [Skill] { Skills.shared.all.filter { $0.services.contains(service.domain) } }
+    private var skills: [Manifest.Skill] { service.definition.skills }
     private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
     @State private var signInRequestActive = false
     @State private var signingOut = false
@@ -389,7 +389,7 @@ struct ServiceDetailView: View {
         }
     }
 
-    private var repository: Repository.Descriptor? {
+    private var repository: ServiceRepository.Repository? {
         guard let repositoryID = service.definition.repositoryID else { return nil }
         return serviceManager.repositories.first { $0.id == repositoryID }
     }
@@ -403,7 +403,7 @@ struct ServiceDetailView: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .padding(.horizontal, Theme.Spacing.md)
                 NavigationLink {
-                    RepositoryDetailView(repositoryID: repository.id)
+                    ServiceRepositoryDetailView(repositoryID: repository.id)
                 } label: {
                     HStack(spacing: Theme.Spacing.md) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -431,7 +431,7 @@ struct ServiceDetailView: View {
         }
     }
 
-    private func repositoryStatus(_ repository: Repository.Descriptor) -> String {
+    private func repositoryStatus(_ repository: ServiceRepository.Repository) -> String {
         if repository.provenance == .bundled { return String(localized: "Included with Ox") }
         if repository.provenance == .local { return String(localized: "Editable on this device") }
         guard let date = repository.lastSyncedAt else { return String(localized: "Last sync unavailable") }
@@ -766,7 +766,7 @@ struct ServiceDetailView: View {
             .settingsSurface()
     }
 
-    private func skillRow(_ skill: Skill) -> some View {
+    private func skillRow(_ skill: Manifest.Skill) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(skill.name)
                 .font(Theme.Fonts.bodyMd)

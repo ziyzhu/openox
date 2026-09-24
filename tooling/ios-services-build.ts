@@ -13,10 +13,7 @@ const localPackage = `{
   "services" : [
 
   ],
-  "skills" : [
-
-  ],
-  "version" : 3
+  "version" : 2
 }
 `;
 
@@ -62,7 +59,7 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
   const local = join(resources, "Local");
   await mkdir(local, { recursive: true });
   await writeFile(join(local, "repository.json"), localPackage);
-  await initializeRepository(local, "Initialize Local repository");
+  await initializeRepository(local, "Initialize Local services");
   await rename(join(local, ".git"), join(resources, "Local.git"));
   await rm(local, { recursive: true });
 }

@@ -1013,6 +1013,13 @@ struct ChatPage: View {
 
     @ViewBuilder
     private func promptBlock(_ prompt: ChatPromptBlock, sourceBlockID: UUID) -> some View {
+        if let key = prompt.secretKey, prompt.isActive {
+            SecretEntryRequestCard(key: key, onSave: { displayName, value in
+                chat.resolveSecretPrompt(blockId: sourceBlockID, displayName: displayName, value: value)
+            }, onCancel: {
+                chat.resolvePrompt(blockId: sourceBlockID, answer: "Cancelled")
+            })
+        } else {
         switch prompt.kind {
         case .permission:
             if let request = PermissionRequest(
@@ -1052,6 +1059,7 @@ struct ChatPage: View {
             }
             .allowsHitTesting(prompt.isActive)
             .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
+        }
         }
     }
 

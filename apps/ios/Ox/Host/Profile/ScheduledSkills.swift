@@ -144,7 +144,7 @@ nonisolated struct ScheduledSkill: Codable, Equatable, Identifiable, Sendable {
 }
 
 nonisolated struct ScheduledSkillsDocument: Codable, Sendable {
-    static let currentVersion = 2
+    static let currentVersion = 1
     var version: Int
     var schedules: [ScheduledSkill]
 
@@ -168,7 +168,6 @@ nonisolated struct ScheduledSkillsDocument: Codable, Sendable {
                message.count > ScheduledSkills.maximumOutcomeCharacters {
                 throw ScheduledSkillError.invalidSchedule
             }
-            try SkillFiles.validate(schedule.skill)
             try schedule.recurrence.validate()
         }
         return self

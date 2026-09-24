@@ -61,7 +61,7 @@ function printUsage(program: string, description: string, groups: Record<string,
     ["--host <ws-url>", "Ox Host WebSocket endpoint"],
     ["--chat <chat-id>", "Chat-bound VM on the Host"],
     ["--profile <path>", "Profile directory for direct administration"],
-    ["--repository <origin>", "Repository path or Git URL"],
+    ["--repository <origin>", "Service repository path or Git URL"],
     ["-v, --version", "Display the installed version and exit"],
     ["-h, --help", "Display this menu and exit"],
   ];
@@ -158,7 +158,7 @@ function validateContext(command: string, subcommand: string | undefined, contex
   const hostCommands = new Set(["host", "discover", "chat", "agent", "logs", "vm"]);
   const chatCommands = new Set(["chat", "agent", "vm"]);
   const liveServiceCommands = new Set(["status", "invoke", "eval", "reload", "sync", "test"]);
-  const repositoryServiceCommands = new Set(["list", "inspect", "actions"]);
+  const repositoryServiceCommands = new Set(["list", "inspect", "actions", "skills"]);
   if (context.chat && !chatCommands.has(command)) throw new Error("--chat applies only to ox chat, ox agent, and ox vm");
   if (context.chat && ((command === "chat" && subcommand === "list") || (command === "agent" && subcommand === "list"))) {
     throw new Error(`--chat does not apply to ox ${command} list`);
@@ -167,8 +167,8 @@ function validateContext(command: string, subcommand: string | undefined, contex
   if (context.host && !hostCommands.has(command) && !(command === "service" && (!subcommand || liveServiceCommands.has(subcommand)))) {
     throw new Error("--host applies only to live Ox Host commands");
   }
-  if (context.repository && command !== "repository" && command !== "skills" && !(command === "service" && (!subcommand || repositoryServiceCommands.has(subcommand)))) {
-    throw new Error("--repository applies only to ox repository, ox skills, and offline ox service commands");
+  if (context.repository && command !== "repository" && !(command === "service" && (!subcommand || repositoryServiceCommands.has(subcommand)))) {
+    throw new Error("--repository applies only to ox repository and offline ox service commands");
   }
 }
 

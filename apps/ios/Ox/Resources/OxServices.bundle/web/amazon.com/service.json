@@ -2277,5 +2277,11 @@
       }
     }
   },
-  "faviconUrl": "https://openox.ai/assets/services/amazon.com/favicon.png"
+  "faviconUrl": "https://openox.ai/assets/services/amazon.com/favicon.png",
+  "skills": [
+    {
+      "name": "product-research",
+      "description": "Research and compare Amazon products without changing the cart. Use when choosing among products, checking an exact listing or seller, comparing current offers, analyzing review patterns, or using Amazon rankings for product discovery."
+    }
+  ]
 }

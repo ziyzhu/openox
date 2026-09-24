@@ -27,10 +27,16 @@ extension OxHostProtocol {
         }
         let credentialID = client.credentialID
         let key = command.key ?? ""
-        if key.isEmpty {
-            Credentials.clear(for: credentialID)
-        } else {
-            Credentials.set(key, for: credentialID)
+        do {
+            if key.isEmpty {
+                try Secret.unbind(.provider, id: credentialID)
+            } else {
+                let definition = try ProviderRegistry.shared.definition(id: clientId)
+                try Secret.saveProviderKey(key, definition: definition)
+            }
+        } catch {
+            reply.failure(error.localizedDescription)
+            return
         }
         Log.agent.info("OxHostRPC.debug.providers.setKey client=\(clientId) credential=\(credentialID) chars=\(key.count)")
         reply.success()

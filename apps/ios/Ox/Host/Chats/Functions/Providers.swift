@@ -41,6 +41,30 @@ extension Chat {
                 return .object(["id": .string(definition!.id), "status": .string(registry.authenticationStatus(id: definition!.id))])
             case "authenticate":
                 return try await authenticateProvider(definition!)
+            case "connect":
+                guard let credential = fields["credential"]?.objectValue,
+                      let kind = credential["kind"]?.stringValue else {
+                    throw RuntimeError.bridge("Provider credential source is required")
+                }
+                if kind == "oauth" {
+                    guard credential["secretKey"] == nil,
+                          registry.client(id: definition!.id)?.subscriptionAccount != nil else {
+                        throw RuntimeError.bridge("Provider does not support managed OAuth")
+                    }
+                    return try await authenticateProvider(definition!)
+                }
+                guard kind == "secret", let key = credential["secretKey"]?.stringValue,
+                      registry.client(id: definition!.id)?.acceptsAPIKey == true,
+                      let entry = try Secret.entry(key: key) else {
+                    throw RuntimeError.bridge("Provider cannot use this Secret entry")
+                }
+                let prompt = "Connect \(definition!.name) to \(entry.displayName) (\(key))?\nDestination: \(definition!.url.absoluteString)\nField supplied: apiKey"
+                let answer = await awaitPrompt(prompt: prompt, options: ["Connect", "Cancel"])
+                guard answer == "Connect" else {
+                    return .object(["id": .string(definition!.id), "status": .string("cancelled")])
+                }
+                try Secret.bindProvider(key: key, definition: definition!)
+                return .object(["id": .string(definition!.id), "status": .string("connected")])
             default: throw RuntimeError.bridge("Unknown provider operation")
             }
         }

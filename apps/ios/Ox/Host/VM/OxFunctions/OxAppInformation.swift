@@ -153,9 +153,9 @@ nonisolated enum OxAppInformation {
                     ], required: ["defaultPolicy", "resolved", "overrides", "truncated"]),
                 ])
             ), (
-                "ox.app.repositories",
+                "ox.app.serviceRepositories",
                 .object([
-                    "description": .string("Read sanitized summaries of Ox's repositories: `await ox.app.repositories({ purpose })`. Returns at most 50 IDs, names, provenance, enabled state, load state, and service counts. Use a remote repository ID with ox.repository.sync or ox.repository.disconnect. Never returns origins, filesystem paths, Git details, or credentials, and cannot change repositories."),
+                    "description": .string("Read sanitized summaries of Ox's service repositories: `await ox.app.serviceRepositories({ purpose })`. Returns at most 50 IDs, names, provenance, enabled state, load state, and service counts. Use a remote repository ID with ox.service.repository.sync or ox.service.repository.disconnect. Never returns origins, filesystem paths, Git details, or credentials, and cannot change repositories."),
                     "inputSchema": object([:]),
                     "outputSchema": object([
                         "status": enumeration(["idle", "syncing", "ready", "failed"]),
@@ -166,8 +166,7 @@ nonisolated enum OxAppInformation {
                             "enabled": boolean,
                             "state": enumeration(["ready", "failed"]),
                             "serviceCount": integer(minimum: 0),
-                            "skillCount": integer(minimum: 0),
-                        ], required: ["id", "name", "provenance", "enabled", "state", "serviceCount", "skillCount"]), maximum: 50),
+                        ], required: ["id", "name", "provenance", "enabled", "state", "serviceCount"]), maximum: 50),
                         "truncated": boolean,
                     ], required: ["status", "repositories", "truncated"]),
                 ])
@@ -275,8 +274,8 @@ nonisolated enum OxAppInformation {
                 let value = jsValueToJSON(options)
                 return env.call { try await $0.appActionPolicies(options: value, purpose: purpose) }
             }
-            let repositories: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appRepositories(purpose: purpose) }
+            let serviceRepositories: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appServiceRepositories(purpose: purpose) }
             }
             let logs: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
                 let value = jsValueToJSON(options)
@@ -296,7 +295,7 @@ nonisolated enum OxAppInformation {
             context.setObject(model as AnyObject, forKeyedSubscript: "__nativeAppModel" as NSString)
             context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
             context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
-            context.setObject(repositories as AnyObject, forKeyedSubscript: "__nativeAppRepositories" as NSString)
+            context.setObject(serviceRepositories as AnyObject, forKeyedSubscript: "__nativeAppServiceRepositories" as NSString)
             context.setObject(logs as AnyObject, forKeyedSubscript: "__nativeAppLogs" as NSString)
             context.setObject(renameChat as AnyObject, forKeyedSubscript: "__nativeAppRenameChat" as NSString)
         },
@@ -312,7 +311,7 @@ nonisolated enum OxAppInformation {
           model: (value) => { const options = __oxOptions(value, 'ox.app.model'); return __nativeAppModel(String(options.purpose)); },
           defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
           actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },
-          repositories: (value) => { const options = __oxOptions(value, 'ox.app.repositories'); return __nativeAppRepositories(String(options.purpose)); },
+          serviceRepositories: (value) => { const options = __oxOptions(value, 'ox.app.serviceRepositories'); return __nativeAppServiceRepositories(String(options.purpose)); },
           logs: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.logs'); return __nativeAppLogs(options, String(purpose)); },
           renameChat: (value) => { const options = __oxOptions(value, 'ox.app.renameChat'); return __nativeAppRenameChat(String(options.title), String(options.purpose)); }
         """

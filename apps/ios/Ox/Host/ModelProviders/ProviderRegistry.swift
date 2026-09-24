@@ -173,7 +173,8 @@ final class ProviderRegistry {
     }
 
     func deauthenticate(_ definition: ProviderDefinition) {
-        Credentials.clear(for: definition.credentialID)
+        do { try Secret.unbind(.provider, id: definition.credentialID) }
+        catch { Log.agent.error("ProviderRegistry.deauthenticate secret unavailable error=\(error.localizedDescription)") }
         if let account = client(id: definition.id)?.subscriptionAccount { account.signOut() }
         else if definition.auth.kind == .oauth { ProviderOAuthAccount(definition).signOut() }
         Log.agent.info("ProviderRegistry.deauthenticate provider=\(definition.id)")

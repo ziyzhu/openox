@@ -16,8 +16,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case skills
         case skill(String)
         case skillFile(String)
-        case skillDirectory(String, String)
-        case skillResource(String, String)
+        case skillReferences(String)
+        case skillReference(String, String)
         case services
         case serviceKind(ServicesMount.Kind)
         case service(ServicesMount.Kind, String)
@@ -40,8 +40,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .skills: "skills"
             case .skill(let name): "skills/\(name)"
             case .skillFile(let name): "skills/\(name)/SKILL.md"
-            case .skillDirectory(let name, let path): "skills/\(name)/\(path)"
-            case .skillResource(let name, let path): "skills/\(name)/\(path)"
+            case .skillReferences(let name): "skills/\(name)/references"
+            case .skillReference(let name, let reference): "skills/\(name)/references/\(reference)"
             case .services: "services"
             case .serviceKind(let kind): "services/\(kind.rawValue)"
             case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
@@ -59,8 +59,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
 
         var isDirectory: Bool {
             switch self {
-            case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder: true
-            case .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
+            case .root, .artifacts, .skills, .skill, .skillReferences, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder: true
+            case .memory, .soul, .artifact, .skillFile, .skillReference, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
             }
         }
 
@@ -69,7 +69,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .memory: .memory
             case .soul: .soul
             case .artifacts, .artifact: .artifacts
-            case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
+            case .skills, .skill, .skillFile, .skillReferences, .skillReference: .skills
             case .services, .serviceKind, .service, .serviceItem: .services
             case .chats, .chat, .chatMetadata, .chatTurns: .chats
             case .files: .files
@@ -153,13 +153,16 @@ nonisolated public struct VirtualFileSystem: Sendable {
             let name = parts[1]
             guard SkillsMount.isPathName(name) else { throw Error.invalidPath(rawPath) }
             return .skillFile(name)
-        case let parts where parts.count >= 3 && parts[0] == "skills":
+        case let parts where parts.count == 3 && parts[0] == "skills" && parts[2] == "references":
             let name = parts[1]
-            let path = parts.dropFirst(2).joined(separator: "/")
-            guard SkillsMount.isPathName(name) else { throw Error.invalidPath(rawPath) }
-            if ["references", "scripts"].contains(path) { return .skillDirectory(name, path) }
-            guard SkillFiles.isResourcePath(path) || SkillFiles.isResourcePath(path + "/file.js") else { throw Error.invalidPath(rawPath) }
-            return .skillResource(name, path)
+            guard name.hasPrefix("system:"), SkillsMount.isPathName(name) else { throw Error.invalidPath(rawPath) }
+            return .skillReferences(name)
+        case let parts where parts.count == 4 && parts[0] == "skills" && parts[2] == "references":
+            let name = parts[1]
+            guard name.hasPrefix("system:"),
+                  SkillsMount.isPathName(name),
+                  BuiltInSkills.isReferenceName(parts[3]) else { throw Error.invalidPath(rawPath) }
+            return .skillReference(name, parts[3])
         case ["services"]: return .services
         case let parts where parts.count == 2 && parts[0] == "services":
             guard let kind = ServicesMount.Kind(rawValue: parts[1]) else { throw Error.invalidPath(rawPath) }

@@ -113,6 +113,9 @@ final class APIServiceAuthorization {
     let auth: APIServiceAuth
     let binding: String
     private let account: String
+    private let secretIdentity: String
+    private let displayName: String
+    private let destination: String
     private static var refreshTasks: [String: (id: UUID, task: Task<APIServiceCredential, Error>)] = [:]
     private var rejectedCredential: APIServiceCredential?
 
@@ -128,14 +131,28 @@ final class APIServiceAuthorization {
         let data = try JSONSerialization.data(withJSONObject: configuration, options: [.sortedKeys])
         binding = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         let identity = Data("\(definition.repositoryID ?? ""):\(definition.domain)".utf8)
-        account = "service:api:" + SHA256.hash(data: identity).map { String(format: "%02x", $0) }.joined()
+        let identityHash = SHA256.hash(data: identity).map { String(format: "%02x", $0) }.joined()
+        secretIdentity = identityHash
+        displayName = definition.name
+        destination = baseURL.absoluteString
+        if case .oauth = auth {
+            account = ManagedOAuthAccount.apiService(identityHash)
+        } else {
+            account = "service:api:\(identityHash)"
+        }
     }
 
     var credential: APIServiceCredential? {
-        guard let value = Credentials.secret(for: account), let data = value.data(using: .utf8),
-              let credential = try? JSONDecoder().decode(APIServiceCredential.self, from: data),
-              credential.version == 1, credential.binding == binding else { return nil }
-        return credential
+        if case .oauth = auth {
+            guard let value = Credentials.secret(for: account), let data = value.data(using: .utf8),
+                  let credential = try? JSONDecoder().decode(APIServiceCredential.self, from: data),
+                  credential.version == 1, credential.binding == binding else { return nil }
+            return credential
+        }
+        guard let resolved = try? Secret.apiServiceCredential(id: secretIdentity, fingerprint: binding, auth: auth) else {
+            return nil
+        }
+        return APIServiceCredential(binding: binding, secret: resolved.0, username: resolved.1)
     }
 
     var isConfigured: Bool {
@@ -168,7 +185,12 @@ final class APIServiceAuthorization {
     }
 
     func save(_ credential: APIServiceCredential) throws {
-        try persist(credential)
+        if case .oauth = auth {
+            try persist(credential)
+        } else {
+            try Secret.saveAPIServiceCredential(credential, id: secretIdentity,
+                                                displayName: displayName, destination: destination, auth: auth)
+        }
         cancelRefresh()
         rejectedCredential = nil
     }
@@ -182,7 +204,12 @@ final class APIServiceAuthorization {
     func clear() {
         rejectedCredential = nil
         cancelRefresh()
-        Credentials.clearSecret(for: account)
+        if case .oauth = auth {
+            Credentials.clearSecret(for: account)
+        } else {
+            do { try Secret.unbind(.apiService, id: secretIdentity) }
+            catch { Log.service.error("APIServiceAuthorization.clear secret unavailable error=\(error.localizedDescription)") }
+        }
     }
 
     func prepare(_ request: URLRequest) async throws -> URLRequest {

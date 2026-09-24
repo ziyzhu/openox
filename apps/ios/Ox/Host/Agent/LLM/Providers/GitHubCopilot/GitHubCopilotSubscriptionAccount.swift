@@ -4,7 +4,7 @@ nonisolated final class GitHubCopilotSubscriptionAccount: SubscriptionAccount, @
     static let shared = GitHubCopilotSubscriptionAccount()
 
     let providerName = "GitHub Copilot"
-    private let store = SubscriptionTokenStore<GitHubCopilotTokens>(key: "oauth:github-copilot")
+    private let store = SubscriptionTokenStore<GitHubCopilotTokens>(key: ManagedOAuthAccount.modelProvider("github-copilot"))
 
     var isSignedIn: Bool { store.current() != nil }
     var planLabel: String? { isSignedIn ? "Subscription" : nil }

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readRepository } from "./repositories.ts";
+import { readSkills } from "../../../packages/service-sdk/src/skills.ts";
 import {
   HOST_PATTERN,
   validateServiceManifest,
@@ -51,11 +51,9 @@ export async function verifyRepository(args: string[], _context: CliContext): Pr
     }
     result.pass(`main → ${mainSha.slice(0, 12)}`);
 
-    const packageMetadata = await readRepository(directory);
-    result.pass(`${packageMetadata.skills.length} repository skills validated`);
     const kinds = ["web", "api", "ios", "mcp"] as const;
     const rootDirectories = await directoryNames(directory);
-    const unexpected = rootDirectories.filter(name => !name.startsWith(".") && name !== "skills" && !kinds.includes(name as typeof kinds[number]));
+    const unexpected = rootDirectories.filter(name => !name.startsWith(".") && !kinds.includes(name as typeof kinds[number]));
     if (unexpected.length) {
       result.fail("grouped service layout", `unexpected root directories: ${unexpected.join(", ")}`);
       summarize(result);
@@ -64,6 +62,11 @@ export async function verifyRepository(args: string[], _context: CliContext): Pr
     const services = (await Promise.all(kinds.map(async kind =>
       (await directoryNames(join(directory, kind))).map(id => ({ kind, id }))
     ))).flat();
+    if (!services.length) {
+      result.fail("services count", "0 services found");
+      summarize(result);
+      return;
+    }
     result.pass("grouped service layout");
     result.pass(`${services.length} services discovered`);
 
@@ -156,6 +159,7 @@ async function checkWebService(servicesDirectory: string, domain: string, result
   if (manifest === undefined) return;
   const sourceManifest = { ...manifest };
   delete sourceManifest.faviconUrl;
+  delete sourceManifest.skills;
   const apiValidation = kind === "api" ? validateServiceManifest(sourceManifest) : null;
   const issues = apiValidation ? apiValidation.ok ? [] : apiValidation.errors : validateManifest(domain, manifest);
   if (kind === "api" && (manifest.kind !== "api" || manifest.domain !== domain)) issues.push("API identity must match its repository directory");
@@ -168,7 +172,29 @@ async function checkWebService(servicesDirectory: string, domain: string, result
     result.fail(`${label}: actions.js`, "empty");
     return;
   }
-  result.pass(`${label} — ${manifest.actions.length} actions, ${actionsSize}B`);
+  const skills = readSkills(directory);
+  if (!skills.ok) {
+    result.fail(`${label}: skills`, skills.error);
+    return;
+  }
+  const declared = manifest.skills ?? [];
+  if (!Array.isArray(declared)) {
+    result.fail(`${label}: manifest.skills`, "must be an array");
+    return;
+  }
+  const normalized = declared.map((skill: any) => ({
+    name: skill?.name,
+    description: skill?.description,
+  })).sort((left: any, right: any) => String(left.name).localeCompare(String(right.name)));
+  const validShape = declared.every((skill: any) =>
+    typeof skill === "object" && skill !== null
+    && Object.keys(skill).every(key => key === "name" || key === "description")
+    && typeof skill.name === "string" && typeof skill.description === "string");
+  if (!validShape || JSON.stringify(normalized) !== JSON.stringify(skills.skills)) {
+    result.fail(`${label}: skills`, "manifest catalog does not match skills/*/SKILL.md");
+    return;
+  }
+  result.pass(`${label} — ${manifest.actions.length} actions, ${skills.skills.length} skills, ${actionsSize}B`);
 }
 
 async function checkCatalogService(

@@ -1,10 +1,11 @@
 import SwiftUI
 
-nonisolated enum ProviderCredentialEntry {
+@MainActor enum ProviderCredentialEntry {
     static func save(_ value: String, for client: any ProviderClient) throws {
         let credential = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !credential.isEmpty else { throw RuntimeError.bridge("A credential is required") }
-        try Credentials.setSecretChecked(credential, for: "api:\(client.credentialID)")
+        let definition = try ProviderRegistry.shared.definition(id: client.id)
+        try Secret.saveProviderKey(credential, definition: definition)
     }
 }
 

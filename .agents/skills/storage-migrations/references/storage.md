@@ -161,7 +161,7 @@ Profiles can use three storage locations:
   another device.
 - External profiles remain in a user-selected Files folder outside Ox's local and
   iCloud Documents directories. Ox holds the folder's security scope while it
-  is registered and reads and writes the vault in place. Closing an external
+  is registered and reads and writes the profile in place. Closing an external
   profile removes its bookmark without deleting the folder.
 
 Saved profiles deduplicate by profile UUID. If the active profile is unavailable,
@@ -284,10 +284,12 @@ The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 mounts:
 
 ```text
-skills/<name>/
-├── SKILL.md                                    resolved package instructions
-├── references/<path>                           optional nested UTF-8 references
-└── scripts/<path>.js                           optional Ox VM helpers
+skills/
+├── <skill-name>/SKILL.md                        read-write, active Profile
+├── system:<skill-name>/SKILL.md                 read-only, app-owned
+├── system:<skill-name>/references/<name>.md     read-only, app-owned
+├── system:<skill-name>/references/<name>.js     read-only, app-owned authoring source
+└── service:<domain>:<skill-name>/SKILL.md       read-only, attached service
 
 services/
 └── <kind>/<id>/
@@ -300,15 +302,13 @@ chats/
     └── turns.jsonl                              read-only, stored transcript
 ```
 
-The mount resolves permissions from the selected source, never frontmatter. System,
-enabled repository, and active Profile packages share one catalog before service
-attachment. Duplicate names require a Profile source selection; no source silently
-overrides another. System names are reserved. Local packages are writable only at
-its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
+The mount resolves permissions from each entry's source. A prefix is part of
+the virtual address, not an authority claim supplied by file contents. Only
+currently attached service skills are visible. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
 `services/<kind>/<id>/` path. Repository host paths, markers,
-`chats/<chat-uuid>/context.json`, and unrelated vault contents are not
+`chats/<chat-uuid>/context.json`, and unrelated secret contents are not
 addressable. The chat mount returns the canonical files already persisted by
 `ProfileRepository`; it does not introduce a second transcript representation.
 System-skill JavaScript references are readable as source by the agent, but are not installed,
@@ -357,41 +357,22 @@ only `SOUL.md` reloads after relevant external changes. Each chat snapshots the
 loaded memory into its system prompt so later memory changes do not invalidate the
 chat's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
 
-Each skill package contains `SKILL.md` and optional nested UTF-8 files under
-`references/` and JavaScript helpers under `scripts/`. Names use lowercase kebab-case;
-frontmatter includes the matching name, description, and optional comma-separated
-service dependencies. Packages are limited to 64 files and 512 KiB. Symlinks and
-traversal are rejected. Profile packages live at `skills/<name>/`; repository
-packages live at the repository root `skills/<name>/` and are declared in version 3
-`repository.json`. Services no longer declare or contain skills.
+Each user skill is one `<name>` directory containing `SKILL.md`, where `<name>`
+is lowercase kebab-case. The `system:` and `service:` namespaces are reserved
+for virtual read-only entries.
+Frontmatter stores its matching name, description, and optional service list;
+the body stores instructions. Creation, update, and deletion are scoped to the
+active Profile and refresh the shared skill catalog. Saving a skill does not select
+or execute it.
 
-`skill-selections.json` in each Profile is version 1, with `sources` mapping skill
-names to stable owner IDs (`user` or `repository:<id>`). Absent selection resolves a
-unique name automatically. A missing selected source remains unresolved. Source
-labels and writable state are derived from the current catalog. Selection metadata
-syncs and exports with the Profile. Packages read during a run are frozen together
-with all references and helpers for that run.
+Skill sharing creates a transient `.skill` ZIP archive containing the skill
+directory and `SKILL.md`. Incoming archives remain external until the user
+confirms import; Ox then validates and writes the skill through the same
+active Profile repository path. The archive itself is not retained.
 
-Customizing makes an independent complete Profile copy. Sharing into Local copies
-the complete package for Git review. `.skill` exports contain every supported
-resource and strip source ownership; imports create a Profile package after user
-confirmation. The archive itself is transient.
-
-The `2026-09-24-repository-skills` Profile milestone normalizes old virtual paths
-and API names in authored instructions and renames reserved user names to
-`user-<name>`, failing on unequal collisions. Transcript bytes remain unchanged.
-Repository version 2 conversion preserves original manifests and packages in a
-sibling `.<directory>-repository-v2-backup` journal. The journal is retained for
-recovery. A clean Local upgrade adds a commit; a dirty upgrade leaves its index
-and HEAD intact. A clean historical checkout is normalized in purgeable
-`Caches/RepositoryViews/<hash>/` without altering the original checkout. Invalid
-legacy drafts defer migration with originals retained. Future versions fail closed.
-The existing `service-repositories` disk paths, configuration filename, and PAT
-Keychain account remain stable despite the product/API rename to Repository.
-
-`Application Support/scheduled-skills.json` is a version 2 device-owned document
+`Application Support/scheduled-skills.json` is a versioned device-owned document
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
-and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly
+and stores a frozen user-skill snapshot, optional argument, one-time/daily/weekly
 recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
 with its result chat UUID. The file is validated by `StorageMigrator` before the
 scheduler reads it; unknown versions and malformed or duplicate records fail closed.
@@ -450,21 +431,19 @@ Their paths and encoding are unchanged. Local discovery validates repository
 metadata separately from draft contents and retains source access for repairing
 invalid drafts; incomplete services do not make the entire Local repository
 unavailable. Read-only repositories still require valid service file structure.
-Repositories declare `version` 3 in `repository.json`; version 2 is normalized
-by the repository-skill migration before loading. Version 1 is retired for external
-repositories. `service.json` carries no version. `actions.js`
+Repositories declare `version` 2 in `repository.json`; version 1 is retired and
+rejected when the Host connects. `service.json` carries no version. `actions.js`
 calls `window.ox.install(installer)`, and the installer receives only `action` for
 web and `action` plus `request` for API. On preparation, `StorageMigrator`
 rewrites a Local `repository.json` at version 1 to version 2 and commits it when
 that file and the index are clean; otherwise it leaves the change uncommitted and
-logs `pending=true`. The app does not rewrite Action implementation source: sources that pass a
+logs `pending=true`. The app does not rewrite service source: sources that pass a
 version to `install` or use the retired `retryFetch`, `log`, `lib`, or fetch
 capture fail validation with an actionable error and must be repaired by hand.
 Builds older than iOS 1.0.7 reject version 2 Local repositories and
 single-argument installers instead of interpreting them.
 `ox.service.validate` checks a complete Local draft, including file structure,
-manifest, action registration, and service size limits. Root skill packages are
-validated separately with the shared package loader. The same
+manifest, action registration, declared skills, and service size limits. The same
 validator runs before Save and before loading Local source for a caller. Failed
 validation leaves the draft untouched and cannot replace a chat's running
 attachment. `ox.service.attach` validates and replaces that chat's attachment when
@@ -519,21 +498,37 @@ legacy `llm.customProviders`, and regional selection transforms belong solely
 to `StorageMigrator`. Unknown catalog formats fail closed without overwriting
 their bytes.
 
-Provider API keys, repository proposal authorization, and subscription token bundles are generic-password Keychain
-items under the bundle-derived `<application bundle identifier>.llm` service. They use After First Unlock accessibility
-so user-invoked background Siri and CarPlay requests can run after the device's
-first unlock following a restart. Standard provider credentials are scoped to
-the provider ID and a hash of its endpoint and authentication configuration.
-Changing the endpoint or auth requires new authentication. Registered custom
-authentication adapters retain their existing credential identities and restrict
-credentials to their registered destination. Separate account regions use
-separate provider IDs. Deauthenticating removes the corresponding Keychain item.
-The compatibility gate copies legacy API keys to their destination-scoped items
-before publishing the new catalog; it preserves the source during migration.
+Reusable credentials use generic-password Keychain accounts `secret:<key>` under
+the bundle-derived `<application bundle identifier>.llm` service. Each item is a
+validated flat UTF-8 JSON object of string fields (16 KiB maximum). New items use After First Unlock
+This Device Only accessibility. `secret.index` in app UserDefaults is a version-1
+JSON `SecretIndex` with entries (key, display name, origin, use policy) and
+bindings (consumer kind and ID, key, destination, configuration fingerprint,
+required fields). Values are absent from the index. A missing Keychain item
+keeps its metadata but cannot authenticate. Unknown index versions fail closed.
+`StorageMigrator` converts predecessor `vault.index` metadata and `vault:<key>`
+Keychain accounts into `secret.index` and `secret:<key>` before credentials are
+read. It renames each binding's `vaultKey` field to `secretKey`, verifies copied
+values, and removes old records only after the new records are durable. The
+compatibility gate copies and verifies old `api:<credential ID>` provider
+keys before deleting their source items. Standard provider credential IDs include
+the provider ID and a hash of endpoint and auth; registered custom adapters
+retain their credential identity and check the current configuration at use.
+Provider deauthentication removes its binding and deletes an unshared entry
+generated for that provider. Named entries remain until removed in Secrets.
 
-Repository proposals store a validated classic GitHub personal access token as a
-raw secret under `pat:service-repository:github`. The account login is fetched
-from GitHub, not persisted. Invalid or revoked saved tokens and tokens missing
+Flow-managed OAuth bundles remain separate Keychain items with After First Unlock
+accessibility. Their account families are `oauth:model-provider:<credential ID>`,
+`oauth:mcp-service:<endpoint hash>`, and `oauth:api-service:<identity hash>`.
+`StorageMigrator` copies, verifies, and removes predecessor `oauth:<credential ID>`,
+`oauth:mcp:<endpoint hash>`, and OAuth `service:api:<identity hash>` items. OAuth
+envelopes are never exposed as Secret entries.
+
+Repository proposals store a validated classic GitHub personal access token in
+`secret:ox.repository.github` as `{"token":"…"}` with a publication-only binding
+to OpenOx's GitHub API destination. `StorageMigrator` moves the predecessor
+`pat:service-repository:github` item after verifying the new entry. The account
+login is fetched from GitHub, not persisted. Invalid or revoked saved tokens and tokens missing
 public-repository scope are removed before prompting for replacement. Transient
 network failures preserve the token. Tokens never enter chat transcripts or
 model inputs. Users can revoke the token in GitHub Settings.
@@ -567,7 +562,9 @@ secrets.
 | iCloud Profile content | iCloud Documents | iCloud Drive | Delete or move the Profile |
 | Temporary chat | Memory | None | Leave chat or terminate process |
 | Active provider catalog | UserDefaults | Device backup policy | Delete provider or app |
-| Provider credentials | Keychain | System policy | Sign out or clear credential |
+| Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
+| Secret metadata and bindings | UserDefaults | Device backup policy | Sign out or delete entry |
+| Managed provider OAuth | Keychain | System policy | Sign out |
 | Service website state | Domain website store | Local persistent state | Sign out service family |
 | Remote MCP endpoints and transports | UserDefaults | Device backup policy | Disconnect the MCP server |
 | Scheduled skill definitions | Application Support | Device backup policy | Delete the schedule or app |
@@ -586,14 +583,14 @@ in repository.json. Existing web, iOS, and MCP representations are unchanged.
 Older readers reject the unsupported API package identity rather than interpreting
 it as a website service. No legacy data transform is needed for this additive kind.
 
-The Host stores version-1 API credential envelopes through Credentials under the
-bundle-derived Keychain service. The account is `service:api:<sha256>` derived from
-the repository ID and service ID. Envelopes contain a binding hash, secret, and
-optional Basic username or OAuth refresh token, expiry, and granted scopes.
-The binding hashes canonical auth configuration, API base URL, repository ID,
-and service ID; a mismatch or unknown envelope version is treated as requiring
-setup. Updating public service configuration never transfers credentials to the
-new destination. Sign out deletes the envelope; replacing credentials overwrites
-it. These credentials are device-owned and never stored in Profile files or
-repository source. Accessibility and backup behavior follow Credentials' existing
-Keychain policy. Auth status is observed at runtime rather than persisted.
+The API-service identity hash derives from repository ID and service domain.
+Static API keys, bearer tokens, and Basic username/password pairs are JSON Secret
+entries with a binding to that identity, canonical auth configuration, and API
+base URL. `StorageMigrator` converts matching version-1 predecessor envelopes
+from `service:api:<identity hash>` and removes each source after verifying its
+new credential and binding. OAuth version-1 envelopes retain their format under
+`oauth:api-service:<identity hash>`. The binding hash covers auth configuration,
+API base URL, repository ID, and service domain; a mismatch requires setup.
+Sign out unbinds static credentials or removes the managed OAuth envelope.
+Replacing a static credential writes a dedicated Secret entry for that service.
+Auth status is observed at runtime rather than persisted.

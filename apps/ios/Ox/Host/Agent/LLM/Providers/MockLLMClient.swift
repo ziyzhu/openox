@@ -312,7 +312,7 @@ extension Scenario {
             Entry("69", "solve — human-verification handoff", .botControl),
             Entry("70", "helper schemas — callable help and service inspection", .help),
             Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
-            Entry("72", "prompt context — unified skills and current service and artifact state", .skillCatalog),
+            Entry("72", "prompt context — stable system skills and transient service and artifact state", .skillCatalog),
             Entry("73", "memory — read durable context on demand", .memoryOnDemand),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "shoveler — display non-interactive cards", .shoveler),
@@ -1130,8 +1130,8 @@ extension Scenario {
             return [
                 .say("Loading the skill-authoring instructions.\n"),
                 execute("""
-                const manager = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Read skill manager" });
-                const workflow = await ox.fs.read({ path: "skills/manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
+                const manager = await ox.fs.read({ path: "skills/system:manage-skills/SKILL.md", purpose: "Read skill manager" });
+                const workflow = await ox.fs.read({ path: "skills/system:manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
                 console.log(manager.text + "\\n" + workflow.text);
                 """),
             ]
@@ -1185,7 +1185,7 @@ extension Scenario {
     static let localServiceWorkflow = Scenario(name: "local-service") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service management workflow" });
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service management workflow" });
             const checks = [];
             const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
             const rejected = async (call, fragment) => {
@@ -1207,7 +1207,7 @@ extension Scenario {
             await rejected(() => ox.service.validate({ domain, purpose: "Reject invalid JavaScript" }), "actions.js syntax");
             await rejected(() => ox.service.attach({ domain, purpose: "Reject invalid attachment" }), "actions.js syntax");
             await rejected(
-              () => ox.repository.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }),
+              () => ox.service.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }),
               "Validation failed for services/web/example.test: actions.js syntax"
             );
             await ox.fs.write({ path: path + "actions.js", content: skeleton, purpose: "Restore generated installer" });
@@ -1237,13 +1237,13 @@ extension Scenario {
             check((await ox.service.attach({ domain, purpose: "Reload second valid draft" })).reloaded, "Explicit reload");
             const current = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect reloaded attachment" });
             check(current.actions.revision.description === "Draft two", "Reloaded snapshot");
-            await ox.repository.git.commit({ message: "Save validation fixture", purpose: "Save valid test service" });
-            check(!(await ox.repository.git.status({ purpose: "Check successful Save" })).dirty, "Valid Save");
+            await ox.service.git.commit({ message: "Save validation fixture", purpose: "Save valid test service" });
+            check(!(await ox.service.git.status({ purpose: "Check successful Save" })).dirty, "Valid Save");
             await ox.fs.write({ path: "artifacts/local-validation-recovery.json", content: JSON.stringify({ manifest: nextManifest, actions: nextActions }), purpose: "Preserve restart test fixture" });
             await ox.fs.delete({ path: path + "service.json", purpose: "Stage missing manifest" });
             await ox.fs.write({ path: path + "actions.js", content: ")", purpose: "Stage interrupted service edit" });
             await rejected(() => ox.service.validate({ domain, purpose: "Reject incomplete restart draft" }), "");
-            check((await ox.repository.git.status({ purpose: "Check recoverable draft" })).dirty, "Incomplete draft remains editable");
+            check((await ox.service.git.status({ purpose: "Check recoverable draft" })).dirty, "Incomplete draft remains editable");
             console.log(JSON.stringify({ checks, readyForRestart: true }));
             """#)]
         }
@@ -1311,11 +1311,11 @@ extension Scenario {
     static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service recovery workflow" });
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service recovery workflow" });
             const check = (value, name) => { if (!value) throw new Error(name); };
             const domain = "example.test";
             const path = "services/web/" + domain + "/";
-            const before = await ox.repository.git.status({ purpose: "Inspect interrupted draft" });
+            const before = await ox.service.git.status({ purpose: "Inspect interrupted draft" });
             check(before.dirty, "Draft must survive restart");
             check((await ox.fs.read({ path: path + "actions.js", purpose: "Read interrupted installer" })).text === ")", "Invalid source must survive restart");
             let rejected = false;
@@ -1329,7 +1329,7 @@ extension Scenario {
             await ox.service.attach({ domain, purpose: "Attach recovered service" });
             const inspected = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect recovered attachment" });
             check(inspected.actions.revision.description === "Draft two", "Recovered attachment must match saved source");
-            const clean = await ox.repository.git.status({ purpose: "Verify preserved saved version" });
+            const clean = await ox.service.git.status({ purpose: "Verify preserved saved version" });
             check(!clean.dirty && before.commitHash === clean.commitHash, "Recovery must preserve history and restore exact source");
             console.log(JSON.stringify({ recovered: true, clean: !clean.dirty, commitHash: clean.commitHash }));
             """#)]
@@ -1345,7 +1345,7 @@ extension Scenario {
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service copy workflow" });
+            await ox.fs.read({ path: "skills/system:manage-services/SKILL.md", purpose: "Load service copy workflow" });
             const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy validation fixture" });
             const path = "services/web/archive.ph/service.json";
             const before = (await ox.fs.read({ path, purpose: "Read copied manifest" })).text;
@@ -1376,29 +1376,29 @@ extension Scenario {
             return [execute("""
             await ox.service.create({ kind: "web", domain: "history.test", purpose: "Create history service" });
             await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "first version", purpose: "Write history note" });
-            const first = await ox.repository.git.commit({ message: "Add history test service", purpose: "Commit history service" });
+            const first = await ox.service.git.commit({ message: "Add history test service", purpose: "Commit history service" });
             await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "second version", purpose: "Revise history note" });
-            const second = await ox.repository.git.commit({ message: "Revise history test note", purpose: "Commit revised note" });
+            const second = await ox.service.git.commit({ message: "Revise history test note", purpose: "Commit revised note" });
             await ox.fs.delete({ path: "services/web/history.test/NOTES.md", purpose: "Delete history note" });
-            await ox.repository.git.restore({ path: "services/web/history.test/NOTES.md", purpose: "Restore history note" });
+            await ox.service.git.restore({ path: "services/web/history.test/NOTES.md", purpose: "Restore history note" });
             const pathRestored = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify targeted restore" });
-            const log = await ox.repository.git.log({ limit: 3, purpose: "Read Local history" });
-            const shown = await ox.repository.git.show({ commitHash: first.commitHash, path: "web/history.test/NOTES.md", purpose: "Read first note" });
-            const historical = await ox.repository.git.checkout({ commitHash: first.commitHash, purpose: "Visit first version" });
+            const log = await ox.service.git.log({ limit: 3, purpose: "Read Local history" });
+            const shown = await ox.service.git.show({ commitHash: first.commitHash, path: "web/history.test/NOTES.md", purpose: "Read first note" });
+            const historical = await ox.service.git.checkout({ commitHash: first.commitHash, purpose: "Visit first version" });
             let readOnly;
             try {
               await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "forbidden", purpose: "Test historical write" });
             } catch (error) {
               readOnly = String(error);
             }
-            await ox.repository.git.checkout({ commitHash: "latest", purpose: "Return to latest" });
+            await ox.service.git.checkout({ commitHash: "latest", purpose: "Return to latest" });
             await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "draft", purpose: "Write disposable draft" });
-            const dirty = await ox.repository.git.status({ purpose: "Inspect disposable draft" });
-            await ox.repository.git.restore({ purpose: "Discard disposable draft" });
+            const dirty = await ox.service.git.status({ purpose: "Inspect disposable draft" });
+            await ox.service.git.restore({ purpose: "Discard disposable draft" });
             const restored = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify restored note" });
-            await ox.repository.git.revert({ commitHash: second.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
+            await ox.service.git.revert({ commitHash: second.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
             const reverted = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify reverted note" });
-            const clean = await ox.repository.git.status({ purpose: "Verify clean history" });
+            const clean = await ox.service.git.status({ purpose: "Verify clean history" });
             console.log(JSON.stringify({
               first: first.commitHash,
               second: second.commitHash,
@@ -1434,14 +1434,14 @@ extension Scenario {
     static let localHistoryRecovery = Scenario(name: "local-history-recovery") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const dirty = await ox.repository.git.status({ purpose: "Inspect pending history draft" });
-            await ox.repository.git.restore({ purpose: "Discard pending history draft" });
-            const log = await ox.repository.git.log({ limit: 2, purpose: "Read pending history" });
+            const dirty = await ox.service.git.status({ purpose: "Inspect pending history draft" });
+            await ox.service.git.restore({ purpose: "Discard pending history draft" });
+            const log = await ox.service.git.log({ limit: 2, purpose: "Read pending history" });
             const target = log.commits[0];
             const before = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Read latest history note" });
-            const inverse = await ox.repository.git.revert({ commitHash: target.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
+            const inverse = await ox.service.git.revert({ commitHash: target.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
             const after = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Read reverted history note" });
-            const clean = await ox.repository.git.status({ purpose: "Verify clean Local history" });
+            const clean = await ox.service.git.status({ purpose: "Verify clean Local history" });
             console.log(JSON.stringify({ dirty: dirty.dirty, before: before.text, after: after.text, inverse: inverse.commitHash, clean: clean.dirty }));
             """)]
         }
@@ -1461,9 +1461,9 @@ extension Scenario {
             return [execute("""
             await ox.service.create({ kind: "web", domain: "diff.test", purpose: "Create diff service" });
             await ox.fs.write({ path: "services/web/diff.test/NOTES.md", content: "diff fixture", purpose: "Write diff fixture" });
-            const pending = await ox.repository.git.diff({ path: "web/diff.test/NOTES.md", purpose: "Review pending diff" });
-            const commit = await ox.repository.git.commit({ message: "Add diff test service", purpose: "Commit diff service" });
-            const committed = await ox.repository.git.diff({ commitHash: commit.commitHash, path: "web/diff.test/NOTES.md", purpose: "Review committed diff" });
+            const pending = await ox.service.git.diff({ path: "web/diff.test/NOTES.md", purpose: "Review pending diff" });
+            const commit = await ox.service.git.commit({ message: "Add diff test service", purpose: "Commit diff service" });
+            const committed = await ox.service.git.diff({ commitHash: commit.commitHash, path: "web/diff.test/NOTES.md", purpose: "Review committed diff" });
             console.log(JSON.stringify({ pending, commit, committed }));
             """)]
         }
@@ -1486,10 +1486,10 @@ extension Scenario {
         guard let output = ctx.resultText("execute") else {
             return [execute("""
             await ox.service.create({ kind: "web", domain: "delete.test", purpose: "Create delete fixture" });
-            await ox.repository.git.commit({ message: "Add delete test service", purpose: "Commit delete fixture" });
+            await ox.service.git.commit({ message: "Add delete test service", purpose: "Commit delete fixture" });
             const deleted = await ox.service.delete({ domain: "delete.test", purpose: "Delete Local fixture" });
-            const dirty = await ox.repository.git.status({ purpose: "Inspect service deletion" });
-            await ox.repository.git.restore({ purpose: "Restore deleted service" });
+            const dirty = await ox.service.git.status({ purpose: "Inspect service deletion" });
+            await ox.service.git.restore({ purpose: "Restore deleted service" });
             const restored = await ox.fs.read({ path: "services/web/delete.test/service.json", purpose: "Verify restored service" });
             console.log(JSON.stringify({ deleted, dirty: dirty.dirty, restored: restored.text.includes('"domain" : "delete.test"') || restored.text.includes('"domain": "delete.test"') }));
             """)]
@@ -1505,22 +1505,31 @@ extension Scenario {
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
         let userSkill = "- `skills/grocery-planner/SKILL.md` — Plan a weekly grocery list from meals, dietary needs, and pantry items."
+        let manageArtifacts = "- `skills/system:manage-artifacts/SKILL.md` — Create, inspect, revise, import, rename, present, attach, or delete Profile artifacts, with specialized guidance for Markdown notes and interactive HTML canvases."
+        let manageServices = "- `skills/system:manage-services/SKILL.md` — Manage Ox service definitions and remote MCP connections; build Local web services, including website requests with no suitable service. Not for ordinary use of existing services."
+        let manageSkills = "- `skills/system:manage-skills/SKILL.md` — Create, inspect, revise, copy, or delete Profile-owned and Local service-owned skills while respecting read-only system and external service skills."
+        let serviceSkill = "- `skills/service:127.0.0.1:sanity/SKILL.md` — Deterministic fixture workflow for validating service skill loading."
         let expectsService = ctx.latestUserSaid("attached")
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = ["manage-artifacts", "manage-services", "manage-skills"].allSatisfy {
-            ctx.transientContext.contains("skills/\($0)/SKILL.md") && !ctx.systemPrompt.contains("- `skills/\($0)/SKILL.md` —")
-        }
+        let hasStableSystemSkills = ctx.systemPrompt.contains(manageArtifacts)
+            && ctx.systemPrompt.contains(manageServices)
+            && ctx.systemPrompt.contains(manageSkills)
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
             .first
             .map { $0.hasPrefix("[") && $0.hasSuffix(" \(TimeZone.autoupdatingCurrent.identifier)]") }
             == true
         let hasTurnStateAfterTimestamp = ctx.serializedUserText.contains("\n\n<turn-state>\n")
-        let hasServiceSkill = ctx.transientContext.contains("## Attached Services")
+        let hasServiceSkill = ctx.transientContext.contains("Attached-service skills:")
+            && ctx.transientContext.contains("skills/service:")
+            && ctx.transientContext.contains("/SKILL.md` —")
+        let hasFixtureServiceSkill = !ctx.transientContext.contains("127.0.0.1")
+            || ctx.transientContext.contains(serviceSkill)
         let retainedServiceState = ctx.priorUserContext(containing: "attached")
-            .map { $0.contains("## Attached Services") } == true
+            .map { $0.contains("Attached-service skills:") && $0.contains("skills/service:") }
+            == true
         let artifactPaths = ctx.messages.flatMap { message -> [String] in
             let content = switch message {
             case .user(let value): value.content
@@ -1536,9 +1545,9 @@ extension Scenario {
             || ctx.transientContext.contains("## Chat Artifacts")
                 && artifactPaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
         let languageDirective = AppLocale.resolvedResponseDirective
-        guard ctx.transientContext.contains(userSkill) == expectsUserSkill,
+        guard ctx.systemPrompt.contains(userSkill) == expectsUserSkill,
               !ctx.systemPrompt.contains("## Language"),
-              !ctx.systemPrompt.contains(userSkill),
+              !ctx.transientContext.contains(userSkill),
               ctx.transientContext.contains("## Language") == !languageDirective.isEmpty,
               (languageDirective.isEmpty || ctx.transientContext.contains(languageDirective)),
               !ctx.transientContext.contains("User slash commands:"),
@@ -1546,8 +1555,9 @@ extension Scenario {
               !ctx.transientContext.contains("127.0.0.1:delayedEcho"),
               hasStableSystemSkills,
               hasTimestamp,
-              hasTurnStateAfterTimestamp,
+              hasTurnStateAfterTimestamp == (expectsService || !artifactPaths.isEmpty || !languageDirective.isEmpty),
               !verifiesStablePrefix || retainedServiceState,
+              hasFixtureServiceSkill,
               hasArtifactState,
               hasServiceSkill == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
@@ -1576,10 +1586,10 @@ extension Scenario {
     static let systemSkillReferences = Scenario(name: "system-skill-references") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute("""
-            const manager = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Read skill manager" });
-            const references = await ox.fs.list({ path: "skills/manage-skills/references", purpose: "List skill references" });
-            const user = await ox.fs.read({ path: "skills/manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
-            const matched = await ox.fs.glob({ path: "skills/manage-skills", pattern: "references/*.md", purpose: "Find skill references" });
+            const manager = await ox.fs.read({ path: "skills/system:manage-skills/SKILL.md", purpose: "Read skill manager" });
+            const references = await ox.fs.list({ path: "skills/system:manage-skills/references", purpose: "List skill references" });
+            const user = await ox.fs.read({ path: "skills/system:manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
+            const matched = await ox.fs.glob({ path: "skills/system:manage-skills", pattern: "references/*.md", purpose: "Find skill references" });
             console.log(JSON.stringify({ manager: manager.text.includes("# Manage Skills"), references: references.items.map(item => item.path), user: user.text.includes("# User Skill"), matched: matched.paths }));
             """)]
         }
@@ -1587,12 +1597,12 @@ extension Scenario {
               result["manager"]?.boolValue == true,
               result["user"]?.boolValue == true,
               result["references"]?.arrayValue?.compactMap(\.stringValue) == [
-                "skills/manage-skills/references/repository-skill.md",
-                "skills/manage-skills/references/user-skill.md",
+                "skills/system:manage-skills/references/service-skill.md",
+                "skills/system:manage-skills/references/user-skill.md",
               ],
               result["matched"]?.arrayValue?.compactMap(\.stringValue) == [
-                "skills/manage-skills/references/repository-skill.md",
-                "skills/manage-skills/references/user-skill.md",
+                "skills/system:manage-skills/references/service-skill.md",
+                "skills/system:manage-skills/references/user-skill.md",
               ] else {
             return [.say("System skill references were not mounted correctly."), .stop(.stop)]
         }
@@ -1693,7 +1703,7 @@ extension Scenario {
             const model = await ox.app.model({ purpose: "Read model" });
             const defaultModel = await ox.app.defaultModel({ purpose: "Read default model" });
             const actionPolicies = await ox.app.actionPolicies({ action: "ox.app.info", limit: 2, purpose: "Read Action policy" });
-            const repositories = await ox.app.repositories({ purpose: "Read repositories" });
+            const serviceRepositories = await ox.app.serviceRepositories({ purpose: "Read service repositories" });
             const assert = (ok, message) => { if (!ok) throw new Error(message); };
             assert(typeof ox.app.inspect === "undefined", "Aggregate inspection must not be callable");
             assert(Object.keys(info).sort().join(",") === "build,name,region,version" && info.name === "Ox" && info.version.length > 0 && info.build.length > 0, "App info must contain identity only");
@@ -1709,15 +1719,15 @@ extension Scenario {
             assert(voiceOptions.options.length <= 100 && voiceOptions.options.every(item => ["id", "name", "language", "quality", "selected", "effective"].every(key => key in item)), "Invalid voice options");
             assert(typeof defaultModel.configured === "boolean" && ["global", "china"].includes(defaultModel.region) && typeof defaultModel.provider.name === "string" && typeof defaultModel.model.name === "string", "Invalid default model");
             assert((actionPolicies.defaultPolicy === null || ["ask", "allow", "block"].includes(actionPolicies.defaultPolicy)) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default", "actionDefault"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
-            assert(["idle", "syncing", "ready", "failed"].includes(repositories.status) && repositories.repositories.length <= 50 && repositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,id,name,provenance,serviceCount,skillCount,state"), "Invalid repositories");
-            assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateRepository === "undefined", "Human-controlled settings must not expose mutations");
-            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["voiceOptions", { limit: 1 }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["repositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
+            assert(["idle", "syncing", "ready", "failed"].includes(serviceRepositories.status) && serviceRepositories.repositories.length <= 50 && serviceRepositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,name,provenance,serviceCount,state"), "Invalid service repositories");
+            assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateServiceRepository === "undefined", "Human-controlled settings must not expose mutations");
+            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["voiceOptions", { limit: 1 }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["serviceRepositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
               let rejected = false;
               try { await ox.app[name]({ ...options, purpose: "Reject invalid input" }); }
               catch { rejected = true; }
               assert(rejected, name + " must reject invalid input");
             }
-            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, voiceOptionCount: voiceOptions.options.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: repositories.repositories.length }));
+            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, voiceOptionCount: voiceOptions.options.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: serviceRepositories.repositories.length }));
             """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
@@ -1739,7 +1749,7 @@ extension Scenario {
               !output.contains("filesystem") else {
             return [.say("App information was incomplete or exposed private configuration."), .stop(.stop)]
         }
-        return [.say("Ox read its identity, Profiles, notification permission, language, theme, voices, current and default models, Action policies, and repositories without changing settings. Aggregate inspection is removed. Bounds, filtering, and credential redaction passed."), .stop(.stop)]
+        return [.say("Ox read its identity, Profiles, notification permission, language, theme, voices, current and default models, Action policies, and service repositories without changing settings. Aggregate inspection is removed. Bounds, filtering, and credential redaction passed."), .stop(.stop)]
     }
 
     private static func checkAppActionPolicyQuery() throws {
@@ -1933,7 +1943,7 @@ extension Scenario {
             if let failure = contextBudgetRegressionFailure() { return [.say(failure), .stop(.stop)] }
             return [
                 execute("""
-                await ox.fs.read({ path: "skills/manage-artifacts/SKILL.md", purpose: "Activate skill before compaction" });
+                await ox.fs.read({ path: "skills/system:manage-artifacts/SKILL.md", purpose: "Activate skill before compaction" });
                 console.log("EARLY_STEP_" + "A".repeat(50000));
                 """),
             ]
@@ -1951,7 +1961,7 @@ extension Scenario {
                 case .toolResult(let result):
                     guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
                     if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
-                    skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/manage-artifacts/SKILL.md" }
+                    skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/system:manage-artifacts/SKILL.md" }
                 }
             }
             guard pending.isEmpty, skillRestored, ctx.resultText("execute")?.contains("RECENT_STEP_") == true else {

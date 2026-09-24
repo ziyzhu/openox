@@ -64,7 +64,7 @@ try {
   const repositoryRoot = await run(["bun", checkPath], installDirectory);
   const raw = JSON.parse(await readFile(join(repositoryRoot, "repository.json"), "utf8"));
   const repository = validateRepositoryPackage(raw);
-  if ("error" in repository || repository.services.length === 0) throw new Error("installed repository is invalid or empty");
+  if ("error" in repository || repository.services.length === 0) throw new Error("installed service repository is invalid or empty");
   console.log(`PASS ${report.name}@${report.version} services=${repository.services.length} ${report.size} bytes packed, ${report.unpackedSize} bytes unpacked`);
   if (outputArgument >= 0) console.log(`Tarball ${tarball}`);
 } finally {

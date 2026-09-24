@@ -7,6 +7,7 @@ export const SUBS: Record<string, SubCommand> = {
   "list": { desc: "List web services in the selected repository (--json)", fn: listServicesCmd },
   "inspect": { desc: "Print a service's full manifest as JSON", fn: inspectService },
   "actions": { desc: "List actions declared by a service (--json)", fn: listActions },
+  "skills": { desc: "List skills declared by a service (--json)", fn: listSkills },
   "test": { desc: "Replay committed service cases through the selected Host", fn: testService },
   "status": { desc: "Show services and their live page state on the selected Host", fn: status },
   "invoke": { desc: "Invoke a service action through the selected Host", fn: invoke },
@@ -228,6 +229,25 @@ async function listActions(rawArgs: string[], context: CliContext): Promise<void
     const label = a.label ? ` — ${a.label}` : "";
     const tail = chips ? `  ${chips}` : "";
     console.log(`    ${a.id}${label}${tail}`);
+  }
+  console.log("");
+}
+
+async function listSkills(rawArgs: string[], context: CliContext): Promise<void> {
+  const { json, rest } = takeJsonFlag(rawArgs);
+  const { domain } = parseServiceFlag(rest);
+  const { manifest } = await loadManifest(domain, context);
+  const skills = manifest.skills ?? [];
+
+  if (json) {
+    process.stdout.write(JSON.stringify({ domain, skills }, null, 2) + "\n");
+    return;
+  }
+
+  console.log(`\n${manifest.name} (${domain})`);
+  console.log(`\n  skills (${skills.length})`);
+  for (const skill of skills) {
+    console.log(`    ${skill.name} — ${skill.description}`);
   }
   console.log("");
 }

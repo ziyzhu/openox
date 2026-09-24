@@ -120,6 +120,7 @@ final class Chat: Identifiable {
         let presentation: ChatPromptPresentation
         let allowsCustomAnswer: Bool
         let autoApproval: AutoApproval?
+        let secretKey: String?
     }
 
     enum Interaction: Equatable {
@@ -230,7 +231,6 @@ final class Chat: Identifiable {
     let presentations: AppPresentations
     let repository: ProfileRepository
     let scope: ProfileScope
-    let skillSession = SkillSession()
     let serviceManager: ServiceManager
     let fileMutationCoordinator = FileMutationCoordinator.shared
     private(set) var retention: ChatRetention
@@ -1481,6 +1481,7 @@ final class Chat: Identifiable {
         allowsCustomAnswer: Bool = false,
         presentation: ChatPromptPresentation = .conversation,
         autoApproval: PendingPrompt.AutoApproval? = nil,
+        secretKey: String? = nil,
         resolution: ((String) -> String?)? = nil
     ) async -> String {
         let stepID = StepID()
@@ -1501,7 +1502,8 @@ final class Chat: Identifiable {
             options: options,
             presentation: presentation,
             allowsCustomAnswer: allowsCustomAnswer,
-            autoApproval: autoApproval
+            autoApproval: autoApproval,
+            secretKey: secretKey
         )
         Log.session.info("Chat.awaitPrompt id=\(id) kind=\(kind.rawValue) presentation=\(String(describing: presentation)) options=\(options.count)")
         let result = await waitForPrompt(pending)
@@ -1533,6 +1535,20 @@ final class Chat: Identifiable {
         interactionWaiter = nil
         advanceInteraction()
         continuation.resume(returning: .answered(answer))
+    }
+
+    func resolveSecretPrompt(blockId: UUID, displayName: String, value: String) -> String? {
+        guard case .prompt(let prompt, let continuation) = interactionWaiter,
+              prompt.id == blockId, let key = prompt.secretKey else { return "Secret entry is no longer active" }
+        do {
+            try Secret.set(key: key, displayName: displayName, value: value)
+            interactionWaiter = nil
+            advanceInteraction()
+            continuation.resume(returning: .answered("Saved"))
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {
@@ -2384,8 +2400,6 @@ final class Chat: Identifiable {
         await Soul.shared.waitUntilCurrent()
         await UserMemory.shared.waitUntilCurrent()
         await Skills.shared.waitUntilCurrent()
-        skillSession.snapshots = [:]
-        if let invocation = submission.skillInvocation { skillSession.snapshots[invocation.skill.name] = invocation.skill }
         await agentControlTask?.value
         let configuration = agentConfiguration(client: client, model: model)
         await agent.configure(configuration)
@@ -2403,8 +2417,6 @@ final class Chat: Identifiable {
             : []
         let transientContext = Self.turnContext(
             TurnContext(
-                skills: (try? await skillsMount.entries().map(\.skill)) ?? [],
-                skillConflicts: (try? await skillsMount.catalog().conflicts.filter { $0.selectedSourceID == nil }.map(\.name)) ?? [],
                 attachedServices: attached,
                 definitions: definitions,
                 fileMountPaths: fileMountPaths,

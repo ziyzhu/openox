@@ -29,7 +29,7 @@ final class RepositoryTokenPrompt {
         while let presented = presenter.presentedViewController { presenter = presented }
         let alert = UIAlertController(
             title: String(localized: "GitHub personal access token"),
-            message: String(localized: "Use a classic token with public_repo access. It is saved in Keychain and never sent to the model. After creating a token, return to Ox and propose again."),
+            message: String(localized: "Use a classic token with public_repo access. It is saved in Secrets and never sent to the model. After creating a token, return to Ox and propose again."),
             preferredStyle: .alert
         )
         self.alert = alert
