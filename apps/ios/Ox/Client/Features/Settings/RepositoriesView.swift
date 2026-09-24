@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ServiceRepositoriesView: View {
+struct RepositoriesView: View {
     @Environment(ServiceManager.self) private var manager
     @State private var addingRepository = false
 
@@ -38,7 +38,7 @@ struct ServiceRepositoriesView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
-        .navigationTitle("Service Repositories")
+        .navigationTitle("Repositories")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -53,7 +53,7 @@ struct ServiceRepositoriesView: View {
             }
         }
         .sheet(isPresented: $addingRepository) {
-            AddServiceRepositoryView()
+            AddRepositoryView()
         }
     }
 
@@ -87,14 +87,14 @@ struct ServiceRepositoriesView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingsSurface()
 
-            Text("Repositories are collections of services that let Ox work with websites, apps, and other tools. Add your own repository to extend Ox with more services. Local is always available. Other enabled repositories are read-only.")
+            Text("Repositories provide services and shared skills. Your personal skills are stored in your Profile.")
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .settingsContentInset()
         }
     }
 
-    private func repositoryRow(_ repository: ServiceRepository.Repository) -> some View {
+    private func repositoryRow(_ repository: Repository.Descriptor) -> some View {
         HStack(spacing: Theme.Spacing.xs) {
             if repository.provenance == .local {
                 Image(systemName: "checkmark.square.fill")
@@ -124,7 +124,7 @@ struct ServiceRepositoriesView: View {
             }
 
             NavigationLink {
-                ServiceRepositoryDetailView(repositoryID: repository.id)
+                RepositoryDetailView(repositoryID: repository.id)
             } label: {
                 HStack(spacing: Theme.Spacing.sm) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -137,6 +137,12 @@ struct ServiceRepositoriesView: View {
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                        if let description = repository.provenance.skillOwnershipDescription {
+                            Text(description)
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
@@ -152,14 +158,14 @@ struct ServiceRepositoriesView: View {
         .padding(5)
     }
 
-    private func repositorySubtitle(_ repository: ServiceRepository.Repository) -> String {
+    private func repositorySubtitle(_ repository: Repository.Descriptor) -> String {
         let source = switch repository.provenance {
         case .bundled: String(localized: "Included with Ox")
         case .local: String(localized: "Editable on this device")
         case .development: String(localized: "Development Server")
         case .remote: repository.origin?.host ?? String(localized: "Repository")
         }
-        return "\(repository.serviceCount) services · \(source)"
+        return String(localized: "\(repository.serviceCount) services · \(repository.skills.count) skills · \(source)")
     }
 
     private var conflictsSection: some View {
@@ -177,7 +183,7 @@ struct ServiceRepositoriesView: View {
         }
     }
 
-    private func conflictRow(_ conflict: ServiceRepository.Conflict) -> some View {
+    private func conflictRow(_ conflict: Repository.Conflict) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             Text(verbatim: conflict.serviceID)
                 .font(Theme.Fonts.labelMd)
@@ -191,7 +197,7 @@ struct ServiceRepositoriesView: View {
         .padding(Theme.Spacing.md)
     }
 
-    private func conflictPicker(_ conflict: ServiceRepository.Conflict) -> some View {
+    private func conflictPicker(_ conflict: Repository.Conflict) -> some View {
         let selectedName = conflict.candidates.first {
             $0.repositoryID == conflict.selectedRepositoryID
         }?.repositoryName ?? "Choose"
@@ -226,8 +232,8 @@ struct ServiceRepositoriesView: View {
     }
 
     private func resolve(
-        _ conflict: ServiceRepository.Conflict,
-        with candidate: ServiceRepository.Conflict.Candidate
+        _ conflict: Repository.Conflict,
+        with candidate: Repository.Conflict.Candidate
     ) {
         Task {
             await manager.resolveConflict(
@@ -239,7 +245,7 @@ struct ServiceRepositoriesView: View {
     }
 }
 
-private struct AddServiceRepositoryView: View {
+private struct AddRepositoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var manager
     @State private var draft = ""
@@ -314,13 +320,13 @@ private struct AddServiceRepositoryView: View {
     }
 }
 
-struct ServiceRepositoryDetailView: View {
+struct RepositoryDetailView: View {
     let repositoryID: String
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var manager
     @State private var confirmingRemoval = false
 
-    private var repository: ServiceRepository.Repository? {
+    private var repository: Repository.Descriptor? {
         manager.repositories.first { $0.id == repositoryID }
     }
 
@@ -329,12 +335,12 @@ struct ServiceRepositoryDetailView: View {
     }
 
     private var canUpdate: Bool {
-        repositoryID != ServiceRepository.bundledID && repositoryID != ServiceRepository.localID
+        repositoryID != Repository.bundledID && repositoryID != Repository.localID
     }
 
     private var canRemove: Bool {
-        repositoryID != ServiceRepository.bundledID
-            && repositoryID != ServiceRepository.localID
+        repositoryID != Repository.bundledID
+            && repositoryID != Repository.localID
             && repositoryID != "development"
     }
 
@@ -363,9 +369,9 @@ struct ServiceRepositoryDetailView: View {
                         VStack(spacing: 0) {
                             switch repository.provenance {
                             case .bundled:
-                                detailRow("Source", value: "Included with Ox")
+                                detailRow("Source", value: String(localized: "Included with Ox"))
                             case .local:
-                                detailRow("Source", value: "Editable on this device")
+                                detailRow("Source", value: String(localized: "Editable on this device"))
                             case .development, .remote:
                                 detailRow("Last Synced", value: lastSyncedText(repository))
                             }
@@ -376,6 +382,12 @@ struct ServiceRepositoryDetailView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .settingsSurface()
+                        if let description = repository.provenance.skillOwnershipDescription {
+                            Text(description)
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                                .settingsSectionHeaderInset()
+                        }
                     }
                     if !repository.services.isEmpty {
                         SettingsSection("Services", insetContent: false) {
@@ -383,6 +395,15 @@ struct ServiceRepositoryDetailView: View {
                                 ForEach(Array(repository.services.enumerated()), id: \.element.id) { index, service in
                                     if index > 0 { Divider().settingsContentInset() }
                                     serviceRow(service)
+                                }
+                            }
+                        }
+                    }
+                    if !repository.skills.isEmpty {
+                        SettingsSection("Skills", insetContent: false) {
+                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                ForEach(repository.skills, id: \.self) { name in
+                                    Text(verbatim: "/\(name)").settingsRowPadding()
                                 }
                             }
                         }
@@ -428,12 +449,12 @@ struct ServiceRepositoryDetailView: View {
         }
     }
 
-    private func lastSyncedText(_ repository: ServiceRepository.Repository) -> String {
+    private func lastSyncedText(_ repository: Repository.Descriptor) -> String {
         repository.lastSyncedAt?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "Unavailable")
     }
 
     @ViewBuilder
-    private func serviceRow(_ reference: ServiceRepository.ServiceReference) -> some View {
+    private func serviceRow(_ reference: Repository.ServiceReference) -> some View {
         if let service = manager.service(domain: reference.runtimeID) {
             NavigationLink {
                 ServiceDetailView(
@@ -498,5 +519,15 @@ struct ServiceRepositoryDetailView: View {
                 .truncationMode(.middle)
         }
         .settingsRowPadding()
+    }
+}
+
+private extension Repository.Descriptor.Provenance {
+    var skillOwnershipDescription: LocalizedStringKey? {
+        switch self {
+        case .bundled: "Services and shared skills included with Ox."
+        case .local: "Services and shared skills you can edit on this device. Available across Profiles."
+        case .development, .remote: nil
+        }
     }
 }

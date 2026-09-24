@@ -7,7 +7,7 @@ struct ServiceImportView: View {
     private var definition: ServiceDefinition { proposal.payload.definition }
 
     private var hasLocalService: Bool {
-        coordinator.manager.repositories.first(where: { $0.id == ServiceRepository.localID })?
+        coordinator.manager.repositories.first(where: { $0.id == Repository.localID })?
             .services.contains(where: { $0.runtimeID == proposal.payload.domain }) == true
     }
 
@@ -30,15 +30,6 @@ struct ServiceImportView: View {
                             Text("Actions").font(Theme.Fonts.labelMd)
                             ForEach(definition.actions) { action in
                                 Text(verbatim: action.label).font(Theme.Fonts.bodyMd)
-                            }
-                        }
-                    }
-
-                    if !definition.skills.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text("Skills").font(Theme.Fonts.labelMd)
-                            ForEach(definition.skills, id: \.name) { skill in
-                                Text(verbatim: skill.name).font(Theme.Fonts.bodyMd)
                             }
                         }
                     }

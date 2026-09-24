@@ -190,8 +190,8 @@ extension Chat {
         }
     }
 
-    public func appServiceRepositories(purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.appServiceRepositories, .object([:]), purpose: purpose) {
+    public func appRepositories(purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appRepositories, .object([:]), purpose: purpose) {
             let repositories = serviceManager.repositories
             let limit = 50
             return .object([
@@ -204,6 +204,7 @@ extension Chat {
                         "enabled": .bool(repository.isEnabled),
                         "state": .string(repository.state.appInformationValue),
                         "serviceCount": .int(repository.serviceCount),
+                        "skillCount": .int(repository.skills.count),
                     ])
                 }),
                 "truncated": .bool(repositories.count > limit),
@@ -464,7 +465,7 @@ private extension ServiceManager.RepositoryState {
     }
 }
 
-private extension ServiceRepository.Repository.State {
+private extension Repository.Descriptor.State {
     var appInformationValue: String {
         switch self {
         case .ready: "ready"

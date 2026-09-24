@@ -69,8 +69,8 @@ final class ServiceManager {
     @ObservationIgnored private var faviconData: [String: Data] = [:]
     @ObservationIgnored private var persistedRemoteMCPServers: [PersistedRemoteMCP] = []
     @ObservationIgnored private var monoRepositoryMCPEndpoints: Set<String> = []
-    @ObservationIgnored private let repository: ServiceRepository
-    @ObservationIgnored private var monoRepository: ServiceRepository.MonoRepository?
+    @ObservationIgnored private let repository: Repository
+    @ObservationIgnored private var monoRepository: Repository.MonoRepository?
     @ObservationIgnored private var monoRepositoryLocale: String?
     @ObservationIgnored private var monoRepositoryGeneration: UInt64 = 0
     @ObservationIgnored private var semanticState: SemanticState = .unavailable
@@ -85,8 +85,9 @@ final class ServiceManager {
     private(set) var repositoryState: RepositoryState = .idle
     private(set) var monoRepositoryState: MonoRepositoryState = .idle
     private(set) var monoRepositoryHash: String?
-    private(set) var repositories: [ServiceRepository.Repository] = []
-    private(set) var repositoryConflicts: [ServiceRepository.Conflict] = []
+    private(set) var repositories: [Repository.Descriptor] = []
+    private(set) var repositorySkills: [Skill] = []
+    private(set) var repositoryConflicts: [Repository.Conflict] = []
 
     struct ServiceMatch: Identifiable {
         let service: Service
@@ -173,7 +174,7 @@ final class ServiceManager {
     var serverURL: URL { Self.defaultServerURL }
 
     init() {
-        repository = ServiceRepository(developmentRemote: Self.launchServerURL)
+        repository = Repository(developmentRemote: Self.launchServerURL)
         savedDomains = Set(UserDefaults.standard.stringArray(forKey: Self.savedKey) ?? [])
         actionPolicies = Self.loadActionPolicies()
         persistedRemoteMCPServers = Self.loadPersistedRemoteMCPServers()
@@ -208,7 +209,7 @@ final class ServiceManager {
         try await repository.prepareStorage()
     }
 
-    func storageManifestFiles() async throws -> [ServiceRepository.ManifestFile] {
+    func storageManifestFiles() async throws -> [Repository.ManifestFile] {
         try await repository.monoRepository().webManifests
     }
 
@@ -541,6 +542,8 @@ final class ServiceManager {
             self.monoRepository = monoRepository
             repositories = monoRepository.repositories
             repositoryConflicts = monoRepository.conflicts
+            repositorySkills = monoRepository.skills
+            Skills.shared.setRepositorySkills(monoRepository.skills)
             let hasReadyRepository = monoRepository.repositories.contains { repository in
                 if case .ready = repository.state { return true }
                 return false
@@ -550,7 +553,7 @@ final class ServiceManager {
                     if case .failed(let message) = $0.state { return message }
                     return nil
                 }
-                throw ServiceRepository.Failure(message: failures.first ?? "No valid service repositories are available")
+                throw Repository.Failure(message: failures.first ?? "No valid repositories are available")
             }
             monoRepositoryHash = monoRepository.hash
             repositoryState = .ready
@@ -611,14 +614,14 @@ final class ServiceManager {
         }
     }
 
-    func connectRepository(from origin: URL, locale: String?) async throws -> ServiceRepository.Repository {
+    func connectRepository(from origin: URL, locale: String?) async throws -> Repository.Descriptor {
         repositoryState = .syncing
         do {
             try await repository.install(from: origin)
             _ = await loadRepositories(locale: locale)
             guard case .ready = repositoryState,
                   let installed = repositories.first(where: { $0.origin == origin }) else {
-                throw ServiceRepository.Failure(message: "The repository was installed but could not be loaded")
+                throw Repository.Failure(message: "The repository was installed but could not be loaded")
             }
             return installed
         } catch {
@@ -635,7 +638,7 @@ final class ServiceManager {
         }
     }
 
-    func syncRepository(_ repositoryID: String, locale: String?) async throws -> ServiceRepository.Repository {
+    func syncRepository(_ repositoryID: String, locale: String?) async throws -> Repository.Descriptor {
         repositoryState = .syncing
         do {
             try await repository.update(repositoryID: repositoryID)
@@ -643,7 +646,7 @@ final class ServiceManager {
             guard case .ready = repositoryState,
                   let synced = repositories.first(where: { $0.id == repositoryID }),
                   case .ready = synced.state else {
-                throw ServiceRepository.Failure(message: "The repository was updated but could not be loaded")
+                throw Repository.Failure(message: "The repository was updated but could not be loaded")
             }
             return synced
         } catch {
@@ -665,7 +668,7 @@ final class ServiceManager {
             try await repository.remove(repositoryID: repositoryID)
             _ = await loadRepositories(locale: locale)
             guard case .ready = repositoryState else {
-                throw ServiceRepository.Failure(message: "The repository was removed but services could not be reloaded")
+                throw Repository.Failure(message: "The repository was removed but services could not be reloaded")
             }
         } catch {
             repositoryState = .failed(error.localizedDescription)
@@ -674,19 +677,33 @@ final class ServiceManager {
         }
     }
 
-    func createService(kind: ServiceRepository.ServiceKind, id: String, locale: String?) async throws {
+    func saveLocalSkill(_ skill: Skill, replacing: String? = nil, createOnly: Bool = false) async throws -> Skill {
+        try await repository.saveSkill(skill, replacing: replacing, createOnly: createOnly)
+        await refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
+        guard let saved = repositorySkills.first(where: { $0.name == skill.name && $0.owner.id == "repository:local" }) else {
+            throw SkillError.missing(skill.name)
+        }
+        return saved
+    }
+
+    func deleteLocalSkill(name: String) async throws {
+        try await repository.deleteSkill(name: name)
+        await refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
+    }
+
+    func createService(kind: Repository.ServiceKind, id: String, locale: String?) async throws {
         try await repository.createService(kind: kind, id: id)
         _ = await loadRepositories(locale: locale)
         guard service(domain: id) != nil else {
-            throw ServiceRepository.Failure(message: "The Local service could not be activated.")
+            throw Repository.Failure(message: "The Local service could not be activated.")
         }
     }
 
     func copyServiceToLocal(domain: String, locale: String?) async throws {
         try await repository.copyServiceToLocal(id: domain)
         _ = await loadRepositories(locale: locale)
-        guard monoRepository?.repositories.contains(where: { $0.id == ServiceRepository.localID }) == true else {
-            throw ServiceRepository.Failure(message: "The Local repository is unavailable.")
+        guard monoRepository?.repositories.contains(where: { $0.id == Repository.localID }) == true else {
+            throw Repository.Failure(message: "The Local repository is unavailable.")
         }
     }
 
@@ -705,11 +722,11 @@ final class ServiceManager {
         try await repository.importLocalService(payload, replacing: replacing)
         _ = await loadRepositories(locale: locale)
         guard case .ready = repositoryState else {
-            throw ServiceRepository.Failure(message: "The service was imported but the repository could not be reloaded.")
+            throw Repository.Failure(message: "The service was imported but the repository could not be reloaded.")
         }
     }
 
-    func deleteLocalService(domain: String, locale: String?) async throws -> ServiceRepository.ServiceKind {
+    func deleteLocalService(domain: String, locale: String?) async throws -> Repository.ServiceKind {
         let kind = try await repository.deleteLocalService(id: domain)
         _ = await loadRepositories(locale: locale)
         if service(domain: domain) == nil {
@@ -723,24 +740,24 @@ final class ServiceManager {
         return kind
     }
 
-    func serviceGitStatus(repositoryID: String) async throws -> ServiceRepository.GitStatus {
+    func repositoryGitStatus(repositoryID: String) async throws -> Repository.GitStatus {
         try await repository.gitStatus(repositoryID: repositoryID)
     }
 
-    func serviceGitLog(repositoryID: String, limit: Int, cursor: String?) async throws -> ServiceRepository.GitLog {
+    func repositoryGitLog(repositoryID: String, limit: Int, cursor: String?) async throws -> Repository.GitLog {
         try await repository.gitLog(repositoryID: repositoryID, limit: limit, cursor: cursor)
     }
 
-    func serviceGitShow(repositoryID: String, commitHash: String, path: String?) async throws -> ServiceRepository.GitShow {
+    func repositoryGitShow(repositoryID: String, commitHash: String, path: String?) async throws -> Repository.GitShow {
         try await repository.gitShow(repositoryID: repositoryID, commitHash: commitHash, path: path)
     }
 
-    func serviceGitDiff(
+    func repositoryGitDiff(
         repositoryID: String,
         commitHash: String?,
         baseCommitHash: String?,
         path: String?
-    ) async throws -> ServiceRepository.GitDiff {
+    ) async throws -> Repository.GitDiff {
         try await repository.gitDiff(
             repositoryID: repositoryID,
             commitHash: commitHash,
@@ -749,30 +766,30 @@ final class ServiceManager {
         )
     }
 
-    func checkoutServiceRepository(repositoryID: String, commitHash: String, locale: String?) async throws -> ServiceRepository.GitStatus {
+    func checkoutRepository(repositoryID: String, commitHash: String, locale: String?) async throws -> Repository.GitStatus {
         let status = try await repository.gitCheckout(repositoryID: repositoryID, commitHash: commitHash)
         _ = await loadRepositories(locale: locale)
         return status
     }
 
-    func commitLocalServices(message: String, locale: String?) async throws -> ServiceRepository.GitCommit {
+    func commitLocalRepository(message: String, locale: String?) async throws -> Repository.GitCommit {
         try await validateLocalRepository()
         let commit = try await repository.gitCommitLocal(message: message)
         _ = await loadRepositories(locale: locale)
         return commit
     }
 
-    func serviceProposalSnapshot(commitHash: String, services: [String]) async throws -> ServiceRepositoryProposalSnapshot {
-        let snapshot = try await repository.proposalSnapshot(commitHash: commitHash, services: services)
+    func repositoryProposalSnapshot(commitHash: String, services: [String], skills: [String]) async throws -> RepositoryProposalSnapshot {
+        let snapshot = try await repository.proposalSnapshot(commitHash: commitHash, services: services, skills: skills)
         for service in snapshot.services {
             guard let kind = ServicesMount.Kind(rawValue: service.kind.rawValue) else {
-                throw ServiceRepository.Failure(message: "Only Local web and API services can be published")
+                throw Repository.Failure(message: "Only Local web and API services can be published")
             }
             let prefix = "\(service.kind.rawValue)/\(service.domain)/"
             try await validateServiceSource(kind: kind, domain: service.domain) { components in
                 let path = prefix + components.joined(separator: "/")
                 guard let file = service.files.first(where: { $0.path == path }) else {
-                    throw ServiceRepository.Failure(message: "Missing service source file: \(path)")
+                    throw Repository.Failure(message: "Missing service source file: \(path)")
                 }
                 return file.data
             }
@@ -780,7 +797,7 @@ final class ServiceManager {
         return snapshot
     }
 
-    func revertLocalServices(commitHash: String, message: String, locale: String?) async throws -> ServiceRepository.GitCommit {
+    func revertLocalRepository(commitHash: String, message: String, locale: String?) async throws -> Repository.GitCommit {
         try await repository.prepareLocalRevert(commitHash: commitHash)
         do {
             _ = await loadRepositories(locale: locale)
@@ -795,13 +812,13 @@ final class ServiceManager {
         }
     }
 
-    func restoreLocalServices(path: String?, locale: String?) async throws -> ServiceRepository.GitStatus {
+    func restoreLocalRepository(path: String?, locale: String?) async throws -> Repository.GitStatus {
         let status = try await repository.gitRestoreLocal(path: path)
         _ = await loadRepositories(locale: locale)
         return status
     }
 
-    func listServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> [ServiceRepository.Entry] {
+    func listServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> [Repository.Entry] {
         try await repository.listSource(kind: kind.repositoryKind, id: domain, path: path)
     }
 
@@ -827,7 +844,7 @@ final class ServiceManager {
 
     private func localScriptKind(_ domain: String) -> ServicesMount.Kind {
         monoRepository?.repositories.contains(where: {
-            $0.id == ServiceRepository.localID && $0.services.contains(where: { $0.id == "api:\(domain)" })
+            $0.id == Repository.localID && $0.services.contains(where: { $0.id == "api:\(domain)" })
         }) == true ? .api : .web
     }
 
@@ -852,13 +869,13 @@ final class ServiceManager {
         case .web, .api:
             let manifestData = try await read(["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
-            let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local)
+            let definition = try ServiceDefinition(manifest: raw, repositoryID: Repository.localID, provenance: .local)
             guard definition.domain == domain, definition.isAPI == (kind == .api) else {
-                throw ServiceRepository.Failure(message: "manifest identity does not match its directory")
+                throw Repository.Failure(message: "manifest identity does not match its directory")
             }
             let actionsData = try await read(["actions.js"])
             guard let source = String(data: actionsData, encoding: .utf8) else {
-                throw ServiceRepository.Failure(message: "actions.js is not UTF-8")
+                throw Repository.Failure(message: "actions.js is not UTF-8")
             }
             let context = JSContext()!
             var syntaxError: String?
@@ -866,7 +883,7 @@ final class ServiceManager {
             let encoded = try JSONEncoder().encode(source)
             context.evaluateScript("new Function(\(String(decoding: encoded, as: UTF8.self)))")
             if let syntaxError {
-                throw ServiceRepository.Failure(message: "actions.js syntax: \(syntaxError)")
+                throw Repository.Failure(message: "actions.js syntax: \(syntaxError)")
             }
             syntaxError = nil
             context.evaluateScript(#"""
@@ -902,7 +919,7 @@ final class ServiceManager {
             """#)
             context.evaluateScript(source)
             if let syntaxError {
-                throw ServiceRepository.Failure(message: "actions.js registration: \(syntaxError)")
+                throw Repository.Failure(message: "actions.js registration: \(syntaxError)")
             }
             guard let result = context.evaluateScript(
                 "JSON.stringify({ installations: window.ox.__installations, actions: window.ox.__registered })"
@@ -911,7 +928,7 @@ final class ServiceManager {
                   let registration = try JSONSerialization.jsonObject(with: resultData) as? [String: Any],
                   registration["installations"] as? Int == 1,
                   let registered = registration["actions"] as? [String] else {
-                throw ServiceRepository.Failure(message: "actions.js must install exactly once")
+                throw Repository.Failure(message: "actions.js must install exactly once")
             }
             let declared = Set(definition.actions.map(\.id))
             let implemented = Set(registered)
@@ -922,41 +939,35 @@ final class ServiceManager {
                     missing.isEmpty ? nil : "missing implementations: \(missing.joined(separator: ", "))",
                     extra.isEmpty ? nil : "undeclared implementations: \(extra.joined(separator: ", "))",
                 ].compactMap { $0 }.joined(separator: "; ")
-                throw ServiceRepository.Failure(message: "actions.js registration mismatch; \(details)")
-            }
-            for skill in definition.skills {
-                let data = try await read(["skills", skill.name, "SKILL.md"])
-                guard let content = String(data: data, encoding: .utf8),
-                      SkillFiles.parse(content, directoryName: skill.name) != nil else {
-                    throw ServiceRepository.Failure(message: "invalid skill \(skill.name)")
-                }
+                throw Repository.Failure(message: "actions.js registration mismatch; \(details)")
             }
         case .mcp:
             let data = try await read(["service.json"])
             let manifest = try JSONDecoder().decode(MCPCatalogManifest.self, from: data)
             guard manifest.id == domain, manifest.isValid else {
-                throw ServiceRepository.Failure(message: "invalid MCP manifest")
+                throw Repository.Failure(message: "invalid MCP manifest")
             }
         case .iOS:
-            throw ServiceRepository.Failure(message: "Native iOS services cannot be edited in Local.")
+            throw Repository.Failure(message: "Native iOS services cannot be edited in Local.")
         }
     }
 
     private func validateLocalRepository() async throws {
-        guard let local = monoRepository?.repositories.first(where: { $0.id == ServiceRepository.localID }) else {
-            throw ServiceRepository.Failure(message: "The Local repository is unavailable.")
+        try await repository.validateLocalSkills()
+        guard let local = monoRepository?.repositories.first(where: { $0.id == Repository.localID }) else {
+            throw Repository.Failure(message: "The Local repository is unavailable.")
         }
         for service in local.services {
             guard let separator = service.id.firstIndex(of: ":"),
                   let kind = ServicesMount.Kind(rawValue: String(service.id[..<separator])) else {
-                throw ServiceRepository.Failure(message: "Local contains an invalid service identity")
+                throw Repository.Failure(message: "Local contains an invalid service identity")
             }
             do {
                 try await validateLocalService(kind: kind, domain: service.runtimeID)
             } catch let error as CancellationError {
                 throw error
             } catch {
-                throw ServiceRepository.Failure(
+                throw Repository.Failure(
                     message: "Validation failed for services/\(kind.rawValue)/\(service.runtimeID): \(error.localizedDescription)"
                 )
             }
@@ -980,18 +991,17 @@ final class ServiceManager {
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
             definition = try ServiceDefinition(
                 manifest: Manifest.localized(raw, locale: monoRepositoryLocale),
-                repositoryID: ServiceRepository.localID,
+                repositoryID: Repository.localID,
                 provenance: .local
             )
         }
 
-        guard let source = await repository.source(domain: domain, skills: definition.skills.map(\.name)) else {
-            throw ServiceRepository.Failure(message: "Service files are unavailable")
+        guard let source = await repository.source(domain: domain) else {
+            throw Repository.Failure(message: "Service files are unavailable")
         }
         return Service(
             definition: definition,
             actions: source.actions,
-            skills: source.skills,
             manager: self
         )
     }
@@ -1187,7 +1197,7 @@ final class ServiceManager {
     }
 
     nonisolated private static func decodeListings(
-        _ files: [ServiceRepository.ManifestFile],
+        _ files: [Repository.ManifestFile],
         locale: String?
     ) -> [Listing] {
         let out: [Listing] = files.compactMap { file in
@@ -1268,12 +1278,12 @@ final class ServiceManager {
 
     // MARK: - Fetch
 
-    struct Fetched { let actions: String; let skills: [String: String] }
+    struct Fetched { let actions: String }
 
     // Read the service's built artifacts from the working tree.
     func fetch(domain: String) async -> Fetched? {
         guard let definition = byDomain[domain]?.definition else { return nil }
-        if definition.repositoryID == ServiceRepository.localID {
+        if definition.repositoryID == Repository.localID {
             do {
                 try await validateLocalService(kind: localScriptKind(domain), domain: domain)
             } catch {
@@ -1281,12 +1291,12 @@ final class ServiceManager {
                 return nil
             }
         }
-        guard let source = await repository.source(domain: domain, skills: definition.skills.map(\.name)) else {
+        guard let source = await repository.source(domain: domain) else {
             Log.service.error("ServiceManager.fetch missing in working tree domain=\(domain)")
             return nil
         }
-        Log.service.info("ServiceManager.fetch ok domain=\(domain) actionsBytes=\(source.actions.utf8.count) skills=\(source.skills.count)")
-        return Fetched(actions: source.actions, skills: source.skills)
+        Log.service.info("ServiceManager.fetch ok domain=\(domain) actionsBytes=\(source.actions.utf8.count)")
+        return Fetched(actions: source.actions)
     }
 
 }

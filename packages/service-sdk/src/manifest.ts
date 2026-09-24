@@ -1,6 +1,5 @@
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { SkillMeta } from "./skills.ts";
 
 const HOST_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -222,7 +221,6 @@ export type LocaleOverlay = Static<typeof LocaleOverlaySchema>;
 
 export type Manifest = ServiceManifest & {
   faviconUrl?: string;
-  skills?: SkillMeta[];
 };
 
 const requiresAuth = (x: { requireAuth: boolean }) => x.requireAuth;
@@ -372,10 +370,6 @@ export type ManifestProfile = "builtin" | "repository";
 
 const RepositoryExtensionsSchema = Type.Object({
   faviconUrl: Type.Optional(Type.String({ pattern: "^https://" })),
-  skills: Type.Optional(Type.Array(Type.Object({
-    name: Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" }),
-    description: Type.String(),
-  }))),
 });
 
 export type ValidateServiceResult =
@@ -387,12 +381,10 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
   const at = (path: string, msg: string) => errors.push(`${path}: ${msg}`);
   const repository = profile === "repository";
   if (repository && input && typeof input === "object" && !Array.isArray(input)) {
-    const { faviconUrl, skills, ...rest } = input as Record<string, unknown>;
-    for (const e of Value.Errors(RepositoryExtensionsSchema, { faviconUrl, skills })) {
+    const { faviconUrl, ...rest } = input as Record<string, unknown>;
+    for (const e of Value.Errors(RepositoryExtensionsSchema, { faviconUrl })) {
       at(e.path.replace(/^\//, "").replace(/\//g, "."), e.message);
     }
-    const names = Array.isArray(skills) ? skills.map(skill => (skill as { name?: unknown })?.name) : [];
-    if (new Set(names).size !== names.length) at("skills", "skill names must be unique");
     input = rest;
   }
 

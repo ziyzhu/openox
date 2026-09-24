@@ -408,10 +408,10 @@ struct SettingsSheet: View {
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    ServiceRepositoriesView()
+                    RepositoriesView()
                 } label: {
                     SettingsDisclosureRow(
-                        title: "Service Repositories",
+                        title: "Repositories",
                         value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
                     )
                 }

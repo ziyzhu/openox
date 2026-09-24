@@ -26,35 +26,37 @@ extension Chat: OxFunctionBridge {
         return result
     }
 
-    public func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitStatus(repository: repository, purpose: purpose)
+    public func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryGitStatus(repository: repository, purpose: purpose)
     }
 
-    public func connectServiceRepository(origin: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.connectServiceRepository(origin: origin, purpose: purpose)
+    public func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.connectRepository(origin: origin, purpose: purpose)
     }
 
-    public func syncServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.syncServiceRepository(repository: repository, purpose: purpose)
+    public func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.syncRepository(repository: repository, purpose: purpose)
     }
 
-    public func disconnectServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.disconnectServiceRepository(repository: repository, purpose: purpose)
+    public func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.disconnectRepository(repository: repository, purpose: purpose)
     }
 
-    public func proposeServiceRepository(
+    public func proposeRepository(
         target: String,
         commitHash: String,
         services: [String],
+        skills: [String],
         title: String,
         body: String,
         status: String,
         purpose: String
     ) async throws -> JSONValue? {
-        try await serviceOperations.proposeServiceRepository(
+        try await serviceOperations.proposeRepository(
             target: target,
             commitHash: commitHash,
             services: services,
+            skills: skills,
             title: title,
             body: body,
             status: status,
@@ -62,48 +64,48 @@ extension Chat: OxFunctionBridge {
         )
     }
 
-    public func serviceGitLog(
+    public func repositoryGitLog(
         repository: String,
         limit: Int,
         cursor: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitLog(repository: repository, limit: limit, cursor: cursor, purpose: purpose)
+        try await serviceOperations.repositoryGitLog(repository: repository, limit: limit, cursor: cursor, purpose: purpose)
     }
 
-    public func serviceGitShow(
+    public func repositoryGitShow(
         repository: String,
         commitHash: String,
         path: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitShow(repository: repository, commitHash: commitHash, path: path, purpose: purpose)
+        try await serviceOperations.repositoryGitShow(repository: repository, commitHash: commitHash, path: path, purpose: purpose)
     }
 
-    public func serviceGitDiff(
+    public func repositoryGitDiff(
         repository: String,
         commitHash: String?,
         baseCommitHash: String?,
         path: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitDiff(repository: repository, commitHash: commitHash, baseCommitHash: baseCommitHash, path: path, purpose: purpose)
+        try await serviceOperations.repositoryGitDiff(repository: repository, commitHash: commitHash, baseCommitHash: baseCommitHash, path: path, purpose: purpose)
     }
 
-    public func serviceGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitCheckout(repository: repository, commitHash: commitHash, purpose: purpose)
+    public func repositoryGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryGitCheckout(repository: repository, commitHash: commitHash, purpose: purpose)
     }
 
-    public func serviceGitCommit(message: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitCommit(message: message, purpose: purpose)
+    public func repositoryGitCommit(message: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryGitCommit(message: message, purpose: purpose)
     }
 
-    public func serviceGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitRevert(commitHash: commitHash, message: message, purpose: purpose)
+    public func repositoryGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryGitRevert(commitHash: commitHash, message: message, purpose: purpose)
     }
 
-    public func serviceGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.serviceGitRestore(path: path, purpose: purpose)
+    public func repositoryGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryGitRestore(path: path, purpose: purpose)
     }
 
     public func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue? {

@@ -7,12 +7,8 @@ import { verifyRepository } from "./repository-verify.ts";
 import { inspectInstaller } from "@openox/service-sdk/installer";
 import { validateServiceManifest } from "@openox/service-sdk/manifest";
 
-type RepositoryPackage = {
-  version: 1;
-  name: string;
-  contentHash?: string;
-  services: string[];
-};
+import { validateRepositoryPackage, type RepositoryPackage } from "@openox/service-sdk/repository";
+import { readSkills } from "@openox/service-sdk/skills";
 
 type RepositoryCheckout = {
   root: string;
@@ -32,14 +28,14 @@ const CONTENT_HASH = /^[a-f0-9]{64}$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export const SUBS: Record<string, SubCommand> = {
-  inspect: { desc: "Inspect a local, localhost, or HTTPS service repository", fn: inspectRepository },
-  validate: { desc: "Validate a local, localhost, or HTTPS service repository", fn: validateRepository },
+  inspect: { desc: "Inspect a local, localhost, or HTTPS repository", fn: inspectRepository },
+  validate: { desc: "Validate a local, localhost, or HTTPS repository", fn: validateRepository },
   verify: { desc: "Verify that a Git URL conforms to the Ox Server IR", fn: verifyRepository },
-  serve: { desc: "Serve a local or remote service repository on localhost", fn: serveRepository },
+  serve: { desc: "Serve a local or remote repository on localhost", fn: serveRepository },
 };
 
 export async function repository(args: string[], context: CliContext): Promise<void> {
-  return dispatch("repository", "Inspect, validate, verify, or locally serve a service repository.", SUBS, args, context);
+  return dispatch("repository", "Inspect, validate, verify, or locally serve a repository.", SUBS, args, context);
 }
 
 function servicePath(id: string): string {
@@ -144,18 +140,10 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
     : join(root, "ox.json");
   await regularFile(packagePath, 512_000);
   const raw = JSON.parse(await readFile(packagePath, "utf8")) as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !["version", "name", "contentHash", "services"].includes(key))
-    || raw.version !== 2
-    || typeof raw.name !== "string"
-    || raw.name.trim().length === 0
-    || raw.name.length > 100
-    || !Array.isArray(raw.services)
-    || raw.services.length > 256
-    || raw.services.some(service => typeof service !== "string" || !SERVICE_ID.test(service))
-    || (raw.contentHash !== undefined && (typeof raw.contentHash !== "string" || !CONTENT_HASH.test(raw.contentHash)))) {
-    throw new Error("repository.json is invalid");
-  }
-  const repository = raw as RepositoryPackage;
+  const repository = validateRepositoryPackage(raw);
+  if ("error" in repository) throw new Error(repository.error);
+  const skillResult = readSkills(root, repository.skills);
+  if (!skillResult.ok) throw new Error(skillResult.error);
   const identities = new Set<string>();
   const problems: string[] = [];
   for (const service of repository.services) {
@@ -204,6 +192,9 @@ export async function createSnapshot(sourceRoot: string): Promise<Snapshot> {
       if (!existsSync(join(destination, "service.json")) && existsSync(legacyManifest)) {
         await rename(legacyManifest, join(destination, "service.json"));
       }
+    }
+    for (const name of repository.skills) {
+      await cp(join(sourceRoot, "skills", name), join(root, "skills", name), { recursive: true, errorOnExist: true });
     }
     await git(["init", "-q", "--initial-branch=main"], root);
     await git(["add", "-A"], root);
@@ -291,7 +282,7 @@ async function validateRepository(args: string[]): Promise<void> {
   const selected = await checkout(origin);
   try {
     const manifest = await readRepository(selected.root);
-    console.log(`${terminalText("valid", [C.bold, C.sky])} ${manifest.name} services=${manifest.services.length}`);
+    console.log(`${terminalText("valid", [C.bold, C.sky])} ${manifest.name} services=${manifest.services.length} skills=${manifest.skills.length}`);
   } finally {
     await selected.dispose();
   }
@@ -338,7 +329,7 @@ async function serveRepository(args: string[]): Promise<void> {
     });
     const endpoint = `http://127.0.0.1:${server.port}/repository.git`;
     console.log(`READY ${endpoint}`);
-    console.log(`repository=${basename(selected.root)} services=${snapshot.repository.services.length} head=${snapshot.head.slice(0, 12)}`);
+    console.log(`repository=${basename(selected.root)} services=${snapshot.repository.services.length} skills=${snapshot.repository.skills.length} head=${snapshot.head.slice(0, 12)}`);
     await waitForTermination();
     await server.stop(true);
   } finally {

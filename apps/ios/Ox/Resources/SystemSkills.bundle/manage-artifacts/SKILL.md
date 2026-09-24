@@ -13,7 +13,7 @@ Reads return complete text into JavaScript by default. Filter or slice long reco
 
 Choose only the guidance needed for content authoring:
 
-- For a responsive visual, interactive tool, chart, comparison, map, or HTML Canvas, read `skills/system:manage-artifacts/references/canvas.md`.
+- For a responsive visual, interactive tool, chart, comparison, map, or HTML Canvas, read `skills/manage-artifacts/references/canvas.md`.
 - For a Markdown note, write or edit one UTF-8 `artifacts/<name>.md` file. Preserve the user's content and add only useful structure. A successful write or edit displays it automatically.
 - For listing, reading, importing, attaching, presenting, renaming, or deleting an artifact, proceed without loading a format reference.
 

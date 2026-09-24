@@ -776,11 +776,5 @@
       }
     }
   },
-  "faviconUrl": "https://openox.ai/assets/services/xiaohongshu.com/favicon.png",
-  "skills": [
-    {
-      "name": "research",
-      "description": "Search Xiaohongshu notes and assess the credibility of their claims and authors. Use for recommendations, comparisons, firsthand experiences, current trends, products, places, people, or claims when the work should include query refinement, counterevidence, comment review, author-history checks, commercial-bias checks, or corroboration across independent accounts."
-    }
-  ]
+  "faviconUrl": "https://openox.ai/assets/services/xiaohongshu.com/favicon.png"
 }

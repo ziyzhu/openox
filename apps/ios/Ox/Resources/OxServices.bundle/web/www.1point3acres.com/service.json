@@ -516,11 +516,5 @@
       }
     }
   },
-  "faviconUrl": "https://openox.ai/assets/services/www.1point3acres.com/favicon.png",
-  "skills": [
-    {
-      "name": "research",
-      "description": "Research study, career, interview, visa, immigration, and life-abroad questions on 1Point3Acres while separating community anecdotes from corroborated patterns and structured data. Use when searching discussions, comparing reported experiences, checking current visa-bulletin dates, or interpreting H-1B sponsorship rankings."
-    }
-  ]
+  "faviconUrl": "https://openox.ai/assets/services/www.1point3acres.com/favicon.png"
 }

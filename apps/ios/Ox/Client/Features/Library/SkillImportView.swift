@@ -6,7 +6,8 @@ struct SkillImportView: View {
     @State private var skills: Skills = .shared
 
     private var hasConflict: Bool {
-        skills.skill(named: proposal.skill.name) != nil
+        skills.all.contains { $0.name == proposal.skill.name && $0.owner == .user }
+            || skills.conflicts.contains { $0.name == proposal.skill.name && $0.candidates.contains { $0.owner == .user } }
     }
 
     var body: some View {

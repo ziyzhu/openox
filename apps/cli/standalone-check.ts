@@ -24,7 +24,7 @@ const server = Bun.serve({
       const request = JSON.parse(String(message));
       const result = request.method === "host.describe" ? {
         implementation: { name: "Ox fixture", version: "1", build: "1" },
-        protocols: { repository: [2] },
+        protocols: { repository: [3] },
         methods: ["host.describe", "chats.list"],
       } : {
         chats: [{ id: "standalone-smoke", title: "Standalone smoke test", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: false }],
@@ -66,7 +66,7 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
   await run(["/bin/sh", join(import.meta.dir, "install.sh")], {
     ...environment, PATH: tools, OX_INSTALL_DIR: runtimeDirectory, OX_CLI_VERSION: packageMetadata.version,
   });
-  await cp(resolve(import.meta.dir, "../../examples/service-repository"), repositoryDirectory, { recursive: true });
+  await cp(resolve(import.meta.dir, "../../examples/repository"), repositoryDirectory, { recursive: true });
   await writeFile(join(runtimeDirectory, "bunfig.toml"), 'preload = ["./does-not-exist.ts"]\n');
   await writeFile(join(runtimeDirectory, ".env"), "OX_HOST_ENDPOINT=ws://127.0.0.1:1\n");
   const executable = join(runtimeDirectory, "ox");

@@ -1,3 +1,4 @@
+import { withRepository } from "./repositories.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -238,27 +239,30 @@ export async function soul(args: string[], context: CliContext): Promise<void> {
 export async function skills(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --profile <path> skills [name] [--json]");
+    console.log("Usage: ox (--profile <path> | --repository <path-or-url>) skills [name] [--json]");
     return;
   }
-  const root = profileRoot(context);
-  const result = readSkills(root);
-  const entries = result.ok ? result.skills : fail(result.error);
-  if (parsed.value) {
-    if (parsed.json) fail("--json cannot be used when printing a skill");
-    if (!SKILL_NAME.test(parsed.value)) fail(`invalid skill name: ${parsed.value}`);
-    if (!entries.some((skill) => skill.name === parsed.value)) fail(`skill not found: ${parsed.value}`);
-    const text = readFileSync(join(root, "skills", parsed.value, "SKILL.md"), "utf8");
-    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
-    return;
-  }
-  if (parsed.json) {
-    writeJson(entries);
-    return;
-  }
-  for (const skill of entries) {
-    console.log(`${terminalText(skill.name, [C.sky])}  ${terminalText(skill.description, [C.dim])}`);
-  }
+  const print = (root: string, declared?: string[]): void => {
+    const result = readSkills(root, declared);
+    const entries = result.ok ? result.skills : fail(result.error);
+    if (parsed.value) {
+      if (parsed.json) fail("--json cannot be used when printing a skill");
+      if (!SKILL_NAME.test(parsed.value)) fail(`invalid skill name: ${parsed.value}`);
+      if (!entries.some((skill) => skill.name === parsed.value)) fail(`skill not found: ${parsed.value}`);
+      const text = readFileSync(join(root, "skills", parsed.value, "SKILL.md"), "utf8");
+      process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+      return;
+    }
+    if (parsed.json) {
+      writeJson(entries);
+      return;
+    }
+    for (const skill of entries) {
+      console.log(`${terminalText(skill.name, [C.sky])}  ${terminalText(skill.description, [C.dim])}`);
+    }
+  };
+  if (context.repository) await withRepository(context.repository, async (root, repository) => print(root, repository.skills));
+  else print(profileRoot(context));
 }
 
 export async function artifacts(args: string[], context: CliContext): Promise<void> {

@@ -1,11 +1,16 @@
 import CryptoKit
 import Foundation
 
-nonisolated struct ServiceRepositoryProposalSnapshot: Sendable {
+nonisolated struct RepositoryProposalSnapshot: Sendable {
     struct Service: Sendable {
         let id: String
-        let kind: ServiceRepository.ServiceKind
+        let kind: Repository.ServiceKind
         let domain: String
+        let files: [File]
+    }
+
+    struct SharedSkill: Sendable {
+        let name: String
         let files: [File]
     }
 
@@ -16,9 +21,10 @@ nonisolated struct ServiceRepositoryProposalSnapshot: Sendable {
 
     let commitHash: String
     let services: [Service]
+    let skills: [SharedSkill]
 }
 
-nonisolated struct ServiceRepositoryProposalRequest: Sendable {
+nonisolated struct RepositoryProposalRequest: Sendable {
     enum Status: String, Sendable {
         case draft
         case open
@@ -28,10 +34,10 @@ nonisolated struct ServiceRepositoryProposalRequest: Sendable {
     let title: String
     let body: String
     let status: Status
-    let snapshot: ServiceRepositoryProposalSnapshot
+    let snapshot: RepositoryProposalSnapshot
 }
 
-nonisolated struct ServiceRepositoryProposalResult: Encodable, Sendable {
+nonisolated struct RepositoryProposalResult: Encodable, Sendable {
     let target: String
     let provider: String
     let kind: String
@@ -43,22 +49,23 @@ nonisolated struct ServiceRepositoryProposalResult: Encodable, Sendable {
     let sourceCommitHash: String
     let publishedCommitHash: String
     let services: [String]
+    let skills: [String]
     let operation: String
 }
 
 @MainActor
-final class ServiceRepositoryProposal {
-    static let shared = ServiceRepositoryProposal()
+final class RepositoryProposal {
+    static let shared = RepositoryProposal()
     nonisolated static let targetID = "openox"
 
-    private let github = GitHubServiceRepositoryProposalProvider()
+    private let github = GitHubRepositoryProposalProvider()
 
     func propose(
-        _ request: ServiceRepositoryProposalRequest,
+        _ request: RepositoryProposalRequest,
         authorization: RepositoryTokenPresenter?
-    ) async throws -> ServiceRepositoryProposalResult {
+    ) async throws -> RepositoryProposalResult {
         guard request.target == Self.targetID else {
-            throw RuntimeError.bridge("Unknown service publication target: \(request.target)")
+            throw RuntimeError.bridge("Unknown repository publication target: \(request.target)")
         }
         return try await github.propose(request, authorization: authorization)
     }
@@ -67,7 +74,7 @@ final class ServiceRepositoryProposal {
 typealias RepositoryTokenValidation = @Sendable (String) async throws -> Void
 typealias RepositoryTokenPresenter = @MainActor @Sendable (@escaping RepositoryTokenValidation) async -> Bool
 
-nonisolated private final class GitHubServiceRepositoryAccount: Sendable {
+nonisolated private final class GitHubRepositoryAccount: Sendable {
     struct Tokens: Sendable {
         let accessToken: String
         let login: String
@@ -116,22 +123,22 @@ nonisolated private enum GitHubRepositoryError: LocalizedError {
         switch self {
         case .invalidToken: "Enter a GitHub personal access token (classic), beginning with ghp_."
         case .unauthorized: "This GitHub token is invalid, expired, or revoked. Create a new token and try again."
-        case .missingScope: "This GitHub token needs the public_repo scope to propose services."
+        case .missingScope: "This GitHub token needs the public_repo scope to propose repository changes."
         }
     }
 }
 
-nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchecked Sendable {
+nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sendable {
     private let owner = "ziyzhu"
     private let repository = "openox"
     private let baseRef = "main"
     private let rootPath = "repositories/builtin"
-    private let account = GitHubServiceRepositoryAccount()
+    private let account = GitHubRepositoryAccount()
 
     func propose(
-        _ request: ServiceRepositoryProposalRequest,
+        _ request: RepositoryProposalRequest,
         authorization: RepositoryTokenPresenter?
-    ) async throws -> ServiceRepositoryProposalResult {
+    ) async throws -> RepositoryProposalResult {
         let credential = try await account.credential(authorization: authorization)
         let api = GitHubRepositoryAPI(accessToken: credential.accessToken)
         let targetRepository = try await api.object(method: "GET", path: "/repos/\(owner)/\(repository)")
@@ -158,9 +165,9 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
               let url = pullRequest.object["html_url"] as? String else {
             throw RuntimeError.bridge("GitHub returned an invalid pull request response.")
         }
-        Log.service.info("ServiceRepositoryProposal completed provider=github target=\(ServiceRepositoryProposal.targetID) pull=\(number.intValue) services=\(request.snapshot.services.count)")
-        return ServiceRepositoryProposalResult(
-            target: ServiceRepositoryProposal.targetID,
+        Log.service.info("RepositoryProposal completed provider=github target=\(RepositoryProposal.targetID) pull=\(number.intValue) services=\(request.snapshot.services.count)")
+        return RepositoryProposalResult(
+            target: RepositoryProposal.targetID,
             provider: "github",
             kind: "pullRequest",
             identifier: String(number.intValue),
@@ -171,6 +178,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
             sourceCommitHash: request.snapshot.commitHash,
             publishedCommitHash: publishedCommit,
             services: request.snapshot.services.map(\.domain),
+            skills: request.snapshot.skills.map(\.name),
             operation: pullRequest.created ? "created" : "updated"
         )
     }
@@ -208,14 +216,12 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
     private func proposalFiles(
         api: GitHubRepositoryAPI,
         base: (commit: String, tree: String),
-        snapshot: ServiceRepositoryProposalSnapshot
+        snapshot: RepositoryProposalSnapshot
     ) async throws -> [String: Data?] {
         var files: [String: Data?] = [:]
-        let serviceRoots = Set(snapshot.services.map { "\(rootPath)/\($0.kind.rawValue)/\($0.domain)" })
-        for service in snapshot.services {
-            for file in service.files {
-                files["\(rootPath)/\(file.path)"] = file.data
-            }
+        let serviceRoots = Set(snapshot.services.map { "\(rootPath)/\($0.kind.rawValue)/\($0.domain)" } + snapshot.skills.map { "\(rootPath)/skills/\($0.name)" })
+        for file in snapshot.services.flatMap(\.files) + snapshot.skills.flatMap(\.files) {
+            files["\(rootPath)/\(file.path)"] = file.data
         }
         let tree = try await api.object(
             method: "GET",
@@ -237,11 +243,15 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
         guard let encoded = manifestResponse["content"] as? String,
               let manifestData = Data(base64Encoded: encoded.filter { !$0.isWhitespace }),
               var manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any],
-              var services = manifest["services"] as? [String] else {
-            throw RuntimeError.bridge("The target service repository manifest is invalid.")
+              manifest["version"] as? Int == 3,
+              var services = manifest["services"] as? [String],
+              let skills = manifest["skills"] as? [String] else {
+            throw RuntimeError.bridge("The target repository manifest is invalid.")
         }
         services.append(contentsOf: snapshot.services.map(\.id))
         manifest["services"] = Array(Set(services)).sorted()
+        manifest["skills"] = Array(Set(skills + snapshot.skills.map(\.name))).sorted()
+        manifest.removeValue(forKey: "contentHash")
         var updatedManifest = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
         updatedManifest.append(0x0A)
         files[manifestPath] = updatedManifest
@@ -306,7 +316,7 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
         api: GitHubRepositoryAPI,
         publishingOwner: String,
         branch: String,
-        request: ServiceRepositoryProposalRequest
+        request: RepositoryProposalRequest
     ) async throws -> (object: [String: Any], created: Bool) {
         let head = "\(publishingOwner):\(branch)"
         let encodedHead = head.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? head
@@ -340,10 +350,10 @@ nonisolated private final class GitHubServiceRepositoryProposalProvider: @unchec
         return (created, true)
     }
 
-    private func branchName(snapshot: ServiceRepositoryProposalSnapshot) -> String {
-        let identity = snapshot.services.map(\.id).sorted().joined(separator: "\n")
+    private func branchName(snapshot: RepositoryProposalSnapshot) -> String {
+        let identity = (snapshot.services.map(\.id) + snapshot.skills.map { "skill:\($0.name)" }).sorted().joined(separator: "\n")
         let digest = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
-        return "ox/services-\(snapshot.commitHash.prefix(12))-\(digest.prefix(8))"
+        return "ox/repository-\(snapshot.commitHash.prefix(12))-\(digest.prefix(8))"
     }
 }
 
@@ -410,7 +420,7 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         if allowNotFound && status == 404 { return nil }
         guard (200..<300).contains(status) else {
             let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
-            Log.network.error("ServiceRepositoryProposal GitHub method=\(method) path=\(url.path) status=\(status)")
+            Log.network.error("RepositoryProposal GitHub method=\(method) path=\(url.path) status=\(status)")
             throw RuntimeError.bridge("GitHub returned HTTP \(status)\(message.map { ": \($0)" } ?? ".")")
         }
         if validateScope {

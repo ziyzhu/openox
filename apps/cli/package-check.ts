@@ -63,7 +63,7 @@ try {
   const services = JSON.parse(await run([
     executable,
     "--repository",
-    resolve(import.meta.dir, "../../examples/service-repository"),
+    resolve(import.meta.dir, "../../examples/repository"),
     "service",
     "list",
     "--json",

@@ -20,7 +20,7 @@ nonisolated struct ServicePackageDocument: Transferable, Sendable {
 }
 
 nonisolated struct ServicePackagePayload: Sendable {
-    let kind: ServiceRepository.ServiceKind
+    let kind: Repository.ServiceKind
     let domain: String
     let definition: ServiceDefinition
     let files: [ZipArchiveCodec.File]
@@ -52,7 +52,7 @@ nonisolated enum ServicePackageError: LocalizedError, Sendable {
 nonisolated enum ServicePackageCodec {
     private struct Header: Codable {
         let version: Int
-        let kind: ServiceRepository.ServiceKind
+        let kind: Repository.ServiceKind
         let domain: String
     }
 
@@ -60,7 +60,7 @@ nonisolated enum ServicePackageCodec {
     private static let maximumSourceBytes = 4_000_000
     private static let maximumFiles = 64
 
-    static func encode(kind: ServiceRepository.ServiceKind, domain: String, files: [ZipArchiveCodec.File]) throws -> Data {
+    static func encode(kind: Repository.ServiceKind, domain: String, files: [ZipArchiveCodec.File]) throws -> Data {
         let header = Header(version: 1, kind: kind, domain: domain)
         let metadata = try JSONEncoder().encode(header)
         let archive = [ZipArchiveCodec.File(path: "package.json", data: metadata)] + files
@@ -101,7 +101,7 @@ nonisolated enum ServicePackageCodec {
               let manifest = files.first(where: { $0.path == prefix + "service.json" })?.data,
               files.contains(where: { $0.path == prefix + "actions.js" }),
               let raw = try? JSONDecoder().decode(JSONValue.self, from: manifest),
-              let definition = try? ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local),
+              let definition = try? ServiceDefinition(manifest: raw, repositoryID: Repository.localID, provenance: .local),
               definition.domain == header.domain,
               definition.isAPI == (header.kind == .api) else {
             throw ServicePackageError.invalidSource

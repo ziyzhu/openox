@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import SwiftGitX
 
-actor ServiceRepository {
+actor Repository {
     struct Entry: Sendable {
         let name: String
         let isDirectory: Bool
@@ -18,21 +18,20 @@ actor ServiceRepository {
 
     struct ManifestFile: Sendable {
         let repositoryID: String
-        let provenance: Repository.Provenance
+        let provenance: Descriptor.Provenance
         let domain: String
         let data: Data
     }
 
     struct RepositoryManifestFile: Sendable {
         let repositoryID: String
-        let provenance: Repository.Provenance
+        let provenance: Descriptor.Provenance
         let id: String
         let data: Data
     }
 
     struct Source: Sendable {
         let actions: String
-        let skills: [String: String]
     }
 
     struct ServiceReference: Identifiable, Equatable, Sendable {
@@ -40,7 +39,7 @@ actor ServiceRepository {
         let runtimeID: String
     }
 
-    struct Repository: Identifiable, Equatable, Sendable {
+    struct Descriptor: Identifiable, Equatable, Sendable {
         enum Provenance: String, Codable, Sendable {
             case bundled
             case local
@@ -86,6 +85,7 @@ actor ServiceRepository {
         let serviceCount: Int
         let services: [ServiceReference]
         let state: State
+        var skills: [String] = []
     }
 
     struct Conflict: Identifiable, Equatable, Sendable {
@@ -102,12 +102,13 @@ actor ServiceRepository {
     }
 
     struct MonoRepository: Sendable {
-        let repositories: [Repository]
+        let repositories: [Descriptor]
         let conflicts: [Conflict]
         let webManifests: [ManifestFile]
         let iOSManifests: [RepositoryManifestFile]
         let mcpManifests: [RepositoryManifestFile]
         let hash: String
+        let skills: [Skill]
     }
 
     struct GitStatus: Encodable, Sendable {
@@ -190,6 +191,7 @@ actor ServiceRepository {
         let name: String
         let contentHash: String?
         var services: [Service]
+        var skills: [String] = []
     }
 
     private struct ServiceID: Codable, Hashable {
@@ -274,9 +276,17 @@ actor ServiceRepository {
     }
 
     private struct LoadedRepository {
-        let descriptor: Repository
+        let descriptor: Descriptor
         let root: URL
         let package: Package
+        let contentRoot: URL
+
+        init(descriptor: Descriptor, root: URL, package: Package, contentRoot: URL? = nil) {
+            self.descriptor = descriptor
+            self.root = root
+            self.package = package
+            self.contentRoot = contentRoot ?? root
+        }
     }
 
     private struct Candidate {
@@ -288,7 +298,7 @@ actor ServiceRepository {
         let kind: ServiceKind
         let root: URL
         let repositoryID: String
-        let provenance: Repository.Provenance
+        let provenance: Descriptor.Provenance
     }
 
     static let bundledID = "bundled"
@@ -304,8 +314,8 @@ actor ServiceRepository {
     init(root: URL? = nil, developmentRemote: URL? = nil) {
         bundledRoot = root ?? Bundle.main.url(forResource: "OxServices", withExtension: "bundle")
         self.developmentRemote = developmentRemote
-        repositoriesRoot = AppStoragePaths.serviceRepositories
-        configurationURL = AppStoragePaths.serviceRepositoriesConfiguration
+        repositoriesRoot = AppStoragePaths.repositories
+        configurationURL = AppStoragePaths.repositoriesConfiguration
         configuration = Self.loadConfiguration(from: configurationURL)
     }
 
@@ -320,7 +330,7 @@ actor ServiceRepository {
         } catch {
             let message = Self.errorMessage(error)
             localMaterializationFailure = message
-            Log.service.error("ServiceRepository.local unavailable error=\(message)")
+            Log.service.error("Repository.local unavailable error=\(message)")
         }
         let bundled = loadBundledRepository()
         let development = loadDevelopmentRepository()
@@ -331,7 +341,23 @@ actor ServiceRepository {
             if case .ready = loaded.descriptor.state { return loaded }
             return nil
         }
-        let descriptors = available.map(\.descriptor)
+        let descriptors = available.map { loaded in
+            var descriptor = loaded.descriptor
+            descriptor.skills = loaded.package.skills
+            return descriptor
+        }
+        var skills: [Skill] = []
+        for loaded in loaded where loaded.descriptor.isEnabled {
+            for name in loaded.package.skills {
+                do {
+                    var skill = try SkillFiles.load(directory: loaded.contentRoot.appendingPathComponent("skills/\(name)"))
+                    skill.source = .repository(id: loaded.descriptor.id, name: loaded.descriptor.name, writable: loaded.descriptor.provenance == .local && loaded.descriptor.view == .live)
+                    skills.append(skill)
+                } catch {
+                    Log.service.error("Repository.skill invalid name=\(name) repository=\(loaded.descriptor.id) error=\(error.localizedDescription)")
+                }
+            }
+        }
         var candidates: [String: [Candidate]] = [:]
         for repository in loaded where repository.descriptor.isEnabled {
             for service in repository.package.services {
@@ -378,7 +404,7 @@ actor ServiceRepository {
         for candidate in selected {
             let repository = candidate.repository
             let service = candidate.service
-            let serviceRoot = repository.root.appendingPathComponent(service.id.path, isDirectory: true)
+            let serviceRoot = repository.contentRoot.appendingPathComponent(service.id.path, isDirectory: true)
             let source = ActiveSource(
                 kind: service.id.kind,
                 root: serviceRoot,
@@ -392,14 +418,14 @@ actor ServiceRepository {
                 try Self.validateRegularFile(manifestURL, maximumSize: 512_000)
                 data = try Data(contentsOf: manifestURL)
             } catch {
-                Log.service.error("ServiceRepository.manifest unavailable id=\(service.id.rawValue) repository=\(repository.descriptor.id) error=\(Self.errorMessage(error))")
+                Log.service.error("Repository.manifest unavailable id=\(service.id.rawValue) repository=\(repository.descriptor.id) error=\(Self.errorMessage(error))")
                 continue
             }
             switch service.id.kind {
             case .web, .api:
                 guard let manifest = try? JSONDecoder().decode(JSONValue.self, from: data),
                       (manifest.objectValue?["kind"]?.stringValue == "api") == (service.id.kind == .api) else {
-                    Log.service.error("ServiceRepository.manifest kind-mismatch id=\(service.id.rawValue)")
+                    Log.service.error("Repository.manifest kind-mismatch id=\(service.id.rawValue)")
                     continue
                 }
                 web.append(ManifestFile(
@@ -436,31 +462,24 @@ actor ServiceRepository {
             }
             return "\($0.service.id.rawValue):\(repository.descriptor.id):\(version ?? "unknown")"
         }.sorted().joined(separator: "\n")
-        let hash = SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
-        Log.service.info("ServiceRepository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
+        let skillInput = skills.map { "\($0.id):\(SkillFiles.serialize($0)):\(($0.resources ?? [:]).sorted { $0.key < $1.key }.map { $0.key + $0.value }.joined())" }.sorted().joined(separator: "\n")
+        let hash = SHA256.hash(data: Data((input + skillInput).utf8)).map { String(format: "%02x", $0) }.joined()
+        Log.service.info("Repository.monoRepository repositories=\(descriptors.count) enabled=\(descriptors.count(where: \.isEnabled)) services=\(selected.count) conflicts=\(conflicts.count) hash=\(hash.prefix(12))")
         return MonoRepository(
             repositories: descriptors,
             conflicts: conflicts,
             webManifests: web,
             iOSManifests: iOS,
             mcpManifests: mcp,
-            hash: hash
+            hash: hash,
+            skills: skills
         )
     }
 
-    func source(domain: String, skills: [String]) async -> Source? {
+    func source(domain: String) async -> Source? {
         guard let root = activeSources[domain]?.root,
-              let actions = try? String(contentsOf: root.appendingPathComponent("actions.js"), encoding: .utf8)
-        else { return nil }
-        var bodies: [String: String] = [:]
-        for skill in skills {
-            guard let body = try? String(
-                contentsOf: root.appendingPathComponent("skills/\(skill)/SKILL.md"),
-                encoding: .utf8
-            ) else { return nil }
-            bodies[skill] = body
-        }
-        return Source(actions: actions, skills: bodies)
+              let actions = try? String(contentsOf: root.appendingPathComponent("actions.js"), encoding: .utf8) else { return nil }
+        return Source(actions: actions)
     }
 
     func setEnabled(repositoryID: String, enabled: Bool) throws {
@@ -476,13 +495,13 @@ actor ServiceRepository {
             throw Failure(message: "Repository not found")
         }
         try saveConfiguration()
-        Log.service.info("ServiceRepository.enabled id=\(repositoryID) enabled=\(enabled)")
+        Log.service.info("Repository.enabled id=\(repositoryID) enabled=\(enabled)")
     }
 
     func setResolution(serviceID: String, repositoryID: String) throws {
         configuration.resolutions[serviceID] = repositoryID
         try saveConfiguration()
-        Log.service.info("ServiceRepository.resolution service=\(serviceID) repository=\(repositoryID)")
+        Log.service.info("Repository.resolution service=\(serviceID) repository=\(repositoryID)")
     }
 
     func install(from origin: URL) async throws {
@@ -495,7 +514,7 @@ actor ServiceRepository {
         let staging = repositoriesRoot.appendingPathComponent(".installing-\(id)", isDirectory: true)
         let destination = repositoryDirectory(id)
         do {
-            Log.service.info("ServiceRepository.install origin=\(Self.redacted(origin)) id=\(id)")
+            Log.service.info("Repository.install origin=\(Self.redacted(origin)) id=\(id)")
             try await replaceSnapshot(from: origin, at: destination, staging: staging, provenance: .remote)
             configuration.repositories.append(InstalledRepository(id: id, origin: origin, isEnabled: true))
             try saveConfiguration()
@@ -507,7 +526,7 @@ actor ServiceRepository {
 
     func update(repositoryID: String) async throws {
         if repositoryID == "development", let developmentRemote {
-            Log.service.info("ServiceRepository.update origin=\(Self.redacted(developmentRemote)) id=development")
+            Log.service.info("Repository.update origin=\(Self.redacted(developmentRemote)) id=development")
             try await syncDevelopmentRepository()
             return
         }
@@ -517,7 +536,7 @@ actor ServiceRepository {
         let destination = repositoryDirectory(repositoryID)
         let staging = repositoriesRoot.appendingPathComponent(".updating-\(repositoryID)", isDirectory: true)
         do {
-            Log.service.info("ServiceRepository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID)")
+            Log.service.info("Repository.update origin=\(Self.redacted(stored.origin)) id=\(repositoryID)")
             try await replaceSnapshot(from: stored.origin, at: destination, staging: staging, provenance: .remote)
         } catch {
             try? FileManager.default.removeItem(at: staging)
@@ -534,7 +553,44 @@ actor ServiceRepository {
         configuration.repositories.remove(at: index)
         configuration.resolutions = configuration.resolutions.filter { $0.value != repositoryID }
         try saveConfiguration()
-        Log.service.info("ServiceRepository.remove id=\(repositoryID)")
+        Log.service.info("Repository.remove id=\(repositoryID)")
+    }
+
+    func saveSkill(_ skill: Skill, replacing: String? = nil, createOnly: Bool = false) throws {
+        _ = try editableLocalRepository()
+        guard !SkillFiles.reservedNames.contains(skill.name) else { throw SkillError.reserved(skill.name) }
+        try SkillFiles.validate(skill)
+        var package = try Self.loadPackage(at: localRoot, provenance: .local)
+        let destination = localRoot.appendingPathComponent("skills/\(skill.name)")
+        if (createOnly || replacing != nil && replacing != skill.name), FileManager.default.fileExists(atPath: destination.path) {
+            throw SkillError.exists(skill.name)
+        }
+        if let replacing { guard SkillFiles.isLocalName(replacing) else { throw SkillError.invalidName } }
+        try SkillFiles.write(skill, directory: destination)
+        if let replacing, replacing != skill.name { package.skills.removeAll { $0 == replacing } }
+        if !package.skills.contains(skill.name) { package.skills.append(skill.name) }
+        package.skills.sort()
+        try Self.writePackage(package, at: localRoot)
+        if let replacing, replacing != skill.name {
+            try FileManager.default.removeItem(at: localRoot.appendingPathComponent("skills/\(replacing)"))
+        }
+        Log.service.info("Repository.skill save name=\(skill.name)")
+    }
+
+    func deleteSkill(name: String) throws {
+        _ = try editableLocalRepository()
+        guard SkillFiles.isLocalName(name) else { throw SkillError.invalidName }
+        var package = try Self.loadPackage(at: localRoot, provenance: .local)
+        guard package.skills.contains(name) else { throw SkillError.missing(name) }
+        package.skills.removeAll { $0 == name }
+        try Self.writePackage(package, at: localRoot)
+        try FileManager.default.removeItem(at: localRoot.appendingPathComponent("skills/\(name)"))
+        Log.service.info("Repository.skill delete name=\(name)")
+    }
+
+    func validateLocalSkills() throws {
+        let package = try Self.loadPackage(at: localRoot, provenance: .local)
+        for name in package.skills { _ = try SkillFiles.load(directory: localRoot.appendingPathComponent("skills/\(name)")) }
     }
 
     func createService(kind: ServiceKind, id: String) throws {
@@ -587,7 +643,7 @@ actor ServiceRepository {
         }
         configuration.resolutions[domain] = Self.localID
         try saveConfiguration()
-        Log.service.info("ServiceRepository.local create domain=\(domain)")
+        Log.service.info("Repository.local create domain=\(domain)")
     }
 
     func copyServiceToLocal(id: String) throws {
@@ -617,7 +673,7 @@ actor ServiceRepository {
         }
         configuration.resolutions[id] = Self.localID
         try saveConfiguration()
-        Log.service.info("ServiceRepository.local copy id=\(id) source=\(source.repositoryID)")
+        Log.service.info("Repository.local copy id=\(id) source=\(source.repositoryID)")
     }
 
     func exportLocalService(id: String) throws -> Data {
@@ -642,7 +698,7 @@ actor ServiceRepository {
             files.append(.init(path: "services/\(service.id.path)/\(path)", data: try Data(contentsOf: url)))
         }
         let data = try ServicePackageCodec.encode(kind: service.id.kind, domain: id, files: files.sorted { $0.path < $1.path })
-        Log.service.info("ServiceRepository.export id=\(service.id.rawValue) files=\(files.count) bytes=\(data.count)")
+        Log.service.info("Repository.export id=\(service.id.rawValue) files=\(files.count) bytes=\(data.count)")
         return data
     }
 
@@ -698,7 +754,7 @@ actor ServiceRepository {
             configuration.resolutions[payload.domain] = Self.localID
             try saveConfiguration()
             if existing != nil { try FileManager.default.removeItem(at: backup) }
-            Log.service.info("ServiceRepository.import id=\(service.id.rawValue) files=\(payload.files.count) replaced=\(existing != nil)")
+            Log.service.info("Repository.import id=\(service.id.rawValue) files=\(payload.files.count) replaced=\(existing != nil)")
         } catch {
             configuration = originalConfiguration
             try? saveConfiguration()
@@ -746,7 +802,7 @@ actor ServiceRepository {
             }
             throw error
         }
-        Log.service.info("ServiceRepository.local delete id=\(id) kind=\(service.id.kind.rawValue)")
+        Log.service.info("Repository.local delete id=\(id) kind=\(service.id.kind.rawValue)")
         return service.id.kind
     }
 
@@ -818,7 +874,7 @@ actor ServiceRepository {
         let url = try sourceURL(source, path: path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
-        Log.service.info("ServiceRepository.local write id=\(id) path=\(path.joined(separator: "/")) bytes=\(data.count)")
+        Log.service.info("Repository.local write id=\(id) path=\(path.joined(separator: "/")) bytes=\(data.count)")
     }
 
     func deleteLocalSource(kind: ServiceKind, id: String, path: [String]) throws {
@@ -828,7 +884,7 @@ actor ServiceRepository {
             throw Failure(message: "Only Local service files can be deleted.")
         }
         try FileManager.default.removeItem(at: url)
-        Log.service.info("ServiceRepository.local delete id=\(id) path=\(path.joined(separator: "/"))")
+        Log.service.info("Repository.local delete id=\(id) path=\(path.joined(separator: "/"))")
     }
 
     func validateLocalSource(kind: ServiceKind, id: String) throws {
@@ -930,7 +986,7 @@ actor ServiceRepository {
         )
     }
 
-    func proposalSnapshot(commitHash: String, services requested: [String]) throws -> ServiceRepositoryProposalSnapshot {
+    func proposalSnapshot(commitHash: String, services requested: [String], skills requestedSkills: [String]) throws -> RepositoryProposalSnapshot {
         let loaded = try gitRepository(Self.localID)
         let repository = try SwiftGitX.Repository.open(at: loaded.root)
         let commit = try Self.historyCommit(commitHash, in: repository)
@@ -945,23 +1001,40 @@ actor ServiceRepository {
         let blobs = try Self.gitBlobs(in: commit.tree, repository: repository)
         let services = selected.map { service in
             let prefix = service.id.path + "/"
-            let files = blobs.compactMap { path, blob -> ServiceRepositoryProposalSnapshot.File? in
+            let files = blobs.compactMap { path, blob -> RepositoryProposalSnapshot.File? in
                 guard path.hasPrefix(prefix) else { return nil }
                 return .init(path: path, data: blob.content)
             }
-            return ServiceRepositoryProposalSnapshot.Service(
+            return RepositoryProposalSnapshot.Service(
                 id: service.id.rawValue,
                 kind: service.id.kind,
                 domain: service.id.runtimeID,
                 files: files.sorted { $0.path < $1.path }
             )
         }
-        let fileCount = services.reduce(0) { $0 + $1.files.count }
-        let byteCount = services.flatMap(\.files).reduce(0) { $0 + $1.data.count }
-        guard fileCount <= 1_000, byteCount <= 32 * 1_024 * 1_024 else {
-            throw Failure(message: "The selected services exceed the publication size limit")
+        let skills = try requestedSkills.map { name -> RepositoryProposalSnapshot.SharedSkill in
+            guard package.skills.contains(name) else { throw SkillError.missing(name) }
+            let prefix = "skills/\(name)/"
+            let files = blobs.compactMap { path, blob -> RepositoryProposalSnapshot.File? in
+                path.hasPrefix(prefix) ? .init(path: path, data: blob.content) : nil
+            }.sorted { $0.path < $1.path }
+            guard let main = files.first(where: { $0.path == prefix + "SKILL.md" }),
+                  let content = String(data: main.data, encoding: .utf8),
+                  var skill = SkillFiles.parse(content, directoryName: name) else { throw SkillError.invalidPackage }
+            var resources: [String: String] = [:]
+            for file in files where file.path != main.path {
+                guard let text = String(data: file.data, encoding: .utf8) else { throw SkillError.invalidPackage }
+                resources[String(file.path.dropFirst(prefix.count))] = text
+            }
+            skill.resources = resources
+            try SkillFiles.validate(skill)
+            return .init(name: name, files: files)
         }
-        return ServiceRepositoryProposalSnapshot(commitHash: commit.id.hex, services: services)
+        let files = services.flatMap(\.files) + skills.flatMap(\.files)
+        guard files.count <= 1_000, files.reduce(0, { $0 + $1.data.count }) <= 32 * 1_024 * 1_024 else {
+            throw Failure(message: "The selected contents exceed the publication size limit")
+        }
+        return RepositoryProposalSnapshot(commitHash: commit.id.hex, services: services, skills: skills)
     }
 
     func gitDiff(
@@ -1029,7 +1102,7 @@ actor ServiceRepository {
         let loaded = try gitRepository(repositoryID)
         let repository = try SwiftGitX.Repository.open(at: loaded.root)
         guard try repository.status().isEmpty else {
-            throw Failure(message: "Restore or save current changes before viewing service history")
+            throw Failure(message: "Restore or save current changes before viewing repository history")
         }
         guard let previous = try repository.HEAD.target as? Commit else {
             throw Failure(message: "Repository HEAD is not a commit")
@@ -1059,7 +1132,7 @@ actor ServiceRepository {
             throw error
         }
         let status = try Self.gitStatus(repositoryID: repositoryID, provenance: loaded.descriptor.provenance, root: loaded.root)
-        Log.service.info("ServiceRepository.git checkout repository=\(repositoryID) commit=\(status.commitHash.prefix(12)) view=\(status.view)")
+        Log.service.info("Repository.git checkout repository=\(repositoryID) commit=\(status.commitHash.prefix(12)) view=\(status.view)")
         return status
     }
 
@@ -1069,7 +1142,7 @@ actor ServiceRepository {
         guard !before.isEmpty else { throw Failure(message: "Local has no changes to save") }
         try Self.stageAllChanges(in: repository)
         let commit = try repository.commit(message: message)
-        Log.service.info("ServiceRepository.git commit repository=local commit=\(commit.id.abbreviated) files=\(before.count)")
+        Log.service.info("Repository.git commit repository=local commit=\(commit.id.abbreviated) files=\(before.count)")
         return try Self.gitCommit(commit)
     }
 
@@ -1096,7 +1169,7 @@ actor ServiceRepository {
     func commitPreparedLocalRevert(message: String) throws -> GitCommit {
         let repository = try editableLocalRepository()
         let commit = try repository.commit(message: message)
-        Log.service.info("ServiceRepository.git revert repository=local commit=\(commit.id.abbreviated)")
+        Log.service.info("Repository.git revert repository=local commit=\(commit.id.abbreviated)")
         return try Self.gitCommit(commit)
     }
 
@@ -1113,7 +1186,7 @@ actor ServiceRepository {
             try Self.restoreAll(in: repository)
         }
         _ = try Self.loadPackage(at: localRoot, provenance: .local)
-        Log.service.info("ServiceRepository.git restore repository=local path=\(path ?? "all")")
+        Log.service.info("Repository.git restore repository=local path=\(path ?? "all")")
         return try Self.gitStatus(repositoryID: Self.localID, provenance: .local, root: localRoot)
     }
 
@@ -1124,7 +1197,7 @@ actor ServiceRepository {
         try materializeLocalRepository()
         let loaded = loadLocalRepository()
         guard case .ready = loaded.descriptor.state else {
-            throw Failure(message: "Service repository is unavailable")
+            throw Failure(message: "Repository is unavailable")
         }
         return loaded
     }
@@ -1156,13 +1229,13 @@ actor ServiceRepository {
                 Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: []),
                 at: localRoot
             )
-            Log.service.info("ServiceRepository.local materialized")
+            Log.service.info("Repository.local materialized")
         }
-        try StorageMigrator.migrateLegacyLocalServiceRepository(at: localRoot, seed: localRepositorySeed)
+        try StorageMigrator.migrateLegacyLocalRepository(at: localRoot, seed: localRepositorySeed)
         try installLocalRepositoryMetadata()
         try StorageMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
         try StorageMigrator.migrateLegacyLocalServiceActions(at: localRoot)
-        try StorageMigrator.migrateLocalServiceRepositoryVersion(at: localRoot)
+        try StorageMigrator.migrateLocalRepositoryVersion(at: localRoot)
     }
 
     private func loadLocalRepository() -> LoadedRepository {
@@ -1170,7 +1243,7 @@ actor ServiceRepository {
             let package = try Self.loadPackage(at: localRoot, provenance: .local)
             let git = try Self.gitState(at: localRoot)
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: Self.localID,
                     name: package.name,
                     origin: nil,
@@ -1185,11 +1258,12 @@ actor ServiceRepository {
                     state: .ready
                 ),
                 root: localRoot,
-                package: package
+                package: package,
+                contentRoot: try StorageMigrator.prepareRepository(at: localRoot, local: true)
             )
         } catch {
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: Self.localID,
                     name: "Local",
                     origin: nil,
@@ -1211,7 +1285,7 @@ actor ServiceRepository {
 
     private func failedLocal(_ message: String) -> LoadedRepository {
         LoadedRepository(
-            descriptor: Repository(
+            descriptor: Descriptor(
                 id: Self.localID,
                 name: "Local",
                 origin: nil,
@@ -1284,8 +1358,9 @@ actor ServiceRepository {
 
     private static func contentHash(at root: URL, package: Package) throws -> String {
         var digest = SHA256()
-        for service in package.services.sorted(by: { $0.id.path < $1.id.path }) {
-            let serviceRoot = root.appendingPathComponent(service.id.path, isDirectory: true)
+        let paths = package.services.map { $0.id.path } + package.skills.map { "skills/\($0)" }
+        for path in paths.sorted() {
+            let serviceRoot = root.appendingPathComponent(path, isDirectory: true)
             guard let enumerator = FileManager.default.enumerator(
                 at: serviceRoot,
                 includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
@@ -1315,7 +1390,7 @@ actor ServiceRepository {
         do {
             let package = try Self.loadPackage(at: bundledRoot, provenance: .bundled)
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: Self.bundledID,
                     name: package.name,
                     origin: nil,
@@ -1339,7 +1414,7 @@ actor ServiceRepository {
 
     private func failedBundled(_ message: String) -> LoadedRepository {
         LoadedRepository(
-            descriptor: Repository(
+            descriptor: Descriptor(
                 id: Self.bundledID,
                 name: "Built-in",
                 origin: nil,
@@ -1360,11 +1435,11 @@ actor ServiceRepository {
 
     private func loadDevelopmentRepository() -> LoadedRepository? {
         guard let developmentRemote else { return nil }
-        let root = AppStoragePaths.developmentServiceSnapshot
+        let root = AppStoragePaths.developmentRepositorySnapshot
         do {
             let package = try Self.loadPackage(at: root, provenance: .development)
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: "development",
                     name: package.name,
                     origin: developmentRemote,
@@ -1383,7 +1458,7 @@ actor ServiceRepository {
             )
         } catch {
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: "development",
                     name: "Development Server",
                     origin: developmentRemote,
@@ -1408,7 +1483,7 @@ actor ServiceRepository {
         do {
             let package = try Self.loadPackage(at: root, provenance: .remote)
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: stored.id,
                     name: package.name,
                     origin: stored.origin,
@@ -1427,7 +1502,7 @@ actor ServiceRepository {
             )
         } catch {
             return LoadedRepository(
-                descriptor: Repository(
+                descriptor: Descriptor(
                     id: stored.id,
                     name: stored.origin.host ?? "Repository",
                     origin: stored.origin,
@@ -1447,7 +1522,8 @@ actor ServiceRepository {
         }
     }
 
-    private static func loadPackage(at root: URL, provenance: Repository.Provenance) throws -> Package {
+    private static func loadPackage(at root: URL, provenance: Descriptor.Provenance) throws -> Package {
+        let root = try StorageMigrator.prepareRepository(at: root, local: provenance == .local)
         let packageURL = repositoryManifestURL(at: root)
         let values = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
         guard values.isSymbolicLink != true, (values.fileSize ?? 0) <= 512_000 else {
@@ -1463,7 +1539,9 @@ actor ServiceRepository {
         }
         guard !package.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               package.name.count <= 100,
-              package.services.count <= 256 else {
+              package.services.count <= 256, package.skills.count <= 256,
+              Set(package.skills).count == package.skills.count,
+              package.skills.allSatisfy({ SkillFiles.isLocalName($0) && !SkillFiles.reservedNames.contains($0) }) else {
             throw Failure(message: "repository.json metadata is invalid")
         }
         if let hash = package.contentHash,
@@ -1479,6 +1557,9 @@ actor ServiceRepository {
                 throw Failure(message: "Invalid or duplicate service \(service.id.rawValue)")
             }
             if provenance != .local { try validateService(service, root: root) }
+        }
+        if provenance != .local {
+            for name in package.skills { _ = try SkillFiles.load(directory: root.appendingPathComponent("skills/\(name)")) }
         }
         return package
     }
@@ -1522,8 +1603,8 @@ actor ServiceRepository {
 
     private static func validatePackageShape(_ data: Data) throws {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              Set(object.keys).isSubset(of: ["version", "name", "contentHash", "services"]),
-              object["services"] is [String]
+              Set(object.keys).isSubset(of: ["version", "name", "contentHash", "services", "skills"]),
+              object["services"] is [String], object["skills"] is [String]
         else { throw Failure(message: "repository.json is invalid") }
     }
 
@@ -1550,7 +1631,7 @@ actor ServiceRepository {
 
     private func syncDevelopmentRepository() async throws {
         guard let developmentRemote else { return }
-        let root = AppStoragePaths.developmentServiceSnapshot
+        let root = AppStoragePaths.developmentRepositorySnapshot
         let staging = root.deletingLastPathComponent().appendingPathComponent(".updating-development", isDirectory: true)
         do {
             try await replaceSnapshot(from: developmentRemote, at: root, staging: staging, provenance: .development)
@@ -1563,7 +1644,7 @@ actor ServiceRepository {
         from origin: URL,
         at destination: URL,
         staging: URL,
-        provenance: Repository.Provenance
+        provenance: Descriptor.Provenance
     ) async throws {
         let manager = FileManager.default
         let backup = destination.deletingLastPathComponent()
@@ -1598,10 +1679,10 @@ actor ServiceRepository {
                 do {
                     try manager.removeItem(at: backup)
                 } catch {
-                    Log.service.warning("ServiceRepository.snapshot backup cleanup failed error=\(error.localizedDescription)")
+                    Log.service.warning("Repository.snapshot backup cleanup failed error=\(error.localizedDescription)")
                 }
             }
-            Log.service.info("ServiceRepository.snapshot installed provenance=\(provenance.rawValue) head=\(head.id.abbreviated)")
+            Log.service.info("Repository.snapshot installed provenance=\(provenance.rawValue) head=\(head.id.abbreviated)")
         } catch {
             try? manager.removeItem(at: staging)
             throw error
@@ -1638,7 +1719,7 @@ actor ServiceRepository {
     private struct GitState {
         let commitHash: String
         let tipCommitHash: String
-        let view: Repository.View
+        let view: Descriptor.View
     }
 
     private static func gitState(at root: URL) throws -> GitState {
@@ -1678,7 +1759,7 @@ actor ServiceRepository {
             try? manager.removeItem(at: staging)
             throw error
         }
-        Log.service.info("ServiceRepository.git seeded repository=local")
+        Log.service.info("Repository.git seeded repository=local")
     }
 
     private static func errorMessage(_ error: Error) -> String {
@@ -2028,7 +2109,7 @@ actor ServiceRepository {
 
     private static func gitStatus(
         repositoryID: String,
-        provenance: Repository.Provenance,
+        provenance: Descriptor.Provenance,
         root: URL
     ) throws -> GitStatus {
         let repository = try SwiftGitX.Repository.open(at: root)

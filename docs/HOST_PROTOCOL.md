@@ -107,7 +107,9 @@ uses JSON-RPC.
 
 The repository version is declared once in `repository.json`, gated through
 `HostProtocols` when the Host connects to a repository, and applies to every
-service in it; `service.json` carries no version. `version` is the Host format
+service and skill package in it; `service.json` carries no version. Version 3
+adds a required root `skills` array and retires service-level skills. Version 2
+repositories are normalized by `StorageMigrator` before catalog loading. `version` is the Host format
 version, not a release number. Services install with
 `window.ox.install(installer)`; the installer takes no version and receives only
 `action` (plus `request` for API services). Version 1, whose installers also
@@ -118,8 +120,10 @@ to implement it. Repository content hashes and Git commits identify exact
 contents independently of format compatibility. These content interfaces are
 not converted into RPC by this change.
 
-Skills are not versioned. They follow the Agent Skills specification, which has
-no format version; `SKILL.md` frontmatter carries no Ox version.
+`SKILL.md` frontmatter carries no Ox version. System, repository, and Profile
+packages use the same loader and virtual paths. Repository lifecycle and Git
+functions live under `ox.repository.*`; discovery is `ox.app.repositories`.
+See [Repositories and skills](SKILLS.md) for layout, conflicts, and snapshots.
 
 ## References
 

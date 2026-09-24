@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "Built-in",
-  "contentHash": "477e34733d403da48c701aa2f03f702a675ad1b90ed7dfc5de85b0ca192a7fb9",
+  "contentHash": "c725ed6b2095f9accb6651c02f9c5a05db818b1e710fdfe5afff6322987cb1ba",
   "services": [
     "ios:bluetooth",
     "ios:calendar",
@@ -53,5 +53,6 @@
     "web:www.usta.com",
     "web:x.com",
     "web:xiaohongshu.com"
-  ]
+  ],
+  "skills": []
 }

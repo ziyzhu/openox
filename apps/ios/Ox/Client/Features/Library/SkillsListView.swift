@@ -31,6 +31,7 @@ private struct SidebarSafeSkillButton<Label: View>: View {
 }
 
 struct SkillsListView: View {
+    @Environment(ServiceManager.self) private var serviceManager
     @State private var skills: Skills
     let ready: Bool
     let profileID: UUID
@@ -77,6 +78,10 @@ struct SkillsListView: View {
             }
         }
         .searchable(text: $query, prompt: "Search skills")
+        .onChange(of: Skills.shared.repositorySkills) { _, _ in skills.refresh() }
+        .alert("Could not update skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
+            Button("OK") { skills.dismissError() }
+        } message: { Text(verbatim: skills.errorMessage ?? "") }
         .navigationDestination(item: $editing) { draft in
             SkillEditorView(draft: draft, skills: skills, profileID: profileID)
                 .id(draft.id)
@@ -86,7 +91,7 @@ struct SkillsListView: View {
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
         ) {
             Button("Delete", role: .destructive) {
-                if let skill = pendingDelete { skills.delete(skill) }
+                if let skill = pendingDelete { skills.delete(skill, manager: serviceManager) }
                 pendingDelete = nil
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
@@ -96,6 +101,26 @@ struct SkillsListView: View {
     private var skillList: some View {
         ScrollView {
             LazyVStack(spacing: Theme.Spacing.sm) {
+                ForEach(skills.conflicts) { conflict in
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text(verbatim: "/\(conflict.name)").font(Theme.Fonts.bodyMd)
+                        Text("Choose a source").font(Theme.Fonts.caption)
+                        ForEach(conflict.candidates) { candidate in
+                            Button {
+                                skills.select(name: conflict.name, source: candidate.owner.id)
+                            } label: {
+                                HStack {
+                                    Text(verbatim: candidate.owner.name)
+                                    Spacer()
+                                    if conflict.selectedSourceID == candidate.owner.id { Image(systemName: "checkmark") }
+                                }
+                            }
+                            .accessibilityIdentifier("skill.source.\(conflict.name).\(candidate.owner.id)")
+                        }
+                        if conflict.candidates.isEmpty { Text("The selected source is unavailable.") }
+                    }
+                    .padding(.vertical, Theme.Spacing.md)
+                }
                 let displayed = displayedSkills
                 if skills.all.isEmpty {
                     emptyNote
@@ -153,12 +178,22 @@ struct SkillsListView: View {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
             .accessibilityIdentifier(A11yID.Settings.skillShare(skill.name))
+            if skill.owner.isWritable {
             Button(role: .destructive) {
                 pendingDelete = skill
             } label: {
                 Label("Delete", systemImage: "trash")
             }
             .accessibilityIdentifier(A11yID.Settings.skillDelete(skill.name))
+            }
+            if skill.owner != .user {
+                Button("Customize", systemImage: "doc.on.doc") {
+                    skills.customize(skill, name: skill.name + "-copy")
+                }
+            }
+            if skill.owner.id != "repository:local" {
+                Button("Add to Local Repository", systemImage: "square.and.arrow.up") { skills.share(skill, manager: serviceManager) }
+            }
         } preview: {
             SkillContextMenuPreview(skill: skill)
         }
@@ -180,6 +215,7 @@ struct SkillLibraryRow: View {
                 Text(verbatim: "/\(skill.displayName)")
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
+                Text(verbatim: skill.owner.name).font(Theme.Fonts.caption).foregroundStyle(Theme.Colors.onSurfaceMuted)
                 Text(verbatim: skill.description)
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -201,6 +237,8 @@ struct SkillLibraryRow: View {
 
 struct SkillDraft: Identifiable, Hashable {
     let id = UUID()
+    var owner: SkillOwner = .user
+    var resources: [String: String]? = nil
     var originalName: String?
     var name: String
     var description: String
@@ -216,6 +254,8 @@ struct SkillDraft: Identifiable, Hashable {
     }
 
     init(_ skill: Skill) {
+        owner = skill.owner
+        resources = skill.resources
         originalName = skill.name
         name = skill.displayName
         description = skill.description
@@ -235,6 +275,8 @@ struct SkillEditorView: View {
     @State private var instructions: String
     @State private var services: [String]
     @State private var pickingServices = false
+    private let owner: SkillOwner
+    private let resources: [String: String]?
     private let originalName: String?
 
     @FocusState private var instructionsFocused: Bool
@@ -244,6 +286,8 @@ struct SkillEditorView: View {
         _description = State(initialValue: draft.description)
         _instructions = State(initialValue: draft.instructions)
         _services = State(initialValue: draft.services)
+        owner = draft.owner
+        resources = draft.resources
         originalName = draft.originalName
         self.skills = skills
         self.profileID = profileID
@@ -252,11 +296,12 @@ struct SkillEditorView: View {
     private var slug: String { SkillFiles.slug(name) }
 
     private var conflict: Bool {
-        slug != originalName && skills.skill(named: slug) != nil
+        SkillFiles.reservedNames.contains(slug) && owner != .system
+            || slug != originalName && skills.skill(named: slug)?.owner == owner
     }
 
     private var canSave: Bool {
-        !slug.isEmpty
+        owner.isWritable && !slug.isEmpty
             && !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !conflict
@@ -275,6 +320,7 @@ struct SkillEditorView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .accessibilityIdentifier(A11yID.Settings.skillName)
+                        .disabled(!owner.isWritable)
                 }
                 .padding(Theme.Spacing.sm)
                 .background(
@@ -304,6 +350,7 @@ struct SkillEditorView: View {
                         in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     )
                     .accessibilityIdentifier(A11yID.Settings.skillDescription)
+                    .disabled(!owner.isWritable)
 
                 Text("These instructions drop into the message box when you pick the skill in a chat.")
                     .font(Theme.Fonts.bodySm)
@@ -322,8 +369,9 @@ struct SkillEditorView: View {
                         in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     )
                     .accessibilityIdentifier(A11yID.Settings.skillInstructions)
+                    .disabled(!owner.isWritable)
 
-                serviceSection
+                serviceSection.disabled(!owner.isWritable)
 
                 if let skill = persistedSkill {
                     SkillSchedulesSection(skill: skill, profileID: profileID)
@@ -337,9 +385,15 @@ struct SkillEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") { save() }
-                    .disabled(!canSave)
-                    .accessibilityIdentifier(A11yID.Settings.skillSave)
+                if owner.isWritable {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .accessibilityIdentifier(A11yID.Settings.skillSave)
+                } else {
+                    Button("Customize") {
+                        if let skill = persistedSkill { skills.customize(skill, name: skill.name + "-copy") }
+                    }
+                }
             }
         }
         .sheet(isPresented: $pickingServices) {
@@ -409,9 +463,15 @@ struct SkillEditorView: View {
             description: description,
             instructions: instructions,
             services: services,
-            replacing: originalName
+            replacing: originalName,
+            resources: resources,
+            owner: owner,
+            manager: serviceManager
         )
-        dismiss()
+        Task {
+            await skills.waitUntilCurrent()
+            if skills.errorMessage == nil { dismiss() }
+        }
     }
 }
 

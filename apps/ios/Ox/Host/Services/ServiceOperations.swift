@@ -155,7 +155,7 @@ final class ServiceOperations {
         guard endpoint == nil, transport == nil else {
             throw RuntimeError.bridge("ox.service.create: endpoint and transport apply only to MCP services.")
         }
-        guard let serviceKind = ServiceRepository.ServiceKind(rawValue: kind), [.web, .api].contains(serviceKind) else {
+        guard let serviceKind = Repository.ServiceKind(rawValue: kind), [.web, .api].contains(serviceKind) else {
             throw RuntimeError.bridge("ox.service.create: kind must be 'web', 'api', or 'mcp'")
         }
         let cleanDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -269,21 +269,21 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
-        let repository = try serviceRepositoryID(repository, function: "status")
-        return try await tracked(Actions.serviceGitStatus, .object(["repository": .string(repository)]), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.serviceGitStatus(repositoryID: repository))
+    func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue? {
+        let repository = try repositoryID(repository, function: "status")
+        return try await tracked(Actions.repositoryGitStatus, .object(["repository": .string(repository)]), purpose: purpose) {
+            try Self.encodeToJSON(try await self.serviceManager.repositoryGitStatus(repositoryID: repository))
         }
     }
 
-    func connectServiceRepository(origin: String, purpose: String) async throws -> JSONValue? {
+    func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
         let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
               url.user == nil, url.password == nil, url.fragment == nil else {
-            throw RuntimeError.bridge("ox.service.repository.connect: origin must be a public HTTPS Git URL without credentials or a fragment")
+            throw RuntimeError.bridge("ox.repository.connect: origin must be a public HTTPS Git URL without credentials or a fragment")
         }
         return try await tracked(
-            Actions.serviceRepositoryConnect,
+            Actions.repositoryConnect,
             .object(["origin": .string(origin)]),
             purpose: purpose
         ) {
@@ -296,15 +296,16 @@ final class ServiceOperations {
                 "name": .string(repository.name),
                 "origin": .string(origin),
                 "serviceCount": .int(repository.serviceCount),
+                "skillCount": .int(repository.skills.count),
                 "connected": .bool(true),
             ])
         }
     }
 
-    func disconnectServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
+    func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }),
               let origin = selected.origin else {
-            throw RuntimeError.bridge("ox.service.repository.disconnect: select an installed remote repository ID from ox.app.serviceRepositories")
+            throw RuntimeError.bridge("ox.repository.disconnect: select an installed remote repository ID from ox.app.repositories")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),
@@ -312,7 +313,7 @@ final class ServiceOperations {
             "origin": .string(origin.absoluteString),
             "serviceCount": .int(selected.serviceCount),
         ])
-        return try await tracked(Actions.serviceRepositoryDisconnect, args, purpose: purpose) {
+        return try await tracked(Actions.repositoryDisconnect, args, purpose: purpose) {
             try await self.serviceManager.disconnectRepository(
                 selected.id,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -321,16 +322,16 @@ final class ServiceOperations {
         }
     }
 
-    func syncServiceRepository(repository: String, purpose: String) async throws -> JSONValue? {
+    func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }) else {
-            throw RuntimeError.bridge("ox.service.repository.sync: select an installed remote repository ID from ox.app.serviceRepositories")
+            throw RuntimeError.bridge("ox.repository.sync: select an installed remote repository ID from ox.app.repositories")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),
             "name": .string(selected.name),
             "serviceCount": .int(selected.serviceCount),
         ])
-        return try await tracked(Actions.serviceRepositorySync, args, purpose: purpose) {
+        return try await tracked(Actions.repositorySync, args, purpose: purpose) {
             let synced = try await self.serviceManager.syncRepository(
                 selected.id,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -339,15 +340,17 @@ final class ServiceOperations {
                 "id": .string(synced.id),
                 "name": .string(synced.name),
                 "serviceCount": .int(synced.serviceCount),
+                "skillCount": .int(synced.skills.count),
                 "synced": .bool(true),
             ])
         }
     }
 
-    func proposeServiceRepository(
+    func proposeRepository(
         target: String,
         commitHash: String,
         services: [String],
+        skills: [String],
         title: String,
         body: String,
         status: String,
@@ -355,36 +358,38 @@ final class ServiceOperations {
     ) async throws -> JSONValue? {
         let target = target.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard target == ServiceRepositoryProposal.targetID else {
-            throw RuntimeError.bridge("ox.service.repository.propose: target must be openox")
+        guard target == RepositoryProposal.targetID else {
+            throw RuntimeError.bridge("ox.repository.propose: target must be openox")
         }
         guard commitHash.range(of: "^[a-f0-9]{40}$", options: .regularExpression) != nil else {
-            throw RuntimeError.bridge("ox.service.repository.propose: commitHash must be a full Local commit hash")
+            throw RuntimeError.bridge("ox.repository.propose: commitHash must be a full Local commit hash")
         }
-        guard (1...20).contains(services.count), Set(services).count == services.count,
+        guard (1...20).contains(services.count + skills.count), Set(services).count == services.count,
+              Set(skills).count == skills.count, skills.allSatisfy(SkillFiles.isLocalName),
               services.allSatisfy({ !$0.isEmpty && $0.count <= 500 }) else {
-            throw RuntimeError.bridge("ox.service.repository.propose: services must contain 1-20 unique Local service domains")
+            throw RuntimeError.bridge("ox.repository.propose: services must contain 1-20 unique Local service domains")
         }
         guard !title.isEmpty, title.count <= 200 else {
-            throw RuntimeError.bridge("ox.service.repository.propose: title must contain 1-200 characters")
+            throw RuntimeError.bridge("ox.repository.propose: title must contain 1-200 characters")
         }
         guard body.count <= 20_000 else {
-            throw RuntimeError.bridge("ox.service.repository.propose: body must contain at most 20,000 characters")
+            throw RuntimeError.bridge("ox.repository.propose: body must contain at most 20,000 characters")
         }
-        guard let proposalStatus = ServiceRepositoryProposalRequest.Status(rawValue: status) else {
-            throw RuntimeError.bridge("ox.service.repository.propose: status must be draft or open")
+        guard let proposalStatus = RepositoryProposalRequest.Status(rawValue: status) else {
+            throw RuntimeError.bridge("ox.repository.propose: status must be draft or open")
         }
-        let snapshot = try await serviceManager.serviceProposalSnapshot(commitHash: commitHash, services: services)
+        let snapshot = try await serviceManager.repositoryProposalSnapshot(commitHash: commitHash, services: services, skills: skills)
         let args: JSONValue = .object([
             "target": .string(target),
             "commitHash": .string(commitHash),
             "services": .array(services.map(JSONValue.string)),
+            "skills": .array(skills.map(JSONValue.string)),
             "title": .string(title),
             "body": .string(body),
             "status": .string(status),
         ])
-        return try await tracked(Actions.serviceRepositoryPropose, args, purpose: purpose) {
-            let result = try await ServiceRepositoryProposal.shared.propose(
+        return try await tracked(Actions.repositoryPropose, args, purpose: purpose) {
+            let result = try await RepositoryProposal.shared.propose(
                 .init(
                     target: target,
                     title: title,
@@ -398,23 +403,23 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitLog(
+    func repositoryGitLog(
         repository: String,
         limit: Int,
         cursor: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        let repository = try serviceRepositoryID(repository, function: "log")
+        let repository = try repositoryID(repository, function: "log")
         guard (1...100).contains(limit) else {
-            throw RuntimeError.bridge("ox.service.git.log: limit must be between 1 and 100")
+            throw RuntimeError.bridge("ox.repository.git.log: limit must be between 1 and 100")
         }
         var fields: [String: JSONValue] = [
             "repository": .string(repository),
             "limit": .int(limit),
         ]
         if let cursor { fields["cursor"] = .string(cursor) }
-        return try await tracked(Actions.serviceGitLog, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.serviceGitLog(
+        return try await tracked(Actions.repositoryGitLog, .object(fields), purpose: purpose) {
+            try Self.encodeToJSON(try await self.serviceManager.repositoryGitLog(
                 repositoryID: repository,
                 limit: limit,
                 cursor: cursor
@@ -422,20 +427,20 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitShow(
+    func repositoryGitShow(
         repository: String,
         commitHash: String,
         path: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        let repository = try serviceRepositoryID(repository, function: "show")
+        let repository = try repositoryID(repository, function: "show")
         var fields: [String: JSONValue] = [
             "repository": .string(repository),
             "commitHash": .string(commitHash),
         ]
         if let path { fields["path"] = .string(path) }
-        return try await tracked(Actions.serviceGitShow, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.serviceGitShow(
+        return try await tracked(Actions.repositoryGitShow, .object(fields), purpose: purpose) {
+            try Self.encodeToJSON(try await self.serviceManager.repositoryGitShow(
                 repositoryID: repository,
                 commitHash: commitHash,
                 path: path
@@ -443,23 +448,23 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitDiff(
+    func repositoryGitDiff(
         repository: String,
         commitHash: String?,
         baseCommitHash: String?,
         path: String?,
         purpose: String
     ) async throws -> JSONValue? {
-        let repository = try serviceRepositoryID(repository, function: "diff")
+        let repository = try repositoryID(repository, function: "diff")
         guard commitHash != nil || baseCommitHash == nil else {
-            throw RuntimeError.bridge("ox.service.git.diff: commitHash is required when baseCommitHash is provided")
+            throw RuntimeError.bridge("ox.repository.git.diff: commitHash is required when baseCommitHash is provided")
         }
         var fields: [String: JSONValue] = ["repository": .string(repository)]
         if let commitHash { fields["commitHash"] = .string(commitHash) }
         if let baseCommitHash { fields["baseCommitHash"] = .string(baseCommitHash) }
         if let path { fields["path"] = .string(path) }
-        return try await tracked(Actions.serviceGitDiff, .object(fields), purpose: purpose) {
-            try Self.encodeToJSON(try await self.serviceManager.serviceGitDiff(
+        return try await tracked(Actions.repositoryGitDiff, .object(fields), purpose: purpose) {
+            try Self.encodeToJSON(try await self.serviceManager.repositoryGitDiff(
                 repositoryID: repository,
                 commitHash: commitHash,
                 baseCommitHash: baseCommitHash,
@@ -468,14 +473,14 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue? {
-        let repository = try serviceRepositoryID(repository, function: "checkout")
+    func repositoryGitCheckout(repository: String, commitHash: String, purpose: String) async throws -> JSONValue? {
+        let repository = try repositoryID(repository, function: "checkout")
         let args: JSONValue = .object([
             "repository": .string(repository),
             "commitHash": .string(commitHash),
         ])
-        return try await tracked(Actions.serviceGitCheckout, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.checkoutServiceRepository(
+        return try await tracked(Actions.repositoryGitCheckout, args, purpose: purpose) {
+            return try Self.encodeToJSON(try await self.serviceManager.checkoutRepository(
                 repositoryID: repository,
                 commitHash: commitHash,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -483,25 +488,25 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitCommit(message: String, purpose: String) async throws -> JSONValue? {
+    func repositoryGitCommit(message: String, purpose: String) async throws -> JSONValue? {
         let message = try serviceCommitMessage(message, function: "commit")
         let args: JSONValue = .object(["message": .string(message)])
-        return try await tracked(Actions.serviceGitCommit, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.commitLocalServices(
+        return try await tracked(Actions.repositoryGitCommit, args, purpose: purpose) {
+            return try Self.encodeToJSON(try await self.serviceManager.commitLocalRepository(
                 message: message,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             ))
         }
     }
 
-    func serviceGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue? {
+    func repositoryGitRevert(commitHash: String, message: String, purpose: String) async throws -> JSONValue? {
         let message = try serviceCommitMessage(message, function: "revert")
         let args: JSONValue = .object([
             "commitHash": .string(commitHash),
             "message": .string(message),
         ])
-        return try await tracked(Actions.serviceGitRevert, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.revertLocalServices(
+        return try await tracked(Actions.repositoryGitRevert, args, purpose: purpose) {
+            return try Self.encodeToJSON(try await self.serviceManager.revertLocalRepository(
                 commitHash: commitHash,
                 message: message,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
@@ -509,9 +514,9 @@ final class ServiceOperations {
         }
     }
 
-    func serviceGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
+    func repositoryGitRestore(path: String?, purpose: String) async throws -> JSONValue? {
         let path = try path.map(serviceRestorePath)
-        let status = try await serviceManager.serviceGitStatus(repositoryID: ServiceRepository.localID)
+        let status = try await serviceManager.repositoryGitStatus(repositoryID: Repository.localID)
         var fields: [String: JSONValue] = [
             "staged": .array(status.staged.map(JSONValue.string)),
             "unstaged": .array(status.unstaged.map(JSONValue.string)),
@@ -519,8 +524,8 @@ final class ServiceOperations {
         ]
         if let path { fields["path"] = .string(path) }
         let args: JSONValue = .object(fields)
-        return try await tracked(Actions.serviceGitRestore, args, purpose: purpose) {
-            return try Self.encodeToJSON(try await self.serviceManager.restoreLocalServices(
+        return try await tracked(Actions.repositoryGitRestore, args, purpose: purpose) {
+            return try Self.encodeToJSON(try await self.serviceManager.restoreLocalRepository(
                 path: path,
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             ))
@@ -668,10 +673,10 @@ final class ServiceOperations {
         }
     }
 
-    private func serviceRepositoryID(_ value: String, function: String) throws -> String {
+    private func repositoryID(_ value: String, function: String) throws -> String {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard clean == ServiceRepository.localID else {
-            throw RuntimeError.bridge("ox.service.git.\(function): repository must be 'local'")
+        guard clean == Repository.localID else {
+            throw RuntimeError.bridge("ox.repository.git.\(function): repository must be 'local'")
         }
         return clean
     }
@@ -680,7 +685,7 @@ final class ServiceOperations {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let path = clean.hasPrefix("services/") ? String(clean.dropFirst("services/".count)) : clean
         guard !path.isEmpty else {
-            throw RuntimeError.bridge("ox.service.git.restore: path cannot be empty")
+            throw RuntimeError.bridge("ox.repository.git.restore: path cannot be empty")
         }
         return path
     }
@@ -688,7 +693,7 @@ final class ServiceOperations {
     private func serviceCommitMessage(_ value: String, function: String) throws -> String {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, clean.count <= 500 else {
-            throw RuntimeError.bridge("ox.service.git.\(function): message must contain 1-500 characters")
+            throw RuntimeError.bridge("ox.repository.git.\(function): message must contain 1-500 characters")
         }
         return clean
     }
@@ -732,7 +737,6 @@ final class ServiceOperations {
         let signIn: Service.SignInState
         let saved: Bool
         let attached: Bool
-        let skills: [Manifest.Skill]
         let matchedAction: MatchedAction?
 
         init(match: ServiceManager.ServiceMatch, attached: Bool, kind: String) {
@@ -752,7 +756,6 @@ final class ServiceOperations {
             signIn = snapshot.signIn
             saved = snapshot.saved
             self.attached = snapshot.attached
-            skills = snapshot.skills
             matchedAction = match.matchedActionID.flatMap { id in
                 match.matchedAction.map { MatchedAction(id: id, label: $0) }
             }

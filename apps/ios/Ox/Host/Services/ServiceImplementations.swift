@@ -83,7 +83,7 @@ final class IOSService {
     init(domain: String, permission: NativePermission?) {
         self.domain = domain
         self.permission = permission
-        browserState = domain == "ios:browser" ? .idle(Service.Resolved(actions: "", skills: [:])) : nil
+        browserState = domain == "ios:browser" ? .idle(Service.Resolved(actions: "")) : nil
     }
 
     var hasBrowserRuntime: Bool { browserState != nil }
