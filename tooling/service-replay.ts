@@ -118,7 +118,7 @@ async function waitForRegistry(endpoint: string, expectedDomain?: string): Promi
 
 function parseOptions(args: string[]): Options {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log("Usage: bun run test:services [domain[:action[:case]]] --repository <service-repository> [--device ox-qa-N]");
+    console.log("Usage: bun run test:services [domain[:action[:case]]] --repository <repository> [--device ox-qa-N]");
     process.exit(0);
   }
   let selector: string | undefined;
@@ -129,7 +129,7 @@ function parseOptions(args: string[]): Options {
       if (!args[++index]) throw new Error("--device requires ox-qa-N");
     } else if (argument === "--repository") {
       const value = args[++index];
-      if (!value) throw new Error("--repository requires a local service repository");
+      if (!value) throw new Error("--repository requires a local repository");
       repository = resolve(value);
     } else if (argument.startsWith("--")) {
       throw new Error(`Unknown option ${argument}`);
@@ -141,7 +141,7 @@ function parseOptions(args: string[]): Options {
   }
   const device = qaNumberedDevice(args, Bun.env.OX_QA_DEVICE ?? targetedQaDevice);
   repository ??= Bun.env.OX_SERVER_ROOT ? resolve(Bun.env.OX_SERVER_ROOT) : undefined;
-  if (!repository) throw new Error("Pass --repository <service-repository> or set OX_SERVER_ROOT");
+  if (!repository) throw new Error("Pass --repository <repository> or set OX_SERVER_ROOT");
   return { device, selector, repository };
 }
 

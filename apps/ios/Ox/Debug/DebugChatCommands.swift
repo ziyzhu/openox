@@ -154,6 +154,7 @@ extension OxHostProtocol {
                     savedServicesMigrated: replay.savedServicesMigrated,
                     futureActionPoliciesPreserved: replay.futureActionPoliciesPreserved,
                     actionPolicyResolutionValid: replay.actionPolicyResolutionValid,
+                    skillChecks: replay.skillChecks,
                     fixtureResults: replay.fixtureResults
                 ))
             } catch {

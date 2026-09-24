@@ -15,7 +15,7 @@ Resolve the installed repository root:
 import { repositoryRoot } from "@openox/services";
 ```
 
-Use `repositoryRoot` anywhere Ox accepts a local service repository path.
+Use `repositoryRoot` anywhere Ox accepts a local repository path.
 
 Service authoring APIs are published separately as `@openox/service-sdk`.
 

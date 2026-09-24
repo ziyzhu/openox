@@ -36,7 +36,7 @@ function transport(endpoint: string) {
 
 const description = {
   implementation: { name: "Ox", version: "1.0.7", build: "1" },
-  protocols: { repository: [2] },
+  protocols: { repository: [3] },
   methods: ["host.describe", "chats.list"],
 };
 const row = { id: "chat", title: "Example", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: true };

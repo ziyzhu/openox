@@ -2,7 +2,7 @@ import Foundation
 
 extension Chat {
     var skillsMount: SkillsMount {
-        SkillsMount(repository: repository, scope: scope, services: attachedServices)
+        SkillsMount(repository: repository, scope: scope, manager: serviceManager, session: skillSession)
     }
 
     private var servicesMount: ServicesMount {
@@ -35,21 +35,24 @@ extension Chat {
                     fileSystemItem(path: "artifacts/\($0.fileName)", type: "file", size: $0.size)
                 }
             case .skills:
-                items = await skillsMount.entries().map {
+                items = try await skillsMount.entries().map {
                     fileSystemItem(path: $0.directoryPath, type: "directory", size: nil)
                 }
             case .skill(let name):
                 let skill = try await skillsMount.entry(named: name)
                 var skillItems = [fileSystemItem(path: skill.filePath, type: "file", size: skill.content.utf8.count)]
-                if !skill.references.isEmpty {
-                    skillItems.append(fileSystemItem(path: skill.referenceDirectoryPath, type: "directory", size: nil))
+                for directory in ["references", "scripts"] where skill.resources.contains(where: { $0.name.hasPrefix(directory + "/") }) {
+                    skillItems.append(fileSystemItem(path: "\(skill.directoryPath)/\(directory)", type: "directory", size: nil))
                 }
                 items = skillItems
-            case .skillReferences(let name):
+            case .skillDirectory(let name, let path), .skillResource(let name, let path):
                 let skill = try await skillsMount.entry(named: name)
-                guard !skill.references.isEmpty else { throw VirtualFileSystem.Error.notDirectory(location.path) }
-                items = skill.references.map {
-                    fileSystemItem(path: skill.referencePath($0), type: "file", size: $0.content.utf8.count)
+                let prefix = path + "/"
+                let children = Set(skill.resources.filter { $0.name.hasPrefix(prefix) }.map { String($0.name.dropFirst(prefix.count).split(separator: "/")[0]) })
+                items = children.map { child in
+                    let relative = prefix + child
+                    let resource = skill.resources.first { $0.name == relative }
+                    return fileSystemItem(path: "\(skill.directoryPath)/\(relative)", type: resource == nil ? "directory" : "file", size: resource?.content.utf8.count)
                 }
             case .services:
                 items = ServicesMount.Kind.allCases.map {
@@ -91,7 +94,7 @@ extension Chat {
                 }
             case .deviceFolder, .deviceItem:
                 items = try await self.listDeviceFiles(location)
-            case .memory, .soul, .artifact, .skillFile, .skillReference, .chatMetadata, .chatTurns:
+            case .memory, .soul, .artifact, .skillFile, .chatMetadata, .chatTurns:
                 throw VirtualFileSystem.Error.notDirectory(location.path)
             }
             let sorted = items.sorted { lhs, rhs in
@@ -163,8 +166,12 @@ extension Chat {
             case .artifact(let name):
                 _ = try await repository.deleteArtifact(named: name, in: scope)
             case .skill(let name), .skillFile(let name):
-                _ = try await repository.deleteSkill(named: name, in: scope)
+                try await skillsMount.delete(name: name)
                 refreshUserSkills()
+            case .skillResource(let name, let path):
+                var skill = try await skillsMount.entry(named: name).skill
+                guard skill.resources?.removeValue(forKey: path) != nil else { throw SkillError.missing(path) }
+                _ = try await skillsMount.save(skill)
             case .serviceItem(let kind, let domain, let path):
                 try await servicesMount.deleteSource(kind: kind, domain: domain, path: path)
             case .deviceItem:
@@ -329,9 +336,9 @@ extension Chat {
 
     private func requireWritableFileContext(_ location: VirtualFileSystem.Location, action: String) async throws {
         switch location {
-        case .skill(let name), .skillFile(let name):
+        case .skill(let name), .skillFile(let name), .skillResource(let name, _):
             try await skillsMount.requireWritable(name: name, path: location.path)
-        case .skillReferences, .skillReference:
+        case .skillDirectory:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .serviceItem:
             return
@@ -350,6 +357,8 @@ extension Chat {
 
     private func fileSystemIsDirectory(_ location: VirtualFileSystem.Location) async throws -> Bool {
         switch location {
+        case .skillResource(let name, let path):
+            return try await skillsMount.entry(named: name).resources.contains { $0.name.hasPrefix(path + "/") }
         case .serviceItem(let kind, let domain, let path):
             return try await servicesMount.sourceIsDirectory(kind: kind, domain: domain, path: path)
         case .deviceItem:
@@ -441,14 +450,14 @@ extension Chat {
             }.value
             return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
         case .skillFile(let name):
-            let skill = try await skillsMount.entry(named: name)
+            let skill = try await skillsMount.activate(named: name)
             let result = try fileSystemTextRead(skill.content, maxBytes: maxBytes)
             if let content = result.text {
                 activateSkill(name: skill.name, path: skill.filePath, content: content)
             }
             return result
-        case .skillReference(let name, let referenceName):
-            let reference = try await skillsMount.reference(skill: name, named: referenceName)
+        case .skillResource(let name, let referenceName):
+            let reference = try await skillsMount.resource(skill: name, path: referenceName)
             return try fileSystemTextRead(reference.content, maxBytes: maxBytes)
         case .serviceItem(let kind, let domain, let path):
             return try fileSystemTextRead(
@@ -470,7 +479,7 @@ extension Chat {
                 return try ArtifactLibrary.read(artifact, options: readOptions)
             }
             return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
-        case .root, .artifacts, .skills, .skill, .skillReferences, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }
@@ -499,8 +508,8 @@ extension Chat {
             return text
         case .skillFile(let name):
             return try await skillsMount.entry(named: name).content
-        case .skillReference(let name, let referenceName):
-            return try await skillsMount.reference(skill: name, named: referenceName).content
+        case .skillResource(let name, let referenceName):
+            return try await skillsMount.resource(skill: name, path: referenceName).content
         case .serviceItem(let kind, let domain, let path):
             return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
         case .chatMetadata(let id):
@@ -516,7 +525,7 @@ extension Chat {
                 guard let text = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
                 return text
             }
-        case .root, .artifacts, .skills, .skill, .skillReferences, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }
@@ -545,19 +554,21 @@ extension Chat {
             guard let skill = SkillFiles.parse(content, directoryName: name) else {
                 throw RuntimeError.bridge("ox.fs.write: skills/\(name)/SKILL.md must contain valid skill frontmatter and non-empty instructions.")
             }
-            let replacing = (try? await repository.skill(named: name, in: scope)) == nil ? nil : name
-            let saved = try await repository.saveSkill(
-                name: skill.name,
-                description: skill.description,
-                instructions: skill.instructions,
-                services: skill.services,
-                replacing: replacing,
-                in: scope
-            )
+            var content = skill
+            content.resources = try? await skillsMount.entry(named: name).skill.resources
+            let saved = try await skillsMount.save(content)
             refreshUserSkills()
             embedSkill(saved)
             let serialized = SkillFiles.serialize(saved)
             return fileSystemItem(path: "skills/\(saved.name)/SKILL.md", type: "file", size: serialized.utf8.count)
+        case .skillResource(let name, let path):
+            guard SkillFiles.isResourcePath(path) else { throw SkillError.invalidPackage }
+            var skill = try await skillsMount.entry(named: name).skill
+            var resources = skill.resources ?? [:]
+            resources[path] = content
+            skill.resources = resources
+            _ = try await skillsMount.save(skill)
+            return fileSystemItem(path: location.path, type: "file", size: data.count)
         case .serviceItem(let kind, let domain, let path):
             try await servicesMount.writeSource(kind: kind, domain: domain, path: path, content: content)
             return fileSystemItem(path: location.path, type: "file", size: data.count)
@@ -570,7 +581,7 @@ extension Chat {
                 try data.write(to: url, options: .atomic)
             }
             return fileSystemItem(path: location.path, type: "file", size: data.count)
-        case .root, .artifacts, .skills, .skill, .skillReferences, .skillReference, .services, .serviceKind, .service, .chats, .chat, .chatMetadata, .chatTurns, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .chatMetadata, .chatTurns, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }
     }
@@ -607,14 +618,13 @@ extension Chat {
             return [base.path]
         case .skill(let name):
             let skill = try await skillsMount.entry(named: name)
-            return [skill.filePath] + skill.references.map(skill.referencePath)
+            return [skill.filePath] + skill.resources.map(skill.resourcePath)
         case .skillFile:
             return [base.path]
-        case .skillReferences(let name):
+        case .skillDirectory(let name, let path), .skillResource(let name, let path):
             let skill = try await skillsMount.entry(named: name)
-            return skill.references.map(skill.referencePath)
-        case .skillReference:
-            return [base.path]
+            let matches = skill.resources.filter { $0.name == path || $0.name.hasPrefix(path + "/") }
+            return matches.map(skill.resourcePath)
         default:
             break
         }
@@ -636,8 +646,8 @@ extension Chat {
             break
         }
         let artifacts = await repository.artifacts(in: scope).map { "artifacts/\($0.fileName)" }
-        let skills = await skillsMount.entries().flatMap { skill in
-            [skill.filePath] + skill.references.map(skill.referencePath)
+        let skills = try await skillsMount.entries().flatMap { skill in
+            [skill.filePath] + skill.resources.map(skill.resourcePath)
         }
         var services: [String] = []
         for service in servicesMount.entries() {
@@ -688,8 +698,8 @@ extension Chat {
             return Soul.shared.text
         case .skillFile(let name):
             return try await skillsMount.entry(named: name).content
-        case .skillReference(let name, let referenceName):
-            return try await skillsMount.reference(skill: name, named: referenceName).content
+        case .skillResource(let name, let referenceName):
+            return try await skillsMount.resource(skill: name, path: referenceName).content
         case .serviceItem(let kind, let domain, let path):
             return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
         case .chatMetadata(let id):
@@ -712,7 +722,7 @@ extension Chat {
                 guard data.count <= ArtifactLimits.textBytes else { return nil }
                 return String(data: data, encoding: .utf8)
             }
-        case .root, .artifacts, .skills, .skill, .skillReferences, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
+        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
             return nil
         }
     }

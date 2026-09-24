@@ -6,7 +6,10 @@ nonisolated struct Skill: Codable, Identifiable, Equatable, Sendable {
     var description: String
     var instructions: String
     var services: [String] = []
-    var id: String { name }
+    var resources: [String: String]? = nil
+    var source: SkillOwner? = nil
+    var owner: SkillOwner { source ?? .user }
+    var id: String { "\(owner.id):\(name)" }
     var displayName: String { name }
 }
 
@@ -17,6 +20,9 @@ nonisolated struct SkillPatch: Sendable {
 }
 
 nonisolated enum SkillError: LocalizedError, Sendable {
+    case invalidPackage
+    case conflict(String)
+    case reserved(String)
     case invalidName
     case missing(String)
     case exists(String)
@@ -27,6 +33,9 @@ nonisolated enum SkillError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
+        case .invalidPackage: "The skill package is invalid or too large."
+        case .conflict(let name): "Choose a source for /\(name) in Skills before using it."
+        case .reserved(let name): "The name /\(name) is reserved for a system skill."
         case .invalidName: "User skill names must use lowercase kebab-case."
         case .missing(let name): "No skill named /\(name) exists."
         case .exists(let name): "A skill named /\(name) already exists."
@@ -40,6 +49,9 @@ nonisolated enum SkillError: LocalizedError, Sendable {
 
 nonisolated enum SkillFiles {
     static let fileName = "SKILL.md"
+    static let maximumBytes = 524_288
+    static let maximumFiles = 64
+    static let reservedNames: Set<String> = ["manage-artifacts", "manage-services", "manage-skills"]
 
     static func displayName(_ name: String) -> String {
         name
@@ -79,7 +91,7 @@ nonisolated enum SkillFiles {
         guard let closing = content.range(of: "\n---\n") else { return nil }
         let fields = parseFields(String(content[..<closing.lowerBound]))
         let instructions = String(content[closing.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard fields["name"] == directoryName,
+        guard isLocalName(directoryName), directoryName.count <= 100, fields["name"] == directoryName,
               let description = fields["description"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               !description.isEmpty,
               !instructions.isEmpty else { return nil }
@@ -87,7 +99,8 @@ nonisolated enum SkillFiles {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty } ?? []
-        return Skill(name: directoryName, description: description, instructions: instructions, services: services)
+        guard services.allSatisfy({ $0.range(of: "^[a-z0-9]+(?:[.:-][a-z0-9]+)*$", options: .regularExpression) != nil }) else { return nil }
+        return Skill(name: directoryName, description: description, instructions: instructions, services: services.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } })
     }
 
     static func serialize(_ skill: Skill) -> String {
@@ -113,12 +126,14 @@ nonisolated enum SkillFiles {
         var fields: [String: String] = [:]
         for line in frontmatter.split(whereSeparator: \.isNewline) {
             let parts = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-            guard parts.count == 2 else { continue }
+            guard parts.count == 2 else { return [:] }
             let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+            guard ["name", "description", "services"].contains(key), fields[key] == nil else { return [:] }
             let raw = String(parts[1]).trimmingCharacters(in: .whitespaces)
             if let data = raw.data(using: .utf8), let decoded = try? JSONDecoder().decode(String.self, from: data) {
                 fields[key] = decoded
             } else {
+                guard !raw.hasPrefix("\"") else { return [:] }
                 fields[key] = raw
             }
         }
@@ -136,29 +151,20 @@ extension ProfileRepository {
                 includingPropertiesForKeys: [.isDirectoryKey]
               ) else { return [] }
         return directories.compactMap { directory in
-            guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
-                  SkillFiles.isUserName(directory.lastPathComponent),
-                  let text = try? String(
-                    contentsOf: directory.appendingPathComponent(SkillFiles.fileName),
-                    encoding: .utf8
-                  ),
-                  let skill = SkillFiles.parse(text, directoryName: directory.lastPathComponent) else {
-                Log.ui.error("ProfileRepository.skills invalid path=\(directory.lastPathComponent)")
+            guard SkillFiles.isUserName(directory.lastPathComponent) else { return nil }
+            do { return try SkillFiles.load(directory: directory) }
+            catch {
+                Log.ui.error("ProfileRepository.skills invalid path=\(directory.lastPathComponent) error=\(error.localizedDescription)")
                 return nil
             }
-            return skill
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     func skill(named rawName: String, in scope: ProfileScope) throws -> Skill {
         let name = try canonicalSkillName(rawName)
-        let file = try skillsDirectory(in: scope)
-            .appendingPathComponent(name, isDirectory: true)
-            .appendingPathComponent(SkillFiles.fileName)
-        guard FileManager.default.fileExists(atPath: file.path) else { throw SkillError.missing(name) }
-        let text = try String(contentsOf: file, encoding: .utf8)
-        guard let skill = SkillFiles.parse(text, directoryName: name) else { throw SkillError.missing(name) }
-        return skill
+        let directory = try skillsDirectory(in: scope).appendingPathComponent(name, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { throw SkillError.missing(name) }
+        return try SkillFiles.load(directory: directory)
     }
 
     @discardableResult
@@ -168,6 +174,7 @@ extension ProfileRepository {
         instructions: String,
         services: [String] = [],
         replacing: String? = nil,
+        resources: [String: String]? = nil,
         in scope: ProfileScope
     ) throws -> Skill {
         let name = try canonicalSkillName(name)
@@ -179,30 +186,16 @@ extension ProfileRepository {
         if directoryExists, replacing != name {
             throw SkillError.exists(name)
         }
-        let skill = try validatedSkill(
+        var skill = try validatedSkill(
             name: name,
             description: description,
             instructions: instructions,
             services: services
         )
-        do {
-            try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-            try SkillFiles.serialize(skill).write(
-                to: directory.appendingPathComponent(SkillFiles.fileName),
-                atomically: true,
-                encoding: .utf8
-            )
-            if let replacing, replacing != name {
-                do {
-                    try manager.removeItem(at: root.appendingPathComponent(replacing, isDirectory: true))
-                } catch {
-                    try? manager.removeItem(at: directory)
-                    throw error
-                }
-            }
-        } catch {
-            if !directoryExists { try? manager.removeItem(at: directory) }
-            throw error
+        skill.resources = try resources ?? replacing.flatMap { try self.skill(named: $0, in: scope).resources }
+        try SkillFiles.write(skill, directory: directory)
+        if let replacing, replacing != name {
+            try manager.removeItem(at: root.appendingPathComponent(replacing, isDirectory: true))
         }
         Log.ui.info("ProfileRepository.saveSkill name=\(name) replacing=\(replacing ?? "-") services=\(services.count) count=\(skills(in: scope).count)")
         return skill
@@ -280,6 +273,7 @@ extension ProfileRepository {
     private func canonicalSkillName(_ rawName: String) throws -> String {
         let name = SkillFiles.slug(rawName)
         guard SkillFiles.isUserName(name) else { throw SkillError.invalidName }
+        guard !SkillFiles.reservedNames.contains(name) else { throw SkillError.reserved(name) }
         return name
     }
 
@@ -307,8 +301,10 @@ extension ProfileRepository {
 @Observable
 final class Skills {
     static let shared = Skills()
-
     private(set) var all: [Skill] = []
+    private(set) var conflicts: [SkillCatalog.Conflict] = []
+    private(set) var errorMessage: String?
+    private(set) var repositorySkills: [Skill] = []
     private(set) var isLoaded = false
     @ObservationIgnored private let fixedScope: ProfileScope?
     @ObservationIgnored private var operation: Task<Void, Never>?
@@ -323,56 +319,69 @@ final class Skills {
         refresh()
     }
 
-    private var scope: ProfileScope? {
-        fixedScope ?? StorageRoot.currentScope
+    private var scope: ProfileScope? { fixedScope ?? StorageRoot.currentScope }
+
+    func setRepositorySkills(_ skills: [Skill]) {
+        guard repositorySkills != skills else { return }
+        repositorySkills = skills
+        refresh()
     }
 
-    func refresh() {
-        isLoaded = false
-        enqueue { _, _ in }
+    static func catalog(in scope: ProfileScope, repositorySkills: [Skill]) async throws -> SkillCatalog {
+        let users = await ProfileRepository.shared.skills(in: scope)
+        let selections = try await ProfileRepository.shared.skillSelections(in: scope)
+        return SkillCatalog(candidates: BuiltInSkills.skills + repositorySkills + users, selections: selections.sources)
     }
 
-    func waitUntilCurrent() async {
-        await operation?.value
-    }
+    func refresh() { enqueue { _, _ in } }
+    func waitUntilCurrent() async { await operation?.value }
+    func dismissError() { errorMessage = nil }
+    func skill(named name: String) -> Skill? { all.first { $0.name == SkillFiles.slug(name) } }
 
-    func skill(named name: String) -> Skill? {
-        all.first { $0.name == SkillFiles.slug(name) }
-    }
-
-    func upsert(name: String, description: String, instructions: String, services: [String] = [], replacing: String? = nil) {
+    func select(name: String, source: String?) {
         enqueue(syncActive: true) { repository, scope in
-            do {
-                try await repository.saveSkill(
-                    name: name,
-                    description: description,
-                    instructions: instructions,
-                    services: services,
-                    replacing: replacing,
-                    in: scope
-                )
-            } catch {
-                Log.ui.error("Skills.upsert name=\(name) failed: \(error.localizedDescription)")
+            try await repository.selectSkill(name: name, source: source, in: scope)
+        }
+    }
+
+    func customize(_ skill: Skill, name: String) {
+        enqueue(syncActive: true) { repository, scope in
+            let saved = try await repository.saveSkill(name: name, description: skill.description, instructions: skill.instructions, services: skill.services, resources: skill.resources, in: scope)
+            try await repository.selectSkill(name: saved.name, source: SkillOwner.user.id, in: scope)
+        }
+    }
+
+    func share(_ skill: Skill, manager: ServiceManager) {
+        enqueue(syncActive: true) { _, _ in
+            _ = try await manager.saveLocalSkill(skill, createOnly: true)
+        }
+    }
+
+    func upsert(name: String, description: String, instructions: String, services: [String] = [], replacing: String? = nil, resources: [String: String]? = nil, owner: SkillOwner = .user, manager: ServiceManager? = nil) {
+        enqueue(syncActive: true) { repository, scope in
+            guard owner.isWritable else { throw SkillError.reserved(name) }
+            if case .repository = owner {
+                guard let manager else { throw SkillError.missing(name) }
+                let skill = Skill(name: SkillFiles.slug(name), description: description, instructions: instructions, services: services, resources: resources)
+                _ = try await manager.saveLocalSkill(skill, replacing: replacing)
+            } else {
+                _ = try await repository.saveSkill(name: name, description: description, instructions: instructions, services: services, replacing: replacing, resources: resources, in: scope)
             }
         }
     }
 
-    func delete(_ skill: Skill) {
+    func delete(_ skill: Skill, manager: ServiceManager) {
         enqueue(syncActive: true) { repository, scope in
-            do {
-                try await repository.deleteSkill(named: skill.name, in: scope)
-            } catch {
-                Log.ui.error("Skills.delete name=\(skill.name) failed: \(error.localizedDescription)")
-            }
+            guard skill.owner.isWritable else { throw SkillError.reserved(skill.name) }
+            if case .repository = skill.owner { try await manager.deleteLocalSkill(name: skill.name) }
+            else { _ = try await repository.deleteSkill(named: skill.name, in: scope) }
         }
     }
 
-    private func enqueue(
-        syncActive: Bool = false,
-        _ mutation: @escaping @Sendable (ProfileRepository, ProfileScope) async -> Void
-    ) {
+    private func enqueue(syncActive: Bool = false, _ mutation: @escaping @MainActor (ProfileRepository, ProfileScope) async throws -> Void) {
         guard let scope else {
             all = []
+            conflicts = []
             isLoaded = true
             return
         }
@@ -380,16 +389,20 @@ final class Skills {
         let repository = ProfileRepository.shared
         operation = Task { @MainActor [weak self] in
             await previous?.value
-            await mutation(repository, scope)
-            let skills = await repository.skills(in: scope)
-            guard self?.scope == scope else { return }
-            self?.all = skills
-            self?.isLoaded = true
-            if syncActive, let fixedScope = self?.fixedScope,
-               StorageRoot.currentScope?.profileID == fixedScope.profileID {
-                Skills.shared.refresh()
+            do {
+                try await mutation(repository, scope)
+                let catalog = try await Self.catalog(in: scope, repositorySkills: Self.shared.repositorySkills)
+                guard self?.scope == scope else { return }
+                self?.all = catalog.skills
+                self?.conflicts = catalog.conflicts
+                self?.errorMessage = nil
+            } catch {
+                guard self?.scope == scope else { return }
+                self?.errorMessage = error.localizedDescription
+                Log.ui.error("Skills.refresh failed=\(error.localizedDescription)")
             }
-            Log.ui.info("Skills.refresh count=\(skills.count) generation=\(scope.generation)")
+            self?.isLoaded = true
+            if syncActive, self?.fixedScope != nil, StorageRoot.currentScope == scope { Self.shared.refresh() }
         }
     }
 }

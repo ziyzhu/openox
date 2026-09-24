@@ -82,7 +82,7 @@ const storageMigrationCallers = new Set([
   "apps/ios/Ox/Host/IOSHost.swift",
   "apps/ios/Ox/Host/Profile/StorageMigration.swift",
   "apps/ios/Ox/Host/Profile/StorageRoot.swift",
-  "apps/ios/Ox/Host/Services/Repository/ServiceRepository.swift",
+  "apps/ios/Ox/Host/Services/Repository/Repository.swift",
 ]);
 for (const [index, source] of allSource.entries()) {
   const path = relative(ROOT, allSwiftFiles[index]);

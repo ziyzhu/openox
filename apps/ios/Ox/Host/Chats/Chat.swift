@@ -230,6 +230,7 @@ final class Chat: Identifiable {
     let presentations: AppPresentations
     let repository: ProfileRepository
     let scope: ProfileScope
+    let skillSession = SkillSession()
     let serviceManager: ServiceManager
     let fileMutationCoordinator = FileMutationCoordinator.shared
     private(set) var retention: ChatRetention
@@ -2383,6 +2384,8 @@ final class Chat: Identifiable {
         await Soul.shared.waitUntilCurrent()
         await UserMemory.shared.waitUntilCurrent()
         await Skills.shared.waitUntilCurrent()
+        skillSession.snapshots = [:]
+        if let invocation = submission.skillInvocation { skillSession.snapshots[invocation.skill.name] = invocation.skill }
         await agentControlTask?.value
         let configuration = agentConfiguration(client: client, model: model)
         await agent.configure(configuration)
@@ -2400,6 +2403,8 @@ final class Chat: Identifiable {
             : []
         let transientContext = Self.turnContext(
             TurnContext(
+                skills: (try? await skillsMount.entries().map(\.skill)) ?? [],
+                skillConflicts: (try? await skillsMount.catalog().conflicts.filter { $0.selectedSourceID == nil }.map(\.name)) ?? [],
                 attachedServices: attached,
                 definitions: definitions,
                 fileMountPaths: fileMountPaths,

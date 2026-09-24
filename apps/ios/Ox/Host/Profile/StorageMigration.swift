@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import SwiftGitX
 import UniformTypeIdentifiers
 
@@ -21,6 +22,7 @@ nonisolated enum ProfileSchema {
         "2026-08-31-model-selection",
         "2026-09-18-providers",
         "2026-09-20-browser-functions",
+        "2026-09-24-repository-skills",
     ]
     static var current: String { versions.last! }
 
@@ -41,6 +43,7 @@ nonisolated enum ProfileSchema {
         { try StorageMigrator.migrateChatModelSelections(at: $0) },
         { try StorageMigrator.migrateChatProviderDefinitions(at: $0) },
         { try StorageMigrator.removeBrowserServiceAttachments(at: $0) },
+        { try StorageMigrator.migrateProfileSkillCatalog(at: $0) },
     ]
 }
 
@@ -50,11 +53,11 @@ nonisolated enum StorageMigrationError: LocalizedError {
     case invalidAttachment(String)
     case invalidApplicationStorage(String)
     case invalidArtifact(String)
-    case invalidLocalServiceRepositorySeed
-    case invalidRepairedLocalServiceRepository
+    case invalidLocalRepositorySeed
+    case invalidRepairedLocalRepository
     case missingArtifact(String)
     case missingConfig
-    case localServiceRepositoryRollbackFailed(String)
+    case localRepositoryRollbackFailed(String)
     case profileMigrationFailed(String)
     case unsupportedProfileVersion(String, String)
 
@@ -65,11 +68,11 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .invalidAttachment(let path): "Legacy attachment metadata is invalid: \(path)"
         case .invalidApplicationStorage(let component): "Stored \(component) data is not compatible with this version of Ox."
         case .invalidArtifact(let path): "Legacy artifact metadata is invalid: \(path)"
-        case .invalidLocalServiceRepositorySeed: "The Local service repository repair seed is invalid."
-        case .invalidRepairedLocalServiceRepository: "The repaired Local service repository is invalid."
+        case .invalidLocalRepositorySeed: "The Local repository repair seed is invalid."
+        case .invalidRepairedLocalRepository: "The repaired Local repository is invalid."
         case .missingArtifact(let path): "Legacy artifact content is missing: \(path)"
         case .missingConfig: "The Profile configuration could not be read."
-        case .localServiceRepositoryRollbackFailed(let detail): "The Local service repository repair and rollback failed: \(detail)"
+        case .localRepositoryRollbackFailed(let detail): "The Local repository repair and rollback failed: \(detail)"
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
         case .unsupportedProfileVersion(let name, let version):
             "The Profile “\(name)” uses data format “\(version)”, which this version of Ox does not support. Install the Ox version that last opened it or a newer one."
@@ -98,6 +101,7 @@ nonisolated struct StorageMigrationReplay: Sendable {
     let savedServicesMigrated: Bool
     let futureActionPoliciesPreserved: Bool
     let actionPolicyResolutionValid: Bool
+    let skillChecks: [String: Bool]
     let fixtureResults: [StorageMigrationFixtureReplay]
 }
 
@@ -122,7 +126,7 @@ nonisolated struct StorageMigrationFixtureReplay: Codable, Sendable {
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
 
-    private enum LegacyLocalServiceRepositoryState {
+    private enum LegacyLocalRepositoryState {
         case main(String)
         case empty
         case unsupported([String])
@@ -189,6 +193,10 @@ nonisolated enum StorageMigrator {
         }
         var migrated = profile
         migrated.version = ProfileSchema.current
+        let selections = profile.url.appendingPathComponent("skill-selections.json")
+        if FileManager.default.fileExists(atPath: selections.path) {
+            guard try JSONDecoder().decode(SkillSelections.self, from: Data(contentsOf: selections)).version == 1 else { throw SkillError.invalidPackage }
+        }
         return migrated
     }
 
@@ -298,6 +306,10 @@ nonisolated enum StorageMigrator {
     }
 
     private static func canonicalApprovalAction(_ action: String) -> String {
+        let renamed = action.replacingOccurrences(of: "ox.service.repository.", with: "ox.repository.")
+            .replacingOccurrences(of: "ox.service.git.", with: "ox.repository.git.")
+            .replacingOccurrences(of: "ox.app.serviceRepositories", with: "ox.app.repositories")
+        if renamed != action { return renamed }
         if action.hasPrefix("ox.") || action.hasPrefix("web:") || action.hasPrefix("api:")
             || action.hasPrefix("ios:") || action.hasPrefix("mcp:") {
             return action
@@ -336,6 +348,7 @@ nonisolated enum StorageMigrator {
         )
         if FileManager.default.fileExists(atPath: AppStoragePaths.scheduledSkills.path) {
             do {
+                try migrateScheduledSkillPackages(at: AppStoragePaths.scheduledSkills)
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 let document = try decoder.decode(
@@ -573,7 +586,7 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    static func migrateLegacyLocalServiceRepository(at root: URL, seed: URL?) throws {
+    static func migrateLegacyLocalRepository(at root: URL, seed: URL?) throws {
         let manager = FileManager.default
         let metadata = root.appendingPathComponent(".git", isDirectory: true)
         guard manager.fileExists(atPath: metadata.path) else { return }
@@ -583,30 +596,30 @@ nonisolated enum StorageMigrator {
                 == "ref: refs/heads/master"
         else { return }
 
-        switch try legacyLocalServiceRepositoryState(at: root) {
+        switch try legacyLocalRepositoryState(at: root) {
         case .main(let expectedCommit):
             do {
                 try Data("ref: refs/heads/main\n".utf8).write(to: headURL, options: .atomic)
-                guard try localServiceRepositoryCommit(at: root) == expectedCommit else {
-                    throw StorageMigrationError.invalidRepairedLocalServiceRepository
+                guard try localRepositoryCommit(at: root) == expectedCommit else {
+                    throw StorageMigrationError.invalidRepairedLocalRepository
                 }
             } catch {
                 do {
                     try headData.write(to: headURL, options: .atomic)
                 } catch let rollbackError {
-                    throw StorageMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
+                    throw StorageMigrationError.localRepositoryRollbackFailed(rollbackError.localizedDescription)
                 }
                 throw error
             }
-            Log.service.info("StorageMigrator.localServiceRepository repaired=head commit=\(expectedCommit.prefix(12))")
+            Log.service.info("StorageMigrator.localRepository repaired=head commit=\(expectedCommit.prefix(12))")
         case .empty:
             guard let seed, manager.fileExists(atPath: seed.path) else {
-                throw StorageMigrationError.invalidLocalServiceRepositorySeed
+                throw StorageMigrationError.invalidLocalRepositorySeed
             }
-            try replaceLegacyLocalServiceRepositoryMetadata(at: root, metadata: metadata, seed: seed)
-            Log.service.info("StorageMigrator.localServiceRepository repaired=seed preservedWorkingTree=true")
+            try replaceLegacyLocalRepositoryMetadata(at: root, metadata: metadata, seed: seed)
+            Log.service.info("StorageMigrator.localRepository repaired=seed preservedWorkingTree=true")
         case .unsupported(let references):
-            Log.service.warning("StorageMigrator.localServiceRepository skipped references=\(references.joined(separator: ","))")
+            Log.service.warning("StorageMigrator.localRepository skipped references=\(references.joined(separator: ","))")
         }
     }
 
@@ -719,7 +732,7 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    static func migrateLocalServiceRepositoryVersion(at root: URL) throws {
+    static func migrateLocalRepositoryVersion(at root: URL) throws {
         let manager = FileManager.default
         let current = root.appendingPathComponent("repository.json", isDirectory: false)
         let packageURL = manager.fileExists(atPath: current.path) ? current : root.appendingPathComponent("ox.json", isDirectory: false)
@@ -741,12 +754,203 @@ nonisolated enum StorageMigrator {
         output.append(0x0A)
         try output.write(to: packageURL, options: .atomic)
         guard !dirty, !hasStagedChanges else {
-            Log.service.info("StorageMigrator.localServiceRepositoryVersion from=1 to=2 pending=true")
+            Log.service.info("StorageMigrator.localRepositoryVersion from=1 to=2 pending=true")
             return
         }
         try repository.add(paths: [path])
         let commit = try repository.commit(message: "Upgrade Local services repository to version 2")
-        Log.service.info("StorageMigrator.localServiceRepositoryVersion from=1 to=2 commit=\(commit.id.abbreviated)")
+        Log.service.info("StorageMigrator.localRepositoryVersion from=1 to=2 commit=\(commit.id.abbreviated)")
+    }
+
+    static func prepareRepository(at root: URL, local: Bool) throws -> URL {
+        let manager = FileManager.default
+        let current = root.appendingPathComponent("repository.json")
+        let packageURL = manager.fileExists(atPath: current.path) ? current : root.appendingPathComponent("ox.json")
+        let metadata = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
+        guard metadata.isSymbolicLink != true, (metadata.fileSize ?? 0) <= 512_000 else { throw SkillError.invalidPackage }
+        let data = try Data(contentsOf: packageURL)
+        guard let package = try JSONSerialization.jsonObject(with: data) as? [String: Any], let version = package["version"] as? Int else {
+            throw StorageMigrationError.invalidApplicationStorage("repository")
+        }
+        guard version != 3 else { return root }
+        guard version == 2 else { throw StorageMigrationError.invalidApplicationStorage("repository version \(version)") }
+        if local {
+            let git = try SwiftGitX.Repository.open(at: root)
+            if git.isHEADDetached {
+                guard try git.status().isEmpty, let commit = try git.HEAD.target as? Commit else {
+                    throw StorageMigrationError.invalidApplicationStorage("historical repository with unfinished changes; return to latest")
+                }
+                let identity = SHA256.hash(data: Data((root.path + commit.id.hex).utf8)).map { String(format: "%02x", $0) }.joined()
+                let view = AppStoragePaths.caches.appendingPathComponent("RepositoryViews/\(identity)")
+                if manager.fileExists(atPath: view.appendingPathComponent("repository.json").path),
+                   let saved = try? JSONSerialization.jsonObject(with: Data(contentsOf: view.appendingPathComponent("repository.json"))) as? [String: Any], saved["version"] as? Int == 3 { return view }
+                if manager.fileExists(atPath: view.path) { try manager.removeItem(at: view) }
+                try manager.createDirectory(at: view, withIntermediateDirectories: true)
+                for file in try manager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey]) where file.lastPathComponent != ".git" {
+                    guard try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw SkillError.invalidPackage }
+                    try manager.copyItem(at: file, to: view.appendingPathComponent(file.lastPathComponent))
+                }
+                try migrateRepositorySkills(at: view)
+                return view
+            }
+        }
+        try migrateRepositorySkills(at: root)
+        return root
+    }
+
+    private static func migratedSkillName(domain: String, name: String) -> String {
+        let known = ["xiaohongshu.com:research": "xiaohongshu-research", "www.1point3acres.com:research": "1point3acres-research", "news.ycombinator.com:display": "hacker-news-display", "x.com:research": "x-research", "amazon.com:product-research": "product-research"]
+        return known[domain + ":" + name] ?? SkillFiles.slug(domain + "-" + name)
+    }
+
+    private static func migratedSkillInstructions(_ text: String) -> String {
+        var value = text.replacingOccurrences(of: "skills/system:", with: "skills/")
+            .replacingOccurrences(of: "ox.service.repository.", with: "ox.repository.")
+            .replacingOccurrences(of: "ox.service.git.", with: "ox.repository.git.")
+            .replacingOccurrences(of: "ox.app.serviceRepositories", with: "ox.app.repositories")
+        let regex = try! NSRegularExpression(pattern: "skills/service:([a-z0-9.-]+):([a-z0-9-]+)/")
+        for match in regex.matches(in: value, range: NSRange(value.startIndex..., in: value)).reversed() {
+            guard let whole = Range(match.range, in: value), let domain = Range(match.range(at: 1), in: value), let name = Range(match.range(at: 2), in: value) else { continue }
+            let replacement = "skills/" + migratedSkillName(domain: String(value[domain]), name: String(value[name])) + "/"
+            value.replaceSubrange(whole, with: replacement)
+        }
+        return value
+    }
+
+    static func migrateRepositorySkills(at root: URL) throws {
+        let manager = FileManager.default
+        let current = root.appendingPathComponent("repository.json")
+        let packageURL = manager.fileExists(atPath: current.path) ? current : root.appendingPathComponent("ox.json")
+        guard var package = try JSONSerialization.jsonObject(with: Data(contentsOf: packageURL)) as? [String: Any] else { throw SkillError.invalidPackage }
+        guard package["version"] as? Int == 2 else { return }
+        guard let services = package["services"] as? [String], services.count <= 256 else { throw SkillError.invalidPackage }
+        let git = try? SwiftGitX.Repository.open(at: root)
+        let clean = try git?.status().isEmpty == true
+        let backup = root.deletingLastPathComponent().appendingPathComponent(".\(root.lastPathComponent)-repository-v2-backup", isDirectory: true)
+        if !manager.fileExists(atPath: backup.path) { try manager.createDirectory(at: backup, withIntermediateDirectories: true) }
+        let packageBackup = backup.appendingPathComponent(packageURL.lastPathComponent)
+        if !manager.fileExists(atPath: packageBackup.path) { try manager.copyItem(at: packageURL, to: packageBackup) }
+        var names = Set(package["skills"] as? [String] ?? [])
+        var oldDirectories: [URL] = []
+        var manifests: [(URL, Data)] = []
+        var moved: [(URL, Skill)] = []
+        for service in services {
+            let parts = service.split(separator: ":", maxSplits: 1).map(String.init)
+            guard parts.count == 2, ["web", "api", "ios", "mcp"].contains(parts[0]),
+                  parts[1].range(of: "^[a-z0-9][a-z0-9._-]*$", options: .regularExpression) != nil else { throw SkillError.invalidPackage }
+            let directory = root.appendingPathComponent(parts[0] + "/" + parts[1])
+            guard directory.resolvingSymlinksInPath().standardizedFileURL.path == root.resolvingSymlinksInPath().appendingPathComponent(parts[0] + "/" + parts[1]).standardizedFileURL.path else { throw SkillError.invalidPackage }
+            let file = directory.appendingPathComponent("service.json")
+            guard manager.fileExists(atPath: file.path) else { continue }
+            guard try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw SkillError.invalidPackage }
+            let manifestBackup = backup.appendingPathComponent(parts[0] + "/" + parts[1] + "/service.json")
+            guard var manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] else { throw SkillError.invalidPackage }
+            if manifest["skills"] == nil, manager.fileExists(atPath: manifestBackup.path) {
+                guard let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestBackup)) as? [String: Any] else { throw SkillError.invalidPackage }
+                manifest = saved
+            }
+            guard manifest["skills"] == nil || manifest["skills"] is [[String: Any]] else { throw SkillError.invalidPackage }
+            let declarations = manifest["skills"] as? [[String: Any]] ?? []
+            for declaration in declarations {
+                guard let oldName = declaration["name"] as? String, SkillFiles.isLocalName(oldName) else { throw SkillError.invalidPackage }
+                let source = directory.appendingPathComponent("skills/\(oldName)")
+                let savedSource = backup.appendingPathComponent(parts[0] + "/" + parts[1] + "/skills/" + oldName)
+                if !manager.fileExists(atPath: savedSource.path) {
+                    try manager.createDirectory(at: savedSource.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try manager.copyItem(at: source, to: savedSource)
+                }
+                guard source.resolvingSymlinksInPath().standardizedFileURL.path == directory.resolvingSymlinksInPath().appendingPathComponent("skills/\(oldName)").standardizedFileURL.path else { throw SkillError.invalidPackage }
+                var skill = try SkillFiles.load(directory: manager.fileExists(atPath: source.path) ? source : savedSource)
+                oldDirectories.append(source)
+                skill.name = migratedSkillName(domain: parts[1], name: oldName)
+                skill.instructions = migratedSkillInstructions(skill.instructions)
+                let dependency = parts[0] == "ios" ? service : parts[1]
+                skill.services = Array(Set(skill.services + [dependency])).sorted()
+                let destination = root.appendingPathComponent("skills/\(skill.name)")
+                if manager.fileExists(atPath: destination.path), try SkillFiles.load(directory: destination) != skill {
+                    throw StorageMigrationError.collision("skills/\(skill.name)")
+                }
+                if moved.contains(where: { $0.1.name == skill.name && $0.1 != skill }) {
+                    throw StorageMigrationError.collision("skills/\(skill.name)")
+                }
+                moved.append((destination, skill))
+                names.insert(skill.name)
+            }
+            if manifest.removeValue(forKey: "skills") != nil {
+                manifests.append((file, try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])))
+            }
+        }
+        for (file, _) in manifests {
+            let relative = String(file.path.dropFirst(root.path.count + 1))
+            let destination = backup.appendingPathComponent(relative)
+            if !manager.fileExists(atPath: destination.path) {
+                try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try manager.copyItem(at: file, to: destination)
+            }
+        }
+        for (destination, skill) in moved { try SkillFiles.write(skill, directory: destination) }
+        for (file, data) in manifests { try data.write(to: file, options: .atomic) }
+        for directory in oldDirectories where manager.fileExists(atPath: directory.path) {
+            try manager.removeItem(at: directory)
+            let parent = directory.deletingLastPathComponent()
+            if (try? manager.contentsOfDirectory(atPath: parent.path).isEmpty) == true { try manager.removeItem(at: parent) }
+        }
+        package["version"] = 3
+        package["skills"] = names.sorted()
+        package.removeValue(forKey: "contentHash")
+        try JSONSerialization.data(withJSONObject: package, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]).write(to: current, options: .atomic)
+        if clean, let git {
+            let paths = ["repository.json"] + manifests.map { String($0.0.path.dropFirst(root.path.count + 1)) } + moved.map { "skills/\($0.1.name)" } + oldDirectories.map { String($0.path.dropFirst(root.path.count + 1)) }
+            try git.add(paths: paths)
+            let commit = try git.commit(message: "Move shared skills into repository version 3")
+            Log.app.info("StorageMigrator.repositorySkills from=2 to=3 count=\(moved.count) commit=\(commit.id.abbreviated)")
+        } else {
+            Log.app.info("StorageMigrator.repositorySkills from=2 to=3 count=\(moved.count) pending=\(git != nil)")
+        }
+    }
+
+    private static func migrateScheduledSkillPackages(at file: URL) throws {
+        guard var document = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any],
+              document["version"] as? Int == 1, var schedules = document["schedules"] as? [[String: Any]] else { return }
+        for index in schedules.indices {
+            guard var skill = schedules[index]["skill"] as? [String: Any], let instructions = skill["instructions"] as? String else { throw SkillError.invalidPackage }
+            skill["instructions"] = migratedSkillInstructions(instructions)
+            if let name = skill["name"] as? String, SkillFiles.reservedNames.contains(name) { skill["name"] = "user-" + name }
+            schedules[index]["skill"] = skill
+        }
+        document["version"] = 2
+        document["schedules"] = schedules
+        let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        _ = try decoder.decode(ScheduledSkillsDocument.self, from: data).validated()
+        try data.write(to: file, options: .atomic)
+        Log.app.info("StorageMigrator.scheduledSkills from=1 to=2 count=\(schedules.count)")
+    }
+
+    static func migrateProfileSkillCatalog(at root: URL) throws {
+        let manager = FileManager.default
+        let skills = root.appendingPathComponent("skills")
+        if manager.fileExists(atPath: skills.path) {
+            for directory in try manager.contentsOfDirectory(at: skills, includingPropertiesForKeys: nil) where SkillFiles.isLocalName(directory.lastPathComponent) {
+                var skill = try SkillFiles.load(directory: directory)
+                skill.instructions = migratedSkillInstructions(skill.instructions)
+                var destination = directory
+                if SkillFiles.reservedNames.contains(skill.name) {
+                    skill.name = "user-" + skill.name
+                    destination = skills.appendingPathComponent(skill.name)
+                    if manager.fileExists(atPath: destination.path), try SkillFiles.load(directory: destination) != skill {
+                        throw StorageMigrationError.collision(destination.lastPathComponent)
+                    }
+                }
+                try SkillFiles.write(skill, directory: destination)
+                if destination != directory { try manager.removeItem(at: directory) }
+            }
+        }
+        let selections = root.appendingPathComponent("skill-selections.json")
+        if manager.fileExists(atPath: selections.path) {
+            guard try JSONDecoder().decode(SkillSelections.self, from: Data(contentsOf: selections)).version == 1 else { throw SkillError.invalidPackage }
+        }
     }
 
     private static func migrateProfile(_ profile: Profile) async -> Bool {
@@ -854,7 +1058,7 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    private static func legacyLocalServiceRepositoryState(at root: URL) throws -> LegacyLocalServiceRepositoryState {
+    private static func legacyLocalRepositoryState(at root: URL) throws -> LegacyLocalRepositoryState {
         let repository = try SwiftGitX.Repository.open(at: root)
         if let main = repository.reference["refs/heads/main"], let commit = main.target as? Commit {
             return .main(commit.id.hex)
@@ -863,7 +1067,7 @@ nonisolated enum StorageMigrator {
         return references.isEmpty && repository.isEmpty ? .empty : .unsupported(references)
     }
 
-    private static func replaceLegacyLocalServiceRepositoryMetadata(
+    private static func replaceLegacyLocalRepositoryMetadata(
         at root: URL,
         metadata: URL,
         seed: URL
@@ -877,7 +1081,7 @@ nonisolated enum StorageMigrator {
             try manager.moveItem(at: metadata, to: backup)
             do {
                 try manager.moveItem(at: staging, to: metadata)
-                _ = try localServiceRepositoryCommit(at: root)
+                _ = try localRepositoryCommit(at: root)
             } catch {
                 do {
                     if manager.fileExists(atPath: metadata.path) {
@@ -885,14 +1089,14 @@ nonisolated enum StorageMigrator {
                     }
                     try manager.moveItem(at: backup, to: metadata)
                 } catch let rollbackError {
-                    throw StorageMigrationError.localServiceRepositoryRollbackFailed(rollbackError.localizedDescription)
+                    throw StorageMigrationError.localRepositoryRollbackFailed(rollbackError.localizedDescription)
                 }
                 throw error
             }
             do {
                 try manager.removeItem(at: backup)
             } catch {
-                Log.service.warning("StorageMigrator.localServiceRepository backup cleanup failed error=\(error.localizedDescription)")
+                Log.service.warning("StorageMigrator.localRepository backup cleanup failed error=\(error.localizedDescription)")
             }
         } catch {
             try? manager.removeItem(at: staging)
@@ -900,13 +1104,13 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    private static func localServiceRepositoryCommit(at root: URL) throws -> String {
+    private static func localRepositoryCommit(at root: URL) throws -> String {
         let repository = try SwiftGitX.Repository.open(at: root)
         guard let head = try repository.HEAD.target as? Commit,
               let main = repository.reference["refs/heads/main"],
               let tip = main.target as? Commit,
               head.id == tip.id else {
-            throw StorageMigrationError.invalidRepairedLocalServiceRepository
+            throw StorageMigrationError.invalidRepairedLocalRepository
         }
         return head.id.hex
     }
@@ -1525,6 +1729,9 @@ nonisolated enum StorageMigrator {
             actions: [
                 "ox.app.inspect": .allow,
                 "ox.app.info": .block,
+                "ox.service.repository.connect": .block,
+                "ox.service.git.commit": .ask,
+                "ox.app.serviceRepositories": .allow,
                 "ios:browser:executeScript": .allow,
                 "ox.service.attach:ios:browser": .allow,
             ]
@@ -1539,7 +1746,7 @@ nonisolated enum StorageMigrator {
             && migratedCurrentActionPolicies?.format == ActionPolicyConfiguration.currentFormat
             && migratedCurrentActionPolicies?.defaultPolicy == nil
             && migratedCurrentActionPolicies?.sources == legacyConfiguration.sources
-            && migratedCurrentActionPolicies?.actions == ["ox.app.info": .block]
+            && migratedCurrentActionPolicies?.actions == ["ox.app.info": .block, "ox.repository.connect": .block, "ox.repository.git.commit": .ask, "ox.app.repositories": .allow]
         defaults.set(["ios:browser", "web:example.com"], forKey: ServiceManager.savedKey)
         migrateSavedServices(defaults: defaults)
         let savedServicesFirst = defaults.stringArray(forKey: ServiceManager.savedKey)
@@ -1781,8 +1988,94 @@ nonisolated enum StorageMigrator {
             savedServicesMigrated: savedServicesMigrated,
             futureActionPoliciesPreserved: futureActionPoliciesPreserved,
             actionPolicyResolutionValid: actionPolicyResolutionValid,
+            skillChecks: try replayRepositorySkills(),
             fixtureResults: fixtureResults
         )
+    }
+
+    private static func replayRepositorySkills() throws -> [String: Bool] {
+        let manager = FileManager.default
+        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "repository-skills-replay")
+        defer { FileStaging.cleanup(root, operation: "repository-skills-replay") }
+        var checks: [String: Bool] = [:]
+        let original = Skill(name: "research", description: "Research a topic", instructions: "Read skills/system:manage-skills/SKILL.md.", resources: ["references/nested/guide.md": "Preserve this reference", "scripts/run.js": "return args;"])
+        func fixture(_ name: String) throws -> (URL, SwiftGitX.Repository, Commit) {
+            let directory = root.appendingPathComponent(name)
+            try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+            let git = try SwiftGitX.Repository(at: directory)
+            let config = directory.appendingPathComponent(".git/config")
+            let existing = try String(contentsOf: config, encoding: .utf8)
+            try (existing + "\n[user]\nname = Ox\nemail = ox@example.test\n").write(to: config, atomically: true, encoding: .utf8)
+            try #"{"version":2,"name":"Fixture","services":["web:example.com"]}"#.write(to: directory.appendingPathComponent("repository.json"), atomically: true, encoding: .utf8)
+            let service = directory.appendingPathComponent("web/example.com")
+            try SkillFiles.write(original, directory: service.appendingPathComponent("skills/research"))
+            try #"{"domain":"example.com","skills":[{"name":"research","description":"Research a topic"}]}"#.write(to: service.appendingPathComponent("service.json"), atomically: true, encoding: .utf8)
+            try git.add(paths: ["."])
+            return (directory, git, try git.commit(message: "Predecessor repository"))
+        }
+        let (clean, cleanGit, prior) = try fixture("clean")
+        _ = try prepareRepository(at: clean, local: true)
+        let migrated = try SkillFiles.load(directory: clean.appendingPathComponent("skills/example-com-research"))
+        checks["repositoryPackagePreserved"] = migrated.resources == original.resources && migrated.services == ["example.com"] && migrated.instructions == "Read skills/manage-skills/SKILL.md."
+        let current = try cleanGit.HEAD.target as? Commit
+        checks["cleanRepositoryCommitted"] = try current?.id != prior.id && cleanGit.status().isEmpty
+        let first = try Data(contentsOf: clean.appendingPathComponent("repository.json"))
+        _ = try prepareRepository(at: clean, local: true)
+        checks["repositorySecondRunNoOp"] = try Data(contentsOf: clean.appendingPathComponent("repository.json")) == first && (cleanGit.HEAD.target as? Commit)?.id == current?.id
+        try cleanGit.switch(to: prior)
+        let view = try prepareRepository(at: clean, local: true)
+        checks["historicalRepositoryPreserved"] = try view != clean && cleanGit.isHEADDetached && cleanGit.status().isEmpty && SkillFiles.load(directory: view.appendingPathComponent("skills/example-com-research")).resources == original.resources
+        let (dirty, dirtyGit, dirtyHead) = try fixture("dirty")
+        let draft = dirty.appendingPathComponent("draft.txt")
+        try "staged draft".write(to: draft, atomically: true, encoding: .utf8)
+        try dirtyGit.add(paths: ["draft.txt"])
+        try "working draft".write(to: draft, atomically: true, encoding: .utf8)
+        let index = try Data(contentsOf: dirty.appendingPathComponent(".git/index"))
+        _ = try prepareRepository(at: dirty, local: true)
+        checks["dirtyRepositoryPreserved"] = try Data(contentsOf: dirty.appendingPathComponent(".git/index")) == index && String(contentsOf: draft, encoding: .utf8) == "working draft" && (dirtyGit.HEAD.target as? Commit)?.id == dirtyHead.id
+        let (collision, _, _) = try fixture("collision")
+        var other = original
+        other.name = "example-com-research"
+        other.instructions = "Independent draft"
+        try SkillFiles.write(other, directory: collision.appendingPathComponent("skills/example-com-research"))
+        do {
+            _ = try prepareRepository(at: collision, local: true)
+            checks["repositoryCollisionRejected"] = false
+        } catch StorageMigrationError.collision {
+            checks["repositoryCollisionRejected"] = try SkillFiles.load(directory: collision.appendingPathComponent("skills/example-com-research")) == other && SkillFiles.load(directory: collision.appendingPathComponent("web/example.com/skills/research")) == original
+        }
+        try manager.removeItem(at: collision.appendingPathComponent("skills/example-com-research"))
+        _ = try prepareRepository(at: collision, local: true)
+        checks["repositoryRetryAfterCollision"] = try SkillFiles.load(directory: collision.appendingPathComponent("skills/example-com-research")).resources == original.resources
+        var user = migrated
+        user.source = .user
+        var shared = migrated
+        shared.source = .repository(id: "remote", name: "Remote", writable: false)
+        let conflict = SkillCatalog(candidates: [user, shared], selections: [:])
+        checks["skillConflictRequiresSelection"] = conflict.skills.isEmpty && conflict.conflicts.count == 1
+        checks["skillSelectionResolves"] = SkillCatalog(candidates: [user, shared], selections: [user.name: "user"]).skills == [user]
+        checks["missingSelectedSourceStaysUnresolved"] = SkillCatalog(candidates: [user], selections: [user.name: "repository:remote"]).skills.isEmpty
+        let data = try SkillPackageCodec.encode(shared)
+        let imported = try SkillPackageCodec.decode(data, sourceName: "fixture.skill").skill
+        checks["completeSkillArchiveRoundTrip"] = imported.resources == shared.resources && imported.instructions == shared.instructions && imported.owner == .user
+        var snapshot = ScheduledSkill(id: UUID(), profileID: UUID(), skill: shared, argument: "topic", recurrence: .daily(hour: 9, minute: 0, timeZone: "UTC"), nextFireAt: nil, isEnabled: true, createdAt: Date())
+        shared.resources?["scripts/run.js"] = "return null;"
+        snapshot.isEnabled = false
+        checks["scheduleRetainsPackage"] = try ScheduledSkillsDocument(schedules: [snapshot]).validated().schedules.first?.skill.resources == original.resources
+        snapshot.skill.name = "manage-skills"
+        snapshot.skill.instructions = "Read skills/system:manage-services/SKILL.md."
+        var legacySchedule = ScheduledSkillsDocument(schedules: [snapshot])
+        legacySchedule.version = 1
+        let scheduleEncoder = JSONEncoder()
+        scheduleEncoder.dateEncodingStrategy = .iso8601
+        let scheduleFile = root.appendingPathComponent("scheduled-skills.json")
+        try scheduleEncoder.encode(legacySchedule).write(to: scheduleFile)
+        try migrateScheduledSkillPackages(at: scheduleFile)
+        let scheduleDecoder = JSONDecoder()
+        scheduleDecoder.dateDecodingStrategy = .iso8601
+        let upgraded = try scheduleDecoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: scheduleFile)).validated()
+        checks["legacyScheduledPackageMigrated"] = upgraded.schedules.first?.skill.name == "user-manage-skills" && upgraded.schedules.first?.skill.instructions == "Read skills/manage-services/SKILL.md." && upgraded.schedules.first?.skill.resources == original.resources
+        return checks
     }
 
     private static func replayProviderCatalogMigration(defaults: UserDefaults) throws -> Bool {

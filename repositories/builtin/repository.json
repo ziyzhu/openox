@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "Built-in",
   "services": [
     "ios:bluetooth",
@@ -52,5 +52,6 @@
     "web:www.usta.com",
     "web:x.com",
     "web:xiaohongshu.com"
-  ]
+  ],
+  "skills": []
 }

@@ -6,7 +6,6 @@ import {
   type ServiceManifest,
 } from "@openox/service-sdk/manifest";
 import { inspectInstaller } from "@openox/service-sdk/installer";
-import { readSkills } from "@openox/service-sdk/skills";
 
 export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
 const SOURCE_ROOT = join(BUILTIN_REPOSITORY_ROOT, "web");
@@ -70,8 +69,6 @@ export async function buildService(domain: string): Promise<
   if (installerErrors.length) return { error: `service ${domain}: ${installerErrors.join("; ")}` };
 
   const dir = sourceDirFor(domain);
-  const skillResult = readSkills(dir);
-  if (!skillResult.ok) return { error: `service ${domain}: ${skillResult.error}` };
   const faviconUrl = existsSync(join(dir, "favicon.png"))
     ? serviceAssetURL(domain)
     : undefined;
@@ -79,7 +76,6 @@ export async function buildService(domain: string): Promise<
   const manifest: Manifest = {
     ...svc,
     ...(faviconUrl ? { faviconUrl } : {}),
-    ...(skillResult.skills.length ? { skills: skillResult.skills } : {}),
   };
   return { manifest, actions: loaded };
 }

@@ -257,6 +257,7 @@ extension OxHostProtocol {
         let savedServicesMigrated: Bool?
         let futureActionPoliciesPreserved: Bool?
         let actionPolicyResolutionValid: Bool?
+        let skillChecks: [String: Bool]?
         let fixtureResults: [StorageMigrationFixtureReplay]?
     }
 

@@ -284,12 +284,10 @@ The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 mounts:
 
 ```text
-skills/
-├── <skill-name>/SKILL.md                        read-write, active Profile
-├── system:<skill-name>/SKILL.md                 read-only, app-owned
-├── system:<skill-name>/references/<name>.md     read-only, app-owned
-├── system:<skill-name>/references/<name>.js     read-only, app-owned authoring source
-└── service:<domain>:<skill-name>/SKILL.md       read-only, attached service
+skills/<name>/
+├── SKILL.md                                    resolved package instructions
+├── references/<path>                           optional nested UTF-8 references
+└── scripts/<path>.js                           optional Ox VM helpers
 
 services/
 └── <kind>/<id>/
@@ -302,9 +300,11 @@ chats/
     └── turns.jsonl                              read-only, stored transcript
 ```
 
-The mount resolves permissions from each entry's source. A prefix is part of
-the virtual address, not an authority claim supplied by file contents. Only
-currently attached service skills are visible. Every selected service exposes
+The mount resolves permissions from the selected source, never frontmatter. System,
+enabled repository, and active Profile packages share one catalog before service
+attachment. Duplicate names require a Profile source selection; no source silently
+overrides another. System names are reserved. Local packages are writable only at
+its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
 `services/<kind>/<id>/` path. Repository host paths, markers,
@@ -357,22 +357,41 @@ only `SOUL.md` reloads after relevant external changes. Each chat snapshots the
 loaded memory into its system prompt so later memory changes do not invalidate the
 chat's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
 
-Each user skill is one `<name>` directory containing `SKILL.md`, where `<name>`
-is lowercase kebab-case. The `system:` and `service:` namespaces are reserved
-for virtual read-only entries.
-Frontmatter stores its matching name, description, and optional service list;
-the body stores instructions. Creation, update, and deletion are scoped to the
-active Profile and refresh the shared skill catalog. Saving a skill does not select
-or execute it.
+Each skill package contains `SKILL.md` and optional nested UTF-8 files under
+`references/` and JavaScript helpers under `scripts/`. Names use lowercase kebab-case;
+frontmatter includes the matching name, description, and optional comma-separated
+service dependencies. Packages are limited to 64 files and 512 KiB. Symlinks and
+traversal are rejected. Profile packages live at `skills/<name>/`; repository
+packages live at the repository root `skills/<name>/` and are declared in version 3
+`repository.json`. Services no longer declare or contain skills.
 
-Skill sharing creates a transient `.skill` ZIP archive containing the skill
-directory and `SKILL.md`. Incoming archives remain external until the user
-confirms import; Ox then validates and writes the skill through the same
-active Profile repository path. The archive itself is not retained.
+`skill-selections.json` in each Profile is version 1, with `sources` mapping skill
+names to stable owner IDs (`user` or `repository:<id>`). Absent selection resolves a
+unique name automatically. A missing selected source remains unresolved. Source
+labels and writable state are derived from the current catalog. Selection metadata
+syncs and exports with the Profile. Packages read during a run are frozen together
+with all references and helpers for that run.
 
-`Application Support/scheduled-skills.json` is a versioned device-owned document
+Customizing makes an independent complete Profile copy. Sharing into Local copies
+the complete package for Git review. `.skill` exports contain every supported
+resource and strip source ownership; imports create a Profile package after user
+confirmation. The archive itself is transient.
+
+The `2026-09-24-repository-skills` Profile milestone normalizes old virtual paths
+and API names in authored instructions and renames reserved user names to
+`user-<name>`, failing on unequal collisions. Transcript bytes remain unchanged.
+Repository version 2 conversion preserves original manifests and packages in a
+sibling `.<directory>-repository-v2-backup` journal. The journal is retained for
+recovery. A clean Local upgrade adds a commit; a dirty upgrade leaves its index
+and HEAD intact. A clean historical checkout is normalized in purgeable
+`Caches/RepositoryViews/<hash>/` without altering the original checkout. Invalid
+legacy drafts defer migration with originals retained. Future versions fail closed.
+The existing `service-repositories` disk paths, configuration filename, and PAT
+Keychain account remain stable despite the product/API rename to Repository.
+
+`Application Support/scheduled-skills.json` is a version 2 device-owned document
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
-and stores a frozen user-skill snapshot, optional argument, one-time/daily/weekly
+and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly
 recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
 with its result chat UUID. The file is validated by `StorageMigrator` before the
 scheduler reads it; unknown versions and malformed or duplicate records fail closed.
@@ -431,19 +450,21 @@ Their paths and encoding are unchanged. Local discovery validates repository
 metadata separately from draft contents and retains source access for repairing
 invalid drafts; incomplete services do not make the entire Local repository
 unavailable. Read-only repositories still require valid service file structure.
-Repositories declare `version` 2 in `repository.json`; version 1 is retired and
-rejected when the Host connects. `service.json` carries no version. `actions.js`
+Repositories declare `version` 3 in `repository.json`; version 2 is normalized
+by the repository-skill migration before loading. Version 1 is retired for external
+repositories. `service.json` carries no version. `actions.js`
 calls `window.ox.install(installer)`, and the installer receives only `action` for
 web and `action` plus `request` for API. On preparation, `StorageMigrator`
 rewrites a Local `repository.json` at version 1 to version 2 and commits it when
 that file and the index are clean; otherwise it leaves the change uncommitted and
-logs `pending=true`. The app does not rewrite service source: sources that pass a
+logs `pending=true`. The app does not rewrite Action implementation source: sources that pass a
 version to `install` or use the retired `retryFetch`, `log`, `lib`, or fetch
 capture fail validation with an actionable error and must be repaired by hand.
 Builds older than iOS 1.0.7 reject version 2 Local repositories and
 single-argument installers instead of interpreting them.
 `ox.service.validate` checks a complete Local draft, including file structure,
-manifest, action registration, declared skills, and service size limits. The same
+manifest, action registration, and service size limits. Root skill packages are
+validated separately with the shared package loader. The same
 validator runs before Save and before loading Local source for a caller. Failed
 validation leaves the draft untouched and cannot replace a chat's running
 attachment. `ox.service.attach` validates and replaces that chat's attachment when

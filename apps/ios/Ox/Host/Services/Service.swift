@@ -24,7 +24,7 @@ final class Service: NSObject, Identifiable {
     var isIOSService: Bool { iOSService != nil }
     var isAPIService: Bool { apiService != nil }
     var isMCPService: Bool { remoteMCPService != nil }
-    var isLocalService: Bool { definition.repositoryID == ServiceRepository.localID }
+    var isLocalService: Bool { definition.repositoryID == Repository.localID }
     var hasWebRuntime: Bool { webService != nil || iOSService?.hasBrowserRuntime == true }
     var icon: ServiceIcon? { definition.icon }
     var detailCapabilities: ServiceDetailCapabilities {
@@ -40,7 +40,6 @@ final class Service: NSObject, Identifiable {
 
     struct Resolved {
         let actions: String
-        let skills: [String: String]
     }
 
     struct AuthObservation: Equatable {
@@ -229,7 +228,6 @@ final class Service: NSObject, Identifiable {
         let signIn: SignInState
         let saved: Bool
         let attached: Bool
-        let skills: [Manifest.Skill]
     }
 
     enum OwnedPageOwner: Equatable {
@@ -488,12 +486,7 @@ final class Service: NSObject, Identifiable {
 
     var manifest: JSONValue? { definition.manifest }
 
-    var skills: [Manifest.Skill] { definition.skills }
     var supportsBotControl: Bool { definition.supportsBotControl }
-
-    func skill(named name: String) -> String? {
-        apiService?.source?.skills[name] ?? (hasWebRuntime ? resolutionState.resolved?.skills[name] : nil)
-    }
 
     func actionLabel(for id: String) -> String? {
         definition.action(id, includingStandard: true)?.label
@@ -547,8 +540,7 @@ final class Service: NSObject, Identifiable {
             description: summary.isEmpty ? nil : summary,
             signIn: signInState,
             saved: manager.isSaved(self),
-            attached: attached,
-            skills: skills
+            attached: attached
         )
     }
 
@@ -642,7 +634,7 @@ final class Service: NSObject, Identifiable {
                 self.setCapabilityState(.unavailable("service files are unavailable"), reason: reason)
                 return
             }
-            let resolved = Resolved(actions: fetched.actions, skills: fetched.skills)
+            let resolved = Resolved(actions: fetched.actions)
             if self.finishManifestResolution(resolutionID, with: resolved) {
                 self.setCapabilityState(.ready, reason: reason)
                 Log.service.info("Service.loadManifest resolved domain=\(self.domain)")
@@ -949,12 +941,11 @@ extension Service {
     convenience init(
         definition: ServiceDefinition,
         actions: String,
-        skills: [String: String],
         manager: ServiceManager
     ) {
         self.init(definition: definition, manager: manager)
-        if let apiService { apiService.source = Resolved(actions: actions, skills: skills) }
-        else { resolutionState = .idle(Resolved(actions: actions, skills: skills)) }
+        if let apiService { apiService.source = Resolved(actions: actions) }
+        else { resolutionState = .idle(Resolved(actions: actions)) }
         capabilityState = .ready
     }
 

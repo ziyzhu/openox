@@ -1020,11 +1020,5 @@
       }
     }
   },
-  "faviconUrl": "https://openox.ai/assets/services/x.com/favicon.png",
-  "skills": [
-    {
-      "name": "research",
-      "description": "Research claims, events, trends, and accounts on X with thread context and source assessment. Use when investigating posts, reactions, timelines, or an author's credibility, including focused searches, thread reconstruction, posting-history checks, and corroboration across independent accounts."
-    }
-  ]
+  "faviconUrl": "https://openox.ai/assets/services/x.com/favicon.png"
 }

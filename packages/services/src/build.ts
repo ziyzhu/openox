@@ -1,7 +1,8 @@
-import { mkdir, writeFile, copyFile, readdir, readFile } from "node:fs/promises";
+import { mkdir, writeFile, cp, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { readSkills } from "@openox/service-sdk/skills";
 import {
-  buildService, sourceDirFor,
+  buildService,
   BUILTIN_REPOSITORY_ROOT,
 } from "./service.ts";
 import {
@@ -95,14 +96,6 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     await mkdir(out, { recursive: true });
     await writeFile(join(out, "service.json"), JSON.stringify(service.manifest, null, 2));
     await writeFile(join(out, "actions.js"), service.actions);
-    for (const skill of service.manifest.skills ?? []) {
-      const skillOut = join(out, "skills", skill.name);
-      await mkdir(skillOut, { recursive: true });
-      await copyFile(
-        join(sourceDirFor(domain), "skills", skill.name, "SKILL.md"),
-        join(skillOut, "SKILL.md"),
-      );
-    }
     entries.push(qualifiedRepositoryServiceID(kind, identity));
   }
   for (const { kind, id, manifest } of catalogResults) {
@@ -118,11 +111,17 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     && JSON.stringify(services) !== JSON.stringify([...sourcePackage.services].sort((a, b) => a.localeCompare(b)))) {
     throw new Error("repositories/builtin/repository.json does not match built-in service directories");
   }
+  const skillResult = readSkills(BUILTIN_REPOSITORY_ROOT, sourcePackage.skills);
+  if (!skillResult.ok) throw new Error(skillResult.error);
+  for (const skill of skillResult.skills) {
+    await cp(join(BUILTIN_REPOSITORY_ROOT, "skills", skill.name), join(outDir, "skills", skill.name), { recursive: true });
+  }
   const repository: RepositoryPackage = {
     version: sourcePackage.version,
     name: options.name ?? sourcePackage.name,
     contentHash: await contentHash(outDir),
     services,
+    skills: sourcePackage.skills,
   };
   const validated = validateRepositoryPackage(repository);
   if ("error" in validated) throw new Error(validated.error);

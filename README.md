@@ -61,7 +61,7 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 - **Ox Model Provider** — The language model selected by the user. OpenOx does not prescribe a model or provider; the Host adapts provider-specific APIs to the provider-neutral agent loop.
 - **Ox Profile** — A portable folder containing the Agent’s persistent state: its identity, memory, skills, artifacts, and conversation history. This keeps the Ox’s state independent of a particular Client or model.
 - **Ox VM** — The execution environment supplied by an Ox Host. The Agent writes and runs code inside the VM without direct access to the network, Host filesystem, or device. Instead, it uses explicit `ox.*` capabilities to interact with the Profile, services, websites, users, and device capabilities. The `ox.fs` virtual filesystem presents Profile content, skills, services, chats, and user-granted files while preserving each source’s permissions.
-- **Ox Service Repository** — A versioned collection of services described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Each service exposes typed actions the Agent can invoke and may include reusable skills that teach the Agent when and how to use them.
+- **Ox Repository** — A versioned collection of services and reusable skills described by a `repository.json` manifest. Each Ox Host manages an editable Local repository and can install compatible remote repositories. Services expose typed Actions; repository-root skill packages teach workflows that can combine several services. System, repository, and Profile skills share one catalog with explicit source selection for conflicting names. See [Repositories and skills](docs/SKILLS.md).
 
   - **Device services** are supplied by the Host’s platform adapters and expose capabilities such as Browser.
   - **Web services** expose actions backed by websites and the user’s browser session.
@@ -76,7 +76,7 @@ Each Ox can self-evolve locally and, optionally, co-evolve with others. An Ox se
 With an attached Browser capability, an Ox can navigate and inspect a website, perform approved interactions, and capture the evidence needed to create a reusable web service. That service becomes a set of actions the Ox can use again, combine with other services, or share through a repository.
 
 1. The Agent invokes Browser or another attached service from the VM to gather evidence for the required capability.
-2. The Agent uses `ox.fs` to write or revise the service manifest, actions, and optional skills in its Local Service Repository.
+2. The Agent uses `ox.fs` to write or revise the service manifest, actions, and repository-root skills in its Local Repository.
 3. The Host validates each source mutation, and the Agent uses `ox.service.attach` to load or reload the service for the chat.
 4. The Agent can invoke new actions later in the same turn or in subsequent turns. New skills guide subsequent agent work.
 5. Local Git can record the changes for inspection, reversal, and publication.

@@ -15,7 +15,7 @@ extension Chat {
         let args = scheduleArgs(skillName: skillName, frequency: frequency)
         return try await tracked(Actions.scheduleCreate, args, purpose: purpose) {
             try requireProfileMutation(Actions.scheduleCreate)
-            let skill = try await repository.skill(named: skillName, in: scope)
+            let skill = try await skillsMount.entry(named: skillName).skill
             let recurrence = try scheduledRecurrence(
                 frequency: frequency,
                 fireAt: fireAt,
