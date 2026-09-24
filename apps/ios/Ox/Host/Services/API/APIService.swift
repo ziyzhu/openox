@@ -76,7 +76,7 @@ final class APIService {
             guard let source else {
                 throw Service.InvokeError.invalidContract(name)
             }
-            let script = "const __serviceVersion = \(definition.version ?? 0);\n" + Self.installer + "\n" + source.actions + "\n"
+            let script = Self.installer + "\n" + source.actions + "\n"
                 + "return await __invokeAPI(\(JSONValue.string(actionID).jsonString()), \(args.jsonString()), \(JSONValue.array(definition.actions.map { .string($0.id) }).jsonString()));"
             let result = try await runtime.runAPI(source: script) { [self] args in
                 do {
@@ -148,28 +148,20 @@ final class APIService {
     const __handlers = new Map();
     let __installed = false;
     const window = Object.freeze({ ox: Object.freeze({ install(install, ...extra) {
-      if (typeof install !== 'function' || extra.length) throw new Error('window.ox.install takes only the installer; the repository declares the version');
-      const version = __serviceVersion;
-      if (__installed || (version !== 1 && version !== 2)) throw new Error('Invalid API installer');
+      if (typeof install !== 'function' || extra.length) throw new Error('window.ox.install takes only the installer');
+      if (__installed) throw new Error('Invalid API installer');
       __installed = true;
       const action = (name, handler) => {
         if (typeof name !== 'string' || __handlers.has(name) || typeof handler?.invoke !== 'function') throw new Error('Invalid API action');
         __handlers.set(name, handler.invoke);
       };
       const request = args => __apiRequest(args);
-      const api = version === 1
-        ? Object.freeze({
-          action,
-          request,
-          log: (...args) => console.log(...args),
-          lib: Object.freeze({ cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim() })
-        })
-        : new Proxy(Object.freeze({ action, request }), {
-          get(target, name) {
-            if (name in target) return target[name];
-            throw new Error(`service version 2 does not provide ${String(name)}`);
-          }
-        });
+      const api = new Proxy(Object.freeze({ action, request }), {
+        get(target, name) {
+          if (name in target) return target[name];
+          throw new Error(`service installer does not provide ${String(name)}`);
+        }
+      });
       const result = install(api);
       if (result?.then) throw new Error('API installer must be synchronous');
     } }) });

@@ -5,6 +5,7 @@ import {
   type Manifest,
   type ServiceManifest,
 } from "@openox/service-sdk/manifest";
+import { inspectInstaller } from "@openox/service-sdk/installer";
 import { readSkills } from "@openox/service-sdk/skills";
 
 export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
@@ -34,71 +35,6 @@ async function loadActions(
   }
 }
 
-function inspectActions(
-  domain: string,
-  manifest: ServiceManifest,
-  source: string,
-  version: number,
-): { ok: true } | { error: string } {
-  const actions: Record<string, (args: any) => any> = {};
-  const stub = () => { throw new Error("not callable during registration inspection"); };
-  let installations = 0;
-  const window = {
-    ox: {
-      install: (installer: unknown, ...extra: unknown[]) => {
-        installations++;
-        if (installations > 1) throw new Error("service installer may run only once");
-        if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; the repository declares the version");
-        if (version !== 1 && version !== 2) throw new Error(`unsupported service version: ${String(version)}`);
-        const action = (name: string, definition: { invoke?: (args: any) => any }) => {
-            if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
-            if (actions[name]) throw new Error(`duplicate action: ${name}`);
-            if (typeof definition?.invoke !== "function") throw new Error(`action ${name} has no invoke function`);
-            actions[name] = definition.invoke;
-          };
-        const api = version === 1 ? {
-          action,
-          retryFetch: stub,
-          request: stub,
-          log: () => {},
-          lib: {
-            cookie: stub,
-            cleanText: (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim(),
-            pageCursor: (value: string | undefined, firstPage: number) =>
-              Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage),
-          },
-        } : new Proxy(Object.freeze(manifest.kind === "api" ? { action, request: stub } : { action }), {
-          get(target, name) {
-            if (name in target) return Reflect.get(target, name);
-            throw new Error(`service version 2 does not provide ${String(name)}`);
-          },
-        });
-        const result = installer(api);
-        if (result && typeof result.then === "function") throw new Error("service installer must be synchronous");
-      },
-    },
-  };
-  try {
-    new Function("window", source)(window);
-  } catch (error) {
-    return { error: `service ${domain} actions failed to register: ${(error as Error).message}` };
-  }
-  if (installations !== 1) return { error: `service ${domain}: actions must install exactly once` };
-  const declared = new Set(manifest.actions.map((action) => action.id));
-  const registered = new Set(Object.keys(actions));
-  const missing = [...declared].filter((id) => !registered.has(id)).sort();
-  const extra = [...registered].filter((id) => !declared.has(id)).sort();
-  if (missing.length || extra.length) {
-    const parts = [
-      missing.length ? `missing implementations: ${missing.join(", ")}` : "",
-      extra.length ? `undeclared implementations: ${extra.join(", ")}` : "",
-    ].filter(Boolean);
-    return { error: `service ${domain}: action registration mismatch; ${parts.join("; ")}` };
-  }
-
-  return { ok: true };
-}
-
 async function loadManifest(
   domain: string,
 ): Promise<ServiceManifest | { error: string }> {
@@ -121,7 +57,7 @@ async function loadManifest(
   return result.manifest;
 }
 
-export async function buildService(domain: string, version: number): Promise<
+export async function buildService(domain: string): Promise<
   { manifest: Manifest; actions: string } | { error: string }
 > {
   const svc = await loadManifest(domain);
@@ -130,8 +66,8 @@ export async function buildService(domain: string, version: number): Promise<
   const loaded = await loadActions(domain);
   if (typeof loaded !== "string") return loaded;
 
-  const inspected = inspectActions(domain, svc, loaded, version);
-  if ("error" in inspected) return inspected;
+  const installerErrors = inspectInstaller(loaded, svc);
+  if (installerErrors.length) return { error: `service ${domain}: ${installerErrors.join("; ")}` };
 
   const dir = sourceDirFor(domain);
   const skillResult = readSkills(dir);

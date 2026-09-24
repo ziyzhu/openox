@@ -13,7 +13,7 @@ const localPackage = `{
   "services" : [
 
   ],
-  "version" : 1
+  "version" : 2
 }
 `;
 

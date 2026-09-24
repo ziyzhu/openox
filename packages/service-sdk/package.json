@@ -14,6 +14,7 @@
     "./action": "./src/action.ts",
     "./action-lib": "./src/action-lib.ts",
     "./catalog": "./src/catalog.ts",
+    "./installer": "./src/installer.ts",
     "./manifest": "./src/manifest.ts",
     "./repository": "./src/repository.ts",
     "./skills": "./src/skills.ts",

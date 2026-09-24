@@ -8,80 +8,57 @@ const apiServiceSource = readFileSync(join(import.meta.dir, "../apps/ios/Ox/Host
 const apiInstaller = apiServiceSource.match(/private static let installer = #"""\n([\s\S]*?)\n    """#/)?.[1];
 if (!apiInstaller) throw new Error("API installer source is missing");
 
-function runtime(version: number) {
+function runtime() {
   const window = {
     location: { href: "https://example.com/" },
     fetch: async () => ({ ok: true, status: 200 }),
   } as Record<string, any>;
-  const document = { cookie: "session=present" };
-  new Function("window", "document", "Request", source)(window, document, Request);
-  return { window, service: window.__openOxCreateServiceRuntime("example.com", version) };
+  new Function("window", source)(window);
+  return { window, service: window.__openOxCreateServiceRuntime("example.com") };
 }
 
-function apiRuntime(version: number) {
+function apiRuntime() {
   const request = async () => ({ value: "ok" });
-  return new Function("__apiRequest", "__serviceVersion", `${apiInstaller}\nreturn { window, __invokeAPI };`)(request, version);
+  return new Function("__apiRequest", `${apiInstaller}\nreturn { window, __invokeAPI };`)(request);
 }
 
-test("version 1 retains the legacy installer and capture", async () => {
-  const { window, service } = runtime(1);
-  service.install(({ action, retryFetch, log, lib }: Record<string, any>) => {
-    expect(typeof retryFetch).toBe("function");
-    expect(typeof log).toBe("function");
-    expect(lib.cleanText(" a  b ")).toBe("a b");
-    action("value", { invoke: () => ({ value: lib.cookie("session") }) });
-  });
-  expect(typeof window.oxFetchCapture).toBe("function");
-  expect(await service.callServiceAction("value")).toEqual({ value: "present" });
-});
-
-test("version 2 provides only action and does not install capture", async () => {
-  const { window, service } = runtime(2);
+test("web installers receive only action and page fetch is untouched", async () => {
+  const { window, service } = runtime();
+  const fetch = window.fetch;
   service.install(({ action }: Record<string, any>) => {
     action("value", { invoke: () => ({ value: "ok" }) });
   });
+  expect(window.fetch).toBe(fetch);
   expect(window.oxFetchCapture).toBeUndefined();
   expect(await service.callServiceAction("value")).toEqual({ value: "ok" });
 });
 
-test("version 2 rejects access to legacy helpers during installation", () => {
-  const { service } = runtime(2);
-  expect(() => service.install(({ retryFetch }: Record<string, any>) => retryFetch)).toThrow(
-    "service version 2 does not provide retryFetch",
+test("web installers cannot reach retired helpers", () => {
+  expect(() => runtime().service.install(({ retryFetch }: Record<string, any>) => retryFetch)).toThrow(
+    "service installer does not provide retryFetch",
   );
 });
 
 test.each([
-  { version: 2, arguments: [2, () => {}], error: "window.ox.install takes only the installer; the repository declares the version" },
-  { version: 2, arguments: [() => {}, 2], error: "window.ox.install takes only the installer; the repository declares the version" },
-  { version: 3, arguments: [() => {}], error: "unsupported service version: 3" },
-])("invalid installs fail: %j", ({ version, arguments: args, error }) => {
-  expect(() => runtime(version).service.install(...args)).toThrow(error);
-  expect(() => apiRuntime(version).window.ox.install(...args)).toThrow(version === 3 ? "Invalid API installer" : error);
+  [[2, () => {}]],
+  [[() => {}, 2]],
+])("installers that pass a version fail: %j", args => {
+  expect(() => runtime().service.install(...args)).toThrow("window.ox.install takes only the installer");
+  expect(() => apiRuntime().window.ox.install(...args)).toThrow("window.ox.install takes only the installer");
 });
 
-test("API version 1 remains compatible", async () => {
-  const { window, __invokeAPI } = apiRuntime(1);
-  window.ox.install(({ action, request, log, lib }: Record<string, any>) => {
-    expect(typeof log).toBe("function");
-    expect(lib.cleanText(" a  b ")).toBe("a b");
-    action("value", { invoke: () => request({ path: "/value" }) });
-  });
-  expect(await __invokeAPI("value", {}, ["value"])).toEqual({ value: "ok" });
-});
-
-test("API version 2 provides action and request but no helpers", async () => {
-  const { window, __invokeAPI } = apiRuntime(2);
+test("API installers receive action and request", async () => {
+  const { window, __invokeAPI } = apiRuntime();
   window.ox.install(({ action, request }: Record<string, any>) => {
     action("value", { invoke: () => request({ path: "/value" }) });
   });
   expect(await __invokeAPI("value", {}, ["value"])).toEqual({ value: "ok" });
 });
 
-test("API version 2 rejects legacy helper access", () => {
-  const { window } = apiRuntime(2);
+test("API installers cannot reach retired helpers", () => {
+  const { window } = apiRuntime();
   expect(() => window.ox.install(({ lib }: Record<string, any>) => lib)).toThrow(
-    "service version 2 does not provide lib",
+    "service installer does not provide lib",
   );
 });
 

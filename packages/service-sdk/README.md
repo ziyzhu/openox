@@ -22,7 +22,7 @@ window.ox.install(({ action }) => {
 });
 ```
 
-The app injects the versioned dispatcher before evaluating each service. New web installers receive only `action`; convenience functions belong in each service's `actions.js`. The `action-lib` SDK export and version 1 remain available for legacy sources, but `action-lib` is not importable from a service WebView. The official service collection is published separately as `@openox/services`.
+The app injects the versioned dispatcher before evaluating each service. New web installers receive only `action`; convenience functions belong in each service's `actions.js`. The `action-lib` SDK export is not importable from a service WebView; copy the helpers a service needs into its `actions.js`. The official service collection is published separately as `@openox/services`.
 
 ## Release
 
@@ -45,8 +45,7 @@ and `oauth2` (authorization code with S256 PKCE and a registered app callback).
 Only public configuration belongs in the manifest; the Host stores credentials.
 
 API services install with `window.ox.install(installer)`,
-receiving only `action` and `request`. Version 1 remains supported for existing
-API sources. The asynchronous
+receiving only `action` and `request`. The asynchronous
 `request({ path, method?, query?, json? })` function performs a bounded request
 within the configured API base URL and returns parsed JSON. The Host injects
 credentials only when the action declares `requireAuth: true`. Writes require

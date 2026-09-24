@@ -24,7 +24,7 @@ const server = Bun.serve({
       const request = JSON.parse(String(message));
       const result = request.method === "host.describe" ? {
         implementation: { name: "Ox fixture", version: "1", build: "1" },
-        protocols: { repository: [1, 2] },
+        protocols: { repository: [2] },
         methods: ["host.describe", "chats.list"],
       } : {
         chats: [{ id: "standalone-smoke", title: "Standalone smoke test", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: false }],

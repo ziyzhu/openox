@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { C, dispatch, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { verifyRepository } from "./repository-verify.ts";
+import { inspectInstaller } from "@openox/service-sdk/installer";
+import { validateServiceManifest } from "@openox/service-sdk/manifest";
 
 type RepositoryPackage = {
   version: 1;
@@ -143,7 +145,7 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
   await regularFile(packagePath, 512_000);
   const raw = JSON.parse(await readFile(packagePath, "utf8")) as Record<string, unknown>;
   if (Object.keys(raw).some(key => !["version", "name", "contentHash", "services"].includes(key))
-    || (raw.version !== 1 && raw.version !== 2)
+    || raw.version !== 2
     || typeof raw.name !== "string"
     || raw.name.trim().length === 0
     || raw.name.length > 100
@@ -155,6 +157,7 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
   }
   const repository = raw as RepositoryPackage;
   const identities = new Set<string>();
+  const problems: string[] = [];
   for (const service of repository.services) {
     const identity = service.slice(service.indexOf(":") + 1);
     if (identities.has(identity)) throw new Error(`duplicate service identity: ${identity}`);
@@ -165,9 +168,25 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
       ? join(path, "service.json")
       : join(path, "manifest.json");
     await regularFile(manifestPath, 512_000);
-    if (service.startsWith("web:") || service.startsWith("api:")) await regularFile(join(path, "actions.js"), 1_000_000);
+    if (!service.startsWith("web:") && !service.startsWith("api:")) continue;
+    const actionsPath = join(path, "actions.js");
+    await regularFile(actionsPath, 1_000_000);
+    problems.push(...(await serviceProblems(service, manifestPath, actionsPath)).map(problem => `${service}: ${problem}`));
   }
+  if (problems.length) throw new Error(`repository has ${problems.length} invalid service ${problems.length === 1 ? "entry" : "entries"}:\n  ${problems.join("\n  ")}`);
   return repository;
+}
+
+async function serviceProblems(service: string, manifestPath: string, actionsPath: string): Promise<string[]> {
+  let raw: unknown;
+  try { raw = JSON.parse(await readFile(manifestPath, "utf8")); }
+  catch (error) { return [`service.json is not valid JSON: ${(error as Error).message}`]; }
+  const result = validateServiceManifest(raw, "repository");
+  if (!result.ok) return result.errors;
+  const identity = service.slice(service.indexOf(":") + 1);
+  if (result.manifest.domain !== identity) return [`service.json domain "${result.manifest.domain}" does not match ${identity}`];
+  if ((result.manifest.kind === "api") !== service.startsWith("api:")) return ["service.json kind does not match its directory"];
+  return inspectInstaller(await readFile(actionsPath, "utf8"), result.manifest);
 }
 
 export async function createSnapshot(sourceRoot: string): Promise<Snapshot> {

@@ -27,9 +27,10 @@ export function validateJSONSchemaProfile(
   input: unknown,
   path: string,
   defs?: Record<string, JSONSchema>,
+  anyKeyword = false,
 ): string[] {
   const errors: string[] = [];
-  validateProfile(input, path, defs, errors);
+  validateProfile(input, path, defs, errors, anyKeyword);
   return errors;
 }
 
@@ -94,6 +95,7 @@ function validateProfile(
   path: string,
   defs: Record<string, JSONSchema> | undefined,
   errors: string[],
+  anyKeyword: boolean,
 ): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     errors.push(`${path}: schema must be an object`);
@@ -101,7 +103,7 @@ function validateProfile(
   }
   const schema = input as Record<string, unknown>;
   for (const key of Object.keys(schema)) {
-    if (!SCHEMA_KEYS.has(key)) errors.push(`${path}.${key}: unsupported schema keyword`);
+    if (!anyKeyword && !SCHEMA_KEYS.has(key)) errors.push(`${path}.${key}: unsupported schema keyword`);
   }
   if (schema.$ref !== undefined) {
     if (typeof schema.$ref !== "string") errors.push(`${path}.$ref: must be a string`);
@@ -122,7 +124,7 @@ function validateProfile(
       errors.push(`${path}.properties: must be an object`);
     } else {
       for (const [name, property] of Object.entries(schema.properties)) {
-        validateProfile(property, `${path}.properties.${name}`, defs, errors);
+        validateProfile(property, `${path}.properties.${name}`, defs, errors, anyKeyword);
       }
     }
   }
@@ -131,9 +133,9 @@ function validateProfile(
     errors.push(`${path}.required: must be an array of strings`);
   }
   if (schema.additionalProperties !== undefined && typeof schema.additionalProperties !== "boolean") {
-    validateProfile(schema.additionalProperties, `${path}.additionalProperties`, defs, errors);
+    validateProfile(schema.additionalProperties, `${path}.additionalProperties`, defs, errors, anyKeyword);
   }
-  if (schema.items !== undefined) validateProfile(schema.items, `${path}.items`, defs, errors);
+  if (schema.items !== undefined) validateProfile(schema.items, `${path}.items`, defs, errors, anyKeyword);
   for (const key of ["oneOf", "anyOf", "allOf"] as const) {
     const variants = schema[key];
     if (variants === undefined) continue;
@@ -141,7 +143,7 @@ function validateProfile(
       errors.push(`${path}.${key}: must be a non-empty array`);
       continue;
     }
-    variants.forEach((variant, index) => validateProfile(variant, `${path}.${key}[${index}]`, defs, errors));
+    variants.forEach((variant, index) => validateProfile(variant, `${path}.${key}[${index}]`, defs, errors, anyKeyword));
   }
   if (schema.enum !== undefined && (!Array.isArray(schema.enum) || schema.enum.length === 0)) {
     errors.push(`${path}.enum: must be a non-empty array`);
@@ -366,13 +368,33 @@ function isStringOrNullSchema(schema: unknown): boolean {
     && types.includes("null");
 }
 
+export type ManifestProfile = "builtin" | "repository";
+
+const RepositoryExtensionsSchema = Type.Object({
+  faviconUrl: Type.Optional(Type.String({ pattern: "^https://" })),
+  skills: Type.Optional(Type.Array(Type.Object({
+    name: Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" }),
+    description: Type.String(),
+  }))),
+});
+
 export type ValidateServiceResult =
   | { ok: true; manifest: ServiceManifest }
   | { ok: false; errors: string[] };
 
-export function validateServiceManifest(input: unknown): ValidateServiceResult {
+export function validateServiceManifest(input: unknown, profile: ManifestProfile = "builtin"): ValidateServiceResult {
   const errors: string[] = [];
   const at = (path: string, msg: string) => errors.push(`${path}: ${msg}`);
+  const repository = profile === "repository";
+  if (repository && input && typeof input === "object" && !Array.isArray(input)) {
+    const { faviconUrl, skills, ...rest } = input as Record<string, unknown>;
+    for (const e of Value.Errors(RepositoryExtensionsSchema, { faviconUrl, skills })) {
+      at(e.path.replace(/^\//, "").replace(/\//g, "."), e.message);
+    }
+    const names = Array.isArray(skills) ? skills.map(skill => (skill as { name?: unknown })?.name) : [];
+    if (new Set(names).size !== names.length) at("skills", "skill names must be unique");
+    input = rest;
+  }
 
   for (const e of Value.Errors(ServiceManifestSchema, input)) {
     const path = e.path === "" ? "root" : e.path.replace(/^\//, "").replace(/\//g, ".");
@@ -421,7 +443,7 @@ export function validateServiceManifest(input: unknown): ValidateServiceResult {
   }
 
   for (const [name, schema] of Object.entries(m.$defs ?? {})) {
-    errors.push(...validateJSONSchemaProfile(schema, `$defs.${name}`, m.$defs));
+    errors.push(...validateJSONSchemaProfile(schema, `$defs.${name}`, m.$defs, repository));
   }
 
   const seenActions = new Set<string>();
@@ -430,8 +452,8 @@ export function validateServiceManifest(input: unknown): ValidateServiceResult {
     if (seenActions.has(a.id)) at(`${path}.id`, `duplicate action "${a.id}"`);
     else seenActions.add(a.id);
 
-    errors.push(...validateJSONSchemaProfile(a.inputSchema, `${path}.inputSchema`, m.$defs));
-    errors.push(...validateJSONSchemaProfile(a.outputSchema, `${path}.outputSchema`, m.$defs));
+    errors.push(...validateJSONSchemaProfile(a.inputSchema, `${path}.inputSchema`, m.$defs, repository));
+    errors.push(...validateJSONSchemaProfile(a.outputSchema, `${path}.outputSchema`, m.$defs, repository));
     errors.push(...validateConcreteOutputSchema(a.outputSchema, `${path}.outputSchema`, m.$defs));
 
     if (Object.prototype.hasOwnProperty.call(a, "defaultArgs")) {

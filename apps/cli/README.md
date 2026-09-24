@@ -237,6 +237,12 @@ ox --repository /path/to/repository service actions -s mail.google.com --json
 ox --repository /path/to/repository service skills -s mail.google.com --json
 ```
 
+`validate` and `serve` check `repository.json` and every web and API service:
+each `service.json` against the manifest rules the Host accepts, and each
+`actions.js` by running its installer with only `action` (plus `request` for API
+services) and matching the registered actions to the manifest. Every invalid
+service is reported.
+
 Repository origins may be local paths, loopback Git URLs, or HTTPS Git URLs.
 Private HTTPS repositories are cloned with the developer's Git credentials
 before being served; credentials are never embedded in the URL.

@@ -431,16 +431,17 @@ Their paths and encoding are unchanged. Local discovery validates repository
 metadata separately from draft contents and retains source access for repairing
 invalid drafts; incomplete services do not make the entire Local repository
 unavailable. Read-only repositories still require valid service file structure.
-Services run at the version their `repository.json` declares, 1 or 2; the Local
-repository is version 1, and `service.json` carries no version. `actions.js` calls
-`window.ox.install(installer)` without a version. Sources written before iOS 1.0.7
-that pass a version to `install` fail validation with an actionable error and must
-be repaired by hand; the app does not migrate them. Version 1 retains its original web and API helper
-inputs for existing Local and installed repositories; version 2 accepts only
-`action` for web and `action` plus `request` for API. The app does not rewrite
-user-owned Local source during upgrade. A service using the single-argument
-installer cannot run in a build older than iOS 1.0.7, which expects an installer
-version argument; that build rejects the installer instead of interpreting it.
+Repositories declare `version` 2 in `repository.json`; version 1 is retired and
+rejected when the Host connects. `service.json` carries no version. `actions.js`
+calls `window.ox.install(installer)`, and the installer receives only `action` for
+web and `action` plus `request` for API. On preparation, `StorageMigrator`
+rewrites a Local `repository.json` at version 1 to version 2 and commits it when
+that file and the index are clean; otherwise it leaves the change uncommitted and
+logs `pending=true`. The app does not rewrite service source: sources that pass a
+version to `install` or use the retired `retryFetch`, `log`, `lib`, or fetch
+capture fail validation with an actionable error and must be repaired by hand.
+Builds older than iOS 1.0.7 reject version 2 Local repositories and
+single-argument installers instead of interpreting them.
 `ox.service.validate` checks a complete Local draft, including file structure,
 manifest, action registration, declared skills, and service size limits. The same
 validator runs before Save and before loading Local source for a caller. Failed

@@ -19,7 +19,6 @@ actor ServiceRepository {
     struct ManifestFile: Sendable {
         let repositoryID: String
         let provenance: Repository.Provenance
-        let version: Int
         let domain: String
         let data: Data
     }
@@ -406,7 +405,6 @@ actor ServiceRepository {
                 web.append(ManifestFile(
                     repositoryID: repository.descriptor.id,
                     provenance: repository.descriptor.provenance,
-                    version: repository.package.version,
                     domain: service.id.runtimeID,
                     data: data
                 ))
@@ -798,10 +796,6 @@ actor ServiceRepository {
         return try readSource(source, path: path)
     }
 
-    func localVersion() throws -> Int {
-        try Self.loadPackage(at: localRoot, provenance: .local).version
-    }
-
     func readLocalSource(kind: ServiceKind, id: String, path: [String]) throws -> Data {
         try readSource(localSource(kind: kind, id: id), path: path)
     }
@@ -1159,7 +1153,7 @@ actor ServiceRepository {
         if !FileManager.default.fileExists(atPath: packageURL.path) {
             try FileManager.default.createDirectory(at: localRoot, withIntermediateDirectories: true)
             try Self.writePackage(
-                Package(version: 1, name: "Local", contentHash: nil, services: []),
+                Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: []),
                 at: localRoot
             )
             Log.service.info("ServiceRepository.local materialized")
@@ -1168,6 +1162,7 @@ actor ServiceRepository {
         try installLocalRepositoryMetadata()
         try StorageMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
         try StorageMigrator.migrateLegacyLocalServiceActions(at: localRoot)
+        try StorageMigrator.migrateLocalServiceRepositoryVersion(at: localRoot)
     }
 
     private func loadLocalRepository() -> LoadedRepository {
@@ -1209,7 +1204,7 @@ actor ServiceRepository {
                     state: .failed(Self.errorMessage(error))
                 ),
                 root: localRoot,
-                package: Package(version: 1, name: "Local", contentHash: nil, services: [])
+                package: Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: [])
             )
         }
     }
@@ -1231,7 +1226,7 @@ actor ServiceRepository {
                 state: .failed(message)
             ),
             root: localRoot,
-            package: Package(version: 1, name: "Local", contentHash: nil, services: [])
+            package: Package(version: HostProtocols.repository.last!, name: "Local", contentHash: nil, services: [])
         )
     }
 
@@ -1359,7 +1354,7 @@ actor ServiceRepository {
                 state: .failed(message)
             ),
             root: bundledRoot ?? Bundle.main.bundleURL,
-            package: Package(version: 1, name: "Built-in", contentHash: nil, services: [])
+            package: Package(version: HostProtocols.repository.last!, name: "Built-in", contentHash: nil, services: [])
         )
     }
 
@@ -1403,7 +1398,7 @@ actor ServiceRepository {
                     state: .failed(error.localizedDescription)
                 ),
                 root: root,
-                package: Package(version: 1, name: "Development Server", contentHash: nil, services: [])
+                package: Package(version: HostProtocols.repository.last!, name: "Development Server", contentHash: nil, services: [])
             )
         }
     }
@@ -1447,7 +1442,7 @@ actor ServiceRepository {
                     state: .failed(error.localizedDescription)
                 ),
                 root: root,
-                package: Package(version: 1, name: "Invalid", contentHash: nil, services: [])
+                package: Package(version: HostProtocols.repository.last!, name: "Invalid", contentHash: nil, services: [])
             )
         }
     }

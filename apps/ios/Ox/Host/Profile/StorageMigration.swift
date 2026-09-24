@@ -719,6 +719,36 @@ nonisolated enum StorageMigrator {
         }
     }
 
+    static func migrateLocalServiceRepositoryVersion(at root: URL) throws {
+        let manager = FileManager.default
+        let current = root.appendingPathComponent("repository.json", isDirectory: false)
+        let packageURL = manager.fileExists(atPath: current.path) ? current : root.appendingPathComponent("ox.json", isDirectory: false)
+        guard let data = try? Data(contentsOf: packageURL),
+              var package = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              package["version"] as? Int == 1 else { return }
+        let repository = try SwiftGitX.Repository.open(at: root)
+        guard !repository.isHEADDetached else { return }
+        let path = packageURL.lastPathComponent
+        let status = try repository.status()
+        let dirty = status.contains { [$0.workingTree?.newFile.path, $0.index?.newFile.path].contains(path) }
+        let hasStagedChanges = status.contains {
+            $0.status.contains(where: {
+                [.indexNew, .indexModified, .indexDeleted, .indexRenamed, .indexTypeChange, .conflicted].contains($0)
+            })
+        }
+        package["version"] = 2
+        var output = try JSONSerialization.data(withJSONObject: package, options: [.prettyPrinted, .sortedKeys])
+        output.append(0x0A)
+        try output.write(to: packageURL, options: .atomic)
+        guard !dirty, !hasStagedChanges else {
+            Log.service.info("StorageMigrator.localServiceRepositoryVersion from=1 to=2 pending=true")
+            return
+        }
+        try repository.add(paths: [path])
+        let commit = try repository.commit(message: "Upgrade Local services repository to version 2")
+        Log.service.info("StorageMigrator.localServiceRepositoryVersion from=1 to=2 commit=\(commit.id.abbreviated)")
+    }
+
     private static func migrateProfile(_ profile: Profile) async -> Bool {
         guard let sourceVersion = sourceVersion(for: profile.version),
               let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else { return false }

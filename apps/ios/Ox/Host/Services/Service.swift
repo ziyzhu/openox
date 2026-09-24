@@ -798,7 +798,7 @@ final class Service: NSObject, Identifiable {
         if mode == .service {
             ucc.addBridgeUserScripts()
             ucc.addUserScript(WKUserScript(
-                source: ServiceActionRuntime.source(domain: domain, version: definition.version ?? 0),
+                source: ServiceActionRuntime.source(domain: domain),
                 injectionTime: .atDocumentStart,
                 forMainFrameOnly: true
             ))

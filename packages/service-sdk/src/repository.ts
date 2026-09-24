@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
-export const REPOSITORY_VERSIONS = [1, 2] as const;
+export const REPOSITORY_VERSIONS = [2] as const;
 
 const RepositoryServiceSchema = Type.String({
   minLength: 5,

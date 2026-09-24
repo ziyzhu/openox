@@ -67,13 +67,11 @@ nonisolated struct ServiceDefinition: Sendable {
     let definitions: [String: JSONValue]
     let skills: [Manifest.Skill]
     let remoteMCPIcons: [RemoteMCPIcon]
-    private(set) var version: Int?
 
     init(
         manifest: JSONValue,
         repositoryID: String = ServiceRepository.bundledID,
-        provenance: ServiceRepository.Repository.Provenance = .bundled,
-        version: Int? = nil
+        provenance: ServiceRepository.Repository.Provenance = .bundled
     ) throws {
         guard let object = manifest.objectValue else { throw ValidationError.invalid("root") }
         guard let domain = object["domain"]?.stringValue?.lowercased(), !domain.isEmpty else {
@@ -150,7 +148,6 @@ nonisolated struct ServiceDefinition: Sendable {
         self.definitions = object["$defs"]?.objectValue ?? [:]
         self.skills = skills
         self.remoteMCPIcons = []
-        self.version = version
     }
 
     init(iOS manifest: IOSCatalogManifest, repositoryID: String? = nil) throws {

@@ -44,7 +44,7 @@ the Host and CLI are updated together.
 
 | Line | Consumer declares | Host supports | Checked |
 | --- | --- | --- | --- |
-| `repository` | `version` in `repository.json` | 1, 2 | when the Host connects to a repository |
+| `repository` | `version` in `repository.json` | 2 | when the Host connects to a repository |
 
 `host.describe` returns `implementation` (`name`, `version`, `build`),
 `protocols`, the lists above, and `methods`, the method names derived from the
@@ -109,10 +109,9 @@ The repository version is declared once in `repository.json`, gated through
 `HostProtocols` when the Host connects to a repository, and applies to every
 service in it; `service.json` carries no version. `version` is the Host format
 version, not a release number. Services install with
-`window.ox.install(installer)`; the installer takes no version. Version 1 gives
-installers `action`, `retryFetch`, `log`, and `lib` (plus `request` for API
-services); version 2 gives only `action` (plus `request`), so version 2 sources
-also run in version 1 repositories. Local repositories are version 1. Adding a
+`window.ox.install(installer)`; the installer takes no version and receives only
+`action` (plus `request` for API services). Version 1, whose installers also
+received `retryFetch`, `log`, `lib`, and fetch capture, is retired. Adding a
 version also requires the service runtimes
 (`ServiceActionRuntime.js`, `APIService`, and the `@openox/services` inspector)
 to implement it. Repository content hashes and Git commits identify exact

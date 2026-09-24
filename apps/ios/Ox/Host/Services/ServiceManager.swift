@@ -852,7 +852,7 @@ final class ServiceManager {
         case .web, .api:
             let manifestData = try await read(["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
-            let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local, version: try await repository.localVersion())
+            let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local)
             guard definition.domain == domain, definition.isAPI == (kind == .api) else {
                 throw ServiceRepository.Failure(message: "manifest identity does not match its directory")
             }
@@ -877,8 +877,7 @@ final class ServiceManager {
               install(installer, ...extra) {
                 this.__installations++;
                 if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; the repository declares the version");
-                const version = \#(definition.version ?? 0);
+                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer");
                 const names = this.__registered;
                 const action = (name, definition) => {
                   if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
@@ -887,23 +886,12 @@ final class ServiceManager {
                   names.push(name);
                 };
                 const unavailable = () => { throw new Error("not callable during registration validation"); };
-                const legacy = {
-                  action,
-                  retryFetch: unavailable,
-                  request: unavailable,
-                  log() {},
-                  lib: {
-                    cookie: unavailable,
-                    cleanText: value => String(value ?? "").replace(/\s+/g, " ").trim(),
-                    pageCursor: (value, firstPage) => Math.max(firstPage, Number.parseInt(value ?? String(firstPage), 10) || firstPage),
-                  },
-                };
-                const api = version === 1 ? legacy : new Proxy(
+                const api = new Proxy(
                   Object.freeze(\#(kind == .api ? "true" : "false") ? { action, request: unavailable } : { action }),
                   {
                     get(target, name) {
                       if (name in target) return target[name];
-                      throw new Error(`service version 2 does not provide ${String(name)}`);
+                      throw new Error(`service installer does not provide ${String(name)}`);
                     },
                   }
                 );
@@ -993,8 +981,7 @@ final class ServiceManager {
             definition = try ServiceDefinition(
                 manifest: Manifest.localized(raw, locale: monoRepositoryLocale),
                 repositoryID: ServiceRepository.localID,
-                provenance: .local,
-                version: try await repository.localVersion()
+                provenance: .local
             )
         }
 
@@ -1210,8 +1197,7 @@ final class ServiceManager {
                 let definition = try ServiceDefinition(
                     manifest: manifest,
                     repositoryID: file.repositoryID,
-                    provenance: file.provenance,
-                    version: file.version
+                    provenance: file.provenance
                 )
                 guard definition.domain == file.domain else {
                     Log.service.error("ServiceManager.listServices domain mismatch directory=\(file.domain) manifest=\(definition.domain)")

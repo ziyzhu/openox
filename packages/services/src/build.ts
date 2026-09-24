@@ -56,7 +56,7 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
   const catalogKinds = options.catalogKinds ?? ["ios", "mcp"];
   const results = await Promise.all(domains.map(async (domain) => ({
     domain,
-    service: await buildService(domain, sourcePackage.version),
+    service: await buildService(domain),
   })));
   const catalogResults = await Promise.all(catalogKinds.flatMap((kind) =>
     sourcePackage.services
