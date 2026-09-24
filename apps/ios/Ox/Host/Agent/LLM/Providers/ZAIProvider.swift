@@ -8,7 +8,8 @@ nonisolated enum ZAIProvider {
         endpoint: regionalURL("https://api.z.ai/api/coding/paas/v4", overrides: [.china: "https://open.bigmodel.cn/api/coding/paas/v4"]),
         credentialKind: .subscriptionKey,
         regionalCredentials: true,
-        reasoningControl: .disabled(.thinking),
+        reasoningReplayModelIDs: ["glm-5.3", "glm-5.3-highspeed"],
+        reasoningControl: .effort(.low),
         website: regionalURL("https://z.ai/subscribe", overrides: [.china: "https://open.bigmodel.cn/glm-coding"])
     )
 
@@ -18,7 +19,8 @@ nonisolated enum ZAIProvider {
         regions: [.global, .china],
         endpoint: regionalURL("https://api.z.ai/api/paas/v4", overrides: [.china: "https://open.bigmodel.cn/api/paas/v4"]),
         regionalCredentials: true,
-        reasoningControl: .disabled(.thinking),
+        reasoningReplayModelIDs: ["glm-4.7-flash", "glm-5.3"],
+        reasoningControl: .effort(.low),
         website: regionalURL("https://z.ai/manage-apikey/apikey-list", overrides: [.china: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"]),
         authNotice: "GLM-4.7 Flash is free. Other Z.AI models may charge your account. Usage and rate limits apply.",
         authNoticeRegions: [.china],

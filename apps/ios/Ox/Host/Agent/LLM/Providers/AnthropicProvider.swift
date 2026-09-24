@@ -8,7 +8,7 @@ nonisolated enum AnthropicProvider {
             models: models,
             endpoint: URL(string: "https://api.anthropic.com/v1/messages")!,
             website: URL(string: "https://console.anthropic.com/settings/keys"),
-            adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]
+            adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5-5", "claude-fable-5-1"]
         )
     }
 }

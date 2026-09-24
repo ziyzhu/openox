@@ -5,14 +5,14 @@
         "catalogProvider": "openai",
         "models": [
           {
-            "source": "gpt-5.6-sol",
+            "source": "gpt-6-sol",
             "overrides": {
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-sol",
-              "displayName": "GPT-5.6 Sol",
+              "id": "gpt-6-sol",
+              "displayName": "GPT-6 Sol",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -38,16 +38,16 @@
             }
           },
           {
-            "source": "gpt-5.6-sol",
+            "source": "gpt-6-sol",
             "overrides": {
-              "id": "gpt-5.6-sol@fast",
+              "id": "gpt-6-sol@fast",
               "variant": "fast",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-sol@fast",
-              "displayName": "GPT-5.6 Sol · Fast",
+              "id": "gpt-6-sol@fast",
+              "displayName": "GPT-6 Sol · Fast",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -70,25 +70,24 @@
                   "text"
                 ]
               },
-              "providerModelID": "gpt-5.6-sol",
+              "providerModelID": "gpt-6-sol",
               "variant": "fast"
             }
           },
           {
-            "source": "gpt-5.6-terra",
+            "source": "gpt-6-astra",
             "overrides": {
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-terra",
-              "displayName": "GPT-5.6 Terra",
+              "id": "gpt-6-astra",
+              "displayName": "GPT-6 Astra",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
-                "none",
                 "low",
                 "medium",
                 "high",
@@ -108,22 +107,21 @@
             }
           },
           {
-            "source": "gpt-5.6-terra",
+            "source": "gpt-6-astra",
             "overrides": {
-              "id": "gpt-5.6-terra@fast",
+              "id": "gpt-6-astra@fast",
               "variant": "fast",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-terra@fast",
-              "displayName": "GPT-5.6 Terra · Fast",
+              "id": "gpt-6-astra@fast",
+              "displayName": "GPT-6 Astra · Fast",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
-                "none",
                 "low",
                 "medium",
                 "high",
@@ -140,19 +138,19 @@
                   "text"
                 ]
               },
-              "providerModelID": "gpt-5.6-terra",
+              "providerModelID": "gpt-6-astra",
               "variant": "fast"
             }
           },
           {
-            "source": "gpt-5.6-luna",
+            "source": "gpt-6-luna",
             "overrides": {
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-luna",
-              "displayName": "GPT-5.6 Luna",
+              "id": "gpt-6-luna",
+              "displayName": "GPT-6 Luna",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -178,16 +176,16 @@
             }
           },
           {
-            "source": "gpt-5.6-luna",
+            "source": "gpt-6-luna",
             "overrides": {
-              "id": "gpt-5.6-luna@fast",
+              "id": "gpt-6-luna@fast",
               "variant": "fast",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-luna@fast",
-              "displayName": "GPT-5.6 Luna · Fast",
+              "id": "gpt-6-luna@fast",
+              "displayName": "GPT-6 Luna · Fast",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -210,7 +208,7 @@
                   "text"
                 ]
               },
-              "providerModelID": "gpt-5.6-luna",
+              "providerModelID": "gpt-6-luna",
               "variant": "fast"
             }
           }
@@ -222,13 +220,13 @@
         "catalogProvider": "openai",
         "models": [
           {
-            "source": "gpt-5.6-sol",
+            "source": "gpt-6-sol",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-sol",
-              "displayName": "GPT-5.6 Sol",
+              "id": "gpt-6-sol",
+              "displayName": "GPT-6 Sol",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
@@ -254,19 +252,18 @@
             }
           },
           {
-            "source": "gpt-5.6-terra",
+            "source": "gpt-6-astra",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-terra",
-              "displayName": "GPT-5.6 Terra",
+              "id": "gpt-6-astra",
+              "displayName": "GPT-6 Astra",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
-                "none",
                 "low",
                 "medium",
                 "high",
@@ -286,13 +283,13 @@
             }
           },
           {
-            "source": "gpt-5.6-luna",
+            "source": "gpt-6-luna",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-luna",
-              "displayName": "GPT-5.6 Luna",
+              "id": "gpt-6-luna",
+              "displayName": "GPT-6 Luna",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
@@ -356,13 +353,13 @@
             }
           },
           {
-            "source": "claude-opus-5",
+            "source": "claude-opus-5-5",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "claude-opus-5",
-              "displayName": "Claude Opus 5",
+              "id": "claude-opus-5-5",
+              "displayName": "Claude Opus 5.5",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -387,13 +384,13 @@
             }
           },
           {
-            "source": "claude-fable-5",
+            "source": "claude-fable-5-1",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "claude-fable-5",
-              "displayName": "Claude Fable 5",
+              "id": "claude-fable-5-1",
+              "displayName": "Claude Fable 5.1",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -452,10 +449,10 @@
         "catalogProvider": "google",
         "models": [
           {
-            "source": "gemini-3.7-flash",
+            "source": "gemini-3.8-flash",
             "model": {
-              "id": "gemini-3.7-flash",
-              "displayName": "Gemini 3.7 Flash",
+              "id": "gemini-3.8-flash",
+              "displayName": "Gemini 3.8 Flash",
               "maxTokens": 65536,
               "maxContext": 1048576,
               "supportsTools": true,
@@ -516,13 +513,13 @@
         "catalogProvider": "github-copilot",
         "models": [
           {
-            "source": "gpt-5.6-sol",
+            "source": "gpt-6-sol",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-sol",
-              "displayName": "GPT-5.6 Sol",
+              "id": "gpt-6-sol",
+              "displayName": "GPT-6 Sol",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
@@ -548,13 +545,44 @@
             }
           },
           {
-            "source": "gpt-5.6-terra",
+            "source": "gpt-6-astra",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-terra",
-              "displayName": "GPT-5.6 Terra",
+              "id": "gpt-6-astra",
+              "displayName": "GPT-6 Astra",
+              "maxTokens": 16384,
+              "maxContext": 1050000,
+              "supportsTools": true,
+              "reasoning": true,
+              "reasoningEfforts": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "modalities": {
+                "input": [
+                  "text",
+                  "image",
+                  "pdf"
+                ],
+                "output": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "source": "gpt-6-luna",
+            "overrides": {
+              "maxTokens": 16384
+            },
+            "model": {
+              "id": "gpt-6-luna",
+              "displayName": "GPT-6 Luna",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
@@ -580,45 +608,13 @@
             }
           },
           {
-            "source": "gpt-5.6-luna",
+            "source": "grok-4.7",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "gpt-5.6-luna",
-              "displayName": "GPT-5.6 Luna",
-              "maxTokens": 16384,
-              "maxContext": 1050000,
-              "supportsTools": true,
-              "reasoning": true,
-              "reasoningEfforts": [
-                "none",
-                "low",
-                "medium",
-                "high",
-                "xhigh",
-                "max"
-              ],
-              "modalities": {
-                "input": [
-                  "text",
-                  "image",
-                  "pdf"
-                ],
-                "output": [
-                  "text"
-                ]
-              }
-            }
-          },
-          {
-            "source": "grok-4.5",
-            "overrides": {
-              "maxTokens": 16384
-            },
-            "model": {
-              "id": "grok-4.5",
-              "displayName": "Grok 4.5",
+              "id": "grok-4.7",
+              "displayName": "Grok 4.7",
               "maxTokens": 16384,
               "maxContext": 500000,
               "supportsTools": true,
@@ -626,12 +622,14 @@
               "reasoningEfforts": [
                 "low",
                 "medium",
-                "high"
+                "high",
+                "xhigh"
               ],
               "modalities": {
                 "input": [
                   "text",
-                  "image"
+                  "image",
+                  "pdf"
                 ],
                 "output": [
                   "text"
@@ -647,13 +645,13 @@
         "catalogProvider": "xai",
         "models": [
           {
-            "source": "grok-4.5",
+            "source": "grok-4.7",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "grok-4.5",
-              "displayName": "Grok 4.5",
+              "id": "grok-4.7",
+              "displayName": "Grok 4.7",
               "maxTokens": 16384,
               "maxContext": 500000,
               "supportsTools": true,
@@ -661,7 +659,8 @@
               "reasoningEfforts": [
                 "low",
                 "medium",
-                "high"
+                "high",
+                "xhigh"
               ],
               "modalities": {
                 "input": [
@@ -683,14 +682,13 @@
         "catalogProvider": "opencode-go",
         "models": [
           {
-            "source": "deepseek-v4-flash",
+            "source": "deepseek-v4.1-flash",
             "overrides": {
-              "displayName": "DeepSeek V4 Flash",
               "maxTokens": 16384
             },
             "model": {
-              "id": "deepseek-v4-flash",
-              "displayName": "DeepSeek V4 Flash",
+              "id": "deepseek-v4.1-flash",
+              "displayName": "DeepSeek V4.1 Flash",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -702,7 +700,8 @@
               ],
               "modalities": {
                 "input": [
-                  "text"
+                  "text",
+                  "image"
                 ],
                 "output": [
                   "text"
@@ -764,18 +763,19 @@
             }
           },
           {
-            "source": "glm-5.2",
+            "source": "glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -790,20 +790,22 @@
             }
           },
           {
-            "source": "ox-alpha-free",
+            "source": "space-bunny-free",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "ox-alpha-free",
-              "displayName": "Ox Alpha Free (Unlimited)",
+              "id": "space-bunny-free",
+              "displayName": "Space Bunny Free",
               "maxTokens": 16384,
-              "maxContext": 1000000,
+              "maxContext": 1048576,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
                 "low",
+                "medium",
                 "high",
+                "xhigh",
                 "max"
               ],
               "modalities": {
@@ -929,8 +931,8 @@
             "model": {
               "id": "MiniMax-M3",
               "displayName": "MiniMax M3",
-              "maxTokens": 128000,
-              "maxContext": 1000000,
+              "maxTokens": 512000,
+              "maxContext": 1048576,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [],
@@ -959,8 +961,8 @@
             "model": {
               "id": "MiniMax-M3",
               "displayName": "MiniMax M3",
-              "maxTokens": 128000,
-              "maxContext": 1000000,
+              "maxTokens": 512000,
+              "maxContext": 1048576,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [],
@@ -1005,20 +1007,22 @@
             }
           },
           {
-            "source": "stealth/ox-alpha",
+            "source": "stealth/space-bunny-alpha",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "stealth/ox-alpha",
-              "displayName": "Ox Alpha",
+              "id": "stealth/space-bunny-alpha",
+              "displayName": "Space Bunny Alpha",
               "maxTokens": 16384,
-              "maxContext": 1048576,
+              "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
                 "low",
+                "medium",
                 "high",
+                "xhigh",
                 "max"
               ],
               "modalities": {
@@ -1065,19 +1069,18 @@
             }
           },
           {
-            "source": "openai/gpt-5.6-terra",
+            "source": "openai/gpt-6-astra",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "openai/gpt-5.6-terra",
-              "displayName": "GPT-5.6 Terra",
+              "id": "openai/gpt-6-astra",
+              "displayName": "GPT-6 Astra",
               "maxTokens": 16384,
               "maxContext": 1050000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
-                "none",
                 "low",
                 "medium",
                 "high",
@@ -1097,13 +1100,13 @@
             }
           },
           {
-            "source": "google/gemini-3.7-flash",
+            "source": "google/gemini-3.8-flash",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "google/gemini-3.7-flash",
-              "displayName": "Gemini 3.7 Flash",
+              "id": "google/gemini-3.8-flash",
+              "displayName": "Gemini 3.8 Flash",
               "maxTokens": 16384,
               "maxContext": 1048576,
               "supportsTools": true,
@@ -1128,16 +1131,15 @@
             }
           },
           {
-            "source": "deepseek/deepseek-v4-flash-0731",
+            "source": "deepseek/deepseek-v4.1-flash",
             "overrides": {
-              "displayName": "DeepSeek V4 Flash",
               "maxTokens": 16384
             },
             "model": {
-              "id": "deepseek/deepseek-v4-flash-0731",
-              "displayName": "DeepSeek V4 Flash",
+              "id": "deepseek/deepseek-v4.1-flash",
+              "displayName": "DeepSeek V4.1 Flash",
               "maxTokens": 16384,
-              "maxContext": 1310720,
+              "maxContext": 1048576,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
@@ -1147,7 +1149,8 @@
               ],
               "modalities": {
                 "input": [
-                  "text"
+                  "text",
+                  "image"
                 ],
                 "output": [
                   "text"
@@ -1156,13 +1159,13 @@
             }
           },
           {
-            "source": "qwen/qwen3.8-max",
+            "source": "qwen/qwen3.8-max-prime",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "qwen/qwen3.8-max",
-              "displayName": "Qwen3.8 Max",
+              "id": "qwen/qwen3.8-max-prime",
+              "displayName": "Qwen 3.8 Max Prime",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -1216,20 +1219,21 @@
             }
           },
           {
-            "source": "z-ai/glm-5.2",
+            "source": "z-ai/glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "z-ai/glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "z-ai/glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
-              "maxContext": 1048576,
+              "maxContext": 1310720,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
-                "xhigh"
+                "max"
               ],
               "modalities": {
                 "input": [
@@ -1249,15 +1253,15 @@
         "catalogProvider": "amazon-bedrock",
         "models": [
           {
-            "source": "openai.gpt-5.6-sol",
+            "source": "openai.gpt-6-sol",
             "overrides": {
-              "id": "gpt-5.6-sol",
+              "id": "gpt-6-sol",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-sol",
-              "displayName": "GPT-5.6 Sol",
+              "id": "gpt-6-sol",
+              "displayName": "GPT-6 Sol",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -1280,25 +1284,24 @@
                   "text"
                 ]
               },
-              "providerModelID": "openai.gpt-5.6-sol"
+              "providerModelID": "openai.gpt-6-sol"
             }
           },
           {
-            "source": "openai.gpt-5.6-terra",
+            "source": "openai.gpt-6-astra",
             "overrides": {
-              "id": "gpt-5.6-terra",
+              "id": "gpt-6-astra",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-terra",
-              "displayName": "GPT-5.6 Terra",
+              "id": "gpt-6-astra",
+              "displayName": "GPT-6 Astra",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
-                "none",
                 "low",
                 "medium",
                 "high",
@@ -1315,19 +1318,19 @@
                   "text"
                 ]
               },
-              "providerModelID": "openai.gpt-5.6-terra"
+              "providerModelID": "openai.gpt-6-astra"
             }
           },
           {
-            "source": "openai.gpt-5.6-luna",
+            "source": "openai.gpt-6-luna",
             "overrides": {
-              "id": "gpt-5.6-luna",
+              "id": "gpt-6-luna",
               "maxTokens": 16384,
               "maxContext": 272000
             },
             "model": {
-              "id": "gpt-5.6-luna",
-              "displayName": "GPT-5.6 Luna",
+              "id": "gpt-6-luna",
+              "displayName": "GPT-6 Luna",
               "maxTokens": 16384,
               "maxContext": 272000,
               "supportsTools": true,
@@ -1350,7 +1353,7 @@
                   "text"
                 ]
               },
-              "providerModelID": "openai.gpt-5.6-luna"
+              "providerModelID": "openai.gpt-6-luna"
             }
           },
           {
@@ -1387,14 +1390,14 @@
             }
           },
           {
-            "source": "anthropic.claude-opus-5",
+            "source": "anthropic.claude-opus-5-5",
             "overrides": {
-              "id": "claude-opus-5",
+              "id": "claude-opus-5-5",
               "maxTokens": 16384
             },
             "model": {
-              "id": "claude-opus-5",
-              "displayName": "Claude Opus 5",
+              "id": "claude-opus-5-5",
+              "displayName": "Claude Opus 5.5",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -1416,18 +1419,18 @@
                   "text"
                 ]
               },
-              "providerModelID": "anthropic.claude-opus-5"
+              "providerModelID": "anthropic.claude-opus-5-5"
             }
           },
           {
-            "source": "anthropic.claude-fable-5",
+            "source": "anthropic.claude-fable-5-1",
             "overrides": {
-              "id": "claude-fable-5",
+              "id": "claude-fable-5-1",
               "maxTokens": 16384
             },
             "model": {
-              "id": "claude-fable-5",
-              "displayName": "Claude Fable 5",
+              "id": "claude-fable-5-1",
+              "displayName": "Claude Fable 5.1",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -1449,7 +1452,7 @@
                   "text"
                 ]
               },
-              "providerModelID": "anthropic.claude-fable-5"
+              "providerModelID": "anthropic.claude-fable-5-1"
             }
           },
           {
@@ -1619,13 +1622,13 @@
         "catalogProvider": "deepseek",
         "models": [
           {
-            "source": "deepseek-v4-flash",
+            "source": "deepseek-flash",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "deepseek-v4-flash",
-              "displayName": "DeepSeek V4 Flash",
+              "id": "deepseek-flash",
+              "displayName": "DeepSeek V4.1 Flash",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -1637,7 +1640,8 @@
               ],
               "modalities": {
                 "input": [
-                  "text"
+                  "text",
+                  "image"
                 ],
                 "output": [
                   "text"
@@ -1658,6 +1662,7 @@
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1677,13 +1682,13 @@
         "catalogProvider": "deepseek",
         "models": [
           {
-            "source": "deepseek-v4-flash",
+            "source": "deepseek-flash",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "deepseek-v4-flash",
-              "displayName": "DeepSeek V4 Flash",
+              "id": "deepseek-flash",
+              "displayName": "DeepSeek V4.1 Flash",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
@@ -1695,7 +1700,8 @@
               ],
               "modalities": {
                 "input": [
-                  "text"
+                  "text",
+                  "image"
                 ],
                 "output": [
                   "text"
@@ -1716,6 +1722,7 @@
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1737,18 +1744,19 @@
         "catalogProvider": "zai-coding-plan",
         "models": [
           {
-            "source": "glm-5.2",
+            "source": "glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1763,18 +1771,19 @@
             }
           },
           {
-            "source": "glm-5.2-highspeed",
+            "source": "glm-5.3-highspeed",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2-highspeed",
-              "displayName": "GLM-5.2 Highspeed",
+              "id": "glm-5.3-highspeed",
+              "displayName": "GLM-5.3 Highspeed",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1794,18 +1803,19 @@
         "catalogProvider": "zhipuai-coding-plan",
         "models": [
           {
-            "source": "glm-5.2",
+            "source": "glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1820,18 +1830,19 @@
             }
           },
           {
-            "source": "glm-5.2-highspeed",
+            "source": "glm-5.3-highspeed",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2-highspeed",
-              "displayName": "GLM-5.2 Highspeed",
+              "id": "glm-5.3-highspeed",
+              "displayName": "GLM-5.3 Highspeed",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1853,18 +1864,19 @@
         "catalogProvider": "zai",
         "models": [
           {
-            "source": "glm-5.2",
+            "source": "glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -1907,18 +1919,19 @@
             }
           },
           {
-            "source": "glm-5.2",
+            "source": "glm-5.3",
             "overrides": {
               "maxTokens": 16384
             },
             "model": {
-              "id": "glm-5.2",
-              "displayName": "GLM-5.2",
+              "id": "glm-5.3",
+              "displayName": "GLM-5.3",
               "maxTokens": 16384,
               "maxContext": 1000000,
               "supportsTools": true,
               "reasoning": true,
               "reasoningEfforts": [
+                "low",
                 "high",
                 "max"
               ],
@@ -2249,7 +2262,10 @@
               "maxContext": 256000,
               "supportsTools": true,
               "reasoning": true,
-              "reasoningEfforts": [],
+              "reasoningEfforts": [
+                "none",
+                "high"
+              ],
               "modalities": {
                 "input": [
                   "text"

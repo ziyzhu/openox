@@ -33,7 +33,7 @@ nonisolated struct AmazonBedrockProvider: ProviderClient {
             displayName: displayName,
             models: claudeModels,
             endpoint: URL(string: "https://bedrock-mantle.us-east-1.api.aws/anthropic/v1/messages")!,
-            adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]
+            adaptiveThinkingModelIDs: ["anthropic.claude-sonnet-5", "anthropic.claude-opus-5-5", "anthropic.claude-fable-5-1"]
         )
     }
 

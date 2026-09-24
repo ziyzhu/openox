@@ -24,14 +24,14 @@ nonisolated struct OpenRouterAuth: OpenAIChatTransportAuth {
 
 nonisolated enum OpenRouterProvider {
     private static let reasoningReplayModelIDs: Set<String> = [
-        "stealth/ox-alpha",
+        "stealth/space-bunny-alpha",
         "anthropic/claude-sonnet-5",
-        "openai/gpt-5.6-terra",
-        "google/gemini-3.7-flash",
-        "deepseek/deepseek-v4-flash-0731",
-        "qwen/qwen3.8-max",
+        "openai/gpt-6-astra",
+        "google/gemini-3.8-flash",
+        "deepseek/deepseek-v4.1-flash",
+        "qwen/qwen3.8-max-prime",
         "moonshotai/kimi-k3",
-        "z-ai/glm-5.2",
+        "z-ai/glm-5.3",
     ]
 
     static func client(models: [ProviderModel]) -> OpenAIChatTransport {

@@ -30,6 +30,12 @@ When adding a built-in provider:
 
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 
+## Updating models
+
+`bun run update:llms` refreshes metadata from models.dev for the sources already selected in `provider-models.json`; it does not discover or select newer releases. For a model refresh, review each selected provider's catalog for supported successors, update the source selections and any affected ID or display-name overrides, then run the command. Preserve intentional token caps and regional or subscription account boundaries. Do not infer a reseller's availability from the upstream vendor's catalog.
+
+Keep the importer's capability and status checks intact when a selected model is deprecated or missing. Confirm a supported replacement or remove the unavailable selection. Verify changed request requirements against provider documentation, including whether reasoning can be disabled. Review model-specific adaptive-thinking and reasoning-replay lists alongside catalog changes; these lists must match wire IDs, including provider prefixes.
+
 ## Provider references
 
 - [Amazon Bedrock](references/amazon-bedrock.md)
