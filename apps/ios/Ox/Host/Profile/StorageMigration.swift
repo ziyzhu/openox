@@ -182,6 +182,7 @@ nonisolated enum StorageMigrator {
         try migratePublicationToken()
         try await storage.resolve()
         try migrateSecretProviderKeys()
+        try removeVerifiedLegacyProviderKeys()
         try await services.prepareStorage()
         let manifests = try await services.storageManifestFiles()
         try migrateAPIServiceOAuthAccounts(manifests: manifests)
@@ -379,6 +380,34 @@ nonisolated enum StorageMigrator {
             migrated += 1
         }
         Log.app.info("StorageMigrator.secretProviderKeys migrated=\(migrated)")
+    }
+
+    @MainActor
+    private static func removeVerifiedLegacyProviderKeys() throws {
+        let definitions = ProviderRegistry.shared.definitions
+        let definitionsByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
+        var aliases: [String: Set<String>] = [:]
+        for definition in definitions where definition.id != definition.credentialID {
+            aliases[definition.id, default: []].insert(definition.credentialID)
+        }
+        for bundled in ProviderRegistry.bundledDefinitions() {
+            guard let definition = definitionsByID[bundled.definition.id],
+                  bundled.legacyCredentialID != definition.credentialID else { continue }
+            aliases[bundled.legacyCredentialID, default: []].insert(definition.credentialID)
+        }
+        var removed = 0
+        var retained = 0
+        for (sourceID, targetIDs) in aliases {
+            let account = "api:\(sourceID)"
+            guard let old = try Credentials.secretChecked(for: account) else { continue }
+            guard targetIDs.contains(where: { Secret.providerKey(for: $0) == old }) else {
+                retained += 1
+                continue
+            }
+            try Credentials.deleteSecretChecked(for: account)
+            removed += 1
+        }
+        Log.app.info("StorageMigrator.legacyProviderCopies removed=\(removed) retained=\(retained)")
     }
 
     @MainActor

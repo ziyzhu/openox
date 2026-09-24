@@ -514,6 +514,9 @@ compatibility gate copies and verifies old `api:<credential ID>` provider
 keys before deleting their source items. Standard provider credential IDs include
 the provider ID and a hash of endpoint and auth; registered custom adapters
 retain their credential identity and check the current configuration at use.
+Older provider-ID accounts can coexist with their destination-scoped copies;
+the compatibility gate removes each old account only when its value exactly
+matches a bound Secret entry, retaining any unmatched account for recovery.
 Provider deauthentication removes its binding and deletes an unshared entry
 generated for that provider. Named entries remain until removed in Secrets.
 

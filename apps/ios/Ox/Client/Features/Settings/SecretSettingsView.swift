@@ -139,32 +139,33 @@ private struct SecretEntryDetailView: View {
                             }
                         }
                     }
-                    if fields != nil {
-                        Button {
-                            showsValues.toggle()
-                        } label: {
-                            Group {
-                                if showsValues { Text("Hide") }
-                                else { Text("Show") }
+                    VStack(spacing: 0) {
+                        if fields != nil {
+                            Button {
+                                showsValues.toggle()
+                            } label: {
+                                Group {
+                                    if showsValues { Text("Hide") }
+                                    else { Text("Show") }
+                                }
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.primary)
+                                .settingsRowPadding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
-                            .font(Theme.Fonts.bodyMd)
-                            .foregroundStyle(Theme.Colors.primary)
-                            .settingsRowPadding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                            Divider().settingsContentInset()
                         }
-                        .settingsSurface(singleRow: true)
-                        .buttonStyle(.plain)
+                        Button(role: .destructive) { confirmingDelete = true } label: {
+                            Text("Delete secret")
+                                .font(Theme.Fonts.bodyMd)
+                                .foregroundStyle(Theme.Colors.error)
+                                .settingsRowPadding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
                     }
-                    Button(role: .destructive) { confirmingDelete = true } label: {
-                        Text("Delete secret")
-                            .font(Theme.Fonts.bodyMd)
-                            .foregroundStyle(Theme.Colors.error)
-                            .settingsRowPadding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .settingsSurface(singleRow: true)
+                    .settingsSurface()
                     .buttonStyle(.plain)
                 }
                 if let error {
