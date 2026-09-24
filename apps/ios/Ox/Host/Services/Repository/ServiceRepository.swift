@@ -1457,7 +1457,9 @@ actor ServiceRepository {
         guard let package = try? JSONDecoder().decode(Package.self, from: data) else {
             throw Failure(message: "repository.json is invalid")
         }
-        guard package.version == 1 else { throw Failure(message: "Unsupported repository.json version") }
+        guard HostProtocols.repository.contains(package.version) else {
+            throw Failure(message: HostProtocols.unsupported("repository.json", version: package.version, supported: HostProtocols.repository))
+        }
         guard !package.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               package.name.count <= 100,
               package.services.count <= 256 else {

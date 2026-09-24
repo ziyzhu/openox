@@ -4,7 +4,7 @@ import { HostConnection, isObject } from "./host-connection.ts";
 
 const HostDescriptionSchema = Type.Object({
   implementation: Type.Object({ name: Type.String(), version: Type.String(), build: Type.String() }),
-  protocols: Type.Object({ rpc: Type.Array(Type.Integer({ minimum: 1 })) }),
+  protocols: Type.Record(Type.String(), Type.Array(Type.Integer({ minimum: 1 }))),
   methods: Type.Array(Type.String()),
 });
 
@@ -47,9 +47,9 @@ export class HostRPCClient {
 
   private ensureCompatible(timeoutMs: number): Promise<HostDescription> {
     this.compatibleHost ??= this.describe(timeoutMs).then(description => {
-      const supported = description.protocols.rpc;
+      const supported = description.protocols.rpc ?? [];
       if (!supported.includes(RPC_VERSION)) {
-        throw new Error(`Host supports RPC versions ${supported.join(", ")}; this client uses RPC ${RPC_VERSION}. Update the Host and CLI together.`);
+        throw new Error(`Host supports RPC versions ${supported.join(", ") || "none"}; this client uses RPC ${RPC_VERSION}. Update the Host and CLI together.`);
       }
       return description;
     }).catch(error => {

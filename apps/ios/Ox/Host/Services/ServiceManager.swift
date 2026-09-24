@@ -877,7 +877,7 @@ final class ServiceManager {
               install(version, installer) {
                 this.__installations++;
                 if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (version !== 1 && version !== 2) throw new Error(`unsupported service action ABI: ${version}`);
+                if (!\#(HostProtocols.action).includes(version)) throw new Error(`unsupported service action ABI: ${version}; this Ox supports \#(HostProtocols.action.map(String.init).joined(separator: ", "))`);
                 if (typeof installer !== "function") throw new Error("service installer must be a function");
                 const names = this.__registered;
                 const action = (name, definition) => {

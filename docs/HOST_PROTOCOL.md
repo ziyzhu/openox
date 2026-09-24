@@ -41,11 +41,20 @@ targets. Boundaries advance independently because their support windows differ:
 lockstep clients can drop old RPC versions immediately, while persisted services
 may need old versions for much longer.
 
+`HostProtocols` is the single Host-side list of supported versions:
+
+| Line | Consumer declares | Host supports | Checked |
+| --- | --- | --- | --- |
+| `rpc` | `RPC_VERSION` in `HostRPCClient` | 1 | once per connection, by the client |
+| `repository` | `version` in `repository.json` | 1 | when a repository loads |
+| `action` | `window.ox.install(<version>, …)` in `actions.js` | 1, 2 | when a service is validated |
+| `skill` | nothing yet; undeclared means 1 | 1 | not checked |
+
 `host.describe` returns `implementation` (`name`, `version`, `build`),
-`protocols.rpc`, the RPC versions the Host supports, and `methods`, the method
-names derived from the same `OxHostProtocol.Method` enum used for dispatch. The
-current RPC version is 1, independent of the JSON-RPC envelope version and
-software release versions.
+`protocols`, the lists above, and `methods`, the method names derived from the
+same `OxHostProtocol.Method` enum used for dispatch. These versions are
+independent of the JSON-RPC envelope version and software release versions.
+Unsupported versions fail with both the declared and supported versions named.
 
 The shared TypeScript `HostRPCClient` declares `RPC_VERSION` and checks it
 against `protocols.rpc` once per connection, before its first operation. An
@@ -103,15 +112,18 @@ uses JSON-RPC.
 
 ## Host ↔ repositories, services, and skills
 
-Repository format 1 and Action ABIs 1 and 2 retain their existing validation and
-execution rules. Repository content hashes and Git commits identify exact
+Repository and action versions are declared by the content and gated through
+`HostProtocols` as described above. Adding an action ABI also requires the
+service runtimes (`ServiceActionRuntime.js`, `APIService`, and the
+`@openox/services` inspector) to implement it. Repository content hashes and Git commits identify exact
 contents independently of format compatibility. These content interfaces are
 not converted into RPC by this change.
 
 Skills contain instructions whose tool assumptions can change even when their
-Markdown remains readable. Bundled skills have existing validation; explicit
-requirements for independently distributed skills remain a separate design.
-No repository/skill metadata or service manifest schema changes are introduced.
+Markdown remains readable. Skills do not declare a version yet; the Host treats
+every skill as version 1. Introduce a declared skill version together with the
+first incompatible skill change. No repository, skill, or service manifest
+schema changes are introduced.
 
 ## References
 

@@ -383,5 +383,5 @@ git push origin ox-cli-v0.1.0
 
 All live Host commands use JSON-RPC 2.0. Update the Host and CLI together;
 older wire formats are not supported. `ox host describe --json` reports Host
-identity, supported RPC versions, and methods. See [Host contracts](../../docs/HOST_PROTOCOL.md)
+identity, supported protocol versions, and methods. See [Host contracts](../../docs/HOST_PROTOCOL.md)
 for method names, errors, and versioning rules.

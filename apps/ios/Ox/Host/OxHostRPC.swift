@@ -10,12 +10,17 @@ enum OxHostRPC {
                 "version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"),
                 "build": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"),
             ]),
-            "protocols": .object(["rpc": .array(rpcVersions.map { .int($0) })]),
+            "protocols": .object([
+                "rpc": versions(HostProtocols.rpc),
+                "repository": versions(HostProtocols.repository),
+                "action": versions(HostProtocols.action),
+                "skill": versions(HostProtocols.skill),
+            ]),
             "methods": .array(OxHostProtocol.Method.allCases.map { .string($0.rawValue) }),
         ])
     }
 
-    static let rpcVersions = [1]
+    private static func versions(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }
 
     static func handle(_ data: Data, host: any OxHost) async -> JSONValue? {
         guard let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {

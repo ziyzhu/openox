@@ -2,7 +2,7 @@ import { HostRPCClient, RPC_VERSION } from "./host-rpc.ts";
 import { dispatch, fail, type CliContext, type SubCommand } from "./lib.ts";
 
 export const SUBS: Record<string, SubCommand> = {
-  describe: { desc: "Show Host identity, supported RPC versions and methods (--json)", fn: describe },
+  describe: { desc: "Show Host identity, supported protocol versions and methods (--json)", fn: describe },
 };
 
 export async function host(args: string[], context: CliContext): Promise<void> {
@@ -30,7 +30,8 @@ async function describe(args: string[], context: CliContext): Promise<void> {
     else {
       const { name, version, build } = description.implementation;
       console.log(`${name} ${version} (${build})`);
-      console.log(`RPC ${description.protocols.rpc.join(", ")} (client uses ${RPC_VERSION})`);
+      for (const [name, versions] of Object.entries(description.protocols).sort(([a], [b]) => a.localeCompare(b))) console.log(`${name}: ${versions.join(", ")}`);
+      console.log(`client rpc: ${RPC_VERSION}`);
       for (const method of description.methods) console.log(method);
     }
   } catch (error) {
