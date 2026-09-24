@@ -392,7 +392,7 @@ struct SettingsSheet: View {
                 } label: {
                     SettingsDisclosureRow(
                         title: "Permissions",
-                        value: Text(serviceManager.defaultActionPolicy?.title ?? "Action Defaults")
+                        value: Text(serviceManager.defaultActionPolicy?.title ?? "Default")
                     )
                 }
                 .buttonStyle(.plain)

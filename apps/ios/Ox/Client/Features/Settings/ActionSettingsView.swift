@@ -43,7 +43,7 @@ struct ActionPolicyPicker: View {
                 }
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
-                    Text(resolved?.title ?? "Action Defaults")
+                    Text(resolved?.title ?? "Default")
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
                 }
@@ -69,13 +69,13 @@ struct ActionSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
                     "Default",
-                    footer: "Action Defaults allow built-in Ox Actions except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
+                    footer: "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
                 ) {
                     ActionPolicyPicker(
                         title: "All Actions",
                         selection: serviceManager.defaultActionPolicy,
                         resolved: serviceManager.defaultActionPolicy,
-                        inheritLabel: "Use Action Defaults",
+                        inheritLabel: "Use Default",
                         onChange: { serviceManager.defaultActionPolicy = $0 }
                     )
                 }
@@ -121,7 +121,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
-            Text(serviceManager.resolvedSourcePolicy(for: "ox")?.title ?? "Action Defaults")
+            Text(serviceManager.resolvedSourcePolicy(for: "ox")?.title ?? "Default")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
@@ -139,7 +139,7 @@ struct ActionSettingsView: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
             Spacer(minLength: 0)
-            Text(serviceManager.resolvedSourcePolicy(for: ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace))?.title ?? "Action Defaults")
+            Text(serviceManager.resolvedSourcePolicy(for: ActionPolicyConfiguration.sourceID(forServiceNamespace: service.definition.actionNamespace))?.title ?? "Default")
                 .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             Image(systemName: "chevron.right")
