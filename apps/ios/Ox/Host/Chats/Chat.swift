@@ -660,6 +660,7 @@ final class Chat: Identifiable {
     }
     private(set) var lastActivityAt: Date?
 
+    @ObservationIgnored weak var chatManager: ChatManager?
     @ObservationIgnored var onPersistableChange: (() -> Void)?
     @ObservationIgnored var onPrivateDataTemporaryContinuation: ((ChatContinuation) -> Void)?
 
@@ -1764,7 +1765,7 @@ final class Chat: Identifiable {
                 options: request.options,
                 kind: .permission,
                 presentation: .application,
-                autoApproval: PendingPrompt.AutoApproval(
+                autoApproval: request.requiresExplicitApproval ? nil : PendingPrompt.AutoApproval(
                     action: request.action,
                     defaultPolicy: defaultPolicy,
                     approve: request.approve,

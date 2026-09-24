@@ -15,7 +15,8 @@ struct ActionApproval {
         let approve = L10n.string("Approve")
         let alwaysApprove = L10n.string("Always allow")
         let deny = L10n.string("Deny")
-        var options: [String] { [approve, alwaysApprove, deny] }
+        var requiresExplicitApproval: Bool { action == Actions.chatDelete }
+        var options: [String] { requiresExplicitApproval ? [approve, deny] : [approve, alwaysApprove, deny] }
     }
 
     let serviceManager: ServiceManager
@@ -32,13 +33,13 @@ struct ActionApproval {
     ) async -> Outcome {
         guard !Task.isCancelled else { return .stopped }
         switch serviceManager.actionPolicy(for: action, default: defaultPolicy) {
-        case .allow:
+        case .allow where action != Actions.chatDelete:
             Log.service.info("ActionApproval.allow action=\(action) caller=\(ownerID)")
             return .approved
         case .block:
             Log.service.info("ActionApproval.block action=\(action) caller=\(ownerID)")
             return .blocked
-        case .ask:
+        case .ask, .allow:
             break
         }
         let display = approvalLabel(for: action)
@@ -67,7 +68,7 @@ struct ActionApproval {
         let request = Request(action: action, prompt: prompt)
         guard let answer = await choose(request), !Task.isCancelled else { return .stopped }
         Log.service.info("ActionApproval.answer action=\(action) caller=\(ownerID) answer=\(answer)")
-        if answer == request.alwaysApprove {
+        if answer == request.alwaysApprove, !request.requiresExplicitApproval {
             serviceManager.setActionPolicy(.allow, for: action)
             return .approved
         }

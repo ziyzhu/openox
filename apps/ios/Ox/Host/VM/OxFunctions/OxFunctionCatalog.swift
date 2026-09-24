@@ -3,6 +3,7 @@ import Foundation
 nonisolated enum OxFunctionCatalog {
     private static let namespaceDescriptions: [(String, String)] = [
         ("app", "Read Ox's identity, profile, notification permission, settings, and diagnostic logs, and keep the current chat named."),
+        ("chat", "Delete another chat from the current Profile with approval."),
         ("provider", "Inspect, configure, and authenticate model providers."),
         ("repository", "Connect, sync, inspect, and publish repositories containing services and skills."),
         ("secret", "Manage named secrets without exposing their values to the agent."),
@@ -21,6 +22,7 @@ nonisolated enum OxFunctionCatalog {
         OxAppInformation.function,
         OxProviders.function,
         OxSecret.function,
+        OxChats.function,
         OxActions.function,
         OxWeb.function,
         OxServices.function,

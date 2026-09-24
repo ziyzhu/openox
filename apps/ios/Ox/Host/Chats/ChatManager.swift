@@ -455,14 +455,15 @@ final class ChatManager {
         Log.session.info("ChatManager.toggleFavorite id=\(id) favorite=\(meta.isFavorite) hydration=summary")
     }
 
-    func delete(_ rawID: UUID) {
+    @discardableResult
+    func delete(_ rawID: UUID) -> Task<Void, Error>? {
         let id = ChatID(rawID)
-        guard var record = records[id] else { return }
+        guard var record = records[id] else { return nil }
         let wasCurrent = currentId == rawID
         if record.hydration.chat?.isTemporary == true {
             discardTemporary(id)
             if wasCurrent { startNewChat() }
-            return
+            return nil
         }
         let inFlight: Task<ChatSaveReceipt, Never>?
         switch record.persistence {
@@ -471,17 +472,32 @@ final class ChatManager {
             inFlight = nil
         case .saving(_, _, let task):
             inFlight = task
-        case .clean, .deleting, .deleted:
+        case .clean:
             inFlight = nil
+        case .deleting, .deleted:
+            return nil
         }
         record.persistence = .deleting
         record.hydration.chat?.release()
         records[id] = record
         let scopedRepository = repository
         let storageScope = repositoryScope
-        Task { [weak self] in
+        let deletion = Task { [weak self] in
             _ = await inFlight?.value
-            await scopedRepository.deleteChat(id, in: storageScope)
+            do {
+                try await scopedRepository.deleteChat(id, in: storageScope)
+            } catch {
+                if let self, self.repositoryScope == storageScope {
+                    record.persistence = .clean
+                    self.records[id] = record
+                    if let chat = record.hydration.chat {
+                        self.attachPersistence(chat)
+                        self.persist(chat)
+                    }
+                }
+                Log.session.error("ChatManager.delete failed id=\(id) error=\(error.localizedDescription)")
+                throw error
+            }
             guard let self, self.repositoryScope == storageScope else { return }
             if var deleting = self.records[id] {
                 deleting.persistence = .deleted
@@ -493,6 +509,17 @@ final class ChatManager {
             selection = .empty
             startNewChat()
         }
+        return deletion
+    }
+
+    func deletionTarget(_ id: UUID, requestedBy chat: Chat) throws -> ChatMeta {
+        guard chat.scope == repositoryScope, chat.scope.profileID == storage.scope.profileID,
+              chat.scope.root == storage.scope.root, chat.scope.location == storage.scope.location,
+              id != chat.id,
+              let meta = summaries.first(where: { $0.id == id }) else {
+            throw RuntimeError.bridge("ox.chat.delete: choose another existing chat in the active Profile.")
+        }
+        return meta
     }
 
     func flushAll() {
@@ -648,6 +675,7 @@ final class ChatManager {
     }
 
     private func attachPersistence(_ chat: Chat) {
+        chat.chatManager = self
         if !chat.isTemporary {
             chat.onPersistableChange = { [weak self, weak chat] in
                 guard let self, let chat else { return }

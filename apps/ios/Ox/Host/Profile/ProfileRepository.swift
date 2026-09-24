@@ -519,10 +519,14 @@ actor ProfileRepository {
         return state
     }
 
-    func deleteChat(_ id: ChatID, in scope: ProfileScope) {
+    func deleteChat(_ id: ChatID, in scope: ProfileScope) throws {
+        let url = chatURL(id, in: scope)
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch CocoaError.fileNoSuchFile {
+        }
         deleted[scope, default: []].insert(id)
         writeCache[scope]?[id] = nil
-        try? FileManager.default.removeItem(at: chatURL(id, in: scope))
         Log.session.info("ProfileRepository.deleteChat chat=\(id)")
     }
 
