@@ -143,7 +143,7 @@ export async function readRepository(root: string): Promise<RepositoryPackage> {
   await regularFile(packagePath, 512_000);
   const raw = JSON.parse(await readFile(packagePath, "utf8")) as Record<string, unknown>;
   if (Object.keys(raw).some(key => !["version", "name", "contentHash", "services"].includes(key))
-    || raw.version !== 1
+    || (raw.version !== 1 && raw.version !== 2)
     || typeof raw.name !== "string"
     || raw.name.trim().length === 0
     || raw.name.length > 100

@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 
-export const REPOSITORY_VERSION = 1;
+export const REPOSITORY_VERSIONS = [1, 2] as const;
 
 const RepositoryServiceSchema = Type.String({
   minLength: 5,
@@ -10,7 +10,7 @@ const RepositoryServiceSchema = Type.String({
 });
 
 export const RepositoryPackageSchema = Type.Object({
-  version: Type.Literal(REPOSITORY_VERSION),
+  version: Type.Union(REPOSITORY_VERSIONS.map(version => Type.Literal(version))),
   name: Type.String({ minLength: 1, maxLength: 100 }),
   contentHash: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
   services: Type.Array(RepositoryServiceSchema, { maxItems: 256 }),

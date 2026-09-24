@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "appstoreconnect.apple.com",
   "name": "App Store Connect",
   "description": "Apple's platform for managing App Store releases. Review apps, versions, builds, TestFlight groups, analytics, and team access. Sign-in required. Read-only.",

@@ -153,7 +153,7 @@
     };
     const install = (installer, ...extra) => {
       if (installed || actions.size > 0) throw new Error("service installer may run only once");
-      if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
+      if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; the repository declares the version");
       if (version !== 1 && version !== 2) throw new Error(`unsupported service version: ${version}`);
       try {
         if (version === 1) installFetchCapture(window);

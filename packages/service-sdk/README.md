@@ -8,7 +8,7 @@ The SDK requires Bun 1.3 or newer.
 bun add @openox/service-sdk
 ```
 
-Ox-authored web services use one plain-JavaScript installer format in Local and official repositories. `service.json` declares the service version with `"version": 2`, and `actions.js` installs without one:
+Ox-authored web services use one plain-JavaScript installer format in Local and official repositories. `repository.json` declares the version for every service it contains, and `actions.js` installs without one:
 
 ```js
 const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
@@ -44,7 +44,7 @@ Supported auth types are `none`, `apiKey` (header or query), `http` (basic or be
 and `oauth2` (authorization code with S256 PKCE and a registered app callback).
 Only public configuration belongs in the manifest; the Host stores credentials.
 
-API services declare `"version": 2` and install with `window.ox.install(installer)`,
+API services install with `window.ox.install(installer)`,
 receiving only `action` and `request`. Version 1 remains supported for existing
 API sources. The asynchronous
 `request({ path, method?, query?, json? })` function performs a bounded request

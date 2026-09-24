@@ -852,7 +852,7 @@ final class ServiceManager {
         case .web, .api:
             let manifestData = try await read(["service.json"])
             let raw = try JSONDecoder().decode(JSONValue.self, from: manifestData)
-            let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local)
+            let definition = try ServiceDefinition(manifest: raw, repositoryID: ServiceRepository.localID, provenance: .local, version: try await repository.localVersion())
             guard definition.domain == domain, definition.isAPI == (kind == .api) else {
                 throw ServiceRepository.Failure(message: "manifest identity does not match its directory")
             }
@@ -877,7 +877,7 @@ final class ServiceManager {
               install(installer, ...extra) {
                 this.__installations++;
                 if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
+                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; the repository declares the version");
                 const version = \#(definition.version ?? 0);
                 const names = this.__registered;
                 const action = (name, definition) => {
@@ -993,7 +993,8 @@ final class ServiceManager {
             definition = try ServiceDefinition(
                 manifest: Manifest.localized(raw, locale: monoRepositoryLocale),
                 repositoryID: ServiceRepository.localID,
-                provenance: .local
+                provenance: .local,
+                version: try await repository.localVersion()
             )
         }
 
@@ -1209,7 +1210,8 @@ final class ServiceManager {
                 let definition = try ServiceDefinition(
                     manifest: manifest,
                     repositoryID: file.repositoryID,
-                    provenance: file.provenance
+                    provenance: file.provenance,
+                    version: file.version
                 )
                 guard definition.domain == file.domain else {
                     Log.service.error("ServiceManager.listServices domain mismatch directory=\(file.domain) manifest=\(definition.domain)")

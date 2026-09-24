@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "americanexpress.com",
   "name": "Amex Travel",
   "description": "A travel-booking service for cardmembers. View your traveler profile, saved loyalty programs, and detailed flight, hotel, and car bookings. Read-only; sign-in required.",

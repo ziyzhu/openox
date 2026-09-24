@@ -148,7 +148,7 @@ final class APIService {
     const __handlers = new Map();
     let __installed = false;
     const window = Object.freeze({ ox: Object.freeze({ install(install, ...extra) {
-      if (typeof install !== 'function' || extra.length) throw new Error('window.ox.install takes only the installer; declare version in service.json');
+      if (typeof install !== 'function' || extra.length) throw new Error('window.ox.install takes only the installer; the repository declares the version');
       const version = __serviceVersion;
       if (__installed || (version !== 1 && version !== 2)) throw new Error('Invalid API installer');
       __installed = true;

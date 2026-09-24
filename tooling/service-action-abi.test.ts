@@ -52,12 +52,12 @@ test("version 2 rejects access to legacy helpers during installation", () => {
 });
 
 test.each([
-  { manifest: 2, arguments: [2, () => {}], error: "window.ox.install takes only the installer; declare version in service.json" },
-  { manifest: 2, arguments: [() => {}, 2], error: "window.ox.install takes only the installer; declare version in service.json" },
-  { manifest: 3, arguments: [() => {}], error: "unsupported service version: 3" },
-])("invalid installs fail: %j", ({ manifest, arguments: args, error }) => {
-  expect(() => runtime(manifest).service.install(...args)).toThrow(error);
-  expect(() => apiRuntime(manifest).window.ox.install(...args)).toThrow(manifest === 3 ? "Invalid API installer" : error);
+  { version: 2, arguments: [2, () => {}], error: "window.ox.install takes only the installer; the repository declares the version" },
+  { version: 2, arguments: [() => {}, 2], error: "window.ox.install takes only the installer; the repository declares the version" },
+  { version: 3, arguments: [() => {}], error: "unsupported service version: 3" },
+])("invalid installs fail: %j", ({ version, arguments: args, error }) => {
+  expect(() => runtime(version).service.install(...args)).toThrow(error);
+  expect(() => apiRuntime(version).window.ox.install(...args)).toThrow(version === 3 ? "Invalid API installer" : error);
 });
 
 test("API version 1 remains compatible", async () => {

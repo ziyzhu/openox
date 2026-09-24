@@ -10,7 +10,6 @@ import {
   type CatalogKind,
 } from "./catalog.ts";
 import {
-  REPOSITORY_VERSION,
   validateRepositoryPackage,
   qualifiedRepositoryServiceID,
   repositoryServiceIdentity,
@@ -57,7 +56,7 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
   const catalogKinds = options.catalogKinds ?? ["ios", "mcp"];
   const results = await Promise.all(domains.map(async (domain) => ({
     domain,
-    service: await buildService(domain),
+    service: await buildService(domain, sourcePackage.version),
   })));
   const catalogResults = await Promise.all(catalogKinds.flatMap((kind) =>
     sourcePackage.services
@@ -120,7 +119,7 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     throw new Error("repositories/builtin/repository.json does not match built-in service directories");
   }
   const repository: RepositoryPackage = {
-    version: REPOSITORY_VERSION,
+    version: sourcePackage.version,
     name: options.name ?? sourcePackage.name,
     contentHash: await contentHash(outDir),
     services,

@@ -25,7 +25,7 @@ Read `service.json`, `actions.js`, Local Git status, and the exact saved Local r
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 
-The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. The built-in source stores the audited `favicon.png` and omits Local `faviconUrl` because the build assigns the public built-in asset URL. The build must reject syntax errors, missing or unsupported `service.json` versions, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
+The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. The built-in source stores the audited `favicon.png` and omits Local `faviconUrl` because the build assigns the public built-in asset URL. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
 ## Replay evidence
 

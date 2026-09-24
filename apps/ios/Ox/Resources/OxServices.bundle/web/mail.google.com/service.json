@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "mail.google.com",
   "name": "Gmail",
   "description": "A personal email service. List signed-in accounts, browse and search mailboxes, read complete conversations, and create, update, send, or discard drafts. Sign-in required.",

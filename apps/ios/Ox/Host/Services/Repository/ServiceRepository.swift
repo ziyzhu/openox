@@ -19,6 +19,7 @@ actor ServiceRepository {
     struct ManifestFile: Sendable {
         let repositoryID: String
         let provenance: Repository.Provenance
+        let version: Int
         let domain: String
         let data: Data
     }
@@ -405,6 +406,7 @@ actor ServiceRepository {
                 web.append(ManifestFile(
                     repositoryID: repository.descriptor.id,
                     provenance: repository.descriptor.provenance,
+                    version: repository.package.version,
                     domain: service.id.runtimeID,
                     data: data
                 ))
@@ -561,7 +563,6 @@ actor ServiceRepository {
         do {
             try FileManager.default.createDirectory(at: serviceRoot, withIntermediateDirectories: true)
             var manifest: [String: Any] = [
-                "version": HostProtocols.service.last!,
                 "domain": domain,
                 "name": domain,
                 "description": "Local service for \(domain).",
@@ -795,6 +796,10 @@ actor ServiceRepository {
             throw Failure(message: "Full service source is available only for Bundled and Local services.")
         }
         return try readSource(source, path: path)
+    }
+
+    func localVersion() throws -> Int {
+        try Self.loadPackage(at: localRoot, provenance: .local).version
     }
 
     func readLocalSource(kind: ServiceKind, id: String, path: [String]) throws -> Data {

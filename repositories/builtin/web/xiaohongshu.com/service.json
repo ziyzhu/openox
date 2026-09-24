@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "xiaohongshu.com",
   "name": "Xiaohongshu",
   "description": "A Chinese lifestyle and shopping community. Search notes by keyword, browse the home feed (personalized to the signed-in user), read a note's body and engagement counts, browse its comment thread, and extract a note's image and video URLs.",

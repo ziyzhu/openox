@@ -203,7 +203,6 @@ export const APIAuthSchema = Type.Union([
 export type APIAuth = Static<typeof APIAuthSchema>;
 
 export const ServiceManifestSchema = Type.Object({
-  version: Type.Union([Type.Literal(1), Type.Literal(2)]),
   domain: Type.String({ pattern: "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$" }),
   kind: Type.Optional(Type.Literal("api")),
   auth: Type.Optional(APIAuthSchema),

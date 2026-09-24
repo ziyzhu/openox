@@ -43,7 +43,6 @@ nonisolated struct ServiceDefinition: Sendable {
         case invalid(String)
         case duplicateAction(String)
         case duplicateSkill(String)
-        case unsupportedVersion(String)
 
         var errorDescription: String? {
             switch self {
@@ -51,7 +50,6 @@ nonisolated struct ServiceDefinition: Sendable {
             case let .invalid(field): "invalid \(field)"
             case let .duplicateAction(id): "duplicate action \(id)"
             case let .duplicateSkill(name): "duplicate skill \(name)"
-            case let .unsupportedVersion(version): HostProtocols.unsupported("service.json", version: version, supported: HostProtocols.service)
             }
         }
     }
@@ -69,12 +67,13 @@ nonisolated struct ServiceDefinition: Sendable {
     let definitions: [String: JSONValue]
     let skills: [Manifest.Skill]
     let remoteMCPIcons: [RemoteMCPIcon]
-    var version: Int? { manifest.objectValue?["version"]?.intValue }
+    private(set) var version: Int?
 
     init(
         manifest: JSONValue,
         repositoryID: String = ServiceRepository.bundledID,
-        provenance: ServiceRepository.Repository.Provenance = .bundled
+        provenance: ServiceRepository.Repository.Provenance = .bundled,
+        version: Int? = nil
     ) throws {
         guard let object = manifest.objectValue else { throw ValidationError.invalid("root") }
         guard let domain = object["domain"]?.stringValue?.lowercased(), !domain.isEmpty else {
@@ -91,10 +90,6 @@ nonisolated struct ServiceDefinition: Sendable {
             _ = try APIServiceAuth(auth)
         } else if object["kind"] != nil || object["auth"] != nil {
             throw ValidationError.invalid("kind or auth")
-        }
-        guard let version = object["version"] else { throw ValidationError.missing("version") }
-        guard let value = version.intValue, HostProtocols.service.contains(value) else {
-            throw ValidationError.unsupportedVersion(version.jsonString())
         }
         guard let rawBaseURL = object["baseUrl"]?.stringValue,
               let baseURL = URL(string: rawBaseURL),
@@ -155,6 +150,7 @@ nonisolated struct ServiceDefinition: Sendable {
         self.definitions = object["$defs"]?.objectValue ?? [:]
         self.skills = skills
         self.remoteMCPIcons = []
+        self.version = version
     }
 
     init(iOS manifest: IOSCatalogManifest, repositoryID: String? = nil) throws {

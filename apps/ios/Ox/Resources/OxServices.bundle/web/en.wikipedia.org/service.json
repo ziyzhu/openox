@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "en.wikipedia.org",
   "name": "Wikipedia",
   "description": "The free online encyclopedia. Search articles by full text, fetch article summaries or full section-by-section text, and find related articles. No sign-in required.",

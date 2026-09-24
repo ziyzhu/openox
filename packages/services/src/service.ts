@@ -38,6 +38,7 @@ function inspectActions(
   domain: string,
   manifest: ServiceManifest,
   source: string,
+  version: number,
 ): { ok: true } | { error: string } {
   const actions: Record<string, (args: any) => any> = {};
   const stub = () => { throw new Error("not callable during registration inspection"); };
@@ -47,8 +48,7 @@ function inspectActions(
       install: (installer: unknown, ...extra: unknown[]) => {
         installations++;
         if (installations > 1) throw new Error("service installer may run only once");
-        if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
-        const version = manifest.version;
+        if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; the repository declares the version");
         if (version !== 1 && version !== 2) throw new Error(`unsupported service version: ${String(version)}`);
         const action = (name: string, definition: { invoke?: (args: any) => any }) => {
             if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
@@ -121,7 +121,7 @@ async function loadManifest(
   return result.manifest;
 }
 
-export async function buildService(domain: string): Promise<
+export async function buildService(domain: string, version: number): Promise<
   { manifest: Manifest; actions: string } | { error: string }
 > {
   const svc = await loadManifest(domain);
@@ -130,7 +130,7 @@ export async function buildService(domain: string): Promise<
   const loaded = await loadActions(domain);
   if (typeof loaded !== "string") return loaded;
 
-  const inspected = inspectActions(domain, svc, loaded);
+  const inspected = inspectActions(domain, svc, loaded, version);
   if ("error" in inspected) return inspected;
 
   const dir = sourceDirFor(domain);

@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "www.ncbi.nlm.nih.gov",
   "name": "NCBI",
   "description": "The U.S. hub for biomedical research data. Search Entrez databases, get PubMed suggestions, read article details and indexing terms, find similar or citing articles, and compare a term across NCBI databases. Read-only and public; no sign-in required.",

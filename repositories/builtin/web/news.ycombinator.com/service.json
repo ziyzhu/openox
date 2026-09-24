@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "news.ycombinator.com",
   "name": "Hacker News",
   "description": "A tech and startup news aggregator. Browse stories from feeds like top, new, best, ask, show, jobs, and front page. Read item pages with full comment trees, look up user profiles, and reply to comments as the signed-in user.",

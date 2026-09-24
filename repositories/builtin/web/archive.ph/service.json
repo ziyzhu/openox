@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "domain": "archive.ph",
   "name": "Archive.ph",
   "description": "A permanent webpage snapshot archive. Find saved versions, inspect capture details, and create new snapshots. Human verification may be required when saving.",

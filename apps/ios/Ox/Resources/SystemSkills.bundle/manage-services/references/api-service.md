@@ -6,7 +6,7 @@ Build Local API services inside Ox from published API documentation and verified
 
 Create with `ox.service.create({ kind: "api", domain, purpose })`. Use a stable lowercase identifier such as `google-calendar`; it is independent of the API hostname. Source lives at `services/api/<domain>/service.json` and `actions.js`. Copy an existing repository service into Local before editing it.
 
-The manifest uses `version: 2`, `kind: "api"`, `domain`, `name`, optional `description`, a static HTTPS `baseUrl`, required `auth`, optional `$defs`, and `actions`. Actions retain `id`, `label`, `description`, concrete `inputSchema` and `outputSchema`, `requireAuth`, `requireApproval`, and optional `defaultArgs`. Use Capability in visible copy. API actions cannot declare `baseUrl`, `blocking`, or web sign-in, bot-control, or payment pairs.
+The manifest uses `kind: "api"`, `domain`, `name`, optional `description`, a static HTTPS `baseUrl`, required `auth`, optional `$defs`, and `actions`. Actions retain `id`, `label`, `description`, concrete `inputSchema` and `outputSchema`, `requireAuth`, `requireApproval`, and optional `defaultArgs`. Use Capability in visible copy. API actions cannot declare `baseUrl`, `blocking`, or web sign-in, bot-control, or payment pairs.
 
 Authentication configurations:
 
