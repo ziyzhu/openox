@@ -10,7 +10,7 @@ extension OxHostProtocol {
         case reloadService = "services.reload"
         case refreshServiceAuth = "services.refreshAuth"
         case listServices = "services.list"
-        case syncMonoRepository = "services.sync"
+        case syncServices = "services.sync"
         case listChats = "chats.list"
         case getChat = "chats.get"
         case listModels = "models.list"

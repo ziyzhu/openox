@@ -30,7 +30,7 @@ extension OxHostProtocol {
         reply.success()
     }
 
-    struct SyncMonoRepositoryResult: Encodable {
+    struct SyncServicesResult: Encodable {
         let head: JSONValue
         let changed: [String]
         let services: Int
@@ -176,7 +176,7 @@ extension OxHostProtocol {
 
     @MainActor
 
-    static func handleSyncMonoRepository(
+    static func handleSyncServices(
         _ command: EmptyRequest,
         serviceManager: ServiceManager,
         reply: OxHostRPC.Reply
@@ -192,7 +192,7 @@ extension OxHostProtocol {
             }
             let failure: String? = { if case .failed(let m) = manager.repositoryState { return m }; return nil }()
             Log.agent.debug("OxHostRPC.services.sync id=\(reply.id) monoRepository=\(manager.monoRepositoryHash ?? "nil") changed=\(changed)")
-            reply.complete(SyncMonoRepositoryResult(
+            reply.complete(SyncServicesResult(
                 head: manager.monoRepositoryHash.map(JSONValue.string) ?? .null,
                 changed: changed,
                 services: manager.services.count

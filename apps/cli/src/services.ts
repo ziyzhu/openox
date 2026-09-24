@@ -13,7 +13,7 @@ export const SUBS: Record<string, SubCommand> = {
   "invoke": { desc: "Invoke a service action through the selected Host", fn: invoke },
   "eval": { desc: "Run a JS script on a Host-managed service page", fn: evaluate },
   "reload": { desc: "Reload a service page after active actions finish", fn: reload },
-  "sync": { desc: "Refresh service definitions and invalidate changed live services", fn: syncMonoRepository },
+  "sync": { desc: "Refresh service definitions and invalidate changed live services", fn: syncServices },
 };
 
 export async function service(args: string[], context: CliContext): Promise<void> {
@@ -129,7 +129,7 @@ async function status(args: string[], context: CliContext): Promise<void> {
   }
 }
 
-async function syncMonoRepository(args: string[], context: CliContext): Promise<void> {
+async function syncServices(args: string[], context: CliContext): Promise<void> {
   let timeoutMs = 60000;
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;

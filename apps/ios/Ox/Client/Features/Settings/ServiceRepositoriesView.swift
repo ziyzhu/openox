@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct OxServerView: View {
+struct ServiceRepositoriesView: View {
     @Environment(ServiceManager.self) private var manager
     @State private var addingRepository = false
 

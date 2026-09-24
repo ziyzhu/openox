@@ -1129,21 +1129,20 @@ final class Chat: Identifiable {
     func syncToMonoRepository() async -> [String] {
         resolveAttachedServices()
         let manager = serviceManager
-        guard let head = manager.monoRepositoryHash, head != monoRepositoryHash else { return [] }
+        guard let currentHash = manager.monoRepositoryHash, currentHash != monoRepositoryHash else { return [] }
         defer {
-            monoRepositoryHash = head
+            monoRepositoryHash = currentHash
             onPersistableChange?()
         }
-        guard let since = monoRepositoryHash else { return [] }
-        let changed = await manager.changedServiceDomains(since: since)
-        let affected = attachedServices.filter { changed?.contains($0.domain) ?? true }
-        guard !affected.isEmpty else { return [] }
-        for svc in affected {
-            svc.invalidateResolved()
-            _ = await svc.loadManifest()
+        guard let previousHash = monoRepositoryHash else { return [] }
+        let servicesToReload = attachedServices
+        guard !servicesToReload.isEmpty else { return [] }
+        for service in servicesToReload {
+            service.invalidateResolved()
+            _ = await service.loadManifest()
         }
-        Log.session.info("Chat.syncToMonoRepository id=\(id) \(since.prefix(7))->\(head.prefix(7)) reloaded=\(affected.map(\.domain).joined(separator: ","))")
-        return affected.map(\.title)
+        Log.session.info("Chat.syncToMonoRepository id=\(id) \(previousHash.prefix(7))->\(currentHash.prefix(7)) reloaded=\(servicesToReload.map(\.domain).joined(separator: ","))")
+        return servicesToReload.map(\.title)
     }
 
     // MARK: - Transcript mutation (was ChatManager)

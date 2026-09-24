@@ -589,10 +589,6 @@ final class ServiceManager {
         repositoryLoadWaiters.removeFirst().resume()
     }
 
-    func changedServiceDomains(since monoRepositoryHash: String) async -> Set<String>? {
-        monoRepositoryHash == self.monoRepositoryHash ? [] : nil
-    }
-
     func setRepositoryEnabled(_ repositoryID: String, enabled: Bool, locale: String?) async {
         _ = await mutateRepositories(locale: locale) {
             try await self.repository.setEnabled(repositoryID: repositoryID, enabled: enabled)

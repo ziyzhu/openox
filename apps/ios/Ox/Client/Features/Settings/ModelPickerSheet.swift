@@ -31,7 +31,7 @@ struct SettingsSheet: View {
     let onSelectService: (Service) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(ServiceManager.self) private var serverManager
+    @Environment(ServiceManager.self) private var serviceManager
     @State private var profilePath: [UUID]
     @State private var pendingSkillDraft: SkillDraft?
     @State private var showOnboarding = false
@@ -231,11 +231,11 @@ struct SettingsSheet: View {
                             Divider().settingsContentInset()
 
                             NavigationLink {
-                                OxServerView()
+                                ServiceRepositoriesView()
                             } label: {
                                 SettingsDisclosureRow(
                                     title: "Service Repositories",
-                                    value: Text("\(serverManager.repositories.count(where: \.isEnabled)) enabled")
+                                    value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
                                 )
                             }
                             .buttonStyle(.plain)
@@ -392,7 +392,7 @@ struct SettingsSheet: View {
                 } label: {
                     SettingsDisclosureRow(
                         title: "Permissions",
-                        value: Text(serverManager.defaultActionPolicy?.title ?? "Action Defaults")
+                        value: Text(serviceManager.defaultActionPolicy?.title ?? "Action Defaults")
                     )
                 }
                 .buttonStyle(.plain)
@@ -412,7 +412,7 @@ struct SettingsSheet: View {
                 } label: {
                     SettingsDisclosureRow(
                         title: "Services",
-                        value: Text(verbatim: "\(serverManager.services.count)")
+                        value: Text(verbatim: "\(serviceManager.services.count)")
                     )
                 }
                 .buttonStyle(.plain)

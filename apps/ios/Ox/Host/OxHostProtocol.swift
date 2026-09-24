@@ -32,7 +32,7 @@ enum OxHostProtocol {
         case .reloadService: handleReloadService(try decode(ServiceRequest.self), serviceManager: services, reply: reply)
         case .refreshServiceAuth: handleRefreshServiceAuth(try decode(ServiceRequest.self), serviceManager: services, reply: reply)
         case .listServices: handleListServices(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
-        case .syncMonoRepository: handleSyncMonoRepository(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
+        case .syncServices: handleSyncServices(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
         case .listChats: handleListChats(try decode(EmptyRequest.self), host: host, reply: reply)
         case .getChat: handleGetChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)
         case .listModels: handleListModels(try decode(EmptyRequest.self), reply: reply)
