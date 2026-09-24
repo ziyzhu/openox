@@ -25,7 +25,7 @@ const retryFetch = async (input, init, options) => {
 };
 
 const ORIGIN = "https://www.uscis.gov";
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const absUrl = (p) => {
         if (!p)
             return "";

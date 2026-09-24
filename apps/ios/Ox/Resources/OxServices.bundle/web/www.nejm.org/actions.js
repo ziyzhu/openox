@@ -69,7 +69,7 @@ const totalCount = (doc) => {
     return Number.parseInt(value.replace(/\D/g, ""), 10) || 0;
 };
 const nextCursor = (doc) => doc.querySelector(".ng-pagination_next[aria-disabled='false']")?.dataset.startpage ?? null;
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const fetchDocument = async (url) => {
         const response = await retryFetch(url, { credentials: "include" });
         if (!response.ok)

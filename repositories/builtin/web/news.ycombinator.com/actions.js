@@ -24,7 +24,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const fetchDoc = async (path) => {
         const html = await (await retryFetch(path, { credentials: "include" })).text();
         return new DOMParser().parseFromString(html, "text/html");

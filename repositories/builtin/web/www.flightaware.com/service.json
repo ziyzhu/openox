@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "www.flightaware.com",
   "name": "FlightAware",
   "description": "Live flight tracking. Search airports and flights, get a flight's status, route, position, and times, see an airport's live arrival/departure/en-route boards, and pull an airport's daily traffic and cancellation stats. All actions are read-only and public; no sign-in required.",

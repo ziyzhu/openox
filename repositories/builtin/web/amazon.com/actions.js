@@ -78,7 +78,7 @@ const amazonOrderPage = (orders) => ({
     items: orders.filter(amazonOrderHasData),
     consumed: orders.length,
 });
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://www.amazon.com";
     const RANKING_ROOTS = {
         bestsellers: "/Best-Sellers/zgbs",

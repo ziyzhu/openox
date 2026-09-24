@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "github.com",
   "name": "GitHub",
   "description": "A collaborative software-development platform. Browse and search repositories, code, branches, commits, issues, pull requests, reviews, checks, workflow runs, releases, and tags. Sign in to view your repositories, work items, and notifications, and create pull requests with approval.",

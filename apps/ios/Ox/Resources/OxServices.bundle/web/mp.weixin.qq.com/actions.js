@@ -93,7 +93,7 @@ const articleText = (root, indexes) => {
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     action("getArticle", {
         async invoke({ url: inputUrl }) {
             const requestedUrl = articleUrl(inputUrl);

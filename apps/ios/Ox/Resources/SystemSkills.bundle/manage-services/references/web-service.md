@@ -1,6 +1,6 @@
 # Web Service
 
-Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service action ABI directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
+Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service version declared in `service.json`; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
 
 ## Missing-service bootstrap
 
@@ -115,7 +115,7 @@ Inspect complete Local Git status. Create with `ox.service.create` or copy a non
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
+Author `version: 2`, `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Preserve existing `skills`; author new ones through `skills/system:manage-skills/SKILL.md` after actions are verified.
 
 Every action has:
 
@@ -189,12 +189,12 @@ Add payment when an approved action prepares a cart, booking, or order while fin
 
 ## 6. Author actions.js
 
-Install exactly once against service action ABI version 2:
+Install exactly once. `service.json` declares the service version; the installer takes no version:
 
 ```js
 const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
   action("example", {
     async invoke(args) {
       return { value: cleanText(args.value) };

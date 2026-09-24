@@ -27,7 +27,7 @@ const IDP_CLIENT_ID = "HEXVBay49tf4e8kEksXqDCcRNrUjxTM1";
 const SERVICES = "https://services.usta.com";
 const PLAYTENNIS = "https://playtennis.usta.com";
 const SEARCH = "https://prd-usta-kube.clubspark.pro/unified-search-api/api/Search/tournaments/Query?indexSchema=tournament";
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const apiJson = async (url, init) => {
         const r = await retryFetch(url, { credentials: "include", ...init });
         const text = await r.text();

@@ -76,7 +76,7 @@ final class APIService {
             guard let source else {
                 throw Service.InvokeError.invalidContract(name)
             }
-            let script = Self.installer + "\n" + source.actions + "\n"
+            let script = "const __serviceVersion = \(definition.version ?? 0);\n" + Self.installer + "\n" + source.actions + "\n"
                 + "return await __invokeAPI(\(JSONValue.string(actionID).jsonString()), \(args.jsonString()), \(JSONValue.array(definition.actions.map { .string($0.id) }).jsonString()));"
             let result = try await runtime.runAPI(source: script) { [self] args in
                 do {
@@ -147,8 +147,10 @@ final class APIService {
     private static let installer = #"""
     const __handlers = new Map();
     let __installed = false;
-    const window = Object.freeze({ ox: Object.freeze({ install(version, install) {
-      if (__installed || (version !== 1 && version !== 2) || typeof install !== 'function') throw new Error('Invalid API installer');
+    const window = Object.freeze({ ox: Object.freeze({ install(install, ...extra) {
+      if (typeof install !== 'function' || extra.length) throw new Error('window.ox.install takes only the installer; declare version in service.json');
+      const version = __serviceVersion;
+      if (__installed || (version !== 1 && version !== 2)) throw new Error('Invalid API installer');
       __installed = true;
       const action = (name, handler) => {
         if (typeof name !== 'string' || __handlers.has(name) || typeof handler?.invoke !== 'function') throw new Error('Invalid API action');
@@ -165,7 +167,7 @@ final class APIService {
         : new Proxy(Object.freeze({ action, request }), {
           get(target, name) {
             if (name in target) return target[name];
-            throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+            throw new Error(`service version 2 does not provide ${String(name)}`);
           }
         });
       const result = install(api);

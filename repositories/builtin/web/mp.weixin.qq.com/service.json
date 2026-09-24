@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "mp.weixin.qq.com",
   "name": "Weixin Official Accounts",
   "description": "A public-article publishing platform. Read shared articles with their account, publication details, text, cover, and inline images. Public and read-only; no sign-in required.",

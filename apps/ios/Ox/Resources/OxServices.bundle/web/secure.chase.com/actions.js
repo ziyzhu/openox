@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://secure.chase.com";
     const DASHBOARD_URL = `${ORIGIN}/web/auth/dashboard`;
     const jpmcHeaders = (post = false) => {

@@ -54,7 +54,7 @@ const articleCard = (element, fallbackJournal = null) => {
         url,
     };
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const fetchDocument = async (url) => {
         const response = await retryFetch(url, {
             credentials: "include",

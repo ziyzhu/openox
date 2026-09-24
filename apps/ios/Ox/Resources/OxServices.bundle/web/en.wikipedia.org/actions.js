@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://en.wikipedia.org";
     const fetchJson = async (path) => {
         const res = await retryFetch(`${ORIGIN}${path}`, { credentials: "include" });

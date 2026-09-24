@@ -415,7 +415,7 @@ const marketplaceListings = (payloads) => {
     }
     return [...byId.values()];
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const docIds = Object.fromEntries(Object.entries(operationBaselines).map(([name, baseline]) => [name, baseline.docId]));
     const moduleToken = (name) => {
         try {

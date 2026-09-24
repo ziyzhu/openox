@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://www.perplexity.ai";
     const VERSION = "2.18";
     const SUPPORTED_BLOCKS = [

@@ -37,7 +37,7 @@ const cartMoney = (unitAmount, currency) => ({
     currency: clean(currency) || "USD",
     display: null,
 });
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const graphql = async (operationName, query, variables = {}) => {
         const response = await retryFetch(`${ORIGIN}/graphql/${operationName}?operation=${encodeURIComponent(operationName)}`, {
             method: "POST",

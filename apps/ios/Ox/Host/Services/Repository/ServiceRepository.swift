@@ -561,6 +561,7 @@ actor ServiceRepository {
         do {
             try FileManager.default.createDirectory(at: serviceRoot, withIntermediateDirectories: true)
             var manifest: [String: Any] = [
+                "version": HostProtocols.service.last!,
                 "domain": domain,
                 "name": domain,
                 "description": "Local service for \(domain).",
@@ -575,7 +576,7 @@ actor ServiceRepository {
             var manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
             manifestData.append(0x0A)
             try manifestData.write(to: serviceRoot.appendingPathComponent("service.json"), options: .atomic)
-            try Data("window.ox.install(1, () => {});\n".utf8)
+            try Data("window.ox.install(() => {});\n".utf8)
                 .write(to: serviceRoot.appendingPathComponent("actions.js"), options: .atomic)
             package.services.append(service)
             package.services.sort { $0.id.rawValue.localizedStandardCompare($1.id.rawValue) == .orderedAscending }

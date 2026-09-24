@@ -113,7 +113,7 @@ const transactionKey = (args) => [
 ].join(":");
 const COMPLETED_RESERVATIONS_KEY = "ox.airbnb.completedReservations.v1";
 const ACTIVE_RESERVATION_KEY = "ox.airbnb.activeReservation.v1";
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const requestGet = async (operationName, hash, variables) => {
         const params = new URLSearchParams({
             operationName,

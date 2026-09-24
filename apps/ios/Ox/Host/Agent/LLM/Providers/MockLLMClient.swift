@@ -1219,7 +1219,7 @@ extension Scenario {
             }];
             await ox.fs.write({ path: path + "service.json", content: JSON.stringify(manifest), purpose: "Stage manifest first" });
             await rejected(() => ox.service.validate({ domain, purpose: "Reject missing implementation" }), "missing implementations: version");
-            const actions = 'window.ox.install(1, ({ action }) => { action("version", { invoke: () => ({ value: "one" }) }); });';
+            const actions = 'window.ox.install(({ action }) => { action("version", { invoke: () => ({ value: "one" }) }); });';
             await ox.fs.write({ path: path + "actions.js", content: actions, purpose: "Complete first service draft" });
             check((await ox.service.validate({ domain, purpose: "Validate manifest-first draft" })).valid, "Manifest-first edits");
             check(!(await ox.service.attach({ domain, purpose: "Attach first valid draft" })).reloaded, "First attach");

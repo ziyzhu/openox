@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "taobao.com",
   "name": "Taobao",
   "description": "China's biggest consumer shopping marketplace. Search products by keyword across Taobao and Tmall, read a product's details (price, favorites, sku options, images) and buyer Q&A, and — for the signed-in account — check if an item is favorited and read the current user and cart item count.",

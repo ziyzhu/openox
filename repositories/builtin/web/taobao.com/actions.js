@@ -9,7 +9,7 @@ const cookie = name => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://www.taobao.com";
     const cleanText = (v) => String(v ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
     const httpsUrl = (u) => {

@@ -47,7 +47,7 @@ may need old versions for much longer.
 | --- | --- | --- | --- |
 | `rpc` | `RPC_VERSION` in `HostRPCClient` | 1 | once per connection, by the client |
 | `repository` | `version` in `repository.json` | 1 | when a repository loads |
-| `action` | `window.ox.install(<version>, …)` in `actions.js` | 1, 2 | when a service is validated |
+| `service` | `version` in `service.json` | 1, 2 | when a service loads and installs |
 | `skill` | nothing yet; undeclared means 1 | 1 | not checked |
 
 `host.describe` returns `implementation` (`name`, `version`, `build`),
@@ -112,10 +112,13 @@ uses JSON-RPC.
 
 ## Host ↔ repositories, services, and skills
 
-Repository and action versions are declared by the content and gated through
-`HostProtocols` as described above. Adding an action ABI also requires the
-service runtimes (`ServiceActionRuntime.js`, `APIService`, and the
-`@openox/services` inspector) to implement it. Repository content hashes and Git commits identify exact
+Repository and service versions are declared by content manifests and gated
+through `HostProtocols` as described above. In every Ox manifest, `version` means
+the Host format version, not a release number. Every web and API
+`service.json` must declare `version`, and services install with
+`window.ox.install(installer)`; the installer takes no version. Adding a service version also requires the service runtimes
+(`ServiceActionRuntime.js`, `APIService`, and the `@openox/services` inspector)
+to implement it. Repository content hashes and Git commits identify exact
 contents independently of format compatibility. These content interfaces are
 not converted into RPC by this change.
 

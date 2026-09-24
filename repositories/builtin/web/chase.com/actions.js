@@ -24,7 +24,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const START_URL = "https://secure.chase.com/web/auth/nav?navKey=chaseTravelHome&treatment=chase";
     const GATEWAY = "https://secure.chase.com/svc/wr/profile/l4/gateway/chase-travel/loyalty/bank-rewards/cte-app/v1";
     const uuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {

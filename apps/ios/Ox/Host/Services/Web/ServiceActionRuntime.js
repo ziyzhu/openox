@@ -110,7 +110,7 @@
     };
   };
 
-  window.__openOxCreateServiceRuntime = domain => {
+  window.__openOxCreateServiceRuntime = (domain, version) => {
     const actions = new Map();
     let installed = false;
     const log = message => {
@@ -151,10 +151,10 @@
       if (typeof definition?.invoke !== "function") throw new Error(`action ${name} has no invoke function`);
       actions.set(name, definition.invoke);
     };
-    const install = (version, installer) => {
+    const install = (installer, ...extra) => {
       if (installed || actions.size > 0) throw new Error("service installer may run only once");
-      if (version !== 1 && version !== 2) throw new Error(`unsupported service action ABI: ${version}`);
-      if (typeof installer !== "function") throw new Error("service installer must be a function");
+      if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
+      if (version !== 1 && version !== 2) throw new Error(`unsupported service version: ${version}`);
       try {
         if (version === 1) installFetchCapture(window);
         const api = version === 1
@@ -162,7 +162,7 @@
           : new Proxy(Object.freeze({ action }), {
             get(target, name) {
               if (name in target) return target[name];
-              throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+              throw new Error(`service version 2 does not provide ${String(name)}`);
             },
           });
         const result = installer(api);

@@ -13,7 +13,7 @@ enum OxHostRPC {
             "protocols": .object([
                 "rpc": versions(HostProtocols.rpc),
                 "repository": versions(HostProtocols.repository),
-                "action": versions(HostProtocols.action),
+                "service": versions(HostProtocols.service),
                 "skill": versions(HostProtocols.skill),
             ]),
             "methods": .array(OxHostProtocol.Method.allCases.map { .string($0.rawValue) }),

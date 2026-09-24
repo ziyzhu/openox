@@ -44,11 +44,12 @@ function inspectActions(
   let installations = 0;
   const window = {
     ox: {
-      install: (version: unknown, installer: unknown) => {
+      install: (installer: unknown, ...extra: unknown[]) => {
         installations++;
         if (installations > 1) throw new Error("service installer may run only once");
-        if (version !== 1 && version !== 2) throw new Error(`unsupported service action ABI: ${String(version)}`);
-        if (typeof installer !== "function") throw new Error("service installer must be a function");
+        if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
+        const version = manifest.version;
+        if (version !== 1 && version !== 2) throw new Error(`unsupported service version: ${String(version)}`);
         const action = (name: string, definition: { invoke?: (args: any) => any }) => {
             if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
             if (actions[name]) throw new Error(`duplicate action: ${name}`);
@@ -69,7 +70,7 @@ function inspectActions(
         } : new Proxy(Object.freeze(manifest.kind === "api" ? { action, request: stub } : { action }), {
           get(target, name) {
             if (name in target) return Reflect.get(target, name);
-            throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+            throw new Error(`service version 2 does not provide ${String(name)}`);
           },
         });
         const result = installer(api);

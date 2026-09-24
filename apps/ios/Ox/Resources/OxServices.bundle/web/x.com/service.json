@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "x.com",
   "name": "X",
   "description": "The real-time public conversation network. Read profiles, tweets, timelines, threads, search, trending, bookmarks, likes, verified-blue followers, following, notifications, and long-form articles. All actions are read-only; bookmarks, notifications, and the home timeline are scoped to the signed-in account.",

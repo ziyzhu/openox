@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "www.doordash.com",
   "name": "DoorDash",
   "description": "A local delivery marketplace. Read store and retail product details, inspect the active cart, review checkout on DoorDash, and read order history and receipts.",

@@ -44,7 +44,7 @@ const normalizeGmailRecipients = (values) => {
     }
     return [...recipients.values()];
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://mail.google.com";
     const MAIL_ROOT = `${ORIGIN}/mail/u/0/`;
     const BOOTSTRAP_URL = `${ORIGIN}/mail/_/bscframe`;

@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "example.com",
   "name": "Example",
   "description": "A minimal remote service. Read the current example page.",

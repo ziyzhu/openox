@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "chase.com",
   "name": "Chase Travel",
   "description": "A travel-rewards service for cardmembers. View your travel profile, Ultimate Rewards points, travel credits, trips, recent searches, featured deals, and cart. Read-only; sign-in required.",

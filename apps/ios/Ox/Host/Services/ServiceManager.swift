@@ -874,11 +874,11 @@ final class ServiceManager {
             window.ox = {
               __installations: 0,
               __registered: [],
-              install(version, installer) {
+              install(installer, ...extra) {
                 this.__installations++;
                 if (this.__installations > 1) throw new Error("service installer may run only once");
-                if (!\#(HostProtocols.action).includes(version)) throw new Error(`unsupported service action ABI: ${version}; this Ox supports \#(HostProtocols.action.map(String.init).joined(separator: ", "))`);
-                if (typeof installer !== "function") throw new Error("service installer must be a function");
+                if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer; declare version in service.json");
+                const version = \#(definition.version ?? 0);
                 const names = this.__registered;
                 const action = (name, definition) => {
                   if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
@@ -903,7 +903,7 @@ final class ServiceManager {
                   {
                     get(target, name) {
                       if (name in target) return target[name];
-                      throw new Error(`service action ABI 2 does not provide ${String(name)}`);
+                      throw new Error(`service version 2 does not provide ${String(name)}`);
                     },
                   }
                 );

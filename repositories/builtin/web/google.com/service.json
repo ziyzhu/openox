@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "google.com",
   "name": "Google",
   "description": "A web search engine. Find news, images, videos, and query suggestions. No sign-in required.",

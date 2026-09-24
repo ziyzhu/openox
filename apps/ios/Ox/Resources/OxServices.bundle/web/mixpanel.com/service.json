@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "mixpanel.com",
   "name": "Mixpanel",
   "description": "A product analytics platform. Browse projects, workspaces, dashboards, saved report results, event definitions, and recent events. Sign-in required. Read-only.",

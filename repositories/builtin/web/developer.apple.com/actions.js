@@ -26,7 +26,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://developer.apple.com";
     const DATA = `${ORIGIN}/tutorials/data`;
     const normalizePath = (path, namespace) => {

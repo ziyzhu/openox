@@ -32,7 +32,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     // LinkedIn's CSRF token is the JSESSIONID cookie value with its surrounding
     // quotes stripped (e.g. cookie `"ajax:123"` -> header `ajax:123`). The cookie
     // is JS-readable; li_at (the real session credential) is httpOnly and never

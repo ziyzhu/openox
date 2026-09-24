@@ -86,7 +86,7 @@ const SORT_VALUES = {
     newest: "date_DESC",
     oldest: "date_ASC",
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const strings = (value) => (Array.isArray(value) ? value : value === undefined || value === null ? [] : [value])
         .map(cleanText)
         .filter(Boolean);

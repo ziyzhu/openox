@@ -26,7 +26,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const token = (value) => {
         const normalized = String(value ?? "").trim();
         if (!/^[a-zA-Z0-9_-]+$/.test(normalized))

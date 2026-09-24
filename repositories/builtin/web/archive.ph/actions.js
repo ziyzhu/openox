@@ -23,7 +23,7 @@ const retryFetch = async (input, init, options) => {
 
 const ORIGIN = "https://archive.ph";
 const CAPTURE_ID = /^[A-Za-z0-9]{5}$/;
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const documentFrom = async (response, context) => {
         if (!response.ok)
             throw new Error(`${context}: HTTP ${response.status}`);

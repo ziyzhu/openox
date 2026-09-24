@@ -24,7 +24,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://ourworldindata.org";
     const ALGOLIA_APP_ID = "ASCB5XMYF2";
     const ALGOLIA_API_KEY = "bafe9c4659e5657bf750a38fbee5c269";

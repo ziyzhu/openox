@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const fetchText = async (path) => (await retryFetch(path, { credentials: "include" })).text();
     const matchBrace = (html, from) => {
         let depth = 0, instr = false, esc = false;

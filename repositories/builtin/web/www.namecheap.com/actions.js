@@ -23,7 +23,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const normalizedDomain = (value) => {
         const domain = String(value ?? "").trim().toLowerCase().replace(/\.$/, "");
         const labels = domain.split(".");

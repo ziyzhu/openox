@@ -32,7 +32,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     // Instagram's web client app id — the same constant shipped in Polaris'
     // bundle and required on every /api/v1 call. It identifies the web app, not
     // the user (user auth = sessionid cookie + csrftoken CSRF header), and has

@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "ctrip.com",
   "name": "Ctrip",
   "description": "China's largest online travel agency. Search flight cities, get a city-pair's lowest-price calendar, browse cheapest-destination flight deals, look up hotel cities and search hotels with live prices, and read the signed-in member's profile.",

@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "secure.bankofamerica.com",
   "name": "Bank of America",
   "description": "A U.S. consumer bank. View accounts, balances, transactions, payment and transfer activity, statements, spending insights, and BankAmeriDeals cash-back offers. Read-only; sign-in required.",

@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "www.usta.com",
   "name": "USTA",
   "description": "The national governing body for U.S. tennis. Search USTA-sanctioned tournaments near a location (public), and read the signed-in member's profile, membership, rankings, play history, and upcoming/completed match schedule.",

@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://www.americanexpress.com";
     const START_URL = `${ORIGIN}/en-us/travel`;
     const LOGIN_URL = `${ORIGIN}/en-us/account/login`;

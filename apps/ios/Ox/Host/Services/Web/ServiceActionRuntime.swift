@@ -9,9 +9,9 @@ nonisolated enum ServiceActionRuntime {
         return source
     }()
 
-    static func source(domain: String) -> String {
+    static func source(domain: String, version: Int) -> String {
         let data = try! JSONEncoder().encode(domain)
         let literal = String(decoding: data, as: UTF8.self)
-        return "\(runtime)\nwindow.ox = window.__openOxCreateServiceRuntime(\(literal));"
+        return "\(runtime)\nwindow.ox = window.__openOxCreateServiceRuntime(\(literal), \(version));"
     }
 }

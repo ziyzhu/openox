@@ -24,7 +24,7 @@ const retryFetch = async (input, init, options) => {
 const API = "https://api.1point3acres.com";
 const TRPC = "https://trpc.1point3acres.com/trpc";
 const BBS = "https://www.1point3acres.com/bbs";
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const trpc = async (proc, json) => {
         const input = { "0": { json, meta: { values: { fids: ["undefined"] } } } };
         const url = `${TRPC}/${proc}?batch=1&input=${encodeURIComponent(JSON.stringify(input))}`;

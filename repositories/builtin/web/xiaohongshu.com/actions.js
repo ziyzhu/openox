@@ -1,6 +1,6 @@
 const cleanText = value => String(value ?? "").replace(/\s+/g, " ").trim();
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://www.xiaohongshu.com";
     const numText = (v) => {
         const s = String(v ?? "").trim();

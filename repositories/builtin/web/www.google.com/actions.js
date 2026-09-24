@@ -277,7 +277,7 @@ function directionsUrl({ origin, destination, originPlaceId, destinationPlaceId,
         params.set("destination_place_id", cleanText(destinationPlaceId));
     return `${ORIGIN}/maps/dir/?${params}`;
 }
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     action("searchPlaces", {
         async invoke({ query, limit = 10, cursor = "" } = {}) {
             if (!cleanText(query))

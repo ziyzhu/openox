@@ -118,7 +118,7 @@ const createFetchCapture = target => {
 
 const waitForCapture = createFetchCapture(window);
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://creator.xiaohongshu.com";
     const PUBLIC_ORIGIN = "https://www.xiaohongshu.com";
     const number = (value) => {

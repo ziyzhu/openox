@@ -23,7 +23,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
     const eutils = async (fcgi, params) => {
         const qs = new URLSearchParams({ tool: "ox", ...params });

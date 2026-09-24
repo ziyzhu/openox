@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "outlook.live.com",
   "name": "Outlook",
   "description": "Read signed-in Outlook.com mail and calendar data.",

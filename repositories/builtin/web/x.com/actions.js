@@ -87,7 +87,7 @@ const extractArticleBody = (articleResults) => {
         media_urls,
     };
 };
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     // X's public app-level bearer for the official web client — the same
     // constant shipped in x.com's own main.<hash>.js, required on every
     // /i/api/graphql call even for cookie-authed sessions. It identifies the

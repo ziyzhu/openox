@@ -1,6 +1,6 @@
 
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const BASE_URL = "https://www.ctrip.com/";
     const LOGIN_URL = "https://passport.ctrip.com/user/login";
     const API = "https://m.ctrip.com/restapi/soa2";

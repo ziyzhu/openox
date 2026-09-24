@@ -43,6 +43,7 @@ nonisolated struct ServiceDefinition: Sendable {
         case invalid(String)
         case duplicateAction(String)
         case duplicateSkill(String)
+        case unsupportedVersion(String)
 
         var errorDescription: String? {
             switch self {
@@ -50,6 +51,7 @@ nonisolated struct ServiceDefinition: Sendable {
             case let .invalid(field): "invalid \(field)"
             case let .duplicateAction(id): "duplicate action \(id)"
             case let .duplicateSkill(name): "duplicate skill \(name)"
+            case let .unsupportedVersion(version): HostProtocols.unsupported("service.json", version: version, supported: HostProtocols.service)
             }
         }
     }
@@ -67,6 +69,7 @@ nonisolated struct ServiceDefinition: Sendable {
     let definitions: [String: JSONValue]
     let skills: [Manifest.Skill]
     let remoteMCPIcons: [RemoteMCPIcon]
+    var version: Int? { manifest.objectValue?["version"]?.intValue }
 
     init(
         manifest: JSONValue,
@@ -88,6 +91,10 @@ nonisolated struct ServiceDefinition: Sendable {
             _ = try APIServiceAuth(auth)
         } else if object["kind"] != nil || object["auth"] != nil {
             throw ValidationError.invalid("kind or auth")
+        }
+        guard let version = object["version"] else { throw ValidationError.missing("version") }
+        guard let value = version.intValue, HostProtocols.service.contains(value) else {
+            throw ValidationError.unsupportedVersion(version.jsonString())
         }
         guard let rawBaseURL = object["baseUrl"]?.stringValue,
               let baseURL = URL(string: rawBaseURL),

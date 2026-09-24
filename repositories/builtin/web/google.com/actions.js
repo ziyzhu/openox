@@ -154,7 +154,7 @@ function parseVideoResults(doc, limit, thumbnailFor) {
     }
     return items;
 }
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ensureSearchPage = (doc, responseUrl) => {
         const host = new URL(responseUrl, ORIGIN).hostname;
         if (host === "sorry.google.com" || doc.querySelector("form#captcha-form, form[action*='/sorry/']")) {

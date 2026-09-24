@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "domain": "developer.apple.com",
   "name": "Apple Developer",
   "description": "Official resources for building on Apple platforms. Browse frameworks and technologies, read reference documentation, search symbols, follow Develop in Swift tutorials, and explore Developer Forums topics, posts, search results, and discussions. Public and read-only; no sign-in required.",

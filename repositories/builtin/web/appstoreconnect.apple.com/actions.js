@@ -21,7 +21,7 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
-window.ox.install(2, ({ action }) => {
+window.ox.install(({ action }) => {
     const ORIGIN = "https://appstoreconnect.apple.com";
     const JSON_HEADERS = {
         Accept: "application/vnd.api+json, application/json",
