@@ -1,0 +1,365 @@
+{
+  "domain": "models.dev",
+  "name": "Models.dev",
+  "description": "Open-source database of AI models, providers, capabilities, context limits, pricing, and SDK metadata. Catalog metadata does not guarantee wire protocol or Ox compatibility.",
+  "baseUrl": "https://models.dev/",
+  "$defs": {
+    "jsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "listProviders",
+      "label": "List AI Providers",
+      "description": "List AI providers from models.dev with metadata like API endpoints, documentation, npm packages, and supported environment variables.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50,
+            "description": "Maximum number of providers to return"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Pagination cursor (exact provider ID)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "api": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "doc": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "npm": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "env": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "modelCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "modelCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "limit": 10
+      }
+    },
+    {
+      "id": "searchModels",
+      "label": "Search AI Models",
+      "description": "Search AI models across providers by text query string and optional exact provider ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Search query text matching model ID, name, family, or description"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Optional exact provider ID to filter models"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Maximum number of models to return"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Pagination cursor"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "providerName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "modalities": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/jsonValue"
+                  }
+                },
+                "toolCall": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "reasoning": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "openWeights": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "limit": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/jsonValue"
+                  }
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/jsonValue"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "providerId",
+                "providerName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "query": "claude",
+        "limit": 10
+      }
+    },
+    {
+      "id": "getModelDetails",
+      "label": "Get AI Model Details",
+      "description": "Get complete model details including parent provider metadata, per-model provider overrides, reason options, capabilities, limits, pricing, and SDK metadata.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Exact provider ID"
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Exact model ID"
+          }
+        },
+        "required": [
+          "providerId",
+          "modelId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "api": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "doc": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "npm": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "env": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": {
+              "$ref": "#/$defs/jsonValue"
+            }
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "defaultArgs": {
+        "providerId": "anthropic",
+        "modelId": "claude-sonnet-5"
+      }
+    }
+  ]
+}

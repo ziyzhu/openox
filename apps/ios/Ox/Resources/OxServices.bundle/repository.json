@@ -1,7 +1,7 @@
 {
   "version": 3,
   "name": "Built-in",
-  "contentHash": "c725ed6b2095f9accb6651c02f9c5a05db818b1e710fdfe5afff6322987cb1ba",
+  "contentHash": "8abe1c51df322496267a5896344ed91e86afbf7aa14b479aa94af6b7c1a14e27",
   "services": [
     "ios:bluetooth",
     "ios:calendar",
@@ -29,6 +29,7 @@
     "web:linkedin.com",
     "web:mail.google.com",
     "web:mixpanel.com",
+    "web:models.dev",
     "web:mp.weixin.qq.com",
     "web:news.ycombinator.com",
     "web:ourworldindata.org",

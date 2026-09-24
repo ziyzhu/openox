@@ -27,6 +27,8 @@ Compare the exported source with any existing built-in service and report behavi
 
 The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. The built-in source stores the audited `favicon.png` and omits Local `faviconUrl` because the build assigns the public built-in asset URL. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
+An installed app's validator can lag behind the repository compiler. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and a new saved revision before re-exporting.
+
 ## Replay evidence
 
 Replay verification may exercise already declared actions, but must not become endpoint exploration or service redesign.
@@ -41,6 +43,8 @@ Replay verification may exercise already declared actions, but must not become e
 - Inspect every retained request and response after automated redaction.
 
 Import each sanitized case through the current replay tooling and run it fail-closed through the authoritative iOS harness.
+
+The repository replay harness uninstalls its target app before and after testing. Preserve the authoring app's Local source and other data: use a disposable app identity on the selected simulator, or verify a complete backup and restoration path before running it. Keep the build's bundle identifier and `OX_BUNDLE_ID` aligned.
 
 For page-owned DOM actions, do not retain a raw authenticated SPA capture when making it replayable would require private user payloads, reusable session state, or an unbounded application shell. Use a minimal same-origin structural replay derived only from selectors, routes, and states already verified live by Ox. Replace identities and user-authored content with explicit fixture values, exercise the exact committed action code, and describe this as structural regression coverage rather than endpoint evidence. Do not use a synthetic page to invent or redesign behavior that Ox did not verify live.
 

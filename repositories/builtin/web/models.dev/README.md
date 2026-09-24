@@ -1,0 +1,7 @@
+Models.dev provides public, read-only provider discovery, model search, and model details. No account is required. Catalog metadata and SDK package names do not establish Ox compatibility or guarantee a wire protocol; provider configuration remains a separate step.
+
+The implementation was authored and verified in Ox on ox-qa-3, then exported unchanged from Local revision `9ddd874977e9ce7b72ab5ba167c9558ab8cb9708`. The catalog is fetched from `https://models.dev/api.json` and cached for ten minutes. Results are paginated and limited to 256 KiB of serialized UTF-8 data.
+
+Replay fixtures use a reduced public catalog captured on September 24, 2026: two Anthropic models and one Vertex model with an endpoint override. Their metadata is preserved; unrelated providers and models are omitted. The minimal same-origin HTML page contains no application data. These fixtures provide structural regression coverage, not evidence of current model availability or provider compatibility. Live verification separately exercised the full catalog, pagination, empty searches, missing providers/models, invalid cursors, reasoning options, and provider overrides.
+
+The 128-pixel icon came from the Google-cached raster favicon verified in Ox. The site's original icon was `https://models.dev/favicon-aq6crjze.svg`. The raster passed the promotion icon audit on light and dark backgrounds at 128 and 20 pixels.
