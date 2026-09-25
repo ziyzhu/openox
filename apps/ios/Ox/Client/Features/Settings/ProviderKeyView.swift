@@ -88,7 +88,7 @@ struct ProviderAuthenticationView: View {
             }
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
-                if client.id == "kimi-web", let website = client.website {
+                if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web, let website = client.website {
                     websiteAuthenticationStatusRow
                     Button {
                         let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
@@ -127,7 +127,7 @@ struct ProviderAuthenticationView: View {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
         }
         .task(id: websiteAuthenticationRevision) {
-            guard client.id == "kimi-web" else { return }
+            guard client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web else { return }
             websiteAuthenticationStatus = .checking
             do {
                 let signedIn = try await client.websiteSessionIsAuthenticated()
