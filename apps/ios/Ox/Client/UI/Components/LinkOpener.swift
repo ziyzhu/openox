@@ -49,6 +49,7 @@ enum LinkOpener {
 
 struct ServiceBrowserView: View {
     let session: ServiceBrowserSession
+    var reservesWebsiteSpace = false
     @Environment(\.dismiss) private var dismiss
 
     private var title: String {
@@ -56,29 +57,63 @@ struct ServiceBrowserView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            WebBrowserView(
-                page: session.page,
-                mode: .browse,
-                fallbackHost: session.serviceDomain,
-                initialURL: session.initialURL,
-                errorMessage: session.errorMessage,
-                navigate: { session.navigate(to: $0) },
-                goBack: session.goBack,
-                goForward: session.goForward,
-                reloadOrStop: session.reloadOrStop
-            )
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
+        Group {
+            if reservesWebsiteSpace {
+                VStack(spacing: 0) {
+                    ZStack {
+                        Text(title)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .padding(.horizontal, 80)
+                        HStack {
+                            Spacer()
+                            Button { dismiss() } label: {
+                                Text("Done")
+                                    .frame(minWidth: 64, minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
                             .accessibilityIdentifier(A11yID.ServiceBrowser.done)
+                        }
+                        .padding(.horizontal, Theme.Spacing.md)
                     }
+                    .frame(height: 56)
+                    .frame(maxWidth: .infinity)
+                    .background(Theme.Colors.surface)
+                    browser
                 }
+            } else {
+                NavigationStack {
+                    browser
+                        .navigationTitle(title)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) { doneButton }
+                        }
+                }
+            }
         }
         .presentationDragIndicator(.visible)
         .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
+    }
+
+    private var browser: some View {
+        WebBrowserView(
+            page: session.page,
+            mode: .browse,
+            chromeLayout: reservesWebsiteSpace ? .reserved : .overlay,
+            fallbackHost: session.serviceDomain,
+            initialURL: session.initialURL,
+            errorMessage: session.errorMessage,
+            navigate: { session.navigate(to: $0) },
+            goBack: session.goBack,
+            goForward: session.goForward,
+            reloadOrStop: session.reloadOrStop
+        )
+    }
+
+    private var doneButton: some View {
+        Button("Done") { dismiss() }
+            .accessibilityIdentifier(A11yID.ServiceBrowser.done)
     }
 }

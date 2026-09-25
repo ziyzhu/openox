@@ -142,7 +142,7 @@ struct ProviderAuthenticationView: View {
         .sheet(item: $websiteSignIn, onDismiss: {
             websiteAuthenticationRevision &+= 1
         }) { signIn in
-            ServiceBrowserView(session: signIn.session)
+            ServiceBrowserView(session: signIn.session, reservesWebsiteSpace: true)
         }
     }
 
