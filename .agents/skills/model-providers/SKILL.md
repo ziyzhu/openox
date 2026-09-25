@@ -41,6 +41,7 @@ Keep the importer's capability and status checks intact when a selected model is
 - [Amazon Bedrock](references/amazon-bedrock.md)
 - [Anthropic](references/anthropic.md)
 - [ChatGPT](references/chatgpt.md)
+- [Claude Website](references/claude-website.md)
 - [Custom OpenAI-compatible](references/custom-openai-compatible.md)
 - [DeepSeek](references/deepseek.md)
 - [Gemini](references/gemini.md)

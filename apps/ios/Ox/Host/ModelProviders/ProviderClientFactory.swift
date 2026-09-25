@@ -31,6 +31,8 @@ nonisolated enum ProviderClientFactory {
             switch definition.id {
             case "kimi-web": native = KimiWebsiteProvider(models: models)
             case "qwen-web": native = QwenWebsiteProvider(models: models)
+            case "grok-web": native = GrokWebsiteProvider(models: models)
+            case "claude-web": native = ClaudeWebsiteProvider(models: models)
             default: throw RuntimeError.bridge("Unsupported web provider")
             }
         case .openAIChatCompletions:
@@ -99,6 +101,8 @@ nonisolated enum ProviderClientFactory {
             let registeredURL: URL? = switch definition.id {
             case "kimi-web": URL(string: "https://www.kimi.com/")!
             case "qwen-web": URL(string: "https://chat.qwen.ai/")!
+            case "grok-web": URL(string: "https://grok.com/")!
+            case "claude-web": URL(string: "https://claude.ai/")!
             default: nil
             }
             guard let registeredURL,
