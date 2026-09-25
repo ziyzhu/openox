@@ -1,8 +1,9 @@
 {
   "domain": "qwen.ai",
   "name": "Qwen",
-  "description": "Chat with Qwen, read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry.",
+  "description": "Chat with Qwen, search and read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry.",
   "baseUrl": "https://chat.qwen.ai/",
+  "faviconUrl": "https://assets.alicdn.com/g/qwenweb/qwen-chat-fe/0.3.11/static/images/ms-icon-light-150x150.png",
   "actions": [
     {
       "id": "getSignInUrl",
@@ -381,6 +382,70 @@
       "requireAuth": true,
       "requireApproval": true,
       "blocking": true
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search saved conversations using Qwen history search. Continue with the same query and returned page cursor until an empty terminal page. Read results by ID with getConversation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
     }
   ],
   "$defs": {

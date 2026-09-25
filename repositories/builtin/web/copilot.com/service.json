@@ -1,0 +1,603 @@
+{
+  "domain": "copilot.com",
+  "name": "Microsoft Copilot",
+  "description": "Search saved Copilot chats, read conversations and recent history, and choose response modes. Broad searches requiring additional pages must be narrowed. Automated sending remains experimental and unconfirmed.",
+  "baseUrl": "https://copilot.com/",
+  "faviconUrl": "https://res.cdn.office.net/officehub/images/content/images/unauth-copilotcom/copilot-mobile-logo-static-286643fc8c.png",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Copilot",
+      "description": "Open Microsoft Copilot sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Copilot sign-in",
+      "description": "Check current server-authoritative Copilot session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get Copilot account",
+      "description": "Read the currently signed-in Copilot account.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "accountType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "accountType"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current conversation",
+      "description": "Read up to 100 rendered messages; not full history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "generating": {
+            "type": "boolean"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "generating",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getRecentConversations",
+      "label": "Read recent chats",
+      "description": "Read up to 60 chats loaded in the history view. Does not paginate or search older history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "conversationId",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://copilot.com/chat/all"
+    },
+    {
+      "id": "openConversation",
+      "label": "Open conversation",
+      "description": "Open a saved conversation by ID through in-page routing. Refuses unsent drafts. Reads up to 100 rendered messages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "generating": {
+            "type": "boolean"
+          },
+          "coverage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "generating",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getResponseModes",
+      "label": "Read response modes",
+      "description": "List live Auto, Quick response and Think deeper choices, not named models.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selected": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "selectResponseMode",
+      "label": "Select response mode",
+      "description": "Change response mode with approval. Quick response and restoring Auto verified.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "Auto",
+              "Quick response",
+              "Think deeper"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "selected": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "chat",
+      "label": "Start Copilot chat",
+      "description": "EXPERIMENTAL: automated sending is unverified; follow-up test remained unconfirmed. Sends once. Read state after pending results; never blindly resend.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "pending"
+            ]
+          },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "assistant"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generating": {
+                "type": "boolean"
+              },
+              "coverage": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "conversationId",
+              "url",
+              "messages",
+              "generating",
+              "coverage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue Copilot chat",
+      "description": "EXPERIMENTAL: automated sending is unverified; follow-up test remained unconfirmed. Sends once. Read state after pending results; never blindly resend.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          }
+        },
+        "required": [
+          "conversationId",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "pending"
+            ]
+          },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "assistant"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generating": {
+                "type": "boolean"
+              },
+              "coverage": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "conversationId",
+              "url",
+              "messages",
+              "generating",
+              "coverage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search saved chats using Copilot server search. Returns complete terminal results only. If more source pages exist, throws and asks for a narrower query; continuation is not yet supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "conversationId",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://copilot.com/chat/all"
+    }
+  ]
+}

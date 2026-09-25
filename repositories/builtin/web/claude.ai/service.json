@@ -3,6 +3,7 @@
   "name": "Claude",
   "description": "Chat with Claude using your signed-in website account, read paginated conversation history, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
   "baseUrl": "https://claude.ai/robots.txt",
+  "faviconUrl": "https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c129d018a-0ZbJsTbu.png",
   "actions": [
     {
       "id": "getSignInUrl",
@@ -493,7 +494,7 @@
     {
       "id": "searchConversations",
       "label": "Search conversations",
-      "description": "Return up to 25 source-ranked conversation matches. Search may include semantic matches. Nonterminal source pagination is not yet supported.",
+      "description": "Search in ranked mode (up to 200 source-ranked semantic/content matches, not exhaustive) or titles mode (case-insensitive title substring over unarchived history with real source-offset pagination). Titles mode scans at most 30 history rows per page; filtered pages can be empty with a nextCursor. Continue with identical query, scope and limit. Native ranked continuation is unavailable.",
       "requireAuth": true,
       "requireApproval": false,
       "inputSchema": {
@@ -508,6 +509,26 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ranked",
+              "titles"
+            ],
+            "default": "ranked"
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Source offset from titles-mode nextCursor only."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 25,
+            "description": "Ranked result cap; titles mode scans min(limit,30) source rows."
           }
         },
         "required": [
@@ -566,13 +587,26 @@
           },
           "mode": {
             "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ranked",
+              "titles-unarchived"
+            ]
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "True only when titles mode reaches the end of source history. Ranked search never claims exhaustive coverage."
           }
         },
         "required": [
           "items",
           "nextCursor",
           "degraded",
-          "mode"
+          "mode",
+          "scope",
+          "complete"
         ],
         "additionalProperties": false
       }

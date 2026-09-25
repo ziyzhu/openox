@@ -1,14 +1,14 @@
 {
-  "domain": "chat.z.ai",
-  "name": "Z.ai",
-  "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval.",
-  "baseUrl": "https://chat.z.ai/",
-  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://chat.z.ai&size=128",
+  "domain": "gemini.google.com",
+  "name": "Gemini",
+  "description": "Search saved Gemini chats, open search results and recent conversations, read messages, and chat with approval.",
+  "baseUrl": "https://gemini.google.com/app",
+  "faviconUrl": "https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png",
   "actions": [
     {
       "id": "getSignInUrl",
-      "label": "Sign in",
-      "description": "Open Z.ai sign-in.",
+      "label": "Sign in to Gemini",
+      "description": "Open Gemini to sign in with Google.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -28,12 +28,13 @@
         "additionalProperties": false
       },
       "requireAuth": false,
-      "requireApproval": false
+      "requireApproval": false,
+      "blocking": true
     },
     {
       "id": "getSignInState",
-      "label": "Check sign-in",
-      "description": "Check a fresh server session response.",
+      "label": "Check Gemini sign-in",
+      "description": "Check a fresh server response for an authenticated session.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -53,12 +54,13 @@
         "additionalProperties": false
       },
       "requireAuth": false,
-      "requireApproval": false
+      "requireApproval": false,
+      "blocking": true
     },
     {
-      "id": "getCurrentUser",
-      "label": "Read account",
-      "description": "Read basic signed-in account information.",
+      "id": "getCurrentConversation",
+      "label": "Read Gemini conversation",
+      "description": "Read up to 100 currently rendered messages. Not full-history pagination.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -68,217 +70,70 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "email"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "listModels",
-      "label": "List models",
-      "description": "List available Z.ai model identifiers and names.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "nextCursor": {
+          "conversationId": {
             "type": [
               "string",
               "null"
             ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "listConversations",
-      "label": "List saved chats",
-      "description": "Read one source page of saved chats. Continue until an empty terminal page.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "cursor": {
-            "type": "string",
-            "pattern": "^[1-9][0-9]{0,4}$"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "url": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "url"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "getConversation",
-      "label": "Read saved chat",
-      "description": "Read the latest branch of a saved conversation, up to 100 messages; excludes reasoning blocks.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "conversationId": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "conversationId"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "conversationId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "messages": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
                 "role": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
                 },
                 "text": {
                   "type": "string"
-                },
-                "done": {
-                  "type": "boolean"
                 }
               },
               "required": [
-                "id",
                 "role",
-                "text",
-                "done"
+                "text"
               ],
               "additionalProperties": false
             }
           },
-          "truncated": {
-            "type": "boolean"
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rendered"
+            ]
           }
         },
         "required": [
           "conversationId",
-          "title",
           "url",
           "messages",
-          "truncated"
+          "scope"
         ],
         "additionalProperties": false
       },
       "requireAuth": true,
-      "requireApproval": false
+      "requireApproval": false,
+      "blocking": true
     },
     {
       "id": "openConversation",
-      "label": "Open saved chat",
-      "description": "Open a unique title from the loaded sidebar and read its latest server messages.",
+      "label": "Open Gemini conversation",
+      "description": "Open an exact conversation ID from the loaded recent sidebar and read rendered messages.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "conversationId": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
-            "minLength": 1,
-            "maxLength": 100
+            "pattern": "^[a-f0-9]{8,64}$"
           }
         },
         "required": [
@@ -290,51 +145,98 @@
         "type": "object",
         "properties": {
           "conversationId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "messages": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
                 "role": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
                 },
                 "text": {
                   "type": "string"
-                },
-                "done": {
-                  "type": "boolean"
                 }
               },
               "required": [
-                "id",
                 "role",
-                "text",
-                "done"
+                "text"
               ],
               "additionalProperties": false
             }
           },
-          "truncated": {
-            "type": "boolean"
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rendered"
+            ]
           }
         },
         "required": [
           "conversationId",
-          "title",
           "url",
           "messages",
-          "truncated"
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List Gemini modes",
+      "description": "Read the current finite model/mode picker; does not change selection.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ],
         "additionalProperties": false
       },
@@ -344,15 +246,15 @@
     },
     {
       "id": "chat",
-      "label": "Start a chat",
-      "description": "Send one message in a new chat, preserving drafts. Confirm using fresh server messages; never retries.",
+      "label": "Start Gemini chat",
+      "description": "Start a new text conversation and submit once. Returns confirmed submission or uncertainty; replies may still be generating.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "message": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 20000
+            "maxLength": 30000
           }
         },
         "required": [
@@ -363,24 +265,26 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "accepted",
-              "completed"
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "submissionConfirmed": {
             "type": "boolean"
           },
-          "url": {
-            "type": "string"
-          },
-          "conversationId": {
-            "type": [
-              "string",
-              "null"
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "unconfirmed"
             ]
           },
           "reply": {
@@ -391,10 +295,10 @@
           }
         },
         "required": [
-          "status",
-          "submissionConfirmed",
-          "url",
           "conversationId",
+          "url",
+          "submissionConfirmed",
+          "status",
           "reply"
         ],
         "additionalProperties": false
@@ -405,21 +309,19 @@
     },
     {
       "id": "continueChat",
-      "label": "Continue a chat",
-      "description": "Open a recent sidebar chat and send once. Confirm fresh server messages and return the latest reply.",
+      "label": "Continue Gemini chat",
+      "description": "Open a chat from the loaded sidebar and submit one follow-up. Does not retry uncertain submissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "conversationId": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
-            "minLength": 1,
-            "maxLength": 100
+            "pattern": "^[a-f0-9]{8,64}$"
           },
           "message": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 20000
+            "maxLength": 30000
           }
         },
         "required": [
@@ -431,24 +333,26 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "accepted",
-              "completed"
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "submissionConfirmed": {
             "type": "boolean"
           },
-          "url": {
-            "type": "string"
-          },
-          "conversationId": {
-            "type": [
-              "string",
-              "null"
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "unconfirmed"
             ]
           },
           "reply": {
@@ -459,10 +363,10 @@
           }
         },
         "required": [
-          "status",
-          "submissionConfirmed",
-          "url",
           "conversationId",
+          "url",
+          "submissionConfirmed",
+          "status",
           "reply"
         ],
         "additionalProperties": false
@@ -474,7 +378,7 @@
     {
       "id": "searchConversations",
       "label": "Search saved chats",
-      "description": "Search conversation titles only across native default-history pages, not message content. Captures website-owned history reads without copying credentials. Continue the same query with the next source-page cursor; empty filtered pages may still have continuation. Session-local cache holds 20 pages and resets on reload. Further pages require native sidebar scrolling.",
+      "description": "Search saved chats through Gemini native search with source continuation cursors. Continue the same query on this service page; search state resets on reload. Keeps up to 12 captured pages. Open returned results with openSearchConversation. Uses native matching and ranking, not guaranteed literal substring matching; terminal and empty-result behavior remain unverified.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -485,7 +389,8 @@
           },
           "cursor": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*$"
+            "minLength": 1,
+            "maxLength": 10000
           }
         },
         "required": [
@@ -524,17 +429,84 @@
               "string",
               "null"
             ]
-          },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "default-history-titles"
-            ]
           }
         },
         "required": [
           "items",
-          "nextCursor",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "openSearchConversation",
+      "label": "Open search result",
+      "description": "Open and read a conversation ID returned by the current search session, including chats absent from the sidebar.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8,64}$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rendered"
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
           "scope"
         ],
         "additionalProperties": false
