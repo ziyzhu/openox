@@ -55,7 +55,7 @@ final class APIService {
 
     var detailCapabilities: ServiceDetailCapabilities {
         ServiceDetailCapabilities(authentication: .service, attachmentData: .remote, showsDomain: true,
-            showsSkills: true, supportsPageInspection: false, supportsWebsiteDataManagement: false,
+            supportsPageInspection: false, supportsWebsiteDataManagement: false,
             supportsFolderAccess: false, supportsRemoteManagement: false)
     }
 

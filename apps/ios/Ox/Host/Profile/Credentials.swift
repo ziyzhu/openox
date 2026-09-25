@@ -26,9 +26,14 @@ nonisolated enum Credentials {
     static func secret(for account: String) -> String? {
         cache.withLock { cache in
             if let cached = cache[account] { return cached.isEmpty ? nil : cached }
-            let value = read(account)
-            cache[account] = value ?? ""
-            return value
+            do {
+                let value = try secretChecked(for: account)
+                cache[account] = value ?? ""
+                return value
+            } catch {
+                Log.agent.error("Credentials.read failed account=\(account) error=\(error.localizedDescription)")
+                return nil
+            }
         }
     }
 
@@ -36,10 +41,14 @@ nonisolated enum Credentials {
         let trimmed = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { clearSecret(for: account); return }
         cache.withLock { cache in
-            _ = write(account, trimmed)
+            let status = write(account, trimmed)
+            guard status == errSecSuccess else {
+                Log.agent.error("Credentials.set failed account=\(account) status=\(status)")
+                return
+            }
             cache[account] = trimmed
+            Log.agent.info("Credentials.set account=\(account) chars=\(trimmed.count)")
         }
-        Log.agent.info("Credentials.set account=\(account) chars=\(trimmed.count)")
     }
 
     static func setSecretChecked(_ secret: String, for account: String) throws {
@@ -50,7 +59,7 @@ nonisolated enum Credentials {
         try cache.withLock { cache in
             let status = write(account, secret, accessibility: accessibility)
             guard status == errSecSuccess else {
-                throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Credentials could not be saved."])
+                throw keychainError(status)
             }
             cache[account] = secret
         }
@@ -93,10 +102,14 @@ nonisolated enum Credentials {
 
     static func clearSecret(for account: String) {
         cache.withLock { cache in
-            SecItemDelete(query(account) as CFDictionary)
+            let status = SecItemDelete(query(account) as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                Log.agent.error("Credentials.clear failed account=\(account) status=\(status)")
+                return
+            }
             cache[account] = ""
+            Log.agent.info("Credentials.clear account=\(account)")
         }
-        Log.agent.info("Credentials.clear account=\(account)")
     }
 
     private static func query(_ account: String) -> [String: Any] {
@@ -107,35 +120,35 @@ nonisolated enum Credentials {
         ]
     }
 
-    private static func read(_ account: String) -> String? {
-        var q = query(account)
-        q[kSecReturnData as String] = true
-        q[kSecMatchLimit as String] = kSecMatchLimitOne
-        var out: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
-              let data = out as? Data,
-              let value = String(data: data, encoding: .utf8),
-              !value.isEmpty else { return nil }
-        return value
-    }
-
     private static func write(_ account: String, _ key: String, accessibility: CFString = accessibility) -> OSStatus {
         let data = Data(key.utf8)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: accessibility,
         ]
-        if SecItemCopyMatching(query(account) as CFDictionary, nil) == errSecSuccess {
+        let status = SecItemCopyMatching(query(account) as CFDictionary, nil)
+        if status == errSecSuccess {
             return SecItemUpdate(query(account) as CFDictionary, attributes as CFDictionary)
-        } else {
+        } else if status == errSecItemNotFound {
             var add = query(account)
             add.merge(attributes) { _, new in new }
             return SecItemAdd(add as CFDictionary, nil)
         }
+        return status
     }
 
     private static func keychainError(_ status: OSStatus) -> NSError {
-        NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Keychain is unavailable."])
+        Log.app.error("Credentials.keychain failed status=\(status)")
+        let message: String
+        switch status {
+        case errSecMissingEntitlement:
+            message = "This build cannot access Keychain. Install a correctly signed build of Ox."
+        case errSecInteractionNotAllowed, errSecNotAvailable:
+            message = "Keychain is temporarily unavailable. Unlock your device and try again."
+        default:
+            message = "Keychain could not be accessed (code \(status)). Try again, or contact support if this continues."
+        }
+        return NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
 

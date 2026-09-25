@@ -878,13 +878,13 @@
         }
       }
     },
-    "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data." : {
+    "Adds this service to a chat, giving Ox its actions and your signed-in data." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将此服务添加到对话，让 Ox 可以使用其操作、技能以及你的登录数据。"
+            "value" : "将此服务添加到对话，让 Ox 可以使用其操作和你的登录数据。"
           }
         }
       }
@@ -10505,17 +10505,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此请求无法在已保存的聊天中运行。请开始临时聊天以继续。"
-          }
-        }
-      }
-    },
-    "This service exposes no skills." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此服务未提供任何技能。"
           }
         }
       }

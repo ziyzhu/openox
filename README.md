@@ -47,6 +47,12 @@ Live commands connect to a running Ox Host; the reference control endpoint is
 provided by a DEBUG iOS Simulator app. See the [CLI guide](apps/cli/README.md)
 for Host connections, offline commands, and package-manager alternatives.
 
+## Development setup
+
+For a new checkout, follow the [OpenOx onboarding skill](.agents/skills/openox-onboarding/SKILL.md).
+It covers local dependencies, iOS signing, the repository server, and a verified
+simulator launch.
+
 ## Architecture
 
 An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.

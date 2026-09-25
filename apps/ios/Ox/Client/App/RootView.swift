@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import WebKit
+import Security
 
 @Observable
 final class SidebarInteraction {
@@ -466,10 +467,16 @@ struct RootView: View {
         }
     }
 
+    private enum StartupRecovery: Equatable {
+        case manual
+        case whenAvailable
+        case updateBuild
+    }
+
     private enum Startup: Equatable {
         case idle
         case loading(StartupPhase)
-        case failed(String)
+        case failed(message: String, recovery: StartupRecovery)
         case ready
 
         var canBegin: Bool {
@@ -558,6 +565,7 @@ struct RootView: View {
                     activeProfileMonitor.deactivate()
                     chats.flushAll()
                 case .active:
+                    if case .failed(_, .whenAvailable) = startup { bootstrap() }
                     chats.current?.setTranscriptVisible(true)
                     Task {
                         await storage.revalidateActive()
@@ -570,6 +578,9 @@ struct RootView: View {
                 }
             }
             .environment(\.locale, AppLocale.shared.locale)
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
+                if case .failed(_, .whenAvailable) = startup { bootstrap() }
+            }
     }
 
     private var rootLayout: some View {
@@ -867,7 +878,7 @@ struct RootView: View {
     private var startupLoadingView: some View {
         VStack(spacing: Theme.Spacing.sm) {
             switch startup {
-            case .failed(let message):
+            case .failed(let message, let recovery):
                 Image(systemName: "exclamationmark.triangle")
                     .font(.title.weight(.medium))
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -877,8 +888,10 @@ struct RootView: View {
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .multilineTextAlignment(.center)
-                Button("Try Again") { bootstrap() }
-                    .buttonStyle(.borderedProminent)
+                if recovery != .updateBuild {
+                    Button("Try Again") { bootstrap() }
+                        .buttonStyle(.borderedProminent)
+                }
             case .loading(let phase):
                 CellularAutomatonLoader()
                 Text(phase.label)
@@ -1114,8 +1127,18 @@ struct RootView: View {
                 monitorActiveProfile()
                 importSharedNotes()
             } catch {
-                startup = .failed(error.localizedDescription)
-                Log.app.error("RootView.startup failed: \(error.localizedDescription)")
+                let keychainError = error as NSError
+                let recovery: StartupRecovery
+                if keychainError.domain == NSOSStatusErrorDomain && keychainError.code == Int(errSecMissingEntitlement) {
+                    recovery = .updateBuild
+                } else if keychainError.domain == NSOSStatusErrorDomain
+                    && [Int(errSecInteractionNotAllowed), Int(errSecNotAvailable)].contains(keychainError.code) {
+                    recovery = .whenAvailable
+                } else {
+                    recovery = .manual
+                }
+                startup = .failed(message: error.localizedDescription, recovery: recovery)
+                Log.app.error("RootView.startup failed domain=\(keychainError.domain) code=\(keychainError.code) recovery=\(String(describing: recovery)) error=\(error.localizedDescription)")
             }
         }
     }

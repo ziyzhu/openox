@@ -95,6 +95,16 @@ struct ServiceExplorerView: View {
     @Environment(ServiceManager.self) private var serviceManager
 
     private let pageSize = 20
+    private let featuredDomains = [
+        "chatgpt.com",
+        "claude.ai",
+        "grok.com",
+        "www.kimi.com",
+        "qwen.ai",
+        "doubao.com",
+        "chat.z.ai",
+        "muse.ai"
+    ]
 
     @State private var query = ""
     @State private var filter: ServiceManager.Filter = .all
@@ -107,12 +117,20 @@ struct ServiceExplorerView: View {
     private var shown: ArraySlice<ServiceManager.ServiceMatch> { matches.prefix(visible) }
 
     private var matches: [ServiceManager.ServiceMatch] {
+        let matches: [ServiceManager.ServiceMatch]
         if filter == .all, trimmedQuery.isEmpty {
-            return services.map {
+            matches = services.map {
                 ServiceManager.ServiceMatch(service: $0, matchedActionID: nil, matchedAction: nil)
             }
+        } else {
+            matches = results
         }
-        return results
+        guard trimmedQuery.isEmpty else { return matches }
+        return matches.enumerated().sorted { lhs, rhs in
+            let lhsRank = featuredDomains.firstIndex(of: lhs.element.service.domain) ?? Int.max
+            let rhsRank = featuredDomains.firstIndex(of: rhs.element.service.domain) ?? Int.max
+            return lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
+        }.map(\.element)
     }
 
     var body: some View {

@@ -944,7 +944,6 @@ final class RemoteMCPService {
             authentication: .mcp,
             attachmentData: .remote,
             showsDomain: true,
-            showsSkills: false,
             supportsPageInspection: false,
             supportsWebsiteDataManagement: false,
             supportsFolderAccess: false,

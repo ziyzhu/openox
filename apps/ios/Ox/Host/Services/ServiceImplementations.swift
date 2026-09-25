@@ -19,7 +19,6 @@ struct ServiceDetailCapabilities {
     let authentication: Authentication
     let attachmentData: AttachmentData
     let showsDomain: Bool
-    let showsSkills: Bool
     let supportsPageInspection: Bool
     let supportsWebsiteDataManagement: Bool
     let supportsFolderAccess: Bool
@@ -63,7 +62,6 @@ final class WebService {
             authentication: .service,
             attachmentData: .signedIn,
             showsDomain: true,
-            showsSkills: true,
             supportsPageInspection: true,
             supportsWebsiteDataManagement: true,
             supportsFolderAccess: false,
@@ -93,7 +91,6 @@ final class IOSService {
             authentication: permission == nil ? .none : .systemPermission,
             attachmentData: .onDevice,
             showsDomain: false,
-            showsSkills: false,
             supportsPageInspection: hasBrowserRuntime,
             supportsWebsiteDataManagement: false,
             supportsFolderAccess: domain == "ios:files",

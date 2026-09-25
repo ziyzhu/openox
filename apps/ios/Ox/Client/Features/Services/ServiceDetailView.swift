@@ -46,7 +46,6 @@ struct ServiceDetailView: View {
     private var capabilities: ServiceDetailCapabilities { service.detailCapabilities }
 
     private var actions: [Manifest.Action] { service.definition.exposedActions }
-    private var skills: [Skill] { Skills.shared.all.filter { $0.services.contains(service.domain) } }
     private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
     @State private var signInRequestActive = false
     @State private var signingOut = false
@@ -91,7 +90,6 @@ struct ServiceDetailView: View {
                 descriptionSection
                 permissionsSection
                 actionsSection
-                skillsSection
                 domainSection
                 repositorySection
                 manageSection
@@ -476,35 +474,6 @@ struct ServiceDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var skillsSection: some View {
-        if capabilities.showsSkills {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Skills")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
-
-                if loadingManifest {
-                    CellularAutomatonLoader.small
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.lg)
-                } else if skills.isEmpty {
-                    Text("This service exposes no skills.")
-                        .font(Theme.Fonts.bodySm)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .padding(.horizontal, Theme.Spacing.md)
-                } else {
-                    VStack(spacing: Theme.Spacing.sm) {
-                        ForEach(skills, id: \.name) { skill in
-                            skillRow(skill)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Manage
 
     @ViewBuilder
@@ -557,7 +526,7 @@ struct ServiceDetailView: View {
 
     private var attachPermissionDescription: LocalizedStringKey {
         switch capabilities.attachmentData {
-        case .signedIn: "Adds this service to a chat, giving Ox its actions, skills, and your signed-in data."
+        case .signedIn: "Adds this service to a chat, giving Ox its actions and your signed-in data."
         case .onDevice: "Its actions and permitted device data become available to this chat."
         case .remote: "Its remote Actions can receive arguments from this chat and return data to Ox."
         }
@@ -764,21 +733,6 @@ struct ServiceDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Theme.Spacing.md)
             .settingsSurface()
-    }
-
-    private func skillRow(_ skill: Skill) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(skill.name)
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-            Text(skill.description)
-                .font(Theme.Fonts.bodySm)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.md)
-        .settingsSurface()
     }
 
     private func chip(_ text: LocalizedStringKey) -> some View {
