@@ -500,5 +500,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/qwen.ai/favicon.png"
 }

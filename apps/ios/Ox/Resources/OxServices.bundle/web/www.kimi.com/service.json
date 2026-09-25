@@ -549,5 +549,6 @@
       "requireApproval": true,
       "blocking": true
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.kimi.com/favicon.png"
 }

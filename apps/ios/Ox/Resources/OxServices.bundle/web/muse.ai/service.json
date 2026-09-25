@@ -375,5 +375,6 @@
       "requireApproval": false,
       "blocking": true
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/muse.ai/favicon.png"
 }

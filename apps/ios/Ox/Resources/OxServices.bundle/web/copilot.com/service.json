@@ -598,5 +598,6 @@
       "requireApproval": false,
       "baseUrl": "https://copilot.com/chat/all"
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/copilot.com/favicon.png"
 }

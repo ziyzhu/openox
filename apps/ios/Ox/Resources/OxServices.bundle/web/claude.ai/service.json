@@ -610,5 +610,6 @@
         "additionalProperties": false
       }
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/claude.ai/favicon.png"
 }

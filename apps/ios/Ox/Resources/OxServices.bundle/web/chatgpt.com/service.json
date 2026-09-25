@@ -599,5 +599,6 @@
         "additionalProperties": false
       }
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/chatgpt.com/favicon.png"
 }

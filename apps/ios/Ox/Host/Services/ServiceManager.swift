@@ -458,7 +458,12 @@ final class ServiceManager {
         let cacheKey = service.isMCPService ? "\(domain):\(preferredTheme ?? "any")" : domain
         if let data = faviconData[cacheKey] { return data }
         let data: Data?
-        if let url = service.definition.faviconURL {
+        let bundledFavicon = Bundle.main.url(forResource: "OxServices", withExtension: "bundle")?
+            .appending(path: "web/\(domain)/favicon.png")
+        if service.isWebService, service.definition.repositoryID == Repository.bundledID,
+           let bundledFavicon, let bundledData = try? Data(contentsOf: bundledFavicon) {
+            data = bundledData
+        } else if let url = service.definition.faviconURL {
             data = await ServiceImageLoader.data(url: url)
         } else if service.isMCPService {
             guard let endpoint = service.definition.baseURL else {
