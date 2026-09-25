@@ -1090,17 +1090,21 @@ private struct ProviderPickerView: View {
     @Binding var selectedClientID: String?
 
     var body: some View {
-        let featuredClients = clients
+        let websiteClients = clients.filter { client in
+            client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
+        }
+        let freeClients = clients
             .filter { $0.gettingStartedOffer != nil }
             .sorted {
                 ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max)
             }
-        let featuredIDs = Set(featuredClients.map(\.id))
+        let prioritizedIDs = Set((websiteClients + freeClients).map(\.id))
         let customOption = SettingsSelectionOption<String?>(
             id: "custom",
             value: nil,
             title: L10n.string("Custom provider"),
             systemImage: "plus",
+            subtitle: "OpenAI-compatible server",
             accessibilityIdentifier: A11yID.Chat.modelCustomProviders
         )
         let providerOption = { (client: any ProviderClient) in
@@ -1108,26 +1112,32 @@ private struct ProviderPickerView: View {
                 id: client.id,
                 value: client.id,
                 title: client.displayName,
-                subtitle: client.gettingStartedOffer?.summary,
+                subtitle: subtitle(for: client),
                 accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
             )
         }
-        let showsFeatured = !featuredClients.isEmpty
-        let options = showsFeatured
-            ? featuredClients.map(providerOption)
-                + [customOption]
-                + clients.filter { !featuredIDs.contains($0.id) }.map(providerOption)
-            : [customOption] + clients.map(providerOption)
+        let options = websiteClients.map(providerOption)
+            + freeClients.filter { client in !websiteClients.contains { $0.id == client.id } }.map(providerOption)
+            + clients.filter { !prioritizedIDs.contains($0.id) }.map(providerOption)
+            + [customOption]
 
         SettingsSelectionPickerView(
             title: "Provider",
             options: options,
-            selection: $selectedClientID,
-            separatesFirstOption: !showsFeatured,
-            promotedOptionCount: showsFeatured ? featuredClients.count : 0,
-            promotedTitle: "Free options",
-            remainingTitle: "More providers"
+            selection: $selectedClientID
         )
+    }
+
+    private func subtitle(for client: any ProviderClient) -> String {
+        if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web {
+            return "Website sign-in"
+        }
+        if let offer = client.gettingStartedOffer { return offer.summary }
+        if client.subscriptionAccount != nil {
+            return client.acceptsAPIKey ? "Account sign-in or API key" : "Account sign-in"
+        }
+        if !client.acceptsAPIKey { return "Not required" }
+        return client.credentialKind == .subscriptionKey ? "Subscription key" : "API key"
     }
 }
 
@@ -1144,27 +1154,12 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
     let title: LocalizedStringKey
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value
-    var separatesFirstOption = false
-    var promotedOptionCount = 0
-    var promotedTitle: LocalizedStringKey?
-    var remainingTitle: LocalizedStringKey?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.lg) {
-                if promotedOptionCount > 0, promotedOptionCount < options.count {
-                    titledOptionGroup(promotedTitle, Array(options.prefix(promotedOptionCount)))
-                    titledOptionGroup(remainingTitle, Array(options.dropFirst(promotedOptionCount)))
-                } else if separatesFirstOption, let first = options.first {
-                    optionRow(first, horizontalInset: SettingsLayout.rowVerticalInset)
-                        .settingsSurface(singleRow: true)
-                    optionGroup(Array(options.dropFirst()))
-                } else {
-                    optionGroup(options)
-                }
-            }
-            .settingsPagePadding()
+            optionGroup(options)
+                .settingsPagePadding()
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background, ignoresSafeAreaEdges: .all)
@@ -1182,25 +1177,7 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
         .settingsSurface()
     }
 
-    private func titledOptionGroup(
-        _ title: LocalizedStringKey?,
-        _ options: [SettingsSelectionOption<Value>]
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            if let title {
-                Text(title)
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .settingsSectionHeaderInset()
-            }
-            optionGroup(options)
-        }
-    }
-
-    private func optionRow(
-        _ option: SettingsSelectionOption<Value>,
-        horizontalInset: CGFloat = SettingsLayout.horizontalInset
-    ) -> some View {
+    private func optionRow(_ option: SettingsSelectionOption<Value>) -> some View {
         Button {
             selection = option.value
             dismiss()
@@ -1229,7 +1206,7 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
                         .foregroundStyle(Theme.Colors.primary)
                 }
             }
-            .padding(.horizontal, horizontalInset)
+            .padding(.horizontal, SettingsLayout.horizontalInset)
             .padding(.vertical, SettingsLayout.rowVerticalInset)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
