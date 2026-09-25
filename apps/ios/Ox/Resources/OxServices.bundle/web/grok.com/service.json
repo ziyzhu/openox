@@ -1,7 +1,7 @@
 {
   "domain": "grok.com",
   "name": "Grok",
-  "description": "Browse recent Grok conversations, read rendered messages, and send prompts with approval using your signed-in account.",
+  "description": "Search saved Grok conversations, browse recent history, read messages, and send prompts with approval.",
   "baseUrl": "https://grok.com/",
   "actions": [
     {
@@ -494,6 +494,64 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search saved chats using Grok search, up to 60 source-ranked matches. Native matching may not behave like substring search. More-result continuation is unverified and raises an explicit error; narrow the query. Read returned IDs with getCurrentConversation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/grok.com/favicon.png"
 }

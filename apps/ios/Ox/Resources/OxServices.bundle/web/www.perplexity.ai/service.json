@@ -1,7 +1,7 @@
 {
   "domain": "www.perplexity.ai",
   "name": "Perplexity",
-  "description": "An AI-powered answer engine. Ask web questions, review cited answers and place results, and browse your signed-in search history.",
+  "description": "Search saved sessions, ask cited questions, start and continue conversations, read history, and inspect the model catalog.",
   "baseUrl": "https://www.perplexity.ai/",
   "$defs": {
     "nullableString": {
@@ -303,7 +303,7 @@
     {
       "id": "getThread",
       "label": "Get search thread",
-      "description": "Gets answers, cited sources, related questions, and place results from a Perplexity search thread. Sign-in required.",
+      "description": "Gets answers, cited sources, related questions, and place results from a Perplexity search thread. Sign-in required. Repeated source cursors raise an error rather than returning duplicate pages.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -369,6 +369,522 @@
       },
       "requireApproval": false,
       "requireAuth": true
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get Perplexity account",
+      "description": "Returns basic signed-in account identity.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "email": {
+            "$ref": "#/$defs/nullableString"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listConversations",
+      "label": "List recent conversations",
+      "description": "Returns the recent 20-thread window only; older-history pagination is not supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/threadSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getConversation",
+      "label": "Get conversation",
+      "description": "Reads a saved thread with citations and source pagination. Repeated source cursors raise an error rather than returning duplicate pages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The thread identifier from recent searches."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The continuation value returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "updatedAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/answer"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "entries",
+          "nextCursor",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "openConversation",
+      "label": "Open conversation",
+      "description": "Opens a saved thread and returns its first entries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "updatedAt": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/answer"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "entries",
+          "nextCursor",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current conversation",
+      "description": "Reads up to 20 entries from the active thread; null on home.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "$ref": "#/$defs/nullableString"
+                  },
+                  "updatedAt": {
+                    "$ref": "#/$defs/nullableString"
+                  },
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/answer"
+                    }
+                  },
+                  "nextCursor": {
+                    "$ref": "#/$defs/nullableString"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "createdAt",
+                  "updatedAt",
+                  "entries",
+                  "nextCursor",
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List model catalog",
+      "description": "Lists search-model catalog entries; does not assert subscription availability or selected model.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "availability": {
+                  "type": "string",
+                  "enum": [
+                    "catalog-only"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "availability"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "chat",
+      "label": "Start Perplexity chat",
+      "description": "Sends one message in a new thread. Inspect unconfirmed outcomes before retrying. Preserves website privacy mode; incognito threads may not appear in history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "reply-available",
+              "pending",
+              "unconfirmed"
+            ]
+          },
+          "conversationId": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "url": {
+            "type": "string"
+          },
+          "entry": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/answer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversationId",
+          "url",
+          "entry"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue Perplexity chat",
+      "description": "Sends one follow-up in the specified saved thread. Inspect uncertain results before retrying. Limited to threads fitting the 20-entry read window.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "reply-available",
+              "pending",
+              "unconfirmed"
+            ]
+          },
+          "conversationId": {
+            "$ref": "#/$defs/nullableString"
+          },
+          "url": {
+            "type": "string"
+          },
+          "entry": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/answer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversationId",
+          "url",
+          "entry"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search saved sessions using the website command-palette search. Returns up to 10 mixed-type source matches filtered to chat threads, not a complete history scan. No source continuation is exposed. complete is always false; narrow the query. Read results with getConversation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ranked-typeahead"
+            ]
+          },
+          "complete": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "scope",
+          "complete"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/www.perplexity.ai/favicon.png"

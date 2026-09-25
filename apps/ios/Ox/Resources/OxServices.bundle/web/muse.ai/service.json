@@ -1,7 +1,7 @@
 {
   "domain": "muse.ai",
   "name": "Muse",
-  "description": "Chat with Meta’s personal AI agent and read the current conversation. Signed-in session required; sending messages requires approval.",
+  "description": "Search saved Muse chat-message excerpts, read the current conversation, and send messages with approval.",
   "baseUrl": "https://muse.ai/",
   "actions": [
     {
@@ -301,6 +301,78 @@
       },
       "requireAuth": true,
       "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search Muse native command-palette chat-message matches and return excerpts. This is a bounded native result set, not exhaustive history; no source continuation or reliable result opening is exposed. complete is always false. Preserves unsent drafts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "excerpt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "excerpt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "native-palette-chat-messages"
+            ]
+          },
+          "complete": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "scope",
+          "complete"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
       "blocking": true
     }
   ]

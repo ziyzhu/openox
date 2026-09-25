@@ -1,13 +1,13 @@
 {
-  "domain": "chat.z.ai",
-  "name": "Z.ai",
-  "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval.",
-  "baseUrl": "https://chat.z.ai/",
+  "domain": "chat.deepseek.com",
+  "name": "DeepSeek",
+  "description": "Search saved DeepSeek chats, read server-backed conversation history, reopen recent chats, and send text with approval.",
+  "baseUrl": "https://chat.deepseek.com/",
   "actions": [
     {
       "id": "getSignInUrl",
       "label": "Sign in",
-      "description": "Open Z.ai sign-in.",
+      "description": "Open DeepSeek sign-in.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -32,7 +32,7 @@
     {
       "id": "getSignInState",
       "label": "Check sign-in",
-      "description": "Check a fresh server session response.",
+      "description": "Check the server account using a fresh website-owned request.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -55,9 +55,9 @@
       "requireApproval": false
     },
     {
-      "id": "getCurrentUser",
-      "label": "Read account",
-      "description": "Read basic signed-in account information.",
+      "id": "getCurrentConversation",
+      "label": "Read current chat",
+      "description": "Read up to 100 currently rendered messages. Does not load older messages.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -67,159 +67,6 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "email"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "listModels",
-      "label": "List models",
-      "description": "List available Z.ai model identifiers and names.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "listConversations",
-      "label": "List saved chats",
-      "description": "Read one source page of saved chats. Continue until an empty terminal page.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "cursor": {
-            "type": "string",
-            "pattern": "^[1-9][0-9]{0,4}$"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "url": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "url"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false
-    },
-    {
-      "id": "getConversation",
-      "label": "Read saved chat",
-      "description": "Read the latest branch of a saved conversation, up to 100 messages; excludes reasoning blocks.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "conversationId": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "conversationId"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "conversationId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
           "url": {
             "type": "string"
           },
@@ -228,72 +75,60 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
                 "role": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
                 },
                 "text": {
                   "type": "string"
-                },
-                "done": {
-                  "type": "boolean"
                 }
               },
               "required": [
-                "id",
                 "role",
-                "text",
-                "done"
+                "text"
               ],
               "additionalProperties": false
             }
           },
-          "truncated": {
+          "renderedOnly": {
             "type": "boolean"
           }
         },
         "required": [
-          "conversationId",
-          "title",
           "url",
           "messages",
-          "truncated"
+          "renderedOnly"
         ],
         "additionalProperties": false
       },
       "requireAuth": true,
-      "requireApproval": false
+      "requireApproval": false,
+      "blocking": true
     },
     {
       "id": "openConversation",
-      "label": "Open saved chat",
-      "description": "Open a unique title from the loaded sidebar and read its latest server messages.",
+      "label": "Open recent chat",
+      "description": "Open an exact unique title from the loaded sidebar and read rendered messages. Older unlisted chats are unsupported.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "conversationId": {
+          "title": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
             "minLength": 1,
-            "maxLength": 100
+            "maxLength": 300
           }
         },
         "required": [
-          "conversationId"
+          "title"
         ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "conversationId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
           "url": {
             "type": "string"
           },
@@ -302,38 +137,32 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
                 "role": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
                 },
                 "text": {
                   "type": "string"
-                },
-                "done": {
-                  "type": "boolean"
                 }
               },
               "required": [
-                "id",
                 "role",
-                "text",
-                "done"
+                "text"
               ],
               "additionalProperties": false
             }
           },
-          "truncated": {
+          "renderedOnly": {
             "type": "boolean"
           }
         },
         "required": [
-          "conversationId",
-          "title",
           "url",
           "messages",
-          "truncated"
+          "renderedOnly"
         ],
         "additionalProperties": false
       },
@@ -344,7 +173,7 @@
     {
       "id": "chat",
       "label": "Start a chat",
-      "description": "Send one message in a new chat, preserving drafts. Confirm using fresh server messages; never retries.",
+      "description": "Send one message in a new DeepSeek conversation. Pending does not confirm submission; inspect before retrying.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -365,18 +194,14 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending",
               "accepted",
-              "completed"
+              "pending"
             ]
           },
           "submissionConfirmed": {
             "type": "boolean"
           },
           "url": {
-            "type": "string"
-          },
-          "conversationId": {
             "type": [
               "string",
               "null"
@@ -393,7 +218,6 @@
           "status",
           "submissionConfirmed",
           "url",
-          "conversationId",
           "reply"
         ],
         "additionalProperties": false
@@ -405,15 +229,14 @@
     {
       "id": "continueChat",
       "label": "Continue a chat",
-      "description": "Open a recent sidebar chat and send once. Confirm fresh server messages and return the latest reply.",
+      "description": "Open an exact unique loaded-sidebar title and send one follow-up. Pending does not confirm submission; never retry blindly.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "conversationId": {
+          "title": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+$",
             "minLength": 1,
-            "maxLength": 100
+            "maxLength": 300
           },
           "message": {
             "type": "string",
@@ -422,7 +245,7 @@
           }
         },
         "required": [
-          "conversationId",
+          "title",
           "message"
         ],
         "additionalProperties": false
@@ -433,18 +256,14 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending",
               "accepted",
-              "completed"
+              "pending"
             ]
           },
           "submissionConfirmed": {
             "type": "boolean"
           },
           "url": {
-            "type": "string"
-          },
-          "conversationId": {
             "type": [
               "string",
               "null"
@@ -461,7 +280,6 @@
           "status",
           "submissionConfirmed",
           "url",
-          "conversationId",
           "reply"
         ],
         "additionalProperties": false
@@ -473,7 +291,7 @@
     {
       "id": "searchConversations",
       "label": "Search saved chats",
-      "description": "Search conversation titles only across native default-history pages, not message content. Captures website-owned history reads without copying credentials. Continue the same query with the next source-page cursor; empty filtered pages may still have continuation. Session-local cache holds 20 pages and resets on reload. Further pages require native sidebar scrolling.",
+      "description": "Search saved message content through DeepSeek native search. Results are message-level hits and may repeat a conversation ID. Continue with the same query and exact source cursor. Partial timeout pages expose their continuation. Read returned conversation IDs with getConversation.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -484,7 +302,7 @@
           },
           "cursor": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*$"
+            "pattern": "^[0-9]+$"
           }
         },
         "required": [
@@ -508,12 +326,20 @@
                 },
                 "url": {
                   "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "excerpt": {
+                  "type": "string"
                 }
               },
               "required": [
                 "id",
                 "title",
-                "url"
+                "url",
+                "messageId",
+                "excerpt"
               ],
               "additionalProperties": false
             }
@@ -524,17 +350,88 @@
               "null"
             ]
           },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "default-history-titles"
-            ]
+          "partial": {
+            "type": "boolean"
           }
         },
         "required": [
           "items",
           "nextCursor",
-          "scope"
+          "partial"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getConversation",
+      "label": "Read saved conversation",
+      "description": "Read the latest 100 messages of the current server branch by ID, including older chats returned by search. Excludes reasoning fragments; does not navigate or send.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "url",
+          "messages",
+          "truncated"
         ],
         "additionalProperties": false
       },
@@ -543,5 +440,5 @@
       "blocking": true
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/chat.z.ai/favicon.png"
+  "faviconUrl": "https://openox.ai/assets/services/chat.deepseek.com/favicon.png"
 }

@@ -10,6 +10,7 @@ action('getSignInState',{async invoke(){return {signedIn:!!(await identity())};}
 action('getCurrentUser',{async invoke(){const u=await identity();if(!u)throw Error('Sign in to Qwen');return {id:u.id,name:String(u.name||''),email:String(u.email||'')};}});
 action('listModels',{async invoke(){const d=await request('/models/');if(!Array.isArray(d?.data))throw Error('Unexpected model catalog');return {items:d.data.map(x=>({id:String(x.id),name:String(x.name)})),nextCursor:null};}});
 action('listConversations',{async invoke(a){const page=Number(a.cursor||1);const items=await list(page);return {items:items.map(x=>({id:String(x.id),title:String(x.title||'')})),nextCursor:items.length?String(page+1):null};}});
+action('searchConversations',{async invoke({query,cursor='1'}){if(!query.trim())throw Error('Search query must not be blank');const page=Number(cursor);if(!Number.isSafeInteger(page)||page<1)throw Error('Invalid search cursor');const rows=await request('/chats/search',{text:query,page});if(!Array.isArray(rows)||rows.some(x=>typeof x.id!=='string'||typeof x.title!=='string'))throw Error('Unexpected Qwen search response');return {items:rows.map(x=>({id:x.id,title:x.title,url:'https://chat.qwen.ai/c/'+encodeURIComponent(x.id)})),nextCursor:rows.length?String(page+1):null};}});
 action('getConversation',{async invoke(a){return detail(a.conversationId);}});
 action('openConversation',{async invoke(a){return openTarget(a.conversationId);}});
 action('chat',{async invoke(a){return send(a.message,null);}});
