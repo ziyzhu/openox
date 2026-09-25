@@ -76,8 +76,8 @@ Related:
 1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
 1. Use `.agents/skills/promote-web-service` only after Ox has committed a verified Local service and the user explicitly requests promotion into the built-in repository.
 1. Build iOS only with `sim`, never `xcodebuild`.
-1. Before simulator testing, start one repository server and verify its `/health` endpoint.
-1. Each concurrent process must use its own numbered simulator and matching service, repository, and debug ports.
+1. Use bundled services for ordinary simulator testing. Start a repository server and verify its `/health` endpoint only when testing repository installation or sync.
+1. Each concurrent process must use its own numbered simulator and matching service and debug ports; reserve its repository port when that test uses a repository server.
 1. Reuse the fixed `ox-qa-1` through `ox-qa-5` simulator pool; do not allocate QA names beyond that pool.
 1. Run the QA simulator pool on an iOS 26 runtime. Check each selected simulator's runtime before testing; if iOS 26 is unavailable, install it before continuing. When replacing a pool device, retain the old simulator under a backup name until the replacement is verified.
 1. Rebuild and install after switching worktrees.

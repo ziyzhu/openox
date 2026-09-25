@@ -52,11 +52,6 @@
       </BuildableProductRunnable>
       <EnvironmentVariables>
          <EnvironmentVariable
-            key = "OX_SERVICES_ENDPOINT"
-            value = "http://localhost:8100/services.git"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
             key = "OX_DEBUG_ENDPOINT"
             value = "ws://127.0.0.1:9876"
             isEnabled = "YES">

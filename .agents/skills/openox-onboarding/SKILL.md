@@ -1,6 +1,6 @@
 ---
 name: openox-onboarding
-description: Set up a new OpenOx checkout for local development, including dependencies, CLI access, iOS simulator signing, repository service, and first launch. Use when a contributor asks to get OpenOx running or diagnose an initial setup failure.
+description: Set up a new OpenOx checkout for local development, including dependencies, CLI access, iOS simulator signing, bundled services, and first launch. Use when a contributor asks to get OpenOx running or diagnose an initial setup failure.
 ---
 
 # OpenOx onboarding
@@ -22,9 +22,9 @@ Help the contributor reach a verified working environment. First determine wheth
 
 ## First simulator run
 
-- Use an available iOS 26 `ox-qa-1` through `ox-qa-5` simulator. Check its runtime with `sim devices` before testing. Read `tooling/qa-config.ts` for its repository and debug ports. Keep QA names within the fixed pool; if replacing a device from another runtime, retain it under a backup name and verify the replacement before removing the backup. Rebuild and reinstall after switching worktrees.
-- Start one repository server with `ox repository serve examples/repository --port <registry-port>` and verify `curl -fsS http://127.0.0.1:<registry-port>/health` before launching the app.
-- Build, install, and launch with `sim --device <simulator> run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios --env OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:<debug-port> --force`.
+- Use an available iOS 26 `ox-qa-1` through `ox-qa-5` simulator. Check its runtime with `sim devices` before testing. Read `tooling/qa-config.ts` for its debug port and optional repository port. Keep QA names within the fixed pool; if replacing a device from another runtime, retain it under a backup name and verify the replacement before removing the backup. Rebuild and reinstall after switching worktrees.
+- Build, install, and launch bundled services with `sim --device <simulator> run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:<debug-port> --force`.
+- To test loading a local repository separately, start `ox repository serve examples/repository --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `--env OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git`.
 - Confirm the normal UI with `sim describe` or a screenshot, then use `ox discover` or the selected Host endpoint to check that the Host is available. If UI automation cannot start `idb_companion`, distinguish that from an app startup failure using the screenshot and logs. Keep diagnostics outside the repository.
 - Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
 

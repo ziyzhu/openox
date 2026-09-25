@@ -252,14 +252,15 @@ before being served; credentials are never embedded in the URL.
 The repository harness owns the complete iOS replay lifecycle:
 
 ```sh
-bun run test:services --repository /path/to/repository --device ox-qa-1
+bun run test:services --device ox-qa-1
+bun run test:services <domain>:<action>:<case> --device ox-qa-1
 bun run test:services <domain>:<action>:<case> \
-  --repository /path/to/repository \
-  --device ox-qa-1
+  --repository /path/to/repository --device ox-qa-1
 ```
 
-Replay runs production action code through the iOS Host while mitmproxy serves
-committed responses. Requests absent from the HAR are terminated locally. The
+Replay uses bundled services by default. Pass `--repository` to exercise loading
+a local repository through a simulator-specific loopback server. Production action
+code runs through the iOS Host while mitmproxy serves committed responses. Requests absent from the HAR are terminated locally. The
 CLI only replays reviewed fixtures; fixture creation happens through the Ox
 Host's service-management workflow.
 

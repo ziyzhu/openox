@@ -8,9 +8,8 @@ closes the session. Status does not refresh the idle timer.
 
 ## Simulator verification
 
-Start the repository server for the selected numbered simulator and verify
-`/health`, then build/install/launch with `sim` and matching repository/debug
-ports. Add Bluetooth from the Services picker. Inspect the ten action contracts
+Build, install, and launch with `sim` on the selected numbered simulator,
+using bundled services and its matching debug port. Add Bluetooth from the Services picker. Inspect the ten action contracts
 through `ox vm` and invoke `status`, `events`, and invalid input cases. Confirm
 that unavailable radio operations return an error without hanging or crashing.
 The simulator does not verify physical discovery, pairing, or GATT exchanges.

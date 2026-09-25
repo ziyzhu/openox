@@ -2,7 +2,7 @@
 
 Verify the `ios:photos` service can inspect authorized photos and organize them into a user album without deleting originals.
 
-Use one owned numbered QA simulator and its matching repository, service, and debug ports. Keep generated test media, screenshots, and logs outside the repository. Start one repository server, verify `/health`, rebuild and install Ox with `sim`, and use `ox` for Host inspection.
+Use one owned numbered QA simulator and its matching service and debug ports. Keep generated test media, screenshots, and logs outside the repository. Rebuild and install Ox with `sim`, use bundled services, and use `ox` for Host inspection.
 
 ## Setup
 

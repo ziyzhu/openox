@@ -13,7 +13,7 @@ const SCHEME = "ios";
 type Options = {
   device: string;
   selector?: string;
-  repository: string;
+  repository?: string;
 };
 
 type CommandOptions = {
@@ -96,9 +96,9 @@ async function waitForHttp(port: number): Promise<void> {
   throw new Error(`Registry health check timed out on port ${port}`);
 }
 
-async function waitForRegistry(endpoint: string, expectedDomain?: string): Promise<void> {
+async function waitForServices(endpoint: string, expectedDomain?: string): Promise<void> {
   const deadline = performance.now() + 60_000;
-  let detail = "registry is not ready";
+  let detail = "services are not ready";
   while (performance.now() < deadline) {
     if (interrupted) throw new Error(`Interrupted by ${interrupted}`);
     try {
@@ -113,12 +113,12 @@ async function waitForRegistry(endpoint: string, expectedDomain?: string): Promi
     } catch (error) { detail = (error as Error).message; }
     await Bun.sleep(100);
   }
-  throw new Error(`Registry did not become ready through ${endpoint}: ${detail}`);
+  throw new Error(`Services did not become ready through ${endpoint}: ${detail}`);
 }
 
 function parseOptions(args: string[]): Options {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log("Usage: bun run test:services [domain[:action[:case]]] --repository <repository> [--device ox-qa-N]");
+    console.log("Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-qa-N]");
     process.exit(0);
   }
   let selector: string | undefined;
@@ -141,7 +141,6 @@ function parseOptions(args: string[]): Options {
   }
   const device = qaNumberedDevice(args, Bun.env.OX_QA_DEVICE ?? targetedQaDevice);
   repository ??= Bun.env.OX_SERVER_ROOT ? resolve(Bun.env.OX_SERVER_ROOT) : undefined;
-  if (!repository) throw new Error("Pass --repository <repository> or set OX_SERVER_ROOT");
   return { device, selector, repository };
 }
 
@@ -191,35 +190,37 @@ const config = qaConfig(options.device);
 const release = claimDevice(config.device);
 let registry: ReturnType<typeof Bun.spawn> | undefined;
 let failed = false;
-const serverTemporary = mkdtempSync(join(tmpdir(), "openox-service-replay-"));
-const generatedRepository = join(serverTemporary, "repository");
+let serverTemporary: string | undefined;
 
 try {
   await Promise.all([
     requireFreePort(config.serviceProxyPort),
-    requireFreePort(config.registryPort),
+    ...(options.repository ? [requireFreePort(config.registryPort)] : []),
     requireFreePort(config.debugPort),
   ]);
   await ensureDevice(config.device);
-  console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, repository ${config.registryPort}, debug ${config.debugPort}`);
-  const builtinRepository = resolve(ROOT, "repositories/builtin");
-  if (options.repository === builtinRepository) {
-    await command(["bun", "packages/services/export.ts", "--output", generatedRepository, "--web-only"]);
-  } else {
-    await command(["bun", "run", "export", "--output", generatedRepository], { cwd: options.repository });
+  console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, services ${options.repository ? `repository ${config.registryPort}` : "bundled"}, debug ${config.debugPort}`);
+  if (options.repository) {
+    serverTemporary = mkdtempSync(join(tmpdir(), "openox-service-replay-"));
+    const generatedRepository = join(serverTemporary, "repository");
+    if (options.repository === resolve(ROOT, "repositories/builtin")) {
+      await command(["bun", "packages/services/export.ts", "--output", generatedRepository, "--web-only"]);
+    } else {
+      await command(["bun", "run", "export", "--output", generatedRepository], { cwd: options.repository });
+    }
+    registry = Bun.spawn({
+      cmd: ["bun", "apps/cli/src/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
+      cwd: ROOT,
+      env: Bun.env,
+      stdout: "inherit",
+      stderr: "ignore",
+    });
+    activeChildren.add(registry);
+    await Promise.race([
+      waitForHttp(config.registryPort),
+      registry.exited.then((code) => { throw new Error(`repository server exited ${code}`); }),
+    ]);
   }
-  registry = Bun.spawn({
-    cmd: ["bun", "apps/cli/src/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
-    cwd: ROOT,
-    env: Bun.env,
-    stdout: "inherit",
-    stderr: "ignore",
-  });
-  activeChildren.add(registry);
-  await Promise.race([
-    waitForHttp(config.registryPort),
-    registry.exited.then((code) => { throw new Error(`repository server exited ${code}`); }),
-  ]);
   await command(["sim", "devices", "boot", config.device]);
   await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
   await command([
@@ -235,16 +236,16 @@ try {
     "--configuration", "Debug",
     "--force",
     "--env", `OX_DEBUG_ENDPOINT=ws://127.0.0.1:${config.debugPort}`,
-    "--env", `OX_SERVICES_ENDPOINT=http://127.0.0.1:${config.registryPort}/repository.git`,
+    ...(options.repository ? ["--env", `OX_SERVICES_ENDPOINT=http://127.0.0.1:${config.registryPort}/repository.git`] : []),
     "--env", `OX_SERVICE_PROXY=http://127.0.0.1:${config.serviceProxyPort}`,
     "--disable-icloud",
   ]);
   const debugEndpoint = `ws://127.0.0.1:${config.debugPort}`;
-  await waitForRegistry(debugEndpoint, options.selector?.split(":")[0]);
+  await waitForServices(debugEndpoint, options.selector?.split(":")[0]);
   const environment = {
     OX_QA_DEVICE: config.device,
     OX_DEBUG_ENDPOINT: debugEndpoint,
-    OX_SERVER_SOURCE: join(options.repository, "web"),
+    OX_SERVER_SOURCE: join(options.repository ?? resolve(ROOT, "repositories/builtin"), "web"),
   };
   await command([
     "bun", "apps/cli/src/ox.ts",
@@ -266,6 +267,6 @@ try {
   }
   await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
   await command(["sim", "devices", "shutdown", config.device], { allowFailure: true });
-  rmSync(serverTemporary, { recursive: true, force: true });
+  if (serverTemporary) rmSync(serverTemporary, { recursive: true, force: true });
   release();
 }

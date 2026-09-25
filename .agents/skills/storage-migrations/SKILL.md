@@ -54,8 +54,8 @@ Add the smallest sanitized fixture and automated upgrade regression that would h
 
 Run this gate after every `StorageMigrator` change, including refactors and diagnostic-only edits:
 
-1. Start one repository server on the port assigned to a numbered QA simulator and verify `/health`.
-2. Force-build, install, and launch the DEBUG app on that simulator with matching repository and debug ports.
+1. Select a numbered QA simulator and use its assigned debug port.
+2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
 3. Run `bun run test:storage-migration` against the running app.
 4. Run `bun run typecheck` and the smallest domain-specific tests.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost prepared`.
@@ -63,9 +63,7 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 For `ox-qa-1`, the standard commands are:
 
 ```sh
-ox repository serve examples/repository --port 8101
-curl -fsS http://127.0.0.1:8101/health
-sim --device ox-qa-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_SERVICES_ENDPOINT=http://localhost:8101/repository.git --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
+sim --device ox-qa-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
 OX_HOST_ENDPOINT=ws://127.0.0.1:9101 bun run test:storage-migration
 bun run typecheck
 ```

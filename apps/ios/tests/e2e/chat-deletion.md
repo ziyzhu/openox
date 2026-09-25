@@ -1,8 +1,8 @@
 # Chat deletion approval
 
 Verify `ox.chat.delete({ id, purpose })` on a numbered QA simulator using only
-disposable chats in a local test Profile. Start the matching repository server,
-verify `/health`, and build, install, and launch with `sim`. Use `ox vm help
+disposable chats in a local test Profile. Build, install, and launch with `sim`
+using bundled services. Use `ox vm help
 ox.chat.delete` to verify the live contract. Keep screenshots and logs outside
 the repository. Record and restore any changed settings and Action policies.
 

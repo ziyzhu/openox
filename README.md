@@ -50,8 +50,8 @@ for Host connections, offline commands, and package-manager alternatives.
 ## Development setup
 
 For a new checkout, follow the [OpenOx onboarding skill](.agents/skills/openox-onboarding/SKILL.md).
-It covers local dependencies, iOS signing, the repository server, and a verified
-simulator launch.
+It covers local dependencies, iOS signing, bundled services, and a verified
+simulator launch. Local repository loading can be tested separately.
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 # Repository proposal personal access token
 
-Use an available numbered QA simulator with matching repository and debug ports.
-Start its repository server, verify `/health`, and build/install with `sim`.
+Use an available numbered QA simulator with its matching debug port.
+Build and install with `sim` using bundled services.
 Use a verified Local service created through the manage-services workflow and
 saved to a Local commit. Never author a service directly for this test.
 

@@ -132,6 +132,7 @@ implementation from the Client.
 Prefer the lifecycle-owning repository harness for replay:
 
 ```sh
+bun run test:services [<domain>:<action>:<case>] --device <numbered-qa-device>
 bun run test:services [<domain>:<action>:<case>] --repository <origin> --device <numbered-qa-device>
 ```
 
@@ -141,7 +142,8 @@ The direct command is intended for the lifecycle-owning harness:
 OX_QA_DEVICE=<device> OX_SERVER_SOURCE=<service-source>/web ox [--host <ws-url>] service test [<domain>:<action>:<case>] --proxy-port <port> [--allow-partial]
 ```
 
-Replay is fail-closed and must not permit unmatched traffic to reach the
+The first command tests bundled services; `--repository` separately tests loading
+a local repository over loopback. Replay is fail-closed and must not permit unmatched traffic to reach the
 network. Create or revise fixtures through the Host's service-management
 workflow, then run the repository harness for verification.
 

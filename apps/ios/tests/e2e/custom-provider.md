@@ -6,21 +6,18 @@ response and persistence across app relaunch. Do not modify repository source or
 use a paid external provider.
 
 Use the `sim-cli` and `ox-cli` skills. Work on the user-selected numbered QA
-simulator, or `ox-qa-1` when none was selected. Use the matching repository and
-debug ports from `tooling/qa-config.ts`. Keep screenshots, request journals,
+simulator, or `ox-qa-1` when none was selected. Use the matching debug port from `tooling/qa-config.ts`. Keep screenshots, request journals,
 temporary server code, and diagnostics in a new temporary directory outside the
 repository.
 
 ## Setup
 
 1. Confirm the simulator exists and is available.
-2. Start exactly one repository server for `repositories/builtin` and verify its
-   `/health` endpoint before launching the app.
-3. Create and start a temporary loopback HTTP server implementing the two OpenAI
+2. Create and start a temporary loopback HTTP server implementing the two OpenAI
    Chat Completions endpoints below. Use a harmless fixed test bearer value and
    never log its raw value.
-4. Build the iOS app with `sim`, install it fresh, mark onboarding complete, and
-   launch the DEBUG app with the matching repository and debug endpoints. Disable
+3. Build the iOS app with `sim`, install it fresh, mark onboarding complete, and
+   launch the DEBUG app with bundled services and the matching debug endpoint. Disable
    iCloud and the built-in mock LLM.
 
 The temporary provider must implement:
