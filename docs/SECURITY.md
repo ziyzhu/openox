@@ -154,11 +154,10 @@ MCP server by design. Hostname DNS rebinding protection remains deferred
 alongside the public-web limitation described above. Server-declared icons are
 untrusted: Ox accepts only bounded PNG or JPEG data, refuses redirects, and
 loads network icons only from the MCP endpoint's registrable domain.
-Web service icons follow the same bounded image and no-redirect rules. Built-in
-manifests retain verified public favicon URLs; existing OpenOx-hosted icons use
-`openox.ai` CloudFront URLs backed by a private S3 bucket. Icon requests use an
-ephemeral session without cookies or stored credentials. An external favicon
-host can observe the device's request for its image.
+Web service icons follow the same bounded image and no-redirect rules. The
+built-in manifests point to `openox.ai` CloudFront URLs backed by a private S3
+bucket, and icon requests use an ephemeral session without cookies or stored
+credentials.
 
 Location requests default to iOS reduced accuracy, and coordinates returned to
 the agent are additionally quantized. Nearby place search and route calculation

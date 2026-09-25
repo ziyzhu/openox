@@ -25,7 +25,7 @@ Read `service.json`, `actions.js`, Local Git status, and the exact saved Local r
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 
-The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve the verified `faviconUrl` with every behavioral manifest field. The build keeps that URL in the generated manifest. Existing built-in sources with `favicon.png` retain their public asset URL as a compatibility path. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
+The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. The built-in source stores the audited `favicon.png` and omits Local `faviconUrl` because the build assigns the public built-in asset URL. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
 An installed app's validator can lag behind the repository compiler. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and a new saved revision before re-exporting.
 
@@ -50,7 +50,9 @@ For page-owned DOM actions, do not retain a raw authenticated SPA capture when m
 
 ## Icon
 
-Preserve the Local manifest's verified public `faviconUrl`. Check that it still returns a direct HTTPS PNG or JPEG without redirects, authentication, or cookies, fits the app's 1 MiB download limit, remains recognizable at 20 px, and renders cleanly in the service avatar on light and dark backgrounds. Keep the authoring workflow's first-party or Google-fallback provenance. If the Local service has no verified icon, report that boundary; do not invent a URL or substitute a generic mark.
+Use the Local manifest's verified public `faviconUrl` as evidence. Fetch the official compact mark with `.agents/skills/promote-web-service/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/promote-web-service/scripts/favicon-audit.sh <path-to-favicon.png>`.
+
+Require an official square source that is at least 128×128, remains recognizable at 20 px, has an intentional background in the central safe area, and renders cleanly on light and dark backgrounds. Never upscale, reconstruct brand artwork, or accept a generic substitute.
 
 ## Verify and report
 
