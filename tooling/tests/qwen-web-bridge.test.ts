@@ -6,7 +6,7 @@ const source = readFileSync(
   "utf8",
 ).match(/private static let bridge = #"""([\s\S]*?)"""#/)?.[1];
 
-function session(chunks: string[], finalText = "Hello world", holdOpen = false, signedIn = true, authDelayMs = 0) {
+function session(chunks: string[], finalText = "Hello world", holdOpen = false, signedIn = true, authDelayMs = 0, finalDone = true) {
   if (!source) throw new Error("Qwen bridge source is missing");
   const events: Array<Record<string, unknown>> = [];
   let settled: (events: Array<Record<string, unknown>>) => void = () => {};
@@ -18,7 +18,7 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
   const request = async (path: string, options: Record<string, any>) => {
     if (path === "__markers__") return { success: false, data: { code: String(options["Accept-Language"] || options.responseType || options.baseURL) } };
     requests.push({ path, options });
-    if (path === "/auths/") {
+    if (path === authPath) {
       if (authDelayMs) await new Promise(resolve => setTimeout(resolve, authDelayMs));
       return signedIn
         ? { success: true, data: { userId: "user-1" } }
@@ -33,10 +33,12 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
       } });
       return { success: true, data: stream, isStream: true };
     }
-    if (path === "/chats/chat-1") return { success: true, data: { chat: { messages: [{ id: "response-1", role: "assistant", done: true, content: finalText }] } } };
+    if (path === "/chats/chat-1") return { success: true, data: { chat: { messages: [{ id: "response-1", role: "assistant", done: finalDone, content: finalText }] } } };
     if (path === "/chat/completions/stop") return { success: true, data: { status: true } };
     throw new Error(`Unexpected path ${path}`);
   };
+  const authPath = "/auths/";
+  const identity = async (_withToast: boolean) => request("/auths/", { baseURL: "/api/v1", toast: false });
   const store = Object.assign(() => {}, { getState: () => ({ selectedModelIds: ["qwen-model"] }) });
   const browser = globalThis as typeof globalThis & { window: any; document: any; __qwenImport: any };
   browser.window = { webkit: { messageHandlers: { oxQwenGeneration: { postMessage(value: Record<string, unknown>) {
@@ -45,7 +47,7 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
     if (value.type === "completed" || value.type === "failed") settled(events);
   } } } } };
   browser.document = { scripts: [{ src: "https://assets.alicdn.com/g/qwenweb/qwen-chat-fe/0.2.91/js/main.js" }] };
-  browser.__qwenImport = async () => ({ request, store });
+  browser.__qwenImport = async () => ({ request, dN: identity, store });
   new Function(source.replace("await import(script.src)", "await globalThis.__qwenImport(script.src)"))();
   browser.window.__oxQwenRun("generation-1", "test prompt");
   return { terminal, responseIdentified, closeStream: () => streamController?.close(), requests, browser };
@@ -62,12 +64,17 @@ test("Qwen bridge submits through the page client and confirms completion", asyn
   expect(requests.find(value => value.path === "/chat/completions")?.options.data.messages[0].content).toBe("test prompt");
 });
 
-test("Qwen bridge rejects EOF without a terminal event", async () => {
+test("Qwen bridge reconciles stream EOF with a completed server message", async () => {
   const { terminal } = session([created + delta]);
+  expect((await terminal).at(-1)?.type).toBe("completed");
+});
+
+test("Qwen bridge rejects EOF without server confirmation", async () => {
+  const { terminal } = session([created + delta], "Hello world", false, true, 0, false);
   const events = await terminal;
   expect(events.at(-1)?.type).toBe("failed");
   expect(events.some(event => event.type === "completed")).toBe(false);
-});
+}, 7000);
 
 test("Qwen bridge reports the website's logged-out response", async () => {
   const { terminal, requests, browser } = session([], "", false, false);

@@ -49,8 +49,6 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
             var assembler = StreamAssembler(model: model, continuation: continuation)
             var cursor = 0
             var text = ""
-            var emittedText = ""
-            var outputIsToolCall = false
             var terminal = false
 
             do {
@@ -67,34 +65,18 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
                         guard !terminal else { throw QwenWebsiteError("Qwen sent events after completion") }
                         switch event {
                         case .textSnapshot(let snapshot):
-                            guard snapshot.hasPrefix(text) || emittedText.isEmpty else {
-                                throw QwenWebsiteError("Qwen revised streamed output; final text was not accepted")
-                            }
                             text = snapshot
-                            if !outputIsToolCall && WebsiteToolContract.isPossibleCallPrefix(snapshot) {
-                                outputIsToolCall = snapshot.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(WebsiteToolContract.start)
-                                continue
-                            }
-                            if outputIsToolCall { continue }
-                            guard snapshot.hasPrefix(emittedText) else {
-                                throw QwenWebsiteError("Qwen revised streamed output; final text was not accepted")
-                            }
-                            let delta = String(snapshot.dropFirst(emittedText.count))
-                            emittedText = snapshot
-                            if !delta.isEmpty { assembler.textDelta(delta) }
                         case .completed:
                             terminal = true
                             await WebsiteAuthenticationCache.set(true, for: id)
-                            if !outputIsToolCall && emittedText.isEmpty && WebsiteToolContract.isPossibleCallPrefix(text) {
-                                throw QwenWebsiteError("Qwen returned an incomplete Ox Action call")
-                            }
-                            if outputIsToolCall {
+                            if WebsiteToolContract.isPossibleCallPrefix(text) {
                                 guard let call = try WebsiteToolContract.call(from: text, tools: tools) else {
                                     throw QwenWebsiteError("Qwen returned an invalid Ox Action call")
                                 }
                                 assembler.completeToolCall(call)
                                 assembler.finish(reason: .toolUse, label: id, lines: cursor)
                             } else {
+                                assembler.textDelta(text)
                                 assembler.finish(reason: .stop, label: id, lines: cursor)
                             }
                         case .failed(let message, let kind):
@@ -278,9 +260,9 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
               const script = [...document.scripts].find(value => value.src.includes('/qwen-chat-fe/') && value.src.endsWith('/js/main.js'));
               if (script) {
                 const module = await import(script.src);
-                const matches = Object.values(module).filter(value => typeof value === 'function' && String(value).includes('Accept-Language') && String(value).includes('responseType') && String(value).includes('baseURL'));
-                if (matches.length !== 1) throw new Error('Qwen request client changed');
-                return {module, request: matches[0]};
+                const requests = Object.values(module).filter(value => typeof value === 'function' && String(value).includes('Accept-Language') && String(value).includes('responseType') && String(value).includes('baseURL'));
+                if (requests.length !== 1 || typeof module.dN !== 'function' || !String(module.dN).includes('/auths/')) throw new Error('Qwen page client changed');
+                return {module, request: requests[0], identity: module.dN};
               }
               await pause(100);
             }
@@ -292,8 +274,8 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
             return result.data;
           };
           window.__oxQwenSignedIn = async () => {
-            const {request} = await client();
-            const result = await request('/auths/', {baseURL: '/api/v1', toast: false});
+            const {identity} = await client();
+            const result = await identity(false);
             if (result?.success === false && (result?.data?.code === 'Unauthorized' || result?.data?.message === '401 Unauthorized')) return false;
             if (result?.success === true && result.data) return true;
             throw new Error('Qwen sign-in status could not be verified: ' + String(result?.data?.code || result?.status || 'unknown response'));
@@ -329,6 +311,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let done = false;
+                const frameKeys = new Set();
                 while (!done) {
                   const next = await reader.read();
                   if (next.done) break;
@@ -341,6 +324,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                     if (data === '[DONE]') { done = true; break; }
                     if (!data) continue;
                     const frame = JSON.parse(data);
+                    for (const key of Object.keys(frame)) frameKeys.add(key);
                     if (frame.error) throw new Error(String(frame.error.message || frame.error));
                     const createdResponse = frame['response.created'];
                     if (createdResponse?.response_id) {
@@ -355,7 +339,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                     }
                   }
                 }
-                if (!done || !generation.responseId) throw new Error('Qwen stream ended without a terminal event or response ID');
+                if (!generation.responseId) throw new Error('Qwen stream ended without a response ID; frames=' + [...frameKeys].join(','));
                 let finalMessage;
                 for (let attempt = 0; attempt < 20; attempt++) {
                   const chat = await checked(request, '/chats/' + generation.chatId, {method: 'GET'});
@@ -364,7 +348,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                   if (finalMessage?.done === true) break;
                   await pause(250);
                 }
-                if (finalMessage?.done !== true) throw new Error('Qwen did not confirm completion');
+                if (finalMessage?.done !== true) throw new Error('Qwen did not confirm completion; streamTerminal=' + done + '; frames=' + [...frameKeys].join(','));
                 if (finalMessage.error) throw new Error('Qwen completed with an error');
                 const finalText = typeof finalMessage.content === 'string' && finalMessage.content ? finalMessage.content : (finalMessage.content_list || []).filter(value => value.phase === 'answer').map(value => value.content || '').join('\n');
                 if (typeof finalText !== 'string' || !finalText) throw new Error('Qwen completed without text');

@@ -50,9 +50,9 @@ nonisolated enum WebsiteToolContract {
             ])
         }
         return """
-        You may call only the Ox Actions listed below. When an Action is needed, respond with exactly one complete call and no other text:
+        Ox Actions are separate from this website's tools. Never invoke a website tool for an Ox Action. When an Action is needed, write this envelope as literal response text, with exactly one complete call and no other text:
         \(start){"name":"<listed name>","arguments":{}}\(end)
-        Use JSON arguments conforming to the listed schema. Ox executes the call and sends its result in the next turn. Do not claim an Action ran unless its result appears in the conversation. For a final answer, write ordinary text without these markers.
+        Use JSON arguments conforming to the listed schema. Start your response with the first < of the envelope and end it with the last >. Any introduction, explanation, or code fence makes the call invalid, so Ox will not execute it. Ox reads a valid envelope, executes the call, and sends its result in the next turn. Do not claim an Action ran unless its result appears in the conversation. For a final answer, write ordinary text without these markers.
         Available Ox Actions: \(JSONValue.array(available).jsonString(fallback: "[]"))
         """
     }
