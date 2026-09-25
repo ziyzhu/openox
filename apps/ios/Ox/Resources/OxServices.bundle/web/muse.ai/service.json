@@ -1,0 +1,307 @@
+{
+  "domain": "muse.ai",
+  "name": "Muse",
+  "description": "Chat with Meta’s personal AI agent and read the current conversation. Signed-in session required; sending messages requires approval.",
+  "baseUrl": "https://muse.ai/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Muse",
+      "description": "Open Muse to sign in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Muse sign-in",
+      "description": "Check the current server session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current conversation",
+      "description": "Read currently rendered messages, not full conversation history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rendered"
+            ]
+          },
+          "pending": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "url",
+          "messages",
+          "scope",
+          "pending"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "chat",
+      "label": "Chat with Muse",
+      "description": "Send one message in the current Muse conversation. Muse may take actions in response; this is not restricted to text generation. Never automatically retry an uncertain submission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submitted": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "replied",
+              "pending"
+            ]
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "rendered"
+                ]
+              },
+              "pending": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "url",
+              "messages",
+              "scope",
+              "pending"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "submitted",
+          "status",
+          "reply",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue Muse chat",
+      "description": "Send one message in the current Muse conversation. Muse may take actions in response; this is not restricted to text generation. Never automatically retry an uncertain submission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submitted": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "replied",
+              "pending"
+            ]
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "rendered"
+                ]
+              },
+              "pending": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "url",
+              "messages",
+              "scope",
+              "pending"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "submitted",
+          "status",
+          "reply",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    }
+  ]
+}

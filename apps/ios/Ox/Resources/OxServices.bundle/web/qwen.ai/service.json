@@ -1,0 +1,440 @@
+{
+  "domain": "qwen.ai",
+  "name": "Qwen",
+  "description": "Chat with Qwen, read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry.",
+  "baseUrl": "https://chat.qwen.ai/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in",
+      "description": "Open Qwen sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Check a fresh page-owned server identity response.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get account",
+      "description": "Read basic signed-in account information.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List models",
+      "description": "Read available catalog model names; not all are exposed in the picker.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listConversations",
+      "label": "List saved chats",
+      "description": "Read source-numbered pages. An empty page ends pagination.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,5}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "chat",
+      "label": "Start chat",
+      "description": "Start a new text chat and wait briefly for the reply. Never automatically retries an uncertain submission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "pending",
+              "uncertain"
+            ]
+          },
+          "conversation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/conversation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "getConversation",
+      "label": "Read conversation",
+      "description": "Read up to 100 messages from the server-returned history window.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/conversation"
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "openConversation",
+      "label": "Open saved chat",
+      "description": "Open an exact, uniquely titled chat from the loaded sidebar. Older unloaded chats are unsupported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/conversation"
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue chat",
+      "description": "Open the selected sidebar chat and send one message with fresh server confirmation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "conversationId",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionConfirmed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "pending",
+              "uncertain"
+            ]
+          },
+          "conversation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/conversation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "submissionConfirmed",
+          "status",
+          "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "selectModel",
+      "label": "Select model",
+      "description": "Choose a model available in the current website picker without sending a message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "selected": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    }
+  ],
+  "$defs": {
+    "conversation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "done": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "text",
+              "done"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hasEarlierMessages": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url",
+        "messages",
+        "hasEarlierMessages"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

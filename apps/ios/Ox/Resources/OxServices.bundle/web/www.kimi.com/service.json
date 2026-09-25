@@ -1,0 +1,553 @@
+{
+  "domain": "www.kimi.com",
+  "name": "Kimi",
+  "description": "Chat with Kimi, search and open saved conversations, read rendered messages, list model choices, and read basic account information.",
+  "baseUrl": "https://www.kimi.com/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in",
+      "description": "Open Kimi to sign in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Check a fresh server account response through Kimi’s page-owned request client. Unexpected responses throw.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get account",
+      "description": "Read your account identifier and display name from a fresh server response.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getInterfaceState",
+      "label": "Check interface readiness",
+      "description": "Read non-content readiness diagnostics; this is not a sign-in check.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "readyState": {
+            "type": "string"
+          },
+          "composer": {
+            "type": "boolean"
+          },
+          "modelPicker": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "readyState",
+          "composer",
+          "modelPicker"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listConversations",
+      "label": "List saved chats",
+      "description": "Read saved conversations with the source continuation cursor. Does not change chats.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search saved chats through Kimi. Continue with the same query, limit, and returned source cursor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "openConversation",
+      "label": "Open saved chat",
+      "description": "Verify and open a conversation ID returned by list or search. Does not send a message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current chat",
+      "description": "Read bounded rendered user and assistant messages, not the complete stored history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "renderedOnly": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url",
+          "messages",
+          "renderedOnly",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List model choices",
+      "description": "Read the model options currently exposed by Kimi’s picker.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "selected": {
+                  "type": "boolean"
+                },
+                "available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "selected",
+                "available"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "chat",
+      "label": "New chat",
+      "description": "Start a new Kimi conversation. Refuse to overwrite a draft. Send exactly once, then return response progress; never automatically retry an uncertain submission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "responding",
+              "submissionUnconfirmed"
+            ]
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url",
+          "response",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue current chat",
+      "description": "Send once in the current conversation with an exact returned conversationRef. Reject stale references and existing drafts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "conversationRef",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "responding",
+              "submissionUnconfirmed"
+            ]
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url",
+          "response",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    }
+  ]
+}
