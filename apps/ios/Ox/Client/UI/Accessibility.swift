@@ -180,6 +180,7 @@ nonisolated enum A11yID {
         static let temporaryEmpty = "chat.temporaryEmpty"
         static let persistedEmpty = "chat.persistedEmpty"
         static let newActions = "chat.newActions"
+        static let importMemory = "chat.importMemory"
         static let followIntent = "chat.followIntent"
         static let newActionsService = "chat.newActions.service"
         static let newActionsRequest = "chat.newActions.request"

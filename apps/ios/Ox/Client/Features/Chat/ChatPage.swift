@@ -1563,6 +1563,7 @@ struct ChatPage: View {
             isFieldFocused: composerFocused,
             sessionID: chat.id,
             isChatEmpty: isChatEmpty,
+            isTemporary: chat.isTemporary,
             isBusy: chat.isBusy,
             followIntents: chat.followIntents,
             floatsTopStrip: floatsTopStrip,

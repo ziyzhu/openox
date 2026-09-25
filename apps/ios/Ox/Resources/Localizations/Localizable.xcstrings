@@ -4865,6 +4865,16 @@
         }
       }
     },
+    "Import memory to Ox" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将记忆导入 Ox"
+          }
+        }
+      }
+    },
     "Import an artifact" : {
       "extractionState" : "manual",
       "localizations" : {

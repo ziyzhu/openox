@@ -19,6 +19,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
+│   │   ├── chat.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
 │   │   ├── speech.voice.identifier          read-aloud voice preference
 │   │   ├── storage.activeProfile            active profile UUID
 │   │   └── chatgpt.installationId           per-install Codex client ID
@@ -75,6 +76,7 @@ legacy bundle-derived identifiers.
 Primary owners:
 
 - UserDefaults onboarding state — owner: App.swift
+- UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
@@ -388,6 +390,12 @@ and HEAD intact. A clean historical checkout is normalized in purgeable
 legacy drafts defer migration with originals retained. Future versions fail closed.
 The existing `service-repositories` disk paths, configuration filename, and PAT
 Keychain account remain stable despite the product/API rename to Repository.
+
+The `2026-09-25-import-memory` Profile milestone reserves `import-memory` for a
+bundled system skill. An existing Profile skill with that name moves to
+`user-import-memory`, preserving its package resources and moving an explicit
+user source selection to the new name. An unequal destination collision stops
+the migration without replacing either package.
 
 `Application Support/scheduled-skills.json` is a version 2 device-owned document
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID

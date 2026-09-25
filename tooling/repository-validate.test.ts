@@ -80,6 +80,7 @@ test("a skill-only repository validates complete packages", async () => {
 
 test("repositories reject reserved and duplicate skill names", async () => {
   await expect(readRepository(skillRepository(["manage-skills"]))).rejects.toThrow();
+  await expect(readRepository(skillRepository(["import-memory"]))).rejects.toThrow();
   await expect(readRepository(skillRepository(["research", "research"]))).rejects.toThrow();
 });
 

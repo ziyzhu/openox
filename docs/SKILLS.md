@@ -35,6 +35,8 @@ All three use the same parser, catalog, resource mount, and invocation format.
 Discovery includes enabled repository skills before their services are attached.
 The agent sees names and descriptions, then reads `skills/<name>/SKILL.md` to
 activate a package. Instructions guide normal service discovery and attachment.
+The bundled `import-memory` skill guides a reviewed transfer of durable context
+from another AI app into the active Profile's `MEMORY.md`.
 
 Duplicate names require a source choice in the Skills library. Choices belong to
 the Profile, include user-versus-repository conflicts, and survive reloads. A

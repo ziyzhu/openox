@@ -4,8 +4,9 @@ import { ROOT } from "./lib.ts";
 
 const systemSkillsRoot = join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const expectedPackages = ["manage-artifacts", "manage-services", "manage-skills"];
+const expectedPackages = ["import-memory", "manage-artifacts", "manage-services", "manage-skills"];
 const expectedReferences = new Map([
+  ["import-memory", []],
   ["manage-artifacts", ["canvas.md", "note.md"]],
   ["manage-services", ["api-service.md", "helpers.js", "web-service.md"]],
   ["manage-skills", ["repository-skill.md", "user-skill.md"]],
@@ -65,11 +66,17 @@ export async function validateSystemSkills(): Promise<number> {
     }
     const referencesRoot = join(systemSkillsRoot, directory.name, "references");
     try {
-      const references = (await readdir(referencesRoot, { withFileTypes: true }))
+      const expected = expectedReferences.get(directory.name) ?? [];
+      const entries = expected.length === 0
+        ? await readdir(referencesRoot, { withFileTypes: true }).catch(error => {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+          throw error;
+        })
+        : await readdir(referencesRoot, { withFileTypes: true });
+      const references = entries
         .filter((entry) => entry.isFile())
         .map((entry) => entry.name)
         .sort((left, right) => left.localeCompare(right));
-      const expected = expectedReferences.get(directory.name) ?? [];
       if (JSON.stringify(references) !== JSON.stringify(expected)) {
         failures.push(`${directory.name}: expected references ${expected.join(", ")}; found ${references.join(", ")}`);
       }

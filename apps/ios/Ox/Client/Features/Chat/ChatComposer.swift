@@ -206,6 +206,23 @@ struct ChatComposer: View, Equatable {
         }
     }
 
+    private enum ComposerIntent: Identifiable {
+        case suggested(FollowIntent)
+        case importMemory
+
+        var id: String {
+            switch self {
+            case .suggested(let intent): "suggested:\(intent.id)"
+            case .importMemory: "importMemory"
+            }
+        }
+    }
+
+    private struct ImportMemoryOpportunity: Equatable {
+        let sessionID: UUID
+        let isEligible: Bool
+    }
+
     @Bindable var composer: ChatComposerModel
     let isEditingMessage: Bool
     @Binding var editDraft: AttributedString
@@ -216,6 +233,7 @@ struct ChatComposer: View, Equatable {
     let isFieldFocused: Bool
     let sessionID: UUID
     let isChatEmpty: Bool
+    let isTemporary: Bool
     let isBusy: Bool
     let followIntents: [FollowIntent]
     let floatsTopStrip: Bool
@@ -247,6 +265,8 @@ struct ChatComposer: View, Equatable {
     @State private var promptTemplate: PromptTemplate?
     @State private var promptPrimaryInput = ""
     @State private var promptSecondaryInput = ""
+    @State private var hasShownImportMemory = false
+    @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
 
     @Environment(\.appTheme) private var appTheme
 
@@ -260,6 +280,7 @@ struct ChatComposer: View, Equatable {
             && lhs.isFieldFocused == rhs.isFieldFocused
             && lhs.sessionID == rhs.sessionID
             && lhs.isChatEmpty == rhs.isChatEmpty
+            && lhs.isTemporary == rhs.isTemporary
             && lhs.isBusy == rhs.isBusy
             && lhs.followIntents == rhs.followIntents
             && lhs.floatsTopStrip == rhs.floatsTopStrip
@@ -313,6 +334,14 @@ struct ChatComposer: View, Equatable {
                 guard previous.first != "/", current.first == "/" else { return }
                 Skills.shared.refresh()
             }
+            .onChange(of: importMemoryOpportunity, initial: true) { previous, opportunity in
+                if previous.sessionID != opportunity.sessionID { hasShownImportMemory = false }
+                guard opportunity.isEligible, !hasShownImportMemory, importMemoryIntentDisplays < 3 else { return }
+                hasShownImportMemory = true
+                importMemoryIntentDisplays += 1
+                Log.ui.info("ChatComposer.importMemoryIntent shown chat=\(sessionID) display=\(importMemoryIntentDisplays)")
+            }
+            .onDisappear { hasShownImportMemory = false }
             .alert(promptTemplate?.title ?? "", isPresented: promptTemplatePresented) {
                 if let promptTemplate {
                     promptFields(promptTemplate)
@@ -504,12 +533,32 @@ struct ChatComposer: View, Equatable {
         !isEditingMessage
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
-            && (!followIntents.isEmpty
-                || isChatEmpty && !isBusy && attachedServices.isEmpty && chatArtifacts.isEmpty)
+            && (!followIntents.isEmpty || showsImportMemoryIntent)
     }
 
-    private var visibleFollowIntents: [FollowIntent] {
-        followIntents.isEmpty ? [.newActions, .newSkills] : followIntents
+    private var showsDefaultIntents: Bool {
+        followIntents.isEmpty
+            && !isEditingMessage
+            && composer.draft.isEmpty
+            && composer.draftAttachments.isEmpty
+            && isChatEmpty
+            && !isBusy
+            && attachedServices.isEmpty
+            && chatArtifacts.isEmpty
+    }
+
+    private var importMemoryOpportunity: ImportMemoryOpportunity {
+        ImportMemoryOpportunity(sessionID: sessionID, isEligible: showsDefaultIntents && !isTemporary)
+    }
+
+    private var showsImportMemoryIntent: Bool {
+        importMemoryOpportunity.isEligible
+            && (hasShownImportMemory || importMemoryIntentDisplays < 3)
+    }
+
+    private var visibleFollowIntents: [ComposerIntent] {
+        if !followIntents.isEmpty { return followIntents.map(ComposerIntent.suggested) }
+        return showsImportMemoryIntent ? [.importMemory] : []
     }
 
     private var promptTemplatePresented: Binding<Bool> {
@@ -542,17 +591,26 @@ struct ChatComposer: View, Equatable {
         }
     }
 
-    private func followIntentButton(_ intent: FollowIntent) -> some View {
+    private func followIntentButton(_ intent: ComposerIntent) -> some View {
         Button {
             switch intent {
-            case .send(_, let message):
-                fillDraft(message)
-                Log.ui.info("ChatComposer.followIntent fill chat=\(sessionID) chars=\(message.count)")
-            case .newActions, .newSkills:
-                let template: PromptTemplate = intent == .newActions ? .actions : .skills
-                resetPromptTemplate()
-                promptTemplate = template
-                Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
+            case .suggested(let suggestion):
+                switch suggestion {
+                case .send(_, let message):
+                    fillDraft(message)
+                    Log.ui.info("ChatComposer.followIntent fill chat=\(sessionID) chars=\(message.count)")
+                case .newActions, .newSkills:
+                    let template: PromptTemplate = suggestion == .newActions ? .actions : .skills
+                    resetPromptTemplate()
+                    promptTemplate = template
+                    Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
+                }
+            case .importMemory:
+                guard let skill = BuiltInSkills.skills.first(where: { $0.name == "import-memory" }) else {
+                    Log.ui.error("ChatComposer.importMemoryIntent missingSkill chat=\(sessionID)")
+                    return
+                }
+                onSubmitSkill(skill, "")
             }
         } label: {
             followIntentTitle(intent)
@@ -571,19 +629,27 @@ struct ChatComposer: View, Equatable {
         .accessibilityIdentifier(followIntentIdentifier(intent))
     }
 
-    private func followIntentTitle(_ intent: FollowIntent) -> Text {
+    private func followIntentTitle(_ intent: ComposerIntent) -> Text {
         switch intent {
-        case .send(let label, _): Text(verbatim: label)
-        case .newActions: Text("Add new actions")
-        case .newSkills: Text("Add new skills")
+        case .suggested(let suggestion):
+            switch suggestion {
+            case .send(let label, _): Text(verbatim: label)
+            case .newActions: Text("Add new actions")
+            case .newSkills: Text("Add new skills")
+            }
+        case .importMemory: Text("Import memory to Ox")
         }
     }
 
-    private func followIntentIdentifier(_ intent: FollowIntent) -> String {
+    private func followIntentIdentifier(_ intent: ComposerIntent) -> String {
         switch intent {
-        case .send: A11yID.Chat.followIntent
-        case .newActions: A11yID.Chat.newActions
-        case .newSkills: A11yID.Chat.newSkills
+        case .suggested(let suggestion):
+            switch suggestion {
+            case .send: A11yID.Chat.followIntent
+            case .newActions: A11yID.Chat.newActions
+            case .newSkills: A11yID.Chat.newSkills
+            }
+        case .importMemory: A11yID.Chat.importMemory
         }
     }
 

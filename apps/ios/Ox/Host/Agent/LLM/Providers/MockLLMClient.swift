@@ -1509,7 +1509,7 @@ extension Scenario {
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = ["manage-artifacts", "manage-services", "manage-skills"].allSatisfy {
+        let hasStableSystemSkills = ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].allSatisfy {
             ctx.transientContext.contains("skills/\($0)/SKILL.md") && !ctx.systemPrompt.contains("- `skills/\($0)/SKILL.md` —")
         }
         let hasTimestamp = ctx.serializedUserText
