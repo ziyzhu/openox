@@ -1,0 +1,603 @@
+{
+  "domain": "chatgpt.com",
+  "name": "ChatGPT",
+  "description": "Chat with ChatGPT, search saved conversations, open and continue chats, read rendered messages, inspect models, and access account information.",
+  "baseUrl": "https://chatgpt.com/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in",
+      "description": "Open ChatGPT sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Check the current server session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get account",
+      "description": "Return basic information for the signed-in account.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "chat",
+      "label": "New chat",
+      "description": "Start a fresh guest or signed-in conversation. Sending requires approval.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string"
+          },
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "response",
+          "conversationRef",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": true,
+      "baseUrl": "https://chatgpt.com/",
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue current chat",
+      "description": "Send a follow-up in the currently loaded conversation. Use its returned conversationRef; stale references are rejected.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "conversationRef",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string"
+          },
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "response",
+          "conversationRef",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current chat",
+      "description": "Read bounded rendered messages in the currently loaded chat, not the complete saved history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "renderedOnly": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url",
+          "messages",
+          "renderedOnly",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List available models",
+      "description": "Read choices exposed by the current model picker; this does not return an API model catalog.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "selected": {
+                  "type": "boolean"
+                },
+                "available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "selected",
+                "available"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "selectModel",
+      "label": "Select model",
+      "description": "Choose an available model by its exact returned name. Does not purchase or unlock models.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "openConversation",
+      "label": "Open recent chat",
+      "description": "Open a uniquely titled chat from the loaded sidebar. Older chats outside the loaded sidebar are not supported.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "conversationRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "conversationRef"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search via ChatGPT’s website. Returns conversation matches only from each source-sized global search page; empty filtered pages can still have a next cursor. Continue with the exact query and nextCursor on this service page. Results reflect the current search session, which resets on reload.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "snippet",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partialResults": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "partialResults"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openSearchConversation",
+      "label": "Open search result",
+      "description": "Open a conversation ID returned by the current search session. The result must still be loaded in the search panel.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "conversationRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "conversationRef"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getInterfaceState",
+      "label": "Check interface readiness",
+      "description": "Return non-content UI readiness diagnostics. Startup placeholder editors do not count as a ready composer.",
+      "requireAuth": false,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "readyState": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "composer": {
+            "type": "boolean"
+          },
+          "dialogs": {
+            "type": "integer"
+          },
+          "inputs": {
+            "type": "integer"
+          },
+          "viewport": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "visible": {
+                  "type": "boolean"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "expanded": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "visible",
+                "disabled",
+                "expanded"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "composerKind": {
+            "type": "string"
+          },
+          "composerControls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modelCandidates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "readyState",
+          "visibility",
+          "focused",
+          "composer",
+          "dialogs",
+          "inputs",
+          "viewport",
+          "controls",
+          "composerKind",
+          "composerControls",
+          "modelCandidates"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

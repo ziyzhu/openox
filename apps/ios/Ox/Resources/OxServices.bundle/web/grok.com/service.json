@@ -1,0 +1,499 @@
+{
+  "domain": "grok.com",
+  "name": "Grok",
+  "description": "Browse recent Grok conversations, read rendered messages, and send prompts with approval using your signed-in account.",
+  "baseUrl": "https://grok.com/",
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Get sign-in URL",
+      "description": "Open Grok sign-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Check the current server session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "listConversations",
+      "label": "List conversations",
+      "description": "Read up to 60 recent conversations. Further pagination is not yet supported; nextCursor indicates additional results.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 20
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "createTime": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "modifyTime": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "conversationId",
+                "title",
+                "url",
+                "createTime",
+                "modifyTime"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "openConversation",
+      "label": "Open conversation",
+      "description": "Open an exact conversation from the loaded sidebar; older unrendered conversations are not supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-zA-Z0-9-]+$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "rendered"
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "getCurrentConversation",
+      "label": "Read current conversation",
+      "description": "Read a conversation by ID directly from Grok, without waiting for the sidebar. Returns message text and complete or pending status. Up to 200 messages; branched histories are not supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-zA-Z0-9-]+$"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "chat",
+      "label": "Start chat",
+      "description": "Send one prompt in a new Grok conversation using its native form. Requires approval and preserves existing drafts. Accepted confirms a fresh matching user message and conversation ID, not a completed reply. Read the conversation separately for the response. Never retry an uncertain result automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30000
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "uncertain"
+            ]
+          },
+          "submissionConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "status",
+          "submissionConfirmed"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "continueChat",
+      "label": "Continue chat",
+      "description": "Reopen the requested sidebar conversation and send one prompt using its native form. Requires approval and preserves existing drafts. Accepted confirms a fresh matching user message and conversation ID, not a completed reply. Read the conversation separately for the response. Never retry an uncertain result automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-zA-Z0-9-]+$"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30000
+          }
+        },
+        "required": [
+          "conversationId",
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "uncertain"
+            ]
+          },
+          "submissionConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationId",
+          "url",
+          "messages",
+          "status",
+          "submissionConfirmed"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "getInterfaceState",
+      "label": "Check chat readiness",
+      "description": "Read bounded editor and submission readiness without exposing draft text or sending messages.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "editorPresent": {
+            "type": "boolean"
+          },
+          "domLength": {
+            "type": "integer"
+          },
+          "stateLength": {
+            "type": "integer"
+          },
+          "testDraftMatches": {
+            "type": "boolean"
+          },
+          "messageCount": {
+            "type": "integer"
+          },
+          "submitPresent": {
+            "type": "boolean"
+          },
+          "submitDisabled": {
+            "type": "boolean"
+          },
+          "sidebarIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "editorPresent",
+          "domLength",
+          "stateLength",
+          "testDraftMatches",
+          "messageCount",
+          "submitPresent",
+          "submitDisabled"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
