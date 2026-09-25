@@ -259,6 +259,9 @@ private struct ServicePickerPanel: View {
             let rSaved = saved.contains(rhs.element.service.domain)
             if lSaved != rSaved { return lSaved }
             if trimmed.isEmpty {
+                let lhsRank = ServiceListOrder.rank(lhs.element.service.domain)
+                let rhsRank = ServiceListOrder.rank(rhs.element.service.domain)
+                if lhsRank != rhsRank { return lhsRank < rhsRank }
                 let order = lhs.element.service.title.localizedCaseInsensitiveCompare(rhs.element.service.title)
                 if order != .orderedSame { return order == .orderedAscending }
             }
