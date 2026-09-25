@@ -3,6 +3,7 @@
   "name": "Qwen",
   "description": "Chat with Qwen, search and read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry.",
   "baseUrl": "https://chat.qwen.ai/",
+  "faviconUrl": "https://assets.alicdn.com/g/qwenweb/qwen-chat-fe/0.3.11/static/images/ms-icon-light-150x150.png",
   "actions": [
     {
       "id": "getSignInUrl",

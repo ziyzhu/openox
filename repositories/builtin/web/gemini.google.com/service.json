@@ -3,6 +3,7 @@
   "name": "Gemini",
   "description": "Search saved Gemini chats, open search results and recent conversations, read messages, and chat with approval.",
   "baseUrl": "https://gemini.google.com/app",
+  "faviconUrl": "https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png",
   "actions": [
     {
       "id": "getSignInUrl",

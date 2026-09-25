@@ -3,6 +3,7 @@
   "name": "Doubao",
   "description": "Search saved message content, read rendered chats, reopen recent Doubao conversations, and send with approval. Search continuation and title-only matching are not supported.",
   "baseUrl": "https://www.doubao.com/chat/",
+  "faviconUrl": "https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/favicon/new-doubao/180x180.png",
   "actions": [
     {
       "id": "getSignInUrl",

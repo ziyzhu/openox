@@ -3,6 +3,7 @@
   "name": "Perplexity",
   "description": "Search saved sessions, ask cited questions, start and continue conversations, read history, and inspect the model catalog.",
   "baseUrl": "https://www.perplexity.ai/",
+  "faviconUrl": "https://www.perplexity.ai/apple-touch-icon.png",
   "$defs": {
     "nullableString": {
       "oneOf": [

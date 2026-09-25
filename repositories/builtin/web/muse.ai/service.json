@@ -3,6 +3,7 @@
   "name": "Muse",
   "description": "Search saved Muse chat-message excerpts, read the current conversation, and send messages with approval.",
   "baseUrl": "https://muse.ai/",
+  "faviconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://muse.ai&size=128",
   "actions": [
     {
       "id": "getSignInUrl",

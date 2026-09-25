@@ -3,6 +3,7 @@
   "name": "Kimi",
   "description": "Chat with Kimi, search and open saved conversations, read rendered messages, list model choices, and read basic account information.",
   "baseUrl": "https://www.kimi.com/",
+  "faviconUrl": "https://www.kimi.com/pwa-192.png",
   "actions": [
     {
       "id": "getSignInUrl",

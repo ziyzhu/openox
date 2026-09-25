@@ -3,6 +3,7 @@
   "name": "Grok",
   "description": "Search saved Grok conversations, browse recent history, read messages, and send prompts with approval.",
   "baseUrl": "https://grok.com/",
+  "faviconUrl": "https://grok.com/images/apple-touch-icon.png",
   "actions": [
     {
       "id": "getSignInUrl",
