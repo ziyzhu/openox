@@ -28,10 +28,11 @@ nonisolated enum ProviderClientFactory {
         switch definition.api {
         case .web:
             try validateAdapter(definition)
-            guard definition.id == "kimi-web" else {
-                throw RuntimeError.bridge("Unsupported web provider")
+            switch definition.id {
+            case "kimi-web": native = KimiWebsiteProvider(models: models)
+            case "qwen-web": native = QwenWebsiteProvider(models: models)
+            default: throw RuntimeError.bridge("Unsupported web provider")
             }
-            native = KimiWebsiteProvider(models: models)
         case .openAIChatCompletions:
             let auth: any OpenAIChatTransportAuth
             if definition.auth.kind == .custom { auth = try customChatAuth(definition) }
@@ -95,13 +96,18 @@ nonisolated enum ProviderClientFactory {
 
     static func validateAdapter(_ definition: ProviderDefinition) throws {
         if definition.api == .web {
-            guard definition.id == "kimi-web",
-                  definition.url == URL(string: "https://www.kimi.com/")!,
+            let registeredURL: URL? = switch definition.id {
+            case "kimi-web": URL(string: "https://www.kimi.com/")!
+            case "qwen-web": URL(string: "https://chat.qwen.ai/")!
+            default: nil
+            }
+            guard let registeredURL,
+                  definition.url == registeredURL,
                   definition.auth.kind == .custom,
-                  definition.auth.adapter == "kimi-web",
+                  definition.auth.adapter == definition.id,
                   definition.models.map(\.id) == ["website-default"],
                   definition.options == nil else {
-                throw RuntimeError.bridge("Invalid Kimi website provider configuration")
+                throw RuntimeError.bridge("Invalid website provider configuration")
             }
             return
         }

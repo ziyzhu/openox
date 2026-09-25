@@ -84,6 +84,7 @@ nonisolated struct KimiWebsiteProvider: ProviderClient {
                             if !delta.isEmpty { assembler.textDelta(delta) }
                         case .completed:
                             terminal = true
+                            await WebsiteAuthenticationCache.set(true, for: id)
                             if !outputIsToolCall && emittedText.isEmpty && WebsiteToolContract.isPossibleCallPrefix(text) {
                                 throw KimiWebsiteError("Kimi returned an incomplete Ox Action call")
                             }
@@ -102,6 +103,9 @@ nonisolated struct KimiWebsiteProvider: ProviderClient {
                     }
                 }
             } catch {
+                if !(error is CancellationError) {
+                    await WebsiteAuthenticationCache.invalidate(id)
+                }
                 let cancelled = await KimiWebGenerationSession.shared.cancel(generationID)
                 Log.agent.info("KimiWebsite.cancel generation=\(generationID) confirmed=\(cancelled)")
                 throw error
@@ -167,6 +171,7 @@ private final class KimiWebGenerationSession: NSObject, WKScriptMessageHandler {
             return id
         } catch {
             generations.removeValue(forKey: id)
+            WebsiteAuthenticationCache.invalidate("kimi-web")
             Log.agent.error("KimiWeb.start failed generation=\(id) error=\(error.localizedDescription)")
             throw KimiWebsiteError("Kimi website request could not start: \(error.localizedDescription)")
         }

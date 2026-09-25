@@ -4,6 +4,7 @@ struct ProviderAuthenticationView: View {
     private struct WebsiteSignIn: Identifiable {
         let id = UUID()
         let session: ServiceBrowserSession
+        let dismissWhenAuthenticated: Bool
     }
 
     private enum AuthenticationMethod {
@@ -92,7 +93,12 @@ struct ProviderAuthenticationView: View {
                     websiteAuthenticationStatusRow
                     Button {
                         let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
-                        websiteSignIn = WebsiteSignIn(session: session)
+                        WebsiteAuthenticationCache.invalidate(client.id)
+                        websiteSignIn = WebsiteSignIn(
+                            session: session,
+                            dismissWhenAuthenticated: websiteAuthenticationStatus != .signedIn
+                        )
+                        websiteAuthenticationRevision &+= 1
                     } label: {
                         SettingsActionButtonLabel {
                             if websiteAuthenticationStatus == .signedIn {
@@ -127,14 +133,21 @@ struct ProviderAuthenticationView: View {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
         }
         .task(id: websiteAuthenticationRevision) {
-            guard client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web else { return }
+            guard client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web,
+                  websiteSignIn == nil else { return }
+            if let cached = WebsiteAuthenticationCache.status(for: client.id) {
+                websiteAuthenticationStatus = cached ? .signedIn : .signedOut
+                return
+            }
             websiteAuthenticationStatus = .checking
+            let revision = websiteAuthenticationRevision
             do {
                 let signedIn = try await client.websiteSessionIsAuthenticated()
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
+                if let signedIn { WebsiteAuthenticationCache.set(signedIn, for: client.id) }
                 websiteAuthenticationStatus = signedIn == true ? .signedIn : .signedOut
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
                 websiteAuthenticationStatus = .unavailable
                 Log.ui.warning("ProviderAuthentication.websiteStatus client=\(client.id) error=\(LogPrivacy.text(error.localizedDescription))")
             }
@@ -143,6 +156,28 @@ struct ProviderAuthenticationView: View {
             websiteAuthenticationRevision &+= 1
         }) { signIn in
             ServiceBrowserView(session: signIn.session, reservesWebsiteSpace: true)
+                .task { await monitorWebsiteAuthentication(for: signIn) }
+        }
+    }
+
+    private func monitorWebsiteAuthentication(for signIn: WebsiteSignIn) async {
+        guard signIn.dismissWhenAuthenticated else { return }
+        while !Task.isCancelled {
+            do {
+                if try await client.websiteSessionIsAuthenticated() == true {
+                    guard !Task.isCancelled, websiteSignIn?.id == signIn.id else { return }
+                    WebsiteAuthenticationCache.set(true, for: client.id)
+                    websiteAuthenticationStatus = .signedIn
+                    websiteSignIn = nil
+                    Log.ui.info("ProviderAuthentication.websiteSignedIn client=\(client.id)")
+                    return
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                Log.ui.warning("ProviderAuthentication.websiteSignInCheck client=\(client.id) error=\(LogPrivacy.text(error.localizedDescription))")
+            }
+            try? await Task.sleep(for: .seconds(5))
         }
     }
 

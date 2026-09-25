@@ -1,5 +1,20 @@
 import Foundation
 
+@MainActor
+enum WebsiteAuthenticationCache {
+    private static var states: [String: Bool] = [:]
+
+    static func status(for providerID: String) -> Bool? { states[providerID] }
+
+    static func set(_ signedIn: Bool, for providerID: String) {
+        states[providerID] = signedIn
+    }
+
+    static func invalidate(_ providerID: String) {
+        states.removeValue(forKey: providerID)
+    }
+}
+
 nonisolated struct WebsiteProviderError: ProviderClientError {
     let message: String
     let failureKind: LLMFailureKind

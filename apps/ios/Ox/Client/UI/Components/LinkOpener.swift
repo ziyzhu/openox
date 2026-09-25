@@ -60,25 +60,12 @@ struct ServiceBrowserView: View {
         Group {
             if reservesWebsiteSpace {
                 VStack(spacing: 0) {
-                    ZStack {
-                        Text(title)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .padding(.horizontal, 80)
-                        HStack {
-                            Spacer()
-                            Button { dismiss() } label: {
-                                Text("Done")
-                                    .frame(minWidth: 64, minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .accessibilityIdentifier(A11yID.ServiceBrowser.done)
-                        }
-                        .padding(.horizontal, Theme.Spacing.md)
-                    }
-                    .frame(height: 56)
-                    .frame(maxWidth: .infinity)
-                    .background(Theme.Colors.surface)
+                    Text(title)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .frame(height: 56)
+                        .frame(maxWidth: .infinity)
+                        .background(Theme.Colors.surface)
                     browser
                 }
             } else {
