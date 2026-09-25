@@ -13,15 +13,16 @@ async function client() {
   return c.http.http;
 }
 async function identity(){
-  const c=await client();
-  let timer;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
   try {
-    const r=await Promise.race([c.get('/api/v0/users/current'),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
-    const j=r.json;
+    const r = await fetch('/api/v0/users/current', {credentials:'include',cache:'no-store',signal:controller.signal});
+    if(r.redirected) throw new Error('Unexpected DeepSeek identity redirect');
+    let j; try { j = await r.json(); } catch { throw new Error('Invalid DeepSeek identity response'); }
     if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
     if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};
-    throw new Error('Unrecognized DeepSeek identity response');
-  }finally{clearTimeout(timer);}
+    throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
+  } finally { clearTimeout(timer); }
 }
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}
 function messages(){return Array.from(document.querySelectorAll('.ds-message')).slice(-100).flatMap(e=>{const a=e.querySelector('.ds-assistant-message-main-content');const user=e.classList.contains('d29f3d7d');if(!a&&!user)return [];return [{role:a?'assistant':'user',text:((a||e).innerText||(a||e).textContent||'').trim()}];}).filter(m=>m.text);}
