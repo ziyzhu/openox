@@ -1180,38 +1180,13 @@ struct ChatPage: View {
         _ block: ChatBlock,
         identified: Bool = true
     ) -> some View {
-        let view = chatBlockHost(block)
-        let enters = block.sourceBlockID == chat.transcript.last?.id
-            && Date().timeIntervalSince(block.createdAt) < 2
-            && !block.isUserInitiated
-            && !block.isResponseFooter
-        let row = view
-        .padding(.top, block.spacingBefore)
-        .modifier(RowEntrance(enabled: enters && !block.isPendingThinking))
+        let row = chatBlockHost(block)
+            .padding(.top, block.spacingBefore)
 
         if identified {
             row.id(block.id)
         } else {
             row
-        }
-    }
-
-    private struct RowEntrance: ViewModifier {
-        let enabled: Bool
-        @State private var entered: Bool
-
-        init(enabled: Bool) {
-            self.enabled = enabled
-            _entered = State(initialValue: !enabled)
-        }
-
-        func body(content: Content) -> some View {
-            content
-                .opacity(!enabled || entered ? 1 : 0)
-                .onAppear {
-                    guard enabled, !entered else { return }
-                    withAnimation(Theme.Animation.entrance) { entered = true }
-                }
         }
     }
 
