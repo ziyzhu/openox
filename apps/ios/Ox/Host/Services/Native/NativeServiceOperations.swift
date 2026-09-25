@@ -59,7 +59,6 @@ final class NativeServiceOperations {
             if actionID != "status" { try requireActive() }
             return try await bluetooth.invoke(actionID, fields: args.objectValue ?? [:])
         }
-        if serviceID == "ios:browser" { try requireActive() }
         let fields = args.objectValue ?? [:]
         switch (serviceID, actionID) {
         case ("ios:browser", "navigate"):

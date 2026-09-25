@@ -327,13 +327,31 @@ final class Chat: Identifiable {
     private(set) var isTranscriptVisible = false
     private(set) var hasUnreadResponse = false
     @ObservationIgnored private var servicesAttached = false
+    @ObservationIgnored private var browserURLToRestore: URL?
+    @ObservationIgnored private var browserRestoreTask: Task<Void, Never>?
 
     func select() {
         guard !isSelected else { return }
         isSelected = true
+        Log.session.info("Chat.selection id=\(id) selected=true busy=\(isBusy)")
         outputDelivery.setVisibility(.visible)
         if outputDelivery.needsFrames { startStreamLink() }
         scheduleModelPreparation()
+        if let browserURLToRestore,
+           !isBusy,
+           serviceManager.browserActionSessions.existingSession(for: id)?.webPage == nil {
+            browserRestoreTask = Task { [weak self] in
+                guard let self, isSelected else { return }
+                let session = serviceManager.browserActionSessions.session(
+                    for: serviceManager.browserService,
+                    ownerID: id
+                )
+                let restored = try? await session.navigate(browserURLToRestore)
+                if restored == nil {
+                    Log.webView.warning("Chat.browser restore failed id=\(id) host=\(browserURLToRestore.host ?? "?")")
+                }
+            }
+        }
     }
 
     func setTranscriptVisible(_ visible: Bool) {
@@ -347,8 +365,12 @@ final class Chat: Identifiable {
     func deselect() {
         guard isSelected else { return }
         isSelected = false
+        Log.session.info("Chat.selection id=\(id) selected=false busy=\(isBusy)")
         setTranscriptVisible(false)
-        serviceManager.browserActionSessions.closeSession(for: id)
+        browserRestoreTask?.cancel()
+        browserRestoreTask = nil
+        browserURLToRestore = serviceManager.browserActionSessions.existingSession(for: id)?.webPage?.url
+            ?? browserURLToRestore
         bluetooth.close()
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
@@ -365,6 +387,7 @@ final class Chat: Identifiable {
         modelPreparationTask?.cancel()
         modelPreparationTask = nil
         deselect()
+        serviceManager.browserActionSessions.closeSession(for: id)
         if cancelling { cancelAll() }
         detach()
     }
