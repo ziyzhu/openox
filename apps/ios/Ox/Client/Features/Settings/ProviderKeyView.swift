@@ -1,15 +1,28 @@
 import SwiftUI
 
 struct ProviderAuthenticationView: View {
+    private struct WebsiteSignIn: Identifiable {
+        let id = UUID()
+        let session: ServiceBrowserSession
+    }
+
     private enum AuthenticationMethod {
         case apiKey
         case subscription
+    }
+
+    private enum WebsiteAuthenticationStatus {
+        case checking
+        case signedIn
+        case signedOut
+        case unavailable
     }
 
     let client: any ProviderClient
     @Binding var apiKey: String
     let onChange: () -> Void
     var onAuthenticated: (() -> Void)? = nil
+    @Environment(ServiceManager.self) private var serviceManager
 
     @State private var authenticationMethod: AuthenticationMethod
     @State private var signedIn = false
@@ -18,6 +31,9 @@ struct ProviderAuthenticationView: View {
     @State private var busy = false
     @State private var showSignOutConfirm = false
     @State private var signInError: String?
+    @State private var websiteSignIn: WebsiteSignIn?
+    @State private var websiteAuthenticationStatus: WebsiteAuthenticationStatus = .checking
+    @State private var websiteAuthenticationRevision = 0
 
     init(
         client: any ProviderClient,
@@ -72,13 +88,31 @@ struct ProviderAuthenticationView: View {
             }
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
-                Text("Not required")
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .settingsRowPadding()
-                    .settingsSurface(singleRow: true)
-                    .accessibilityIdentifier(A11yID.Chat.modelAuthNone)
+                if client.id == "kimi-web", let website = client.website {
+                    websiteAuthenticationStatusRow
+                    Button {
+                        let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
+                        websiteSignIn = WebsiteSignIn(session: session)
+                    } label: {
+                        SettingsActionButtonLabel {
+                            if websiteAuthenticationStatus == .signedIn {
+                                Text("Manage")
+                            } else {
+                                Text("Sign in")
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
+                } else {
+                    Text("Not required")
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .settingsRowPadding()
+                        .settingsSurface(singleRow: true)
+                        .accessibilityIdentifier(A11yID.Chat.modelAuthNone)
+                }
             }
         }
         .alert("Sign out of \(client.displayName)?", isPresented: $showSignOutConfirm) {
@@ -92,6 +126,47 @@ struct ProviderAuthenticationView: View {
         .onAppear {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
         }
+        .task(id: websiteAuthenticationRevision) {
+            guard client.id == "kimi-web" else { return }
+            websiteAuthenticationStatus = .checking
+            do {
+                let signedIn = try await client.websiteSessionIsAuthenticated()
+                guard !Task.isCancelled else { return }
+                websiteAuthenticationStatus = signedIn == true ? .signedIn : .signedOut
+            } catch {
+                guard !Task.isCancelled else { return }
+                websiteAuthenticationStatus = .unavailable
+                Log.ui.warning("ProviderAuthentication.websiteStatus client=\(client.id) error=\(LogPrivacy.text(error.localizedDescription))")
+            }
+        }
+        .sheet(item: $websiteSignIn, onDismiss: {
+            websiteAuthenticationRevision &+= 1
+        }) { signIn in
+            ServiceBrowserView(session: signIn.session)
+        }
+    }
+
+    private var websiteAuthenticationStatusRow: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: websiteAuthenticationStatus == .signedIn ? "checkmark.seal.fill" : "person.crop.circle")
+                .foregroundStyle(websiteAuthenticationStatus == .signedIn ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
+            switch websiteAuthenticationStatus {
+            case .checking:
+                Text("Checking sign-in…")
+            case .signedIn:
+                Text("Signed in to \(client.displayName)")
+            case .signedOut:
+                Text("Signed out")
+            case .unavailable:
+                Text("Unavailable")
+            }
+            Spacer()
+        }
+        .font(Theme.Fonts.bodyMd)
+        .foregroundStyle(Theme.Colors.onSurface)
+        .settingsRowPadding()
+        .settingsSurface(singleRow: true)
+        .accessibilityIdentifier(A11yID.Chat.modelWebsiteAuthStatus)
     }
 
     private var authenticationMethodPicker: some View {

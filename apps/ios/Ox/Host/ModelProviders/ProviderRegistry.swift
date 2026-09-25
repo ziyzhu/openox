@@ -182,6 +182,7 @@ final class ProviderRegistry {
 
     func authenticationStatus(id: String) -> String {
         guard let definition = try? definition(id: id) else { return "unavailable" }
+        if definition.api == .web { return "browser-session" }
         if definition.auth.kind == .none { return "not-required" }
         if client(id: id)?.subscriptionAccount?.isSignedIn == true { return "authenticated" }
         if Credentials.key(for: definition.credentialID) != nil { return "credential-stored" }

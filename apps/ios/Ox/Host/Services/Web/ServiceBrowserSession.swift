@@ -57,12 +57,19 @@ final class ServiceBrowserSession {
         #endif
     }
 
-    init(url: URL) {
+    init(url: URL, serviceManager: ServiceManager? = nil) {
         let router = Router()
         serviceDomain = url.host ?? url.absoluteString
         serviceTitle = url.host ?? url.absoluteString
         initialURL = url
-        page = WebPage(navigationDecider: NavigationDecider(router: router))
+        if let serviceManager {
+            page = WebPage(
+                configuration: serviceManager.makeBrowserPageConfiguration(for: serviceDomain),
+                navigationDecider: NavigationDecider(router: router)
+            )
+        } else {
+            page = WebPage(navigationDecider: NavigationDecider(router: router))
+        }
         router.openPopup = { [weak self] request in self?.loadPopup(request) }
         router.openExternal = { url in UIApplication.shared.open(url) }
         #if targetEnvironment(simulator)

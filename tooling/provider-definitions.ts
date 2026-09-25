@@ -76,6 +76,7 @@ export const ProviderSchema = Type.Union([
     beta: Type.Optional(strings()),
   })) }),
   object({ ...common, api: Type.Literal("gemini-generate-content"), options: Type.Optional(object(requestOptions)) }),
+  object({ ...common, api: Type.Literal("web") }),
 ]);
 
 export type Provider = Static<typeof ProviderSchema>;

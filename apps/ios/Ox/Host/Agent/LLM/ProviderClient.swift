@@ -101,6 +101,7 @@ nonisolated public enum LLMWireProtocol: String, Sendable, Codable, Equatable {
     case openAIChatCompletions = "openai-chat-completions"
     case anthropicMessages = "anthropic-messages"
     case geminiGenerateContent = "gemini-generate-content"
+    case web
 }
 
 nonisolated public struct LLMProtocolDiagnostics: Sendable {
@@ -164,6 +165,7 @@ nonisolated public protocol ProviderClient: Sendable {
     var protocolDiagnostics: LLMProtocolDiagnostics { get }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol?
+    func websiteSessionIsAuthenticated() async throws -> Bool?
 
     func prepare(
         model: ProviderModel,
@@ -195,6 +197,7 @@ nonisolated extension ProviderClient {
     public var protocolDiagnostics: LLMProtocolDiagnostics { LLMProtocolDiagnostics() }
 
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { nil }
+    public func websiteSessionIsAuthenticated() async throws -> Bool? { nil }
 
     public func prepare(
         model: ProviderModel,

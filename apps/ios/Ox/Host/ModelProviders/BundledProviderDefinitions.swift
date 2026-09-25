@@ -43,6 +43,23 @@ nonisolated extension BuiltInProviders {
         entries.append(bedrockMessages)
         entries.append(custom(XAIProvider.client(models: modelLookup("xai", .global)), url: XAIOAuth.responsesBaseURL, api: .openAIResponses))
         entries += profiles(trailingProfiles, modelLookup: modelLookup)
+        let webModel = ProviderModel(
+            id: "website-default", displayName: "Website default", maxTokens: 4_096,
+            maxContext: 32_768, supportsTools: true
+        )
+        entries.append(BundledProviderDefinition(
+            definition: ProviderDefinition(
+                id: "kimi-web", name: "Kimi Website", url: URL(string: "https://www.kimi.com/")!,
+                api: .web, auth: .init(kind: .custom, adapter: "kimi-web"),
+                options: nil, models: [.init(webModel)]
+            ),
+            presentation: ProviderPresentation(
+                regions: [.global], website: URL(string: "https://www.kimi.com/"),
+                authNotice: "Kimi Website uses your Ox browser session. Website inference accepts text inputs; Ox Action calls are experimental.",
+                credentialKind: .bearerToken
+            ),
+            legacyID: "kimi-web", legacyRegion: nil, legacyCredentialID: "kimi-web"
+        ))
         return entries
     }
 

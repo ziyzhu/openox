@@ -483,7 +483,7 @@ nonisolated enum AgentRunner {
             model: snapshot.model,
             systemPrompt: snapshot.context.systemPrompt.isEmpty ? nil : snapshot.context.systemPrompt,
             messages: snapshot.context.messages,
-            tools: snapshot.context.tools,
+            tools: snapshot.client.supportsTools(for: snapshot.model) ? snapshot.context.tools : [],
             options: snapshot.streamOptions
         )
 

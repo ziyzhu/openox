@@ -26,6 +26,12 @@ nonisolated enum ProviderClientFactory {
         let authentication = ProviderRequestAuthentication(definition: definition, account: genericAccount)
         let native: any ProviderClient
         switch definition.api {
+        case .web:
+            try validateAdapter(definition)
+            guard definition.id == "kimi-web" else {
+                throw RuntimeError.bridge("Unsupported web provider")
+            }
+            native = KimiWebsiteProvider(models: models)
         case .openAIChatCompletions:
             let auth: any OpenAIChatTransportAuth
             if definition.auth.kind == .custom { auth = try customChatAuth(definition) }
@@ -88,6 +94,17 @@ nonisolated enum ProviderClientFactory {
     }
 
     static func validateAdapter(_ definition: ProviderDefinition) throws {
+        if definition.api == .web {
+            guard definition.id == "kimi-web",
+                  definition.url == URL(string: "https://www.kimi.com/")!,
+                  definition.auth.kind == .custom,
+                  definition.auth.adapter == "kimi-web",
+                  definition.models.map(\.id) == ["website-default"],
+                  definition.options == nil else {
+                throw RuntimeError.bridge("Invalid Kimi website provider configuration")
+            }
+            return
+        }
         guard definition.auth.kind == .custom else { return }
         let expected: (URL, LLMWireProtocol)?
         switch definition.auth.adapter {
@@ -141,6 +158,7 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var id: String { definition.id }
     var displayName: String { definition.name }
     var models: [ProviderModel] {
+        if definition.api == .web { return native.models }
         let models = definition.models.map(\.runtimeModel)
         guard definition.auth.adapter == "github-copilot",
               let available = GitHubCopilotSubscriptionAccount.shared.cachedAvailableModelIDs else { return models }
@@ -155,11 +173,16 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var credentialKind: LLMCredentialKind { definition.auth.kind == .bearer && presentation.inferenceLocation == .userHosted ? .bearerToken : presentation.credentialKind }
     var credentialID: String { definition.credentialID }
     var subscriptionAccount: (any SubscriptionAccount)? { account }
+    var supportsTools: Bool { native.supportsTools }
     var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     var reasoningPolicy: LLMReasoningPolicy { native.reasoningPolicy }
     var protocolDiagnostics: LLMProtocolDiagnostics { native.protocolDiagnostics }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { definition.api }
+
+    func websiteSessionIsAuthenticated() async throws -> Bool? {
+        try await native.websiteSessionIsAuthenticated()
+    }
 
     func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool]) async -> LLMPreparationOutcome {
         await native.prepare(model: model, systemPrompt: systemPrompt, tools: tools)

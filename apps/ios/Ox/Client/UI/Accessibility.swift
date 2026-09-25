@@ -192,6 +192,7 @@ nonisolated enum A11yID {
         static func modelKeySignIn(_ clientId: String) -> String { "chat.modelKeySignIn.\(clientId)" }
         static let modelKeySignInError = "chat.modelKeySignInError"
         static let modelKeyNotice = "chat.modelKeyNotice"
+        static let modelWebsiteAuthStatus = "chat.modelWebsiteAuthStatus"
         static let modelKeyField = "chat.modelKeyField"
         static let modelKeyRemove = "chat.modelKeyRemove"
         static let modelKeyWebsite = "chat.modelKeyWebsite"
