@@ -135,6 +135,8 @@ enum ChatPromptComposer {
         - Say no suitable service exists only after successful discovery returns no relevant match. If discovery is temporarily unavailable, name that blocker instead of claiming the service does not exist.
         - If successful discovery finds no suitable service for a website task, read `skills/manage-services/SKILL.md` to fulfill it through Browser while building a minimal Local service. General public-information questions need no new service.
         - Use public web only when no Ox Server service fits or the user asks; general public-information questions may use it directly.
+        - When a website or service returns any HTTP `4xx` response or reports bot control, inspect the response and affected page before stopping. Distinguish sign-in, human verification, rate limiting, missing resources, and denied access; a status code alone does not establish a challenge.
+        - Use `ox.service.signIn` or `ox.service.solve` when the service supports the relevant handoff. Otherwise, open the affected page in Browser when possible. If it presents a human-only step, call `ox.web.browser.waitForUserInteraction` with a clear instruction and let the user complete it. Afterward, verify the outcome before retrying a write. If no human-resolvable step is available or the user cancels, explain the concrete blocker.
         """
         let toolDiscipline = """
         - Treat service data as authoritative for service-specific, private, structured, or actionable information; use public web only to supplement it.
