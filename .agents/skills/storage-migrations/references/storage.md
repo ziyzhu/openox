@@ -415,8 +415,9 @@ merged. Closing it removes the saved bookmark and leaves every file untouched.
 
 `OxServices.bundle` is the built-in service repository in the signed app bundle.
 Service manifests and actions are read directly from the app without a Git
-repository or Application Support copy. Web favicon bytes are not packaged:
-each generated manifest stores an `https://openox.ai/assets/services/<domain>/favicon.png`
+repository or Application Support copy. Web favicon bytes are not packaged.
+Generated manifests retain a verified public `faviconUrl`; legacy sources with
+`favicon.png` receive an `https://openox.ai/assets/services/<domain>/favicon.png`
 URL backed by a private S3 bucket through CloudFront. The app downloads bounded
 PNG or JPEG data without cookies or credential storage and keeps successful
 images in memory for the process lifetime. Every service source has a top-level
