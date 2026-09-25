@@ -11,14 +11,15 @@
     while (Date.now() < end) { const value = get(); if (value) return value; await pause(150); }
     throw new Error(message);
   }
-  async function identity() {
-    const r = await fetch('/backend-api/me', {credentials:'include', cache:'no-store'});
+  async function sessionUser() {
+    const r = await fetch('/api/auth/session', {credentials:'include', cache:'no-store'});
     if (r.redirected) throw new Error('Unexpected redirect checking ChatGPT session');
     let j; try { j = await r.json(); } catch { throw new Error('Invalid ChatGPT session response'); }
-    // Observed: 200 identity with string id; 401 {detail:"Unauthorized"} without credentials.
-    if (r.status === 401 && j.detail === 'Unauthorized') return null;
-    if (r.status !== 200 || typeof j.id !== 'string' || !j.id) throw new Error('Unclassified ChatGPT session response: HTTP ' + r.status);
-    return j;
+    if (r.status !== 200 || !j || typeof j !== 'object' || Array.isArray(j)) throw new Error('Unclassified ChatGPT session response: HTTP ' + r.status);
+    const keys = Object.keys(j);
+    if (keys.length === 1 && keys[0] === 'WARNING_BANNER') return null;
+    if (typeof j.user?.id !== 'string' || !j.user.id) throw new Error('Unclassified ChatGPT session response: missing user');
+    return j.user;
   }
   const composer = () => [...document.querySelectorAll('textarea#mobile-composer-prompt, textarea[aria-label="Chat with ChatGPT"], textarea[placeholder="Ask ChatGPT"], [contenteditable="true"][role="textbox"][aria-label="Ask ChatGPT"]')].find(e=>visible(e)&&!e.id.startsWith('pending-'));
   const roleNodes = () => { const legacy = [...document.querySelectorAll('[data-message-author-role="user"], [data-message-author-role="assistant"]')].filter(visible); if (legacy.length) return legacy; return [...document.querySelectorAll('main h4')].filter(h => /^(You said:|ChatGPT said:)$/.test(h.textContent.trim())).map(h => { const role = h.textContent.trim() === 'You said:' ? 'user' : 'assistant'; const e = h.parentElement.querySelector(role === 'user' ? '[data-user-message-bubble]' : '[data-markdown-text-style="assistant-message"]'); if (e) e.setAttribute('data-ox-message-role',role); return e; }).filter(visible); };
@@ -165,8 +166,8 @@
       return {url:pageUrl(),conversationRef:reference()};
     }});
     action('getSignInUrl',{async invoke(){return {url:'https://chatgpt.com/auth/login'};}});
-    action('getSignInState',{async invoke(){return {signedIn:!!(await identity())};}});
-    action('getCurrentUser',{async invoke(){const j=await identity();if(!j)throw new Error('Sign in to ChatGPT');return {id:j.id,name:typeof j.name==='string'?j.name:null,email:typeof j.email==='string'?j.email:null};}});
+    action('getSignInState',{async invoke(){return {signedIn:!!(await sessionUser())};}});
+    action('getCurrentUser',{async invoke(){const j=await sessionUser();if(!j)throw new Error('Sign in to ChatGPT');return {id:j.id,name:typeof j.name==='string'?j.name:null,email:typeof j.email==='string'?j.email:null};}});
     action('chat',{async invoke(args){return send(args.message,true);}});
     action('continueChat',{async invoke(args){if(args.conversationRef!==reference())throw new Error('Stale conversation reference; read the current conversation first');if(!messages().length)throw new Error('No loaded conversation to continue');return send(args.message,false);}});
     action('getCurrentConversation',{async invoke(args){await waitFor(composer,'ChatGPT conversation is not ready');const all=messages(),limit=args.limit??50;return {conversationRef:reference(),url:pageUrl(),messages:all.slice(-limit),renderedOnly:true,truncated:all.length>limit};}});
