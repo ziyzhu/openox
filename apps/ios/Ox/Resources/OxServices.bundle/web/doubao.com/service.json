@@ -1,7 +1,7 @@
 {
   "domain": "doubao.com",
   "name": "Doubao",
-  "description": "Chat with Doubao, read rendered messages, and reopen recent conversations. Sign-in required; sending requires approval. Full-history search, model switching and attachments are not supported.",
+  "description": "Search saved message content, read rendered chats, reopen recent Doubao conversations, and send with approval. Search continuation and title-only matching are not supported.",
   "baseUrl": "https://www.doubao.com/chat/",
   "actions": [
     {
@@ -406,6 +406,72 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved messages (experimental)",
+      "description": "Search saved message content using Doubao native search and website-default date range; returns matching conversations. Title-only matches are excluded. Source continuation is not verified: broad searches with more results throw and require a narrower query. Returned URLs open chats; existing openConversation remains recent-sidebar only. Experimental: some native result formats are unsupported and fail explicitly; an empty-search test encountered such a format.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "null"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "message-content"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://www.doubao.com/chat/"
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "domain": "chat.z.ai",
   "name": "Z.ai",
-  "description": "Chat with Z.ai, list and read saved conversations, open and continue recent sidebar chats, inspect models, and read account information.",
+  "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval.",
   "baseUrl": "https://chat.z.ai/",
   "actions": [
     {
@@ -468,6 +468,78 @@
       },
       "requireAuth": true,
       "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "searchConversations",
+      "label": "Search saved chats",
+      "description": "Search conversation titles only across native default-history pages, not message content. Captures website-owned history reads without copying credentials. Continue the same query with the next source-page cursor; empty filtered pages may still have continuation. Session-local cache holds 20 pages and resets on reload. Further pages require native sidebar scrolling.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "cursor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "default-history-titles"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
       "blocking": true
     }
   ]

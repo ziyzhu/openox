@@ -1,27 +1,6 @@
-const retryFetch = async (input, init, options) => {
-  const retries = options?.retries ?? 3;
-  const delay = options?.delay ?? 400;
-  const factor = options?.factor ?? 2;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const response = await window.fetch(input, init);
-      const retryable = response.status === 408 || response.status === 429
-        || (response.status >= 500 && response.status <= 599);
-      if (response.ok || !retryable || attempt >= retries) return response;
-      console.log(`retryFetch: status ${response.status}, attempt ${attempt + 1}/${retries}`);
-    } catch (error) {
-      const message = String(error?.message ?? "");
-      const retryable = message.includes("Load failed")
-        || message.includes("NetworkError")
-        || message.includes("Failed to fetch");
-      if (!retryable || attempt >= retries) throw error;
-      console.log(`retryFetch: network ${JSON.stringify(message)}, attempt ${attempt + 1}/${retries}`);
-    }
-    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(factor, attempt)));
-  }
-};
-
-window.ox.install(({ action }) => {
+window.ox.install(({ action: register }) => {
+    const handlers = {};
+    const action = (id, spec) => { handlers[id] = spec.invoke; register(id, spec); };
     const ORIGIN = "https://www.perplexity.ai";
     const VERSION = "2.18";
     const SUPPORTED_BLOCKS = [
@@ -59,7 +38,7 @@ window.ox.install(({ action }) => {
         "background_agents",
     ];
     const fetchJson = async (url, init = {}) => {
-        const response = await retryFetch(url, { credentials: "include", ...init });
+        const response = await fetch(url, { credentials: "include", cache: "no-store", signal: AbortSignal.timeout(8000), ...init });
         const text = await response.text();
         if (!response.ok)
             throw new Error(`Perplexity returned HTTP ${response.status}`);
@@ -70,7 +49,14 @@ window.ox.install(({ action }) => {
             throw new Error("Perplexity returned an unreadable response");
         }
     };
-    const getSession = () => fetchJson(`${ORIGIN}/api/auth/session`);
+    const getSession = async () => {
+        const data = await fetchJson(ORIGIN + '/api/auth/session', {cache:'no-store'});
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            if (typeof data.user?.id === 'string' && data.user.id.length) return data;
+            if (Object.keys(data).length === 0) return data;
+        }
+        throw new Error('Unexpected Perplexity session response');
+    };
     const accountHeaders = async () => {
         const session = await getSession();
         const id = session?.user?.id;
@@ -184,7 +170,7 @@ window.ox.install(({ action }) => {
     };
     action("getSignInUrl", {
         async invoke() {
-            return { url: `${ORIGIN}/login` };
+            return { url: `${ORIGIN}/auth/signin` };
         },
     });
     action("getSignInState", {
@@ -271,6 +257,7 @@ window.ox.install(({ action }) => {
             return answer;
         },
     });
+    action("searchConversations", {async invoke({query}) {if(!query.trim())throw new Error('Search query must not be blank');const j=await fetchJson(ORIGIN+'/rest/perplexity_ask/graphql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationName:'CommandPaletteTypeaheadSearchRelayQuery',variables:{query},extensions:{persistedQuery:{version:1,sha256Hash:'e36e392682ac1cec902667d8091ef3d7bc609d9aae6092313926cfe825eca763'}}})});const edges=j.data?.viewer?.typeaheadSearch?.edges;if(j.errors||!Array.isArray(edges))throw new Error('Unexpected Perplexity history-search response');const items=edges.filter(e=>e.node?.type==='SEARCH_THREAD').map(e=>{const n=e.node,o=n.object;if(o?.__typename!=='Thread'||typeof o.entryId!=='string'||typeof o.threadSlug!=='string'||typeof n.title!=='string')throw new Error('Invalid history search result');return {id:o.entryId,title:n.title,url:ORIGIN+'/search/'+encodeURIComponent(o.threadSlug)};});return {items,nextCursor:null,scope:'ranked-typeahead',complete:false};}});
     action("listThreads", {
         async invoke() {
             const endpoint = `${ORIGIN}/rest/thread/list_recent?exclude_asi=false&version=${VERSION}&source=default`;
@@ -300,6 +287,10 @@ window.ox.install(({ action }) => {
             if (data?.status !== "success" || !Array.isArray(data?.entries)) {
                 throw new Error("Perplexity returned an unexpected thread");
             }
+            const stableCursor = value => {
+                try { const d=JSON.parse(value); const canonical=x=>x&&typeof x==='object'?(Array.isArray(x)?x.map(canonical):Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])]))):x; return JSON.stringify(canonical(d)); } catch { return String(value); }
+            };
+            if(cursor && data.next_cursor!=null && stableCursor(cursor)===stableCursor(data.next_cursor))throw new Error('Perplexity pagination stalled; refusing to repeat the same page');
             const metadata = data.thread_metadata || {};
             const result = {
                 id,
@@ -314,4 +305,50 @@ window.ox.install(({ action }) => {
             return result;
         },
     });
+    const pause = ms => new Promise(r => setTimeout(r,ms));
+    const wait = async (fn, ms=7000) => { const end=Date.now()+ms; do { const v=fn(); if(v)return v; await pause(100); }while(Date.now()<end); throw new Error('Perplexity interface not ready'); };
+    const currentId = () => location.pathname.startsWith('/search/') ? decodeURIComponent(location.pathname.slice(8)) : null;
+    const route = async id => {
+        const path=id?'/search/'+encodeURIComponent(id):'/';
+        if(location.pathname!==path){const old=document.querySelector('.prose');history.pushState({},'',path);window.dispatchEvent(new PopStateEvent('popstate'));if(old)await wait(()=>!old.isConnected);}
+        await wait(()=>location.pathname===path && document.querySelector('#ask-input[data-lexical-editor="true"]'));
+        if(id) await wait(()=>document.querySelector('.prose'));
+        else await wait(()=>!document.querySelector('.prose'));
+    };
+    action('getCurrentUser',{async invoke(){const s=await getSession();if(!s.user)throw new Error('Not signed in');return {id:s.user.id,name:typeof s.user.name==='string'?s.user.name:null,email:typeof s.user.email==='string'?s.user.email:null};}});
+    action('listConversations',{async invoke(){return handlers.listThreads({});}});
+    action('getConversation',{async invoke(args){return handlers.getThread(args);}});
+    action('openConversation',{async invoke({id}){const result=await handlers.getThread({id,limit:10});await route(id);return result;}});
+    action('getCurrentConversation',{async invoke(){await wait(()=>document.querySelector('#ask-input'));const id=currentId();return {conversation:id?await handlers.getThread({id,limit:20}):null};}});
+    action('listModels',{async invoke(){const d=await fetchJson(ORIGIN+'/rest/models/config/v2?version='+VERSION+'&source=default');if(!d.models||typeof d.models!=='object')throw new Error('Unexpected model catalog');return {items:Object.entries(d.models).filter(([id,m])=>m.mode==='search').map(([id,m])=>({id,name:m.label||id,availability:'catalog-only'})),nextCursor:null};}});
+    const send = async (message,id) => {
+        await route(id);
+        const before = id ? await handlers.getThread({id,limit:20}) : null;
+        if(before?.nextCursor)throw new Error('Sending to threads longer than the read window is not supported');
+        const old = new Set(before?.entries.map(e=>e.id)||[]);
+        const editor=document.querySelector('#ask-input');
+        if(editor.textContent.trim())throw new Error('Composer has an existing draft; refusing to overwrite');
+        editor.focus();
+        const selection=getSelection();const range=document.createRange();range.selectNodeContents(editor);selection.removeAllRanges();selection.addRange(range);
+        if(!document.execCommand('insertText',false,message))throw new Error('Unable to insert message');
+        await wait(()=>editor.textContent.trim()===message.trim(),2000);
+        const button=await wait(()=>{const b=document.querySelector('button[aria-label="Submit"]');return b&&!b.disabled?b:null;},2000);
+        button.click();
+        const end=Date.now()+14000;let matched=null;let target=id;
+        do {
+            await pause(700);target=currentId();
+            if(!target || (id&&target!==id))continue;
+            let t;
+            try { t=await handlers.getThread({id:target,limit:20}); } catch(error) {
+                if(String(error.message).includes('HTTP 404'))continue;
+                throw new Error('Submission outcome uncertain; inspect conversation before retrying. '+error.message);
+            }
+            matched=t.entries.find(e=>!old.has(e.id)&&e.query.trim()===message.trim())||null;
+            if(matched)return {submissionConfirmed:true,status:matched.answer?'reply-available':'pending',conversationId:target,url:t.url,entry:matched};
+        }while(Date.now()<end);
+        return {submissionConfirmed:false,status:'unconfirmed',conversationId:target||null,url:location.href,entry:null};
+    };
+    action('chat',{async invoke({message}){return send(message,null);}});
+    action('continueChat',{async invoke({id,message}){return send(message,id);}});
+
 });
