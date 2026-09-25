@@ -94,7 +94,7 @@ nonisolated extension BuiltInProviders {
             ),
             presentation: ProviderPresentation(
                 regions: [.global], website: URL(string: "https://claude.ai/"),
-                authNotice: "Claude Website uses your Ox browser session. Website inference accepts text inputs; Ox Action calls are experimental.",
+                authNotice: "Claude Website uses your Ox browser session. Text replies appear after completion; Ox Action calls are experimental. Stopping Ox may not stop Claude generation.",
                 credentialKind: .bearerToken
             ),
             legacyID: "claude-web", legacyRegion: nil, legacyCredentialID: "claude-web"

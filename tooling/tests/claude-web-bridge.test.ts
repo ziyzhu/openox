@@ -27,7 +27,9 @@ test("Claude website submission accepts one verified draft", async () => {
   };
   expect(await run("test prompt", { pathname: "/new" }, document)).toEqual({ status: "submitted" });
   expect(clicks).toBe(1);
-  expect((await run("second prompt", { pathname: "/new" }, document)).status).toBe("failed");
+  expect(await run("second prompt", { pathname: "/new" }, document)).toEqual({
+    status: "failed", message: "Claude has an existing draft; clear it on the website before retrying",
+  });
   expect(clicks).toBe(1);
 });
 

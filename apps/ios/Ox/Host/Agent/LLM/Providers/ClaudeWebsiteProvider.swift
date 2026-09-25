@@ -262,8 +262,9 @@ private final class ClaudeWebGenerationSession {
         try {
           if (location.pathname !== '/new') throw new Error('Claude is not on a fresh conversation');
           let input;
-          for (let attempt = 0; attempt < 60 && !input; attempt++) { input = editor(); if (!input) await pause(100); }
-          if (!input || input.innerText.trim()) throw new Error('Claude editor is unavailable or contains an existing draft');
+          for (let attempt = 0; attempt < 150 && !input; attempt++) { input = editor(); if (!input) await pause(100); }
+          if (!input) throw new Error('Claude editor did not load');
+          if (input.innerText.trim()) throw new Error('Claude has an existing draft; clear it on the website before retrying');
           input.focus();
           if (!document.execCommand('insertText', false, prompt)) throw new Error('Claude editor rejected the prompt');
           let button;
