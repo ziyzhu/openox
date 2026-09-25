@@ -24,7 +24,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── storage.activeProfile            active profile UUID
 │   │   └── chatgpt.installationId           per-install Codex client ID
 │   ├── Application Support/
-│   │   ├── service-repositories.json        enabled repositories and conflict resolutions
+│   │   ├── service-repositories.json        built-in, Local, Development, and installed repository enablement; conflict resolutions
 │   │   ├── service-repositories/local/      editable local git working tree
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── service-repositories/<uuid>/     installed public HEAD snapshots
@@ -113,6 +113,11 @@ stamp them. Unknown Profile versions and unsuccessful migrations fail closed at
 the loading screen rather than allowing consumers to interpret incompatible
 data; an unknown version specifically directs the user to the Ox build that last
 opened the Profile or a newer one.
+
+Repository configuration keeps format version 1. The optional `localEnabled`
+field defaults to true when older configuration files omit it; disabling Local
+removes its services and skills from the active catalog without deleting its Git
+working tree or history.
 
 ## Shared preferences
 

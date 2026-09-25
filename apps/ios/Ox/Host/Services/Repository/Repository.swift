@@ -247,6 +247,7 @@ actor Repository {
     struct Configuration: Codable {
         var formatVersion = 1
         var bundledEnabled = true
+        var localEnabled = true
         var developmentEnabled = true
         var repositories: [InstalledRepository] = []
         var resolutions: [String: String] = [:]
@@ -254,12 +255,14 @@ actor Repository {
         init(
             formatVersion: Int = 1,
             bundledEnabled: Bool = true,
+            localEnabled: Bool = true,
             developmentEnabled: Bool = true,
             repositories: [InstalledRepository] = [],
             resolutions: [String: String] = [:]
         ) {
             self.formatVersion = formatVersion
             self.bundledEnabled = bundledEnabled
+            self.localEnabled = localEnabled
             self.developmentEnabled = developmentEnabled
             self.repositories = repositories
             self.resolutions = resolutions
@@ -269,6 +272,7 @@ actor Repository {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             formatVersion = try values.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
             bundledEnabled = try values.decodeIfPresent(Bool.self, forKey: .bundledEnabled) ?? true
+            localEnabled = try values.decodeIfPresent(Bool.self, forKey: .localEnabled) ?? true
             developmentEnabled = try values.decodeIfPresent(Bool.self, forKey: .developmentEnabled) ?? true
             repositories = try values.decodeIfPresent([InstalledRepository].self, forKey: .repositories) ?? []
             resolutions = try values.decodeIfPresent([String: String].self, forKey: .resolutions) ?? [:]
@@ -486,7 +490,7 @@ actor Repository {
         if repositoryID == Self.bundledID {
             configuration.bundledEnabled = enabled
         } else if repositoryID == Self.localID {
-            throw Failure(message: "Local is always enabled.")
+            configuration.localEnabled = enabled
         } else if repositoryID == "development", developmentRemote != nil {
             configuration.developmentEnabled = enabled
         } else if let index = configuration.repositories.firstIndex(where: { $0.id == repositoryID }) {
@@ -1251,7 +1255,7 @@ actor Repository {
                     tipCommitHash: git.tipCommitHash,
                     view: git.view,
                     lastSyncedAt: nil,
-                    isEnabled: true,
+                    isEnabled: configuration.localEnabled,
                     provenance: .local,
                     serviceCount: package.services.count,
                     services: Self.serviceReferences(in: package),
@@ -1271,7 +1275,7 @@ actor Repository {
                     tipCommitHash: nil,
                     view: .live,
                     lastSyncedAt: nil,
-                    isEnabled: true,
+                    isEnabled: configuration.localEnabled,
                     provenance: .local,
                     serviceCount: 0,
                     services: [],
@@ -1293,7 +1297,7 @@ actor Repository {
                 tipCommitHash: nil,
                 view: .live,
                 lastSyncedAt: nil,
-                isEnabled: true,
+                isEnabled: configuration.localEnabled,
                 provenance: .local,
                 serviceCount: 0,
                 services: [],

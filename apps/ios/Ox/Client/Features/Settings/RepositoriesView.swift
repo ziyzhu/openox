@@ -96,32 +96,22 @@ struct RepositoriesView: View {
 
     private func repositoryRow(_ repository: Repository.Descriptor) -> some View {
         HStack(spacing: Theme.Spacing.xs) {
-            if repository.provenance == .local {
-                Image(systemName: "checkmark.square.fill")
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(Theme.Colors.primary)
-                    .frame(width: 44, height: 44)
-                    .accessibilityLabel(Text(verbatim: repository.name))
-                    .accessibilityValue("Always enabled")
-                    .accessibilityIdentifier(A11yID.Settings.repositoryEnabled(repository.id))
-            } else {
-                Button {
-                    Task {
-                        await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
-                    }
-                } label: {
-                    Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 21, weight: .medium))
-                        .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+            Button {
+                Task {
+                    await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
                 }
-                .buttonStyle(.plain)
-                .disabled(isBusy)
-                .accessibilityLabel(Text(verbatim: repository.name))
-                .accessibilityValue(repository.isEnabled ? "Enabled" : "Disabled")
-                .accessibilityIdentifier(A11yID.Settings.repositoryEnabled(repository.id))
+            } label: {
+                Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(isBusy)
+            .accessibilityLabel(Text(verbatim: repository.name))
+            .accessibilityValue(repository.isEnabled ? "Enabled" : "Disabled")
+            .accessibilityIdentifier(A11yID.Settings.repositoryEnabled(repository.id))
 
             NavigationLink {
                 RepositoryDetailView(repositoryID: repository.id)
