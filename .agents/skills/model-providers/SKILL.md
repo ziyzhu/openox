@@ -31,6 +31,8 @@ When adding a built-in provider:
 
 When adding attachment support, check bundled and discovered model capabilities, provider validation, user messages, Action results, and history together. Verify that the model can read a synthetic image or document through the real upload path; an upload ID alone is insufficient. For composer-driven providers, reacquire the editor after file processing and verify native editor state before submission; an enabled Send button can reflect attachments while the prompt is still uncommitted. Preserve pre-existing website drafts.
 
+For built-in model web services, use reviewed 128×128 `favicon.png` sources and let the service build generate the OpenOx CloudFront URL; remove third-party `faviconUrl` overrides. Audit the opaque central 96×96 area and light/dark rendering at 20 px, upload through the existing service-assets deployment workflow, and verify the anonymous hosted response matches the source. See [icon provenance](../../../docs/MODEL_WEB_PROVIDER_ICONS.md). Use the resolved service and shared `ServiceAvatar` in the web-provider picker so it honors the same icon URL and loading rules as Services. Local user-authored services retain their verified public icon URLs.
+
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 
 ## Updating models

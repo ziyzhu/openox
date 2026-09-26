@@ -3,7 +3,6 @@
   "name": "DeepSeek",
   "description": "Search saved DeepSeek chats, read server-backed conversation history, reopen recent chats, and send text with approval.",
   "baseUrl": "https://chat.deepseek.com/",
-  "faviconUrl": "https://fe-static.deepseek.com/chat/icon-180.png",
   "actions": [
     {
       "id": "getSignInUrl",

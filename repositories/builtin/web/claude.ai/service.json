@@ -3,7 +3,6 @@
   "name": "Claude",
   "description": "Chat with Claude using your signed-in website account, read paginated conversation history, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
   "baseUrl": "https://claude.ai/robots.txt",
-  "faviconUrl": "https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c129d018a-0ZbJsTbu.png",
   "actions": [
     {
       "id": "getSignInUrl",

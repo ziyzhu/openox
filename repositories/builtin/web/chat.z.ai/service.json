@@ -3,7 +3,6 @@
   "name": "Z.ai",
   "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval.",
   "baseUrl": "https://chat.z.ai/",
-  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://chat.z.ai&size=128",
   "actions": [
     {
       "id": "getSignInUrl",

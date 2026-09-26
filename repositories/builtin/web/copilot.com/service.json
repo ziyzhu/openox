@@ -3,7 +3,6 @@
   "name": "Microsoft Copilot",
   "description": "Search saved Copilot chats, read conversations and recent history, and choose response modes. Broad searches requiring additional pages must be narrowed. Automated sending remains experimental and unconfirmed.",
   "baseUrl": "https://copilot.com/",
-  "faviconUrl": "https://res.cdn.office.net/officehub/images/content/images/unauth-copilotcom/copilot-mobile-logo-static-286643fc8c.png",
   "actions": [
     {
       "id": "getSignInUrl",

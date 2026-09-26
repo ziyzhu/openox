@@ -1275,6 +1275,7 @@ private struct ProviderPickerView: View {
             value: client.id,
             title: client.displayName,
             faviconDomain: client.website?.host,
+            serviceDomain: (client as? WebServiceModelProvider)?.domain,
             subtitle: showsSubtitle ? subtitle(for: client) : nil,
             accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
         )
@@ -1293,6 +1294,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let title: String
     var systemImage: String? = nil
     var faviconDomain: String? = nil
+    var serviceDomain: String? = nil
     var subtitle: String? = nil
     let accessibilityIdentifier: String
     var children: [SettingsSelectionOption<Value>] = []
@@ -1304,6 +1306,7 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
     @Binding var selection: Value
     var onSelect: ((Value) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(ServiceManager.self) private var serviceManager
 
     var body: some View {
         ScrollView {
@@ -1362,7 +1365,9 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
 
     private func optionLabel(_ option: SettingsSelectionOption<Value>) -> some View {
         HStack(spacing: SettingsLayout.horizontalInset) {
-            if let faviconDomain = option.faviconDomain {
+            if let domain = option.serviceDomain, let service = serviceManager.service(domain: domain) {
+                ServiceAvatar(service: service, size: 24, shape: .roundedRect(3))
+            } else if let faviconDomain = option.faviconDomain {
                 DomainFavicon(domain: faviconDomain, size: 24)
             }
             if let systemImage = option.systemImage {
