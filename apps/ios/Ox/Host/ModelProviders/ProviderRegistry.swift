@@ -27,6 +27,8 @@ final class ProviderRegistry {
     private let bundled: [BundledProviderDefinition]
     private var catalog: ProviderCatalog
     private var catalogAvailable = true
+    private var modelServices: [ServiceDefinition] = []
+    private var discoveredServiceModels: [String: [ProviderModel]] = [:]
     private(set) var allClients: [any ProviderClient] = []
     private(set) var defaultModel: ModelSelection?
 
@@ -71,11 +73,23 @@ final class ProviderRegistry {
         }
     }
 
-    var definitions: [ProviderDefinition] {
+    private var catalogDefinitions: [ProviderDefinition] {
         let replacements = Dictionary(uniqueKeysWithValues: catalog.providers.map { ($0.id, $0) })
         let bundledIDs = Set(bundled.map { $0.definition.id })
         return bundled.map { replacements[$0.definition.id] ?? $0.definition }
             + catalog.providers.filter { !bundledIDs.contains($0.id) }
+    }
+    var definitions: [ProviderDefinition] {
+        var result = catalogDefinitions.filter { $0.api != .web }
+        for service in modelServices {
+            let id = WebServiceModelProvider.providerID(domain: service.domain)
+            guard let url = service.baseURL, let client = client(id: id) else { continue }
+            let definition = ProviderDefinition(id: id, name: service.name, url: url, api: .web,
+                                                auth: .init(kind: .custom, adapter: id), models: client.models.map { .init($0) })
+            if let index = result.firstIndex(where: { $0.id == id }) { result[index] = definition }
+            else { result.append(definition) }
+        }
+        return result
     }
     var defaultDefinitions: [ProviderDefinition] { bundled.map(\.definition) }
 
@@ -118,6 +132,10 @@ final class ProviderRegistry {
             model.reasoningEffort = selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
             return model
         }
+        if client is WebServiceModelProvider {
+            let id = selection.modelID.hasPrefix("website:") ? String(selection.modelID.dropFirst(8)) : selection.modelID
+            return WebServiceModelProvider.model(id: id, name: selection.modelID, input: [.text, .image, .pdf])
+        }
         return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
     }
 
@@ -143,6 +161,9 @@ final class ProviderRegistry {
     }
 
     func save(_ definition: ProviderDefinition) throws {
+        guard definition.api != .web else {
+            throw RuntimeError.bridge("Edit this model provider through its Local web service")
+        }
         _ = try ProviderDefinition.decode(definition.json)
         try ProviderClientFactory.validateAdapter(definition)
         _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
@@ -156,6 +177,11 @@ final class ProviderRegistry {
     }
 
     func updateDiscoveredModels(_ models: [ProviderModel], for clientID: String) throws {
+        if modelServices.contains(where: { WebServiceModelProvider.providerID(domain: $0.domain) == clientID }) {
+            discoveredServiceModels[clientID] = models
+            rebuildClients()
+            return
+        }
         guard client(id: clientID)?.canLoadModels == true,
               let bundledDefinition = bundled.first(where: { $0.definition.id == clientID })?.definition,
               let defaultModel = bundledDefinition.models.first else {
@@ -216,11 +242,31 @@ final class ProviderRegistry {
     private func rebuildClients() {
         var resolved: [any ProviderClient] = []
         if MockLLMClient.isEnabled { resolved.append(MockLLMClient()) }
-        for definition in definitions {
+        for definition in catalogDefinitions where definition.api != .web {
             do { resolved.append(try ProviderClientFactory.make(definition, presentation: presentation(for: definition))) }
             catch { Log.agent.error("ProviderRegistry.resolve provider=\(definition.id) error=\(error.localizedDescription)") }
         }
+        for service in modelServices {
+            let id = WebServiceModelProvider.providerID(domain: service.domain)
+            let definition = catalogDefinitions.first { $0.id == id }
+            let models = discoveredServiceModels[id] ?? definition?.models.map(\.runtimeModel)
+                ?? [WebServiceModelProvider.model(id: "website-default", name: "Default")]
+            resolved.append(WebServiceModelProvider(id: id, domain: service.domain, displayName: service.name,
+                                                    website: service.baseURL, models: models,
+                                                    regions: definition.map { presentation(for: $0).regions } ?? [.global, .china]))
+        }
         allClients = resolved
+    }
+
+    func refreshModelServices(_ services: [Service]) {
+        let next = services.filter { $0.definition.supportsModelGeneration }.map(\.definition)
+        let unchanged = Set(next.filter { candidate in
+            modelServices.contains { $0.domain == candidate.domain && $0.repositoryID == candidate.repositoryID && $0.manifest == candidate.manifest }
+        }.map { WebServiceModelProvider.providerID(domain: $0.domain) })
+        discoveredServiceModels = discoveredServiceModels.filter { unchanged.contains($0.key) }
+        modelServices = next
+        rebuildClients()
+        Log.agent.info("ProviderRegistry.modelServices count=\(modelServices.count)")
     }
 
     private var unavailableClient: any ProviderClient { UnavailableProviderClient() }

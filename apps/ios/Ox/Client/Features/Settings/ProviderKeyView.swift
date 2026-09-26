@@ -4,7 +4,6 @@ struct ProviderAuthenticationView: View {
     private struct WebsiteSignIn: Identifiable {
         let id = UUID()
         let session: ServiceBrowserSession
-        let dismissWhenAuthenticated: Bool
     }
 
     private enum AuthenticationMethod {
@@ -36,7 +35,7 @@ struct ProviderAuthenticationView: View {
     @State private var websiteSignIn: WebsiteSignIn?
     @State private var websiteAuthenticationStatus: WebsiteAuthenticationStatus = .checking
     @State private var websiteAuthenticationRevision = 0
-    @State private var websiteAuthenticationCompleted = false
+    @State private var presentations = AppPresentationCoordinator()
 
     init(
         client: any ProviderClient,
@@ -93,13 +92,13 @@ struct ProviderAuthenticationView: View {
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
                 if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web, let website = client.website {
                     Button {
+                        if let provider = client as? WebServiceModelProvider,
+                           websiteAuthenticationStatus != .signedIn {
+                            signInModelService(provider)
+                            return
+                        }
                         let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
-                        websiteAuthenticationCompleted = false
-                        WebsiteAuthenticationCache.invalidate(client.id)
-                        websiteSignIn = WebsiteSignIn(
-                            session: session,
-                            dismissWhenAuthenticated: websiteAuthenticationStatus != .signedIn
-                        )
+                        websiteSignIn = WebsiteSignIn(session: session)
                         websiteAuthenticationRevision &+= 1
                     } label: {
                         if websiteAuthenticationStatus == .signedIn {
@@ -111,6 +110,7 @@ struct ProviderAuthenticationView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .disabled(busy)
                     .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
                 } else {
                     Text("Not required")
@@ -137,16 +137,11 @@ struct ProviderAuthenticationView: View {
         .task(id: websiteAuthenticationRevision) {
             guard client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web,
                   websiteSignIn == nil else { return }
-            if let cached = WebsiteAuthenticationCache.status(for: client.id) {
-                websiteAuthenticationStatus = cached ? .signedIn : .signedOut
-                return
-            }
             websiteAuthenticationStatus = .checking
             let revision = websiteAuthenticationRevision
             do {
                 let signedIn = try await client.websiteSessionIsAuthenticated()
                 guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
-                if let signedIn { WebsiteAuthenticationCache.set(signedIn, for: client.id) }
                 websiteAuthenticationStatus = signedIn == true ? .signedIn : .signedOut
             } catch {
                 guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
@@ -156,35 +151,27 @@ struct ProviderAuthenticationView: View {
         }
         .sheet(item: $websiteSignIn, onDismiss: {
             websiteAuthenticationRevision &+= 1
-            if websiteAuthenticationCompleted {
-                websiteAuthenticationCompleted = false
-                onAuthenticated?()
-            }
         }) { signIn in
             ServiceBrowserView(session: signIn.session, reservesWebsiteSpace: true)
-                .task { await monitorWebsiteAuthentication(for: signIn) }
         }
+        .appPresentations(presentations)
     }
 
-    private func monitorWebsiteAuthentication(for signIn: WebsiteSignIn) async {
-        guard signIn.dismissWhenAuthenticated else { return }
-        while !Task.isCancelled {
-            do {
-                if try await client.websiteSessionIsAuthenticated() == true {
-                    guard !Task.isCancelled, websiteSignIn?.id == signIn.id else { return }
-                    WebsiteAuthenticationCache.set(true, for: client.id)
-                    websiteAuthenticationStatus = .signedIn
-                    websiteAuthenticationCompleted = true
-                    websiteSignIn = nil
-                    Log.ui.info("ProviderAuthentication.websiteSignedIn client=\(client.id)")
-                    return
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                Log.ui.warning("ProviderAuthentication.websiteSignInCheck client=\(client.id) error=\(LogPrivacy.text(error.localizedDescription))")
+    private func signInModelService(_ provider: WebServiceModelProvider) {
+        guard !busy, let service = serviceManager.service(domain: provider.domain) else { return }
+        busy = true
+        Task { @MainActor in
+            defer {
+                busy = false
+                websiteAuthenticationRevision &+= 1
             }
-            try? await Task.sleep(for: .seconds(5))
+            do {
+                try await service.requestAccess(using: presentations)
+                if try await provider.websiteSessionIsAuthenticated() == true { onAuthenticated?() }
+            } catch {
+                websiteAuthenticationStatus = .unavailable
+                Log.ui.warning("ProviderAuthentication.modelService domain=\(provider.domain) error=\(LogPrivacy.text(error.localizedDescription))")
+            }
         }
     }
 

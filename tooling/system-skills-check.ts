@@ -8,7 +8,7 @@ const expectedPackages = ["import-memory", "manage-artifacts", "manage-services"
 const expectedReferences = new Map([
   ["import-memory", []],
   ["manage-artifacts", ["canvas.md", "note.md"]],
-  ["manage-services", ["api-service.md", "helpers.js", "web-service.md"]],
+  ["manage-services", ["api-service.md", "helpers.js", "model-schemas.md", "model-service.md", "web-service.md"]],
   ["manage-skills", ["repository-skill.md", "user-skill.md"]],
 ]);
 

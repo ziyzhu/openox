@@ -11,6 +11,7 @@ Keep every provider integration easy to discover without turning documentation i
 
 - Provider references own official product and developer links, the purpose of human-facing account portals, and account or geography distinctions that affect setup.
 - Provider Swift files own exact client identifiers, display names, picker regions, endpoint URLs, portal deep links, credentials, transport selection, and request policy.
+- Model-capable web services own website authentication, submission, upload, completion, and model discovery behavior in `repositories/builtin/web/<domain>/actions.js`. They expose the standard model Actions described by the built-in `manage-services` skill; `WebServiceModelProvider.swift` owns their shared adapter and compatibility identities.
 - `apps/ios/Ox/Host/ModelProviders/provider-models.json` owns bundled model metadata sourced from models.dev.
 - `CuratedProviderModels.swift` owns the smallest reviewed model set for providers absent from the shared catalog.
 
@@ -28,7 +29,7 @@ When adding a built-in provider:
 4. Add the reference to the routing list below.
 5. Keep account-region boundaries explicit, especially when Global and China use different credentials or portals.
 
-When adding attachment support, check bundled and discovered model capabilities, provider validation, user messages, Action results, and history together. Verify that the model can read a synthetic image or document through the real upload path; an upload ID alone is insufficient.
+When adding attachment support, check bundled and discovered model capabilities, provider validation, user messages, Action results, and history together. Verify that the model can read a synthetic image or document through the real upload path; an upload ID alone is insufficient. For composer-driven providers, reacquire the editor after file processing and verify native editor state before submission; an enabled Send button can reflect attachments while the prompt is still uncommitted. Preserve pre-existing website drafts.
 
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 

@@ -163,9 +163,10 @@ final class Service: NSObject, Identifiable {
         case blockingAction
         case authenticationProbe
         case dangerousBrowserControl
+        case modelGeneration
 
         var isAuthenticationProbe: Bool { self == .authenticationProbe }
-        var requiresExclusiveAccess: Bool { self != .standard }
+        var requiresExclusiveAccess: Bool { self != .standard && self != .modelGeneration }
     }
 
     final class Action {
@@ -235,6 +236,7 @@ final class Service: NSObject, Identifiable {
         case inspector(UUID)
         case debug(UUID)
         case browser(UUID)
+        case model(UUID)
 
         var logLabel: String {
             switch self {
@@ -242,6 +244,7 @@ final class Service: NSObject, Identifiable {
             case .inspector: "inspector"
             case .debug: "debug"
             case .browser: "browser"
+            case .model: "model"
             }
         }
     }

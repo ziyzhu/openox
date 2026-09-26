@@ -1,5 +1,6 @@
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+import { validateModelActions, MODEL_GENERATION_ACTION_IDS } from "./model-actions.ts";
 
 const HOST_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -396,6 +397,10 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
 
   const m = input as ServiceManifest;
   const api = m.kind === "api";
+  if (api && m.actions.some(action => MODEL_GENERATION_ACTION_IDS.includes(action.id))) {
+    at("actions", "standard model Actions require a web service");
+  }
+  errors.push(...validateModelActions(m.actions, m.$defs));
   if (!api && !HOST_RE.test(m.domain)) at("domain", "must be a website domain");
   if (api !== (m.auth !== undefined)) at("auth", "is required only for API services");
   if (api && m.auth?.type === "oauth2") {

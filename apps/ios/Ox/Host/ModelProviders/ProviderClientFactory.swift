@@ -27,14 +27,7 @@ nonisolated enum ProviderClientFactory {
         let native: any ProviderClient
         switch definition.api {
         case .web:
-            try validateAdapter(definition)
-            switch definition.id {
-            case "kimi-web": native = KimiWebsiteProvider(models: models)
-            case "qwen-web": native = QwenWebsiteProvider(models: models)
-            case "grok-web": native = GrokWebsiteProvider(models: models)
-            case "claude-web": native = ClaudeWebsiteProvider(models: models)
-            default: throw RuntimeError.bridge("Unsupported web provider")
-            }
+            throw RuntimeError.bridge("Website model providers are resolved from services")
         case .openAIChatCompletions:
             let auth: any OpenAIChatTransportAuth
             if definition.auth.kind == .custom { auth = try customChatAuth(definition) }
@@ -137,7 +130,7 @@ nonisolated enum ProviderClientFactory {
             guard let wireID = $0.wireID, !wireID.isEmpty else { return false }
             let input = Set($0.input ?? [.text])
             guard input.contains(.text), input.isSubset(of: [.text, .image, .pdf]) else { return false }
-            return $0 == ProviderDefinition.Model(QwenWebsiteProvider.model(id: wireID, name: $0.name, input: input))
+            return $0 == ProviderDefinition.Model(WebServiceModelProvider.model(id: wireID, name: $0.name, input: input))
         }
     }
 

@@ -1,13 +1,20 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { modelSiteSource } from "../fixtures/model-service-source";
 
-const source = readFileSync(
-  "apps/ios/Ox/Host/Agent/LLM/Providers/KimiWebsiteProvider.swift",
-  "utf8",
-).match(/private static let bridge = #"""([\s\S]*?)"""#/)?.[1];
+const source = modelSiteSource("www.kimi.com") + `
+  async function identity() {
+    const services = document.querySelector('#app').__vue_app__._context.provides.services.serviceMap;
+    const client = [...services].find(([definition]) => definition.typeName === 'kimi.gateway.account.v1.UserService')[1];
+    const result = await client.getCurrentUser();
+    return result.user?.id ? result.user : null;
+  }
+  const site = createModelSite(value => window.webkit.messageHandlers.oxKimiGeneration.postMessage(value));
+  window.__oxKimiRun = (id, prompt, systemPrompt) => site.start(id, prompt, '', systemPrompt);
+  window.__oxKimiCancel = site.cancel;
+  window.__oxKimiSignedIn = site.signedIn;`;
 
 function run(status: number | number[], uploadStatus?: number) {
-  if (!source) throw new Error("Kimi bridge source is missing");
+  if (!source) throw new Error("Kimi service source is missing");
   const events: Array<Record<string, unknown>> = [];
   let settled: (events: Array<Record<string, unknown>>) => void = () => {};
   const terminal = new Promise<Array<Record<string, unknown>>>((resolve) => { settled = resolve; });
@@ -66,8 +73,8 @@ function run(status: number | number[], uploadStatus?: number) {
   return terminal.then(events => ({ events, resumeCount, submitted, uploadedBlocks }));
 }
 
-test("Kimi bridge checks the current website account", async () => {
-  if (!source) throw new Error("Kimi bridge source is missing");
+test("Kimi service uses the shared service authentication result", async () => {
+  if (!source) throw new Error("Kimi service source is missing");
   let userId: string | undefined;
   const services = new Map<{ typeName: string }, object>([
     [{ typeName: "kimi.gateway.account.v1.UserService" }, { getCurrentUser: async () => ({ user: { id: userId } }) }],
@@ -81,26 +88,26 @@ test("Kimi bridge checks the current website account", async () => {
   expect(await browser.window.__oxKimiSignedIn()).toBe(true);
 });
 
-test("Kimi bridge emits ordered snapshots and confirms completed status", async () => {
+test("Kimi service emits ordered snapshots and confirms completed status", async () => {
   const { events } = await run(2);
   expect(events.filter(event => event.type !== "progress").map(event => event.type)).toEqual(["snapshot", "snapshot", "snapshot", "completed"]);
   expect(events.at(-2)?.text).toBe("Hello world");
 });
 
-test("Kimi bridge rejects a stream whose final message failed", async () => {
+test("Kimi service rejects a stream whose final message failed", async () => {
   const { events } = await run(5);
   expect(events.at(-1)?.type).toBe("failed");
   expect(events.some(event => event.type === "completed")).toBe(false);
 });
 
-test("Kimi bridge resumes the same generation before reporting completion", async () => {
+test("Kimi service resumes the same generation before reporting completion", async () => {
   const { events, resumeCount } = await run([1, 2]);
   expect(resumeCount).toBe(1);
   expect(events.at(-1)?.type).toBe("completed");
 });
 
-test("Kimi bridge requests remote cancellation for the identified generation", async () => {
-  if (!source) throw new Error("Kimi bridge source is missing");
+test("Kimi service requests remote cancellation for the identified generation", async () => {
+  if (!source) throw new Error("Kimi service source is missing");
   let ready: () => void = () => {};
   const identified = new Promise<void>(resolve => { ready = resolve; });
   let cancellations = 0;
@@ -130,8 +137,8 @@ test("Kimi bridge requests remote cancellation for the identified generation", a
   expect(cancellations).toBe(1);
 });
 
-test("Kimi bridge keeps simultaneous generation events separate", async () => {
-  if (!source) throw new Error("Kimi bridge source is missing");
+test("Kimi service keeps simultaneous generation events separate", async () => {
+  if (!source) throw new Error("Kimi service source is missing");
   const terminal = new Map<string, (events: Array<Record<string, unknown>>) => void>();
   const events = new Map<string, Array<Record<string, unknown>>>([["first", []], ["second", []]]);
   const results = ["first", "second"].map(id => new Promise<Array<Record<string, unknown>>>(resolve => { terminal.set(id, resolve); }));

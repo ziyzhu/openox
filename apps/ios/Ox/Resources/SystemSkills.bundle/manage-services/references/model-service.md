@@ -1,0 +1,27 @@
+# Model web services
+
+A web service becomes available as a model provider by implementing `listModels`, `startModelGeneration`, `readModelGeneration`, and `cancelModelGeneration` with the standard schemas. There is no model-provider manifest field or separate service kind. An ordinary `listModels` Action alone does not declare model support.
+
+Use the web-service workflow for discovery, authoring, live verification, and Save. Built-in services remain read-only: copy to Local, resolve the existing service conflict, and edit the Local service. Model generation and ordinary Actions use the same selected service source. Preserve unrelated Local edits. No automatic repair or task recovery is provided.
+
+When an existing ordinary `listModels` Action uses another schema, preserve its handler and schema as `listWebsiteModels` before adding the standard model Action. Keep other ordinary Actions intact.
+
+Read `skills/manage-services/references/model-schemas.md` for the exact Action input/output schemas. Copy these schemas into the corresponding manifest Actions and provide the normal label, requireAuth, and requireApproval fields. Do not change the standard schemas. Register all four handlers in `actions.js` alongside existing ordinary Actions. Share website-specific helpers between the two surfaces.
+
+## Execution contract
+
+- The Host creates an owned page for each generation. Keep state in that page's installer closure. Start, read, and cancel must use the same literal base URL and must not be blocking Actions. The Host limits active generation sessions and closes their pages after completion, cancellation, or interruption.
+- `listModels` returns raw website model IDs, names, input modalities, known token limits or null, and supported generation options. Include `website-default` for the website's default model. Do not add the Host's `website:` prefix: the Host adds it for saved selections and supplies the raw ID to start. State streaming and cancellation support truthfully. Model IDs and names must be nonempty and at most 100 characters; return at most 100 models. Always include text input. Use positive token limits when known.
+- `startModelGeneration` receives structured messages with role and text. Serialize the full conversation for the website, preserving the supplied system instructions and Ox Action envelope. Reject unsupported model IDs, options, and attachments before submission. Initiate one submission, retain its asynchronous work in the page, and return a generation ID promptly. Return uncertain until remote acceptance is confirmed. Never retry an uncertain submission automatically.
+- The Host stages attachments as `File` objects in `window.__oxWebsiteFiles` on the generation page. Each attachment argument's integer ID indexes that array; name and MIME type describe the staged file. Use the website's real upload flow, then clear temporary references when no longer needed. Do not request arbitrary local paths or credentials.
+- `readModelGeneration` returns events after a zero-based cursor and the next cursor. Every returned event advances the cursor by one. Wait no longer than waitMilliseconds, which is at most 1000. Reads must be repeatable. Keep terminal events for the remaining page lifetime. Never consume or delete an event merely because a caller read it.
+- Text events contain the full current answer snapshot, not a delta. Once emitted, text must grow by appending; do not emit provisional text that will be replaced. Emit exactly one completed or failed event and no events afterward. Final-only websites return one text event followed by completed. Return no more than 1000 events per read and keep text snapshots under 2 MB. Bound retained history, for example by emitting at most one snapshot per read plus terminal events.
+- Classify failures as contextOverflow, rateLimited, network, authentication, unsupportedInput, or provider. Completion means a verified finished answer, not merely an accepted request.
+- `cancelModelGeneration` reports cancelled only when cancellation is confirmed. Otherwise return requested, completed, or unsupported. Closing a page alone does not prove the remote generation stopped. Cancellation must remain callable while read is waiting.
+- Authentication uses the existing getSignInUrl/getSignInState Actions and website storage. Ordinary service Actions keep their approval rules. The Host invokes internal model Actions for a user-selected model; they are excluded from ordinary tool discovery.
+
+## Verification
+
+Validate the entire draft, activate it using the existing service workflow, and exercise the provider through a real Ox chat. Test text and conversation context, model discovery, supported attachments, Ox Action calls, final-only or incremental output, and cancellation with accurate outcomes. Verify ordinary service Actions still work. Confirm a new generation uses the edited Local source and there is still one provider entry for the service. Preserve sign-in data and saved model selections.
+
+When a page is lost, report the interrupted generation. Do not implement background repair, durable checkpoints, fallback-provider selection, or automatic resubmission.

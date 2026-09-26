@@ -58,7 +58,9 @@ final class ServiceManager {
         case ready(UInt64)
     }
 
-    private var resolvedServices = ResolvedServices()
+    private var resolvedServices = ResolvedServices() {
+        didSet { ProviderRegistry.shared.refreshModelServices(resolvedServices.services) }
+    }
     var services: [Service] { resolvedServices.services }
     private var byDomain: [String: Service] { resolvedServices.byDomain }
     private(set) var monoRepositoryRevision: UInt64 = 0 {
@@ -1077,6 +1079,7 @@ final class ServiceManager {
 
     func serviceCapabilitiesDidChange(_ service: Service) {
         guard byDomain[service.domain] === service else { return }
+        ProviderRegistry.shared.refreshModelServices(services)
         monoRepositoryRevision &+= 1
         reindexMonoRepository()
     }

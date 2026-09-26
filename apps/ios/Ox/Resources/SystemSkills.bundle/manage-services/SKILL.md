@@ -13,6 +13,8 @@ For web-service authoring, read `skills/manage-services/references/helpers.js` o
 
 Read `skills/manage-services/references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
+Read `skills/manage-services/references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
+
 ## Ownership and safeguards
 
 - Local API source at `services/api/<id>/` is editable and uses Host-managed authentication.

@@ -79,11 +79,11 @@ nonisolated extension BuiltInProviders {
             definition: ProviderDefinition(
                 id: "grok-web", name: "Grok Website", url: URL(string: "https://grok.com/")!,
                 api: .web, auth: .init(kind: .custom, adapter: "grok-web"),
-                options: nil, models: [.init(webModel)]
+                options: nil, models: [.init(attachmentWebModel)]
             ),
             presentation: ProviderPresentation(
                 regions: [.global], website: URL(string: "https://grok.com/"),
-                authNotice: "Grok Website uses your Ox browser session. Website inference accepts text inputs; Ox Action calls are experimental.",
+                authNotice: "Grok Website uses your Ox browser session. Text, image, and PDF inputs are supported; Ox Action calls are experimental.",
                 credentialKind: .bearerToken
             ),
             legacyID: "grok-web", legacyRegion: nil, legacyCredentialID: "grok-web"
@@ -92,11 +92,11 @@ nonisolated extension BuiltInProviders {
             definition: ProviderDefinition(
                 id: "claude-web", name: "Claude Website", url: URL(string: "https://claude.ai/")!,
                 api: .web, auth: .init(kind: .custom, adapter: "claude-web"),
-                options: nil, models: [.init(webModel)]
+                options: nil, models: [.init(attachmentWebModel)]
             ),
             presentation: ProviderPresentation(
                 regions: [.global], website: URL(string: "https://claude.ai/"),
-                authNotice: "Claude Website uses your Ox browser session. Text replies appear after completion; Ox Action calls are experimental. Stopping Ox may not stop Claude generation.",
+                authNotice: "Claude Website uses your Ox browser session. Text, image, and PDF inputs are supported. Replies appear after completion; Ox Action calls are experimental. Stopping Ox may not stop Claude generation.",
                 credentialKind: .bearerToken
             ),
             legacyID: "claude-web", legacyRegion: nil, legacyCredentialID: "claude-web"

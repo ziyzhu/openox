@@ -1,13 +1,17 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { modelSiteSource, serviceSource } from "../fixtures/model-service-source";
 
-const source = readFileSync(
-  "apps/ios/Ox/Host/Agent/LLM/Providers/QwenWebsiteProvider.swift",
-  "utf8",
-).match(/private static let bridge = #"""([\s\S]*?)"""#/)?.[1];
+const service = serviceSource("qwen.ai");
+const source = service.slice(0, service.indexOf("window.ox.install")) + modelSiteSource("qwen.ai")
+  + service.slice(service.indexOf("async function modelCatalog()"), service.indexOf("const modelGenerations"))
+  + `const site = createModelSite(value => window.webkit.messageHandlers.oxQwenGeneration.postMessage(value));
+     window.__oxQwenRun = site.start;
+     window.__oxQwenCancel = site.cancel;
+     window.__oxQwenSignedIn = site.signedIn;
+     window.__oxQwenModels = modelCatalog;`;
 
-function session(chunks: string[], finalText = "Hello world", holdOpen = false, signedIn = true, authDelayMs = 0, finalDone = true, uploadState?: "success" | "failed" | "rejected" | "upload_error") {
-  if (!source) throw new Error("Qwen bridge source is missing");
+function session(chunks: string[], finalText = "Hello world", holdOpen = false, signedIn = true, authDelayMs = 0, finalDone = true, uploadState?: "success" | "failed" | "rejected" | "upload_error", hydrationDelay = 0) {
+  if (!source) throw new Error("Qwen service source is missing");
   const events: Array<Record<string, unknown>> = [];
   let settled: (events: Array<Record<string, unknown>>) => void = () => {};
   const terminal = new Promise<Array<Record<string, unknown>>>(resolve => { settled = resolve; });
@@ -21,10 +25,10 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
     if (path === authPath) {
       if (authDelayMs) await new Promise(resolve => setTimeout(resolve, authDelayMs));
       return signedIn
-        ? { success: true, data: { userId: "user-1" } }
-        : { success: false, data: { code: "ERR_UNKNOWN_ERROR", message: "401 Unauthorized" } };
+        ? { success: true, data: { id: "user-1", role: "user" } }
+        : { success: false, data: { code: "Unauthorized", message: "401 Unauthorized" } };
     }
-    if (path === "/models") return { success: true, data: { data: [
+    if (path === "/models/") return { success: true, data: { data: [
       { id: "vision", name: "Vision", info: { is_active: true, meta: { chat_type: ["t2t"], abilities: { vision: 1, document: 1 } } } },
       { id: "text", name: "Text", info: { is_active: true, meta: { chat_type: ["t2t"], abilities: {} } } },
     ] } };
@@ -43,7 +47,8 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
   };
   const authPath = "/auths/";
   const identity = async (_withToast: boolean) => request("/auths/", { baseURL: "/api/v1", toast: false });
-  const store = Object.assign(() => {}, { getState: () => ({ selectedModelIds: ["qwen-model"], setSelectedModelIds: (ids: string[]) => { expect(ids).toEqual(["qwen-model"]); } }) });
+  const hydratedAt = Date.now() + hydrationDelay;
+  const store = Object.assign(() => {}, { getState: () => ({ selectedModelIds: Date.now() >= hydratedAt ? ["vision"] : [], setSelectedModelIds: (ids: string[]) => { expect(ids).toEqual(["vision"]); } }) });
   const browser = globalThis as typeof globalThis & { window: any; document: any; __qwenImport: any };
   browser.window = { webkit: { messageHandlers: { oxQwenGeneration: { postMessage(value: Record<string, unknown>) {
     events.push(value);
@@ -62,8 +67,8 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
     }
   }
   if (uploadState) browser.window.__oxWebsiteFiles = [new File(["synthetic PDF bytes"], "ox-1.pdf", { type: "application/pdf" })];
-  browser.__qwenImport = async () => ({ request, dN: identity, store, FileManager });
-  new Function(source.replace("await import(script.src)", "await globalThis.__qwenImport(script.src)"))();
+  browser.__qwenImport = async () => ({ p: request, dN: identity, store, FileManager });
+  new Function(source.replace("await import(s.src)", "await globalThis.__qwenImport(s.src)"))();
   browser.window.__oxQwenRun("generation-1", "test prompt");
   return { terminal, responseIdentified, closeStream: () => streamController?.close(), requests, browser };
 }
@@ -71,7 +76,7 @@ function session(chunks: string[], finalText = "Hello world", holdOpen = false, 
 const created = 'data: {"response.created":{"chat_id":"chat-1","response_id":"response-1"}}\n\n';
 const delta = 'data: {"choices":[{"delta":{"role":"assistant","phase":"answer","content":"Hello world"}}]}\n\n';
 
-test("Qwen bridge submits through the page client and confirms completion", async () => {
+test("Qwen service submits through the page client and confirms completion", async () => {
   const { terminal, requests } = session([created.slice(0, 20), created.slice(20) + delta, "data: [DONE]\n\n"]);
   const events = await terminal;
   expect(events.filter(event => event.type === "snapshot").map(event => event.text)).toEqual(["Hello world", "Hello world"]);
@@ -79,33 +84,33 @@ test("Qwen bridge submits through the page client and confirms completion", asyn
   expect(requests.find(value => value.path === "/chat/completions")?.options.data.messages[0].content).toBe("test prompt");
 });
 
-test("Qwen bridge reconciles stream EOF with a completed server message", async () => {
+test("Qwen service reconciles stream EOF with a completed server message", async () => {
   const { terminal } = session([created + delta]);
   expect((await terminal).at(-1)?.type).toBe("completed");
 });
 
-test("Qwen bridge rejects EOF without server confirmation", async () => {
+test("Qwen service rejects EOF without server confirmation", async () => {
   const { terminal } = session([created + delta], "Hello world", false, true, 0, false);
   const events = await terminal;
   expect(events.at(-1)?.type).toBe("failed");
   expect(events.some(event => event.type === "completed")).toBe(false);
 }, 7000);
 
-test("Qwen bridge reports the website's logged-out response", async () => {
+test("Qwen service reports the website's logged-out response", async () => {
   const { terminal, requests, browser } = session([], "", false, false);
   expect(await browser.window.__oxQwenSignedIn()).toBe(false);
   expect((await terminal).at(-1)?.type).toBe("failed");
   expect(requests.some(value => value.path === "/chats/new")).toBe(false);
 });
 
-test("Qwen bridge accepts CRLF event boundaries split across chunks", async () => {
+test("Qwen service accepts CRLF event boundaries split across chunks", async () => {
   const frames = (created + delta + "data: [DONE]\n\n").replaceAll("\n", "\r\n");
   const cut = frames.indexOf("\r\n\r\n") + 1;
   const { terminal } = session([frames.slice(0, cut), frames.slice(cut)]);
   expect((await terminal).at(-1)?.type).toBe("completed");
 });
 
-test("Qwen bridge sends the identified response to the stop endpoint", async () => {
+test("Qwen service sends the identified response to the stop endpoint", async () => {
   const { terminal, responseIdentified, closeStream, requests, browser } = session([created + delta], "Hello world", true);
   await responseIdentified;
   expect(await browser.window.__oxQwenCancel("generation-1")).toBe(true);
@@ -115,7 +120,7 @@ test("Qwen bridge sends the identified response to the stop endpoint", async () 
   expect(requests.find(value => value.path === "/chat/completions")?.options.responseType).toBe("stream");
 });
 
-test("Qwen bridge cancels before submitting a completion", async () => {
+test("Qwen service cancels before submitting a completion", async () => {
   const { browser, requests } = session([], "", false, true, 20);
   expect(await browser.window.__oxQwenCancel("generation-1")).toBe(true);
   await new Promise(resolve => setTimeout(resolve, 30));
@@ -138,9 +143,17 @@ for (const state of ["failed", "rejected", "upload_error"] as const) {
 
 test("Qwen discovers each model's supported attachment modalities", async () => {
   const { browser, terminal } = session([created + delta]);
-  expect(JSON.parse(await browser.window.__oxQwenModels())).toEqual([
+  expect((await browser.window.__oxQwenModels()).filter((model: any) => model.id !== "website-default").map(({id, name, input}: any) => ({id, name, input}))).toEqual([
     { id: "vision", name: "Vision", input: ["text", "image", "pdf"] },
     { id: "text", name: "Text", input: ["text"] },
   ]);
+  await terminal;
+});
+
+test("Qwen model discovery waits for the website selection to hydrate", async () => {
+  const {browser, terminal} = session([created + delta], "Hello world", false, true, 0, true, undefined, 40);
+  const models = await browser.window.__oxQwenModels();
+  expect(models[0].id).toBe("website-default");
+  expect(models[0].input).toEqual(["text", "image", "pdf"]);
   await terminal;
 });
