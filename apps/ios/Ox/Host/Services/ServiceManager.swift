@@ -458,17 +458,8 @@ final class ServiceManager {
         let cacheKey = service.isMCPService ? "\(domain):\(preferredTheme ?? "any")" : domain
         if let data = faviconData[cacheKey] { return data }
         let data: Data?
-        let bundledFavicon = Bundle.main.url(forResource: "OxServices", withExtension: "bundle")?
-            .appending(path: "web/\(domain)/favicon.png")
         if let url = service.definition.faviconURL {
-            let fetched = await ServiceImageLoader.data(url: url)
-            if fetched == nil, service.isWebService, service.definition.repositoryID == Repository.bundledID,
-               let bundledFavicon, let bundledData = try? Data(contentsOf: bundledFavicon) {
-                Log.service.info("Service.icon bundled fallback id=\(domain)")
-                data = bundledData
-            } else {
-                data = fetched
-            }
+            data = await ServiceImageLoader.data(url: url)
         } else if service.isMCPService {
             guard let endpoint = service.definition.baseURL else {
                 Log.service.error("RemoteMCP.icon missing endpoint id=\(domain)")

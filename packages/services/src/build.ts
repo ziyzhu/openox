@@ -1,11 +1,9 @@
-import { existsSync } from "node:fs";
 import { mkdir, writeFile, cp, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readSkills } from "@openox/service-sdk/skills";
 import {
   buildService,
   BUILTIN_REPOSITORY_ROOT,
-  sourceDirFor,
 } from "./service.ts";
 import {
   loadIOSManifest,
@@ -98,8 +96,6 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     await mkdir(out, { recursive: true });
     await writeFile(join(out, "service.json"), JSON.stringify(service.manifest, null, 2));
     await writeFile(join(out, "actions.js"), service.actions);
-    const favicon = join(sourceDirFor(domain), "favicon.png");
-    if (existsSync(favicon)) await cp(favicon, join(out, "favicon.png"));
     entries.push(qualifiedRepositoryServiceID(kind, identity));
   }
   for (const { kind, id, manifest } of catalogResults) {
