@@ -171,6 +171,12 @@ struct ChatSidebar: View {
         }
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
+        .overlay {
+            if contentState == .loading {
+                CellularAutomatonLoader()
+                    .accessibilityLabel("Loading your chats…")
+            }
+        }
     }
 
     private func row(_ meta: ChatMeta) -> some View {
