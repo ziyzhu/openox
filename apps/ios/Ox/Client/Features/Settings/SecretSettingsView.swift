@@ -111,9 +111,11 @@ private struct SecretEntryDetailView: View {
                             if let fields {
                                 ForEach(Array(fields.enumerated()), id: \.element.id) { index, field in
                                     if index > 0 { Divider().settingsContentInset() }
-                                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    HStack(spacing: Theme.Spacing.md) {
                                         Text(verbatim: field.name)
                                             .font(Theme.Fonts.bodyMd)
+                                            .lineLimit(1)
+                                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                                         ScrollView(.horizontal) {
                                             if showsValues {
                                                 Text(verbatim: field.value)
@@ -128,6 +130,7 @@ private struct SecretEntryDetailView: View {
                                             }
                                         }
                                         .scrollIndicators(.hidden)
+                                        .frame(minWidth: 0, maxWidth: .infinity)
                                     }
                                     .settingsRowPadding()
                                     .frame(maxWidth: .infinity, alignment: .leading)

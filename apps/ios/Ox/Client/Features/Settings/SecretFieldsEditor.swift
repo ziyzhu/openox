@@ -46,27 +46,30 @@ struct SecretFieldsEditor: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             ForEach(model.fields) { field in
                 let fieldBinding = binding(for: field)
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    HStack {
-                        TextField("Field name", text: fieldBinding.name)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button {
-                            model.fields.removeAll { $0.id == field.id }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .accessibilityLabel("Remove field")
-                        .disabled(model.fields.count == 1)
-                    }
+                HStack(spacing: Theme.Spacing.sm) {
+                    TextField("Field name", text: fieldBinding.name)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
                     SecureField("Value", text: fieldBinding.value)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .privacySensitive()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
+                    Button {
+                        model.fields.removeAll { $0.id == field.id }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(Theme.Fonts.captionMd)
+                            .frame(width: 44, height: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Remove field")
+                    .disabled(model.fields.count == 1)
                 }
                 if field.id != model.fields.last?.id { Divider() }
             }
-            Button("Add field", systemImage: "plus") {
+            RequestPillButton(title: String(localized: "Add field"), isPrimary: false) {
                 model.fields.append(SecretFieldDraft(name: "", value: ""))
             }
         }
