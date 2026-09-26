@@ -1691,7 +1691,6 @@ struct ChatPage: View {
             if action == .edit {
                 composerFocused = true
             } else {
-                Haptics.impact(.send)
                 if let invocation = composer.slashInvocation {
                     submitSkill(invocation.skill, argument: invocation.argument)
                 } else {

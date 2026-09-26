@@ -310,7 +310,6 @@ struct ChatComposer: View, Equatable {
                 }
             }
             .onChange(of: canSubmit, initial: true) { _, canSubmit in
-                if canSubmit { Haptics.prepareImpact() }
                 onPreparationIntent(canSubmit)
             }
             .onChange(of: composer.draft) { previous, current in
@@ -554,7 +553,6 @@ struct ChatComposer: View, Equatable {
             case .suggested(let suggestion):
                 let message = suggestion.message
                 composer.draft = message
-                Haptics.impact(.send)
                 Log.ui.info("ChatComposer.followIntent send chat=\(sessionID) chars=\(message.count)")
                 submit()
             case .importMemory:
@@ -748,7 +746,7 @@ struct ChatComposer: View, Equatable {
     @ViewBuilder
     private var trailingControl: some View {
         if isEditingMessage, canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, event: .send, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, action: submit)
         } else if isEditingMessage {
             EmptyView()
         } else if composer.isImporting, isBusy {
@@ -760,7 +758,7 @@ struct ChatComposer: View, Equatable {
                 .padding(.vertical, 5)
                 .accessibilityLabel("Attaching")
         } else if composer.canSubmit {
-            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, event: .send, action: submit)
+            composerButton(systemName: "arrow.up", label: A11yLabel.send, id: A11yID.Chat.send, action: submit)
         } else if isBusy, !composer.suppressesStopControl {
             composerButton(systemName: "stop.fill", label: A11yLabel.stop, id: A11yID.Chat.stop, event: .stop, action: onStop)
         } else if composer.isEmpty {
@@ -875,11 +873,11 @@ struct ChatComposer: View, Equatable {
         systemName: String,
         label: String,
         id: String,
-        event: Haptics.Event,
+        event: Haptics.Event? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            Haptics.impact(event)
+            if let event { Haptics.impact(event) }
             action()
         } label: {
             Image(systemName: systemName)

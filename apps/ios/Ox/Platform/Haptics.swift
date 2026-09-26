@@ -12,7 +12,6 @@ enum Haptics {
         case permissionPersistenceToggled
         case queuedMessageCancelled
         case selectionConfirmed
-        case send
         case speechStarted
         case speechStopped
         case serviceAttached
