@@ -9,7 +9,7 @@ nonisolated enum OxUser {
                 (
                     "ox.user.follow",
                     .object([
-                        "description": .string("Show up to two likely next intents scoped to the current conversation above the empty composer without waiting for a response: `await ox.user.follow({ intents, purpose })`. Use `send` for a complete user message, or `actions` and `skills` for the built-in input forms. A send intent fills the composer for the user to review and send when tapped; form intents place a draft in the composer after the user supplies details."),
+                        "description": .string("Show up to two likely next intents scoped to the current conversation above the empty composer without waiting for a response: `await ox.user.follow({ intents, purpose })`. Use `send` with a short label and the user message to send. Tapping any intent immediately sends its request. Collect any missing details in chat afterward."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -21,12 +21,12 @@ nonisolated enum OxUser {
                                         "properties": .object([
                                             "kind": .object([
                                                 "type": .string("string"),
-                                                "enum": .array(["send", "actions", "skills"].map(JSONValue.string)),
+                                                "enum": .array(["send"].map(JSONValue.string)),
                                             ]),
                                             "label": .object(["type": .string("string"), "maxLength": .int(80)]),
                                             "message": .object(["type": .string("string"), "maxLength": .int(1_000)]),
                                         ]),
-                                        "required": .array([.string("kind")]),
+                                        "required": .array(["kind", "label", "message"].map(JSONValue.string)),
                                         "additionalProperties": .bool(false),
                                     ]),
                                 ]),
