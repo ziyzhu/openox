@@ -26,6 +26,7 @@ struct ProviderAuthenticationView: View {
     @Environment(ServiceManager.self) private var serviceManager
 
     @State private var authenticationMethod: AuthenticationMethod
+    @State private var apiKeySaved = false
     @State private var signedIn = false
     @State private var plan: String?
     @State private var accountLabel: String?
@@ -227,11 +228,48 @@ struct ProviderAuthenticationView: View {
         HStack {
             APIKeySecureField(
                 placeholder: "\(credentialProviderName) \(client.credentialKind.name.lowercased())",
-                text: $apiKey
+                text: Binding(
+                    get: { apiKey },
+                    set: {
+                        apiKey = $0
+                        apiKeySaved = false
+                        signInError = nil
+                    }
+                )
             )
             .accessibilityIdentifier(A11yID.Chat.modelKeyField)
+
+            Button {
+                do {
+                    try ProviderCredentialEntry.save(apiKey, for: client)
+                    signInError = nil
+                    apiKeySaved = true
+                    onChange()
+                    onAuthenticated?()
+                } catch { signInError = error.localizedDescription }
+            } label: {
+                Group {
+                    if apiKeySaved {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                    } else {
+                        Text("Save")
+                            .font(Theme.Fonts.labelMd)
+                    }
+                }
+                .foregroundStyle(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? Theme.Colors.onSurfaceMuted : Theme.Colors.primary)
+                .fixedSize()
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(apiKeySaved || apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityLabel(apiKeySaved ? "Saved" : "Save")
+            .accessibilityIdentifier("provider.authentication.save")
         }
-        .settingsRowPadding()
+        .padding(.horizontal, SettingsLayout.horizontalInset)
+        .padding(.vertical, Theme.Spacing.xs)
         .settingsSurface(singleRow: true)
 
         if let website = client.website {
@@ -251,18 +289,6 @@ struct ProviderAuthenticationView: View {
             .font(Theme.Fonts.caption)
             .foregroundStyle(Theme.Colors.onSurfaceMuted)
             .settingsContentInset()
-
-        Button("Save") {
-            do {
-                try ProviderCredentialEntry.save(apiKey, for: client)
-                signInError = nil
-                onChange()
-                onAuthenticated?()
-            } catch { signInError = error.localizedDescription }
-        }
-        .buttonStyle(.plain)
-        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .accessibilityIdentifier("provider.authentication.save")
     }
 
     @ViewBuilder

@@ -538,6 +538,7 @@ struct ModelPickerContent: View {
     private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
+    @State private var choosingProvider = false
     @State private var authRevision = 0
     @State private var selectedRegion: LLMRegion
     @State private var providerSelection: ProviderSelection
@@ -778,19 +779,7 @@ struct ModelPickerContent: View {
     }
 
     private var providerMenu: some View {
-        NavigationLink {
-            ProviderPickerView(
-                clients: displayedClients,
-                selectedClientID: Binding(
-                    get: { selectedClientID },
-                    set: {
-                        providerSelection = $0.map(ProviderSelection.client) ?? .custom
-                        providerDidChange()
-                        applySelection()
-                    }
-                )
-            )
-        } label: {
+        Button { choosingProvider = true } label: {
             selectionRow(providerSelection == .custom
                 ? "Custom provider"
                 : selectedClient?.displayName ?? "Choose a provider",
@@ -802,6 +791,20 @@ struct ModelPickerContent: View {
             ? "Custom provider"
             : selectedClient?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelProvider)
+        .navigationDestination(isPresented: $choosingProvider) {
+            ProviderPickerView(
+                clients: displayedClients,
+                selectedClientID: Binding(
+                    get: { selectedClientID },
+                    set: {
+                        providerSelection = $0.map(ProviderSelection.client) ?? .custom
+                        providerDidChange()
+                        applySelection()
+                    }
+                ),
+                onSelect: { choosingProvider = false }
+            )
+        }
     }
 
     private var modelMenu: some View {
@@ -1225,55 +1228,60 @@ struct ModelPickerContent: View {
 private struct ProviderPickerView: View {
     let clients: [any ProviderClient]
     @Binding var selectedClientID: String?
+    let onSelect: () -> Void
 
     var body: some View {
-        let websiteClients = clients.filter { client in
-            client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
-        }
-        let freeClients = clients
-            .filter { $0.gettingStartedOffer != nil }
-            .sorted {
-                ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max)
-            }
-        let prioritizedIDs = Set((websiteClients + freeClients).map(\.id))
+        let directClients = clients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey && !isWebsite($0) }
+            + clients.filter(isWebsite)
+        let directIDs = Set(directClients.map(\.id))
+        let apiClients = clients.filter { !directIDs.contains($0.id) }
+            .sorted { ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max) }
+        let visibleClients = directClients + apiClients.filter { $0.id == selectedClientID }
+        let apiOption = SettingsSelectionOption<String?>(
+            id: "api",
+            value: nil,
+            title: L10n.string("API provider"),
+            systemImage: "plus",
+            accessibilityIdentifier: A11yID.Chat.modelAPIProviders,
+            children: apiClients.map { providerOption($0, showsSubtitle: true) }
+        )
         let customOption = SettingsSelectionOption<String?>(
             id: "custom",
             value: nil,
             title: L10n.string("Custom provider"),
             systemImage: "plus",
-            subtitle: "OpenAI-compatible server",
             accessibilityIdentifier: A11yID.Chat.modelCustomProviders
         )
-        let providerOption = { (client: any ProviderClient) in
-            SettingsSelectionOption<String?>(
-                id: client.id,
-                value: client.id,
-                title: client.displayName,
-                faviconDomain: client.website?.host,
-                subtitle: subtitle(for: client),
-                accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
-            )
-        }
-        let options = websiteClients.map(providerOption)
-            + freeClients.filter { client in !websiteClients.contains { $0.id == client.id } }.map(providerOption)
-            + clients.filter { !prioritizedIDs.contains($0.id) }.map(providerOption)
-            + [customOption]
 
         SettingsSelectionPickerView(
             title: "Provider",
-            options: options,
-            selection: $selectedClientID
+            options: visibleClients.map { providerOption($0) }
+                + (apiClients.isEmpty ? [] : [apiOption]) + [customOption],
+            selection: $selectedClientID,
+            onSelect: {
+                selectedClientID = $0
+                onSelect()
+            }
+        )
+    }
+
+    private func isWebsite(_ client: any ProviderClient) -> Bool {
+        client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
+    }
+
+    private func providerOption(_ client: any ProviderClient, showsSubtitle: Bool = false) -> SettingsSelectionOption<String?> {
+        SettingsSelectionOption(
+            id: client.id,
+            value: client.id,
+            title: client.displayName,
+            faviconDomain: client.website?.host,
+            subtitle: showsSubtitle ? subtitle(for: client) : nil,
+            accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
         )
     }
 
     private func subtitle(for client: any ProviderClient) -> String {
-        if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web {
-            return "Website sign-in"
-        }
         if let offer = client.gettingStartedOffer { return offer.summary }
-        if client.subscriptionAccount != nil {
-            return client.acceptsAPIKey ? "Account sign-in or API key" : "Account sign-in"
-        }
         if !client.acceptsAPIKey { return "Not required" }
         return client.credentialKind == .subscriptionKey ? "Subscription key" : "API key"
     }
@@ -1287,12 +1295,14 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     var faviconDomain: String? = nil
     var subtitle: String? = nil
     let accessibilityIdentifier: String
+    var children: [SettingsSelectionOption<Value>] = []
 }
 
 private struct SettingsSelectionPickerView<Value: Hashable>: View {
     let title: LocalizedStringKey
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value
+    var onSelect: ((Value) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -1316,45 +1326,75 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
         .settingsSurface()
     }
 
-    private func optionRow(_ option: SettingsSelectionOption<Value>) -> some View {
-        Button {
-            selection = option.value
+    private func select(_ value: Value) {
+        if let onSelect {
+            onSelect(value)
+        } else {
+            selection = value
             dismiss()
-        } label: {
-            HStack(spacing: SettingsLayout.horizontalInset) {
-                if let faviconDomain = option.faviconDomain {
-                    DomainFavicon(domain: faviconDomain, size: 24)
-                }
-                if let systemImage = option.systemImage {
-                    Image(systemName: systemImage)
-                        .font(.system(.body, weight: .medium))
-                        .foregroundStyle(Theme.Colors.primary)
-                        .frame(width: 24, alignment: .leading)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: option.title)
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                    if let subtitle = option.subtitle {
-                        Text(LocalizedStringKey(subtitle))
-                            .font(Theme.Fonts.caption)
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    }
-                }
-                Spacer(minLength: 0)
-                if selection == option.value {
-                    Image(systemName: "checkmark")
-                        .font(.system(.subheadline, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.primary)
+        }
+    }
+
+    @ViewBuilder
+    private func optionRow(_ option: SettingsSelectionOption<Value>) -> some View {
+        if option.children.isEmpty {
+            Button { select(option.value) } label: {
+                optionLabel(option)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(option.accessibilityIdentifier)
+            .accessibilityValue(selection == option.value ? L10n.string("Selected") : "")
+        } else {
+            NavigationLink {
+                SettingsSelectionPickerView(
+                    title: LocalizedStringKey(option.title),
+                    options: option.children,
+                    selection: $selection,
+                    onSelect: select
+                )
+            } label: {
+                optionLabel(option)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(option.accessibilityIdentifier)
+        }
+    }
+
+    private func optionLabel(_ option: SettingsSelectionOption<Value>) -> some View {
+        HStack(spacing: SettingsLayout.horizontalInset) {
+            if let faviconDomain = option.faviconDomain {
+                DomainFavicon(domain: faviconDomain, size: 24)
+            }
+            if let systemImage = option.systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(.body, weight: .medium))
+                    .foregroundStyle(Theme.Colors.primary)
+                    .frame(width: 24, alignment: .leading)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: option.title)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                if let subtitle = option.subtitle {
+                    Text(LocalizedStringKey(subtitle))
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
             }
-            .padding(.horizontal, SettingsLayout.horizontalInset)
-            .padding(.vertical, SettingsLayout.rowVerticalInset)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+            Spacer(minLength: 0)
+            if !option.children.isEmpty {
+                Image(systemName: "chevron.right")
+                    .font(Theme.Icons.xs)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            } else if selection == option.value {
+                Image(systemName: "checkmark")
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.primary)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(option.accessibilityIdentifier)
-        .accessibilityValue(selection == option.value ? L10n.string("Selected") : "")
+        .padding(.horizontal, SettingsLayout.horizontalInset)
+        .padding(.vertical, SettingsLayout.rowVerticalInset)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
