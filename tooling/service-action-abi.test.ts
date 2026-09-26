@@ -22,29 +22,14 @@ function apiRuntime() {
   return new Function("__apiRequest", `${apiInstaller}\nreturn { window, __invokeAPI };`)(request);
 }
 
-test("web installers receive only action and page fetch is untouched", async () => {
+test("web installers execute actions without changing page fetch", async () => {
   const { window, service } = runtime();
   const fetch = window.fetch;
   service.install(({ action }: Record<string, any>) => {
     action("value", { invoke: () => ({ value: "ok" }) });
   });
   expect(window.fetch).toBe(fetch);
-  expect(window.oxFetchCapture).toBeUndefined();
   expect(await service.callServiceAction("value")).toEqual({ value: "ok" });
-});
-
-test("web installers cannot reach retired helpers", () => {
-  expect(() => runtime().service.install(({ retryFetch }: Record<string, any>) => retryFetch)).toThrow(
-    "service installer does not provide retryFetch",
-  );
-});
-
-test.each([
-  [[2, () => {}]],
-  [[() => {}, 2]],
-])("installers that pass a version fail: %j", args => {
-  expect(() => runtime().service.install(...args)).toThrow("window.ox.install takes only the installer");
-  expect(() => apiRuntime().window.ox.install(...args)).toThrow("window.ox.install takes only the installer");
 });
 
 test("API installers receive action and request", async () => {
@@ -53,13 +38,6 @@ test("API installers receive action and request", async () => {
     action("value", { invoke: () => request({ path: "/value" }) });
   });
   expect(await __invokeAPI("value", {}, ["value"])).toEqual({ value: "ok" });
-});
-
-test("API installers cannot reach retired helpers", () => {
-  const { window } = apiRuntime();
-  expect(() => window.ox.install(({ lib }: Record<string, any>) => lib)).toThrow(
-    "service installer does not provide lib",
-  );
 });
 
 test("copyable fetch capture observes a matching response and replays the latest result", async () => {

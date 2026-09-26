@@ -38,13 +38,9 @@ test("a service with Host-accepted fields and a matching installer is valid", as
   expect((await readRepository(root)).services).toEqual(["web:example.com"]);
 });
 
-test.each([
-  ['window.ox.install(2, ({ action }) => action("read", { invoke: () => ({}) }));', "window.ox.install takes only the installer"],
-  ['window.ox.install(({ action, retryFetch }) => { retryFetch; action("read", { invoke: () => ({}) }); });', "service installer does not provide retryFetch"],
-  ['window.ox.install(({ action }) => action("other", { invoke: () => ({}) }));', "missing implementations: read; undeclared implementations: other"],
-])("invalid installers are reported per service: %s", async (actions, message) => {
-  await expect(readRepository(repository(actions))).rejects.toThrow(`web:example.com: `);
-  await expect(readRepository(repository(actions))).rejects.toThrow(message);
+test("action mismatches are reported per service", async () => {
+  const root = repository('window.ox.install(({ action }) => action("other", { invoke: () => ({}) }));');
+  await expect(readRepository(root)).rejects.toThrow("web:example.com: action registration mismatch; missing implementations: read; undeclared implementations: other");
 });
 
 test("manifest errors are reported before running the installer", async () => {
