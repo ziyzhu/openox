@@ -705,30 +705,7 @@ struct ModelPickerContent: View {
                     } else if let selectedClient {
                         authenticationSection(selectedClient)
                         if !isAuthenticating {
-                            selectionSection("Model") {
-                                VStack(spacing: Theme.Spacing.sm) {
-                                    modelMenu
-                                    if selectedClient.canLoadModels {
-                                        Button { loadProviderModels(selectedClient) } label: {
-                                            HStack(spacing: Theme.Spacing.sm) {
-                                                if providerModelsLoading { CellularAutomatonLoader.small }
-                                                Text(providerModelsLoading ? "Loading models…" : "Load models")
-                                                    .font(Theme.Fonts.bodyMd)
-                                                Spacer(minLength: 0)
-                                                Image(systemName: "arrow.clockwise")
-                                                    .font(.caption.weight(.semibold))
-                                            }
-                                            .foregroundStyle(Theme.Colors.onSurface)
-                                            .settingsRowPadding()
-                                            .settingsSurface(singleRow: true)
-                                        }
-                                        .disabled(providerModelsLoading)
-                                    }
-                                    if let providerModelsError {
-                                        SettingsErrorMessage(message: providerModelsError, systemImage: "exclamationmark.circle.fill")
-                                    }
-                                }
-                            }
+                            selectionSection("Model") { modelMenu }
                             if !reasoningEfforts.isEmpty {
                                 selectionSection("Thinking level") { reasoningEffortMenu }
                             }
@@ -828,11 +805,34 @@ struct ModelPickerContent: View {
                     }
                 )
             )
+            .toolbar {
+                if let selectedClient, selectedClient.canLoadModels {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { loadProviderModels(selectedClient) } label: {
+                            if providerModelsLoading {
+                                CellularAutomatonLoader.small
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                        }
+                        .disabled(providerModelsLoading)
+                        .accessibilityLabel(providerModelsLoading ? "Loading models…" : "Load models")
+                    }
+                }
+            }
+            .alert("Load models", isPresented: Binding(
+                get: { providerModelsError != nil },
+                set: { if !$0 { providerModelsError = nil } }
+            )) {
+                Button("OK", role: .cancel) { providerModelsError = nil }
+            } message: {
+                Text(verbatim: providerModelsError ?? "")
+            }
         } label: {
             selectionRow(selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
         }
         .buttonStyle(.plain)
-        .disabled(selectedClient?.models.isEmpty != false)
+        .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelSelection)
