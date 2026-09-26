@@ -21,13 +21,15 @@ Do not copy API base URLs, request headers, model IDs, context limits, reasoning
 
 Read the matching provider reference before changing or reviewing an integration. Verify unstable metadata against first-party provider sources. Treat the provider source and catalog as authoritative when documentation disagrees, then update the reference only where its human-facing context is stale.
 
-When adding a built-in provider:
+When adding a native API or subscription provider:
 
 1. Give it a provider-owned composition file under `apps/ios/Ox/Host/Agent/LLM/Providers`.
 2. Reuse a transport from `LLM/Transports` when its wire protocol already exists.
 3. Add a focused reference named for the provider composition entry point.
 4. Add the reference to the routing list below.
 5. Keep account-region boundaries explicit, especially when Global and China use different credentials or portals.
+
+When adding model capability to an existing web service, follow the built-in `manage-services` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file. Verify both fetch and XHR on a fresh owned generation page. A warm inspection page can use a different transport, and hidden-page animation state may lag completed server responses. Require a native completion marker correlated with the submitted conversation.
 
 Test signed-out and expired-session behavior with synthetic fixtures or an isolated session. Do not remove authentication from a live signed-in website-client request: its unauthorized-response handler can clear the user’s session even when the request itself is read-only. Verify the signed-out-to-signed-in transition across a separate handoff page. Sign-in probes must read fresh shared state and avoid website-client handlers that clear credentials on an unauthorized response; a successful check on an already authenticated page is insufficient.
 

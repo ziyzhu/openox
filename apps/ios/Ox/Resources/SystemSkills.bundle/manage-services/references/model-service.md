@@ -22,6 +22,12 @@ Read `skills/manage-services/references/model-schemas.md` for the exact Action i
 
 ## Verification
 
+Verify submission on a fresh owned generation page. A warm inspection page can use fetch while a fresh page uses XHR; observe both when the website uses both transports. Confirm the submitted prompt and remote conversation/message identity before accepting completion. Prefer native terminal response markers over stable DOM text, stream EOF, or animation state. Long messages can be collapsed in the DOM; use an exact server-echoed prompt and matching turn identities when available instead of requiring the rendered text to contain the entire prompt.
+
+Hidden pages may not run `requestAnimationFrame`. Inspect the website's initialization path when the editor accepts text but submission never starts. If native initialization depends on frame callbacks, a service-local document-start timer fallback can keep those callbacks running while hidden; preserve callback cancellation and execute each callback at most once. This must not trigger another submission or bypass sign-in or human verification.
+
+Exercise the complete serialized Ox prompt, including system instructions, tool schemas, history, and Action results. An ordinary chat Action's character cap is not evidence of the website's model context limit. Verify that native editor state preserves the entire prompt and report context overflow when a known limit is exceeded.
+
 Validate the entire draft, activate it using the existing service workflow, and exercise the provider through a real Ox chat. Test text and conversation context, model discovery, supported attachments, Ox Action calls, final-only or incremental output, and cancellation with accurate outcomes. Verify ordinary service Actions still work. Confirm a new generation uses the edited Local source and there is still one provider entry for the service. Preserve sign-in data and saved model selections.
 
 When a page is lost, report the interrupted generation. Do not implement background repair, durable checkpoints, fallback-provider selection, or automatic resubmission.

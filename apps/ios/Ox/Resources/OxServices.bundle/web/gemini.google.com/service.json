@@ -198,7 +198,7 @@
       "blocking": true
     },
     {
-      "id": "listModels",
+      "id": "listWebsiteModels",
       "label": "List Gemini modes",
       "description": "Read the current finite model/mode picker; does not change selection.",
       "inputSchema": {
@@ -513,6 +513,381 @@
       "requireAuth": true,
       "requireApproval": false,
       "blocking": true
+    },
+    {
+      "id": "listModels",
+      "label": "List provider models",
+      "description": "Standard model provider Action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "image",
+                      "pdf"
+                    ]
+                  }
+                },
+                "contextTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "outputTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "streaming": {
+                  "type": "boolean"
+                },
+                "cancellation": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "temperature",
+                      "maxTokens"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "input",
+                "contextTokens",
+                "outputTokens",
+                "streaming",
+                "cancellation",
+                "options"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://gemini.google.com/app"
+    },
+    {
+      "id": "startModelGeneration",
+      "label": "Start model generation",
+      "description": "Standard model provider Action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "mimeType"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "temperature": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxTokens": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "temperature",
+              "maxTokens"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "modelId",
+          "messages",
+          "attachments",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string"
+          },
+          "submission": {
+            "type": "string",
+            "enum": [
+              "uncertain",
+              "confirmed"
+            ]
+          }
+        },
+        "required": [
+          "generationId",
+          "submission"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "baseUrl": "https://gemini.google.com/app"
+    },
+    {
+      "id": "readModelGeneration",
+      "label": "Read model generation",
+      "description": "Standard model provider Action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string"
+          },
+          "after": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitMilliseconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "generationId",
+          "after",
+          "waitMilliseconds"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "completed"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "failed"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "contextOverflow",
+                        "rateLimited",
+                        "network",
+                        "authentication",
+                        "unsupportedInput",
+                        "provider"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "message",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "nextCursor",
+          "events"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false,
+      "baseUrl": "https://gemini.google.com/app"
+    },
+    {
+      "id": "cancelModelGeneration",
+      "label": "Cancel model generation",
+      "description": "Standard model provider Action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "generationId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled",
+              "requested",
+              "completed",
+              "unsupported"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true,
+      "baseUrl": "https://gemini.google.com/app"
     }
   ],
   "faviconUrl": "https://openox.ai/assets/services/gemini.google.com/favicon.png"

@@ -1,8 +1,35 @@
 # Assistant web services as model providers
 
-Status: draft. Builds on commit `22ef111`, which moved Qwen, Kimi, Grok, and Claude into editable web services. No expansion implementation is included in this plan.
+Status: Gemini and Doubao implemented and saved in Local, with live Ox Action and conversation-context verification. The remaining four candidates still require their own verification. Builds on commit `22ef111`, which moved Qwen, Kimi, Grok, and Claude into editable web services.
+
+## Implementation evidence
+
+- Initial account probes on ox-qa-5 found Gemini signed in and the other candidates signed out. Doubao has since been signed in and explored; check the remaining services afresh before implementation.
+- Gemini now exposes the four standard model Actions through the generic provider, alongside its preserved ordinary Actions. The website picker remains available as `listWebsiteModels`.
+- The first release advertises the default text model with final-only output. Native fetch and XHR responses supply explicit completion markers, correlated with the submitted conversation. Hidden-page rendering state remains busy after completion and is not used as the completion signal.
+- Gemini's native editor truncates input at 32,000 JavaScript string units. The model service rejects oversized serialized context before submission with a context-overflow failure; it never drops instructions or history. Token limits remain unknown because this is a character limit.
+- Live generic-provider text passed. A real Ox chat executed `console.log(7 * 8)`, consumed the returned `56`, and recalled both that result and `MAPLE-847` in a follow-up turn with full Ox instructions present. Ordinary website model discovery also passed.
+- Direct `ox vm call ox.service.attach` from an idle chat cannot present the first-attachment prompt because no agent run is active. First attachment succeeded through the app's Services picker; subsequent CLI attachment calls reloaded the validated Local draft. A trial tracking change did not resolve the underlying run-state requirement and was discarded.
+- Synthetic transport/parser fixtures cover fetch and XHR, native completion flags, response identity, malformed and oversized responses, preserved answer formatting, and input limits. The existing shared lifecycle tests also cover Gemini.
+- All 83 focused tests pass, along with typechecking and bundle compilation. The app builds and launches on ox-qa-5 (iOS 26.5). The saved Gemini selection survives restart; saved Local JavaScript matches the repository and generated bundle, and Local has no pending changes.
+
+Gemini does not yet advertise selectable website modes, attachments, incremental streaming, or confirmed remote cancellation. Cancellation before submission is confirmed; after submission it is reported as unsupported. The remaining candidates must pass the same live gates before becoming model providers.
+
+### Doubao implementation evidence
+
+- Copied the built-in service to Local and activated all four standard model Actions without a new manifest field or Swift provider. The Host discovers one `web:doubao.com` entry using the existing account.
+- Doubao initializes its native submission machinery inside `requestAnimationFrame`, which stalls on hidden pages. A document-start fallback schedules those callbacks while hidden, preserves cancellation, and invokes each callback at most once. Ordinary synthetic chat passed after this fix.
+- The adapter observes the native `/chat/completion` request through fetch or XHR. It correlates the acknowledged question, exact submitted prompt, conversation, and assistant message; reconstructs text patches; and requires native message, answer, and stream completion markers before publishing a final answer.
+- Standardized lifecycle and fresh owned-page generic-provider text tests passed. Synthetic fixtures cover both transports, mismatched identities, incomplete answers, unsupported content, bounded response size, cancellation, hidden-page scheduling, and the shared cursor/lifecycle contract. Typecheck and bundle compilation pass.
+- Long user messages are collapsed in Doubao's DOM. Completion uses the exact server-echoed prompt and matching question/answer identities, plus the conversation route, rather than requiring the collapsed DOM to reproduce the full prompt. The full Ox prompt exceeded 33,000 characters during verification.
+- A real Ox chat called `execute` with `console.log(8 * 9)`, received `72`, and consumed the result in its final answer. A follow-up correctly recalled both `CEDAR-926` and `72` without another Action.
+- Capabilities are limited to the default text model and final-only output. Token limits are unknown; selectable modes, uploads, generation options, incremental streaming, and remote cancellation are not advertised.
+- Saved Local commit `7d62922177a5088b05e7f27bfd6fe121039a6b43`; Local is clean. Saved JavaScript matches the built-in source and generated bundle. All 96 focused tests pass, alongside typecheck and bundle compilation. A forced iOS build installed and launched on ox-qa-5, the saved Doubao selection survived restart, the registry contained one provider entry, and a fresh generation returned `DOUBAO_RESTART_READY`.
+- Source activation requires reloading the service attachment after Local edits. The debug page-reload command alone can retain the prior loaded service definition. First attach the service through the picker when the QA chat is idle, then use `ox.service.attach` for subsequent revisions.
 
 ## Outcome and scope
+
+Microsoft Copilot follow-up: the fresh server-authoritative sign-in check passed on ox-qa-5. A synthetic send opened a native “Verification required” dialog, left the draft intact, and did not confirm a submitted conversation. After the user completed the visible-page handoff, a new service-page test again required Cloudflare Turnstile verification; its only observed chat WebSocket response was a heartbeat. Sign-in remains valid, but visible-page verification did not carry over to the hidden service page. Native submission uses a WebSocket connection to Microsoft's substrate service. Capture was stopped. No Local Copilot draft or model capability has been added; reliable submission and completion remain blocked by the per-page human-verification flow.
 
 Extend the six remaining assistant web services below with the existing standard model Actions. They should appear in Ox's model picker, use their existing website accounts and storage, and remain editable through the normal Local service workflow. ChatGPT is excluded because its existing account integration already covers the intended access.
 

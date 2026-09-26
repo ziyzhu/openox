@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { serviceSource } from "../fixtures/model-service-source";
 
 type Event = { id: string; type: string; text?: string; message?: string };
-const domains = ["qwen.ai", "www.kimi.com", "grok.com", "claude.ai"];
+const domains = ["qwen.ai", "www.kimi.com", "grok.com", "claude.ai", "gemini.google.com", "doubao.com"];
 
 function session(domain: string) {
   const handlers: Record<string, { invoke(args: any): Promise<any> }> = {};
