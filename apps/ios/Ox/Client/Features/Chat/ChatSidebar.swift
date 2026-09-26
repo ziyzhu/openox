@@ -156,11 +156,7 @@ struct ChatSidebar: View {
         let ordered = sorted.filter(\.isFavorite) + sorted.filter { !$0.isFavorite }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if contentState == .loading {
-                    CellularAutomatonLoader.small
-                        .padding(edgeInset)
-                        .accessibilityLabel("Loading your chats…")
-                } else if contentState == .ready, ordered.isEmpty {
+                if contentState == .ready, ordered.isEmpty {
                     Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)

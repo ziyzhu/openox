@@ -517,9 +517,9 @@ struct RootView: View {
     @State private var presentation: Presentation?
     @State private var startup = Startup.idle
     @State private var startupComposer = ChatComposerModel()
-    @State private var startupDraft = ""
+    @State private var startupSpeechInput = ChatSpeechInput()
     @State private var startupMessages: [ChatComposerModel.Message] = []
-    @State private var startupChatID: UUID?
+    @State private var startupChatID = UUID()
     @FocusState private var startupComposerFocused: Bool
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var artifactRefreshEpoch = 0
@@ -529,6 +529,7 @@ struct RootView: View {
     @State private var sharedNoteToast: Toast?
     @State private var sidebarInteraction = SidebarInteraction()
     @ScaledMetric(relativeTo: .title3) private var startupButtonSize: CGFloat = 44
+    @ScaledMetric(relativeTo: .body) private var startupComposerButtonSize: CGFloat = 34
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -593,12 +594,6 @@ struct RootView: View {
         GeometryReader { geo in
             if isSplitLayout {
                 splitLayout(width: geo.size.width)
-            } else if startup != .ready {
-                if showSidebar {
-                    compactSidebarPanel
-                } else {
-                    startupShell
-                }
             } else {
                 compactLayout(geo: geo)
             }
@@ -890,106 +885,107 @@ struct RootView: View {
     }
 
     private var startupShell: some View {
-        VStack(spacing: 0) {
-            HStack {
-                SidebarMenuButton { setSidebar(isSplitLayout ? !showSidebar : true) }
-                Spacer()
-                TemporaryChatIcon(isActive: false)
-                    .frame(width: 29, height: 29)
-                    .frame(width: startupButtonSize, height: startupButtonSize)
-                    .glassEffect(.regular, in: Circle())
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.bottom, Theme.Spacing.xs)
-            ScrollView {
-                startupMessageQueue
-            }
-            .defaultScrollAnchor(.bottom)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            startupStatus
-            startupInputBar
+        NavigationStack {
+            startupPage
+                .toolbar(.hidden, for: .navigationBar)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.surface)
+        .background(Theme.Colors.chatSurface)
     }
 
-    private var startupMessageQueue: some View {
-        VStack(alignment: .trailing, spacing: Theme.Spacing.md) {
-            ForEach(startupMessages, id: \.id) { message in
-                VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
-                    Text(message.text)
-                        .font(Theme.Fonts.bodyMd)
-                        .textSelection(.enabled)
+    private var startupPage: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(startupMessages, id: \.id) { message in
                     HStack {
-                        Text("Queued")
-                            .font(Theme.Fonts.captionSm)
-                        Button("Cancel", systemImage: "xmark") {
-                            startupMessages.removeAll { $0.id == message.id }
-                        }
-                        .labelStyle(.iconOnly)
-                        .minimumTouchTarget()
+                        Spacer(minLength: 40)
+                        UserBubble(
+                            text: message.text,
+                            attachments: message.attachments,
+                            sourcePrefix: "startup:\(message.id.uuidString)",
+                            onOpenAttachment: { _, _ in }
+                        )
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier(A11yID.Chat.Message.user)
                     }
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .padding(.top, ChatTranscriptMetrics.blockSpacing)
                 }
-                .padding(Theme.Spacing.md)
-                .background(Theme.Colors.bubble, in: RoundedRectangle(cornerRadius: Theme.Radius.xl))
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                startupStatus
             }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, 6)
+            .frame(maxWidth: Theme.ContainerWidth.readable)
+            .frame(maxWidth: .infinity)
         }
-        .padding(Theme.Spacing.lg)
-        .frame(maxWidth: Theme.ContainerWidth.readable)
-        .frame(maxWidth: .infinity)
+        .safeAreaBar(edge: .top, spacing: 0) {
+            ChatPageTopBar(
+                chat: nil,
+                blockCount: 0,
+                hasArtifacts: false,
+                showsModelPicker: false,
+                iconButtonSize: startupButtonSize,
+                onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) },
+                onToggleTemporary: {},
+                onPickModel: {},
+                onShowArtifacts: {},
+                onCopyTranscript: {},
+                onDeleteChat: {}
+            )
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            startupInputBar
+                .frame(maxWidth: Theme.ContainerWidth.readable)
+                .frame(maxWidth: .infinity)
+        }
+        .background(Theme.Colors.chatSurface)
     }
 
     private var startupInputBar: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "plus")
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .accessibilityHidden(true)
-            TextField("Type a message", text: $startupDraft, axis: .vertical)
-                .lineLimit(1...6)
-                .focused($startupComposerFocused)
-                .accessibilityIdentifier(A11yID.Chat.input)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: queueStartupMessage) {
-                Image(systemName: "arrow.up")
-                    .font(.system(.subheadline, weight: .bold))
-                    .foregroundStyle(Theme.Colors.onPrimary)
-                    .frame(width: 34, height: 34)
-                    .background(Theme.Colors.primary, in: Circle())
-                    .minimumTouchTarget()
-            }
-            .buttonStyle(.plain)
-            .disabled(startupDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityLabel(A11yLabel.send)
-            .accessibilityIdentifier(A11yID.Chat.send)
-        }
-        .font(Theme.Fonts.bodyMd)
-        .foregroundStyle(Theme.Colors.onSurface)
-        .padding(Theme.Spacing.lg)
-        .glassEffect(.regular, in: Capsule())
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.bottom, Theme.Spacing.sm)
-        .frame(maxWidth: Theme.ContainerWidth.readable)
-        .frame(maxWidth: .infinity)
-        .excludesCompactPageSwitch(includingAreaBelow: true)
+        ChatComposer(
+            composer: startupComposer,
+            isEditingMessage: false,
+            editDraft: .constant(AttributedString()),
+            speech: startupSpeechInput,
+            attachedServices: [],
+            chatArtifacts: [],
+            fieldFocused: $startupComposerFocused,
+            isFieldFocused: startupComposerFocused,
+            sessionID: startupChatID,
+            isChatEmpty: startupMessages.isEmpty,
+            isTemporary: false,
+            isBusy: false,
+            followIntents: [],
+            floatsTopStrip: false,
+            isEmbedded: false,
+            iconButtonSize: startupButtonSize,
+            composerButtonSize: startupComposerButtonSize,
+            onOpenAttachment: { _, _ in },
+            onOpenChatArtifact: { _ in },
+            onPasteImages: { _ in },
+            onOpenService: { _ in },
+            onRemoveService: { _ in },
+            onAttachmentChoice: { _ in },
+            onServices: {},
+            onSubmitSkill: { _, _ in },
+            onPreparationIntent: { _ in },
+            onCancelEdit: {},
+            onSend: queueStartupMessage,
+            onStop: {},
+            onSpeechBegin: { _ in },
+            isReady: false
+        )
     }
 
     private func queueStartupMessage() {
-        let text = startupDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        let message = ChatComposerModel.Message(id: UUID(), text: text, attachments: [])
+        guard let message = startupComposer.takeMessage() else { return }
         startupMessages.append(message)
-        startupDraft = ""
         Log.ui.info("RootView.startup queued draft=\(message.id) count=\(startupMessages.count)")
     }
 
+    @ViewBuilder
     private var startupStatus: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            switch startup {
-            case .failed(let message, let recovery):
+        switch startup {
+        case .failed(let message, let recovery):
+            VStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.title.weight(.medium))
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -1003,16 +999,17 @@ struct RootView: View {
                     Button("Try Again") { bootstrap() }
                         .buttonStyle(.borderedProminent)
                 }
-            case .idle, .loading:
-                CellularAutomatonLoader.small
-                    .revealed(after: .milliseconds(500))
-                    .accessibilityLabel("Opening your Profile…")
-                    .accessibilityIdentifier(A11yID.Startup.status)
-            case .ready:
-                EmptyView()
             }
+            .padding(Theme.Spacing.xl)
+        case .idle, .loading:
+            if !startupMessages.isEmpty {
+                ActivityBubble()
+                    .padding(.top, ChatTranscriptMetrics.blockSpacing)
+                    .padding(.horizontal, 4)
+            }
+        case .ready:
+            EmptyView()
         }
-        .padding(Theme.Spacing.xl)
     }
 
     private func autoCloseSidebar() {
@@ -1229,10 +1226,7 @@ struct RootView: View {
                 }
                 transitionStartup(to: .loadingServices)
                 await manager.refreshServices(locale: serviceLocale)
-                startupComposerFocused = false
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                await Task.yield()
-                startupComposer.draft = startupDraft
+                startupComposer.invalidateEditorBindings()
                 let hasStartupInput = !startupMessages.isEmpty || !startupComposer.isEmpty
                 let chat = hasStartupInput ? chats.startNewChat() : chats.current ?? chats.startNewChat()
                 startupChatID = chat.id

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChatPageTopBar: View {
-    let chat: Chat
+    let chat: Chat?
     let blockCount: Int
     let hasArtifacts: Bool
     let showsModelPicker: Bool
@@ -16,14 +16,14 @@ struct ChatPageTopBar: View {
     var body: some View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
-            if showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
-                modelPill
+            if let chat, showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
+                modelPill(chat: chat)
             }
             Spacer()
-            if chat.canChangeRetention {
+            if chat?.canChangeRetention ?? true {
                 temporaryModeButton
-            } else {
-                overflowMenu
+            } else if let chat {
+                overflowMenu(chat: chat)
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
@@ -32,7 +32,7 @@ struct ChatPageTopBar: View {
 
     private var temporaryModeButton: some View {
         Button(action: onToggleTemporary) {
-            TemporaryChatIcon(isActive: chat.isTemporary)
+            TemporaryChatIcon(isActive: (chat?.isTemporary ?? false))
                 .foregroundStyle(Theme.Colors.onSurface)
                 .frame(width: 29, height: 29)
                 .frame(width: iconButtonSize, height: iconButtonSize)
@@ -40,13 +40,14 @@ struct ChatPageTopBar: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Circle())
-        .accessibilityLabel(chat.isTemporary ? "Turn off temporary chat" : "Start temporary chat")
-        .accessibilityValue(chat.isTemporary ? "On" : "Off")
-        .accessibilityAddTraits(chat.isTemporary ? .isSelected : [])
+        .accessibilityLabel((chat?.isTemporary ?? false) ? "Turn off temporary chat" : "Start temporary chat")
+        .accessibilityValue((chat?.isTemporary ?? false) ? "On" : "Off")
+        .accessibilityAddTraits((chat?.isTemporary ?? false) ? .isSelected : [])
         .accessibilityIdentifier(A11yID.Chat.temporaryToggle)
+        .disabled(chat == nil)
     }
 
-    private var modelPill: some View {
+    private func modelPill(chat: Chat) -> some View {
         Button(action: onPickModel) {
             HStack(spacing: 4) {
                 Text(chat.model.displayName)
@@ -68,7 +69,7 @@ struct ChatPageTopBar: View {
         .accessibilityIdentifier(A11yID.Chat.modelPicker)
     }
 
-    private var overflowMenu: some View {
+    private func overflowMenu(chat: Chat) -> some View {
         Menu {
             Button(action: onPickModel) {
                 Label("Models", systemImage: "slider.horizontal.3")

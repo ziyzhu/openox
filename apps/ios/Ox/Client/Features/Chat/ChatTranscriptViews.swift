@@ -1061,7 +1061,7 @@ struct ArtifactControls {
     let onDelete: (Artifact) -> Void
 }
 
-private struct UserBubble: View {
+struct UserBubble: View {
     let text: String
     let attachments: [Artifact]
     let sourcePrefix: String

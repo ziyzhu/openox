@@ -239,6 +239,7 @@ struct ChatComposer: View, Equatable {
     let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
+    var isReady = true
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -265,6 +266,7 @@ struct ChatComposer: View, Equatable {
             && lhs.isChatEmpty == rhs.isChatEmpty
             && lhs.isTemporary == rhs.isTemporary
             && lhs.isBusy == rhs.isBusy
+            && lhs.isReady == rhs.isReady
             && lhs.followIntents == rhs.followIntents
             && lhs.floatsTopStrip == rhs.floatsTopStrip
             && lhs.isEmbedded == rhs.isEmbedded
@@ -313,7 +315,7 @@ struct ChatComposer: View, Equatable {
                 onPreparationIntent(canSubmit)
             }
             .onChange(of: composer.draft) { previous, current in
-                guard previous.first != "/", current.first == "/" else { return }
+                guard isReady, previous.first != "/", current.first == "/" else { return }
                 Skills.shared.refresh()
             }
             .onChange(of: importMemoryOpportunity, initial: true) { previous, opportunity in
@@ -507,7 +509,8 @@ struct ChatComposer: View, Equatable {
     }
 
     private var showsDefaultIntents: Bool {
-        followIntents.isEmpty
+        isReady
+            && followIntents.isEmpty
             && !isEditingMessage
             && composer.draft.isEmpty
             && composer.draftAttachments.isEmpty
@@ -778,7 +781,7 @@ struct ChatComposer: View, Equatable {
             .contentShape(Circle())
             .overlay {
                 HoldToTalkArea(
-                    canBegin: !composer.isImporting && !speech.isPresented,
+                    canBegin: isReady && !composer.isImporting && !speech.isPresented,
                     onTap: showHoldToTalkHint,
                     onBegin: { onSpeechBegin(false) },
                     onMove: { speech.move(to: $0, distance: $1) },
@@ -792,7 +795,8 @@ struct ChatComposer: View, Equatable {
             .accessibilityLabel("Hold to talk")
             .accessibilityHint("Press and hold to talk.")
             .accessibilityIdentifier(A11yID.Chat.speechHold)
-            .accessibilityAction { onSpeechBegin(true) }
+            .accessibilityAction { if isReady { onSpeechBegin(true) } }
+            .disabled(!isReady)
     }
 
     private func showHoldToTalkHint() {
@@ -829,7 +833,7 @@ struct ChatComposer: View, Equatable {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .disabled(isEditingMessage)
+        .disabled(isEditingMessage || !isReady)
         .accessibilityLabel(A11yLabel.addAttachment)
         .accessibilityIdentifier(A11yID.Chat.attach)
         .popover(
@@ -896,7 +900,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private func submit() {
-        if isEditingMessage {
+        if isEditingMessage || !isReady {
             onSend()
             return
         }
@@ -956,7 +960,7 @@ struct ChatComposer: View, Equatable {
                 let filteredDraft = AttributedString(mutableDraft)
                 let text = String(filteredDraft.characters)
                 var draft = filteredDraft
-                if composer.draft.first == "/" || text.first == "/" {
+                if isReady && (composer.draft.first == "/" || text.first == "/") {
                     draft.foregroundColor = nil
                     if let invocation = composer.slashInvocation(in: text),
                        let range = draft.range(of: invocation.command) {
