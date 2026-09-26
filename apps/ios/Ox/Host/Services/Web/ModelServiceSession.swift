@@ -24,7 +24,6 @@ final class ModelServiceSession {
         case closed
     }
 
-    private static var activeDomains: Set<String> = []
     private let service: Service
     private let page: Service.ServiceWebPage
     private let navigationGeneration: Int
@@ -69,24 +68,16 @@ final class ModelServiceSession {
 
     static func open(domain: String) async throws -> ModelServiceSession {
         let service = try service(domain: domain)
-        guard activeDomains.count < 5, activeDomains.insert(domain).inserted else {
-            throw WebsiteProviderError("Model service already has an active generation or the generation limit was reached")
+        guard let action = await service.resolvedAction(ModelServiceContract.start, role: .modelGeneration) else {
+            throw WebsiteProviderError("Model service source is unavailable")
         }
-        do {
-            guard let action = await service.resolvedAction(ModelServiceContract.start, role: .modelGeneration) else {
-                throw WebsiteProviderError("Model service source is unavailable")
-            }
-            let page = try await service.openOwnedPage(for: action, owner: .model(UUID()))
-            if Task.isCancelled {
-                service.closeOwnedPage(page)
-                throw CancellationError()
-            }
-            Log.service.info("ModelService.open domain=\(domain) source=\(service.definition.repositoryID ?? "unknown") page=\(page.logLabel)")
-            return ModelServiceSession(service: service, page: page)
-        } catch {
-            activeDomains.remove(domain)
-            throw error
+        let page = try await service.openOwnedPage(for: action, owner: .model(UUID()))
+        if Task.isCancelled {
+            service.closeOwnedPage(page)
+            throw CancellationError()
         }
+        Log.service.info("ModelService.open domain=\(domain) source=\(service.definition.repositoryID ?? "unknown") page=\(page.logLabel)")
+        return ModelServiceSession(service: service, page: page)
     }
 
     func start(model: ProviderModel, input: WebsiteProviderInput, options: StreamOptions, modalities: Set<ProviderModelModality>) async throws {
@@ -180,7 +171,6 @@ final class ModelServiceSession {
         guard case .closed = state else {
             state = .closed
             service.closeOwnedPage(page)
-            Self.activeDomains.remove(service.domain)
             Log.service.info("ModelService.close domain=\(service.domain) page=\(page.logLabel)")
             return
         }
