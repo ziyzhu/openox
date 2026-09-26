@@ -85,7 +85,7 @@ struct ServiceDetailView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+            VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 header
                 descriptionSection
                 permissionsSection
@@ -94,8 +94,7 @@ struct ServiceDetailView: View {
                 repositorySection
                 manageSection
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.lg)
+            .settingsPagePadding()
         }
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
@@ -371,17 +370,11 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var domainSection: some View {
         if capabilities.showsDomain {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text(service.isMCPService ? "Endpoint" : "Domain")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
+            SettingsSection(service.isMCPService ? "Endpoint" : "Domain") {
                 Text(verbatim: service.isMCPService ? service.url : service.domain)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Theme.Spacing.md)
-                    .settingsSurface()
                     .accessibilityIdentifier(A11yID.Chat.Attach.domain(service.domain))
             }
         }
@@ -395,11 +388,11 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var repositorySection: some View {
         if let repository {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
                 Text("Repository")
                     .font(Theme.Fonts.labelMd)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
+                    .settingsSectionHeaderInset()
                 NavigationLink {
                     RepositoryDetailView(repositoryID: repository.id)
                 } label: {
@@ -419,11 +412,11 @@ struct ServiceDetailView: View {
                             .font(Theme.Icons.xs)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     }
-                    .padding(Theme.Spacing.md)
+                    .settingsRowPadding()
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .settingsSurface()
+                .settingsSurface(singleRow: true)
                 .accessibilityIdentifier(A11yID.Chat.Attach.repository(service.domain))
             }
         }
@@ -440,11 +433,11 @@ struct ServiceDetailView: View {
 
     @ViewBuilder
     private var actionsSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
             Text("Actions")
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .padding(.horizontal, Theme.Spacing.md)
+                .settingsSectionHeaderInset()
 
             servicePolicyContent
             attachActionContent
@@ -463,7 +456,7 @@ struct ServiceDetailView: View {
                 Text("This service provides no actions.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
+                    .settingsContentInset()
             } else {
                 VStack(spacing: Theme.Spacing.sm) {
                     ForEach(actions) { action in
@@ -479,15 +472,10 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var permissionsSection: some View {
         if capabilities.supportsFolderAccess {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Folders")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
+            SettingsSection("Folders", insetContent: false) {
                 filesPermissionContent
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Theme.Spacing.md)
-                    .settingsSurface()
+                    .settingsRowPadding()
             }
         }
     }
@@ -505,8 +493,8 @@ struct ServiceDetailView: View {
             onChange: { serviceManager.setSourcePolicy($0, for: actionPolicySource) }
         )
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.md)
-        .settingsSurface()
+        .settingsRowPadding()
+        .settingsSurface(singleRow: true)
     }
 
     private var attachActionContent: some View {
@@ -601,11 +589,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var manageSection: some View {
         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement || service.isLocalService {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Manage")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .padding(.horizontal, Theme.Spacing.md)
+            SettingsSection("Manage", insetContent: false) {
                 VStack(spacing: 0) {
                     if canInspectPage {
                         manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {
@@ -615,7 +599,7 @@ struct ServiceDetailView: View {
                     }
                     if capabilities.supportsWebsiteDataManagement {
                         if canInspectPage {
-                            Divider().padding(.horizontal, Theme.Spacing.md)
+                            Divider().settingsContentInset()
                         }
                         manageRow("Clear website data", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmClearWebData = true
@@ -630,7 +614,7 @@ struct ServiceDetailView: View {
                     }
                     if service.isLocalService {
                         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement {
-                            Divider().padding(.horizontal, Theme.Spacing.md)
+                            Divider().settingsContentInset()
                         }
                         ShareLink(
                             item: ServicePackageDocument(domain: service.domain, manager: serviceManager),
@@ -640,19 +624,18 @@ struct ServiceDetailView: View {
                                 .font(Theme.Fonts.bodyMd)
                                 .foregroundStyle(Theme.Colors.onSurface)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(Theme.Spacing.md)
+                                .settingsRowPadding()
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.Chat.Attach.shareLocalService(service.domain))
-                        Divider().padding(.horizontal, Theme.Spacing.md)
+                        Divider().settingsContentInset()
                         manageRow("Delete Local service", tint: AnyShapeStyle(Theme.Colors.error)) {
                             confirmDeleteLocalService = true
                         }
                         .accessibilityIdentifier(A11yID.Chat.Attach.deleteLocalService(service.domain))
                     }
                 }
-                .settingsSurface()
             }
         }
     }
@@ -671,7 +654,7 @@ struct ServiceDetailView: View {
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(tint)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.Spacing.md)
+                .settingsRowPadding()
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -731,7 +714,7 @@ struct ServiceDetailView: View {
     private func actionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.Spacing.md)
+            .settingsRowPadding()
             .settingsSurface()
     }
 
