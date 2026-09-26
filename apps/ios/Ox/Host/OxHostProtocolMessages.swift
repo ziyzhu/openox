@@ -19,6 +19,7 @@ extension OxHostProtocol {
         case repositoryGate = "debug.repositories.saveGate"
         case replayStorageMigration = "debug.storage.replayMigration"
         case runAgent = "agents.run"
+        case evaluateAgent = "agents.evaluate"
         case vmInspect = "vm.inspect"
         case vmFunctions = "vm.functions"
         case vmCall = "vm.call"

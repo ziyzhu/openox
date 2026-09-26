@@ -40,6 +40,7 @@ enum OxHostProtocol {
         case .getComposerFormatting: DebugUIAPI.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), chatManager: chats, reply: reply)
         case .replayStorageMigration: handleReplayStorageMigration(try decode(ReplayStorageMigrationRequest.self), reply: reply)
+        case .evaluateAgent: handleEvaluateAgent(try decode(EvaluateAgentRequest.self), chatManager: chats, reply: reply)
         case .runAgent: handleRunAgent(try decode(RunAgentRequest.self), chatManager: chats, reply: reply)
         case .vmInspect: handleVMInspect(try decode(VMRequest.self), chatManager: chats, reply: reply)
         case .vmFunctions: handleVMFunctions(try decode(VMFunctionsRequest.self), reply: reply)

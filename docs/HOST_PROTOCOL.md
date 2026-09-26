@@ -61,7 +61,7 @@ or established behavior only together with every client.
 | --- | --- |
 | Host | `host.describe` |
 | Chats | `chats.list`, `chats.get` |
-| Models and agents | `models.list`, `agents.run` |
+| Models and agents | `models.list`, `agents.run`, `agents.evaluate` |
 | Logs | `logs.list` |
 | VM | `vm.inspect`, `vm.functions`, `vm.call`, `vm.eval` |
 | Services | `services.list`, `services.invoke`, `services.evaluate`, `services.reload`, `services.refreshAuth`, `services.sync` |
@@ -129,3 +129,10 @@ See [Repositories and skills](SKILLS.md) for layout, conflicts, and snapshots.
 
 - [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification)
 - [Apple Encodable documentation](https://developer.apple.com/documentation/swift/encodable)
+
+`agents.evaluate` runs an isolated production Agent with fixture-backed tools on
+the simulator. It requires an idle empty `sessionId`, `clientId`, `modelId`,
+`prompts`, ordered `fixtures`, `maxTurns` (1–20), and `timeoutMs` (1–300000).
+Fixtures carry `tool`, `sourceIncludes`, `text`, `isError`, and `terminate`.
+The response contains messages, effective prompt/tool definitions, model options,
+duration, and errors. It never executes live tools. See [Ox evals](../evals/README.md).
