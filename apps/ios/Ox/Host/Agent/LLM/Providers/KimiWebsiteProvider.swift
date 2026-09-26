@@ -15,7 +15,7 @@ nonisolated struct KimiWebsiteProvider: ProviderClient {
     let models: [ProviderModel]
     let id = "kimi-web"
     let displayName = "Kimi Website"
-    let regions: Set<LLMRegion> = [.global]
+    let regions: Set<LLMRegion> = [.china]
     let website = URL(string: "https://www.kimi.com/")
     let usesAPIKey = false
     let supportsTools = true

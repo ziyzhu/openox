@@ -56,7 +56,7 @@ nonisolated extension BuiltInProviders {
                 options: nil, models: [.init(attachmentWebModel)]
             ),
             presentation: ProviderPresentation(
-                regions: [.global], website: URL(string: "https://www.kimi.com/"),
+                regions: [.china], website: URL(string: "https://www.kimi.com/"),
                 authNotice: "Kimi Website uses your Ox browser session. Text, image, and PDF inputs are supported; Ox Action calls are experimental.",
                 credentialKind: .bearerToken
             ),
