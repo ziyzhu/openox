@@ -42,6 +42,7 @@ struct HoldToTalkArea: UIViewRepresentable {
             isUserInteractionEnabled = false
             isAccessibilityElement = false
             hold.minimumPressDuration = 0.35
+            hold.allowableMovement = Theme.Size.minimumTouchTarget
             hold.delegate = self
             tap.delegate = self
             tap.require(toFail: hold)
@@ -51,6 +52,7 @@ struct HoldToTalkArea: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            guard hold.view !== window else { return }
             detach()
             guard let window else { return }
             window.addGestureRecognizer(hold)

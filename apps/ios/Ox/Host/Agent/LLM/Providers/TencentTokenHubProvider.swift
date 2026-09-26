@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum TencentTokenHubProvider {
     static let profile = OpenAICompatibleProvider(
         id: "tencent-tokenhub",
-        displayName: RegionalValue("Tencent TokenHub"),
+        displayName: RegionalValue("Tencent TokenHub API"),
         regions: [.china],
         endpoint: regionalURL("https://tokenhub.tencentmaas.com/v1"),
         reasoningReplayModelIDs: ["hy3"],

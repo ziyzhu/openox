@@ -28,7 +28,7 @@ public struct GeminiProvider: ProviderClient {
     }
 
     public let id = "gemini"
-    public let displayName = "Gemini"
+    public let displayName = "Gemini API"
     public let regions: Set<LLMRegion> = [.global]
     public let reasoningPolicy: LLMReasoningPolicy = .minimal
     public let website = URL(string: "https://aistudio.google.com/apikey")

@@ -37,24 +37,42 @@ nonisolated struct WebsiteGenerationUpdate: Sendable {
 }
 
 nonisolated enum WebsiteToolContract {
-    static let start = "<<<OX_TOOL_CALL>>>"
-    static let end = "<<<END_OX_TOOL_CALL>>>"
+    static let start = "<tool_call>"
+    static let end = "</tool_call>"
 
     static func instructions(_ tools: [any AgentTool]) -> String {
         guard !tools.isEmpty else { return "" }
         let available = tools.map { tool in
             JSONValue.object([
-                "name": .string(tool.name),
-                "description": .string(tool.description),
-                "parameters": tool.parameters,
+                "type": .string("function"),
+                "function": .object([
+                    "name": .string(tool.name),
+                    "description": .string(tool.description),
+                    "parameters": tool.parameters,
+                ]),
             ])
         }
         return """
-        Ox Actions are separate from this website's tools. Never invoke a website tool for an Ox Action. When an Action is needed, write this envelope as literal response text, with exactly one complete call and no other text:
-        \(start){"name":"<listed name>","arguments":{}}\(end)
-        Use JSON arguments conforming to the listed schema. Start your response with the first < of the envelope and end it with the last >. Any introduction, explanation, or code fence makes the call invalid, so Ox will not execute it. Ox reads a valid envelope, executes the call, and sends its result in the next turn. Do not claim an Action ran unless its result appears in the conversation. For a final answer, write ordinary text without these markers.
-        Available Ox Actions: \(JSONValue.array(available).jsonString(fallback: "[]"))
+        Ox Actions are separate from this website's tools. Never invoke a website tool for an Ox Action. Available Ox Actions:
+        <tools>
+        \(JSONValue.array(available).jsonString(fallback: "[]"))
+        </tools>
+        When an Action is needed, return exactly one call and no other text:
+        \(start)
+        {"name":"<listed name>","arguments":{}}
+        \(end)
+        Arguments must be a JSON object conforming to the listed schema. Do not add an introduction, explanation, or code fence. Ox executes only a valid complete call and sends its result in a <tool_response> block on the next turn. Do not claim an Action ran unless its result appears in the conversation. For a final answer, write ordinary text without these tags.
         """
+    }
+
+    static func response(name: String, callID: String, isError: Bool, text: String) -> String {
+        let payload = JSONValue.object([
+            "name": .string(name),
+            "call_id": .string(callID),
+            "is_error": .bool(isError),
+            "content": .string(text),
+        ])
+        return "<tool_response>\n\(payload.jsonString(fallback: "{}"))\n</tool_response>"
     }
 
     static func isPossibleCallPrefix(_ text: String) -> Bool {
@@ -68,7 +86,7 @@ nonisolated enum WebsiteToolContract {
         guard value.hasSuffix(end), value.utf8.count <= 100_000 else {
             throw WebsiteProviderError("Website model returned an incomplete Ox Action call")
         }
-        let raw = String(value.dropFirst(start.count).dropLast(end.count))
+        let raw = String(value.dropFirst(start.count).dropLast(end.count)).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = raw.data(using: .utf8),
               let payload = try? JSONDecoder().decode(JSONValue.self, from: data),
               let fields = payload.objectValue,
@@ -99,7 +117,7 @@ nonisolated enum WebsiteProviderPrompt {
             case .toolResult(let value):
                 role = "tool"
                 blocks = value.content
-                transientContext = "Ox Action \(value.toolName) call \(value.toolCallId) \(value.isError ? "failed" : "result")"
+                transientContext = nil
             }
             let text = try blocks.compactMap { block -> String? in
                 switch block {
@@ -111,7 +129,13 @@ nonisolated enum WebsiteProviderPrompt {
                     throw WebsiteProviderError("\(providerName) website supports text conversation only", kind: .unsupportedInput)
                 }
             }.joined(separator: "\n")
-            turns.append(["role": role, "text": [transientContext, text].compactMap { $0 }.joined(separator: "\n")])
+            let turnText: String
+            if case .toolResult(let result) = message {
+                turnText = WebsiteToolContract.response(name: result.toolName, callID: result.toolCallId, isError: result.isError, text: text)
+            } else {
+                turnText = [transientContext, text].compactMap { $0 }.joined(separator: "\n")
+            }
+            turns.append(["role": role, "text": turnText])
         }
         guard ["user", "tool"].contains(turns.last?["role"] ?? "") else {
             throw WebsiteProviderError("\(providerName) website requires a final user message or Ox Action result")

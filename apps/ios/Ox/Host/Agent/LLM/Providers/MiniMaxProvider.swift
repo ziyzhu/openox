@@ -17,7 +17,7 @@ nonisolated enum MiniMaxProvider {
 
     static let api = OpenAICompatibleProvider(
         id: "minimax",
-        displayName: RegionalValue("MiniMax"),
+        displayName: RegionalValue("MiniMax API"),
         regions: [.china],
         endpoint: regionalURL("https://api.minimax.io/v1", overrides: [.china: "https://api.minimaxi.com/v1"]),
         regionalCredentials: true,

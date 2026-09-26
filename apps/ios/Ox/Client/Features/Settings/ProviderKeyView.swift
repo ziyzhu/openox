@@ -35,6 +35,7 @@ struct ProviderAuthenticationView: View {
     @State private var websiteSignIn: WebsiteSignIn?
     @State private var websiteAuthenticationStatus: WebsiteAuthenticationStatus = .checking
     @State private var websiteAuthenticationRevision = 0
+    @State private var websiteAuthenticationCompleted = false
 
     init(
         client: any ProviderClient,
@@ -90,9 +91,9 @@ struct ProviderAuthenticationView: View {
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
                 if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web, let website = client.website {
-                    websiteAuthenticationStatusRow
                     Button {
                         let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
+                        websiteAuthenticationCompleted = false
                         WebsiteAuthenticationCache.invalidate(client.id)
                         websiteSignIn = WebsiteSignIn(
                             session: session,
@@ -100,11 +101,11 @@ struct ProviderAuthenticationView: View {
                         )
                         websiteAuthenticationRevision &+= 1
                     } label: {
-                        SettingsActionButtonLabel {
-                            if websiteAuthenticationStatus == .signedIn {
-                                Text("Manage")
-                            } else {
-                                Text("Sign in")
+                        if websiteAuthenticationStatus == .signedIn {
+                            websiteSignedInRow
+                        } else {
+                            SettingsActionButtonLabel {
+                                Text("Sign in with \(client.displayName)")
                             }
                         }
                     }
@@ -154,6 +155,10 @@ struct ProviderAuthenticationView: View {
         }
         .sheet(item: $websiteSignIn, onDismiss: {
             websiteAuthenticationRevision &+= 1
+            if websiteAuthenticationCompleted {
+                websiteAuthenticationCompleted = false
+                onAuthenticated?()
+            }
         }) { signIn in
             ServiceBrowserView(session: signIn.session, reservesWebsiteSpace: true)
                 .task { await monitorWebsiteAuthentication(for: signIn) }
@@ -168,6 +173,7 @@ struct ProviderAuthenticationView: View {
                     guard !Task.isCancelled, websiteSignIn?.id == signIn.id else { return }
                     WebsiteAuthenticationCache.set(true, for: client.id)
                     websiteAuthenticationStatus = .signedIn
+                    websiteAuthenticationCompleted = true
                     websiteSignIn = nil
                     Log.ui.info("ProviderAuthentication.websiteSignedIn client=\(client.id)")
                     return
@@ -181,27 +187,25 @@ struct ProviderAuthenticationView: View {
         }
     }
 
-    private var websiteAuthenticationStatusRow: some View {
+    private var websiteSignedInRow: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: websiteAuthenticationStatus == .signedIn ? "checkmark.seal.fill" : "person.crop.circle")
-                .foregroundStyle(websiteAuthenticationStatus == .signedIn ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
-            switch websiteAuthenticationStatus {
-            case .checking:
-                Text("Checking sign-in…")
-            case .signedIn:
-                Text("Signed in to \(client.displayName)")
-            case .signedOut:
-                Text("Signed out")
-            case .unavailable:
-                Text("Unavailable")
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundStyle(Theme.Colors.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: client.displayName)
+                    .font(Theme.Fonts.labelMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                Text("Signed in")
+                    .font(Theme.Fonts.captionMd)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
             Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(Theme.Icons.xs)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
         }
-        .font(Theme.Fonts.bodyMd)
-        .foregroundStyle(Theme.Colors.onSurface)
         .settingsRowPadding()
         .settingsSurface(singleRow: true)
-        .accessibilityIdentifier(A11yID.Chat.modelWebsiteAuthStatus)
     }
 
     private var authenticationMethodPicker: some View {
@@ -222,7 +226,7 @@ struct ProviderAuthenticationView: View {
     private var apiKeyContent: some View {
         HStack {
             APIKeySecureField(
-                placeholder: "\(client.displayName) \(client.credentialKind.name.lowercased())",
+                placeholder: "\(credentialProviderName) \(client.credentialKind.name.lowercased())",
                 text: $apiKey
             )
             .accessibilityIdentifier(A11yID.Chat.modelKeyField)
@@ -320,12 +324,17 @@ struct ProviderAuthenticationView: View {
     private var credentialDescription: String {
         switch client.credentialKind {
         case .apiKey:
-            "Create your \(client.displayName) API key, then paste it here."
+            "Create your \(credentialProviderName) API key, then paste it here."
         case .subscriptionKey:
             "Paste the key issued for your \(client.displayName) subscription."
         case .bearerToken:
             "Add a bearer token if your \(client.displayName) server requires one."
         }
+    }
+
+    private var credentialProviderName: String {
+        if client.displayName.hasSuffix(" API") { return String(client.displayName.dropLast(4)) }
+        return client.displayName.replacingOccurrences(of: " API ·", with: " ·")
     }
 
     private func signIn(_ account: any SubscriptionAccount) {

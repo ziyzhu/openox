@@ -155,6 +155,17 @@ final class ProviderRegistry {
         Log.agent.info("ProviderRegistry.save provider=\(definition.id) models=\(definition.models.count)")
     }
 
+    func updateDiscoveredModels(_ models: [ProviderModel], for clientID: String) throws {
+        guard client(id: clientID)?.canLoadModels == true,
+              let bundledDefinition = bundled.first(where: { $0.definition.id == clientID })?.definition,
+              let defaultModel = bundledDefinition.models.first else {
+            throw RuntimeError.bridge("Model discovery is unavailable for this provider")
+        }
+        var definition = try definition(id: clientID)
+        definition.models = [defaultModel] + models.map { ProviderDefinition.Model($0) }
+        try save(definition)
+    }
+
     func delete(id: String) throws {
         let definition = try definition(id: id)
         guard catalog.providers.contains(where: { $0.id == id }) else {

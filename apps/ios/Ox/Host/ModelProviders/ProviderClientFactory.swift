@@ -109,7 +109,7 @@ nonisolated enum ProviderClientFactory {
                   definition.url == registeredURL,
                   definition.auth.kind == .custom,
                   definition.auth.adapter == definition.id,
-                  definition.models.map(\.id) == ["website-default"],
+                  validWebsiteModels(definition),
                   definition.options == nil else {
                 throw RuntimeError.bridge("Invalid website provider configuration")
             }
@@ -127,6 +127,15 @@ nonisolated enum ProviderClientFactory {
         guard let expected, definition.id == definition.auth.adapter,
               definition.url == expected.0, definition.api == expected.1 else {
             throw RuntimeError.bridge("Invalid provider: custom adapter must use its registered identity, endpoint, and API format")
+        }
+    }
+
+    private static func validWebsiteModels(_ definition: ProviderDefinition) -> Bool {
+        guard definition.id == "qwen-web" else { return definition.models.map(\.id) == ["website-default"] }
+        guard definition.models.first?.id == "website-default", definition.models.count <= 101 else { return false }
+        return definition.models.dropFirst().allSatisfy {
+            guard let wireID = $0.wireID, !wireID.isEmpty else { return false }
+            return $0 == ProviderDefinition.Model(QwenWebsiteProvider.model(id: wireID, name: $0.name))
         }
     }
 
@@ -187,11 +196,16 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     var reasoningPolicy: LLMReasoningPolicy { native.reasoningPolicy }
     var protocolDiagnostics: LLMProtocolDiagnostics { native.protocolDiagnostics }
+    var canLoadModels: Bool { native.canLoadModels }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { definition.api }
 
     func websiteSessionIsAuthenticated() async throws -> Bool? {
         try await native.websiteSessionIsAuthenticated()
+    }
+
+    func loadModels() async throws -> [ProviderModel] {
+        try await native.loadModels()
     }
 
     func prepare(model: ProviderModel, systemPrompt: String?, tools: [any AgentTool]) async -> LLMPreparationOutcome {

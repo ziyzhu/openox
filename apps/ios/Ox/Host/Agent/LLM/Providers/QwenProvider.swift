@@ -15,7 +15,7 @@ nonisolated enum QwenProvider {
 
     static let api = OpenAICompatibleProvider(
         id: "qwen",
-        displayName: RegionalValue("Qwen"),
+        displayName: RegionalValue("Qwen API"),
         regions: [.global, .china],
         endpoint: regionalURL("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", overrides: [.china: "https://dashscope.aliyuncs.com/compatible-mode/v1"]),
         regionalCredentials: true,

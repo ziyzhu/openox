@@ -173,7 +173,6 @@ nonisolated enum A11yID {
         static let modelAuthAPIKey = "chat.modelAuth.apiKey"
         static let modelAuthOAuth = "chat.modelAuth.oauth"
         static let modelAuthNone = "chat.modelAuth.none"
-        static let modelSave = "chat.modelSave"
         static let modelCustomProviders = "chat.modelCustomProviders"
         static let modelClose = "chat.modelClose"
         static let temporaryToggle = "chat.temporaryToggle"

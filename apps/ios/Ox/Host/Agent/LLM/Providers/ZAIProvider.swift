@@ -15,7 +15,7 @@ nonisolated enum ZAIProvider {
 
     static let api = OpenAICompatibleProvider(
         id: "zai",
-        displayName: RegionalValue("Z.ai (GLM)"),
+        displayName: RegionalValue("Z.ai (GLM) API"),
         regions: [.global, .china],
         endpoint: regionalURL("https://api.z.ai/api/paas/v4", overrides: [.china: "https://open.bigmodel.cn/api/paas/v4"]),
         regionalCredentials: true,

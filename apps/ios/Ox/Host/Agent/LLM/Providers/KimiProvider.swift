@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum KimiProvider {
     static let profile = OpenAICompatibleProvider(
         id: "kimi",
-        displayName: RegionalValue("Kimi"),
+        displayName: RegionalValue("Kimi API"),
         regions: [.global, .china],
         endpoint: regionalURL("https://api.moonshot.ai/v1", overrides: [.china: "https://api.moonshot.cn/v1"]),
         regionalCredentials: true,

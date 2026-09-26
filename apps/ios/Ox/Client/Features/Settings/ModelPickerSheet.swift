@@ -5,12 +5,16 @@ struct ModelPickerSheet: View {
     let chat: Chat
     @Environment(\.dismiss) private var dismiss
     private var registry: ProviderRegistry { .shared }
+    private var isChoosingInitialDefault: Bool { registry.defaultModel == nil }
 
     var body: some View {
         NavigationStack {
             ModelPickerContent(
-                title: "Model",
+                title: isChoosingInitialDefault ? "Choose default model" : "Model for this chat",
                 activeSelection: chat.modelSelection,
+                scopeDescription: isChoosingInitialDefault
+                    ? "Your choice will be used for this chat and future chats."
+                    : "Changes apply immediately and stay with this chat.",
                 onClose: { dismiss() }
             ) { client, model, selection in
                 Log.ui.info("ModelPicker.select chat=\(chat.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
@@ -145,19 +149,21 @@ struct SettingsSheet: View {
 
                     SettingsSection(
                         "Models",
+                        footer: "Used for new chats. Existing chats keep their model.",
                         insetContent: false
                     ) {
                         NavigationLink {
                             ModelPickerContent(
-                                title: "Model",
-                                activeSelection: registry.sessionModel
+                                title: "Default model",
+                                activeSelection: registry.sessionModel,
+                                scopeDescription: "Changes apply immediately to new chats. Existing chats keep their model."
                             ) { client, model, selection in
                                 Log.ui.info("Settings.defaultModel client=\(client.id) model=\(model.id) region=\(selection.region.rawValue)")
                                 registry.select(model, in: client.id, region: selection.region)
                             }
                         } label: {
                             SettingsDisclosureRow(
-                                title: "Model",
+                                title: "Default model",
                                 value: defaultModelValue
                             )
                         }
@@ -520,10 +526,16 @@ struct ModelPickerContent: View {
         case custom
     }
 
-    let title: String
+    private enum Mode {
+        case selection((any ProviderClient, ProviderModel, ModelSelection) -> Void)
+        case authentication(ProviderAuthenticationSession)
+    }
+
+    let title: LocalizedStringKey
     let activeSelection: ModelSelection
+    let scopeDescription: LocalizedStringKey?
     var onClose: (() -> Void)?
-    let onSelect: (any ProviderClient, ProviderModel, ModelSelection) -> Void
+    private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
     @State private var authRevision = 0
@@ -540,23 +552,46 @@ struct ModelPickerContent: View {
     @State private var customModelsLoading = false
     @State private var customError: String?
     @State private var providerCredentialError: String?
+    @State private var providerModelsLoading = false
+    @State private var providerModelsError: String?
 
     private var registry: ProviderRegistry { ProviderRegistry.shared }
 
     init(
-        title: String,
+        title: LocalizedStringKey,
         activeSelection: ModelSelection,
+        scopeDescription: LocalizedStringKey? = nil,
         onClose: (() -> Void)? = nil,
         onSelect: @escaping (any ProviderClient, ProviderModel, ModelSelection) -> Void
     ) {
         self.title = title
         self.activeSelection = activeSelection
+        self.scopeDescription = scopeDescription
         self.onClose = onClose
-        self.onSelect = onSelect
+        mode = .selection(onSelect)
         _selectedRegion = State(initialValue: activeSelection.region)
         _providerSelection = State(initialValue: .client(activeSelection.providerID))
         _selectedModelID = State(initialValue: activeSelection.modelID)
         _selectedReasoningEffort = State(initialValue: activeSelection.reasoningEffort ?? "")
+    }
+
+    init(authenticationSession: ProviderAuthenticationSession) {
+        let client = authenticationSession.client
+        let selection = ModelSelection(providerID: client.id, modelID: client.models.first?.id ?? "", reasoningEffort: nil)
+        title = "Model"
+        activeSelection = selection
+        scopeDescription = nil
+        onClose = nil
+        mode = .authentication(authenticationSession)
+        _selectedRegion = State(initialValue: selection.region)
+        _providerSelection = State(initialValue: .client(client.id))
+        _selectedModelID = State(initialValue: selection.modelID)
+        _selectedReasoningEffort = State(initialValue: "")
+    }
+
+    private var isAuthenticating: Bool {
+        if case .authentication = mode { return true }
+        return false
     }
 
     private var selectedClientID: String? {
@@ -574,6 +609,7 @@ struct ModelPickerContent: View {
     }
 
     private var selectedClient: (any ProviderClient)? {
+        if case .authentication(let session) = mode { return session.client }
         guard let selectedClientID else { return nil }
         return displayedClients.first { $0.id == selectedClientID }
     }
@@ -597,7 +633,7 @@ struct ModelPickerContent: View {
         return !needsAuthentication || hasKey || signedIn
     }
 
-    private var canSave: Bool {
+    private var canSelect: Bool {
         switch providerSelection {
         case .client:
             selectedClient != nil && selectedModel != nil && isAuthenticated
@@ -614,30 +650,28 @@ struct ModelPickerContent: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
+                guard !isAuthenticating else { return }
                 selectAvailableClient()
                 if !reasoningEfforts.contains(selectedReasoningEffort) {
                     selectDefaultReasoningEffort()
                 }
             }
-            .onChange(of: selectedRegion) { _, _ in
-                dismissKeyboard()
-                selectAvailableClient()
-            }
-            .onChange(of: providerSelection) { _, _ in providerDidChange() }
-            .onChange(of: selectedModelID) { _, _ in selectDefaultReasoningEffort() }
             .onChange(of: authRevision) { _, _ in selectAvailableModel() }
             .onChange(of: registry.customProviders) { _, _ in selectAvailableClient() }
             .toolbar {
-                if let onClose {
+                if case .authentication(let session) = mode {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            session.complete(.cancelled)
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("provider.authentication.cancel")
+                    }
+                } else if let onClose {
                     ToolbarItem(placement: .topBarLeading) {
                         SheetDismissToolbarButton(action: onClose)
                             .accessibilityIdentifier(A11yID.Chat.modelClose)
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .accessibilityIdentifier(A11yID.Chat.modelSave)
                 }
             }
     }
@@ -646,18 +680,57 @@ struct ModelPickerContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
-                    selectionSection("Region") { regionMenu }
-                        .id("model-configuration-top")
-                    selectionSection("Provider") { providerMenu }
-                    if providerSelection == .custom {
+                    if let scopeDescription {
+                        Text(scopeDescription)
+                            .font(Theme.Fonts.caption)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .settingsContentInset()
+                    }
+                    if !isAuthenticating {
+                        selectionSection("Region") { regionMenu }
+                            .id("model-configuration-top")
+                    }
+                    selectionSection("Provider") {
+                        if case .authentication(let session) = mode {
+                            selectionRow(session.client.displayName, indicator: nil)
+                        } else {
+                            providerMenu
+                        }
+                    }
+                    if providerSelection == .custom && !isAuthenticating {
                         customConnectionSection
                         customAuthenticationSection
                         selectionSection("Model") { customModelControl }
                     } else if let selectedClient {
                         authenticationSection(selectedClient)
-                        selectionSection("Model") { modelMenu }
-                        if !reasoningEfforts.isEmpty {
-                            selectionSection("Thinking level") { reasoningEffortMenu }
+                        if !isAuthenticating {
+                            selectionSection("Model") {
+                                VStack(spacing: Theme.Spacing.sm) {
+                                    modelMenu
+                                    if selectedClient.canLoadModels {
+                                        Button { loadProviderModels(selectedClient) } label: {
+                                            HStack(spacing: Theme.Spacing.sm) {
+                                                if providerModelsLoading { CellularAutomatonLoader.small }
+                                                Text(providerModelsLoading ? "Loading models…" : "Load models")
+                                                    .font(Theme.Fonts.bodyMd)
+                                                Spacer(minLength: 0)
+                                                Image(systemName: "arrow.clockwise")
+                                                    .font(.caption.weight(.semibold))
+                                            }
+                                            .foregroundStyle(Theme.Colors.onSurface)
+                                            .settingsRowPadding()
+                                            .settingsSurface(singleRow: true)
+                                        }
+                                        .disabled(providerModelsLoading)
+                                    }
+                                    if let providerModelsError {
+                                        SettingsErrorMessage(message: providerModelsError, systemImage: "exclamationmark.circle.fill")
+                                    }
+                                }
+                            }
+                            if !reasoningEfforts.isEmpty {
+                                selectionSection("Thinking level") { reasoningEffortMenu }
+                            }
                         }
                     }
                 }
@@ -666,6 +739,7 @@ struct ModelPickerContent: View {
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: selectedClientID) { _, _ in
+                providerModelsError = nil
                 proxy.scrollTo("model-configuration-top", anchor: .top)
             }
         }
@@ -680,7 +754,16 @@ struct ModelPickerContent: View {
 
     private var regionMenu: some View {
         Menu {
-            Picker("Region", selection: $selectedRegion) {
+            Picker("Region", selection: Binding(
+                get: { selectedRegion },
+                set: { region in
+                    selectedRegion = region
+                    dismissKeyboard()
+                    selectAvailableClient()
+                    selectDefaultReasoningEffort()
+                    applySelection()
+                }
+            )) {
                 ForEach(LLMRegion.allCases, id: \.self) { region in
                     Text(region.displayName).tag(region)
                 }
@@ -700,7 +783,11 @@ struct ModelPickerContent: View {
                 clients: displayedClients,
                 selectedClientID: Binding(
                     get: { selectedClientID },
-                    set: { providerSelection = $0.map(ProviderSelection.client) ?? .custom }
+                    set: {
+                        providerSelection = $0.map(ProviderSelection.client) ?? .custom
+                        providerDidChange()
+                        applySelection()
+                    }
                 )
             )
         } label: {
@@ -729,7 +816,14 @@ struct ModelPickerContent: View {
                         accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
                     )
                 },
-                selection: $selectedModelID
+                selection: Binding(
+                    get: { selectedModelID },
+                    set: { modelID in
+                        selectedModelID = modelID
+                        selectDefaultReasoningEffort()
+                        applySelection()
+                    }
+                )
             )
         } label: {
             selectionRow(selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
@@ -753,7 +847,13 @@ struct ModelPickerContent: View {
                         accessibilityIdentifier: A11yID.Chat.modelThinkingLevelOption(effort)
                     )
                 },
-                selection: $selectedReasoningEffort
+                selection: Binding(
+                    get: { selectedReasoningEffort },
+                    set: { effort in
+                        selectedReasoningEffort = effort
+                        applySelection()
+                    }
+                )
             )
         } label: {
             selectionRow(reasoningEffortName(selectedReasoningEffort), indicator: "chevron.right")
@@ -851,7 +951,13 @@ struct ModelPickerContent: View {
                             accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
                         )
                     },
-                    selection: $customModelID
+                    selection: Binding(
+                        get: { customModelID },
+                        set: { modelID in
+                            customModelID = modelID
+                            applySelection()
+                        }
+                    )
                 )
             } label: {
                 selectionRow(
@@ -888,16 +994,18 @@ struct ModelPickerContent: View {
         }
     }
 
-    private func selectionRow(_ value: String, indicator: String = "chevron.up.chevron.down") -> some View {
+    private func selectionRow(_ value: String, indicator: String? = "chevron.up.chevron.down") -> some View {
         HStack(spacing: Theme.Spacing.md) {
             Text(verbatim: value)
                 .font(Theme.Fonts.bodyMd)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            Image(systemName: indicator)
-                .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            if let indicator {
+                Image(systemName: indicator)
+                    .font(Theme.Icons.xs)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
         }
         .settingsRowPadding()
         .contentShape(Rectangle())
@@ -916,7 +1024,8 @@ struct ModelPickerContent: View {
             ProviderAuthenticationView(
                 client: client,
                 apiKey: $apiKeyDraft,
-                onChange: { authRevision &+= 1 }
+                onChange: { authRevision &+= 1 },
+                onAuthenticated: { authenticationDidComplete(for: client) }
             )
             .id(client.id)
             if let providerCredentialError {
@@ -926,6 +1035,7 @@ struct ModelPickerContent: View {
     }
 
     private func selectAvailableClient() {
+        guard !isAuthenticating else { return }
         let clients = registry.clients(in: selectedRegion)
         guard !clients.isEmpty else { return }
         if providerSelection == .custom { return }
@@ -954,7 +1064,9 @@ struct ModelPickerContent: View {
     private func selectAvailableModel() {
         guard let selectedClient else { return }
         if selectedClient.models.contains(where: { $0.id == selectedModelID }) { return }
-        selectedModelID = registry.selected(for: selectedClient.id, in: selectedRegion).id
+        let preferredID = registry.selected(for: selectedClient.id, in: selectedRegion).id
+        selectedModelID = selectedClient.models.first(where: { $0.id == preferredID })?.id
+            ?? selectedClient.models.first?.id ?? ""
     }
 
     private func selectDefaultReasoningEffort() {
@@ -990,7 +1102,6 @@ struct ModelPickerContent: View {
         customError = nil
         let key = customAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
-            defer { customModelsLoading = false }
             do {
                 let discovered = try await CustomLLMProviderDiscovery.models(
                     baseURL: baseURL,
@@ -998,17 +1109,36 @@ struct ModelPickerContent: View {
                 )
                 customModels = discovered
                 customModelID = discovered[0].id
+                customModelsLoading = false
+                applySelection()
             } catch {
+                customModelsLoading = false
                 customError = error.localizedDescription
             }
         }
     }
 
-    private func save() {
-        guard canSave else { return }
+    private func loadProviderModels(_ client: any ProviderClient) {
+        guard client.canLoadModels, !providerModelsLoading else { return }
+        providerModelsLoading = true
+        providerModelsError = nil
+        Task {
+            defer { providerModelsLoading = false }
+            do {
+                let models = try await client.loadModels()
+                try registry.updateDiscoveredModels(models, for: client.id)
+                if selectedClientID == client.id { selectAvailableModel() }
+            } catch {
+                if selectedClientID == client.id { providerModelsError = error.localizedDescription }
+            }
+        }
+    }
+
+    private func applySelection() {
+        guard canSelect, case .selection(let onSelect) = mode else { return }
         dismissKeyboard()
         if providerSelection == .custom {
-            saveCustomProvider()
+            selectCustomProvider(onSelect: onSelect)
             return
         }
         guard let selectedClient, let selectedModel else { return }
@@ -1024,7 +1154,7 @@ struct ModelPickerContent: View {
                 }
             }
         }
-        Log.ui.info("ModelPicker.save client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
+        Log.ui.info("ModelPicker.select client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
         onSelect(
             selectedClient,
             selectedModel,
@@ -1035,10 +1165,10 @@ struct ModelPickerContent: View {
                 reasoningEffort: selectedModel.selectedReasoningEffort
             )
         )
-        finishSaving()
+        Haptics.success(.settingsSaved)
     }
 
-    private func saveCustomProvider() {
+    private func selectCustomProvider(onSelect: (any ProviderClient, ProviderModel, ModelSelection) -> Void) {
         guard let baseURL = CustomLLMProviderDiscovery.normalizedBaseURL(customURL),
               let model = customModels.first(where: { $0.id == customModelID }) else { return }
         let provider = CustomLLMProvider(
@@ -1057,7 +1187,7 @@ struct ModelPickerContent: View {
                 return
             }
         }
-        Log.ui.info("ModelPicker.save custom client=\(provider.clientID) model=\(model.id)")
+        Log.ui.info("ModelPicker.select custom client=\(provider.clientID) model=\(model.id)")
         onSelect(
             provider.client,
             model.modelInfo,
@@ -1068,16 +1198,23 @@ struct ModelPickerContent: View {
                 reasoningEffort: model.modelInfo.selectedReasoningEffort
             )
         )
-        finishSaving()
+        providerSelection = .client(provider.clientID)
+        selectedModelID = model.id
+        loadCredentialDraft()
+        selectDefaultReasoningEffort()
+        Haptics.success(.settingsSaved)
     }
 
-    private func finishSaving() {
-        Haptics.success(.settingsSaved)
-        if let onClose {
-            onClose()
-        } else {
-            dismiss()
+    private func authenticationDidComplete(for client: any ProviderClient) {
+        if case .selection = mode {
+            applySelection()
+            return
         }
+        guard case .authentication(let session) = mode else { return }
+        let website = client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
+        let signedIn = client.subscriptionAccount?.isSignedIn == true || website
+        session.complete(signedIn ? .authenticated : .credentialStored)
+        dismiss()
     }
 
     private func dismissKeyboard() {
@@ -1112,6 +1249,7 @@ private struct ProviderPickerView: View {
                 id: client.id,
                 value: client.id,
                 title: client.displayName,
+                faviconDomain: client.website?.host,
                 subtitle: subtitle(for: client),
                 accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
             )
@@ -1146,6 +1284,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let value: Value
     let title: String
     var systemImage: String? = nil
+    var faviconDomain: String? = nil
     var subtitle: String? = nil
     let accessibilityIdentifier: String
 }
@@ -1182,7 +1321,10 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
             selection = option.value
             dismiss()
         } label: {
-            HStack(spacing: Theme.Spacing.xs) {
+            HStack(spacing: SettingsLayout.horizontalInset) {
+                if let faviconDomain = option.faviconDomain {
+                    DomainFavicon(domain: faviconDomain, size: 24)
+                }
                 if let systemImage = option.systemImage {
                     Image(systemName: systemImage)
                         .font(.system(.body, weight: .medium))

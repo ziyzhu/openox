@@ -74,8 +74,14 @@ extension Chat {
         if definition.auth.kind == .none {
             return .object(["id": .string(definition.id), "status": .string("not-required")])
         }
-        guard let presenter = presentations.providerAuthentication,
-              let client = ProviderRegistry.shared.client(id: definition.id) else {
+        guard let client = ProviderRegistry.shared.client(id: definition.id) else {
+            throw RuntimeError.bridge("Provider authentication UI is unavailable")
+        }
+        if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web,
+           (try? await client.websiteSessionIsAuthenticated()) == true {
+            return .object(["id": .string(definition.id), "status": .string(ProviderAuthenticationSession.Outcome.authenticated.rawValue)])
+        }
+        guard let presenter = presentations.providerAuthentication else {
             throw RuntimeError.bridge("Provider authentication UI is unavailable")
         }
         let session = ProviderAuthenticationSession(definition: definition, client: client)

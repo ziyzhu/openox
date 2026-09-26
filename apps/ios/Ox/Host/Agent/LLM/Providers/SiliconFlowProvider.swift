@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum SiliconFlowProvider {
     static let profile = OpenAICompatibleProvider(
         id: "siliconflow",
-        displayName: RegionalValue("SiliconFlow"),
+        displayName: RegionalValue("SiliconFlow API"),
         regions: [.china],
         endpoint: regionalURL("https://api.siliconflow.cn/v1"),
         reasoningReplayModelIDs: ["Qwen/Qwen3.5-4B", "deepseek-ai/DeepSeek-V4-Flash", "deepseek-ai/DeepSeek-V4-Pro", "zai-org/GLM-5.2"],

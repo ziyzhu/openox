@@ -24,7 +24,7 @@ nonisolated enum XAIProvider {
     static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
         OpenAIResponsesTransport(
             id: "xai",
-            displayName: "xAI",
+            displayName: "xAI API",
             models: models,
             website: URL(string: "https://console.x.ai/team/default/api-keys"),
             subscriptionAccount: XAISubscriptionAccount.shared,

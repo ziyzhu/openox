@@ -44,9 +44,9 @@ struct OxApp: App {
                     OnboardingView { onboarded = true }
                 }
             }
-            .environment(client.services)
             .themed()
             .appPresentations(presentations)
+            .environment(client.services)
             .onOpenURL { url in
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)

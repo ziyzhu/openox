@@ -204,7 +204,10 @@ nonisolated enum Secret {
                                    id: definition.credentialID)
         let data = try JSONSerialization.data(withJSONObject: ["apiKey": credential], options: [.sortedKeys])
         let json = String(decoding: data, as: UTF8.self)
-        try set(key: key, displayName: "\(definition.name) API key", value: json,
+        let displayName = definition.name.hasSuffix(" API")
+            ? "\(definition.name) key"
+            : "\(definition.name.replacingOccurrences(of: " API ·", with: " ·")) API key"
+        try set(key: key, displayName: displayName, value: json,
                 origin: .generatedFor(.provider, definition.credentialID))
         try bindProvider(key: key, definition: definition)
     }

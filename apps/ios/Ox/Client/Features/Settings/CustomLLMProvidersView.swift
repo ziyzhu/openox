@@ -60,11 +60,15 @@ struct CustomLLMProvidersView: View {
     }
 
     private func providerRow(_ provider: CustomLLMProvider) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "server.rack")
-                .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .frame(width: 24)
+        HStack(spacing: SettingsLayout.horizontalInset) {
+            if let domain = provider.baseURL.host {
+                DomainFavicon(domain: domain, size: 24)
+            } else {
+                Image(systemName: "server.rack")
+                    .font(.system(.body, weight: .medium))
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .frame(width: 24)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: provider.name)
                     .font(Theme.Fonts.bodyMd)

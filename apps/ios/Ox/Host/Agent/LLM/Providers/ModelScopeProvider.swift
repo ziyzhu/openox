@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum ModelScopeProvider {
     static let profile = OpenAICompatibleProvider(
         id: "modelscope",
-        displayName: RegionalValue("ModelScope"),
+        displayName: RegionalValue("ModelScope API"),
         regions: [.china],
         endpoint: regionalURL("https://api-inference.modelscope.cn/v1"),
         reasoningReplayModelIDs: ["ZhipuAI/GLM-4.6"],

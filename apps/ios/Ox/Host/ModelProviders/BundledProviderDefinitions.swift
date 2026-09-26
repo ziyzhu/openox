@@ -30,13 +30,13 @@ nonisolated extension BuiltInProviders {
         var bedrockResponses = entry(bedrock.responses, url: (bedrock.responses.auth as! OpenAIResponsesAPIKeyAuth).baseURL,
                                     api: .openAIResponses, auth: .init(kind: .bearer))
         bedrockResponses.definition.id = "amazon-bedrock:responses"
-        bedrockResponses.definition.name = "Amazon Bedrock · Responses"
+        bedrockResponses.definition.name = "Amazon Bedrock API · Responses"
         bedrockResponses.legacyID = bedrock.id
         bedrockResponses.legacyCredentialID = bedrock.id
         entries.append(bedrockResponses)
         var bedrockMessages = messages(bedrock.messages)
         bedrockMessages.definition.id = "amazon-bedrock:messages"
-        bedrockMessages.definition.name = "Amazon Bedrock · Messages"
+        bedrockMessages.definition.name = "Amazon Bedrock API · Messages"
         bedrockMessages.presentation = presentation(bedrock)
         bedrockMessages.legacyID = bedrock.id
         bedrockMessages.legacyCredentialID = bedrock.id

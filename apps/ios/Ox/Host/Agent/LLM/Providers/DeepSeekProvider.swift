@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum DeepSeekProvider {
     static let profile = OpenAICompatibleProvider(
         id: "deepseek",
-        displayName: RegionalValue("DeepSeek"),
+        displayName: RegionalValue("DeepSeek API"),
         regions: [.global, .china],
         endpoint: regionalURL("https://api.deepseek.com/v1"),
         reasoningReplayModelIDs: ["deepseek-flash", "deepseek-v4-pro"],

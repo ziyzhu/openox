@@ -44,7 +44,7 @@ headers or bearer values.
    the server URL, and the fixed test bearer value as the API key.
 4. Load models. Confirm `ox-e2e-model` becomes selectable and the model without
    tool support does not appear.
-5. Save the provider and confirm the current chat switches to it.
+5. Confirm loading models selects `ox-e2e-model` and switches the current chat to it.
 6. Send `Reply exactly CUSTOM_PROVIDER_E2E_OK.` through the visible composer.
 7. Wait for the completed assistant response and confirm the exact sentinel is
    visible in the transcript.
@@ -53,7 +53,7 @@ Use accessibility identifiers discovered from the current accessibility tree.
 Prefer the existing `chat.modelPicker`, `chat.modelProvider`,
 `chat.modelCustomProviders`, `settings.customProviderName`,
 `settings.customProviderURL`, `settings.customProviderKey`,
-`chat.modelSelection`, `chat.modelSave`, `chat.input`, and `chat.send`
+`chat.modelSelection`, `chat.input`, and `chat.send`
 identifiers when they are present. Do not substitute Host debug commands for the
 UI actions under test.
 

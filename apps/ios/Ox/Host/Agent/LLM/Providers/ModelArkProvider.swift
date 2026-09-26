@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum ModelArkProvider {
     static let profile = OpenAICompatibleProvider(
         id: "ark",
-        displayName: RegionalValue("BytePlus ModelArk", overrides: [.china: "Volcengine Ark"]),
+        displayName: RegionalValue("BytePlus ModelArk API", overrides: [.china: "Volcengine Ark API"]),
         models: RegionalValue(CuratedProviderModels.arkGlobal, overrides: [.china: CuratedProviderModels.arkChina]),
         regions: [.global, .china],
         endpoint: regionalURL(

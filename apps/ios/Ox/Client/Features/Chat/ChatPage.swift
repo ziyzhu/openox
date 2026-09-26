@@ -1454,11 +1454,11 @@ struct ChatPage: View {
 
     private var modelSetupState: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            Text("Choose a model to start chatting.")
+            Text("Choose a default model to start chatting.")
                 .font(Theme.Fonts.headline)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .multilineTextAlignment(.center)
-            Button("Choose a model") { modalPresentation = .modelPicker }
+            Button("Choose default model") { modalPresentation = .modelPicker }
                 .font(Theme.Fonts.labelMd)
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.primary)

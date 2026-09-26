@@ -163,9 +163,11 @@ nonisolated public protocol ProviderClient: Sendable {
     var inferenceLocation: LLMInferenceLocation { get }
     var reasoningPolicy: LLMReasoningPolicy { get }
     var protocolDiagnostics: LLMProtocolDiagnostics { get }
+    var canLoadModels: Bool { get }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol?
     func websiteSessionIsAuthenticated() async throws -> Bool?
+    func loadModels() async throws -> [ProviderModel]
 
     func prepare(
         model: ProviderModel,
@@ -195,9 +197,11 @@ nonisolated extension ProviderClient {
     public var inferenceLocation: LLMInferenceLocation { .remote }
     public var reasoningPolicy: LLMReasoningPolicy { .unavailable }
     public var protocolDiagnostics: LLMProtocolDiagnostics { LLMProtocolDiagnostics() }
+    public var canLoadModels: Bool { false }
 
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { nil }
     public func websiteSessionIsAuthenticated() async throws -> Bool? { nil }
+    public func loadModels() async throws -> [ProviderModel] { models }
 
     public func prepare(
         model: ProviderModel,

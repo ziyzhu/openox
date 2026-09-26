@@ -2122,6 +2122,26 @@
         }
       }
     },
+    "Changes apply immediately and stay with this chat." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改会立即生效，并仅用于此聊天。"
+          }
+        }
+      }
+    },
+    "Changes apply immediately to new chats. Existing chats keep their model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改会立即用于新聊天。现有聊天会保留各自的模型。"
+          }
+        }
+      }
+    },
     "Character" : {
       "comment" : "The title of a screen where a user can edit text that describes a character, in this case, Ox.",
       "localizations" : {
@@ -2243,6 +2263,16 @@
         }
       }
     },
+    "Choose a default model to start chatting." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择默认模型以开始聊天。"
+          }
+        }
+      }
+    },
     "Choose a model" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2261,6 +2291,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择模型以开始聊天。"
+          }
+        }
+      }
+    },
+    "Choose default model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择默认模型"
           }
         }
       }
@@ -6004,6 +6044,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型 ID"
+          }
+        }
+      }
+    },
+    "Model for this chat" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此聊天的模型"
           }
         }
       }
@@ -11084,6 +11134,16 @@
         }
       }
     },
+    "Used for new chats. Existing chats keep their model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用于新聊天。现有聊天会保留各自的模型。"
+          }
+        }
+      }
+    },
     "Used to read agent responses aloud. For higher quality, go to Settings › Accessibility › Read & Speak › Voices and download an Enhanced or Premium voice." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11827,6 +11887,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你离开时，聊天已完成。"
+          }
+        }
+      }
+    },
+    "Your choice will be used for this chat and future chats." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择的模型将用于此聊天和今后的聊天。"
           }
         }
       }

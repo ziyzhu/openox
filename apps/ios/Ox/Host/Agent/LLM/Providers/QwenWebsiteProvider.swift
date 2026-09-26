@@ -11,6 +11,11 @@ nonisolated private struct QwenWebsiteError: ProviderClientError {
     }
 }
 
+nonisolated private struct QwenWebsiteModel: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
 nonisolated struct QwenWebsiteProvider: ProviderClient {
     let models: [ProviderModel]
     let id = "qwen-web"
@@ -20,6 +25,15 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
     let usesAPIKey = false
     let supportsTools = true
     let subscriptionAccount: (any SubscriptionAccount)? = nil
+    let canLoadModels = true
+
+    static func model(id: String, name: String) -> ProviderModel {
+        ProviderModel(id: "website:\(id)", providerModelID: id, displayName: name, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
+    }
+
+    func loadModels() async throws -> [ProviderModel] {
+        try await QwenWebGenerationSession.shared.loadModels().map { Self.model(id: $0.id, name: $0.name) }
+    }
 
     func websiteSessionIsAuthenticated() async throws -> Bool? {
         try await QwenWebGenerationSession.shared.isSignedIn()
@@ -45,7 +59,10 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
             let toolInstructions = WebsiteToolContract.instructions(tools)
             let instructions = [systemPrompt, toolInstructions].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
             let prompt = try WebsiteProviderPrompt.prompt(messages: messages, toolInstructions: instructions, providerName: "Qwen")
-            let generationID = try await QwenWebGenerationSession.shared.start(prompt: prompt)
+            let generationID = try await QwenWebGenerationSession.shared.start(
+                prompt: prompt,
+                modelID: model.id == "website-default" ? nil : model.wireID
+            )
             var assembler = StreamAssembler(model: model, continuation: continuation)
             var cursor = 0
             var text = ""
@@ -132,7 +149,29 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
         return signedIn
     }
 
-    func start(prompt: String) async throws -> UUID {
+    func loadModels() async throws -> [QwenWebsiteModel] {
+        let page = WebPage(configuration: IOSHost.shared.services.makeServicePageConfiguration(for: "chat.qwen.ai"))
+        try await load(page)
+        _ = try await page.callJavaScript(Self.bridge, arguments: [:], in: nil, contentWorld: .page)
+        let response = try await page.callJavaScript(
+            "return await window.__oxQwenModels();",
+            arguments: [:],
+            in: nil,
+            contentWorld: .page
+        )
+        guard let json = response as? String,
+              let data = json.data(using: .utf8),
+              let models = try? JSONDecoder().decode([QwenWebsiteModel].self, from: data),
+              !models.isEmpty, models.count <= 100,
+              models.allSatisfy({ !$0.id.isEmpty && $0.id.count <= 100 && !$0.name.isEmpty && $0.name.count <= 100 }),
+              Set(models.map(\.id)).count == models.count else {
+            throw QwenWebsiteError("Qwen returned an invalid model list")
+        }
+        Log.agent.info("QwenWebsite.models loaded count=\(models.count)")
+        return models
+    }
+
+    func start(prompt: String, modelID: String?) async throws -> UUID {
         guard generations.isEmpty else { throw QwenWebsiteError("Qwen website already has an active generation") }
         let id = UUID()
         var configuration = IOSHost.shared.services.makeServicePageConfiguration(for: "chat.qwen.ai")
@@ -144,12 +183,12 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
             try Task.checkCancellation()
             _ = try await page.callJavaScript(Self.bridge, arguments: [:], in: nil, contentWorld: .page)
             _ = try await page.callJavaScript(
-                "return window.__oxQwenRun(id, prompt);",
-                arguments: ["id": id.uuidString, "prompt": prompt],
+                "return window.__oxQwenRun(id, prompt, modelID);",
+                arguments: ["id": id.uuidString, "prompt": prompt, "modelID": modelID ?? ""],
                 in: nil,
                 contentWorld: .page
             )
-            Log.agent.info("QwenWebsite.start generation=\(id) submission=uncertain")
+            Log.agent.info("QwenWebsite.start generation=\(id) model=\(modelID ?? "website-default") submission=uncertain")
             return id
         } catch {
             generations.removeValue(forKey: id)
@@ -280,7 +319,14 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
             if (result?.success === true && result.data) return true;
             throw new Error('Qwen sign-in status could not be verified: ' + String(result?.data?.code || result?.status || 'unknown response'));
           };
-          window.__oxQwenRun = (id, prompt) => {
+          window.__oxQwenModels = async () => {
+            const {request} = await client();
+            const result = await checked(request, '/models', {method: 'GET'});
+            if (!Array.isArray(result?.data)) throw new Error('Qwen model list is unavailable');
+            return JSON.stringify(result.data.filter(model => model?.info?.is_active !== false && model?.info?.meta?.chat_type?.includes('t2t'))
+              .map(model => ({id: model.id, name: model.name})));
+          };
+          window.__oxQwenRun = (id, prompt, modelID) => {
             const generation = {chatId: '', responseId: '', text: '', canceled: false, requestSubmitted: false};
             active.set(id, generation);
             void (async () => {
@@ -288,7 +334,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                 if (!await window.__oxQwenSignedIn()) throw new Error('Sign in to Qwen in Ox provider settings');
                 if (generation.canceled) return;
                 const {module, request} = await client();
-                let modelId = '';
+                let modelId = modelID || '';
                 for (let attempt = 0; attempt < 100 && !modelId; attempt++) {
                   const stores = Object.values(module).filter(value => typeof value === 'function' && typeof value.getState === 'function');
                   const selected = stores.map(value => value.getState()?.selectedModelIds).find(value => Array.isArray(value) && value.length);

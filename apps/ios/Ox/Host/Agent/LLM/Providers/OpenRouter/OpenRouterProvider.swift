@@ -37,7 +37,7 @@ nonisolated enum OpenRouterProvider {
     static func client(models: [ProviderModel]) -> OpenAIChatTransport {
         OpenAIChatTransport(
             id: "openrouter",
-            displayName: "OpenRouter",
+            displayName: "OpenRouter API",
             models: models,
             regions: [.global],
             auth: OpenRouterAuth(),

@@ -5,7 +5,7 @@ nonisolated enum OpenAIProvider {
         let baseURL = URL(string: "https://api.openai.com/v1")!
         return OpenAIResponsesTransport(
             id: "openai",
-            displayName: "OpenAI",
+            displayName: "OpenAI API",
             models: models,
             website: URL(string: "https://platform.openai.com/api-keys"),
             auth: OpenAIResponsesAPIKeyAuth(clientID: "openai", baseURL: baseURL)
