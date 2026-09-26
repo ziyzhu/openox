@@ -63,6 +63,12 @@ final class ServiceHandoffSession {
     private let observesNavigations: Bool
     private var recoveryURL: URL
     private var hasRecoveredWebContent = false
+    private var startedAt = ProcessInfo.processInfo.systemUptime
+    private var navigationCount = 0
+    private var lastNavigationEvent = "none"
+    private var lastNavigationAt: TimeInterval?
+    private var probeStartedAt: TimeInterval?
+    private var lastProbeOutcome = "none"
     private var completion: CheckedContinuation<Outcome, Never>?
     private var navigationTask: Task<Void, Never>?
     private var periodicProbeTask: Task<Void, Never>?
@@ -206,8 +212,9 @@ final class ServiceHandoffSession {
 
     private func start() {
         phase = .running
+        startedAt = ProcessInfo.processInfo.systemUptime
         let attempt = id.uuidString.prefix(8)
-        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(attempt) phase=running")
+        Log.service.info("ServiceHandoffSession state domain=\(serviceDomain) attempt=\(attempt) phase=running uptime=\(startedAt) os=\(ProcessInfo.processInfo.operatingSystemVersionString) observesNavigations=\(observesNavigations)")
         if observesNavigations {
             navigationTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -249,8 +256,11 @@ final class ServiceHandoffSession {
     private func receive(_ event: WebPage.NavigationEvent) {
         let attempt = id.uuidString.prefix(8)
         let host = page.url?.host?.lowercased() ?? "?"
+        if event == .startedProvisionalNavigation { navigationCount += 1 }
+        lastNavigationEvent = String(describing: event)
+        lastNavigationAt = ProcessInfo.processInfo.systemUptime
         if event == .committed, let url = page.url { recoveryURL = url }
-        Log.service.info("ServiceHandoffSession navigation domain=\(serviceDomain) attempt=\(attempt) event=\(String(describing: event)) host=\(host)")
+        Log.service.info("ServiceHandoffSession navigation domain=\(serviceDomain) attempt=\(attempt) event=\(lastNavigationEvent) host=\(host) \(diagnosticContext)")
         navigationObserver(event, page.url)
         if event == .finished, isServiceHost(host) {
             requestProbe(reason: "service-return")
@@ -272,32 +282,44 @@ final class ServiceHandoffSession {
         guard phase == .running || phase == .verifying else { return }
         let attempt = id.uuidString.prefix(8)
         guard !hasRecoveredWebContent else {
-            Log.service.error("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=failed")
+            Log.service.error("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=failed \(diagnosticContext)")
             finish(.failed)
             return
         }
         hasRecoveredWebContent = true
-        Log.service.warning("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=reload host=\(recoveryURL.host ?? "?")")
+        Log.service.warning("ServiceHandoffSession web-content-terminated domain=\(serviceDomain) attempt=\(attempt) recovery=reload target=\(LogPrivacy.url(recoveryURL.absoluteString)) \(diagnosticContext)")
         page.load(recoveryURL)
     }
 
     private func requestProbe(reason: String) {
         guard phase == .running || phase == .verifying, probeTask == nil else { return }
         phase = .verifying
+        probeStartedAt = ProcessInfo.processInfo.systemUptime
         let attempt = id.uuidString.prefix(8)
-        Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) phase=start")
+        Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) phase=start elapsedMs=\(elapsedMilliseconds(since: startedAt)) nav=\(navigationCount)")
         probeTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let completed = await completionProbe(page.url)
             guard !Task.isCancelled, phase == .verifying else { return }
             probeTask = nil
-            Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) outcome=\(completed ? "completed" : "pending")")
+            lastProbeOutcome = completed ? "completed" : "pending"
+            Log.service.info("ServiceHandoffSession probe domain=\(serviceDomain) attempt=\(attempt) reason=\(reason) outcome=\(lastProbeOutcome) ms=\(elapsedMilliseconds(since: probeStartedAt)) elapsedMs=\(elapsedMilliseconds(since: startedAt))")
+            probeStartedAt = nil
             if completed {
                 finish(.completed)
             } else {
                 phase = .running
             }
         }
+    }
+
+    private var diagnosticContext: String {
+        "elapsedMs=\(elapsedMilliseconds(since: startedAt)) phase=\(phase.rawValue) nav=\(navigationCount) lastEvent=\(lastNavigationEvent) eventAgeMs=\(elapsedMilliseconds(since: lastNavigationAt)) loading=\(page.isLoading) progress=\(page.estimatedProgress) current=\(LogPrivacy.url(page.url?.absoluteString ?? "?")) probeActive=\(probeTask != nil) probeAgeMs=\(elapsedMilliseconds(since: probeStartedAt)) lastProbe=\(lastProbeOutcome)"
+    }
+
+    private func elapsedMilliseconds(since start: TimeInterval?) -> Int {
+        guard let start else { return -1 }
+        return Int((ProcessInfo.processInfo.systemUptime - start) * 1_000)
     }
 
     private static func failureDetails(_ error: any Error) -> String {
@@ -342,6 +364,7 @@ final class ServiceHandoffSession {
 
     private func finish(_ outcome: Outcome) {
         guard phase != .completed, phase != .cancelled, phase != .failed else { return }
+        Log.service.info("ServiceHandoffSession finishing domain=\(serviceDomain) attempt=\(id.uuidString.prefix(8)) outcome=\(outcome.rawValue) \(diagnosticContext)")
         switch outcome {
         case .completed: phase = .completed
         case .cancelled: phase = .cancelled

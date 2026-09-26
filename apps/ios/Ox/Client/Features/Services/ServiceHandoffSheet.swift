@@ -1,8 +1,10 @@
 import SwiftUI
 import WebKit
+import UIKit
 
 @MainActor
 protocol ServiceSheetSession: AnyObject {
+    var id: UUID { get }
     var serviceDomain: String { get }
     var navigationTitle: String { get }
     var page: WebPage { get }
@@ -62,6 +64,7 @@ private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
     let session: Session
     let mode: WebBrowserView.Mode
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -93,12 +96,28 @@ private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 }
         }
         .onAppear {
-            Log.ui.info("ServiceSessionSheet visible domain=\(session.serviceDomain) title=\(session.navigationTitle)")
+            Log.ui.info("ServiceSessionSheet visible domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
         }
         .onDisappear {
-            Log.ui.info("ServiceSessionSheet hidden domain=\(session.serviceDomain) title=\(session.navigationTitle)")
+            Log.ui.info("ServiceSessionSheet hidden domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
             session.cancel()
         }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            Log.ui.info("ServiceSessionSheet scene domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) phase=\(String(describing: phase)) uptime=\(ProcessInfo.processInfo.systemUptime)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            logKeyboard(notification, event: "willChangeFrame")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { notification in
+            logKeyboard(notification, event: "didHide")
+        }
+    }
+
+    private func logKeyboard(_ notification: Notification, event: String) {
+        let frame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? -1
+        let local = notification.userInfo?[UIResponder.keyboardIsLocalUserInfoKey] as? Bool ?? false
+        Log.ui.info("ServiceSessionSheet keyboard domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) event=\(event) local=\(local) endY=\(frame?.minY ?? -1) height=\(frame?.height ?? -1) duration=\(duration) loading=\(session.page.isLoading) uptime=\(ProcessInfo.processInfo.systemUptime)")
     }
 }
 
