@@ -95,7 +95,7 @@ struct RepositoriesView: View {
     }
 
     private func repositoryRow(_ repository: Repository.Descriptor) -> some View {
-        HStack(spacing: Theme.Spacing.xs) {
+        HStack(spacing: 0) {
             Button {
                 Task {
                     await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
@@ -104,7 +104,7 @@ struct RepositoriesView: View {
                 Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
                     .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(repository.isEnabled ? Theme.Colors.primary : Theme.Colors.onSurfaceMuted)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: 44, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
