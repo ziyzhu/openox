@@ -13,17 +13,24 @@ async function client() {
   return c.http.http;
 }
 async function identity(){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem('userToken') || 'null'); }
+  catch { throw new Error('Invalid DeepSeek sign-in storage'); }
+  if(stored === null || stored.value === null)return {signedIn:false};
+  if(typeof stored.value !== 'string' || !stored.value.length)throw new Error('Invalid DeepSeek sign-in storage');
+  let r, j;
   try {
-    const r = await fetch('/api/v0/users/current', {credentials:'include',cache:'no-store',signal:controller.signal});
-    if(r.redirected) throw new Error('Unexpected DeepSeek identity redirect');
-    let j; try { j = await r.json(); } catch { throw new Error('Invalid DeepSeek identity response'); }
-    if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
-    if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};
-    throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
-  } finally { clearTimeout(timer); }
+    r = await fetch('/api/v0/users/current', {
+      headers:{Authorization:'Bearer '+stored.value},
+      credentials:'include',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(7000)
+    });
+    j = await r.json();
+  } catch { throw new Error('DeepSeek identity check failed'); }
+  if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
+  if(r.status===200&&j?.code===40002)return {signedIn:false};
+  throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
 }
+
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}
 function messages(){return Array.from(document.querySelectorAll('.ds-message')).slice(-100).flatMap(e=>{const a=e.querySelector('.ds-assistant-message-main-content');const user=e.classList.contains('d29f3d7d');if(!a&&!user)return [];return [{role:a?'assistant':'user',text:((a||e).innerText||(a||e).textContent||'').trim()}];}).filter(m=>m.text);}
 function guardDraft(){if(document.querySelector('textarea')?.value.trim())throw new Error('Existing draft must be handled before navigating or sending');}

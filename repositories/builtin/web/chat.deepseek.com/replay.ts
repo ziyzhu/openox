@@ -6,5 +6,13 @@ export const replayCases = [
     "output": {
       "signedIn": false
     }
+  },
+  {
+    "action": "getSignInState",
+    "name": "signed-in",
+    "args": {},
+    "output": {
+      "signedIn": true
+    }
   }
 ];
