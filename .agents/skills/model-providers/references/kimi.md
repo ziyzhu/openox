@@ -11,7 +11,7 @@
 
 Ox presents Kimi in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other.
 
-The Kimi Website provider is a separate Global text-chat option. It uses the signed-in Ox browser session for `www.kimi.com` and does not use the Kimi Open Platform API key. Its website RPC is distinct from the official developer API and may change independently. The website chat service remains a separate Ox service.
+The Kimi Website provider is a separate Global chat option with text, image, and PDF input. It uses the signed-in Ox browser session for `www.kimi.com` and does not use the Kimi Open Platform API key. User attachments and live Ox Action media use the signed-in website upload flow. Its website RPC is distinct from the official developer API and may change independently. The website chat service remains a separate Ox service.
 
 ## Runtime sources
 

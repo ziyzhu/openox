@@ -328,6 +328,7 @@ private final class GrokWebGenerationSession: NSObject, WKScriptMessageHandler {
             if (response.redirected) throw new Error('Grok session check redirected');
             const body = await response.json();
             if (response.status === 401 && typeof body.code !== 'undefined' && typeof body.message === 'string') return false;
+            if (response.status === 400 && body.code === 3 && body.message === 'Only authenticated users') return false;
             if (response.status === 200 && typeof body.enableMemory === 'boolean' && typeof body.excludeFromTraining === 'boolean') return true;
             throw new Error('Grok session response changed');
           };

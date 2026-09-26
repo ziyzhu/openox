@@ -28,6 +28,8 @@ When adding a built-in provider:
 4. Add the reference to the routing list below.
 5. Keep account-region boundaries explicit, especially when Global and China use different credentials or portals.
 
+When adding attachment support, check bundled and discovered model capabilities, provider validation, user messages, Action results, and history together. Verify that the model can read a synthetic image or document through the real upload path; an upload ID alone is insufficient.
+
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 
 ## Updating models

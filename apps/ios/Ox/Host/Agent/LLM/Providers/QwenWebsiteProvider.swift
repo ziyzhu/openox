@@ -14,6 +14,7 @@ nonisolated private struct QwenWebsiteError: ProviderClientError {
 nonisolated private struct QwenWebsiteModel: Decodable, Sendable {
     let id: String
     let name: String
+    let input: Set<ProviderModelModality>
 }
 
 nonisolated struct QwenWebsiteProvider: ProviderClient {
@@ -27,12 +28,12 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
     let subscriptionAccount: (any SubscriptionAccount)? = nil
     let canLoadModels = true
 
-    static func model(id: String, name: String) -> ProviderModel {
-        ProviderModel(id: "website:\(id)", providerModelID: id, displayName: name, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
+    static func model(id: String, name: String, input: Set<ProviderModelModality> = [.text]) -> ProviderModel {
+        ProviderModel(id: "website:\(id)", providerModelID: id, displayName: name, maxTokens: 4_096, maxContext: 32_768, supportsTools: true, modalities: .init(input: input, output: [.text]))
     }
 
     func loadModels() async throws -> [ProviderModel] {
-        try await QwenWebGenerationSession.shared.loadModels().map { Self.model(id: $0.id, name: $0.name) }
+        try await QwenWebGenerationSession.shared.loadModels().map { Self.model(id: $0.id, name: $0.name, input: $0.input) }
     }
 
     func websiteSessionIsAuthenticated() async throws -> Bool? {
@@ -50,17 +51,14 @@ nonisolated struct QwenWebsiteProvider: ProviderClient {
             guard models.contains(where: { $0.id == model.id }) else {
                 throw QwenWebsiteError("This Qwen website model is unavailable")
             }
-            guard requiredInputModalities(in: messages).isSubset(of: Set([.text])) else {
-                throw QwenWebsiteError("Qwen website supports text only", kind: .unsupportedInput)
-            }
             guard options.temperature == nil else {
                 throw QwenWebsiteError("Qwen website does not support temperature")
             }
             let toolInstructions = WebsiteToolContract.instructions(tools)
             let instructions = [systemPrompt, toolInstructions].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
-            let prompt = try WebsiteProviderPrompt.prompt(messages: messages, toolInstructions: instructions, providerName: "Qwen")
+            let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: "Qwen")
             let generationID = try await QwenWebGenerationSession.shared.start(
-                prompt: prompt,
+                input: input,
                 modelID: model.id == "website-default" ? nil : model.wireID
             )
             var assembler = StreamAssembler(model: model, continuation: continuation)
@@ -171,7 +169,7 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
         return models
     }
 
-    func start(prompt: String, modelID: String?) async throws -> UUID {
+    func start(input: WebsiteProviderInput, modelID: String?) async throws -> UUID {
         guard generations.isEmpty else { throw QwenWebsiteError("Qwen website already has an active generation") }
         let id = UUID()
         var configuration = IOSHost.shared.services.makeServicePageConfiguration(for: "chat.qwen.ai")
@@ -181,10 +179,12 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
         do {
             try await load(page)
             try Task.checkCancellation()
+            Log.agent.info("QwenWebsite.attachments generation=\(id) count=\(input.attachments.count) bytes=\(input.attachments.reduce(0) { $0 + $1.data.count })")
+            try await WebsiteAttachmentTransfer.stage(input.attachments, on: page)
             _ = try await page.callJavaScript(Self.bridge, arguments: [:], in: nil, contentWorld: .page)
             _ = try await page.callJavaScript(
                 "return window.__oxQwenRun(id, prompt, modelID);",
-                arguments: ["id": id.uuidString, "prompt": prompt, "modelID": modelID ?? ""],
+                arguments: ["id": id.uuidString, "prompt": input.prompt, "modelID": modelID ?? ""],
                 in: nil,
                 contentWorld: .page
             )
@@ -256,6 +256,10 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                 generation.remoteMessageID = messageID
             }
             switch value["type"] as? String {
+            case "progress":
+                if let phase = value["phase"] as? String {
+                    Log.agent.debug("QwenWebsite.upload generation=\(id) phase=\(phase) statuses=\(value["statuses"] as? String ?? "")")
+                }
             case "snapshot":
                 if let text = value["text"] as? String { generation.events.append(.textSnapshot(text)) }
             case "completed":
@@ -324,7 +328,9 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
             const result = await checked(request, '/models', {method: 'GET'});
             if (!Array.isArray(result?.data)) throw new Error('Qwen model list is unavailable');
             return JSON.stringify(result.data.filter(model => model?.info?.is_active !== false && model?.info?.meta?.chat_type?.includes('t2t'))
-              .map(model => ({id: model.id, name: model.name})));
+              .map(model => ({id: model.id, name: model.name, input: ['text',
+                ...(model.info?.meta?.abilities?.vision === 1 ? ['image'] : []),
+                ...(model.info?.meta?.abilities?.document === 1 ? ['pdf'] : [])]})));
           };
           window.__oxQwenRun = (id, prompt, modelID) => {
             const generation = {chatId: '', responseId: '', text: '', canceled: false, requestSubmitted: false};
@@ -343,12 +349,37 @@ private final class QwenWebGenerationSession: NSObject, WKScriptMessageHandler {
                 }
                 if (!modelId) throw new Error('Select a Qwen text model on the website');
                 if (generation.canceled) return;
+                const attachments = window.__oxWebsiteFiles || [];
+                delete window.__oxWebsiteFiles;
+                let files = [];
+                if (attachments.length) {
+                  const managers = Object.values(module).filter(value => typeof value === 'function' && typeof value.prototype?.addFiles === 'function' && typeof value.prototype?.retryFile === 'function');
+                  if (managers.length !== 1) throw new Error('Qwen attachment uploader is unavailable');
+                  const identity = await module.dN(false);
+                  const manager = new managers[0]({parsedFileTypes: ['file'], userId: identity?.data?.id});
+                  send({id, type: 'progress', phase: 'uploading'});
+                  await manager.addFiles(attachments);
+                  let ready = false;
+                  for (let attempt = 0; attempt < 120; attempt++) {
+                    if (generation.canceled) return;
+                    files = manager.getFiles();
+                    if (files.length !== attachments.length) throw new Error('Qwen rejected one or more attachments');
+                    if (files.some(file => file.error || ['failed', 'upload_error'].includes(file.status) || file.greenNet === 'green_error' || file.file?.meta?.parse_meta?.parse_status === 'failed')) throw new Error('Qwen could not process an attachment');
+                    ready = files.every(file => file.id && file.status === 'uploaded' && file.greenNet === 'success'
+                      && (file.type === 'image' || file.file?.meta?.parse_meta?.parse_status === 'success'));
+                    if (ready) break;
+                    send({id, type: 'progress', phase: 'processing', statuses: files.map(file => [file.type, file.status, file.greenNet, file.file?.meta?.parse_meta?.parse_status].join('/')).join(', ')});
+                    await pause(1000);
+                  }
+                  if (!ready) throw new Error('Qwen attachment processing timed out: ' + files.map(file => [file.type, file.status, file.greenNet, file.file?.meta?.parse_meta?.parse_status].join('/')).join(', '));
+                }
+                if (generation.canceled) return;
                 const created = await checked(request, '/chats/new', {method: 'POST', data: {chatId: '', models: [modelId], project_id: '', timestamp: Date.now(), chat_type: 't2t', chat_mode: 'normal'}});
                 if (typeof created?.id !== 'string' || !created.id) throw new Error('Qwen did not return a conversation ID');
                 if (generation.canceled) return;
                 generation.chatId = created.id;
                 send({id, type: 'progress', chatId: generation.chatId});
-                const user = {id: null, fid: crypto.randomUUID(), parentId: null, parent_id: null, childrenIds: [], role: 'user', content: prompt, user_action: 'chat', timestamp: Math.floor(Date.now() / 1000), models: [modelId], model: '', chat_type: 't2t', sub_chat_type: 't2t', feature_config: {thinking_enabled: false, output_schema: 'phase', research_mode: 'normal'}, extra: {meta: {subChatType: 't2t'}}};
+                const user = {id: null, fid: crypto.randomUUID(), parentId: null, parent_id: null, childrenIds: [], role: 'user', content: prompt, ...(files.length ? {files} : {}), user_action: 'chat', timestamp: Math.floor(Date.now() / 1000), models: [modelId], model: '', chat_type: 't2t', sub_chat_type: 't2t', feature_config: {thinking_enabled: false, output_schema: 'phase', research_mode: 'normal'}, extra: {meta: {subChatType: 't2t'}}};
                 const body = {stream: true, version: '2.1', incremental_output: true, chatId: generation.chatId, parentId: '', chat_id: generation.chatId, chat_mode: 'normal', model: modelId, parent_id: null, messages: [user], timestamp: Math.floor(Date.now() / 1000)};
                 generation.requestSubmitted = true;
                 const result = await request('/chat/completions', {method: 'post', responseType: 'stream', headers: {'X-Accel-Buffering': 'no', 'X-Request-Id': crypto.randomUUID()}, params: {chat_id: generation.chatId}, data: body});

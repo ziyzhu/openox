@@ -135,7 +135,9 @@ nonisolated enum ProviderClientFactory {
         guard definition.models.first?.id == "website-default", definition.models.count <= 101 else { return false }
         return definition.models.dropFirst().allSatisfy {
             guard let wireID = $0.wireID, !wireID.isEmpty else { return false }
-            return $0 == ProviderDefinition.Model(QwenWebsiteProvider.model(id: wireID, name: $0.name))
+            let input = Set($0.input ?? [.text])
+            guard input.contains(.text), input.isSubset(of: [.text, .image, .pdf]) else { return false }
+            return $0 == ProviderDefinition.Model(QwenWebsiteProvider.model(id: wireID, name: $0.name, input: input))
         }
     }
 

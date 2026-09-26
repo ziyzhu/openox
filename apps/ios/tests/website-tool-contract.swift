@@ -30,7 +30,7 @@ nonisolated enum ContentBlock: Sendable {
     case text(TextContent)
     case thinking
     case toolCall(ToolCall)
-    case attachment
+    case attachment(Artifact)
 }
 
 nonisolated struct UserMessage: Sendable {
@@ -47,6 +47,34 @@ nonisolated struct ToolResultMessage: Sendable {
     let toolName: String
     let toolCallId: String
     let isError: Bool
+    var transientAttachments: [TransientAttachment] = []
+}
+
+nonisolated struct Artifact: Sendable {
+    enum Kind { case text, html, image, pdf, file }
+    let fileURL: URL
+    let displayName: String
+    let mimeType: String
+    let kind: Kind
+    var exists: Bool { FileManager.default.fileExists(atPath: fileURL.path) }
+    var size: Int? { try? Data(contentsOf: fileURL).count }
+}
+
+nonisolated struct TransientAttachment: Sendable {
+    enum Kind { case text, image, pdf, file }
+    let kind: Kind
+    let mimeType: String
+    let displayName: String
+    let data: Data
+}
+
+nonisolated enum ArtifactLimits {
+    static let fileBytes = 32 * 1024 * 1024
+    static let textBytes = 200 * 1024
+}
+
+nonisolated enum PDFPreparer {
+    static func prepareArtifact(_ data: Data) throws -> Data { data }
 }
 
 nonisolated enum Message: Sendable {
@@ -71,28 +99,28 @@ struct WebsiteToolContractChecks {
     static func main() throws {
         let tool = TestTool()
         let instructions = WebsiteToolContract.instructions([tool])
-        precondition(instructions.contains("<tools>"))
+        precondition(instructions.contains("<ox_actions>"))
         precondition(instructions.contains("\"type\":\"function\""))
-        precondition(instructions.contains("<tool_call>"))
-        precondition(WebsiteToolContract.isPossibleCallPrefix("<tool_ca"))
+        precondition(instructions.contains("<ox_action_call>"))
+        precondition(WebsiteToolContract.isPossibleCallPrefix("<ox_action_ca"))
         precondition(!WebsiteToolContract.isPossibleCallPrefix("The answer is 56."))
 
-        let valid = "<tool_call>\n{\"name\":\"execute\",\"arguments\":{\"code\":\"console.log(56)\"}}\n</tool_call>"
+        let valid = "<ox_action_call>\n{\"name\":\"execute\",\"arguments\":{\"code\":\"console.log(56)\"}}\n</ox_action_call>"
         let call = try WebsiteToolContract.call(from: valid, tools: [tool])
         precondition(call?.name == "execute")
         precondition(call?.arguments.objectValue?["code"] == .string("console.log(56)"))
-        let embeddedTag = "<tool_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"console.log('\\u003c/tool_call>')\"}}</tool_call>"
+        let embeddedTag = "<ox_action_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"console.log('\\u003c/ox_action_call>')\"}}</ox_action_call>"
         let embeddedCall = try WebsiteToolContract.call(from: embeddedTag, tools: [tool])
         precondition(embeddedCall != nil)
         let ordinaryText = try WebsiteToolContract.call(from: "The answer is 56.", tools: [tool])
         precondition(ordinaryText == nil)
 
         for invalid in [
-            "<tool_call>{\"name\":\"execute\",\"arguments\":{}}</tool_call>",
-            "<tool_call>{\"name\":\"unknown\",\"arguments\":{\"code\":\"x\"}}</tool_call>",
-            "<tool_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"},\"extra\":1}</tool_call>",
-            "<tool_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"}}</tool_call> extra",
-            "<tool_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"}}",
+            "<ox_action_call>{\"name\":\"execute\",\"arguments\":{}}</ox_action_call>",
+            "<ox_action_call>{\"name\":\"unknown\",\"arguments\":{\"code\":\"x\"}}</ox_action_call>",
+            "<ox_action_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"},\"extra\":1}</ox_action_call>",
+            "<ox_action_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"}}</ox_action_call> extra",
+            "<ox_action_call>{\"name\":\"execute\",\"arguments\":{\"code\":\"x\"}}",
         ] {
             do {
                 _ = try WebsiteToolContract.call(from: invalid, tools: [tool])
@@ -101,9 +129,9 @@ struct WebsiteToolContractChecks {
         }
 
         let response = WebsiteToolContract.response(name: "execute", callID: "web-1", isError: false, text: "56")
-        precondition(response.hasPrefix("<tool_response>\n"))
-        precondition(response.hasSuffix("\n</tool_response>"))
-        let payload = String(response.dropFirst("<tool_response>\n".count).dropLast("\n</tool_response>".count))
+        precondition(response.hasPrefix("<ox_action_result>\n"))
+        precondition(response.hasSuffix("\n</ox_action_result>"))
+        let payload = String(response.dropFirst("<ox_action_result>\n".count).dropLast("\n</ox_action_result>".count))
         precondition(JSONValue.parse(jsonString: payload)?.objectValue?["content"] == .string("56"))
 
         let prompt = try WebsiteProviderPrompt.prompt(
@@ -118,8 +146,41 @@ struct WebsiteToolContractChecks {
         let data = Data(prompt.utf8)
         let decoded = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         let turns = decoded["conversation"] as! [[String: String]]
-        precondition(turns[1]["text"]?.hasPrefix("<tool_call>") == true)
-        precondition(turns[2]["text"]?.hasPrefix("<tool_response>") == true)
+        precondition(turns[1]["text"]?.hasPrefix("<ox_action_call>") == true)
+        precondition(turns[2]["text"]?.hasPrefix("<ox_action_result>") == true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("image.png")
+        let image = Data([1, 2, 3])
+        try image.write(to: url)
+        let artifact = Artifact(fileURL: url, displayName: "image.png", mimeType: "image/png", kind: .image)
+        let result = ToolResultMessage(content: [.attachment(artifact)], toolName: "execute", toolCallId: "call-2", isError: false,
+                                      transientAttachments: [
+                                        .init(kind: .image, mimeType: "image/png", displayName: "image.png", data: image),
+                                        .init(kind: .image, mimeType: "image/png", displayName: "image.png", data: Data([4, 5, 6])),
+                                        .init(kind: .text, mimeType: "text/plain", displayName: "note.txt", data: Data("read me".utf8)),
+                                      ])
+        let media = try WebsiteProviderPrompt.prepare(messages: [
+            .user(UserMessage(content: [.attachment(artifact)], transientContext: nil)),
+            .toolResult(result),
+            .user(UserMessage(content: [.text(TextContent(text: "Compare both images"))], transientContext: nil)),
+        ], toolInstructions: instructions, providerName: "Test")
+        precondition(media.attachments.count == 2)
+        precondition(media.attachments.map(\.name) == ["ox-1-image.png", "ox-2-image.png"])
+        precondition(media.attachments[1].data == Data([4, 5, 6]))
+        precondition(!media.prompt.contains(image.base64EncodedString()))
+        precondition(media.prompt.contains("read me"))
+        precondition(media.prompt.contains("call-2"))
+        precondition(media.prompt.components(separatedBy: "ox-1-image.png").count == 4)
+        let attachmentOnly = try WebsiteProviderPrompt.prepare(messages: [.user(UserMessage(content: [.attachment(artifact)], transientContext: nil))],
+                                                               toolInstructions: "", providerName: "Test")
+        precondition(attachmentOnly.attachments.count == 1)
+        try FileManager.default.removeItem(at: url)
+        do {
+            _ = try WebsiteProviderPrompt.prepare(messages: [.user(UserMessage(content: [.attachment(artifact)], transientContext: nil))], toolInstructions: "", providerName: "Test")
+            preconditionFailure("Silently dropped a missing attachment")
+        } catch is WebsiteProviderError {}
         print("Website tool contract checks passed")
     }
 }

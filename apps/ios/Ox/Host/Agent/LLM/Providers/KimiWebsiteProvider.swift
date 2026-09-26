@@ -36,16 +36,13 @@ nonisolated struct KimiWebsiteProvider: ProviderClient {
             guard models.contains(where: { $0.id == model.id }) else {
                 throw KimiWebsiteError("This Kimi website model is unavailable")
             }
-            guard requiredInputModalities(in: messages).isSubset(of: Set([.text])) else {
-                throw KimiWebsiteError("Kimi website supports text only", kind: .unsupportedInput)
-            }
             guard options.temperature == nil else {
                 throw KimiWebsiteError("Kimi website does not support temperature")
             }
             let toolInstructions = WebsiteToolContract.instructions(tools)
-            let prompt = try WebsiteProviderPrompt.prompt(messages: messages, toolInstructions: toolInstructions, providerName: "Kimi")
+            let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: toolInstructions, providerName: "Kimi")
             let instructions = [systemPrompt, toolInstructions].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
-            let generationID = try await KimiWebGenerationSession.shared.start(prompt: prompt, systemPrompt: instructions)
+            let generationID = try await KimiWebGenerationSession.shared.start(input: input, systemPrompt: instructions)
             var assembler = StreamAssembler(model: model, continuation: continuation)
             var cursor = 0
             var text = ""
@@ -150,7 +147,7 @@ private final class KimiWebGenerationSession: NSObject, WKScriptMessageHandler {
         return signedIn
     }
 
-    func start(prompt: String, systemPrompt: String?) async throws -> UUID {
+    func start(input: WebsiteProviderInput, systemPrompt: String?) async throws -> UUID {
         guard generations.isEmpty else { throw KimiWebsiteError("Kimi website already has an active generation") }
         let id = UUID()
         var configuration = IOSHost.shared.services.makeServicePageConfiguration(for: "www.kimi.com")
@@ -160,10 +157,12 @@ private final class KimiWebGenerationSession: NSObject, WKScriptMessageHandler {
         do {
             try await load(page)
             try Task.checkCancellation()
+            Log.agent.info("KimiWebsite.attachments generation=\(id) count=\(input.attachments.count) bytes=\(input.attachments.reduce(0) { $0 + $1.data.count })")
+            try await WebsiteAttachmentTransfer.stage(input.attachments, on: page)
             _ = try await page.callJavaScript(Self.bridge, arguments: [:], in: nil, contentWorld: .page)
             _ = try await page.callJavaScript(
                 "return window.__oxKimiRun(id, prompt, systemPrompt);",
-                arguments: ["id": id.uuidString, "prompt": prompt, "systemPrompt": systemPrompt ?? ""],
+                arguments: ["id": id.uuidString, "prompt": input.prompt, "systemPrompt": systemPrompt ?? ""],
                 in: nil,
                 contentWorld: .page
             )
@@ -294,11 +293,45 @@ private final class KimiWebGenerationSession: NSObject, WKScriptMessageHandler {
               try {
                 if (!await window.__oxKimiSignedIn()) throw new Error('Sign in to Kimi in Ox provider settings');
                 const client = await service('kimi.gateway.chat.v1.ChatService');
+                const files = window.__oxWebsiteFiles || [];
+                delete window.__oxWebsiteFiles;
+                const fileBlocks = [];
+                if (files.length) {
+                  const provides = document.querySelector('#app')?.__vue_app__?._context?.provides;
+                  const request = provides && Reflect.ownKeys(provides).filter(key => key.description === 'requestClient').map(key => provides[key])[0];
+                  if (typeof request !== 'function') throw new Error('Kimi attachment uploader is unavailable');
+                  const fileService = await service('kimi.gateway.file.v1.FileService');
+                  for (const file of files) {
+                    generation.controller.signal.throwIfAborted();
+                    const data = new FormData();
+                    data.append('file', file);
+                    send({id, type: 'progress', attachment: file.name, phase: 'uploading'});
+                    const response = await request({baseURL: '/apiv2-files', url: '/file/upload', method: 'POST', data,
+                      responseType: 'text', timeout: 120000, signal: generation.controller.signal});
+                    const uploaded = (typeof response === 'string' ? JSON.parse(response) : response)?.file;
+                    if (!uploaded?.id) throw new Error('Kimi did not return an uploaded file ID');
+                    let ready = false;
+                    for (let attempt = 0; attempt < 120; attempt++) {
+                      generation.controller.signal.throwIfAborted();
+                      const result = await fileService.getFileParseProgress({fileIds: [uploaded.id]}, {signal: generation.controller.signal});
+                      const progress = result.progresses?.find(value => value.fileId === uploaded.id);
+                      if (progress?.status === 4) throw new Error('Kimi could not process attachment: ' + file.name);
+                      if (progress?.status === 3) { ready = true; break; }
+                      send({id, type: 'progress', attachment: file.name, phase: 'processing'});
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    if (!ready) throw new Error('Kimi attachment processing timed out: ' + file.name);
+                    fileBlocks.push({$typeName: 'kimi.chat.v1.Block', id: '', messageId: '', content: {
+                      case: 'file', value: {$typeName: 'kimi.gateway.file.v1.File', id: uploaded.id, status: 3, failReason: ''}
+                    }});
+                  }
+                }
+                generation.controller.signal.throwIfAborted();
                 const message = {
                   $typeName: 'kimi.chat.v1.ChatMessage', id: '', parentId: '', role: 2,
                   blocks: [{$typeName: 'kimi.chat.v1.Block', id: '', messageId: '', content: {
                     case: 'text', value: {$typeName: 'kimi.chat.v1.TextBlock', content: prompt}
-                  }}], labels: [], references: [], childrenMessageIds: [], refVotes: []
+                  }}, ...fileBlocks], labels: [], references: [], childrenMessageIds: [], refVotes: []
                 };
                 const request = {
                   $typeName: 'kimi.gateway.chat.v1.ChatRequest', chatId: '', kimiplusId: '',

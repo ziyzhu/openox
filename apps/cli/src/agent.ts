@@ -77,7 +77,7 @@ function parseOptions(args: string[], command: "list" | "run" | "replay"): {
 }
 
 async function fetchAgents(context: CliContext, timeoutMs: number): Promise<ClientEntry[]> {
-  const result = await requireHost("models.list", context, timeoutMs);
+  const result = await requireHost("models.list", { host: context.host }, timeoutMs);
   return Array.isArray(result.clients) ? result.clients as ClientEntry[] : [];
 }
 
