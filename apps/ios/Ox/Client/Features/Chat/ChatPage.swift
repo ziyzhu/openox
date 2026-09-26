@@ -235,7 +235,7 @@ struct ChatPage: View {
     private var providerRegistry: ProviderRegistry { .shared }
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
-    @State private var composer = ChatComposerModel()
+    @State var composer = ChatComposerModel()
     @State private var speechInput = ChatSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?

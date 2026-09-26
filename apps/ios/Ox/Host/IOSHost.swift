@@ -1,6 +1,5 @@
 enum HostPreparationPhase {
     case opening
-    case updating
     case loadingChats
 }
 
@@ -64,7 +63,6 @@ final class IOSHost: OxHost {
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             onPhase?(.opening)
-            onPhase?(.updating)
             try await StorageMigrator.prepare(storage: .shared, services: services)
             onPhase?(.loadingChats)
             await chats.loadSummariesNow()

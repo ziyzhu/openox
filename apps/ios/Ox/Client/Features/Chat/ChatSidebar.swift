@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct ChatSidebar: View {
+    enum ContentState {
+        case loading
+        case unavailable
+        case ready
+    }
+
+    let contentState: ContentState
     let summaries: [ChatMeta]
     let activities: [UUID: Chat.Activity]
     let currentId: UUID?
@@ -82,6 +89,7 @@ struct ChatSidebar: View {
         }
         .accessibilityLabel(A11yLabel.newChat)
         .accessibilityIdentifier(A11yID.Sidebar.newChat)
+        .disabled(contentState != .ready)
     }
 
     private var settingsButton: some View {
@@ -94,6 +102,7 @@ struct ChatSidebar: View {
         }
         .accessibilityLabel(A11yLabel.settings)
         .accessibilityIdentifier(A11yID.Sidebar.settings)
+        .disabled(contentState != .ready)
     }
 
     private var header: some View {
@@ -147,13 +156,17 @@ struct ChatSidebar: View {
         let ordered = sorted.filter(\.isFavorite) + sorted.filter { !$0.isFavorite }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if ordered.isEmpty {
+                if contentState == .loading {
+                    CellularAutomatonLoader.small
+                        .padding(edgeInset)
+                        .accessibilityLabel("Loading your chats…")
+                } else if contentState == .ready, ordered.isEmpty {
                     Text(LocalizedStringKey(query.isEmpty ? "Empty" : "No chats found"))
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .padding(.horizontal, edgeInset)
                         .padding(.vertical, 11)
-                } else {
+                } else if contentState == .ready {
                     ForEach(ordered) { row($0) }
                 }
                 Color.clear.frame(height: Theme.Spacing.md)

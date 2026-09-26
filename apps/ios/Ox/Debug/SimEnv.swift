@@ -9,6 +9,9 @@ nonisolated enum SimEnv {
     static let iCloudDisabled = argument("--disable-icloud")
     static let mockLLMDisabled = argument("--disable-mock-llm")
     static let cloudOnlyArtifacts = values("OX_CLOUD_ONLY_ARTIFACTS")
+    static let startupDelayMilliseconds = min(30_000, max(0,
+        Int(ProcessInfo.processInfo.environment["OX_STARTUP_DELAY_MS"] ?? "") ?? 0
+    ))
 
     static func servicesURL(path: String) -> URL {
         let base = servicesEndpoint ?? URL(string: "http://127.0.0.1:8100/repository.git")!

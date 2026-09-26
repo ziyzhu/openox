@@ -455,16 +455,8 @@ private extension View {
 struct RootView: View {
     private enum StartupPhase: String {
         case opening
-        case updating
         case loadingChats
-
-        var label: LocalizedStringKey {
-            switch self {
-            case .opening: "Opening your Profile…"
-            case .updating: "Updating your Profile…"
-            case .loadingChats: "Loading your chats…"
-            }
-        }
+        case loadingServices
     }
 
     private enum StartupRecovery: Equatable {
@@ -483,6 +475,14 @@ struct RootView: View {
             switch self {
             case .idle, .failed: true
             case .loading, .ready: false
+            }
+        }
+
+        var sidebarContentState: ChatSidebar.ContentState {
+            switch self {
+            case .idle, .loading: .loading
+            case .failed: .unavailable
+            case .ready: .ready
             }
         }
     }
@@ -516,6 +516,11 @@ struct RootView: View {
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
     @State private var startup = Startup.idle
+    @State private var startupComposer = ChatComposerModel()
+    @State private var startupDraft = ""
+    @State private var startupMessages: [ChatComposerModel.Message] = []
+    @State private var startupChatID: UUID?
+    @FocusState private var startupComposerFocused: Bool
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var artifactRefreshEpoch = 0
     @State private var childNavigationActive = false
@@ -523,6 +528,7 @@ struct RootView: View {
     @State private var sharedNoteImportError: String?
     @State private var sharedNoteToast: Toast?
     @State private var sidebarInteraction = SidebarInteraction()
+    @ScaledMetric(relativeTo: .title3) private var startupButtonSize: CGFloat = 44
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -587,6 +593,12 @@ struct RootView: View {
         GeometryReader { geo in
             if isSplitLayout {
                 splitLayout(width: geo.size.width)
+            } else if startup != .ready {
+                if showSidebar {
+                    compactSidebarPanel
+                } else {
+                    startupShell
+                }
             } else {
                 compactLayout(geo: geo)
             }
@@ -768,6 +780,7 @@ struct RootView: View {
 
     private func makeSidebarPanel(summaries: [ChatMeta], currentId: UUID?) -> ChatSidebar {
         ChatSidebar(
+            contentState: startup.sidebarContentState,
             summaries: summaries,
             activities: chats.activities,
             currentId: currentId,
@@ -810,7 +823,7 @@ struct RootView: View {
     }
 
     private func sidebarAction(_ name: String, perform: () -> Void) {
-        guard !sidebarInteraction.actionsSuppressed else {
+        guard startup == .ready, !sidebarInteraction.actionsSuppressed else {
             Log.ui.info("RootView.sidebarAction suppressed=\(name)")
             return
         }
@@ -824,7 +837,7 @@ struct RootView: View {
                 readyChatLayer
                     .transition(.opacity)
             } else {
-                startupLoadingView
+                startupShell
                     .transition(.opacity)
             }
         }
@@ -854,7 +867,8 @@ struct RootView: View {
                          },
                          onExploreServices: { showServices(for: chat.id) },
                          onArtifactNavigationChange: setChildNavigationActive,
-                         onInitialTranscriptPresented: { finishChatOpening(chat.id) })
+                         onInitialTranscriptPresented: { finishChatOpening(chat.id) },
+                         composer: startupChatID == chat.id ? startupComposer : ChatComposerModel())
                     .onAppear {
                         chat.setTranscriptVisible(scenePhase == .active)
                     }
@@ -875,7 +889,104 @@ struct RootView: View {
         }
     }
 
-    private var startupLoadingView: some View {
+    private var startupShell: some View {
+        VStack(spacing: 0) {
+            HStack {
+                SidebarMenuButton { setSidebar(isSplitLayout ? !showSidebar : true) }
+                Spacer()
+                TemporaryChatIcon(isActive: false)
+                    .frame(width: 29, height: 29)
+                    .frame(width: startupButtonSize, height: startupButtonSize)
+                    .glassEffect(.regular, in: Circle())
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.bottom, Theme.Spacing.xs)
+            ScrollView {
+                startupMessageQueue
+            }
+            .defaultScrollAnchor(.bottom)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            startupStatus
+            startupInputBar
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Colors.surface)
+    }
+
+    private var startupMessageQueue: some View {
+        VStack(alignment: .trailing, spacing: Theme.Spacing.md) {
+            ForEach(startupMessages, id: \.id) { message in
+                VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
+                    Text(message.text)
+                        .font(Theme.Fonts.bodyMd)
+                        .textSelection(.enabled)
+                    HStack {
+                        Text("Queued")
+                            .font(Theme.Fonts.captionSm)
+                        Button("Cancel", systemImage: "xmark") {
+                            startupMessages.removeAll { $0.id == message.id }
+                        }
+                        .labelStyle(.iconOnly)
+                        .minimumTouchTarget()
+                    }
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                }
+                .padding(Theme.Spacing.md)
+                .background(Theme.Colors.bubble, in: RoundedRectangle(cornerRadius: Theme.Radius.xl))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .padding(Theme.Spacing.lg)
+        .frame(maxWidth: Theme.ContainerWidth.readable)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var startupInputBar: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "plus")
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .accessibilityHidden(true)
+            TextField("Type a message", text: $startupDraft, axis: .vertical)
+                .lineLimit(1...6)
+                .focused($startupComposerFocused)
+                .accessibilityIdentifier(A11yID.Chat.input)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: queueStartupMessage) {
+                Image(systemName: "arrow.up")
+                    .font(.system(.subheadline, weight: .bold))
+                    .foregroundStyle(Theme.Colors.onPrimary)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.Colors.primary, in: Circle())
+                    .minimumTouchTarget()
+            }
+            .buttonStyle(.plain)
+            .disabled(startupDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityLabel(A11yLabel.send)
+            .accessibilityIdentifier(A11yID.Chat.send)
+        }
+        .font(Theme.Fonts.bodyMd)
+        .foregroundStyle(Theme.Colors.onSurface)
+        .padding(Theme.Spacing.lg)
+        .glassEffect(.regular, in: Capsule())
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.bottom, Theme.Spacing.sm)
+        .frame(maxWidth: Theme.ContainerWidth.readable)
+        .frame(maxWidth: .infinity)
+        .excludesCompactPageSwitch(includingAreaBelow: true)
+    }
+
+    private func queueStartupMessage() {
+        let text = startupDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        let message = ChatComposerModel.Message(id: UUID(), text: text, attachments: [])
+        startupMessages.append(message)
+        startupDraft = ""
+        Log.ui.info("RootView.startup queued draft=\(message.id) count=\(startupMessages.count)")
+    }
+
+    private var startupStatus: some View {
         VStack(spacing: Theme.Spacing.sm) {
             switch startup {
             case .failed(let message, let recovery):
@@ -892,20 +1003,16 @@ struct RootView: View {
                     Button("Try Again") { bootstrap() }
                         .buttonStyle(.borderedProminent)
                 }
-            case .loading(let phase):
-                CellularAutomatonLoader()
-                Text(phase.label)
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .revealed(after: .milliseconds(500), id: phase)
+            case .idle, .loading:
+                CellularAutomatonLoader.small
+                    .revealed(after: .milliseconds(500))
+                    .accessibilityLabel("Opening your Profile…")
                     .accessibilityIdentifier(A11yID.Startup.status)
-            case .idle, .ready:
-                CellularAutomatonLoader()
+            case .ready:
+                EmptyView()
             }
         }
         .padding(Theme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.surface)
     }
 
     private func autoCloseSidebar() {
@@ -1108,21 +1215,44 @@ struct RootView: View {
     private func loadProfile() {
         Task {
             do {
+                #if DEBUG && targetEnvironment(simulator)
+                if SimEnv.startupDelayMilliseconds > 0 {
+                    Log.ui.info("RootView.startup delayMs=\(SimEnv.startupDelayMilliseconds)")
+                    try await Task.sleep(for: .milliseconds(SimEnv.startupDelayMilliseconds))
+                }
+                #endif
                 try await client.prepare { phase in
                     switch phase {
                     case .opening: transitionStartup(to: .opening)
-                    case .updating: transitionStartup(to: .updating)
                     case .loadingChats: transitionStartup(to: .loadingChats)
                     }
                 }
+                transitionStartup(to: .loadingServices)
                 await manager.refreshServices(locale: serviceLocale)
-                let chat = chats.current ?? chats.startNewChat()
+                startupComposerFocused = false
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                await Task.yield()
+                startupComposer.draft = startupDraft
+                let hasStartupInput = !startupMessages.isEmpty || !startupComposer.isEmpty
+                let chat = hasStartupInput ? chats.startNewChat() : chats.current ?? chats.startNewChat()
+                startupChatID = chat.id
+                for message in startupMessages {
+                    let invocation = startupComposer.slashInvocation(in: message.text).map {
+                        UserSkillInvocation(skill: $0.skill, argument: $0.argument)
+                    }
+                    if let invocation { chat.attachServiceDomains(invocation.skill.services) }
+                    chat.enqueue(invocation?.expandedIntent ?? message.text, skillInvocation: invocation)
+                    Log.ui.info("RootView.startup submitted draft=\(message.id) chat=\(chat.id)")
+                }
+                startupMessages.removeAll()
                 refreshCompactSidebar()
                 Log.ui.info("RootView.startup phase=ready")
                 withAnimation(reduceMotion ? Theme.Animation.press : Theme.Animation.standard, completionCriteria: .logicallyComplete) {
                     startup = .ready
                 } completion: {
-                    requestComposerFocus(for: chat, reason: "appEntry")
+                    if isSplitLayout || !showSidebar {
+                        requestComposerFocus(for: chat, reason: "appEntry")
+                    }
                 }
                 monitorActiveProfile()
                 importSharedNotes()
@@ -1173,6 +1303,7 @@ struct RootView: View {
     }
 
     private func refreshChatSummaries(reason: String) {
+        guard startup == .ready else { return }
         Task {
             let startedAt = Date()
             await chats.loadSummariesNow()
@@ -1232,6 +1363,7 @@ struct RootView: View {
 extension ChatSidebar: Equatable {
     static func == (lhs: ChatSidebar, rhs: ChatSidebar) -> Bool {
         lhs.summaries == rhs.summaries
+            && lhs.contentState == rhs.contentState
             && lhs.activities == rhs.activities
             && lhs.currentId == rhs.currentId
             && lhs.showsCloseButton == rhs.showsCloseButton
