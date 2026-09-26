@@ -1275,6 +1275,7 @@ private struct ProviderPickerView: View {
             value: client.id,
             title: client.displayName,
             faviconDomain: client.website?.host,
+            faviconURL: ProviderIcon.url(id: client.id, website: client.website),
             serviceDomain: (client as? WebServiceModelProvider)?.domain,
             subtitle: showsSubtitle ? subtitle(for: client) : nil,
             accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
@@ -1294,6 +1295,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let title: String
     var systemImage: String? = nil
     var faviconDomain: String? = nil
+    var faviconURL: URL? = nil
     var serviceDomain: String? = nil
     var subtitle: String? = nil
     let accessibilityIdentifier: String
@@ -1368,7 +1370,7 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
             if let domain = option.serviceDomain, let service = serviceManager.service(domain: domain) {
                 ServiceAvatar(service: service, size: 24, shape: .roundedRect(3))
             } else if let faviconDomain = option.faviconDomain {
-                DomainFavicon(domain: faviconDomain, size: 24)
+                DomainFavicon(domain: faviconDomain, size: 24, overrideURL: option.faviconURL)
             }
             if let systemImage = option.systemImage {
                 Image(systemName: systemImage)

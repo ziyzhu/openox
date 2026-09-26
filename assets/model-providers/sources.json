@@ -1,0 +1,96 @@
+{
+  "amazon-bedrock": {
+    "source": "https://d1.awsstatic.com/onedam/marketing-channels/website/public/shared/architecture-icon-release/Icon-package_07312026.5846e92413caa21490223536cc97f1269e44fa92.zip#Architecture-Service-Icons_07312026/Arch_Artificial-Intelligence/64/Arch_Amazon-Bedrock_64.svg",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "anthropic": {
+    "source": "https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/67d31dd7aa394792257596c5_webclip.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "byteplus": {
+    "source": "https://res.gcloudcache.com/bp-fe/console-ark/ark-new-main/static/image/byteplus-180.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "deepseek": {
+    "source": "repositories/builtin/web/chat.deepseek.com/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  },
+  "gemini": {
+    "source": "repositories/builtin/web/gemini.google.com/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  },
+  "github-copilot": {
+    "source": "https://GitHub.gallerycdn.vsassets.io/extensions/github/copilot-chat/0.48.1/1778884121163/Microsoft.VisualStudio.Services.Icons.Default",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "kimi": {
+    "source": "repositories/builtin/web/www.kimi.com/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  },
+  "minimax": {
+    "source": "https://avatars.githubusercontent.com/u/194880281?v=4&s=512",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "mistral": {
+    "source": "https://avatars.githubusercontent.com/u/132372032?v=4&s=512",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "modelscope": {
+    "source": "https://img.alicdn.com/imgextra/i4/O1CN01fvt4it25rEZU4Gjso_!!6000000007579-2-tps-128-128.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "openai": {
+    "source": "repositories/builtin/web/chatgpt.com/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  },
+  "opencode": {
+    "source": "https://opencode.ai/apple-touch-icon-v3.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "openrouter": {
+    "source": "https://openrouter.ai/apple-touch-icon.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "qwen": {
+    "source": "repositories/builtin/web/qwen.ai/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  },
+  "siliconflow": {
+    "source": "https://avatars.githubusercontent.com/u/143005960?v=4&s=512",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "stepfun": {
+    "source": "https://www.stepfun.com/step_favicon.svg",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "tencent-tokenhub": {
+    "source": "https://avatars.githubusercontent.com/u/20101770?v=4&s=512",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "volcengine": {
+    "source": "https://portal.volccdn.com/obj/volcfe/misc/favicon.png",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "xai": {
+    "source": "https://avatars.githubusercontent.com/u/130314967?v=4&s=512",
+    "background": "#ffffff",
+    "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
+  },
+  "zai": {
+    "source": "repositories/builtin/web/chat.z.ai/favicon.png",
+    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+  }
+}

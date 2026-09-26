@@ -35,6 +35,8 @@ When adding attachment support, check bundled and discovered model capabilities,
 
 For built-in model web services, use reviewed 128×128 `favicon.png` sources and let the service build generate the OpenOx CloudFront URL; remove third-party `faviconUrl` overrides. Audit the opaque central 96×96 area and light/dark rendering at 20 px, upload through the existing service-assets deployment workflow, and verify the anonymous hosted response matches the source. See [icon provenance](../../../docs/MODEL_WEB_PROVIDER_ICONS.md). Use the resolved service and shared `ServiceAvatar` in the web-provider picker so it honors the same icon URL and loading rules as Services. Local user-authored services retain their verified public icon URLs.
 
+Native API and subscription-provider artwork lives under `assets/model-providers`, with official provenance in `sources.json` and OpenOx CloudFront URLs resolved by `ProviderIcon`. Cover regional and protocol-suffixed client IDs, including both Bedrock transports and BytePlus/Volcengine identities. Audit normalized 128×128 PNGs with the existing favicon checks; preserve official artwork, never upscale raster sources, and document any opaque white backing used for transparency. See [native provider icon audit](../../../docs/MODEL_PROVIDER_ICONS.md).
+
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 
 ## Updating models

@@ -3,9 +3,10 @@ import SwiftUI
 struct DomainFavicon: View {
     let domain: String
     let size: CGFloat
+    var overrideURL: URL? = nil
 
     var body: some View {
-        AsyncImage(url: faviconURL, transaction: Transaction(animation: Theme.Animation.quick)) { phase in
+        AsyncImage(url: overrideURL ?? faviconURL, transaction: Transaction(animation: Theme.Animation.quick)) { phase in
             if case .success(let image) = phase {
                 image
                     .resizable()
