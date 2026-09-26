@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export function serviceSource(domain: string) {
-  return readFileSync(`repositories/builtin/web/${domain}/actions.js`, "utf8");
+  return readFileSync(`${import.meta.dir}/../../repositories/builtin/web/${domain}/actions.js`, "utf8");
 }
 
 export function modelSiteSource(domain: string) {

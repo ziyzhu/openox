@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
-
-const ROOT = resolve(import.meta.dir, "..");
+import { ROOT, runCheck } from "./lib.ts";
 
 const REQUIRED_LOCALES = ["zh-Hans"];
 const CATALOG_PATHS = [
@@ -43,12 +42,12 @@ function placeholders(value: string): string[] {
     .sort();
 }
 
-export function localizationErrors(catalog: StringCatalog, requiredLocales = REQUIRED_LOCALES): string[] {
+function localizationErrors(catalog: StringCatalog): string[] {
   if (catalog.strings === undefined) return ["catalog has no strings object"];
   const errors: string[] = [];
   for (const [key, entry] of Object.entries(catalog.strings)) {
     if (entry.shouldTranslate === false) continue;
-    for (const locale of requiredLocales) {
+    for (const locale of REQUIRED_LOCALES) {
       const localization = entry.localizations?.[locale];
       if (localization === undefined) {
         errors.push(`${locale} missing: ${key}`);
@@ -76,24 +75,16 @@ export function localizationErrors(catalog: StringCatalog, requiredLocales = REQ
   return errors;
 }
 
-export async function validateLocalizations(paths = CATALOG_PATHS): Promise<number> {
+export async function check(): Promise<string> {
   let entries = 0;
   const failures: string[] = [];
-  for (const path of paths) {
+  for (const path of CATALOG_PATHS) {
     const catalog = await Bun.file(resolve(ROOT, path)).json() as StringCatalog;
     entries += Object.keys(catalog.strings ?? {}).length;
     failures.push(...localizationErrors(catalog).map((error) => `${path}: ${error}`));
   }
   if (failures.length > 0) throw new Error(`Localization validation failed:\n${failures.join("\n")}`);
-  return entries;
+  return `localizations ${CATALOG_PATHS.length} catalogs, ${entries} entries`;
 }
 
-if (import.meta.main) {
-  try {
-    const entries = await validateLocalizations();
-    console.log(`PASS localizations ${CATALOG_PATHS.length} catalogs, ${entries} entries`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
+if (import.meta.main) await runCheck(check);

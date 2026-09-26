@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { HostConnection, HostRPCError } from "../apps/cli/src/host-connection.ts";
-import { HostRPCClient } from "../apps/cli/src/host-rpc.ts";
+import { HostConnection, HostRPCError } from "../../apps/cli/src/host-connection.ts";
+import { HostRPCClient } from "../../apps/cli/src/host-rpc.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); });

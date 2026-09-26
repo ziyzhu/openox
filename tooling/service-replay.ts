@@ -3,76 +3,37 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { callHost } from "../apps/cli/src/host-rpc.ts";
-import { ROOT } from "./lib.ts";
-import { qaConfig, qaNumberedDevice, targetedQaDevice } from "./qa-config.ts";
+import { ROOT, killChildren, run } from "./lib.ts";
+import { qaCommand, targetedQaDevice } from "./qa-config.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
 const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");
 const SCHEME = "ios";
 
-type Options = {
-  device: string;
-  selector?: string;
-  repository?: string;
-};
-
-type CommandOptions = {
-  allowFailure?: boolean;
-  env?: Record<string, string | undefined>;
-  cwd?: string;
-};
-
 type SimInventory = {
   devices?: Record<string, Array<{ name?: unknown }>>;
 };
 
-const activeChildren = new Set<ReturnType<typeof Bun.spawn>>();
 let interrupted: NodeJS.Signals | undefined;
 
 function interrupt(signal: NodeJS.Signals): void {
   if (interrupted) return;
   interrupted = signal;
-  for (const child of activeChildren) child.kill(signal);
+  killChildren(signal);
 }
 
 process.once("SIGINT", () => interrupt("SIGINT"));
 process.once("SIGTERM", () => interrupt("SIGTERM"));
 
-async function command(cmd: string[], options: CommandOptions = {}): Promise<number> {
-  const child = Bun.spawn({
-    cmd,
-    cwd: options.cwd ?? ROOT,
-    env: options.env ? { ...Bun.env, ...options.env } : undefined,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  activeChildren.add(child);
-  const code = await child.exited.finally(() => activeChildren.delete(child));
-  if (code !== 0 && !options.allowFailure) throw new Error(`${cmd.join(" ")} exited ${code}`);
-  return code;
-}
-
-async function commandJSON<T>(cmd: string[]): Promise<T> {
-  const child = Bun.spawn({ cmd, cwd: ROOT, stdout: "pipe", stderr: "pipe" });
-  activeChildren.add(child);
-  const [code, output, error] = await Promise.all([
-    child.exited.finally(() => activeChildren.delete(child)),
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ]);
-  if (code !== 0) throw new Error(`${cmd.join(" ")} exited ${code}: ${(error || output).trim()}`);
-  return JSON.parse(output) as T;
-}
-
 async function ensureDevice(device: string): Promise<void> {
-  const inventory = await commandJSON<SimInventory>(["sim", "devices"]);
-  const simulators = Object.values(inventory.devices ?? {}).flat() as Array<{ name?: unknown }>;
+  const inventory = JSON.parse((await run(["sim", "devices"], { capture: true })).stdout) as SimInventory;
+  const simulators = Object.values(inventory.devices ?? {}).flat();
   if (simulators.some((candidate) => candidate.name === device)) return;
   const source = device === targetedQaDevice ? undefined : targetedQaDevice;
   if (!source || !simulators.some((candidate) => candidate.name === source)) {
     throw new Error(`Cannot create ${device}: no QA simulator template is available`);
   }
-  await command(["sim", "devices", "clone", source, device]);
+  await run(["sim", "devices", "clone", source, device]);
 }
 
 async function requireFreePort(port: number): Promise<void> {
@@ -116,34 +77,6 @@ async function waitForServices(endpoint: string, expectedDomain?: string): Promi
   throw new Error(`Services did not become ready through ${endpoint}: ${detail}`);
 }
 
-function parseOptions(args: string[]): Options {
-  if (args.includes("-h") || args.includes("--help")) {
-    console.log("Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-qa-N]");
-    process.exit(0);
-  }
-  let selector: string | undefined;
-  let repository: string | undefined;
-  for (let index = 0; index < args.length; index++) {
-    const argument = args[index]!;
-    if (argument === "--device") {
-      if (!args[++index]) throw new Error("--device requires ox-qa-N");
-    } else if (argument === "--repository") {
-      const value = args[++index];
-      if (!value) throw new Error("--repository requires a local repository");
-      repository = resolve(value);
-    } else if (argument.startsWith("--")) {
-      throw new Error(`Unknown option ${argument}`);
-    } else if (selector) {
-      throw new Error(`Unexpected argument ${argument}`);
-    } else {
-      selector = argument;
-    }
-  }
-  const device = qaNumberedDevice(args, Bun.env.OX_QA_DEVICE ?? targetedQaDevice);
-  repository ??= Bun.env.OX_SERVER_ROOT ? resolve(Bun.env.OX_SERVER_ROOT) : undefined;
-  return { device, selector, repository };
-}
-
 function claimDevice(device: string): () => void {
   const directory = join(tmpdir(), "ox-service-tests");
   mkdirSync(directory, { recursive: true });
@@ -181,12 +114,15 @@ function staleClaim(path: string): boolean {
   }
 }
 
-async function printDiagnostics(device: string): Promise<void> {
-  await command(["sim", "--device", device, "logs"], { allowFailure: true });
-}
-
-const options = parseOptions(Bun.argv.slice(2));
-const config = qaConfig(options.device);
+const config = qaCommand({
+  usage: "Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-qa-N]",
+  options: { repository: { type: "string" } },
+  positionals: 1,
+  defaultDevice: targetedQaDevice,
+});
+const selector = config.positionals[0];
+const repositoryRoot = config.values.repository ?? Bun.env.OX_SERVER_ROOT;
+const repository = repositoryRoot ? resolve(repositoryRoot) : undefined;
 const release = claimDevice(config.device);
 let registry: ReturnType<typeof Bun.spawn> | undefined;
 let failed = false;
@@ -195,18 +131,18 @@ let serverTemporary: string | undefined;
 try {
   await Promise.all([
     requireFreePort(config.serviceProxyPort),
-    ...(options.repository ? [requireFreePort(config.registryPort)] : []),
+    ...(repository ? [requireFreePort(config.registryPort)] : []),
     requireFreePort(config.debugPort),
   ]);
   await ensureDevice(config.device);
-  console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, services ${options.repository ? `repository ${config.registryPort}` : "bundled"}, debug ${config.debugPort}`);
-  if (options.repository) {
+  console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, services ${repository ? `repository ${config.registryPort}` : "bundled"}, debug ${config.debugPort}`);
+  if (repository) {
     serverTemporary = mkdtempSync(join(tmpdir(), "openox-service-replay-"));
     const generatedRepository = join(serverTemporary, "repository");
-    if (options.repository === resolve(ROOT, "repositories/builtin")) {
-      await command(["bun", "packages/services/export.ts", "--output", generatedRepository, "--web-only"]);
+    if (repository === resolve(ROOT, "repositories/builtin")) {
+      await run(["bun", "packages/services/export.ts", "--output", generatedRepository, "--web-only"]);
     } else {
-      await command(["bun", "run", "export", "--output", generatedRepository], { cwd: options.repository });
+      await run(["bun", "run", "export", "--output", generatedRepository], { cwd: repository });
     }
     registry = Bun.spawn({
       cmd: ["bun", "apps/cli/src/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
@@ -215,42 +151,40 @@ try {
       stdout: "inherit",
       stderr: "ignore",
     });
-    activeChildren.add(registry);
     await Promise.race([
       waitForHttp(config.registryPort),
       registry.exited.then((code) => { throw new Error(`repository server exited ${code}`); }),
     ]);
   }
-  await command(["sim", "devices", "boot", config.device]);
-  await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
-  await command([
+  await run(["sim", "devices", "boot", config.device]);
+  await run(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
+  await run([
     "sim", "--device", config.device,
     "defaults", "write", BUNDLE_ID,
     "app.hasCompletedOnboarding", "true", "--type", "bool",
   ]);
-  await command([
+  await run([
     "sim", "--device", config.device,
     "run", BUNDLE_ID,
     "--project", PROJECT,
     "--scheme", SCHEME,
     "--configuration", "Debug",
     "--force",
-    "--env", `OX_DEBUG_ENDPOINT=ws://127.0.0.1:${config.debugPort}`,
-    ...(options.repository ? ["--env", `OX_SERVICES_ENDPOINT=http://127.0.0.1:${config.registryPort}/repository.git`] : []),
+    "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`,
+    ...(repository ? ["--env", `OX_SERVICES_ENDPOINT=http://127.0.0.1:${config.registryPort}/repository.git`] : []),
     "--env", `OX_SERVICE_PROXY=http://127.0.0.1:${config.serviceProxyPort}`,
     "--disable-icloud",
   ]);
-  const debugEndpoint = `ws://127.0.0.1:${config.debugPort}`;
-  await waitForServices(debugEndpoint, options.selector?.split(":")[0]);
+  await waitForServices(config.debugEndpoint, selector?.split(":")[0]);
   const environment = {
     OX_QA_DEVICE: config.device,
-    OX_DEBUG_ENDPOINT: debugEndpoint,
-    OX_SERVER_SOURCE: join(options.repository ?? resolve(ROOT, "repositories/builtin"), "web"),
+    OX_DEBUG_ENDPOINT: config.debugEndpoint,
+    OX_SERVER_SOURCE: join(repository ?? resolve(ROOT, "repositories/builtin"), "web"),
   };
-  await command([
+  await run([
     "bun", "apps/cli/src/ox.ts",
     "service", "test",
-    ...(options.selector ? [options.selector] : []),
+    ...(selector ? [selector] : []),
     "--proxy-port", String(config.serviceProxyPort),
     "--allow-partial",
   ], { env: environment });
@@ -259,14 +193,13 @@ try {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = interrupted === "SIGINT" ? 130 : interrupted === "SIGTERM" ? 143 : 1;
 } finally {
-  if (failed) await printDiagnostics(config.device);
+  if (failed) await run(["sim", "--device", config.device, "logs"], { allowFailure: true });
   if (registry) {
     registry.kill("SIGTERM");
     await registry.exited;
-    activeChildren.delete(registry);
   }
-  await command(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
-  await command(["sim", "devices", "shutdown", config.device], { allowFailure: true });
+  await run(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
+  await run(["sim", "devices", "shutdown", config.device], { allowFailure: true });
   if (serverTemporary) rmSync(serverTemporary, { recursive: true, force: true });
   release();
 }

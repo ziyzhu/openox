@@ -1,18 +1,12 @@
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { ROOT } from "./lib.ts";
+import { ROOT, run } from "./lib.ts";
 
-const packageNames = {
-  cli: "@openox/cli",
-  "service-sdk": "@openox/service-sdk",
-  services: "@openox/services",
-} as const;
-
-const packageDirectories = {
-  cli: "apps/cli",
-  "service-sdk": "packages/service-sdk",
-  services: "packages/services",
-} as const;
+const packages: Record<string, { name: string; directory: string }> = {
+  cli: { name: "@openox/cli", directory: "apps/cli" },
+  "service-sdk": { name: "@openox/service-sdk", directory: "packages/service-sdk" },
+  services: { name: "@openox/services", directory: "packages/services" },
+};
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -25,13 +19,13 @@ const { values } = parseArgs({
 });
 
 const directory = values.directory;
+const selected = directory && Object.hasOwn(packages, directory) ? packages[directory] : undefined;
 const tarball = values.tarball ? resolve(values.tarball) : null;
-if (!directory || !(directory in packageNames)) throw new Error("Pass --directory <cli|service-sdk|services>");
+if (!selected) throw new Error("Pass --directory <cli|service-sdk|services>");
 if (!tarball || !await Bun.file(tarball).exists()) throw new Error("Pass --tarball <package.tgz>");
 
-const expectedName = packageNames[directory as keyof typeof packageNames];
-const packageDirectory = packageDirectories[directory as keyof typeof packageDirectories];
-const metadata = await Bun.file(join(ROOT, packageDirectory, "package.json")).json() as { name?: string; version?: string };
+const expectedName = selected.name;
+const metadata = await Bun.file(join(ROOT, selected.directory, "package.json")).json() as { name?: string; version?: string };
 if (metadata.name !== expectedName) throw new Error(`${directory}/package.json must be named ${expectedName}`);
 if (!metadata.version?.match(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)) throw new Error(`${directory}/package.json has an invalid version`);
 
@@ -41,7 +35,7 @@ if (basename(tarball) !== archiveName) throw new Error(`expected tarball ${archi
 const bytes = await Bun.file(tarball).arrayBuffer();
 const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(bytes).digest("base64")}`;
 const packageVersion = `${expectedName}@${metadata.version}`;
-const published = await command(["npm", "view", packageVersion, "dist.integrity", "--json"]);
+const published = await run(["npm", "view", packageVersion, "dist.integrity", "--json"], { capture: true, allowFailure: true });
 
 if (published.code === 0) {
   const publishedIntegrity = JSON.parse(published.stdout) as unknown;
@@ -55,7 +49,7 @@ if (!lookupOutput.includes("E404") && !lookupOutput.includes("404 Not Found")) {
   throw new Error(`failed to query ${packageVersion}\n${lookupOutput.trim()}`);
 }
 
-const publish = await command([
+await run([
   "npm",
   "publish",
   tarball,
@@ -64,21 +58,5 @@ const publish = await command([
   "--provenance",
   "--ignore-scripts",
   ...(values["dry-run"] ? ["--dry-run"] : []),
-], false);
-if (publish.code !== 0) throw new Error(`npm publish exited ${publish.code}`);
+]);
 console.log(`PASS published ${packageVersion}${values["dry-run"] ? " (dry run)" : ""}`);
-
-async function command(args: string[], capture = true): Promise<{ code: number; stdout: string; stderr: string }> {
-  const child = Bun.spawn({
-    cmd: args,
-    cwd: ROOT,
-    stdout: capture ? "pipe" : "inherit",
-    stderr: capture ? "pipe" : "inherit",
-  });
-  const [code, stdout, stderr] = await Promise.all([
-    child.exited,
-    capture ? new Response(child.stdout).text() : "",
-    capture ? new Response(child.stderr).text() : "",
-  ]);
-  return { code, stdout, stderr };
-}

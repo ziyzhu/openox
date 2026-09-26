@@ -1,7 +1,6 @@
-import { Type, type Static, type TObject, type TProperties } from "@sinclair/typebox";
-import { readFile, writeFile } from "node:fs/promises";
+import { Type, type TObject, type TProperties } from "@sinclair/typebox";
 import { join } from "node:path";
-import { ROOT } from "./lib.ts";
+import { ROOT, checkGenerated, writeGenerated, type Generated } from "./lib.ts";
 
 const object = <T extends TProperties>(properties: T): TObject<T> => Type.Object(properties, { additionalProperties: false });
 const text = () => Type.String({ minLength: 1, maxLength: 2048 });
@@ -17,7 +16,7 @@ const oauthCommon = {
   requestEncoding: Type.Optional(Type.Union([Type.Literal("form"), Type.Literal("json")])),
 };
 
-export const AuthSchema = Type.Union([
+const AuthSchema = Type.Union([
   object({ kind: Type.Literal("none") }),
   object({ kind: Type.Literal("bearer"), optional: Type.Optional(Type.Boolean()) }),
   object({ kind: Type.Literal("api-key"), header: text(), optional: Type.Optional(Type.Boolean()) }),
@@ -26,7 +25,7 @@ export const AuthSchema = Type.Union([
   object({ kind: Type.Literal("custom"), adapter: id() }),
 ]);
 
-export const ModelSchema = object({
+const ModelSchema = object({
   id: text(),
   name: text(),
   wireID: Type.Optional(text()),
@@ -54,7 +53,7 @@ const requestOptions = {
   extraBody: Type.Optional(Type.Object({}, { additionalProperties: Type.Unknown() })),
 };
 
-export const ProviderSchema = Type.Union([
+const ProviderSchema = Type.Union([
   object({ ...common, api: Type.Literal("openai-chat-completions"), options: Type.Optional(object({
     ...requestOptions,
     maxTokensField: Type.Optional(Type.Union([Type.Literal("max_tokens"), Type.Literal("max_completion_tokens")])),
@@ -79,24 +78,19 @@ export const ProviderSchema = Type.Union([
   object({ ...common, api: Type.Literal("web") }),
 ]);
 
-export type Provider = Static<typeof ProviderSchema>;
-export type Model = Static<typeof ModelSchema>;
-export type Auth = Static<typeof AuthSchema>;
+const providerSchemaPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/provider-definition.schema.json");
 
-export const providerSchemaPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/provider-definition.schema.json");
-export const providerSchemaBytes = () => `${JSON.stringify(ProviderSchema, (key, value) => {
-  if (key === "const") return undefined;
-  if (value && typeof value === "object" && "const" in value) return { ...value, enum: [value.const] };
-  return value;
-}, 2)}\n`;
+export const generated = (): Generated => ({
+  [providerSchemaPath]: `${JSON.stringify(ProviderSchema, (key, value) => {
+    if (key === "const") return undefined;
+    if (value && typeof value === "object" && "const" in value) return { ...value, enum: [value.const] };
+    return value;
+  }, 2)}\n`,
+});
 
-export async function validateProviderSchema() {
-  if (await readFile(providerSchemaPath, "utf8") !== providerSchemaBytes()) {
-    throw new Error("Provider schema is stale. Run bun run build:provider-schema.");
-  }
+export async function check(): Promise<string> {
+  await checkGenerated(generated(), "build:provider-schema");
+  return "provider schema";
 }
 
-if (import.meta.main) {
-  if (process.argv.includes("--check")) await validateProviderSchema();
-  else await writeFile(providerSchemaPath, providerSchemaBytes());
-}
+if (import.meta.main) await writeGenerated(generated());

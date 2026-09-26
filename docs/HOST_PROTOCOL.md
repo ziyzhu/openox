@@ -94,8 +94,8 @@ response; streaming, cancellation, and event replay are separate future changes.
 ox --host ws://127.0.0.1:9103 host describe --json
 ox --host ws://127.0.0.1:9103 chat list --json
 ox --host ws://127.0.0.1:9103 vm inspect --json
-bun run test:host-rpc
-OX_RPC_TEST_ENDPOINT=ws://127.0.0.1:9103 bun run test:host-rpc
+bun test tooling/tests/host-rpc.test.ts
+OX_RPC_TEST_ENDPOINT=ws://127.0.0.1:9103 bun test tooling/tests/host-rpc.test.ts
 ```
 
 CI runs client tests against local WebSocket fixtures. The optional live suite

@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ROOT } from "./lib.ts";
+import { ROOT, runCheck } from "./lib.ts";
 
 const systemSkillsRoot = join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -48,7 +48,7 @@ function validatePackage(name: string, text: string): string[] {
   return failures;
 }
 
-export async function validateSystemSkills(): Promise<number> {
+export async function check(): Promise<string> {
   const entries = await readdir(systemSkillsRoot, { withFileTypes: true });
   const packages = entries.filter((entry) => entry.isDirectory()).sort((left, right) => left.name.localeCompare(right.name));
   const failures = entries.filter((entry) => !entry.isDirectory()).map((entry) => `SystemSkills: unexpected file ${entry.name}`);
@@ -93,15 +93,7 @@ export async function validateSystemSkills(): Promise<number> {
     }
   }
   if (failures.length > 0) throw new Error(`System skill validation failed:\n${failures.join("\n")}`);
-  return packages.length;
+  return `system skills ${packages.length} packages`;
 }
 
-if (import.meta.main) {
-  try {
-    const count = await validateSystemSkills();
-    console.log(`PASS system skills ${count} packages`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
+if (import.meta.main) await runCheck(check);

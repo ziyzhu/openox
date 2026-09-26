@@ -71,8 +71,8 @@ jobs:
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 
-      - name: Verify Host RPC client
-        run: bun run test:host-rpc
+      - name: Test tooling
+        run: bun run test
 
       - name: Verify npm packages
         run: |

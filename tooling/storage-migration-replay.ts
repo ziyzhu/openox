@@ -3,28 +3,9 @@ import { join, relative } from "node:path";
 import { callHost } from "../apps/cli/src/host-rpc.ts";
 import { ROOT } from "./lib.ts";
 
-type ReplayResult = {
+type ReplayResult = Record<string, unknown> & {
   currentVersion?: string;
   skillChecks?: Record<string, boolean>;
-  versionUpdated?: boolean;
-  ordinaryContextRemoved?: boolean;
-  unreadableContextRetained?: boolean;
-  compactedContextRetained?: boolean;
-  compactedContextValid?: boolean;
-  noContextPreserved?: boolean;
-  transcriptsUnchanged?: boolean;
-  secondRunNoOp?: boolean;
-  ordinaryExportOmitsContext?: boolean;
-  compactedExportRetainsContext?: boolean;
-  defaultModelMigrated?: boolean;
-  chatModelMigrated?: boolean;
-  unsupportedVersionRejected?: boolean;
-  providerCatalogMigrated?: boolean;
-  actionPoliciesMigrated?: boolean;
-  savedServicesMigrated?: boolean;
-  futureActionPoliciesPreserved?: boolean;
-  actionPolicyResolutionValid?: boolean;
-  secretsIndexRenamed?: boolean;
   fixtureResults?: Array<{
     name: string;
     migratedAsExpected: boolean;

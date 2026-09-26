@@ -1,24 +1,14 @@
-import { ROOT } from "./lib.ts";
-import { validateLocalizations } from "./localization-check.ts";
-import { validateProviderModels } from "./provider-models.ts";
-import { validateProviderSchema } from "./provider-definitions.ts";
-import { validateSystemSkills } from "./system-skills-check.ts";
+import { runCheck, run } from "./lib.ts";
+import { check as hostContract } from "./ios-host-contract-check.ts";
+import { check as localizations } from "./localization-check.ts";
+import { check as providerModels } from "./provider-models.ts";
+import { check as providerSchema } from "./provider-definitions.ts";
+import { check as publicBoundary } from "./public-boundary-check.ts";
+import { check as systemSkills } from "./system-skills-check.ts";
 
-const boundary = Bun.spawnSync(["bun", "tooling/public-boundary-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
-if (boundary.exitCode !== 0) process.exit(boundary.exitCode);
-
-const hostContract = Bun.spawnSync(["bun", "tooling/ios-host-contract-check.ts"], { cwd: ROOT, stdout: "inherit", stderr: "inherit" });
-if (hostContract.exitCode !== 0) process.exit(hostContract.exitCode);
-
-const systemSkills = await validateSystemSkills();
-console.log(`PASS system skills ${systemSkills} packages`);
-
-const localizationEntries = await validateLocalizations();
-console.log(`PASS localizations ${localizationEntries} entries`);
-
-const providerModels = await validateProviderModels();
-await validateProviderSchema();
-console.log(`PASS provider models providers=${providerModels.providers} selected=${providerModels.selectedModels}`);
+for (const check of [publicBoundary, hostContract, systemSkills, localizations, providerModels, providerSchema]) {
+  await runCheck(check);
+}
 
 const projects = [
   "apps/cli/tsconfig.json",
@@ -29,13 +19,8 @@ const projects = [
 ];
 
 const results = await Promise.all(projects.map(async (project) => {
-  const process = Bun.spawn({
-    cmd: ["bunx", "tsc", "-p", project],
-    cwd: ROOT,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  return { project, code: await process.exited };
+  const { code } = await run(["bunx", "tsc", "-p", project], { allowFailure: true });
+  return { project, code };
 }));
 
 const failed = results.filter((result) => result.code !== 0);

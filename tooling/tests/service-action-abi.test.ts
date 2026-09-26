@@ -2,9 +2,9 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const source = readFileSync(join(import.meta.dir, "../apps/ios/Ox/Host/Services/Web/ServiceActionRuntime.js"), "utf8");
-const helperSource = readFileSync(join(import.meta.dir, "../apps/ios/Ox/Resources/SystemSkills.bundle/manage-services/references/helpers.js"), "utf8");
-const apiServiceSource = readFileSync(join(import.meta.dir, "../apps/ios/Ox/Host/Services/API/APIService.swift"), "utf8");
+const source = readFileSync(join(import.meta.dir, "../../apps/ios/Ox/Host/Services/Web/ServiceActionRuntime.js"), "utf8");
+const helperSource = readFileSync(join(import.meta.dir, "../../apps/ios/Ox/Resources/SystemSkills.bundle/manage-services/references/helpers.js"), "utf8");
+const apiServiceSource = readFileSync(join(import.meta.dir, "../../apps/ios/Ox/Host/Services/API/APIService.swift"), "utf8");
 const apiInstaller = apiServiceSource.match(/private static let installer = #"""\n([\s\S]*?)\n    """#/)?.[1];
 if (!apiInstaller) throw new Error("API installer source is missing");
 

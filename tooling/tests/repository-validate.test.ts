@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { validateServiceManifest } from "../packages/service-sdk/src/manifest.ts";
-import { readRepository } from "../apps/cli/src/repositories.ts";
+import { validateServiceManifest } from "../../packages/service-sdk/src/manifest.ts";
+import { readRepository } from "../../apps/cli/src/repositories.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

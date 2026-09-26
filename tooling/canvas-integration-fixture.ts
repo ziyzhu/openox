@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { createHerdrMCPHandler } from "../apps/cli/src/herdr.ts";
 import { mcpManagementFixture } from "./fixtures/mcp-management.ts";
 import { ROOT } from "./lib.ts";
-import { qaConfig, qaNumberedDevice } from "./qa-config.ts";
+import { qaCommand } from "./qa-config.ts";
 
-const config = qaConfig(qaNumberedDevice(Bun.argv.slice(2), Bun.env.OX_QA_DEVICE));
+const config = qaCommand({ usage: "Usage: bun tooling/canvas-integration-fixture.ts --device ox-qa-N" });
 const directory = await mkdtemp(join(tmpdir(), "ox-canvas-integration-"));
 await mkdir(join(directory, "artifacts"));
 await Bun.write(join(directory, "artifacts/canvas-export.txt"), "Ox canvas export fixture\nNo account data or credentials.\n");
@@ -42,11 +42,12 @@ try {
   });
   server = Bun.serve({
     hostname: "127.0.0.1", port: config.registryPort,
-    fetch: request => new URL(request.url).pathname === "/mcp"
-      ? mcp(request)
-      : ["/mcp-a", "/mcp-b", "/mcp-fail"].includes(new URL(request.url).pathname)
-        ? mcpManagementFixture(request)
-        : fetch(new Request(upstream + new URL(request.url).pathname + new URL(request.url).search, request)),
+    fetch: request => {
+      const { pathname, search } = new URL(request.url);
+      if (pathname === "/mcp") return mcp(request);
+      if (["/mcp-a", "/mcp-b", "/mcp-fail"].includes(pathname)) return mcpManagementFixture(request);
+      return fetch(new Request(upstream + pathname + search, request));
+    },
   });
   const endpoint = `http://127.0.0.1:${server.port}/mcp`;
   const domain = "mcp." + createHash("sha256").update(endpoint).digest("hex").slice(0, 16);

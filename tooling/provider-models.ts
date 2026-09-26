@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { ROOT, fail } from "./lib.ts";
+import { ROOT, runCheck } from "./lib.ts";
 
 const source = "https://models.dev/catalog.json";
 const manifestPath = join(ROOT, "apps/ios/Ox/Host/ModelProviders/provider-models.json");
@@ -95,6 +95,10 @@ type ProviderModelsSummary = {
   selectedModels: number;
 };
 
+function fail(message: string): never {
+  throw new Error(message);
+}
+
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${label} must be an object`);
   return value as Record<string, unknown>;
@@ -111,11 +115,13 @@ function nonEmptyString(value: unknown, label: string): string {
 }
 
 function parse<T>(text: string, label: string): T {
+  let value: unknown;
   try {
-    return object(JSON.parse(text), label) as T;
+    value = JSON.parse(text);
   } catch (error) {
-    return fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`${label} is invalid JSON: ${(error as Error).message}`);
   }
+  return object(value, label) as T;
 }
 
 function validateStructure(manifest: ProviderModelsFile): ProviderModelsSummary {
@@ -257,31 +263,29 @@ function resolveModel(
   };
 }
 
-async function loadConfiguration(): Promise<ProviderModelsFile> {
+async function loadManifest(): Promise<ProviderModelsFile> {
   const manifest = Bun.file(manifestPath);
   if (!await manifest.exists()) fail(`missing ${manifestPath}`);
   return parse<ProviderModelsFile>(await manifest.text(), "provider models");
 }
 
-export async function validateProviderModels(): Promise<ProviderModelsSummary> {
-  const manifest = Bun.file(manifestPath);
-  if (!await manifest.exists()) fail(`missing ${manifestPath}; run bun run update:llms`);
-  return validateStructure(parse<ProviderModelsFile>(await manifest.text(), "provider models"));
+export async function check(): Promise<string> {
+  const summary = validateStructure(await loadManifest());
+  return `provider models providers=${summary.providers} selected=${summary.selectedModels}`;
 }
 
-async function update(): Promise<ProviderModelsSummary> {
+async function update(): Promise<void> {
   const [response, configuration] = await Promise.all([
     fetch(source, { headers: { Accept: "application/json" } }),
-    loadConfiguration(),
+    loadManifest(),
   ]);
   if (!response.ok) fail(`${source} returned HTTP ${response.status}`);
   const resolved = resolve(parse<Catalog>(await response.text(), "models.dev catalog"), configuration);
-  const summary = validateStructure(resolved);
+  validateStructure(resolved);
   await Bun.write(manifestPath, `${JSON.stringify(resolved, null, 2)}\n`);
-  return summary;
 }
 
 if (import.meta.main) {
-  const summary = await update();
-  console.log(`PASS provider models update providers=${summary.providers} selected=${summary.selectedModels}`);
+  await update();
+  await runCheck(check);
 }
