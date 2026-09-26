@@ -21,6 +21,7 @@ const expectedFiles = [
   "src/catalog.ts",
   "src/installer.ts",
   "src/manifest.ts",
+  "src/model-actions.ts",
   "src/repository.ts",
   "src/skills.ts",
   "src/testing/replay/fixtures.ts",
