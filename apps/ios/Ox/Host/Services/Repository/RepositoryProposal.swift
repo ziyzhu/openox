@@ -71,7 +71,7 @@ final class RepositoryProposal {
     }
 }
 
-typealias RepositoryTokenValidation = @Sendable (String) async throws -> Void
+typealias RepositoryTokenValidation = @Sendable (_ token: String, _ displayName: String) async throws -> Void
 typealias RepositoryTokenPresenter = @MainActor @Sendable (@escaping RepositoryTokenValidation) async -> Bool
 
 nonisolated private final class GitHubRepositoryAccount: Sendable {
@@ -93,10 +93,10 @@ nonisolated private final class GitHubRepositoryAccount: Sendable {
         guard let authorization else {
             throw RuntimeError.bridge("Open this chat in the Ox app to enter a GitHub personal access token.")
         }
-        let accepted = await authorization { token in
+        let accepted = await authorization { token, displayName in
             _ = try await self.validate(token)
             try Task.checkCancellation()
-            try Secret.savePublicationToken(token)
+            try Secret.savePublicationToken(token, displayName: displayName)
         }
         guard accepted, let token = Secret.publicationToken() else {
             try Task.checkCancellation()

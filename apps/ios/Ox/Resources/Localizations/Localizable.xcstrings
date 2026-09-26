@@ -1,22 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Save and continue" : {
+    "GitHub publication requires a single token field." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存并继续"
-          }
-        }
-      }
-    },
-    "GitHub token" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GitHub 令牌"
+            "value" : "GitHub 发布需要且只能包含 token 字段。"
           }
         }
       }
@@ -11951,12 +11941,12 @@
         }
       }
     },
-    "Use a classic token with public_repo access. It is saved in Secrets and never sent to the model. After creating a token, return to Ox and paste it here." : {
+    "Use a classic token with public_repo access. [Create token](https://github.com/settings/tokens/new?scopes=public_repo&description=OpenOx), then return to Ox and paste it below. It is saved in Secrets and never sent to the model." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请使用具有 public_repo 权限的经典令牌。令牌保存在密钥中，绝不会发送给模型。创建令牌后，请返回 Ox 并粘贴到此处。"
+            "value" : "请使用具有 public_repo 权限的经典令牌。[创建令牌](https://github.com/settings/tokens/new?scopes=public_repo&description=OpenOx)后，请返回 Ox 并粘贴到下方。令牌保存在密钥中，绝不会发送给模型。"
           }
         }
       }

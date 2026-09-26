@@ -31,8 +31,14 @@ final class SecretEntryRequest: Identifiable, Equatable {
 
     init(validate: @escaping RepositoryTokenValidation) {
         form = .githubPublication
-        save = { _, value in
-            try await validate(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        save = { displayName, value in
+            try Secret.validateDisplayName(displayName)
+            guard let data = value.data(using: .utf8),
+                  let fields = try JSONSerialization.jsonObject(with: data) as? [String: String],
+                  fields.count == 1, let token = fields["token"] else {
+                throw RuntimeError.bridge(String(localized: "GitHub publication requires a single token field."))
+            }
+            try await validate(token.trimmingCharacters(in: .whitespacesAndNewlines), displayName)
         }
     }
 

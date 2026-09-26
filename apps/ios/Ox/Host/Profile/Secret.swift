@@ -286,9 +286,9 @@ nonisolated enum Secret {
         return fields["token"] as? String
     }
 
-    static func savePublicationToken(_ token: String) throws {
+    static func savePublicationToken(_ token: String, displayName: String = "OpenOx GitHub publication token") throws {
         let data = try JSONSerialization.data(withJSONObject: ["token": token], options: [.sortedKeys])
-        try set(key: publicationKey, displayName: "OpenOx GitHub publication token",
+        try set(key: publicationKey, displayName: displayName,
                 value: String(decoding: data, as: UTF8.self),
                 origin: .generatedFor(.repositoryPublication, publicationID), usePolicy: .publicationOnly)
         try bind(SecretBinding(consumerKind: .repositoryPublication, consumerID: publicationID,

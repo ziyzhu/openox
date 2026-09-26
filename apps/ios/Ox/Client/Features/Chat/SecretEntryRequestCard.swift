@@ -7,7 +7,6 @@ struct SecretEntryRequestCard: View {
 
     @Environment(\.appTheme) private var appTheme
     @State private var displayName: String
-    @State private var token = ""
     @StateObject private var fieldModel: SecretFieldsModel
     @State private var error: String?
     private let isEditing: Bool
@@ -26,41 +25,28 @@ struct SecretEntryRequestCard: View {
             _fieldModel = StateObject(wrappedValue: SecretFieldsModel(fields: fields ?? [SecretFieldDraft(name: "", value: "")]))
         case .githubPublication:
             isEditing = false
-            _displayName = State(initialValue: "")
-            _fieldModel = StateObject(wrappedValue: SecretFieldsModel())
+            _displayName = State(initialValue: "OpenOx GitHub publication token")
+            _fieldModel = StateObject(wrappedValue: SecretFieldsModel(fields: [SecretFieldDraft(name: "token", value: "")]))
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Group {
-                switch request.form {
-                case .named:
-                    if isEditing { Text("Edit Secret") }
-                    else { Text("Add Secret") }
-                case .githubPublication:
-                    Text("GitHub personal access token")
-                }
+                if isEditing { Text("Edit Secret") }
+                else { Text("Add Secret") }
             }
             .font(Theme.Fonts.title)
             .foregroundStyle(Theme.Colors.onSurface)
             Group {
-                switch request.form {
-                case .named:
-                    TextField("Display name", text: $displayName)
-                        .textInputAutocapitalization(.sentences)
-                    SecretFieldsEditor(model: fieldModel)
-                case .githubPublication:
-                    Text("Use a classic token with public_repo access. It is saved in Secrets and never sent to the model. After creating a token, return to Ox and paste it here.")
+                if case .githubPublication = request.form {
+                    Text("Use a classic token with public_repo access. [Create token](https://github.com/settings/tokens/new?scopes=public_repo&description=OpenOx), then return to Ox and paste it below. It is saved in Secrets and never sent to the model.")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    Link("Create token", destination: URL(string: "https://github.com/settings/tokens/new?scopes=public_repo&description=OpenOx")!)
-                    SecureField("GitHub token", text: $token)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .privacySensitive()
-                        .accessibilityIdentifier("repository.github.token")
                 }
+                TextField("Display name", text: $displayName)
+                    .textInputAutocapitalization(.sentences)
+                SecretFieldsEditor(model: fieldModel)
             }
             .disabled(request.state != .editing)
             if let message = request.error ?? error {
@@ -75,7 +61,7 @@ struct SecretEntryRequestCard: View {
                     onCancel()
                 }
                 RequestPillButton(
-                    title: saveTitle,
+                    title: String(localized: "Save"),
                     isPrimary: true,
                     isLoading: request.state == .saving,
                     action: save
@@ -93,29 +79,15 @@ struct SecretEntryRequestCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var saveTitle: String {
-        switch request.form {
-        case .named: String(localized: "Save")
-        case .githubPublication: String(localized: "Save and continue")
-        }
-    }
-
     private var canSave: Bool {
-        switch request.form {
-        case .named: !displayName.isEmpty && !fieldModel.fields.isEmpty
-        case .githubPublication: !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+        !displayName.isEmpty && !fieldModel.fields.isEmpty
     }
 
     private func save() {
         error = nil
         do {
-            let value = switch request.form {
-            case .named: try SecretFieldCodec.encode(fieldModel.fields)
-            case .githubPublication: token
-            }
+            let value = try SecretFieldCodec.encode(fieldModel.fields)
             request.submit(displayName: displayName, value: value) {
-                token = ""
                 fieldModel.fields.removeAll()
                 onSaved()
             }
