@@ -11,13 +11,6 @@ struct ProviderAuthenticationView: View {
         case subscription
     }
 
-    private enum WebsiteAuthenticationStatus {
-        case checking
-        case signedIn
-        case signedOut
-        case unavailable
-    }
-
     let client: any ProviderClient
     @Binding var apiKey: String
     let onChange: () -> Void
@@ -33,7 +26,6 @@ struct ProviderAuthenticationView: View {
     @State private var showSignOutConfirm = false
     @State private var signInError: String?
     @State private var websiteSignIn: WebsiteSignIn?
-    @State private var websiteAuthenticationStatus: WebsiteAuthenticationStatus = .checking
     @State private var websiteAuthenticationRevision = 0
     @State private var presentations = AppPresentationCoordinator()
 
@@ -91,27 +83,7 @@ struct ProviderAuthenticationView: View {
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
                 if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web, let website = client.website {
-                    Button {
-                        if let provider = client as? WebServiceModelProvider,
-                           websiteAuthenticationStatus != .signedIn {
-                            signInModelService(provider)
-                            return
-                        }
-                        let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
-                        websiteSignIn = WebsiteSignIn(session: session)
-                        websiteAuthenticationRevision &+= 1
-                    } label: {
-                        if websiteAuthenticationStatus == .signedIn {
-                            websiteSignedInRow
-                        } else {
-                            SettingsActionButtonLabel {
-                                Text("Sign in with \(client.displayName)")
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
-                    .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
+                    websiteAuthenticationContent(website: website)
                 } else {
                     Text("Not required")
                         .font(Theme.Fonts.bodyMd)
@@ -135,20 +107,17 @@ struct ProviderAuthenticationView: View {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
         }
         .task(id: websiteAuthenticationRevision) {
-            guard client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web,
-                  websiteSignIn == nil else { return }
-            websiteAuthenticationStatus = .checking
+            guard let service = websiteService, websiteSignIn == nil else { return }
             let revision = websiteAuthenticationRevision
-            do {
-                let signedIn = try await client.websiteSessionIsAuthenticated()
-                guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
-                websiteAuthenticationStatus = signedIn == true ? .signedIn : .signedOut
-            } catch {
-                guard !Task.isCancelled, websiteSignIn == nil, websiteAuthenticationRevision == revision else { return }
-                websiteAuthenticationStatus = .unavailable
-                Log.ui.warning("ProviderAuthentication.websiteStatus client=\(client.id) error=\(LogPrivacy.text(error.localizedDescription))")
-            }
+            let state = await service.checkAccess(
+                policy: revision == 0 ? .cached : .current,
+                reason: .modelSignIn
+            )
+            guard !Task.isCancelled, websiteSignIn == nil,
+                  websiteAuthenticationRevision == revision else { return }
+            if revision > 0, state.isAuthenticated { onAuthenticated?() }
         }
+        .onChange(of: websiteService?.auth) { _, _ in onChange() }
         .sheet(item: $websiteSignIn, onDismiss: {
             websiteAuthenticationRevision &+= 1
         }) { signIn in
@@ -157,20 +126,82 @@ struct ProviderAuthenticationView: View {
         .appPresentations(presentations)
     }
 
-    private func signInModelService(_ provider: WebServiceModelProvider) {
-        guard !busy, let service = serviceManager.service(domain: provider.domain) else { return }
-        busy = true
-        Task { @MainActor in
-            defer {
-                busy = false
-                websiteAuthenticationRevision &+= 1
+    private var websiteService: Service? {
+        guard let provider = client as? WebServiceModelProvider else { return nil }
+        return serviceManager.service(domain: provider.domain)
+    }
+
+    @ViewBuilder
+    private func websiteAuthenticationContent(website: URL) -> some View {
+        if busy {
+            websiteAuthenticationProgress("Signing in…")
+        } else {
+            switch websiteService?.auth {
+            case .unknown?, .checking?:
+                websiteAuthenticationProgress("Checking sign-in…")
+            case .signingIn?:
+                websiteAuthenticationProgress("Signing in…")
+            case .observed?, .authorized?, .authorizationRequired?, .notAuthorized?:
+                Button {
+                    if websiteService?.signInState.isAuthenticated == true {
+                        let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
+                        websiteSignIn = WebsiteSignIn(session: session)
+                    } else {
+                        signInModelService()
+                    }
+                } label: {
+                    if websiteService?.signInState.isAuthenticated == true {
+                        websiteSignedInRow
+                    } else {
+                        SettingsActionButtonLabel {
+                            Text("Sign in with \(client.displayName)")
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
+            case .notRequired?:
+                Text("Not required")
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .settingsRowPadding()
+            case .unavailable?, nil:
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    SettingsNoticeMessage(message: String(localized: "Sign-in unavailable"), systemImage: "exclamationmark.circle")
+                    Button {
+                        websiteAuthenticationRevision &+= 1
+                    } label: {
+                        SettingsActionButtonLabel { Text("Try Again") }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(websiteService == nil)
+                    .accessibilityIdentifier("provider.authentication.retry")
+                }
             }
+        }
+    }
+
+    private func websiteAuthenticationProgress(_ title: LocalizedStringKey) -> some View {
+        SettingsActionButtonLabel {
+            CellularAutomatonLoader.small
+            Text(title)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("provider.authentication.progress")
+    }
+
+    private func signInModelService() {
+        guard !busy, let service = websiteService else { return }
+        busy = true
+        signInError = nil
+        Task { @MainActor in
+            defer { busy = false }
             do {
                 try await service.requestAccess(using: presentations)
-                if try await provider.websiteSessionIsAuthenticated() == true { onAuthenticated?() }
+                if service.signInState.isAuthenticated { onAuthenticated?() }
             } catch {
-                websiteAuthenticationStatus = .unavailable
-                Log.ui.warning("ProviderAuthentication.modelService domain=\(provider.domain) error=\(LogPrivacy.text(error.localizedDescription))")
+                signInError = error.localizedDescription
+                Log.ui.warning("ProviderAuthentication.modelService domain=\(service.domain) error=\(LogPrivacy.text(error.localizedDescription))")
             }
         }
     }
