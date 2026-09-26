@@ -138,14 +138,13 @@ struct RepositoriesView: View {
                     Image(systemName: "chevron.right")
                         .font(Theme.Icons.xs)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                        .padding(.trailing, Theme.Spacing.lg)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(A11yID.Settings.repository(repository.id))
         }
-        .padding(5)
+        .settingsRowPadding()
     }
 
     private func repositorySubtitle(_ repository: Repository.Descriptor) -> String {
@@ -162,7 +161,7 @@ struct RepositoriesView: View {
         SettingsSection(
             "Conflicts",
             footer: "Choose which repository provides each service. Ox never combines implementations.",
-            insetContent: false
+            layout: .group
         ) {
             VStack(spacing: 0) {
                 ForEach(Array(manager.repositoryConflicts.enumerated()), id: \.element.id) { index, conflict in
@@ -180,11 +179,10 @@ struct RepositoriesView: View {
                 .foregroundStyle(Theme.Colors.onSurface)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .padding(.leading, Theme.Spacing.sm)
             Spacer(minLength: 0)
             conflictPicker(conflict)
         }
-        .padding(Theme.Spacing.md)
+        .settingsRowPadding()
     }
 
     private func conflictPicker(_ conflict: Repository.Conflict) -> some View {
@@ -371,7 +369,7 @@ struct RepositoryDetailView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .settingsSurface()
+                        .settingsSurface(singleRow: repository.origin == nil)
                         if let description = repository.provenance.skillOwnershipDescription {
                             Text(description)
                                 .font(Theme.Fonts.caption)
@@ -380,7 +378,7 @@ struct RepositoryDetailView: View {
                         }
                     }
                     if !repository.services.isEmpty {
-                        SettingsSection("Services", insetContent: false) {
+                        SettingsSection("Services", layout: .group) {
                             VStack(spacing: 0) {
                                 ForEach(Array(repository.services.enumerated()), id: \.element.id) { index, service in
                                     if index > 0 { Divider().settingsContentInset() }
@@ -390,7 +388,7 @@ struct RepositoryDetailView: View {
                         }
                     }
                     if !repository.skills.isEmpty {
-                        SettingsSection("Skills", insetContent: false) {
+                        SettingsSection("Skills", layout: .group) {
                             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                                 ForEach(repository.skills, id: \.self) { name in
                                     Text(verbatim: "/\(name)").settingsRowPadding()
@@ -477,7 +475,7 @@ struct RepositoryDetailView: View {
     }
 
     private var removalSection: some View {
-        SettingsSection("Manage", insetContent: false) {
+        SettingsSection("Manage", layout: .row) {
             Button(role: .destructive) {
                 confirmingRemoval = true
             } label: {

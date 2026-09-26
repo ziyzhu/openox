@@ -99,9 +99,7 @@ struct SpeechVoicePickerView: View {
             .accessibilityLabel(preview.speakingIdentifier == playbackID ? "Stop preview" : "Preview voice")
             .accessibilityIdentifier(previewID)
         }
-        .padding(.leading, SettingsLayout.horizontalInset)
-        .padding(.trailing, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.md)
+        .settingsRowPadding()
     }
 
     private var previewText: String {

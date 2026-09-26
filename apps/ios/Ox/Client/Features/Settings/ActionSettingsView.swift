@@ -80,7 +80,7 @@ struct ActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Actions", insetContent: false) {
+                SettingsSection("Actions", layout: .group) {
                     VStack(spacing: 0) {
                         NavigationLink {
                             BuiltInActionSettingsView()
@@ -171,7 +171,7 @@ struct BuiltInActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Actions", insetContent: false) {
+                SettingsSection("Actions", layout: .group) {
                     VStack(spacing: 0) {
                         ForEach(Array(actions.enumerated()), id: \.element) { index, action in
                             if index > 0 { Divider().settingsContentInset() }
@@ -229,7 +229,7 @@ struct ServiceActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Actions", insetContent: false) {
+                SettingsSection("Actions", layout: .group) {
                     VStack(spacing: 0) {
                         serviceActionRow(
                             title: String(localized: "Attach to a chat"),

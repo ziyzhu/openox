@@ -173,11 +173,11 @@ struct CustomLLMProviderEditor: View {
     }
 
     private var providerFields: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("Provider")
-                .font(Theme.Fonts.labelMd)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsSectionHeaderInset()
+        SettingsSection(
+            "Provider",
+            footer: "Addresses without a path use /v1. On a physical iPhone, use the server computer's local hostname or IP address, not localhost.",
+            layout: .group
+        ) {
             VStack(spacing: 0) {
                 TextField("Name", text: $name)
                     .textInputAutocapitalization(.words)
@@ -201,11 +201,6 @@ struct CustomLLMProviderEditor: View {
                     .settingsRowPadding()
                     .accessibilityIdentifier(A11yID.Settings.customProviderKey)
             }
-            .settingsSurface()
-            Text("Addresses without a path use /v1. On a physical iPhone, use the server computer's local hostname or IP address, not localhost.")
-                .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .settingsContentInset()
         }
     }
 
@@ -263,7 +258,7 @@ struct CustomLLMProviderEditor: View {
                 numericField("Maximum output", value: model.maxTokens)
             }
         }
-        .padding(Theme.Spacing.md)
+        .settingsRowPadding()
         .settingsSurface()
         .accessibilityIdentifier(A11yID.Settings.customProviderModel(model.wrappedValue.id))
     }

@@ -388,11 +388,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var repositorySection: some View {
         if let repository {
-            VStack(alignment: .leading, spacing: SettingsLayout.headerSpacing) {
-                Text("Repository")
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .settingsSectionHeaderInset()
+            SettingsSection("Repository", layout: .row) {
                 NavigationLink {
                     RepositoryDetailView(repositoryID: repository.id)
                 } label: {
@@ -416,7 +412,6 @@ struct ServiceDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .settingsSurface(singleRow: true)
                 .accessibilityIdentifier(A11yID.Chat.Attach.repository(service.domain))
             }
         }
@@ -472,7 +467,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var permissionsSection: some View {
         if capabilities.supportsFolderAccess {
-            SettingsSection("Folders", insetContent: false) {
+            SettingsSection("Folders", layout: .group) {
                 filesPermissionContent
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsRowPadding()
@@ -589,7 +584,7 @@ struct ServiceDetailView: View {
     @ViewBuilder
     private var manageSection: some View {
         if canInspectPage || capabilities.supportsWebsiteDataManagement || capabilities.supportsRemoteManagement || service.isLocalService {
-            SettingsSection("Manage", insetContent: false) {
+            SettingsSection("Manage", layout: .group) {
                 VStack(spacing: 0) {
                     if canInspectPage {
                         manageRow("Inspect service page", tint: AnyShapeStyle(Theme.Colors.onSurface)) {

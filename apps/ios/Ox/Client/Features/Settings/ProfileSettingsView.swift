@@ -260,10 +260,8 @@ struct ProfileSettingsView: View {
     }
 
     private func manageSection(for profile: Profile) -> some View {
-        SettingsSection("Manage", insetContent: false) {
-            VStack(spacing: 0) {
-                nameRow(for: profile)
-            }
+        SettingsSection("Manage", layout: .row) {
+            nameRow(for: profile)
         }
     }
 
@@ -349,7 +347,7 @@ private struct ProfileContentsView: View {
     var body: some View {
         SettingsSection(
             "Profile",
-            insetContent: false
+            layout: .group
         ) {
             VStack(spacing: 0) {
                 NavigationLink {

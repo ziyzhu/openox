@@ -96,7 +96,7 @@ struct SettingsSheet: View {
                     SettingsSection(
                         "Profiles",
                         footer: "Profiles hold chats, artifacts, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
-                        insetContent: false
+                        layout: .group
                     ) {
                         VStack(spacing: 0) {
                             ForEach(Array(storage.profiles.enumerated()), id: \.element.id) { index, profile in
@@ -150,7 +150,7 @@ struct SettingsSheet: View {
                     SettingsSection(
                         "Models",
                         footer: "Used for new chats. Existing chats keep their model.",
-                        insetContent: false
+                        layout: .group
                     ) {
                         NavigationLink {
                             ModelPickerContent(
@@ -224,7 +224,7 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.theme)
                     }
 
-                    SettingsSection("App", insetContent: false) {
+                    SettingsSection("App", layout: .group) {
                         VStack(spacing: 0) {
                             NavigationLink {
                                 NotificationSetupView()
@@ -244,7 +244,7 @@ struct SettingsSheet: View {
                         }
                     }
 
-                    SettingsSection("Community", insetContent: false) {
+                    SettingsSection("Community", layout: .group) {
                         VStack(spacing: 0) {
                             Link(destination: OxLinks.discord) {
                                 SettingsDisclosureRow(
@@ -273,7 +273,7 @@ struct SettingsSheet: View {
                     SettingsSection(
                         "Developer",
                         footer: "Recent on-device activity for troubleshooting. Logs are held in memory and never leave your device.",
-                        insetContent: false
+                        layout: .group
                     ) {
                         VStack(spacing: 0) {
                             NavigationLink {
@@ -378,7 +378,7 @@ struct SettingsSheet: View {
     private var profileNameUnavailable: Bool { profileNameIsEmpty || profileNameTaken }
 
     private var capabilitiesSettingsSection: some View {
-        SettingsSection("Capabilities", insetContent: false) {
+        SettingsSection("Capabilities", layout: .group) {
             VStack(spacing: 0) {
                 NavigationLink {
                     ActionSettingsView()

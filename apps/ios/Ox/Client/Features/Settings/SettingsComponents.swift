@@ -43,20 +43,26 @@ extension View {
 }
 
 struct SettingsSection<Content: View>: View {
+    enum Layout {
+        case paddedRow
+        case row
+        case group
+    }
+
     let header: LocalizedStringKey
     let footer: LocalizedStringKey?
-    let insetContent: Bool
+    let layout: Layout
     let content: Content
 
     init(
         _ header: LocalizedStringKey,
         footer: LocalizedStringKey? = nil,
-        insetContent: Bool = true,
+        layout: Layout = .paddedRow,
         @ViewBuilder content: () -> Content
     ) {
         self.header = header
         self.footer = footer
-        self.insetContent = insetContent
+        self.layout = layout
         self.content = content()
     }
 
@@ -68,9 +74,9 @@ struct SettingsSection<Content: View>: View {
                 .settingsSectionHeaderInset()
 
             content
-                .settingsRowPadding(insetContent)
+                .settingsRowPadding(layout == .paddedRow)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .settingsSurface(singleRow: insetContent)
+                .settingsSurface(singleRow: layout != .group)
 
             if let footer {
                 Text(footer)
