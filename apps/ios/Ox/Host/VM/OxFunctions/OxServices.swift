@@ -30,6 +30,25 @@ nonisolated enum OxServices {
                     ])
                 ),
                 (
+                    "ox.service.list",
+                    .object([
+                        "description": .string("List all available services from enabled repositories and saved MCP connections, sorted by domain: `await ox.service.list({ kind?, purpose })`. Filter by `kind: \"web\"` for website services hosted by Ox Server, `kind: \"ios\"` for client-owned device services, or `kind: \"mcp\"` for directly connected remote MCP servers. Every result includes its kind and current chat attachment state. Returns every service without a result limit; omits action contracts. Disabled repositories are excluded."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "kind": .object([
+                                    "type": .string("string"),
+                                    "enum": .array([.string("web"), .string("api"), .string("ios"), .string("mcp")]),
+                                ]),
+                            ]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object([
+                            "description": .string("Array of available service snapshots with domain, name, description when present, kind, signIn, saved, attached, and repository or MCP connection metadata when applicable."),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.service.listAttached",
                     .object([
                         "description": .string("List the services currently attached to this chat: `await ox.service.listAttached({ kind?, purpose })`. Filter by `kind: \"web\"` for website services hosted by Ox Server, `kind: \"ios\"` for client-owned device services, or `kind: \"mcp\"` for directly connected remote MCP servers. Every result includes its kind."),
@@ -319,6 +338,12 @@ nonisolated enum OxServices {
             }
             ctx.setObject(findBlock as AnyObject, forKeyedSubscript: "__nativeServiceFind" as NSString)
 
+            let listBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
+                let kind = kindValue.isString ? kindValue.toString() : nil
+                return env.call { try await $0.listServices(kind: kind, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(listBlock as AnyObject, forKeyedSubscript: "__nativeServiceList" as NSString)
+
             let listAttachedBlock: @convention(block) (JSValue, JSValue) -> JSValue = { kindValue, purposeValue in
                 let kind = kindValue.isString ? kindValue.toString() : nil
                 return env.call { try await $0.listAttachedServices(kind: kind, purpose: purposeValue.toString()!) }
@@ -396,6 +421,7 @@ nonisolated enum OxServices {
         },
         jsFragment: """
           find: (value) => { const options = __oxOptions(value, 'ox.service.find'); return __nativeServiceFind(String(options.query), String(options.purpose)); },
+          list: (value) => { const options = __oxOptions(value, 'ox.service.list'); return __nativeServiceList(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           listAttached: (value) => { const options = __oxOptions(value, 'ox.service.listAttached'); return __nativeServiceListAttached(options.kind == null ? null : String(options.kind), String(options.purpose)); },
           inspect: (value) => { const options = __oxOptions(value, 'ox.service.inspect'); return __nativeServiceInspect(String(options.domain), options.actions ?? null, String(options.purpose)); },
           validate: (value) => { const options = __oxOptions(value, 'ox.service.validate'); return __nativeServiceValidate(String(options.domain), String(options.purpose)); },

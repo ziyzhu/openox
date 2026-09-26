@@ -578,6 +578,24 @@ final class ServiceOperations {
         }
     }
 
+    func listServices(kind: String?, purpose: String) async throws -> JSONValue? {
+        if let kind, !["web", "api", "ios", "mcp"].contains(kind) {
+            throw RuntimeError.bridge("ox.service.list: kind must be 'web', 'api', 'ios', or 'mcp'")
+        }
+        let args: JSONValue = .object(kind.map { ["kind": .string($0)] } ?? [:])
+        return try await tracked(Actions.serviceList, args, purpose: purpose) {
+            guard serviceManager.monoRepositoryState == .ready else {
+                throw RuntimeError.bridge("ox.service.list: Ox Server is still loading services. Try again later.")
+            }
+            let snapshots = try serviceManager.services
+                .filter { kind == nil || self.serviceKind($0) == kind }
+                .sorted { $0.domain < $1.domain }
+                .map { try self.serviceSnapshot($0) }
+            Log.session.info("bridge.service.list kind=\(kind ?? "all") count=\(snapshots.count)")
+            return .array(snapshots)
+        }
+    }
+
     func findServices(query: String, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.serviceFind, .object(["query": .string(query)]), purpose: purpose) {
             guard serviceManager.monoRepositoryState == .ready else {

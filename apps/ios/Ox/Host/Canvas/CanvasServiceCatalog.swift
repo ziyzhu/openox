@@ -36,6 +36,8 @@ extension ServiceOperations {
         let fields = arguments.objectValue ?? [:]
         let purpose = fields["purpose"]!.stringValue!
         switch function {
+        case "ox.service.list":
+            return try await listServices(kind: fields["kind"]?.stringValue, purpose: purpose)
         case "ox.service.find":
             return try await findServices(query: fields["query"]?.stringValue ?? "", purpose: purpose)
         case "ox.service.inspect":

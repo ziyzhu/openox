@@ -108,9 +108,13 @@ extension Chat: OxFunctionBridge {
         try await serviceOperations.repositoryGitRestore(path: path, purpose: purpose)
     }
 
+    public func listServices(kind: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.listServices(kind: kind, purpose: purpose)
+    }
+
     public func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue? {
-        guard kind == nil || kind == "web" || kind == "ios" || kind == "mcp" else {
-            throw RuntimeError.bridge("ox.service.listAttached: kind must be 'web', 'ios', or 'mcp'")
+        guard kind == nil || kind == "web" || kind == "api" || kind == "ios" || kind == "mcp" else {
+            throw RuntimeError.bridge("ox.service.listAttached: kind must be 'web', 'api', 'ios', or 'mcp'")
         }
         let args: JSONValue = .object(kind.map { ["kind": .string($0)] } ?? [:])
         return try await tracked(Actions.serviceListAttached, args, purpose: purpose) {
@@ -145,6 +149,7 @@ extension Chat: OxFunctionBridge {
 
     private func serviceKind(_ service: Service) -> String {
         if service.isIOSService { return "ios" }
+        if service.isAPIService { return "api" }
         if service.isMCPService { return "mcp" }
         return "web"
     }

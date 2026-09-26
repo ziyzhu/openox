@@ -33,6 +33,7 @@ public protocol OxFunctionBridge: AnyObject {
     func globFileSystem(pattern: String, path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func grepFileSystem(pattern: String, path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func findServices(query: String, purpose: String) async throws -> JSONValue?
+    func listServices(kind: String?, purpose: String) async throws -> JSONValue?
     func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue?
     func inspectService(domain: String, actions: [String]?, purpose: String) async throws -> JSONValue?
     func validateService(domain: String, purpose: String) async throws -> JSONValue?
