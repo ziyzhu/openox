@@ -192,20 +192,6 @@ struct ChatComposer: View, Equatable {
         return Theme.Spacing.sm + restingOffset + surfaceTouchInset + floatingOffset
     }
 
-    private enum PromptTemplate: String, Identifiable {
-        case actions
-        case skills
-
-        var id: String { rawValue }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .actions: "Add new actions"
-            case .skills: "Add new skills"
-            }
-        }
-    }
-
     private enum ComposerIntent: Identifiable {
         case suggested(FollowIntent)
         case importMemory
@@ -262,9 +248,6 @@ struct ChatComposer: View, Equatable {
     @State private var composerTextEditorHeight: CGFloat = 40
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
-    @State private var promptTemplate: PromptTemplate?
-    @State private var promptPrimaryInput = ""
-    @State private var promptSecondaryInput = ""
     @State private var hasShownImportMemory = false
     @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
 
@@ -342,18 +325,6 @@ struct ChatComposer: View, Equatable {
                 Log.ui.info("ChatComposer.importMemoryIntent shown chat=\(sessionID) display=\(importMemoryIntentDisplays)")
             }
             .onDisappear { hasShownImportMemory = false }
-            .alert(promptTemplate?.title ?? "", isPresented: promptTemplatePresented) {
-                if let promptTemplate {
-                    promptFields(promptTemplate)
-                    Button("Cancel", role: .cancel, action: resetPromptTemplate)
-                    Button("Add Prompt", action: applyPromptTemplate)
-                        .disabled(!promptTemplateIsComplete)
-                }
-            } message: {
-                if let promptTemplate {
-                    promptMessage(promptTemplate)
-                }
-            }
     }
 
     @ViewBuilder
@@ -561,20 +532,6 @@ struct ChatComposer: View, Equatable {
         return showsImportMemoryIntent ? [.importMemory] : []
     }
 
-    private var promptTemplatePresented: Binding<Bool> {
-        Binding(
-            get: { promptTemplate != nil },
-            set: { presented in
-                if !presented { resetPromptTemplate() }
-            }
-        )
-    }
-
-    private var promptTemplateIsComplete: Bool {
-        !promptPrimaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     @ViewBuilder
     private var followIntentStrip: some View {
         if showsFollowIntents {
@@ -595,16 +552,11 @@ struct ChatComposer: View, Equatable {
         Button {
             switch intent {
             case .suggested(let suggestion):
-                switch suggestion {
-                case .send(_, let message):
-                    fillDraft(message)
-                    Log.ui.info("ChatComposer.followIntent fill chat=\(sessionID) chars=\(message.count)")
-                case .newActions, .newSkills:
-                    let template: PromptTemplate = suggestion == .newActions ? .actions : .skills
-                    resetPromptTemplate()
-                    promptTemplate = template
-                    Log.ui.info("ChatComposer.promptTemplate present chat=\(sessionID) template=\(template.rawValue)")
-                }
+                let message = suggestion.message
+                composer.draft = message
+                Haptics.impact(.send)
+                Log.ui.info("ChatComposer.followIntent send chat=\(sessionID) chars=\(message.count)")
+                submit()
             case .importMemory:
                 guard let skill = BuiltInSkills.skills.first(where: { $0.name == "import-memory" }) else {
                     Log.ui.error("ChatComposer.importMemoryIntent missingSkill chat=\(sessionID)")
@@ -632,83 +584,16 @@ struct ChatComposer: View, Equatable {
     private func followIntentTitle(_ intent: ComposerIntent) -> Text {
         switch intent {
         case .suggested(let suggestion):
-            switch suggestion {
-            case .send(let label, _): Text(verbatim: label)
-            case .newActions: Text("Add new actions")
-            case .newSkills: Text("Add new skills")
-            }
+            Text(verbatim: suggestion.label)
         case .importMemory: Text("Import memory to Ox")
         }
     }
 
     private func followIntentIdentifier(_ intent: ComposerIntent) -> String {
         switch intent {
-        case .suggested(let suggestion):
-            switch suggestion {
-            case .send: A11yID.Chat.followIntent
-            case .newActions: A11yID.Chat.newActions
-            case .newSkills: A11yID.Chat.newSkills
-            }
+        case .suggested: A11yID.Chat.followIntent
         case .importMemory: A11yID.Chat.importMemory
         }
-    }
-
-    @ViewBuilder
-    private func promptFields(_ template: PromptTemplate) -> some View {
-        switch template {
-        case .actions:
-            TextField("Service or domain", text: $promptPrimaryInput)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .accessibilityLabel("Service or domain")
-                .accessibilityIdentifier(A11yID.Chat.newActionsService)
-            TextField("Actions to add", text: $promptSecondaryInput)
-                .accessibilityLabel("Actions to add")
-                .accessibilityIdentifier(A11yID.Chat.newActionsRequest)
-        case .skills:
-            TextField("Services needed", text: $promptPrimaryInput)
-                .accessibilityLabel("Services needed")
-                .accessibilityIdentifier(A11yID.Chat.newSkillServices)
-            TextField("What should it achieve?", text: $promptSecondaryInput)
-                .accessibilityLabel("What should it achieve?")
-                .accessibilityIdentifier(A11yID.Chat.newSkillOutcome)
-        }
-    }
-
-    @ViewBuilder
-    private func promptMessage(_ template: PromptTemplate) -> some View {
-        switch template {
-        case .actions:
-            Text("Describe the service and the actions you want Ox to add.")
-        case .skills:
-            Text("Describe the services the skill needs and its goal.")
-        }
-    }
-
-    private func applyPromptTemplate() {
-        guard let promptTemplate, promptTemplateIsComplete else { return }
-        let primary = promptPrimaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let secondary = promptSecondaryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let prompt = switch promptTemplate {
-        case .actions:
-            String(localized: "Create a new service for \(primary), or add actions to the existing service if one is already available.\n\nActions: \(secondary)")
-        case .skills:
-            String(localized: "Create a new skill.\n\nServices needed: \(primary)\n\nGoal: \(secondary)")
-        }
-        fillDraft(prompt)
-        Log.ui.info("ChatComposer.promptTemplate apply chat=\(sessionID) template=\(promptTemplate.rawValue) chars=\(composer.draft.count)")
-        resetPromptTemplate()
-    }
-
-    private func fillDraft(_ text: String) {
-        composer.draft = text
-        DispatchQueue.main.async { fieldFocused.wrappedValue = true }
-    }
-
-    private func resetPromptTemplate() {
-        promptTemplate = nil
-        promptPrimaryInput = ""
-        promptSecondaryInput = ""
     }
 
     private var artifactAccessibilityLabel: String {

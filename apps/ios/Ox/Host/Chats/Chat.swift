@@ -8,10 +8,9 @@ enum ChatRetention: Equatable {
     case temporary
 }
 
-nonisolated enum FollowIntent: Equatable, Identifiable, Sendable {
-    case send(label: String, message: String)
-    case newActions
-    case newSkills
+nonisolated struct FollowIntent: Equatable, Identifiable, Sendable {
+    let label: String
+    let message: String
 
     static func parse(_ value: JSONValue) throws -> [Self] {
         guard let entries = value.arrayValue, entries.count <= 2 else {
@@ -30,9 +29,7 @@ nonisolated enum FollowIntent: Equatable, Identifiable, Sendable {
                       !message.isEmpty, message.count <= 1_000 else {
                     throw RuntimeError.bridge("ox.user.follow: send needs a short label and message")
                 }
-                return .send(label: label, message: message)
-            case "actions": return .newActions
-            case "skills": return .newSkills
+                return Self(label: label, message: message)
             default: throw RuntimeError.bridge("ox.user.follow: unsupported intent kind")
             }
         }
@@ -42,13 +39,7 @@ nonisolated enum FollowIntent: Equatable, Identifiable, Sendable {
         return intents
     }
 
-    var id: String {
-        switch self {
-        case .send(let label, _): "send:\(label.lowercased())"
-        case .newActions: "actions"
-        case .newSkills: "skills"
-        }
-    }
+    var id: String { "send:\(label.lowercased())" }
 }
 
 struct ChatContinuation {
