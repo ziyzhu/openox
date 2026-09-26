@@ -1001,12 +1001,13 @@ struct ChatPage: View {
 
     @ViewBuilder
     private func promptBlock(_ prompt: ChatPromptBlock, sourceBlockID: UUID) -> some View {
-        if let key = prompt.secretKey, prompt.isActive {
-            SecretEntryRequestCard(key: key, onSave: { displayName, value in
-                chat.resolveSecretPrompt(blockId: sourceBlockID, displayName: displayName, value: value)
+        if let request = prompt.secretEntry, prompt.isActive {
+            SecretEntryRequestCard(request: request, onSaved: {
+                chat.resolvePrompt(blockId: sourceBlockID, answer: "Saved")
             }, onCancel: {
                 chat.resolvePrompt(blockId: sourceBlockID, answer: "Cancelled")
             })
+            .id(request.id)
         } else {
         switch prompt.kind {
         case .permission:

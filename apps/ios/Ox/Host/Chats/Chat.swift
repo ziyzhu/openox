@@ -120,7 +120,7 @@ final class Chat: Identifiable {
         let presentation: ChatPromptPresentation
         let allowsCustomAnswer: Bool
         let autoApproval: AutoApproval?
-        let secretKey: String?
+        let secretEntry: SecretEntryRequest?
     }
 
     enum Interaction: Equatable {
@@ -199,7 +199,9 @@ final class Chat: Identifiable {
 
         func cancel() {
             switch self {
-            case .prompt(_, let continuation): continuation.resume(returning: .cancelled)
+            case .prompt(let prompt, let continuation):
+                prompt.secretEntry?.cancel()
+                continuation.resume(returning: .cancelled)
             case .serviceControl(_, let continuation): continuation.resume(returning: nil)
             }
         }
@@ -565,7 +567,13 @@ final class Chat: Identifiable {
                     }
                 }
             },
-            repositoryAuthorization: presentations.repositoryAuthorization,
+            repositoryAuthorization: { [unowned self] validate in
+                await awaitPrompt(
+                    prompt: String(localized: "GitHub personal access token"),
+                    options: ["Saved", "Cancelled"],
+                    secretEntry: SecretEntryRequest(validate: validate)
+                ) == "Saved"
+            },
             native: nativeServiceOperations
         )
     }
@@ -1506,9 +1514,10 @@ final class Chat: Identifiable {
         allowsCustomAnswer: Bool = false,
         presentation: ChatPromptPresentation = .conversation,
         autoApproval: PendingPrompt.AutoApproval? = nil,
-        secretKey: String? = nil,
+        secretEntry: SecretEntryRequest? = nil,
         resolution: ((String) -> String?)? = nil
     ) async -> String {
+        defer { secretEntry?.cancel() }
         let stepID = StepID()
         document.apply(.appendPrompt(AgentPrompt(prompt: prompt, options: options, outcome: .pending), choice: kind == .choice, id: stepID))
         markActivity()
@@ -1528,7 +1537,7 @@ final class Chat: Identifiable {
             presentation: presentation,
             allowsCustomAnswer: allowsCustomAnswer,
             autoApproval: autoApproval,
-            secretKey: secretKey
+            secretEntry: secretEntry
         )
         Log.session.info("Chat.awaitPrompt id=\(id) kind=\(kind.rawValue) presentation=\(String(describing: presentation)) options=\(options.count)")
         let result = await waitForPrompt(pending)
@@ -1557,23 +1566,10 @@ final class Chat: Identifiable {
            answer == approval.alwaysApprove {
             serviceManager.setActionPolicy(.allow, for: approval.action)
         }
+        prompt.secretEntry?.cancel()
         interactionWaiter = nil
         advanceInteraction()
         continuation.resume(returning: .answered(answer))
-    }
-
-    func resolveSecretPrompt(blockId: UUID, displayName: String, value: String) -> String? {
-        guard case .prompt(let prompt, let continuation) = interactionWaiter,
-              prompt.id == blockId, let key = prompt.secretKey else { return "Secret entry is no longer active" }
-        do {
-            try Secret.set(key: key, displayName: displayName, value: value)
-            interactionWaiter = nil
-            advanceInteraction()
-            continuation.resume(returning: .answered("Saved"))
-            return nil
-        } catch {
-            return error.localizedDescription
-        }
     }
 
     private func waitForPrompt(_ prompt: PendingPrompt) async -> PromptResult {

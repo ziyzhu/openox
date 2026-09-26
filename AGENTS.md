@@ -73,6 +73,7 @@ Related:
 
 1. Use `bun run` scripts for repository operations and `ox` for service operations.
 1. Create, explore, repair, and verify web services by driving an Ox chat on the user-selected simulator through the built-in `manage-services` workflow.
+1. When delegating service authoring to Ox, actively look for opportunities to improve the authoring harness and fix issues encountered. Turn those findings into reusable improvements to tools, instructions, diagnostics, and verification so future authoring is faster and more reliable.
 1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
 1. Use `.agents/skills/promote-web-service` only after Ox has committed a verified Local service and the user explicitly requests promotion into the built-in repository.
 1. Build iOS only with `sim`, never `xcodebuild`.

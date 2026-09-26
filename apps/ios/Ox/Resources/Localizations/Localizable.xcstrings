@@ -1,6 +1,26 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Save and continue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存并继续"
+          }
+        }
+      }
+    },
+    "GitHub token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 令牌"
+          }
+        }
+      }
+    },
     "" : {
       "shouldTranslate" : false
     },
@@ -11931,12 +11951,12 @@
         }
       }
     },
-    "Use a classic token with public_repo access. It is saved in Secrets and never sent to the model. After creating a token, return to Ox and propose again." : {
+    "Use a classic token with public_repo access. It is saved in Secrets and never sent to the model. After creating a token, return to Ox and paste it here." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请使用具有 public_repo 权限的经典令牌。令牌保存在密钥中，绝不会发送给模型。创建令牌后，请返回 Ox 再次提交提案。"
+            "value" : "请使用具有 public_repo 权限的经典令牌。令牌保存在密钥中，绝不会发送给模型。创建令牌后，请返回 Ox 并粘贴到此处。"
           }
         }
       }

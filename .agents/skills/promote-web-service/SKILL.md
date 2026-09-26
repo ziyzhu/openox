@@ -19,6 +19,8 @@ Require all of the following before changing built-in service source:
 
 If any precondition is missing, return to Ox on the requested simulator. Do not substitute terminal Chrome, mitmproxy exploration, direct source editing, or inferred endpoint behavior.
 
+When returning work to Ox for authoring or repair, follow the `ox-cli` skill's service-authoring guidance: use observed friction and failures to improve the harness, fix underlying issues, and verify the affected flow through Ox so future authoring is faster and more reliable.
+
 ## Export the Local source
 
 Read `service.json`, `actions.js`, Local Git status, and the exact saved Local revision through Ox's debug or service-management APIs. Export from the virtual filesystem into a private temporary directory outside the repository. Do not reconstruct source from chat text or logs.

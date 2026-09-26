@@ -68,6 +68,17 @@ ox vm functions --json
 ox vm help <ox.function>
 ```
 
+## Delegate service authoring to Ox
+
+Drive an Ox chat on the user-selected simulator through the built-in
+`manage-services` workflow for service exploration, authoring, repair, and live
+verification. While observing the run, use chat history and structured logs to
+identify friction, repeated failures, and missing capabilities. Fix the underlying
+harness issues and improve tools, instructions, diagnostics, or verification
+where the evidence supports a reusable improvement. Exercise the affected flow
+through Ox again so future authoring is faster and more reliable. Keep service
+behavior authored inside Ox.
+
 ## Administer a Profile
 
 Discover iCloud Profiles on macOS, then select one by directory:

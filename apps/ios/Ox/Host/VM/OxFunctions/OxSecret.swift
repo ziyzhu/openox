@@ -7,9 +7,9 @@ nonisolated enum OxSecret {
         schema: {
             [
                 ("ox.secret.list", .object([
-                    "description": .string("List named secrets and their availability without reading values: `await ox.secret.list({ purpose })`."),
+                    "description": .string("List secret metadata without exposing values: `await ox.secret.list({ purpose })`. Returns each secret's key, displayName, sorted JSON field names in fields, and available status."),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([:])]),
-                    "outputSchema": .object(["description": .string("Array of keys and availability states; never values.")]),
+                    "outputSchema": .object(["description": .string("Array of { key, displayName, fields: string[], available: boolean }. Fields contains only top-level JSON field names, sorted, or [] when the secret is unavailable. Never includes secret values.")]),
                 ])),
                 ("ox.secret.add", .object([
                     "description": .string("Ask the person to add or replace a named JSON secret in a native inline card: `await ox.secret.add({ key, purpose })`. The value is never a JavaScript argument or result."),

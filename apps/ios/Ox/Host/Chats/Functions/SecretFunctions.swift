@@ -8,15 +8,29 @@ extension Chat {
             switch name {
             case "list":
                 return .array(try Secret.entries().map { entry in
-                    let available = try Credentials.secretChecked(for: "secret:\(entry.key)") != nil
-                    return .object(["key": .string(entry.key), "available": .bool(available)])
+                    let value = try Credentials.secretChecked(for: "secret:\(entry.key)")
+                    let fieldNames: [String]
+                    if let value {
+                        guard let fields = (try? JSONSerialization.jsonObject(with: Data(value.utf8))) as? [String: String] else {
+                            throw RuntimeError.bridge("Secret metadata is unavailable")
+                        }
+                        fieldNames = fields.keys.sorted()
+                    } else {
+                        fieldNames = []
+                    }
+                    return .object([
+                        "key": .string(entry.key),
+                        "displayName": .string(entry.displayName),
+                        "fields": .array(fieldNames.map(JSONValue.string)),
+                        "available": .bool(value != nil),
+                    ])
                 })
             case "add":
                 guard let key = fields["key"]?.stringValue else { throw RuntimeError.bridge("Secret key is required") }
                 try Secret.validateKey(key)
                 guard !key.hasPrefix("ox.") else { throw RuntimeError.bridge("Secret key is reserved") }
                 let status = await awaitPrompt(prompt: "Save a secret: \(key)",
-                                               options: ["Saved", "Cancelled"], secretKey: key)
+                                               options: ["Saved", "Cancelled"], secretEntry: SecretEntryRequest(key: key))
                 return .object(["key": .string(key), "status": .string(status == "Saved" ? "saved" : "cancelled")])
             case "delete":
                 guard let key = fields["key"]?.stringValue,
