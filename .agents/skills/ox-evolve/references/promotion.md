@@ -1,8 +1,3 @@
----
-name: promote-web-service
-description: Promote an Ox-authored, verified Local web service into the official built-in service repository, add sanitized replay coverage, audit its public icon, rebuild the generated bundle, and run release checks. Use only after service exploration, action design, implementation, and live verification were completed inside Ox through the built-in manage-services workflow. Do not use to create, explore, repair, or redesign a service.
----
-
 # Promote an Ox web service
 
 Treat the committed Local service produced by Ox as the behavioral source of truth. Promotion packages and verifies that implementation; it does not provide a second authoring path.
@@ -11,8 +6,8 @@ Treat the committed Local service produced by Ox as the behavioral source of tru
 
 Require all of the following before changing built-in service source:
 
-- Ox created or copied the service into Local through `skills/system:manage-services/SKILL.md`.
-- Ox explored the live site through `ox.web.browser.*`, presented the action plan, and received separate confirmation before authoring.
+- Ox created or copied the service into Local through `skills/manage-services/SKILL.md`.
+- Ox explored the live site through `ox.web.browser.*` and followed the current `manage-services` planning and approval rules, including its scoped missing-service bootstrap path.
 - Ox verified every promoted action and applicable authentication or handoff boundary in iOS.
 - The Local service has a user-approved saved revision with no unrelated pending Local changes.
 - The user explicitly requested promotion into the official built-in repository.
@@ -52,7 +47,7 @@ For page-owned DOM actions, do not retain a raw authenticated SPA capture when m
 
 ## Icon
 
-Check that the Local manifest's `faviconUrl` still returns a direct HTTPS PNG or JPEG without redirects, authentication, or cookies, fits the app's 1 MiB download limit, and remains recognizable at 20 px. Fetch the official compact mark with `.agents/skills/promote-web-service/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/promote-web-service/scripts/favicon-audit.sh <path-to-favicon.png>`.
+Check that the Local manifest's `faviconUrl` still returns a direct HTTPS PNG or JPEG without redirects, authentication, or cookies, fits the app's 1 MiB download limit, and remains recognizable at 20 px. Fetch the official compact mark with `.agents/skills/ox-evolve/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/ox-evolve/scripts/favicon-audit.sh <path-to-favicon.png>`.
 
 Require an official square source that is at least 128×128, remains recognizable at 20 px, has an intentional background in the central safe area, and renders cleanly on light and dark backgrounds. Never upscale, reconstruct brand artwork, or accept a generic substitute.
 

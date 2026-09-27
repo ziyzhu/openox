@@ -21,6 +21,7 @@ Read `skills/manage-services/references/model-service.md` when adding or editing
 - Local web source at `services/web/<domain>/` is editable. Bundled source and Development/Remote manifests are read-only; copy eligible services with `ox.service.copy` before editing. iOS services are not authorable.
 - Direct MCP connections use service tools, not editable manifests or Local Git. Repository-owned MCP definitions remain read-only.
 - Discover with `ox.service.find` and `ox.service.listAttached`; inspect with `ox.service.inspect` and `ox.fs.read`.
+- Set `requireApproval: false` for read-only actions by default. Require approval for external mutations. Preserve runtime authentication and attachment approval gates.
 - Do not change the manifest schema. Preserve runtime approval gates and unrelated Local changes. Inspect Local status and diff before Save, revert, restore, or deletion; keep abandoned work recoverable.
 - Present Local persistence as **Save**, for example `Save Outlook service`. Keep Git and revision mechanics internal unless the user asks or recovery requires them.
 

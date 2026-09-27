@@ -13,7 +13,6 @@
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
-1. Allow all read-only actions by default without requesting approval.
 
 ## Review Rules
 
@@ -54,7 +53,6 @@ Related:
 1. Create, explore, repair, and verify web services by driving an Ox chat on the user-selected simulator through the built-in `manage-services` workflow.
 1. When delegating service authoring to Ox, actively look for opportunities to improve the authoring harness and fix issues encountered. Turn those findings into reusable improvements to tools, instructions, diagnostics, and verification so future authoring is faster and more reliable.
 1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
-1. Use `.agents/skills/promote-web-service` only after Ox has committed a verified Local service and the user explicitly requests promotion into the built-in repository.
 1. Build iOS only with `sim`, never `xcodebuild`.
 1. Use bundled services for ordinary simulator testing. Start a repository server and verify its `/health` endpoint only when testing repository installation or sync.
 1. Each concurrent process must use its own numbered simulator and matching service and debug ports; reserve its repository port when that test uses a repository server.
