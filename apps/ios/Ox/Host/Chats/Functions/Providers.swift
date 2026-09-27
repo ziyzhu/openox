@@ -19,10 +19,7 @@ extension Chat {
             switch name {
             case "default": return .array(try registry.defaultDefinitions.map { try $0.json })
             case "list":
-                return .array(registry.definitions.map {
-                    .object(["id": .string($0.id), "name": .string($0.name), "api": .string($0.api.rawValue),
-                             "models": .int($0.models.count), "authentication": .string(registry.authenticationStatus(id: $0.id))])
-                })
+                return .array(registry.definitions.map { providerSummary($0, registry: registry) })
             case "get": return try definition!.json
             case "validate": return .object(["id": .string(definition!.id), "valid": .bool(true)])
             case "save":
@@ -91,5 +88,81 @@ extension Chat {
             throw RuntimeError.bridge(outcome == .cancelled ? "Provider authentication was cancelled" : "Provider authentication could not be presented")
         }
         return .object(["id": .string(definition.id), "status": .string(outcome.rawValue)])
+    }
+
+    private func providerSummary(_ definition: ProviderDefinition, registry: ProviderRegistry) -> JSONValue {
+        let client = registry.client(id: definition.id)
+        let website = client?.website
+        let offer = client?.gettingStartedOffer
+        return .object([
+            "id": .string(definition.id),
+            "name": .string(definition.name),
+            "source": .string(registry.source(id: definition.id).rawValue),
+            "api": .string(definition.api.rawValue),
+            "url": .string(definition.url.absoluteString),
+            "website": website.map { .string($0.absoluteString) } ?? .null,
+            "regions": .array((client?.regions ?? []).sorted { $0.rawValue < $1.rawValue }.map { .string($0.rawValue) }),
+            "inferenceLocation": .string((client?.inferenceLocation ?? .remote).providerInformationValue),
+            "models": .int(definition.models.count),
+            "availableModels": .int(client?.models.count ?? 0),
+            "authentication": .string(registry.authenticationStatus(id: definition.id)),
+            "access": providerAccess(definition, client: client),
+            "capabilities": .object([
+                "supportsTools": .bool(client?.supportsTools ?? false),
+                "canLoadModels": .bool(client?.canLoadModels ?? false),
+                "reasoningPolicy": .string((client?.reasoningPolicy ?? .unavailable).rawValue),
+            ]),
+            "gettingStarted": offer.map {
+                .object([
+                    "summary": .string($0.summary),
+                    "priority": .int($0.priority),
+                    "regions": .array($0.regions.sorted { $0.rawValue < $1.rawValue }.map { .string($0.rawValue) }),
+                ])
+            } ?? .null,
+        ])
+    }
+
+    private func providerAccess(_ definition: ProviderDefinition, client: (any ProviderClient)?) -> JSONValue {
+        var methods: [String] = []
+        if definition.api == .web {
+            methods.append("browser-session")
+        } else {
+            if client?.subscriptionAccount != nil {
+                methods.append(definition.auth.kind == .oauth ? "oauth" : "subscription")
+            }
+            if let client, client.acceptsAPIKey {
+                methods.append(client.credentialKind.providerInformationValue)
+            }
+            if methods.isEmpty {
+                methods.append(definition.auth.kind == .none ? "none" : definition.auth.kind.rawValue)
+            }
+        }
+        return .object([
+            "methods": .array(methods.map(JSONValue.string)),
+            "credentialKind": client.flatMap { $0.acceptsAPIKey ? $0.credentialKind.providerInformationValue : nil }.map(JSONValue.string) ?? .null,
+            "acceptsSecret": .bool(definition.api != .web && client?.acceptsAPIKey == true),
+            "optional": .bool(definition.auth.optional == true),
+            "notice": client?.authNotice.map(JSONValue.string) ?? .null,
+        ])
+    }
+}
+
+private extension LLMCredentialKind {
+    var providerInformationValue: String {
+        switch self {
+        case .apiKey: "api-key"
+        case .subscriptionKey: "subscription-key"
+        case .bearerToken: "bearer-token"
+        }
+    }
+}
+
+private extension LLMInferenceLocation {
+    var providerInformationValue: String {
+        switch self {
+        case .remote: "remote"
+        case .userHosted: "user-hosted"
+        case .onDevice: "on-device"
+        }
     }
 }

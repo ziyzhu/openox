@@ -16,6 +16,13 @@ nonisolated struct ProviderCatalog: Codable, Equatable, Sendable {
     }
 }
 
+nonisolated enum ProviderSource: String, Sendable {
+    case bundled
+    case override
+    case added
+    case webService = "web-service"
+}
+
 @MainActor
 @Observable
 final class ProviderRegistry {
@@ -109,6 +116,14 @@ final class ProviderRegistry {
     func definition(id: String) throws -> ProviderDefinition {
         guard let definition = definitions.first(where: { $0.id == id }) else { throw RuntimeError.bridge("Provider not found: \(id)") }
         return definition
+    }
+
+    func source(id: String) -> ProviderSource {
+        if modelServices.contains(where: { WebServiceModelProvider.providerID(domain: $0.domain) == id }) { return .webService }
+        let isBundled = bundled.contains { $0.definition.id == id }
+        let isSaved = catalog.providers.contains { $0.id == id }
+        if isBundled { return isSaved ? .override : .bundled }
+        return .added
     }
 
     func region(for id: String?) -> LLMRegion {

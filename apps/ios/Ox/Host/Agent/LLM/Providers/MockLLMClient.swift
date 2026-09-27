@@ -1654,7 +1654,12 @@ extension Scenario {
         const active = await ox.provider.list({ purpose: "Verify addition and override" });
         const unchanged = await ox.provider.default({ purpose: "Verify bundled defaults remain unchanged" });
         check(active.length === count + 1, "Added provider missing");
-        check(active.find(provider => provider.id === "mistral").name === "Mistral (customized)", "Override missing");
+        const activeMistral = active.find(provider => provider.id === "mistral");
+        const activeDemo = active.find(provider => provider.id === "demo-provider");
+        check(activeMistral.name === "Mistral (customized)" && activeMistral.source === "override", "Override missing");
+        check(activeDemo.source === "added" && activeDemo.api === "openai-chat-completions", "Added provider metadata missing");
+        check(activeDemo.inferenceLocation === "user-hosted" && activeDemo.access.methods.includes("none"), "Provider access metadata missing");
+        check(Array.isArray(activeDemo.regions) && typeof activeDemo.capabilities.supportsTools === "boolean", "Provider capability metadata missing");
         check(unchanged.find(provider => provider.id === "mistral").name === original.name, "Bundled default changed");
         let choice;
         do {
