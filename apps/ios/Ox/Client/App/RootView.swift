@@ -909,7 +909,7 @@ struct RootView: View {
         pendingChatPresentationId = id
         compactChatTransition = .closing(id)
         Log.ui.info("ChatUX.lifecycle chat=\(id) phase=shellClosing")
-        setSidebar(false) {
+        setSidebar(false, completionCriteria: .removed) {
             guard compactChatTransition == .closing(id) else { return }
             compactChatTransition = .opening(id)
             Log.ui.info("ChatUX.lifecycle chat=\(id) phase=shellOpening")
@@ -1043,7 +1043,11 @@ struct RootView: View {
         reduceMotion ? Theme.Animation.quick : Self.sidebarSpring
     }
 
-    private func setSidebar(_ open: Bool, completion: @escaping () -> Void = {}) {
+    private func setSidebar(
+        _ open: Bool,
+        completionCriteria: AnimationCompletionCriteria = .logicallyComplete,
+        completion: @escaping () -> Void = {}
+    ) {
         guard !open || chats.current?.activity.isAwaitingUser != true else {
             Log.ui.info("RootView.sidebarOpen suppressed=awaitingUser chat=\(chats.currentId?.uuidString ?? "none")")
             completion()
@@ -1054,7 +1058,7 @@ struct RootView: View {
             refreshCompactSidebar()
             refreshChatSummaries(reason: "sidebar")
         }
-        withAnimation(sidebarAnimation, completionCriteria: .logicallyComplete) {
+        withAnimation(sidebarAnimation, completionCriteria: completionCriteria) {
             if isSplitLayout {
                 showSplitSidebar = open
             } else {
