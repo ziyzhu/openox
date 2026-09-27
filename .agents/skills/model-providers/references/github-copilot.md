@@ -10,7 +10,7 @@
 
 Ox presents GitHub Copilot in Global. Model availability is entitlement-dependent and may differ by account, organization policy, or product surface.
 
-The provider picker uses the official GitHub Copilot extension mark, hosted on OpenOx CloudFront. It must remain distinct from the general GitHub site favicon. See [icon provenance](../../../../docs/MODEL_PROVIDER_ICONS.md).
+The provider picker uses the official GitHub Copilot extension mark, hosted on OpenOx CloudFront. It must remain distinct from the general GitHub site favicon.
 
 ## Runtime sources
 

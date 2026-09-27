@@ -15,12 +15,10 @@
     "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
   },
   "deepseek": {
-    "source": "repositories/builtin/web/chat.deepseek.com/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/chat.deepseek.com/favicon.png"
   },
   "gemini": {
-    "source": "repositories/builtin/web/gemini.google.com/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/gemini.google.com/favicon.png"
   },
   "github-copilot": {
     "source": "https://GitHub.gallerycdn.vsassets.io/extensions/github/copilot-chat/0.48.1/1778884121163/Microsoft.VisualStudio.Services.Icons.Default",
@@ -28,8 +26,7 @@
     "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
   },
   "kimi": {
-    "source": "repositories/builtin/web/www.kimi.com/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/www.kimi.com/favicon.png"
   },
   "minimax": {
     "source": "https://avatars.githubusercontent.com/u/194880281?v=4&s=512",
@@ -47,8 +44,7 @@
     "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
   },
   "openai": {
-    "source": "repositories/builtin/web/chatgpt.com/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/chatgpt.com/favicon.png"
   },
   "opencode": {
     "source": "https://opencode.ai/apple-touch-icon-v3.png",
@@ -61,8 +57,7 @@
     "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
   },
   "qwen": {
-    "source": "repositories/builtin/web/qwen.ai/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/qwen.ai/favicon.png"
   },
   "siliconflow": {
     "source": "https://avatars.githubusercontent.com/u/143005960?v=4&s=512",
@@ -90,7 +85,6 @@
     "normalization": "Downsample official square artwork or rasterize official SVG; preserve mark and composite transparency on white."
   },
   "zai": {
-    "source": "repositories/builtin/web/chat.z.ai/favicon.png",
-    "provenance": "docs/MODEL_WEB_PROVIDER_ICONS.md"
+    "source": "repositories/builtin/web/chat.z.ai/favicon.png"
   }
 }
