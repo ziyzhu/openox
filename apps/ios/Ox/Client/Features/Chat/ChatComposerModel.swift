@@ -162,10 +162,6 @@ final class ChatComposerModel {
         }
     }
 
-    func invalidateEditorBindings() {
-        draftID = UUID()
-    }
-
     func takeMessage() -> Message? {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSubmit else { return nil }

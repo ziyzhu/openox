@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChatPageTopBar: View {
-    let chat: Chat?
+    let chat: Chat
     let blockCount: Int
     let hasArtifacts: Bool
     let showsModelPicker: Bool
@@ -16,13 +16,13 @@ struct ChatPageTopBar: View {
     var body: some View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
-            if let chat, showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
+            if showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
                 modelPill(chat: chat)
             }
             Spacer()
-            if chat?.canChangeRetention ?? true {
+            if chat.canChangeRetention {
                 temporaryModeButton
-            } else if let chat {
+            } else {
                 overflowMenu(chat: chat)
             }
         }
@@ -32,7 +32,7 @@ struct ChatPageTopBar: View {
 
     private var temporaryModeButton: some View {
         Button(action: onToggleTemporary) {
-            TemporaryChatIcon(isActive: (chat?.isTemporary ?? false))
+            TemporaryChatIcon(isActive: chat.isTemporary)
                 .foregroundStyle(Theme.Colors.onSurface)
                 .frame(width: 29, height: 29)
                 .frame(width: iconButtonSize, height: iconButtonSize)
@@ -40,11 +40,10 @@ struct ChatPageTopBar: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Circle())
-        .accessibilityLabel((chat?.isTemporary ?? false) ? "Turn off temporary chat" : "Start temporary chat")
-        .accessibilityValue((chat?.isTemporary ?? false) ? "On" : "Off")
-        .accessibilityAddTraits((chat?.isTemporary ?? false) ? .isSelected : [])
+        .accessibilityLabel(chat.isTemporary ? "Turn off temporary chat" : "Start temporary chat")
+        .accessibilityValue(chat.isTemporary ? "On" : "Off")
+        .accessibilityAddTraits(chat.isTemporary ? .isSelected : [])
         .accessibilityIdentifier(A11yID.Chat.temporaryToggle)
-        .disabled(chat == nil)
     }
 
     private func modelPill(chat: Chat) -> some View {

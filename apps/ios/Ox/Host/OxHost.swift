@@ -15,5 +15,6 @@ protocol OxHost: AnyObject {
     var services: ServiceManager { get }
 
     func listChats() -> [HostChatSummary]
-    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)?) async throws
+    func prepareStorage() async throws
+    func prepare() async throws
 }

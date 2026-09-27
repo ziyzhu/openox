@@ -2254,6 +2254,7 @@ final class Chat: Identifiable {
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.finishWorker(runID) }
+            await waitUntilProfilePrepared(runID: runID)
             await agentControlTask?.value
             await agent.waitForIdle()
             while !submissions.isEmpty {
@@ -2293,6 +2294,14 @@ final class Chat: Identifiable {
         ))
         startBackgroundExecution()
         Log.session.info("Chat.worker start id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) queueDepth=\(queueDepth)")
+    }
+
+    private func waitUntilProfilePrepared(runID: RunID) async {
+        guard let chatManager else { return }
+        let startedAt = Date()
+        await chatManager.profilePreparation()
+        let waitedMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
+        Log.session.info("Chat.worker profileReady id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) waitedMs=\(waitedMs)")
     }
 
     private func finishWorker(_ runID: RunID) {

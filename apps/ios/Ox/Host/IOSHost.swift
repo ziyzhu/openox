@@ -1,19 +1,18 @@
-enum HostPreparationPhase {
-    case opening
-    case loadingChats
-}
-
 @MainActor
 final class IOSHost: OxHost {
     private struct PreparedStorage {}
+
+    private struct Preparation {
+        let storage: Task<Void, Error>
+        let profile: Task<Void, Error>
+    }
 
     static let shared = IOSHost()
 
     let services: ServiceManager
     let chats: ChatManager
 
-    private var preparationTask: Task<Void, Error>?
-    private var isPrepared = false
+    private var preparation: Preparation?
 
     convenience init() {
         StorageMigrator.migrateApplicationStorage()
@@ -39,6 +38,7 @@ final class IOSHost: OxHost {
             serviceManager: serviceManager,
             presentations: presentations
         )
+        chats.profilePreparation = { [weak self] in await self?.waitUntilProfilePrepared() }
     }
 
     func listChats() -> [HostChatSummary] {
@@ -54,27 +54,53 @@ final class IOSHost: OxHost {
         }
     }
 
-    func prepare(onPhase: (@MainActor (HostPreparationPhase) -> Void)? = nil) async throws {
-        if isPrepared { return }
-        if let preparationTask {
-            try await preparationTask.value
-            return
+    func prepareStorage() async throws {
+        try await awaitPreparation(\.storage)
+    }
+
+    func prepare() async throws {
+        try await awaitPreparation(\.profile)
+    }
+
+    private func waitUntilProfilePrepared() async {
+        _ = try? await preparation?.profile.value
+    }
+
+    private func awaitPreparation(_ stage: KeyPath<Preparation, Task<Void, Error>>) async throws {
+        let current = preparation ?? beginPreparation()
+        do {
+            try await current[keyPath: stage].value
+        } catch {
+            if preparation?.profile == current.profile { preparation = nil }
+            throw error
         }
-        let task = Task { @MainActor [weak self] in
-            guard let self else { return }
-            onPhase?(.opening)
+    }
+
+    private func beginPreparation() -> Preparation {
+        let services = services
+        let chats = chats
+        let storage = Task { @MainActor in
             try await StorageMigrator.prepare(storage: .shared, services: services)
-            onPhase?(.loadingChats)
+            Log.app.info("IOSHost storage prepared")
+        }
+        let profile = Task { @MainActor in
+            try await storage.value
+            #if DEBUG && targetEnvironment(simulator)
+            if SimEnv.startupDelayMilliseconds > 0 {
+                Log.app.info("IOSHost profile delayMs=\(SimEnv.startupDelayMilliseconds)")
+                try await Task.sleep(for: .milliseconds(SimEnv.startupDelayMilliseconds))
+            }
+            #endif
             await chats.loadSummariesNow()
             _ = Soul.shared
             _ = UserMemory.shared
             await UserMemory.shared.waitUntilCurrent()
+            await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
             try ScheduledSkillScheduler.shared.activate()
-            isPrepared = true
-            Log.app.info("IOSHost prepared")
+            Log.app.info("IOSHost profile prepared")
         }
-        preparationTask = task
-        defer { preparationTask = nil }
-        try await task.value
+        let preparation = Preparation(storage: storage, profile: profile)
+        self.preparation = preparation
+        return preparation
     }
 }

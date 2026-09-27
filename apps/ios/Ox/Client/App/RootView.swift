@@ -453,12 +453,6 @@ private extension View {
 }
 
 struct RootView: View {
-    private enum StartupPhase: String {
-        case opening
-        case loadingChats
-        case loadingServices
-    }
-
     private enum StartupRecovery: Equatable {
         case manual
         case whenAvailable
@@ -467,20 +461,21 @@ struct RootView: View {
 
     private enum Startup: Equatable {
         case idle
-        case loading(StartupPhase)
+        case openingStorage
+        case loadingProfile
         case failed(message: String, recovery: StartupRecovery)
         case ready
 
         var canBegin: Bool {
             switch self {
             case .idle, .failed: true
-            case .loading, .ready: false
+            case .openingStorage, .loadingProfile, .ready: false
             }
         }
 
         var sidebarContentState: ChatSidebar.ContentState {
             switch self {
-            case .idle, .loading: .loading
+            case .idle, .openingStorage, .loadingProfile: .loading
             case .failed: .unavailable
             case .ready: .ready
             }
@@ -516,11 +511,6 @@ struct RootView: View {
     @State private var composerFocusRequest: ComposerFocusRequest?
     @State private var presentation: Presentation?
     @State private var startup = Startup.idle
-    @State private var startupComposer = ChatComposerModel()
-    @State private var startupSpeechInput = ChatSpeechInput()
-    @State private var startupMessages: [ChatComposerModel.Message] = []
-    @State private var startupChatID = UUID()
-    @FocusState private var startupComposerFocused: Bool
     @State private var activeProfileMonitor = ActiveProfileMonitor()
     @State private var artifactRefreshEpoch = 0
     @State private var childNavigationActive = false
@@ -528,8 +518,6 @@ struct RootView: View {
     @State private var sharedNoteImportError: String?
     @State private var sharedNoteToast: Toast?
     @State private var sidebarInteraction = SidebarInteraction()
-    @ScaledMetric(relativeTo: .title3) private var startupButtonSize: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var startupComposerButtonSize: CGFloat = 34
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -827,14 +815,10 @@ struct RootView: View {
 
     @ViewBuilder
     private var chatLayer: some View {
-        ZStack {
-            if startup == .ready {
-                readyChatLayer
-                    .transition(.opacity)
-            } else {
-                startupShell
-                    .transition(.opacity)
-            }
+        if case .failed(let message, let recovery) = startup {
+            startupFailure(message: message, recovery: recovery)
+        } else {
+            readyChatLayer
         }
     }
 
@@ -862,8 +846,7 @@ struct RootView: View {
                          },
                          onExploreServices: { showServices(for: chat.id) },
                          onArtifactNavigationChange: setChildNavigationActive,
-                         onInitialTranscriptPresented: { finishChatOpening(chat.id) },
-                         composer: startupChatID == chat.id ? startupComposer : ChatComposerModel())
+                         onInitialTranscriptPresented: { finishChatOpening(chat.id) })
                     .onAppear {
                         chat.setTranscriptVisible(scenePhase == .active)
                     }
@@ -884,132 +867,25 @@ struct RootView: View {
         }
     }
 
-    private var startupShell: some View {
-        NavigationStack {
-            startupPage
-                .toolbar(.hidden, for: .navigationBar)
+    private func startupFailure(message: String, recovery: StartupRecovery) -> some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title.weight(.medium))
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            Text("Ox couldn’t update your data")
+                .font(Theme.Fonts.headline)
+            Text(message)
+                .font(Theme.Fonts.bodySm)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .multilineTextAlignment(.center)
+            if recovery != .updateBuild {
+                Button("Try Again") { bootstrap() }
+                    .buttonStyle(.borderedProminent)
+            }
         }
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.chatSurface)
-    }
-
-    private var startupPage: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(startupMessages, id: \.id) { message in
-                    HStack {
-                        Spacer(minLength: 40)
-                        UserBubble(
-                            text: message.text,
-                            attachments: message.attachments,
-                            sourcePrefix: "startup:\(message.id.uuidString)",
-                            onOpenAttachment: { _, _ in }
-                        )
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier(A11yID.Chat.Message.user)
-                    }
-                    .padding(.top, ChatTranscriptMetrics.blockSpacing)
-                }
-                startupStatus
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.top, 6)
-            .frame(maxWidth: Theme.ContainerWidth.readable)
-            .frame(maxWidth: .infinity)
-        }
-        .safeAreaBar(edge: .top, spacing: 0) {
-            ChatPageTopBar(
-                chat: nil,
-                blockCount: 0,
-                hasArtifacts: false,
-                showsModelPicker: false,
-                iconButtonSize: startupButtonSize,
-                onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) },
-                onToggleTemporary: {},
-                onPickModel: {},
-                onShowArtifacts: {},
-                onCopyTranscript: {},
-                onDeleteChat: {}
-            )
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            startupInputBar
-                .frame(maxWidth: Theme.ContainerWidth.readable)
-                .frame(maxWidth: .infinity)
-        }
-        .background(Theme.Colors.chatSurface)
-    }
-
-    private var startupInputBar: some View {
-        ChatComposer(
-            composer: startupComposer,
-            isEditingMessage: false,
-            editDraft: .constant(AttributedString()),
-            speech: startupSpeechInput,
-            attachedServices: [],
-            chatArtifacts: [],
-            fieldFocused: $startupComposerFocused,
-            isFieldFocused: startupComposerFocused,
-            sessionID: startupChatID,
-            isChatEmpty: startupMessages.isEmpty,
-            isTemporary: false,
-            isBusy: false,
-            followIntents: [],
-            floatsTopStrip: false,
-            isEmbedded: false,
-            iconButtonSize: startupButtonSize,
-            composerButtonSize: startupComposerButtonSize,
-            onOpenAttachment: { _, _ in },
-            onOpenChatArtifact: { _ in },
-            onPasteImages: { _ in },
-            onOpenService: { _ in },
-            onRemoveService: { _ in },
-            onAttachmentChoice: { _ in },
-            onServices: {},
-            onSubmitSkill: { _, _ in },
-            onPreparationIntent: { _ in },
-            onCancelEdit: {},
-            onSend: queueStartupMessage,
-            onStop: {},
-            onSpeechBegin: { _ in },
-            isReady: false
-        )
-    }
-
-    private func queueStartupMessage() {
-        guard let message = startupComposer.takeMessage() else { return }
-        startupMessages.append(message)
-        Log.ui.info("RootView.startup queued draft=\(message.id) count=\(startupMessages.count)")
-    }
-
-    @ViewBuilder
-    private var startupStatus: some View {
-        switch startup {
-        case .failed(let message, let recovery):
-            VStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.title.weight(.medium))
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                Text("Ox couldn’t update your data")
-                    .font(Theme.Fonts.headline)
-                Text(message)
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .multilineTextAlignment(.center)
-                if recovery != .updateBuild {
-                    Button("Try Again") { bootstrap() }
-                        .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding(Theme.Spacing.xl)
-        case .idle, .loading:
-            if !startupMessages.isEmpty {
-                ActivityBubble()
-                    .padding(.top, ChatTranscriptMetrics.blockSpacing)
-                    .padding(.horizontal, 4)
-            }
-        case .ready:
-            EmptyView()
-        }
     }
 
     private func autoCloseSidebar() {
@@ -1196,7 +1072,7 @@ struct RootView: View {
 
     private func bootstrap() {
         guard startup.canBegin else { return }
-        transitionStartup(to: .opening)
+        transitionStartup(to: .openingStorage)
         loadProfile()
     }
 
@@ -1212,42 +1088,18 @@ struct RootView: View {
     private func loadProfile() {
         Task {
             do {
-                #if DEBUG && targetEnvironment(simulator)
-                if SimEnv.startupDelayMilliseconds > 0 {
-                    Log.ui.info("RootView.startup delayMs=\(SimEnv.startupDelayMilliseconds)")
-                    try await Task.sleep(for: .milliseconds(SimEnv.startupDelayMilliseconds))
-                }
-                #endif
-                try await client.prepare { phase in
-                    switch phase {
-                    case .opening: transitionStartup(to: .opening)
-                    case .loadingChats: transitionStartup(to: .loadingChats)
-                    }
-                }
-                transitionStartup(to: .loadingServices)
-                await manager.refreshServices(locale: serviceLocale)
-                startupComposer.invalidateEditorBindings()
-                let hasStartupInput = !startupMessages.isEmpty || !startupComposer.isEmpty
-                let chat = hasStartupInput ? chats.startNewChat() : chats.current ?? chats.startNewChat()
-                startupChatID = chat.id
-                for message in startupMessages {
-                    let invocation = startupComposer.slashInvocation(in: message.text).map {
-                        UserSkillInvocation(skill: $0.skill, argument: $0.argument)
-                    }
-                    if let invocation { chat.attachServiceDomains(invocation.skill.services) }
-                    chat.enqueue(invocation?.expandedIntent ?? message.text, skillInvocation: invocation)
-                    Log.ui.info("RootView.startup submitted draft=\(message.id) chat=\(chat.id)")
-                }
-                startupMessages.removeAll()
-                refreshCompactSidebar()
-                Log.ui.info("RootView.startup phase=ready")
+                try await client.prepareStorage()
                 withAnimation(reduceMotion ? Theme.Animation.press : Theme.Animation.standard, completionCriteria: .logicallyComplete) {
-                    startup = .ready
+                    if chats.current == nil { chats.startNewChat() }
+                    transitionStartup(to: .loadingProfile)
                 } completion: {
-                    if isSplitLayout || !showSidebar {
+                    if let chat = chats.current, isSplitLayout || !showSidebar {
                         requestComposerFocus(for: chat, reason: "appEntry")
                     }
                 }
+                try await client.prepare()
+                refreshCompactSidebar()
+                transitionStartup(to: .ready)
                 monitorActiveProfile()
                 importSharedNotes()
             } catch {
@@ -1286,9 +1138,9 @@ struct RootView: View {
         }
     }
 
-    private func transitionStartup(to phase: StartupPhase) {
-        startup = .loading(phase)
-        Log.ui.info("RootView.startup phase=\(phase.rawValue)")
+    private func transitionStartup(to phase: Startup) {
+        startup = phase
+        Log.ui.info("RootView.startup phase=\(String(describing: phase))")
     }
 
     private func refreshCompactSidebar() {

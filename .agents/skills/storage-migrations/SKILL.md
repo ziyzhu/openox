@@ -58,7 +58,7 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
 3. Run `bun run test:storage-migration` against the running app.
 4. Run `bun run typecheck` and the smallest domain-specific tests.
-5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost prepared`.
+5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
 For `ox-qa-1`, the standard commands are:
 

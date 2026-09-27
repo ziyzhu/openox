@@ -94,6 +94,7 @@ final class ChatManager {
     @ObservationIgnored private var repositoryScope: ProfileScope
     @ObservationIgnored private var virtualMachine: VirtualMachine
     @ObservationIgnored private let presentations: AppPresentations
+    @ObservationIgnored var profilePreparation: @MainActor () async -> Void = {}
     #if targetEnvironment(simulator)
     @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
     #endif
