@@ -11,7 +11,20 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
 
     var name: String { Self.schema.name }
     var description: String { Self.schema.description }
+    var websiteDescription: String { Self.websiteDescription }
     var parameters: JSONValue { Self.schema.parameters }
+
+    private static let websiteDescription = """
+    Run JavaScript inside an async function. `await` works. Print model-visible results with `console.log`; return values are discarded. Use `ox.user` and service handoff helpers when the snippet must wait for the user.
+
+    The `ox` namespace provides these built-in capabilities:
+
+    \(OxFunctionCatalog.helpTree(includesSummaries: false))
+
+    Signatures shown above are callable contracts. Every built-in also has a synchronous `.help()` method for its complete description, input schema, and output schema. Inspect unfamiliar or nested options before use. Every operational `ox.*` call requires a short `purpose` describing the visible step; `.help()` does not.
+
+    Each execution is self-contained and has 60 seconds of active execution time. Waiting for a service action or user handoff does not consume that time. Keep intermediate results in JavaScript and print only concise model-visible output.
+    """
 
     static let schema = ToolSchema(
         name: "execute",

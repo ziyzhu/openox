@@ -5,12 +5,23 @@ nonisolated struct AgentContextBudget {
     let usedTokens: Int
     let reserveTokens: Int
 
-    init(context: AgentContext, model: ProviderModel, options: StreamOptions, threshold: Double, fallbackUsage: Int = 0) {
+    init(
+        context: AgentContext,
+        model: ProviderModel,
+        options: StreamOptions,
+        threshold: Double,
+        fallbackUsage: Int = 0,
+        usesWebsiteToolDescriptions: Bool = false
+    ) {
         let window = max(0, model.maxContext)
         reserveTokens = min(window, max(0, options.maxTokens ?? model.maxTokens))
         let safety = min(window, max(256, window / 20))
         inputLimit = max(0, min(Int(Double(window) * min(1, max(0, threshold))), window - reserveTokens - safety))
-        usedTokens = Self.estimate(context: context, fallbackUsage: fallbackUsage)
+        usedTokens = Self.estimate(
+            context: context,
+            fallbackUsage: fallbackUsage,
+            usesWebsiteToolDescriptions: usesWebsiteToolDescriptions
+        )
     }
 
     static func textTokens(_ text: String) -> Int {
@@ -51,9 +62,14 @@ nonisolated struct AgentContextBudget {
         }
     }
 
-    private static func estimate(context: AgentContext, fallbackUsage: Int) -> Int {
+    private static func estimate(
+        context: AgentContext,
+        fallbackUsage: Int,
+        usesWebsiteToolDescriptions: Bool
+    ) -> Int {
         let prompt = textTokens(context.systemPrompt) + context.tools.reduce(0) {
-            $0 + 12 + textTokens($1.name) + textTokens($1.description) + textTokens($1.parameters.jsonString(fallback: ""))
+            let description = usesWebsiteToolDescriptions ? $1.websiteDescription : $1.description
+            return $0 + 12 + textTokens($1.name) + textTokens(description) + textTokens($1.parameters.jsonString(fallback: ""))
         }
         let estimated = prompt + context.messages.reduce(0) { $0 + messageTokens($1) }
         for index in context.messages.indices.reversed() {

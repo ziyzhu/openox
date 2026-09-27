@@ -52,6 +52,7 @@ nonisolated public struct ToolResult: Sendable {
 nonisolated public protocol AgentTool: Sendable {
     var name: String { get }
     var description: String { get }
+    var websiteDescription: String { get }
     var parameters: JSONValue { get }
     var strict: Bool { get }
     var executionMode: AgentToolExecutionMode { get }
@@ -59,6 +60,7 @@ nonisolated public protocol AgentTool: Sendable {
 }
 
 nonisolated public extension AgentTool {
+    var websiteDescription: String { description }
     var strict: Bool { true }
     var executionMode: AgentToolExecutionMode { .sequential }
 }

@@ -73,12 +73,12 @@ nonisolated enum OxFunctionCatalog {
         }))
     }
 
-    static func helpTree() -> String {
+    static func helpTree(includesSummaries: Bool = true) -> String {
         let catalog = catalogEntries
         var lines = ["ox"]
         let rootHelpers = catalog.compactMap { name, schema -> (String, String)? in
             guard name.dropFirst("ox.".count).contains(".") == false,
-                  let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                  let description = compactDescription(name: name, schema: schema, includesUsage: true, includesSummary: includesSummaries) else { return nil }
             return (name, description)
         }.sorted { $0.0 < $1.0 }
         for helper in rootHelpers {
@@ -91,7 +91,7 @@ nonisolated enum OxFunctionCatalog {
             let helpers = catalog.compactMap { name, schema -> (String, String)? in
                 let namespacePrefix = "ox.\(namespace.0)."
                 guard name.hasPrefix(namespacePrefix),
-                      let description = compactDescription(name: name, schema: schema, includesUsage: true) else { return nil }
+                      let description = compactDescription(name: name, schema: schema, includesUsage: true, includesSummary: includesSummaries) else { return nil }
                 return (String(name.dropFirst(namespacePrefix.count)), description)
             }.sorted { $0.0 < $1.0 }
             for (helperIndex, helper) in helpers.enumerated() {
@@ -102,7 +102,12 @@ nonisolated enum OxFunctionCatalog {
         return lines.joined(separator: "\n")
     }
 
-    private static func compactDescription(name: String, schema: JSONValue, includesUsage: Bool = false) -> String? {
+    private static func compactDescription(
+        name: String,
+        schema: JSONValue,
+        includesUsage: Bool = false,
+        includesSummary: Bool = true
+    ) -> String? {
         guard case .object(let fields) = schema,
               let description = fields["description"]?.stringValue else { return nil }
         let oneLine = description
@@ -119,6 +124,9 @@ nonisolated enum OxFunctionCatalog {
         } else {
             let endings = [". ", "? ", "! "].compactMap { oneLine.range(of: $0)?.lowerBound }
             summary = endings.min().map { String(oneLine[...$0]) } ?? oneLine
+        }
+        if !includesSummary {
+            return usageText.map { "`\($0)`" } ?? "`\(name).help()`"
         }
         let sentence = summary.last.map { ".?!".contains($0) } == true ? summary : "\(summary)."
         return usageText.map { "\(sentence) `\($0)`" } ?? sentence

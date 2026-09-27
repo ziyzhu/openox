@@ -41,7 +41,8 @@ nonisolated enum AgentCompactor {
             model: model,
             options: options,
             threshold: threshold,
-            fallbackUsage: lastTurnTokens
+            fallbackUsage: lastTurnTokens,
+            usesWebsiteToolDescriptions: client.wireProtocol(for: model) == .web
         )
         let estimatedTokens = contextBudget.usedTokens
         let reserveTokens = contextBudget.reserveTokens

@@ -32,7 +32,7 @@ nonisolated enum WebsiteToolContract {
                 "type": .string("function"),
                 "function": .object([
                     "name": .string(tool.name),
-                    "description": .string(tool.description),
+                    "description": .string(tool.websiteDescription),
                     "parameters": tool.parameters,
                 ]),
             ])

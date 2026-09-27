@@ -8,7 +8,7 @@ Ox is a local agent that uses the internet for you.
 
 <h3>
 
-[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/7baSAHZTA)
+[Website](https://openox.ai) · [App Store](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) · [Discord](https://discord.gg/55eS3kEEX)
 
 </h3>
 
