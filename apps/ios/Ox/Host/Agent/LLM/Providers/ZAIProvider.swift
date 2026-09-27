@@ -10,6 +10,7 @@ nonisolated enum ZAIProvider {
         regionalCredentials: true,
         reasoningReplayModelIDs: ["glm-5.3", "glm-5.3-highspeed"],
         reasoningControl: .effort(.low),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/zai/favicon.png"),
         website: regionalURL("https://z.ai/subscribe", overrides: [.china: "https://open.bigmodel.cn/glm-coding"])
     )
 
@@ -21,6 +22,7 @@ nonisolated enum ZAIProvider {
         regionalCredentials: true,
         reasoningReplayModelIDs: ["glm-4.7-flash", "glm-5.3"],
         reasoningControl: .effort(.low),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/zai/favicon.png"),
         website: regionalURL("https://z.ai/manage-apikey/apikey-list", overrides: [.china: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys"]),
         authNotice: "GLM-4.7 Flash is free. Other Z.AI models may charge your account. Usage and rate limits apply.",
         authNoticeRegions: [.china],

@@ -1275,7 +1275,7 @@ private struct ProviderPickerView: View {
             value: client.id,
             title: client.displayName,
             faviconDomain: client.website?.host,
-            faviconURL: ProviderIcon.url(id: client.id, website: client.website),
+            faviconURL: client.iconURL,
             serviceDomain: (client as? WebServiceModelProvider)?.domain,
             subtitle: showsSubtitle ? subtitle(for: client) : nil,
             accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)

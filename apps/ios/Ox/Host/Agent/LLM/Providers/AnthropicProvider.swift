@@ -7,6 +7,7 @@ nonisolated enum AnthropicProvider {
             displayName: "Anthropic API",
             models: models,
             endpoint: URL(string: "https://api.anthropic.com/v1/messages")!,
+            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/anthropic/favicon.png"),
             website: URL(string: "https://console.anthropic.com/settings/keys"),
             adaptiveThinkingModelIDs: ["claude-sonnet-5", "claude-opus-5-5", "claude-fable-5-1"]
         )

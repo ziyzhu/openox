@@ -8,6 +8,7 @@ nonisolated enum DeepSeekProvider {
         endpoint: regionalURL("https://api.deepseek.com/v1"),
         reasoningReplayModelIDs: ["deepseek-flash", "deepseek-v4-pro"],
         reasoningControl: .disabled(.thinking),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/deepseek/favicon.png"),
         website: regionalURL("https://platform.deepseek.com/api_keys")
     )
 }

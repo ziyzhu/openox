@@ -7,6 +7,7 @@ nonisolated enum TencentTokenHubProvider {
         regions: [.china],
         endpoint: regionalURL("https://tokenhub.tencentmaas.com/v1"),
         reasoningReplayModelIDs: ["hy3"],
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/tencent-tokenhub/favicon.png"),
         website: regionalURL("https://console.cloud.tencent.com/tokenhub/apikey"),
         authNotice: "New accounts can claim 1M free tokens per language model for 90 days. Calls stop at the limit unless you enable postpaid billing.",
         gettingStartedOffer: ProviderGettingStartedOffer(

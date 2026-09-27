@@ -45,6 +45,7 @@ nonisolated enum OpenRouterProvider {
             extraBody: ["provider": .object(["sort": .string("latency")])],
             reasoningReplayModelIDs: reasoningReplayModelIDs,
             reasoningControl: .reasoningObject,
+            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/openrouter/favicon.png"),
             website: URL(string: "https://openrouter.ai/settings/keys"),
             authNotice: "The Free Models Router automatically chooses a compatible model at no token charge. Availability and rate limits can vary. Other OpenRouter models may charge your account.",
             gettingStartedOffer: ProviderGettingStartedOffer(

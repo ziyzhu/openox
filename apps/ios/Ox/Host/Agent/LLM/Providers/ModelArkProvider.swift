@@ -12,6 +12,7 @@ nonisolated enum ModelArkProvider {
         ),
         regionalCredentials: true,
         reasoningReplayModelIDs: CuratedProviderModels.arkReasoningReplayModelIDs,
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/byteplus/favicon.png", overrides: [.china: "https://openox.ai/assets/services/model-providers/volcengine/favicon.png"]),
         website: regionalURL("https://console.byteplus.com/ark/region:ark+ap-southeast-1/apikey", overrides: [.china: "https://console.volcengine.com/ark/region:ark+cn-beijing/apikey"])
     )
 }

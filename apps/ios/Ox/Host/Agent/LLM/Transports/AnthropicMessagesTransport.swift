@@ -6,6 +6,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
     let models: [ProviderModel]
     let endpoint: URL
     let regions: Set<LLMRegion>
+    let iconURL: URL?
     let website: URL?
     let credentialKind: LLMCredentialKind
     let credentialID: String
@@ -23,6 +24,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         models: [ProviderModel],
         endpoint: URL,
         regions: Set<LLMRegion> = [.global],
+        iconURL: URL? = nil,
         website: URL? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
         credentialID: String? = nil,
@@ -37,6 +39,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         self.models = models
         self.endpoint = endpoint
         self.regions = regions
+        self.iconURL = iconURL
         self.website = website
         self.credentialKind = credentialKind
         self.credentialID = credentialID ?? id

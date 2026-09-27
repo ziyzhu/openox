@@ -5,6 +5,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     public let displayName: String
     public let models: [ProviderModel]
     public let regions: Set<LLMRegion>
+    public let iconURL: URL?
     public let website: URL?
     public let authNotice: String?
     public let usesAPIKey: Bool
@@ -24,6 +25,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         displayName: String,
         models: [ProviderModel],
         regions: Set<LLMRegion> = [.global],
+        iconURL: URL? = nil,
         website: URL? = nil,
         authNotice: String? = nil,
         usesAPIKey: Bool = true,
@@ -41,6 +43,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         self.displayName = displayName
         self.models = models
         self.regions = regions
+        self.iconURL = iconURL
         self.website = website
         self.authNotice = authNotice
         self.usesAPIKey = usesAPIKey

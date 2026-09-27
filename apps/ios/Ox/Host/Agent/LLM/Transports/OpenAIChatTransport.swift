@@ -17,6 +17,7 @@ public struct OpenAIChatTransport: ProviderClient {
     public let maxTokensField: MaxTokensField
     public let reasoningReplayModelIDs: Set<String>
     public let reasoningControl: ReasoningControl
+    public let iconURL: URL?
     public let website: URL?
     public let authNotice: String?
     public let gettingStartedOffer: ProviderGettingStartedOffer?
@@ -104,6 +105,7 @@ public struct OpenAIChatTransport: ProviderClient {
         maxTokensField: MaxTokensField = .maxTokens,
         reasoningReplayModelIDs: Set<String> = [],
         reasoningControl: ReasoningControl = .providerDefault,
+        iconURL: URL? = nil,
         website: URL? = nil,
         authNotice: String? = nil,
         gettingStartedOffer: ProviderGettingStartedOffer? = nil,
@@ -126,6 +128,7 @@ public struct OpenAIChatTransport: ProviderClient {
         self.maxTokensField = maxTokensField
         self.reasoningReplayModelIDs = reasoningReplayModelIDs
         self.reasoningControl = reasoningControl
+        self.iconURL = iconURL
         self.website = website
         self.authNotice = authNotice
         self.gettingStartedOffer = gettingStartedOffer

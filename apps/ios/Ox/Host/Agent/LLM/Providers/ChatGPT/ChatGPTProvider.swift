@@ -35,6 +35,7 @@ struct ChatGPTProvider: ProviderClient {
             id: "chatgpt",
             displayName: "ChatGPT",
             models: models,
+            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/openai/favicon.png"),
             website: URL(string: "https://chatgpt.com/codex"),
             usesAPIKey: false,
             acceptsAPIKey: false,
@@ -52,6 +53,7 @@ struct ChatGPTProvider: ProviderClient {
     var displayName: String { client.displayName }
     var models: [ProviderModel] { client.models }
     var regions: Set<LLMRegion> { client.regions }
+    var iconURL: URL? { client.iconURL }
     var website: URL? { client.website }
     var usesAPIKey: Bool { client.usesAPIKey }
     var acceptsAPIKey: Bool { client.acceptsAPIKey }

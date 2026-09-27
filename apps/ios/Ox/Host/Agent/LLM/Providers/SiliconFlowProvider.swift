@@ -7,6 +7,7 @@ nonisolated enum SiliconFlowProvider {
         regions: [.china],
         endpoint: regionalURL("https://api.siliconflow.cn/v1"),
         reasoningReplayModelIDs: ["Qwen/Qwen3.5-4B", "deepseek-ai/DeepSeek-V4-Flash", "deepseek-ai/DeepSeek-V4-Pro", "zai-org/GLM-5.2"],
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/siliconflow/favicon.png"),
         website: regionalURL("https://cloud.siliconflow.cn/account/ak"),
         authNotice: "Qwen 3.5 4B is free after identity verification. Other SiliconFlow models may charge your account. Fixed rate limits apply.",
         gettingStartedOffer: ProviderGettingStartedOffer(

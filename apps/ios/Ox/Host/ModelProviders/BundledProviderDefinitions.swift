@@ -149,7 +149,7 @@ nonisolated extension BuiltInProviders {
     }
 
     private static func presentation(_ client: any ProviderClient) -> ProviderPresentation {
-        ProviderPresentation(regions: client.regions, website: client.website, authNotice: client.authNotice,
+        ProviderPresentation(regions: client.regions, website: client.website, iconURL: client.iconURL, authNotice: client.authNotice,
                              offer: client.gettingStartedOffer, credentialKind: client.credentialKind, inferenceLocation: client.inferenceLocation)
     }
 

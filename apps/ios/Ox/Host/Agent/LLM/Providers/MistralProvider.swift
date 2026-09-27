@@ -6,6 +6,7 @@ nonisolated enum MistralProvider {
         displayName: RegionalValue("Mistral API"),
         endpoint: regionalURL("https://api.mistral.ai/v1"),
         reasoningControl: .effort(.none),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/mistral/favicon.png"),
         website: regionalURL("https://console.mistral.ai/api-keys"),
         authNotice: "Mistral Free mode includes limited API usage without a credit card. Usage and rate limits apply.",
         gettingStartedOffer: ProviderGettingStartedOffer(

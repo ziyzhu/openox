@@ -7,6 +7,7 @@ nonisolated enum OpenAIProvider {
             id: "openai",
             displayName: "OpenAI API",
             models: models,
+            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/openai/favicon.png"),
             website: URL(string: "https://platform.openai.com/api-keys"),
             auth: OpenAIResponsesAPIKeyAuth(clientID: "openai", baseURL: baseURL)
         )

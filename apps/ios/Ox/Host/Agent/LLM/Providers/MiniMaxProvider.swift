@@ -12,6 +12,7 @@ nonisolated enum MiniMaxProvider {
         maxTokensField: .maxCompletionTokens,
         reasoningReplayModelIDs: ["MiniMax-M3"],
         reasoningControl: .disabled(.thinking),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/minimax/favicon.png"),
         website: regionalURL("https://platform.minimax.io/subscribe/coding-plan", overrides: [.china: "https://platform.minimaxi.com/subscribe/coding-plan"])
     )
 
@@ -25,6 +26,7 @@ nonisolated enum MiniMaxProvider {
         maxTokensField: .maxCompletionTokens,
         reasoningReplayModelIDs: ["MiniMax-M3"],
         reasoningControl: .disabled(.thinking),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/minimax/favicon.png"),
         website: regionalURL("https://platform.minimax.io/user-center/basic-information/interface-key", overrides: [.china: "https://platform.minimaxi.com/user-center/basic-information/interface-key"])
     )
 }

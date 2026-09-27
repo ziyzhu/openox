@@ -30,6 +30,7 @@ nonisolated struct GitHubCopilotProvider: ProviderClient {
             displayName: "GitHub Copilot",
             models: curatedModels,
             regions: [.global],
+            iconURL: URL(string: "https://openox.ai/assets/services/model-providers/github-copilot/favicon.png"),
             website: URL(string: "https://github.com/features/copilot"),
             usesAPIKey: false,
             acceptsAPIKey: false,
@@ -48,6 +49,7 @@ nonisolated struct GitHubCopilotProvider: ProviderClient {
         return compatible.isEmpty ? curatedModels : compatible
     }
     var regions: Set<LLMRegion> { client.regions }
+    var iconURL: URL? { client.iconURL }
     var website: URL? { client.website }
     var usesAPIKey: Bool { client.usesAPIKey }
     var acceptsAPIKey: Bool { client.acceptsAPIKey }

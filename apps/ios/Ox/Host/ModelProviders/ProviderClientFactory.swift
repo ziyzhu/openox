@@ -3,6 +3,7 @@ import Foundation
 nonisolated struct ProviderPresentation: Sendable {
     var regions: Set<LLMRegion> = [.global, .china]
     var website: URL?
+    var iconURL: URL?
     var authNotice: String?
     var offer: ProviderGettingStartedOffer?
     var credentialKind: LLMCredentialKind = .apiKey
@@ -180,6 +181,7 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     }
     var regions: Set<LLMRegion> { presentation.regions }
     var website: URL? { presentation.website }
+    var iconURL: URL? { presentation.iconURL }
     var authNotice: String? { presentation.authNotice }
     var gettingStartedOffer: ProviderGettingStartedOffer? { presentation.offer }
     var usesAPIKey: Bool { definition.auth.kind == .bearer || definition.auth.kind == .apiKey ? definition.auth.optional != true : false }

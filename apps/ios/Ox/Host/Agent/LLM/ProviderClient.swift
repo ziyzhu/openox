@@ -152,6 +152,7 @@ nonisolated public protocol ProviderClient: Sendable {
     var models: [ProviderModel] { get }
     var regions: Set<LLMRegion> { get }
     var website: URL? { get }
+    var iconURL: URL? { get }
     var authNotice: String? { get }
     var gettingStartedOffer: ProviderGettingStartedOffer? { get }
     var usesAPIKey: Bool { get }
@@ -187,6 +188,7 @@ nonisolated public protocol ProviderClient: Sendable {
 nonisolated extension ProviderClient {
     public var regions: Set<LLMRegion> { [.global, .china] }
     public var website: URL? { nil }
+    public var iconURL: URL? { nil }
     public var authNotice: String? { nil }
     public var gettingStartedOffer: ProviderGettingStartedOffer? { nil }
     public var usesAPIKey: Bool { true }

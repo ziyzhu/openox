@@ -10,6 +10,7 @@ nonisolated enum QwenProvider {
         regionalCredentials: true,
         cachesSystemPrompt: true,
         reasoningControl: .disabled(.qwen),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/qwen/favicon.png"),
         website: regionalURL("https://modelstudio.console.alibabacloud.com/coding-plan", overrides: [.china: "https://bailian.console.aliyun.com/?tab=model#/efm/coding_plan"])
     )
 
@@ -21,6 +22,7 @@ nonisolated enum QwenProvider {
         regionalCredentials: true,
         cachesSystemPrompt: true,
         reasoningControl: .disabled(.qwen),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/qwen/favicon.png"),
         website: regionalURL("https://modelstudio.console.alibabacloud.com/?tab=model#/api-key", overrides: [.china: "https://bailian.console.aliyun.com/?tab=model#/api-key"]),
         authNotice: "New Model Studio accounts receive time-limited free quotas on eligible models. Free quotas expire after 90 days. Verified accounts may be charged after quotas are exhausted unless stop-when-free-quota-ends is enabled.",
         authNoticeRegions: [.china],

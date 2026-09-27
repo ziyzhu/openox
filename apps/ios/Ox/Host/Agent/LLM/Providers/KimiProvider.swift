@@ -11,6 +11,7 @@ nonisolated enum KimiProvider {
         maxTokensField: .maxCompletionTokens,
         reasoningReplayModelIDs: ["kimi-k3"],
         reasoningControl: .effort(.low),
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/kimi/favicon.png"),
         website: regionalURL("https://platform.kimi.ai/console/api-keys", overrides: [.china: "https://platform.moonshot.cn/console/api-keys"])
     )
 }

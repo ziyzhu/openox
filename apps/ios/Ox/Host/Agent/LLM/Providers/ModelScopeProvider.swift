@@ -7,6 +7,7 @@ nonisolated enum ModelScopeProvider {
         regions: [.china],
         endpoint: regionalURL("https://api-inference.modelscope.cn/v1"),
         reasoningReplayModelIDs: ["ZhipuAI/GLM-4.6"],
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/modelscope/favicon.png"),
         website: regionalURL("https://modelscope.cn/my/myaccesstoken"),
         authNotice: "Free for development: 2,000 calls/day total, typically 200/model. Requires a verified, linked Alibaba Cloud account; limits can change.",
         gettingStartedOffer: ProviderGettingStartedOffer(

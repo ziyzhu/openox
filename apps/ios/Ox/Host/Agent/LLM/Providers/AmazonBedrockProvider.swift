@@ -4,6 +4,7 @@ nonisolated struct AmazonBedrockProvider: ProviderClient {
     let id = "amazon-bedrock"
     let displayName = "Amazon Bedrock"
     let regions: Set<LLMRegion> = [.global]
+    let iconURL = URL(string: "https://openox.ai/assets/services/model-providers/amazon-bedrock/favicon.png")
     let website = URL(string: "https://console.aws.amazon.com/bedrock/home?region=us-east-1#/api-keys")
     let authNotice: String? = "Ox connects to Amazon Bedrock in US East (N. Virginia). Use a Bedrock API key that can access these models in us-east-1."
     let reasoningPolicy: LLMReasoningPolicy = .none
@@ -21,6 +22,7 @@ nonisolated struct AmazonBedrockProvider: ProviderClient {
             displayName: displayName,
             models: gptModels,
             regions: regions,
+            iconURL: iconURL,
             website: website,
             authNotice: authNotice,
             auth: OpenAIResponsesAPIKeyAuth(

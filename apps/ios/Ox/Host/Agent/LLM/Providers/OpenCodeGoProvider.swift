@@ -8,6 +8,7 @@ nonisolated enum OpenCodeGoProvider {
         credentialKind: .subscriptionKey,
         reasoningReplayModelIDs: ["deepseek-v4.1-flash", "deepseek-v4-pro", "kimi-k3", "glm-5.3", "space-bunny-free"],
         reasoningControl: .providerDefault,
+        iconURL: regionalURL("https://openox.ai/assets/services/model-providers/opencode/favicon.png"),
         website: regionalURL("https://opencode.ai/go")
     )
 }

@@ -34,6 +34,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
     let maxTokensField: OpenAIChatTransport.MaxTokensField
     let reasoningReplayModelIDs: Set<String>
     let reasoningControl: OpenAIChatTransport.ReasoningControl
+    let iconURL: RegionalValue<URL>?
     let website: RegionalValue<URL>?
     let authNotice: String?
     let authNoticeRegions: Set<LLMRegion>
@@ -55,6 +56,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         maxTokensField: OpenAIChatTransport.MaxTokensField = .maxTokens,
         reasoningReplayModelIDs: Set<String> = [],
         reasoningControl: OpenAIChatTransport.ReasoningControl = .providerDefault,
+        iconURL: RegionalValue<URL>? = nil,
         website: RegionalValue<URL>? = nil,
         authNotice: String? = nil,
         authNoticeRegions: Set<LLMRegion> = [.global, .china],
@@ -75,6 +77,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
         self.maxTokensField = maxTokensField
         self.reasoningReplayModelIDs = reasoningReplayModelIDs
         self.reasoningControl = reasoningControl
+        self.iconURL = iconURL
         self.website = website
         self.authNotice = authNotice
         self.authNoticeRegions = authNoticeRegions
@@ -111,6 +114,7 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
             maxTokensField: maxTokensField,
             reasoningReplayModelIDs: reasoningReplayModelIDs,
             reasoningControl: reasoningControl,
+            iconURL: iconURL?.value(for: region),
             website: website?.value(for: region),
             authNotice: authNotice.flatMap { authNoticeRegions.contains(region) ? $0 : nil },
             gettingStartedOffer: gettingStartedOffer.flatMap { $0.regions.contains(region) ? $0 : nil },
