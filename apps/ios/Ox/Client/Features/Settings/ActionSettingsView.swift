@@ -234,7 +234,7 @@ struct ServiceActionSettingsView: View {
                         serviceActionRow(
                             title: String(localized: "Attach to a chat"),
                             actionID: Chat.attachApproveKey(service.domain),
-                            defaultPolicy: .ask
+                            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach)
                         )
                         if service.detailCapabilities.supportsFolderAccess {
                             ForEach(OxFileSystem.actions, id: \.self) { action in

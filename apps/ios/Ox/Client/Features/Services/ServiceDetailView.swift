@@ -502,7 +502,7 @@ struct ServiceDetailView: View {
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .fixedSize(horizontal: false, vertical: true)
-                approvalControl(actionID: Chat.attachApproveKey(service.domain), defaultPolicy: .ask)
+                approvalControl(actionID: Chat.attachApproveKey(service.domain), defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach))
             }
         }
     }

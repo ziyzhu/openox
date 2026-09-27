@@ -265,6 +265,7 @@ final class ServiceManager {
     }
 
     func defaultPolicy(for action: String) -> ActionPolicy {
+        if action.hasPrefix("\(Actions.serviceAttach):") { return Actions.defaultPolicy(for: Actions.serviceAttach) }
         if Actions.builtIn.contains(action) { return Actions.defaultPolicy(for: action) }
         for service in services {
             guard let serviceAction = service.definition.exposedActions.first(where: {

@@ -1714,7 +1714,7 @@ final class Chat: Identifiable {
         }
         switch await requestApproval(
             action: Self.attachApproveKey(service.domain),
-            defaultPolicy: .ask,
+            defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach),
             prompt: "\(title)\n\(message)"
         ) {
         case .approved: return
