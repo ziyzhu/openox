@@ -91,23 +91,8 @@ nonisolated enum ProviderClientFactory {
     }
 
     static func validateAdapter(_ definition: ProviderDefinition) throws {
-        if definition.api == .web {
-            let registeredURL: URL? = switch definition.id {
-            case "kimi-web": URL(string: "https://www.kimi.com/")!
-            case "qwen-web": URL(string: "https://chat.qwen.ai/")!
-            case "grok-web": URL(string: "https://grok.com/")!
-            case "claude-web": URL(string: "https://claude.ai/")!
-            default: nil
-            }
-            guard let registeredURL,
-                  definition.url == registeredURL,
-                  definition.auth.kind == .custom,
-                  definition.auth.adapter == definition.id,
-                  validWebsiteModels(definition),
-                  definition.options == nil else {
-                throw RuntimeError.bridge("Invalid website provider configuration")
-            }
-            return
+        guard definition.api != .web else {
+            throw RuntimeError.bridge("Edit this model provider through its Local web service")
         }
         guard definition.auth.kind == .custom else { return }
         let expected: (URL, LLMWireProtocol)?
@@ -121,17 +106,6 @@ nonisolated enum ProviderClientFactory {
         guard let expected, definition.id == definition.auth.adapter,
               definition.url == expected.0, definition.api == expected.1 else {
             throw RuntimeError.bridge("Invalid provider: custom adapter must use its registered identity, endpoint, and API format")
-        }
-    }
-
-    private static func validWebsiteModels(_ definition: ProviderDefinition) -> Bool {
-        guard definition.id == "qwen-web" else { return definition.models.map(\.id) == ["website-default"] }
-        guard definition.models.first?.id == "website-default", definition.models.count <= 101 else { return false }
-        return definition.models.dropFirst().allSatisfy {
-            guard let wireID = $0.wireID, !wireID.isEmpty else { return false }
-            let input = Set($0.input ?? [.text])
-            guard input.contains(.text), input.isSubset(of: [.text, .image, .pdf]) else { return false }
-            return $0 == ProviderDefinition.Model(WebServiceModelProvider.model(id: wireID, name: $0.name, input: input))
         }
     }
 
@@ -173,7 +147,6 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var id: String { definition.id }
     var displayName: String { definition.name }
     var models: [ProviderModel] {
-        if definition.api == .web { return native.models }
         let models = definition.models.map(\.runtimeModel)
         guard definition.auth.adapter == "github-copilot",
               let available = GitHubCopilotSubscriptionAccount.shared.cachedAvailableModelIDs else { return models }

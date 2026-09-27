@@ -87,14 +87,13 @@ final class ProviderRegistry {
             + catalog.providers.filter { !bundledIDs.contains($0.id) }
     }
     var definitions: [ProviderDefinition] {
-        var result = catalogDefinitions.filter { $0.api != .web }
+        var result = catalogDefinitions
         for service in modelServices {
             let id = WebServiceModelProvider.providerID(domain: service.domain)
             guard let url = service.baseURL, let client = client(id: id) else { continue }
             let definition = ProviderDefinition(id: id, name: service.name, url: url, api: .web,
                                                 auth: .init(kind: .custom, adapter: id), models: client.models.map { .init($0) })
-            if let index = result.firstIndex(where: { $0.id == id }) { result[index] = definition }
-            else { result.append(definition) }
+            result.append(definition)
         }
         return result
     }
@@ -127,7 +126,7 @@ final class ProviderRegistry {
     }
 
     func region(for id: String?) -> LLMRegion {
-        let regions = id.flatMap { target in bundled.first { $0.definition.id == target }?.presentation.regions }
+        let regions = id.flatMap { client(id: $0)?.regions }
         if regions?.count == 1 { return regions!.first! }
         return AppRegion.shared.region
     }
@@ -176,9 +175,6 @@ final class ProviderRegistry {
     }
 
     func save(_ definition: ProviderDefinition) throws {
-        guard definition.api != .web else {
-            throw RuntimeError.bridge("Edit this model provider through its Local web service")
-        }
         _ = try ProviderDefinition.decode(definition.json)
         try ProviderClientFactory.validateAdapter(definition)
         _ = try ProviderClientFactory.make(definition, presentation: presentation(for: definition))
@@ -257,18 +253,16 @@ final class ProviderRegistry {
     private func rebuildClients() {
         var resolved: [any ProviderClient] = []
         if MockLLMClient.isEnabled { resolved.append(MockLLMClient()) }
-        for definition in catalogDefinitions where definition.api != .web {
+        for definition in catalogDefinitions {
             do { resolved.append(try ProviderClientFactory.make(definition, presentation: presentation(for: definition))) }
             catch { Log.agent.error("ProviderRegistry.resolve provider=\(definition.id) error=\(error.localizedDescription)") }
         }
         for service in modelServices {
             let id = WebServiceModelProvider.providerID(domain: service.domain)
-            let definition = catalogDefinitions.first { $0.id == id }
-            let models = discoveredServiceModels[id] ?? definition?.models.map(\.runtimeModel)
-                ?? [WebServiceModelProvider.model(id: "website-default", name: "Default")]
+            let models = discoveredServiceModels[id] ?? [WebServiceModelProvider.model(id: "website-default", name: "Default")]
             resolved.append(WebServiceModelProvider(id: id, domain: service.domain, displayName: service.name,
                                                     website: service.baseURL, models: models,
-                                                    regions: definition.map { presentation(for: $0).regions } ?? [.global, .china]))
+                                                    regions: WebServiceModelProvider.regions(domain: service.domain)))
         }
         allClients = resolved
     }

@@ -1829,7 +1829,7 @@ nonisolated enum StorageMigrator {
         if let existing {
             let catalog = try JSONDecoder().decode(ProviderCatalog.self, from: existing)
             if catalog.format == 2 {
-                try catalog.validate()
+                try removeWebsiteProviderOverrides(from: catalog, defaults: defaults)
                 return
             }
             guard catalog.format == 1 else {
@@ -1849,12 +1849,13 @@ nonisolated enum StorageMigrator {
                 let deleted: [String]
             }
             let overlay = try JSONDecoder().decode(Overlay.self, from: existing)
-            try ProviderCatalog(providers: overlay.providers).validate()
+            let providers = overlay.providers.filter { $0.api != .web }
+            try ProviderCatalog(providers: providers).validate()
             guard Set(overlay.deleted).count == overlay.deleted.count,
                   Set(overlay.deleted).isDisjoint(with: Set(overlay.providers.map(\.id))) else {
                 throw StorageMigrationError.invalidApplicationStorage("provider catalog")
             }
-            catalog.providers = overlay.providers
+            catalog.providers = providers
             for entry in bundled where overlay.deleted.contains(entry.definition.id) {
                 var disabled = entry.definition
                 disabled.models = []
@@ -1889,6 +1890,20 @@ nonisolated enum StorageMigrator {
         }
         defaults.removeObject(forKey: ProviderRegistry.customProvidersKey)
         Log.app.info("StorageMigrator.providerCatalog migrated format=\(catalog.format) providers=\(catalog.providers.count) source=\(existing == nil ? "legacy" : "overlay")")
+    }
+
+    private static func removeWebsiteProviderOverrides(from catalog: ProviderCatalog, defaults: UserDefaults) throws {
+        var next = catalog
+        next.providers.removeAll { $0.api == .web }
+        try next.validate()
+        let removed = catalog.providers.count - next.providers.count
+        guard removed > 0 else { return }
+        let encoded = try JSONEncoder().encode(next)
+        defaults.set(encoded, forKey: ProviderRegistry.catalogKey)
+        guard defaults.data(forKey: ProviderRegistry.catalogKey) == encoded else {
+            throw StorageMigrationError.invalidApplicationStorage("provider catalog")
+        }
+        Log.app.info("StorageMigrator.providerCatalog removedWebsiteOverrides=\(removed) providers=\(next.providers.count)")
     }
 
     static func migrateChatProviderDefinitions(at root: URL) throws {
@@ -2453,6 +2468,18 @@ nonisolated enum StorageMigrator {
               converted.providers.count == 2 else { return false }
         try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
         guard defaults.data(forKey: key) == convertedBytes else { return false }
+        let website = ProviderDefinition(
+            id: "qwen-web", name: "Qwen Website", url: URL(string: "https://chat.qwen.ai/")!, api: .web,
+            auth: .init(kind: .custom, adapter: "qwen-web"), options: nil,
+            models: [.init(WebServiceModelProvider.model(id: "website-default", name: "Default"))]
+        )
+        let legacyWebsite: JSONValue = .object(["format": .int(2), "providers": .array([try changed.json, try website.json])])
+        defaults.set(try encoder.encode(legacyWebsite), forKey: key)
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        let withoutWebsiteBytes = defaults.data(forKey: key)!
+        guard try decoder.decode(ProviderCatalog.self, from: withoutWebsiteBytes).providers == [changed] else { return false }
+        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
+        guard defaults.data(forKey: key) == withoutWebsiteBytes else { return false }
         let unknown = try encoder.encode(ProviderCatalog(format: 999))
         defaults.set(unknown, forKey: key)
         do {

@@ -526,11 +526,11 @@ default; deleting an added definition removes it entirely. A saved definition
 with no models disables that provider for model selection. An empty saved catalog
 uses bundled defaults. `ox.provider.default` returns a fresh copy of
 bundled definitions without changing storage. Provider JSON excludes credentials.
-Qwen Website model discovery updates its existing provider definition with the
-website's current model names while retaining the Default choice. It uses the
-same catalog format and restores the last loaded choices across app launches.
-Catalog format compatibility, conversion from the earlier format-1 overlay
-(deleted built-ins become saved replacements with no models),
+Website model providers come only from model web services and are never saved
+in the catalog; their discovered models stay in memory until the service
+changes. Catalog format compatibility, conversion from the earlier format-1 overlay
+(deleted built-ins become saved replacements with no models), removal of legacy
+saved website provider definitions,
 legacy `llm.customProviders`, and regional selection transforms belong solely
 to `StorageMigrator`. Unknown catalog formats fail closed without overwriting
 their bytes.

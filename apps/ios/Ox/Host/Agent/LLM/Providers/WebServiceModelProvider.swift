@@ -21,6 +21,14 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
         }
     }
 
+    static func regions(domain: String) -> Set<LLMRegion> {
+        switch domain {
+        case "www.kimi.com": [.china]
+        case "qwen.ai", "grok.com", "claude.ai": [.global]
+        default: [.global, .china]
+        }
+    }
+
     static func model(id: String, name: String, input: Set<ProviderModelModality> = [.text], contextTokens: Int? = nil, outputTokens: Int? = nil) -> ProviderModel {
         ProviderModel(id: id == "website-default" ? id : "website:\(id)", providerModelID: id,
                       displayName: name, maxTokens: outputTokens ?? 4_096, maxContext: contextTokens ?? 32_768,

@@ -43,64 +43,6 @@ nonisolated extension BuiltInProviders {
         entries.append(bedrockMessages)
         entries.append(custom(XAIProvider.client(models: modelLookup("xai", .global)), url: XAIOAuth.responsesBaseURL, api: .openAIResponses))
         entries += profiles(trailingProfiles, modelLookup: modelLookup)
-        let webModel = ProviderModel(
-            id: "website-default", displayName: "Default", maxTokens: 4_096,
-            maxContext: 32_768, supportsTools: true
-        )
-        var attachmentWebModel = webModel
-        attachmentWebModel.modalities = .init(input: [.text, .image, .pdf], output: [.text])
-        entries.append(BundledProviderDefinition(
-            definition: ProviderDefinition(
-                id: "kimi-web", name: "Kimi Website", url: URL(string: "https://www.kimi.com/")!,
-                api: .web, auth: .init(kind: .custom, adapter: "kimi-web"),
-                options: nil, models: [.init(attachmentWebModel)]
-            ),
-            presentation: ProviderPresentation(
-                regions: [.china], website: URL(string: "https://www.kimi.com/"),
-                authNotice: "Kimi Website uses your Ox browser session. Text, image, and PDF inputs are supported; Ox Action calls are experimental.",
-                credentialKind: .bearerToken
-            ),
-            legacyID: "kimi-web", legacyRegion: nil, legacyCredentialID: "kimi-web"
-        ))
-        entries.append(BundledProviderDefinition(
-            definition: ProviderDefinition(
-                id: "qwen-web", name: "Qwen Website", url: URL(string: "https://chat.qwen.ai/")!,
-                api: .web, auth: .init(kind: .custom, adapter: "qwen-web"),
-                options: nil, models: [.init(attachmentWebModel)]
-            ),
-            presentation: ProviderPresentation(
-                regions: [.global], website: URL(string: "https://chat.qwen.ai/"),
-                authNotice: "Qwen Website uses your Ox browser session. Image and PDF input depends on the selected model; Ox Action calls are experimental. Reload models to refresh supported inputs.",
-                credentialKind: .bearerToken
-            ),
-            legacyID: "qwen-web", legacyRegion: nil, legacyCredentialID: "qwen-web"
-        ))
-        entries.append(BundledProviderDefinition(
-            definition: ProviderDefinition(
-                id: "grok-web", name: "Grok Website", url: URL(string: "https://grok.com/")!,
-                api: .web, auth: .init(kind: .custom, adapter: "grok-web"),
-                options: nil, models: [.init(attachmentWebModel)]
-            ),
-            presentation: ProviderPresentation(
-                regions: [.global], website: URL(string: "https://grok.com/"),
-                authNotice: "Grok Website uses your Ox browser session. Text, image, and PDF inputs are supported; Ox Action calls are experimental.",
-                credentialKind: .bearerToken
-            ),
-            legacyID: "grok-web", legacyRegion: nil, legacyCredentialID: "grok-web"
-        ))
-        entries.append(BundledProviderDefinition(
-            definition: ProviderDefinition(
-                id: "claude-web", name: "Claude Website", url: URL(string: "https://claude.ai/")!,
-                api: .web, auth: .init(kind: .custom, adapter: "claude-web"),
-                options: nil, models: [.init(attachmentWebModel)]
-            ),
-            presentation: ProviderPresentation(
-                regions: [.global], website: URL(string: "https://claude.ai/"),
-                authNotice: "Claude Website uses your Ox browser session. Text, image, and PDF inputs are supported. Replies appear after completion; Ox Action calls are experimental. Stopping Ox may not stop Claude generation.",
-                credentialKind: .bearerToken
-            ),
-            legacyID: "claude-web", legacyRegion: nil, legacyCredentialID: "claude-web"
-        ))
         return entries
     }
 
