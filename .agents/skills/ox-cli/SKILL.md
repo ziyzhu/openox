@@ -36,7 +36,7 @@ or tab session IDs; a live service is addressed by its domain.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
   agent in a chat actually sees).
-- Use `bun run test:chat-projection` for repository projection fixture replay.
+- Use `sim` to verify chat projection changes; the repository has no dedicated chat projection fixture command.
 - Use `sim` for iOS Simulator interaction.
 
 ## Connect to a Host and VM

@@ -44,6 +44,49 @@ struct InlineBotControlView: View {
     }
 }
 
+struct InlineServiceAuthView: View {
+    let control: ServiceControl
+    let session: ServiceAuthSession?
+    let pageMount: WebPageMountCoordinator
+    let isPresentedInSheet: Bool
+    let expand: (ServiceAuthSession) -> Void
+    let cancel: () -> Void
+
+    @Environment(ServiceManager.self) private var serviceManager
+
+    private var domain: String { control.domain }
+    private var service: Service? { serviceManager.service(domain: domain) }
+    private var name: String {
+        if case .signIn(_, let serviceName) = control {
+            return serviceName ?? service?.title ?? domain
+        }
+        return service?.title ?? domain
+    }
+
+    var body: some View {
+        LivePageCard(
+            service: service,
+            fallbackSystemImage: "person.badge.key.fill",
+            title: name,
+            subtitle: String(localized: "Sign in to continue"),
+            mount: session.flatMap { session in
+                pageMount.isInline(page: session.page, ownerID: session.id)
+                    ? WebPageMount(page: session.page, ownerID: session.id, coordinator: pageMount)
+                    : nil
+            },
+            inlinePageAnchorID: nil,
+            isPresented: isPresentedInSheet,
+            placeholder: .progress(String(localized: "Sign in to continue")),
+            activate: nil,
+            expand: session.map { session in { expand(session) } },
+            cancel: cancel,
+            accessibilityIdentifier: A11yID.Chat.Attach.signIn(domain),
+            expandAccessibilityIdentifier: A11yID.Chat.Attach.signIn(domain) + ".expand",
+            cancelAccessibilityIdentifier: A11yID.Chat.Attach.signInDismiss(domain)
+        )
+    }
+}
+
 struct ServiceControlView: View {
     let control: ServiceControl
     var isActive: Bool = true

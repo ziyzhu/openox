@@ -5,7 +5,7 @@ extension Service {
         isAPIService || isMCPService || iOSService?.requiresPermission == true || supportsWebAuthentication
     }
 
-    private var supportsWebAuthentication: Bool {
+    var supportsWebAuthentication: Bool {
         definition.action(Manifest.SIGN_IN_STATE_ACTION_ID, includingStandard: true) != nil
     }
 

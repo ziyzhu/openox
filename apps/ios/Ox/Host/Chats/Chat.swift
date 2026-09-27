@@ -2045,13 +2045,17 @@ final class Chat: Identifiable {
         if !isBusy { startWorker() }
     }
 
-    func signInService(domain: String, resumeAgent: Bool = true) async -> Bool {
+    func signInService(
+        domain: String,
+        resumeAgent: Bool = true,
+        using presenter: (any ServiceAuthPresenting)? = nil
+    ) async -> Bool {
         guard let service = attachedService(domain: domain) else {
             Log.session.error("Chat.signInService no service domain=\(domain)")
             return false
         }
         Log.session.info("Chat.signInService start id=\(id) domain=\(domain) auth=\(service.signInState.rawValue) resumeAgent=\(resumeAgent)")
-        try? await service.requestAccess(using: presentations.serviceSignIn, source: .chatCard)
+        try? await service.requestAccess(using: presenter ?? presentations.serviceSignIn, source: .chatCard)
         let ok = service.signInState.isAuthenticated
         Log.session.info("Chat.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
         if ok, resumeAgent {

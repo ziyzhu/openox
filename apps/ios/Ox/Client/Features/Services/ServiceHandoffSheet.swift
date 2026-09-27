@@ -60,9 +60,10 @@ struct BotControlSheetView: View {
     }
 }
 
-private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
+struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
     let session: Session
     let mode: WebBrowserView.Mode
+    var returnsInline = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -87,20 +88,21 @@ private struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Cancel", role: .cancel) {
-                            session.cancel()
+                        Button(returnsInline ? String(localized: "Done") : String(localized: "Cancel")) {
+                            if !returnsInline { session.cancel() }
                             dismiss()
                         }
                         .accessibilityIdentifier(A11yID.ServiceHandoff.done)
                     }
                 }
         }
+        .interactiveDismissDisabled(returnsInline)
         .onAppear {
             Log.ui.info("ServiceSessionSheet visible domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
         }
         .onDisappear {
             Log.ui.info("ServiceSessionSheet hidden domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) title=\(session.navigationTitle) uptime=\(ProcessInfo.processInfo.systemUptime)")
-            session.cancel()
+            if !returnsInline { session.cancel() }
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             Log.ui.info("ServiceSessionSheet scene domain=\(session.serviceDomain) attempt=\(session.id.uuidString.prefix(8)) phase=\(String(describing: phase)) uptime=\(ProcessInfo.processInfo.systemUptime)")

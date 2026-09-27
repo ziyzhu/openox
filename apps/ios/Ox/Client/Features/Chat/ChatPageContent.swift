@@ -151,12 +151,17 @@ extension ChatBlock {
                 continue
             }
 
-            let visibleItems = items.enumerated().filter { _, item in
+            let visibleItems = items.enumerated().filter { index, item in
                 switch item {
                 case .text(let text), .progress(let text):
-                    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                case .serviceControl(let control):
+                    if case .signIn = control {
+                        return serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
+                    }
+                    return true
                 default:
-                    true
+                    return true
                 }
             }
             if !visibleItems.isEmpty {

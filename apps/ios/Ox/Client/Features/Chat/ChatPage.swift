@@ -32,6 +32,35 @@ private final class ChatBotControlPresenter: ServiceHandoffPresenting {
     }
 }
 
+@MainActor
+@Observable
+private final class ChatServiceAuthPresenter: ServiceAuthPresenting {
+    private(set) var session: ServiceAuthSession?
+    let pageMount = WebPageMountCoordinator()
+
+    func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
+        if let outcome = await session.preflight(for: .seconds(1)) {
+            Log.ui.info("ChatServiceAuthPresenter preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+            return outcome
+        }
+        guard self.session == nil else {
+            Log.ui.warning("ChatServiceAuthPresenter rejected domain=\(session.serviceDomain) reason=occupied")
+            session.presentationFailed()
+            return .failed
+        }
+        self.session = session
+        pageMount.reconcile(page: session.page, ownerIDs: [session.id])
+        Log.ui.info("ChatServiceAuthPresenter present domain=\(session.serviceDomain)")
+        let outcome = await session.run()
+        if self.session === session {
+            pageMount.clear()
+            self.session = nil
+        }
+        Log.ui.info("ChatServiceAuthPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+        return outcome
+    }
+}
+
 private struct InlineServicePageHost: View {
     let anchor: Anchor<CGRect>
     let mount: WebPageMount
@@ -259,6 +288,12 @@ struct ChatPage: View {
         case artifacts
         case artifactPicker
         case botControl(ServiceHandoffSession)
+        case serviceAuth(ServiceAuthSession)
+
+        var isServiceAuth: Bool {
+            if case .serviceAuth = self { return true }
+            return false
+        }
 
         var id: String {
             switch self {
@@ -271,6 +306,7 @@ struct ChatPage: View {
             case .artifacts: "artifacts"
             case .artifactPicker: "artifactPicker"
             case .botControl(let session): "botControl:\(session.id)"
+            case .serviceAuth(let session): "serviceAuth:\(session.id)"
             }
         }
     }
@@ -300,8 +336,10 @@ struct ChatPage: View {
     @State private var viewportLayout = ChatViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
     @State private var botControlPresenter = ChatBotControlPresenter()
+    @State private var serviceAuthPresenter = ChatServiceAuthPresenter()
     @State private var browserPageMount = WebPageMountCoordinator()
     @State private var expandedBotControlSessionID: UUID?
+    @State private var expandedServiceAuthSessionID: UUID?
 
     private var browserPage: WebPage? {
         guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
@@ -339,7 +377,7 @@ struct ChatPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker, .botControl: modalPresentation
+                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker, .botControl, .serviceAuth: modalPresentation
                 default: nil
                 }
             },
@@ -628,6 +666,10 @@ struct ChatPage: View {
             guard sessionID == nil, case .botControl = modalPresentation else { return }
             modalPresentation = nil
         }
+        .onChange(of: serviceAuthPresenter.session?.id) { _, sessionID in
+            guard sessionID == nil, case .serviceAuth = modalPresentation else { return }
+            modalPresentation = nil
+        }
         .task(id: DelayedActivityKey(
             chatID: chat.id,
             activity: chat.activity,
@@ -671,11 +713,13 @@ struct ChatPage: View {
                     .presentationDetents([.medium, .large])
                 case .botControl(let session):
                     BotControlSheetView(session: session)
+                case .serviceAuth(let session):
+                    ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
                 case .camera, .photos, .files, .attachment:
                     EmptyView()
                 }
             }
-            .presentationDragIndicator(.visible)
+            .presentationDragIndicator(presented.isServiceAuth ? .hidden : .visible)
             .presentationBackground(Theme.Colors.background)
         }
         .fullScreenCover(item: fullScreenModal) { presented in
@@ -685,7 +729,7 @@ struct ChatPage: View {
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker, .botControl:
+            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker, .botControl, .serviceAuth:
                 EmptyView()
             }
         }
@@ -784,6 +828,12 @@ struct ChatPage: View {
             botControlPresenter.pageMount.restore(page: session.page, ownerID: session.id)
         }
         expandedBotControlSessionID = nil
+        if let expandedServiceAuthSessionID,
+           let session = serviceAuthPresenter.session,
+           session.id == expandedServiceAuthSessionID {
+            serviceAuthPresenter.pageMount.restore(page: session.page, ownerID: session.id)
+        }
+        expandedServiceAuthSessionID = nil
         presentPendingArtifactPreview()
     }
 
@@ -1063,6 +1113,21 @@ struct ChatPage: View {
                     expand: expandBotControl,
                     cancel: { $0.cancel() }
                 )
+            } else if case .signIn = control, interactionID != nil {
+                InlineServiceAuthView(
+                    control: control,
+                    session: serviceAuthPresenter.session,
+                    pageMount: serviceAuthPresenter.pageMount,
+                    isPresentedInSheet: expandedServiceAuthSessionID != nil,
+                    expand: expandServiceAuth,
+                    cancel: {
+                        if let session = serviceAuthPresenter.session {
+                            session.cancel()
+                        } else if let interactionID {
+                            chat.resolveServiceControl(id: interactionID, result: nil)
+                        }
+                    }
+                )
             } else {
                 ServiceControlView(
                     control: control,
@@ -1099,6 +1164,15 @@ struct ChatPage: View {
                   botControlPresenter.session === session else { return }
             expandedBotControlSessionID = session.id
             modalPresentation = .botControl(session)
+        }
+    }
+
+    private func expandServiceAuth(_ session: ServiceAuthSession) {
+        Task { @MainActor in
+            guard await serviceAuthPresenter.pageMount.detach(page: session.page, ownerID: session.id),
+                  serviceAuthPresenter.session === session else { return }
+            expandedServiceAuthSessionID = session.id
+            modalPresentation = .serviceAuth(session)
         }
     }
 
@@ -1636,6 +1710,13 @@ struct ChatPage: View {
         Log.ui.info("ChatPage.authProbe done chat=\(chat.id) domain=\(domain) state=\(service.signInState.rawValue)")
         if service.signInState.isAuthenticated {
             chat.resolveServiceControl(id: item.id, result: .null)
+        } else {
+            let signedIn = await chat.signInService(
+                domain: domain,
+                resumeAgent: false,
+                using: service.supportsWebAuthentication ? serviceAuthPresenter : nil
+            )
+            chat.resolveServiceControl(id: item.id, result: signedIn ? .null : nil)
         }
     }
 
