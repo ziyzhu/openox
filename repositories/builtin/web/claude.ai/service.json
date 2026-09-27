@@ -1,8 +1,9 @@
 {
   "domain": "claude.ai",
   "name": "Claude",
-  "description": "Chat with Claude using your signed-in website account, read paginated conversation history, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
+  "description": "Chat with Claude using your signed-in website account, read paginated conversation history including image and document metadata, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
   "baseUrl": "https://claude.ai/robots.txt",
+  "faviconUrl": "https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c129d018a-0ZbJsTbu.png",
   "actions": [
     {
       "id": "getSignInUrl",
@@ -192,7 +193,7 @@
     {
       "id": "getConversation",
       "label": "Read conversation",
-      "description": "Read message text from a conversation. Parent IDs preserve branch relationships; tool and attachment contents are excluded.",
+      "description": "Read conversation text plus safe image and document metadata. Parent IDs preserve branches; hidden thinking and general tool contents remain excluded.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -254,6 +255,98 @@
                     "string",
                     "null"
                   ]
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "mimeType": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sizeBytes": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "url": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Session-bound Claude URL when the source exposes one."
+                      },
+                      "thumbnailUrl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "width": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "height": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "pageCount": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "tokenCount": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "attachment",
+                          "generated"
+                        ]
+                      },
+                      "downloadable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "mimeType",
+                      "sizeBytes",
+                      "url",
+                      "thumbnailUrl",
+                      "width",
+                      "height",
+                      "pageCount",
+                      "tokenCount",
+                      "source",
+                      "downloadable"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -261,7 +354,8 @@
                 "parentId",
                 "role",
                 "text",
-                "createdAt"
+                "createdAt",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -280,7 +374,7 @@
       "requireApproval": false
     },
     {
-      "id": "listWebsiteModels",
+      "id": "listModels",
       "label": "List models",
       "description": "List selectable models currently exposed by the new-chat picker. Credit-purchase options and effort controls are excluded.",
       "inputSchema": {
@@ -364,7 +458,7 @@
     {
       "id": "chat",
       "label": "Start chat",
-      "description": "Send one text message in a new chat. Refuses to overwrite an existing draft. A pending result must be checked with getConversation, not resent. Submission outcomes are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
+      "description": "Send one text message in a new chat. Refuses to overwrite an existing draft. A pending result must be checked with getConversation, not resent. Submission outcomes, including file-only replies, are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -409,13 +503,106 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Session-bound Claude URL when the source exposes one."
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "pageCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "tokenCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "attachment",
+                    "generated"
+                  ]
+                },
+                "downloadable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "mimeType",
+                "sizeBytes",
+                "url",
+                "thumbnailUrl",
+                "width",
+                "height",
+                "pageCount",
+                "tokenCount",
+                "source",
+                "downloadable"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "status",
           "conversationId",
           "url",
-          "response"
+          "response",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -426,7 +613,7 @@
     {
       "id": "continueChat",
       "label": "Continue chat",
-      "description": "Send one text message to an exact conversation loaded in the sidebar. Refuses existing drafts and does not retry submissions. Submission outcomes are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
+      "description": "Send one text message to an exact conversation loaded in the sidebar. Refuses existing drafts and does not retry submissions. Submission outcomes, including file-only replies, are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -476,13 +663,106 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Session-bound Claude URL when the source exposes one."
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "pageCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "tokenCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "attachment",
+                    "generated"
+                  ]
+                },
+                "downloadable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "mimeType",
+                "sizeBytes",
+                "url",
+                "thumbnailUrl",
+                "width",
+                "height",
+                "pageCount",
+                "tokenCount",
+                "source",
+                "downloadable"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "status",
           "conversationId",
           "url",
-          "response"
+          "response",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -609,381 +889,6 @@
         ],
         "additionalProperties": false
       }
-    },
-    {
-      "id": "listModels",
-      "label": "List provider models",
-      "description": "Standard model provider Action.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "models": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "input": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "text",
-                      "image",
-                      "pdf"
-                    ]
-                  }
-                },
-                "contextTokens": {
-                  "anyOf": [
-                    {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "outputTokens": {
-                  "anyOf": [
-                    {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "streaming": {
-                  "type": "boolean"
-                },
-                "cancellation": {
-                  "type": "boolean"
-                },
-                "options": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "temperature",
-                      "maxTokens"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "input",
-                "contextTokens",
-                "outputTokens",
-                "streaming",
-                "cancellation",
-                "options"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "models"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false,
-      "baseUrl": "https://claude.ai/new"
-    },
-    {
-      "id": "startModelGeneration",
-      "label": "Start model generation",
-      "description": "Standard model provider Action.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "modelId": {
-            "type": "string"
-          },
-          "messages": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "role": {
-                  "type": "string",
-                  "enum": [
-                    "system",
-                    "user",
-                    "assistant",
-                    "tool"
-                  ]
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "role",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "attachments": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "name": {
-                  "type": "string"
-                },
-                "mimeType": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "mimeType"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "options": {
-            "type": "object",
-            "properties": {
-              "temperature": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "maxTokens": {
-                "anyOf": [
-                  {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
-            },
-            "required": [
-              "temperature",
-              "maxTokens"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "modelId",
-          "messages",
-          "attachments",
-          "options"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "generationId": {
-            "type": "string"
-          },
-          "submission": {
-            "type": "string",
-            "enum": [
-              "uncertain",
-              "confirmed"
-            ]
-          }
-        },
-        "required": [
-          "generationId",
-          "submission"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": true,
-      "baseUrl": "https://claude.ai/new"
-    },
-    {
-      "id": "readModelGeneration",
-      "label": "Read model generation",
-      "description": "Standard model provider Action.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "generationId": {
-            "type": "string"
-          },
-          "after": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "waitMilliseconds": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1000
-          }
-        },
-        "required": [
-          "generationId",
-          "after",
-          "waitMilliseconds"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "nextCursor": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "text"
-                      ]
-                    },
-                    "text": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "text"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "completed"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "type"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "failed"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "contextOverflow",
-                        "rateLimited",
-                        "network",
-                        "authentication",
-                        "unsupportedInput",
-                        "provider"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "message",
-                    "kind"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            }
-          }
-        },
-        "required": [
-          "nextCursor",
-          "events"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": false,
-      "baseUrl": "https://claude.ai/new"
-    },
-    {
-      "id": "cancelModelGeneration",
-      "label": "Cancel model generation",
-      "description": "Standard model provider Action.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "generationId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "generationId"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "cancelled",
-              "requested",
-              "completed",
-              "unsupported"
-            ]
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "additionalProperties": false
-      },
-      "requireAuth": true,
-      "requireApproval": true,
-      "baseUrl": "https://claude.ai/new"
     }
   ]
 }

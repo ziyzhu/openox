@@ -11,20 +11,23 @@
     while (Date.now() < end) { const value = get(); if (value) return value; await pause(150); }
     throw new Error(message);
   }
-  async function sessionUser() {
-    const r = await fetch('/api/auth/session', {credentials:'include', cache:'no-store'});
+  async function identity() {
+    const r = await fetch('/backend-api/me', {credentials:'include', cache:'no-store'});
     if (r.redirected) throw new Error('Unexpected redirect checking ChatGPT session');
     let j; try { j = await r.json(); } catch { throw new Error('Invalid ChatGPT session response'); }
-    if (r.status !== 200 || !j || typeof j !== 'object' || Array.isArray(j)) throw new Error('Unclassified ChatGPT session response: HTTP ' + r.status);
-    const keys = Object.keys(j);
-    if (keys.length === 1 && keys[0] === 'WARNING_BANNER') return null;
-    if (typeof j.user?.id !== 'string' || !j.user.id) throw new Error('Unclassified ChatGPT session response: missing user');
-    return j.user;
+    // Observed: 200 identity with string id; 401 {detail:"Unauthorized"} without credentials.
+    if (r.status === 401 && j.detail === 'Unauthorized') return null;
+    if (r.status !== 200 || typeof j.id !== 'string' || !j.id) throw new Error('Unclassified ChatGPT session response: HTTP ' + r.status);
+    return j;
   }
   const composer = () => [...document.querySelectorAll('textarea#mobile-composer-prompt, textarea[aria-label="Chat with ChatGPT"], textarea[placeholder="Ask ChatGPT"], [contenteditable="true"][role="textbox"][aria-label="Ask ChatGPT"]')].find(e=>visible(e)&&!e.id.startsWith('pending-'));
   const roleNodes = () => { const legacy = [...document.querySelectorAll('[data-message-author-role="user"], [data-message-author-role="assistant"]')].filter(visible); if (legacy.length) return legacy; return [...document.querySelectorAll('main h4')].filter(h => /^(You said:|ChatGPT said:)$/.test(h.textContent.trim())).map(h => { const role = h.textContent.trim() === 'You said:' ? 'user' : 'assistant'; const e = h.parentElement.querySelector(role === 'user' ? '[data-user-message-bubble]' : '[data-markdown-text-style="assistant-message"]'); if (e) e.setAttribute('data-ox-message-role',role); return e; }).filter(visible); };
   const nodeRole = e => e.getAttribute('data-message-author-role') || e.getAttribute('data-ox-message-role');
-  const messages = () => roleNodes().map(e => ({role:nodeRole(e),text:(e.innerText || '').trim()})).filter(m => m.text);
+  const richInt = v => Number.isSafeInteger(v) && v >= 0 ? v : null;
+  const richUrl = v => { if (typeof v !== 'string' || !v) return null; try { const u=new URL(v,location.origin); return ['http:','https:'].includes(u.protocol)?u.href:null; } catch { return null; } };
+  const richFiles = (e,source) => { const out=[]; for(const img of e.querySelectorAll('img[src]')){const u=richUrl(img.currentSrc||img.src);if(!u||img.getAttribute('aria-hidden')==='true'||(img.naturalWidth&&img.naturalWidth<64))continue;out.push({id:null,name:img.alt||'',kind:'image',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:richInt(img.naturalWidth),height:richInt(img.naturalHeight),pageCount:null,tokenCount:null,source,downloadable:true});} for(const x of e.querySelectorAll('a[href][download],a[href*="/files/"],a[href*="download"],a[href$=".pdf"],a[href$=".docx"],a[href$=".csv"],a[href$=".zip"]')){const u=richUrl(x.href);if(!u)continue;out.push({id:null,name:x.getAttribute('download')||clean(x.textContent),kind:/\.pdf(?:$|\?)/i.test(u)?'document':'file',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source,downloadable:true});}const seen=new Set;return out.filter(f=>{if(seen.has(f.url))return false;seen.add(f.url);return true;}); };
+  const messageFrom = e => { const role=nodeRole(e); return {role,text:(e.innerText||'').trim(),files:richFiles(e,role==='assistant'?'generated':'attachment')}; };
+  const messages = () => roleNodes().map(messageFrom).filter(m => m.text || m.files.length);
   async function send(message, fresh) {
     if (!message || !message.trim()) throw new Error('A nonempty message is required');
     const input = await waitFor(composer, 'ChatGPT composer is not ready; pending startup placeholders cannot accept messages', 3000);
@@ -57,7 +60,7 @@
       if (text !== last) { last=text; stable=Date.now(); }
       const stop = one('button[aria-label="Stop generating"],button[data-testid="stop-button"]');
       const accepted = roleNodes().some(e => !before.has(e) && nodeRole(e) === 'user' && clean(e.innerText) === clean(message));
-      if (accepted && text && !stop && Date.now()-stable >= 1800) return {response:text,conversationRef:reference(),url:pageUrl()};
+      if (accepted && !stop && Date.now()-stable >= 1800 && (text || (node && richFiles(node,'generated').length))) return {response:text||null,responseFiles:node?richFiles(node,'generated'):[],conversationRef:reference(),url:pageUrl()};
       await pause(200);
     }
     throw new Error('Send outcome uncertain: response did not finish in time. Read the current conversation before any retry.');
@@ -166,8 +169,8 @@
       return {url:pageUrl(),conversationRef:reference()};
     }});
     action('getSignInUrl',{async invoke(){return {url:'https://chatgpt.com/auth/login'};}});
-    action('getSignInState',{async invoke(){return {signedIn:!!(await sessionUser())};}});
-    action('getCurrentUser',{async invoke(){const j=await sessionUser();if(!j)throw new Error('Sign in to ChatGPT');return {id:j.id,name:typeof j.name==='string'?j.name:null,email:typeof j.email==='string'?j.email:null};}});
+    action('getSignInState',{async invoke(){return {signedIn:!!(await identity())};}});
+    action('getCurrentUser',{async invoke(){const j=await identity();if(!j)throw new Error('Sign in to ChatGPT');return {id:j.id,name:typeof j.name==='string'?j.name:null,email:typeof j.email==='string'?j.email:null};}});
     action('chat',{async invoke(args){return send(args.message,true);}});
     action('continueChat',{async invoke(args){if(args.conversationRef!==reference())throw new Error('Stale conversation reference; read the current conversation first');if(!messages().length)throw new Error('No loaded conversation to continue');return send(args.message,false);}});
     action('getCurrentConversation',{async invoke(args){await waitFor(composer,'ChatGPT conversation is not ready');const all=messages(),limit=args.limit??50;return {conversationRef:reference(),url:pageUrl(),messages:all.slice(-limit),renderedOnly:true,truncated:all.length>limit};}});
