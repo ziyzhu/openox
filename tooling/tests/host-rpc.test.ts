@@ -130,12 +130,13 @@ test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches an
   expect(await host.describe(5000)).toMatchObject({ protocols: description.protocols, methods: expect.arrayContaining(description.methods) });
   const chats = await host.listChats(5000);
   expect((await host.call("vm.inspect", 5000)).value).toBeDefined();
-  expect((await host.call("models.list", 5000)).clients).toBeArray();
+  expect((await host.call("providers.list", 5000)).providers).toBeArray();
   expect((await host.call("logs.list", 5000)).logs).toBeArray();
   expect((await host.call("services.list", 30000)).services).toBeArray();
   await expect(host.call("debug.providers.setKey", 5000)).rejects.toMatchObject({ code: -32602 });
   await expect(host.call("vm.functions", 5000, { function: "ox.missing" })).rejects.toMatchObject({ code: -32000 });
-  await expect(host.call("agents.run", 5000, { clientId: "missing", modelId: "missing" })).rejects.toMatchObject({ code: -32000 });
+  await expect(host.call("chats.send", 5000, { text: "" })).rejects.toMatchObject({ code: -32000 });
+  await expect(host.call("chats.new", 5000, { providerId: "missing" })).rejects.toMatchObject({ code: -32000 });
   const socket = new WebSocket(endpoint);
   cleanups.push(() => socket.close());
   await new Promise<void>((resolve, reject) => { socket.onopen = () => resolve(); socket.onerror = reject; });

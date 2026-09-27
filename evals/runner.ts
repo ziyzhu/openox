@@ -94,7 +94,7 @@ Requires a running simulator Host built from this checkout; never executes gener
     console.log(`Validated ${cases.length} cases`);
     return;
   }
-  if (!values.host || !values.provider || !values.model) throw new Error("Specify --host, --provider, and --model; use ox discover and ox agent list to select them");
+  if (!values.host || !values.provider || !values.model) throw new Error("Specify --host, --provider, and --model; use ox host discover and ox host providers to select them");
   if (values.provider.toLowerCase() === "mock") throw new Error("Mock responses cannot measure prompt quality");
   const repetitions = integer(values.repeat!, 20);
   const timeoutMs = integer(values.timeout!, 300_000);
@@ -110,10 +110,10 @@ Requires a running simulator Host built from this checkout; never executes gener
     const description = await host.describe(10000);
     if (!description.methods.includes("agents.evaluate")) throw new Error("Host does not support agents.evaluate; rebuild and install this checkout");
     report.host = description.implementation;
-    const catalog = await host.call("models.list", 10000);
-    const clients = catalog.clients as Array<{ id: string; models: Array<{ id: string }> }>;
-    const client = clients.find(entry => entry.id === values.provider);
-    const model = client?.models.find(entry => entry.id === values.model);
+    const catalog = await host.call("providers.list", 10000);
+    const providers = catalog.providers as Array<{ id: string; models: Array<{ id: string }> }>;
+    const provider = providers.find(entry => entry.id === values.provider);
+    const model = provider?.models.find(entry => entry.id === values.model);
     if (!model) throw new Error("Requested provider/model is not exposed by this Host");
     report.catalog = { region: catalog.region, model };
     const snapshot = await host.call("chats.get", 10000, values.chat ? { sessionId: values.chat } : {});
@@ -124,7 +124,7 @@ Requires a running simulator Host built from this checkout; never executes gener
         const base = { id: test.id, caseHash: hash(test), repetition, rubric: test.rubric };
         try {
           const response = await host.call("agents.evaluate", timeoutMs + 10000, {
-            sessionId: template.id, clientId: values.provider, modelId: values.model,
+            sessionId: template.id, providerId: values.provider, modelId: values.model,
             prompts: test.prompts, fixtures: test.fixtures, maxTurns, timeoutMs,
           }) as unknown as EvalResponse;
           if (!Array.isArray(response.messages) || !Array.isArray(response.errors) || typeof response.systemPrompt !== "string") throw new Error("Invalid eval response");

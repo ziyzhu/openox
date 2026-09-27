@@ -20,7 +20,7 @@ test("runner writes scored reports over JSON-RPC and compare detects regression"
         const request = JSON.parse(String(raw));
         let result: unknown;
         if (request.method === "host.describe") result = { implementation: { name: "fixture", version: "1", build: "1" }, protocols: { host: [1] }, methods: ["agents.evaluate"] };
-        else if (request.method === "models.list") result = { region: "global", clients: [{ id: "fixture", models: [{ id: "fixture" }] }] };
+        else if (request.method === "providers.list") result = { region: "global", providers: [{ id: "fixture", models: [{ id: "fixture" }] }] };
         else if (request.method === "chats.get") result = { data: { id: "empty", messages: [] } };
         else if (request.method === "agents.evaluate") {
           expect(request.params.sessionId).toBe("empty");

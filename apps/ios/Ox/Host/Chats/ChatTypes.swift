@@ -112,12 +112,14 @@ nonisolated enum ChatSubmissionOutcome: Equatable, Sendable {
     case completed(String)
     case failed(String)
     case cancelled
+    case needsAttention
 
     var logLabel: String {
         switch self {
         case .completed: "completed"
         case .failed: "failed"
         case .cancelled: "cancelled"
+        case .needsAttention: "needsAttention"
         }
     }
 }

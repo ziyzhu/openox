@@ -28,7 +28,7 @@ Repeat until the goal, abandonment condition, failure, or guardrail is reached:
 5. Record the action, target, timestamps, immediate outcome, relevant UI state, and errors.
 6. Feed an execution failure back into session memory once so the user can recover intelligently. Do not blindly repeat an unchanged action.
 
-Use `ox chat inspect` and structured logs to verify state or diagnose boundaries, not to bypass UI actions under test. Direct `ox agent run` or the LLM benchmark may provide supporting isolation evidence after the user-visible session.
+Use `ox chat inspect` and structured logs to verify state or diagnose boundaries, not to bypass UI actions under test. `ox chat send` or the LLM benchmark may provide supporting evidence after the user-visible session.
 
 ## Time and action budgets
 

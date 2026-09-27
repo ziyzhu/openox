@@ -1,10 +1,9 @@
-import { withRepository } from "./repositories.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { readSkills } from "@openox/service-sdk/skills";
-import { C, fail, terminalText, type CliContext } from "./lib.ts";
+import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 
 type ProfileConfig = {
   id: string;
@@ -108,7 +107,7 @@ export function profileRoot(context: CliContext): string {
 
 function ensureNoArgs(command: string, args: string[]): void {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log(`Usage: ox --profile <path> ${command}`);
+    console.log(`Usage: ox --profile <path> profile ${command}`);
     return;
   }
   if (args.length) fail(`${command} does not accept arguments`);
@@ -116,7 +115,7 @@ function ensureNoArgs(command: string, args: string[]): void {
 
 function printTextFile(command: string, fileName: string, args: string[], context: CliContext): void {
   if (args.includes("-h") || args.includes("--help")) {
-    console.log(`Usage: ox --profile <path> ${command}`);
+    console.log(`Usage: ox --profile <path> profile ${command}`);
     return;
   }
   ensureNoArgs(command, args);
@@ -205,17 +204,17 @@ export function listChats(root: string): ChatSummary[] {
   return chats.sort((left, right) => (right.lastActivity ?? right.createdAt) - (left.lastActivity ?? left.createdAt));
 }
 
-export async function memory(args: string[], context: CliContext): Promise<void> {
+async function memory(args: string[], context: CliContext): Promise<void> {
   printTextFile("memory", "MEMORY.md", args, context);
 }
 
-export async function profiles(args: string[]): Promise<void> {
+async function profiles(args: string[]): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox profiles [--json]");
+    console.log("Usage: ox profile list [--json]");
     return;
   }
-  if (parsed.value) fail("profiles does not accept a name or id");
+  if (parsed.value) fail("profile list does not accept a name or id");
   const documents = iCloudProfileDocuments() ?? fail("listing iCloud Profiles is only supported on macOS");
   let entries: ProfileEntry[];
   try {
@@ -232,17 +231,25 @@ export async function profiles(args: string[]): Promise<void> {
   }
 }
 
-export async function soul(args: string[], context: CliContext): Promise<void> {
+async function soul(args: string[], context: CliContext): Promise<void> {
   printTextFile("soul", "SOUL.md", args, context);
 }
 
-export async function skills(args: string[], context: CliContext): Promise<void> {
+async function skills(args: string[], context: CliContext): Promise<void> {
+  await printSkills(args, "ox --profile <path> profile skills [name] [--json]", async (print) => print(profileRoot(context)));
+}
+
+export async function printSkills(
+  args: string[],
+  usage: string,
+  withSource: (print: (root: string, declared?: string[]) => void) => Promise<void>,
+): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox (--profile <path> | --repository <path-or-url>) skills [name] [--json]");
+    console.log(`Usage: ${usage}`);
     return;
   }
-  const print = (root: string, declared?: string[]): void => {
+  await withSource((root, declared) => {
     const result = readSkills(root, declared);
     const entries = result.ok ? result.skills : fail(result.error);
     if (parsed.value) {
@@ -260,15 +267,13 @@ export async function skills(args: string[], context: CliContext): Promise<void>
     for (const skill of entries) {
       console.log(`${terminalText(skill.name, [C.sky])}  ${terminalText(skill.description, [C.dim])}`);
     }
-  };
-  if (context.repository) await withRepository(context.repository, async (root, repository) => print(root, repository.skills));
-  else print(profileRoot(context));
+  });
 }
 
-export async function artifacts(args: string[], context: CliContext): Promise<void> {
+async function artifacts(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --profile <path> artifacts [filename] [--json]");
+    console.log("Usage: ox --profile <path> profile artifacts [filename] [--json]");
     return;
   }
   const root = profileRoot(context);
@@ -293,10 +298,10 @@ export async function artifacts(args: string[], context: CliContext): Promise<vo
   }
 }
 
-export async function chats(args: string[], context: CliContext): Promise<void> {
+async function chats(args: string[], context: CliContext): Promise<void> {
   const parsed = request(args);
   if (parsed.help) {
-    console.log("Usage: ox --profile <path> chats [id] [--json]");
+    console.log("Usage: ox --profile <path> profile chats [id] [--json]");
     return;
   }
   const root = profileRoot(context);
@@ -330,3 +335,13 @@ export async function chats(args: string[], context: CliContext): Promise<void> 
     console.log(`${terminalText(entry.id, [C.sky])}  ${favorite}${chatTitle(entry)}  ${terminalText(displayDate(entry.lastActivity ?? entry.createdAt), [C.dim])}`);
   }
 }
+
+export const PROFILE_COMMANDS: Record<string, SubCommand> = {
+  list: { desc: "List Profiles in iCloud Drive (--json)", fn: profiles },
+  memory: { desc: "Print the Profile's MEMORY.md", fn: memory },
+  soul: { desc: "Print the Profile's SOUL.md", fn: soul },
+  skills: { desc: "List the Profile's skills, or print one", fn: skills },
+  artifacts: { desc: "List the Profile's artifacts, or print one", fn: artifacts },
+  chats: { desc: "List the Profile's saved chats, or print one transcript", fn: chats },
+};
+

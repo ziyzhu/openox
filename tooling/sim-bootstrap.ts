@@ -47,8 +47,8 @@ function record(value: unknown, label: string, allowed?: readonly string[]): Rec
 function parseAPIKeys(value: unknown): APIKeys {
   const entries = Object.entries(record(value, "API keys"));
   if (entries.length === 0) throw new Error("API keys must declare at least one provider");
-  return Object.fromEntries(entries.map(([clientId, regional]) => {
-    const id = providerID(clientId, "provider ID");
+  return Object.fromEntries(entries.map(([providerId, regional]) => {
+    const id = providerID(providerId, "provider ID");
     const source = record(regional, id, REGIONS);
     const keys = Object.fromEntries(REGIONS
       .filter((region) => source[region] !== undefined)
@@ -121,7 +121,7 @@ async function requireBooted(requested: string[]): Promise<void> {
 }
 
 async function simulatorRegion(endpoint: string): Promise<LLMRegion> {
-  const { region } = await callHost("models.list", {}, 10_000, endpoint);
+  const { region } = await callHost("providers.list", {}, 10_000, endpoint);
   if (region !== "global" && region !== "china") throw new Error("simulator region lookup returned an invalid result");
   return region;
 }
@@ -149,8 +149,8 @@ async function bootstrap(): Promise<void> {
   await requireBooted([target.device, ...(source ? [source.device] : [])]);
   const region = needsCredentials ? await simulatorRegion(target.debugEndpoint) : undefined;
   const artifacts = await readArtifacts(dirname(profilePath ?? apiKeysPath), profile.artifacts);
-  const credentials = profile.providers.map((clientId) => ({ clientId, key: region && apiKeys[clientId]?.[region]?.trim() }));
-  const missing = credentials.filter(({ key }) => !key).map(({ clientId }) => clientId);
+  const credentials = profile.providers.map((providerId) => ({ providerId, key: region && apiKeys[providerId]?.[region]?.trim() }));
+  const missing = credentials.filter(({ key }) => !key).map(({ providerId }) => providerId);
   if (missing.length > 0) throw new Error(`missing API keys for ${missing.join(", ")}`);
 
   if (source) {
@@ -169,9 +169,9 @@ async function bootstrap(): Promise<void> {
     if (!installed || installed.length !== artifacts.length) throw new Error("artifact bootstrap returned an invalid result");
     artifacts.forEach((artifact, index) => console.log(`Artifact ${artifact.path} -> ${installed[index]} (${artifact.bytes} bytes)`));
   }
-  for (const { clientId, key } of credentials) {
-    await callHost("debug.providers.setKey", { clientId, key, region }, 10_000, target.debugEndpoint);
-    console.log(`Provider ${clientId}: ready`);
+  for (const { providerId, key } of credentials) {
+    await callHost("debug.providers.setKey", { providerId, key, region }, 10_000, target.debugEndpoint);
+    console.log(`Provider ${providerId}: ready`);
   }
   console.log(`BOOTSTRAPPED ${target.device} region=${region ?? "none"} providers=${credentials.length}`);
 }

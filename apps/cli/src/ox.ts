@@ -1,35 +1,22 @@
 #!/usr/bin/env bun
-import { service, SUBS as serviceSubs } from "./services.ts";
-import { runCli, type CommandGroup } from "./lib.ts";
-import { artifacts, chats, memory, profiles, skills, soul } from "./ox-content.ts";
-import { skill, SUBS as skillSubs } from "./user-skills.ts";
-import { herdr } from "./herdr.ts";
-import { repository, SUBS as repositorySubs } from "./repositories.ts";
-import { vm, SUBS as vmSubs } from "./vm.ts";
-import { chat, SUBS as chatSubs } from "./chat.ts";
-import { agent, SUBS as agentSubs } from "./agent.ts";
-import { discover } from "./discover.ts";
-import { logs } from "./logs.ts";
-import { host, SUBS as hostSubs } from "./host.ts";
+import { group, runCli, type CommandGroup } from "./lib.ts";
+import { PROFILE_COMMANDS } from "./ox-content.ts";
+import { REPOSITORY_COMMANDS } from "./repositories.ts";
+import { REPOSITORY_SERVICE_COMMANDS } from "./repository-services.ts";
+import { HOST_COMMANDS } from "./host.ts";
+import { SUBS as chatCommands } from "./chat.ts";
+import { SUBS as vmCommands } from "./vm.ts";
 import packageMetadata from "../package.json";
 
 const groups: Record<string, CommandGroup> = {
-  host: { fn: host, desc: "Inspect Host identity and compatibility", subs: hostSubs },
-  discover: { fn: discover, desc: "Discover reachable Ox Hosts" },
-  chat: { fn: chat, desc: "Inspect and watch chats through an Ox Host", subs: chatSubs },
-  agent: { fn: agent, desc: "List, run, or replay Host-provided agents", subs: agentSubs },
-  logs: { fn: logs, desc: "Read or follow structured Host logs" },
-  profiles: { fn: profiles, desc: "List Profiles in iCloud Drive (--json)" },
-  memory: { fn: memory, desc: "Print MEMORY.md from a Profile" },
-  soul: { fn: soul, desc: "Print SOUL.md from a Profile" },
-  skills: { fn: skills, desc: "List skills, or print one skill" },
-  artifacts: { fn: artifacts, desc: "List artifacts, or print one artifact" },
-  chats: { fn: chats, desc: "List chats, or print one transcript" },
-  herdr: { fn: herdr, desc: "Expose local Herdr agents through a loopback MCP server" },
-  repository: { fn: repository, desc: "Inspect, validate, or serve repositories", subs: repositorySubs },
-  skill: { fn: skill, desc: "Create and manage user skills", subs: skillSubs },
-  service: { fn: service, desc: "Inspect and exercise services", subs: serviceSubs },
-  vm: { fn: vm, desc: "Connect to an Ox Host and use its agent VM", subs: vmSubs },
+  profile: group("profile", "Read a Profile directly from disk (--profile <path>).", PROFILE_COMMANDS),
+  repository: group("repository", "Inspect, validate, serve, and test a repository (--repository <path-or-url>).", {
+    ...REPOSITORY_COMMANDS,
+    ...REPOSITORY_SERVICE_COMMANDS,
+  }),
+  host: group("host", "Inspect and operate an Ox Host (--host <ws-url>).", HOST_COMMANDS),
+  chat: group("chat", "Drive and inspect chats on the Host (--chat <chat-id>).", chatCommands),
+  vm: group("vm", "Use a chat-bound VM on the Host (--chat <chat-id>).", vmCommands),
 };
 
-await runCli("ox", packageMetadata.version, "Use Ox Hosts, chats, VMs, Profiles, and services", groups, process.argv.slice(2));
+await runCli("ox", packageMetadata.version, "Use Ox Profiles, repositories, Hosts, chats, and VMs", groups, process.argv.slice(2));

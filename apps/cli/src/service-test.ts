@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { createHostServiceRuntime } from "./service-runtime.ts";
 import {
   auditServiceFixtures,
@@ -9,13 +9,13 @@ import {
 } from "@openox/service-sdk/testing/replay/fixtures";
 import { startReplayProxy } from "@openox/service-sdk/testing/replay/proxy";
 import { fail, type CliContext } from "./lib.ts";
+import { requireRepository, withRepository } from "./repositories.ts";
 
 type Options = {
   selector?: string;
   proxyPort: number;
   timeoutMs: number;
   allowPartial: boolean;
-  source: string;
 };
 
 type CaseResult = { ok: boolean; label: string; detail?: string };
@@ -25,11 +25,12 @@ export async function testService(args: string[], context: CliContext): Promise<
     printUsage();
     return;
   }
-  await replayServices(parseOptions(args), context.host);
+  const options = parseOptions(args);
+  await withRepository(requireRepository(context), (root) => replayServices(options, join(root, "web"), context.host));
 }
 
-async function replayServices(options: Options, host?: string): Promise<void> {
-  const audit = await auditServiceFixtures(options.source);
+async function replayServices(options: Options, source: string, host?: string): Promise<void> {
+  const audit = await auditServiceFixtures(source);
   const selected = selectCases(audit.cases, options.selector);
   const selectedErrors = options.selector
     ? audit.errors.filter((error) => errorMatchesSelector(error, options.selector!))
@@ -141,7 +142,6 @@ function parseOptions(args: string[]): Options {
   let proxyPort: number | undefined;
   let timeoutMs = 30_000;
   let allowPartial = false;
-  let source = Bun.env.OX_SERVER_SOURCE ? resolve(Bun.env.OX_SERVER_SOURCE) : undefined;
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--proxy-port") {
@@ -150,10 +150,6 @@ function parseOptions(args: string[]): Options {
       timeoutMs = positiveInteger(args[++index], "--timeout");
     } else if (argument === "--allow-partial") {
       allowPartial = true;
-    } else if (argument === "--source") {
-      const value = args[++index];
-      if (!value) throw new Error("--source requires a service fixture directory");
-      source = resolve(value);
     } else if (argument.startsWith("--")) {
       throw new Error(`unknown option ${argument}`);
     } else if (selector) {
@@ -163,8 +159,7 @@ function parseOptions(args: string[]): Options {
     }
   }
   if (!proxyPort) throw new Error("service replay requires the fixed --proxy-port used in OX_SERVICE_PROXY");
-  if (!source) throw new Error("service replay requires --source <service-fixture-directory> or OX_SERVER_SOURCE");
-  return { selector, proxyPort, timeoutMs, allowPartial, source };
+  return { selector, proxyPort, timeoutMs, allowPartial };
 }
 
 function requiredDevice(): string {
@@ -187,7 +182,7 @@ function safePathComponent(value: string): string {
 
 function printUsage(): void {
   console.log(`Usage:
-  ox [--host <ws-url>] service test [domain[:action[:case]]] --source directory --proxy-port port [--timeout ms] [--allow-partial]
+  ox [--host <ws-url>] --repository <path-or-url> repository test [domain[:action[:case]]] --proxy-port port [--timeout ms] [--allow-partial]
 
 Replay requires OX_QA_DEVICE and a Host launched with OX_SERVICE_PROXY=http://127.0.0.1:<port>.`);
 }

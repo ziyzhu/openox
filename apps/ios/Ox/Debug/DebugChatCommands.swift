@@ -34,6 +34,123 @@ extension OxHostProtocol {
         reply.success(GetChatResult(data: DebugSnapshot(session)))
     }
 
+    @MainActor
+    static func handleNewChat(
+        _ command: NewChatRequest,
+        chatManager: ChatManager,
+        reply: OxHostRPC.Reply
+    ) {
+        let selection: (client: any ProviderClient, model: ProviderModel)?
+        switch (command.providerId, command.modelId) {
+        case (nil, nil):
+            selection = nil
+        case (let providerId?, let modelId?):
+            guard let client = ProviderRegistry.shared.client(id: providerId) else {
+                return reply.failure("unknown provider: \(providerId)")
+            }
+            guard let model = client.models.first(where: { $0.id == modelId }) else {
+                return reply.failure("unknown model: \(modelId) for provider \(providerId)")
+            }
+            selection = (client, model)
+        default:
+            return reply.failure("provide both providerId and modelId")
+        }
+        let chat = chatManager.startNewChat()
+        if chat.isTemporary != (command.temporary ?? false) {
+            chatManager.toggleTemporaryChat()
+        }
+        if let selection {
+            chat.switchModel(
+                to: selection.client,
+                model: selection.model,
+                selection: ModelSelection(
+                    providerID: selection.client.id,
+                    modelID: selection.model.id,
+                    reasoningEffort: selection.model.selectedReasoningEffort
+                )
+            )
+        }
+        let model = "\(chat.modelSelection.providerID):\(chat.modelSelection.modelID)"
+        Log.agent.info("OxHostRPC.chats.new id=\(reply.id) chat=\(chat.id) temporary=\(chat.isTemporary) model=\(model)")
+        reply.success(NewChatResult(chatId: chat.id.uuidString, temporary: chat.isTemporary, model: model))
+    }
+
+    @MainActor
+    static func handleSendChat(
+        _ command: SendChatRequest,
+        chatManager: ChatManager,
+        reply: OxHostRPC.Reply
+    ) {
+        guard !command.text.isEmpty else { return reply.failure("missing text") }
+        let chat: Chat
+        switch resolveSession(chatManager, command.sessionId) {
+        case .error(let error): return reply.failure(error)
+        case .found(nil): return reply.failure("no active chat; create one with chats.new")
+        case .found(let resolved?): chat = resolved
+        }
+        let wait = command.wait ?? true
+        Log.agent.info("OxHostRPC.chats.send id=\(reply.id) chat=\(chat.id) chars=\(command.text.count) wait=\(wait)")
+        guard wait else {
+            chat.enqueue(command.text)
+            return reply.success(SendChatResult(chatId: chat.id.uuidString, outcome: "queued"))
+        }
+        Task { @MainActor in
+            let outcome = await chat.submitUntilAttention(command.text)
+            Log.agent.info("OxHostRPC.chats.send id=\(reply.id) chat=\(chat.id) outcome=\(outcome.logLabel)")
+            reply.success(SendChatResult(chatId: chat.id.uuidString, outcome: outcome))
+        }
+    }
+
+    @MainActor
+    static func handleStopChat(
+        _ command: SessionRequest,
+        chatManager: ChatManager,
+        reply: OxHostRPC.Reply
+    ) {
+        let chat: Chat
+        switch resolveSession(chatManager, command.sessionId) {
+        case .error(let error): return reply.failure(error)
+        case .found(nil): return reply.failure("no active chat")
+        case .found(let resolved?): chat = resolved
+        }
+        let wasRunning = chat.isBusy
+        chat.stopCurrentTurn()
+        Log.agent.info("OxHostRPC.chats.stop id=\(reply.id) chat=\(chat.id) wasRunning=\(wasRunning)")
+        reply.success(StopChatResult(chatId: chat.id.uuidString, wasRunning: wasRunning))
+    }
+
+    struct NewChatResult: Encodable {
+        let chatId: String
+        let temporary: Bool
+        let model: String
+    }
+
+    struct SendChatResult: Encodable {
+        let chatId: String
+        let outcome: String
+        var text: String?
+        var error: String?
+
+        init(chatId: String, outcome: String) {
+            self.chatId = chatId
+            self.outcome = outcome
+        }
+
+        init(chatId: String, outcome: ChatSubmissionOutcome) {
+            self.init(chatId: chatId, outcome: outcome.logLabel)
+            switch outcome {
+            case .completed(let response): text = response
+            case .failed(let message): error = message
+            case .cancelled, .needsAttention: break
+            }
+        }
+    }
+
+    struct StopChatResult: Encodable {
+        let chatId: String
+        let wasRunning: Bool
+    }
+
     enum ChatLookup {
         case found(Chat?)
         case error(String)
@@ -53,11 +170,11 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleListModels(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
+    static func handleListProviders(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
         let registry = ProviderRegistry.shared
-        let clients = registry.clients.map { client in
+        let providers = registry.clients.map { client in
             let diagnostics = client.protocolDiagnostics
-            return ClientRow(
+            return ProviderRow(
                 id: client.id,
                 displayName: client.displayName,
                 regions: client.regions.map(\.rawValue).sorted(),
@@ -90,8 +207,8 @@ extension OxHostProtocol {
                 }
             )
         }
-        Log.agent.debug("OxHostRPC.models.list id=\(reply.id) count=\(clients.count)")
-        reply.success(ListModelsResult(region: AppRegion.shared.region.rawValue, clients: clients))
+        Log.agent.debug("OxHostRPC.providers.list id=\(reply.id) count=\(providers.count)")
+        reply.success(ListProvidersResult(region: AppRegion.shared.region.rawValue, providers: providers))
     }
 
     @MainActor

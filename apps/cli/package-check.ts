@@ -50,7 +50,10 @@ try {
   const help = await run([executable, "--help"], resolve(import.meta.dir, "../.."));
   if (!help.includes("Use Ox Hosts, chats, VMs, Profiles, and services")) throw new Error("installed ox help was incomplete");
   if (!help.includes("chat watch")) throw new Error("installed ox help omitted chat commands");
-  if (!help.includes("agent replay")) throw new Error("installed ox help omitted agent commands");
+  if (!help.includes("profile skills")) throw new Error("installed ox help omitted Profile commands");
+  if (!help.includes("host logs")) throw new Error("installed ox help omitted Host commands");
+  if (!help.includes("chat send")) throw new Error("installed ox help omitted chat driving commands");
+  if (!help.includes("host providers")) throw new Error("installed ox help omitted provider commands");
   if (help.includes("diagnostics")) throw new Error("installed ox help exposed removed diagnostic commands");
   if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");
   if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
@@ -64,8 +67,8 @@ try {
     executable,
     "--repository",
     resolve(import.meta.dir, "../../examples/repository"),
-    "service",
-    "list",
+    "repository",
+    "services",
     "--json",
   ], resolve(import.meta.dir, "../.."))) as Array<{ domain?: string }>;
   if (!services.some(({ domain }) => domain === "example.com")) throw new Error("installed ox could not inspect the example repository");

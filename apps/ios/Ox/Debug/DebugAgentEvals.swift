@@ -4,7 +4,7 @@ import Foundation
 extension OxHostProtocol {
     struct EvaluateAgentRequest: Decodable {
         let sessionId: String
-        let clientId: String
+        let providerId: String
         let modelId: String
         let prompts: [String]
         let fixtures: [AgentEvalFixture]
@@ -42,7 +42,7 @@ extension OxHostProtocol {
             reply.failure("Evals require an idle, empty chat as the prompt and tool template")
             return
         }
-        guard let client = ProviderRegistry.shared.client(id: command.clientId),
+        guard let client = ProviderRegistry.shared.client(id: command.providerId),
               client.id != "mock", let model = client.models.first(where: { $0.id == command.modelId }) else {
             reply.failure("Evals require a configured real provider and model")
             return

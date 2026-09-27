@@ -17,8 +17,8 @@ simulators, change settings, or import credentials.
 
 ```sh
 bun run evals --list --suite all
-ox discover
-ox --host ws://127.0.0.1:9105 agent list --json
+ox host discover
+ox --host ws://127.0.0.1:9105 host providers --json
 bun run evals --host ws://127.0.0.1:9105 --provider <id> --model <id>
 bun run evals --host ws://127.0.0.1:9105 --provider <id> --model <id> --suite all --repeat 3 --output /tmp/ox-candidate.json
 bun run evals compare /tmp/ox-baseline.json /tmp/ox-candidate.json

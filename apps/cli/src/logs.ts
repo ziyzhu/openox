@@ -91,7 +91,7 @@ function parseOptions(args: string[]): {
     else if (argument === "--interval") intervalMs = positiveNumber(args[++index], "--interval");
     else if (argument.startsWith("--interval=")) intervalMs = positiveNumber(argument.slice(11), "--interval");
     else if (argument === "-h" || argument === "--help") {
-      console.log(`Usage: ox [--host <url>] logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]`);
+      console.log(`Usage: ox [--host <url>] host logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }

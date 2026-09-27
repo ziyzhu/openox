@@ -1944,6 +1944,30 @@ final class Chat: Identifiable {
         }
     }
 
+    func submitUntilAttention(
+        _ intent: String,
+        skillInvocation: UserSkillInvocation? = nil
+    ) async -> ChatSubmissionOutcome {
+        await withTaskGroup(of: ChatSubmissionOutcome.self) { group in
+            group.addTask { @MainActor in
+                await self.submitAndWait(intent, skillInvocation: skillInvocation)
+            }
+            group.addTask { @MainActor in
+                while !Task.isCancelled {
+                    if self.hasPendingInteraction { return .needsAttention }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                return .cancelled
+            }
+            let outcome = await group.next() ?? .cancelled
+            group.cancelAll()
+            if outcome == .needsAttention {
+                Log.session.info("Chat.submitUntilAttention paused id=\(id) reason=pendingInteraction")
+            }
+            return outcome
+        }
+    }
+
     @discardableResult
     private func enqueue(
         _ intent: String,

@@ -23,7 +23,7 @@ document.getElementById("signin").onclick = () => run(() => ox.service.signIn({d
 document.getElementById("verify").onclick = () => run(() => ox.service.solve({domain:"archive.ph", args:{url:"https://example.com/"}, purpose:"Test canvas bot control"}));
 document.getElementById("pay").onclick = () => run(() => ox.service.pay({domain:"oftendining.com", args:{storeId:"canvas-fixture"}, purpose:"Test canvas checkout"}));
 document.getElementById("receipt-error").onclick = () => run(() => ox.service.pay({domain:"my.pacificsciencecenter.org", args:{}, purpose:"Reproduce service receipt error"}));
-const exportFile = path => ox.service.invoke({name:"mcp:__MCP_DOMAIN__:agent_artifact_get", input:{target:"canvas-fixture", path}, purpose:"Export canvas test file"});
+const exportFile = path => ox.service.invoke({name:"mcp:__MCP_DOMAIN__:artifact_get", input:{path}, purpose:"Export canvas test file"});
 document.getElementById("export").onclick = () => run(() => exportFile("artifacts/canvas-export.txt"));
 document.getElementById("missing").onclick = () => run(() => exportFile("artifacts/missing.txt"));
 </script>

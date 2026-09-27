@@ -74,12 +74,12 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
   if (version !== packageMetadata.version) throw new Error(`Unexpected version: ${version}`);
   const help = await run([executable, "--help"]);
   if (!help.includes("vm inspect")) throw new Error("Standalone help omitted VM commands");
-  const services = JSON.parse(await run([executable, "--repository", repositoryDirectory, "service", "list", "--json"]));
+  const services = JSON.parse(await run([executable, "--repository", repositoryDirectory, "repository", "services", "--json"]));
   if (!services.some((service: { domain: string }) => service.domain === "example.com")) {
     throw new Error("Standalone executable could not inspect the example repository");
   }
-  await run([executable, "repository", "validate", repositoryDirectory]);
-  const discovery = JSON.parse(await run([executable, "discover", "--json"], {
+  await run([executable, "--repository", repositoryDirectory, "repository", "validate"]);
+  const discovery = JSON.parse(await run([executable, "host", "discover", "--json"], {
     ...environment, OX_SIM_DAEMON_PORT: String(server.port),
   }));
   if (discovery.hosts[0]?.endpoint !== "ws://127.0.0.1:9876") throw new Error("Standalone loaded the working directory's .env");

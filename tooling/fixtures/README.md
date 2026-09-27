@@ -14,9 +14,8 @@ curl --fail http://127.0.0.1:8102/health
 The command prints a temporary bootstrap profile. Import it with
 `bun run sim:bootstrap --device ox-qa-2 --profile <printed-profile>`.
 In Services, select the MCP filter and connect `http://127.0.0.1:8102/mcp`.
-The server uses the production Herdr artifact handler and permits only workspace
-lookup for `canvas-fixture`; other Herdr operations fail. The only supplied file
-is `artifacts/canvas-export.txt`.
+The server exposes one `artifact_get` tool that returns fixture files as MCP
+resources. The only supplied file is `artifacts/canvas-export.txt`.
 
 Start the network fixtures using mitmproxy 12.2.3:
 
@@ -59,7 +58,7 @@ Open Canvas Integration from Artifacts → All. Verify:
   the canvas deletes that directory. Missing file errors must reject without
   creating an output. Closing while approval is pending must cancel the call.
 - No chat is created. Use `ox --host ws://127.0.0.1:9102 chat list --json` and
-  `ox --host ws://127.0.0.1:9102 logs --grep Canvas` to inspect results.
+  `ox --host ws://127.0.0.1:9102 host logs --grep Canvas` to inspect results.
 
 To repeat handoff tests, request `/canvas-test/reset` on `github.com` and
 `oftendining.com` through the fixture proxy. Restarting the proxy also resets its

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { Value } from "@sinclair/typebox/value";
 import { VMParamsSchemas, VMResultSchema } from "./vm-protocol.ts";
 import { callHost } from "./host-rpc.ts";
-import { dispatch, fail, failResult, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
+import { fail, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
 
 type VMResult = {
   value?: unknown;
@@ -15,13 +15,9 @@ export const SUBS: Record<string, SubCommand> = {
   help: { desc: "Print the complete contract for one ox.* function", fn: help },
   call: { desc: "Call one ox.* function with structured JSON arguments", fn: call },
   eval: { desc: "Run arbitrary JavaScript in the selected chat-bound VM", fn: evaluate },
-  skills: { desc: "List the skills visible to the selected chat-bound VM", fn: skills },
-  skill: { desc: "Read one skill through the selected chat-bound VM", fn: skill },
+  skills: { desc: "List the skills visible to the selected chat-bound VM, or print one", fn: skills },
 };
 
-export async function vm(args: string[], context: CliContext): Promise<void> {
-  return dispatch("vm", "Connect to an Ox Host and use its agent VM contract.", SUBS, args, context);
-}
 
 async function inspect(args: string[], context: CliContext): Promise<void> {
   const options = parseOutputOptions(args, 30000);
@@ -138,40 +134,29 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
 }
 
 async function skills(args: string[], context: CliContext): Promise<void> {
-  const options = parseOutputOptions(args, 60000);
-  const result = await request("vm.call", context, options.timeoutMs, {
-    function: "ox.fs.list",
-    arguments: { path: "skills", purpose: "List VM skills" },
-  });
+  const name = args[0]?.startsWith("-") ? undefined : args[0];
+  const rest = name ? args.slice(1) : args;
+  if (rest.includes("-h") || rest.includes("--help")) {
+    console.log("Usage: ox [--chat <id>] vm skills [name] [--json] [--timeout 60000]");
+    return;
+  }
+  const options = parseOutputOptions(rest, 60000);
+  const result = await request("vm.call", context, options.timeoutMs, name
+    ? { function: "ox.fs.read", arguments: { path: `skills/${name}/SKILL.md`, purpose: "Read VM skill" } }
+    : { function: "ox.fs.list", arguments: { path: "skills", purpose: "List VM skills" } });
   const value = valueObject(result);
   if (options.json) {
     printVMJSON(result);
+    return;
+  }
+  if (name) {
+    if (typeof value.text !== "string") fail("VM skill is not readable text");
+    process.stdout.write(value.text.endsWith("\n") ? value.text : `${value.text}\n`);
     return;
   }
   const items = Array.isArray(value.items) ? value.items : [];
   for (const item of items) console.log(String(object(item).path ?? ""));
   if (value.truncated === true) console.log(terminalText("Results truncated", [C.dim]));
-}
-
-async function skill(args: string[], context: CliContext): Promise<void> {
-  const [subcommand, name, ...rest] = args;
-  if (subcommand === "-h" || subcommand === "--help" || !subcommand) {
-    console.log("Usage: ox vm skill read <name> [--json] [--timeout 60000]");
-    return;
-  }
-  if (subcommand !== "read" || !name) fail("Usage: ox vm skill read <name> [--json] [--timeout 60000]");
-  const options = parseOutputOptions(rest, 60000);
-  const result = await request("vm.call", context, options.timeoutMs, {
-    function: "ox.fs.read",
-    arguments: { path: `skills/${name}/SKILL.md`, purpose: "Read VM skill" },
-  });
-  const value = valueObject(result);
-  if (options.json) {
-    printVMJSON(result);
-    return;
-  }
-  if (typeof value.text !== "string") fail("VM skill is not readable text");
-  process.stdout.write(value.text.endsWith("\n") ? value.text : `${value.text}\n`);
 }
 
 async function request(

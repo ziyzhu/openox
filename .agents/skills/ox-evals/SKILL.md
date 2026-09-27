@@ -10,7 +10,7 @@ Read it before running or modifying evals. Cases, fixtures, scoring, and the run
 belong in `evals/`; keep this skill focused on the workflow.
 
 Use `bun run evals --list --suite all` to inspect coverage. Select a configured
-real provider/model with `ox agent list` and an explicit simulator Host. Reuse the
+real provider/model with `ox host providers` and an explicit simulator Host. Reuse the
 user's authorized target and provider choices. Running the suite invokes that
 provider and consumes tokens; listing, validation, comparison, and scoring tests
 are local. Mock responses cannot establish prompt quality.

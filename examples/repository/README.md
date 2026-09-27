@@ -7,8 +7,8 @@ its own Git repository, replace `example.com` with the target domain, and update
 Validate or serve it from the OpenOx checkout:
 
 ```sh
-ox repository validate examples/repository
-ox repository serve examples/repository --port 8101
+ox --repository examples/repository repository validate
+ox --repository examples/repository repository serve --port 8101
 ```
 
 Remote repositories may contain web and MCP services. Native iOS services are

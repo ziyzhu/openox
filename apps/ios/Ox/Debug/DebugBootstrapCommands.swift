@@ -16,13 +16,13 @@ extension OxHostProtocol {
 
     @MainActor
     static func handleSetKey(_ command: SetKeyRequest, reply: OxHostRPC.Reply) {
-        guard !command.clientId.isEmpty else {
-            reply.failure("missing clientId")
+        guard !command.providerId.isEmpty else {
+            reply.failure("missing providerId")
             return
         }
-        let clientId = command.clientId
-        guard let client = ProviderRegistry.shared.client(id: clientId, in: command.region ?? ProviderRegistry.shared.defaultRegion) else {
-            reply.failure("unknown client: \(clientId)")
+        let providerId = command.providerId
+        guard let client = ProviderRegistry.shared.client(id: providerId, in: command.region ?? ProviderRegistry.shared.defaultRegion) else {
+            reply.failure("unknown provider: \(providerId)")
             return
         }
         let credentialID = client.credentialID
@@ -31,14 +31,14 @@ extension OxHostProtocol {
             if key.isEmpty {
                 try Secret.unbind(.provider, id: credentialID)
             } else {
-                let definition = try ProviderRegistry.shared.definition(id: clientId)
+                let definition = try ProviderRegistry.shared.definition(id: providerId)
                 try Secret.saveProviderKey(key, definition: definition)
             }
         } catch {
             reply.failure(error.localizedDescription)
             return
         }
-        Log.agent.info("OxHostRPC.debug.providers.setKey client=\(clientId) credential=\(credentialID) chars=\(key.count)")
+        Log.agent.info("OxHostRPC.debug.providers.setKey provider=\(providerId) credential=\(credentialID) chars=\(key.count)")
         reply.success()
     }
 

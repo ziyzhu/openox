@@ -81,7 +81,7 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
   ]);
   const removedOptions = new Map([
     ["--runtime", "--runtime was removed; the selected Host owns service page implementation"],
-    ["--session", "--session was removed; use --chat for ox vm or --herdr-session for ox herdr"],
+    ["--session", "--session was removed; use --chat for ox vm"],
     ["--vm-session", "--vm-session was renamed to --chat"],
     ["--root", "--root was renamed to --profile"],
   ]);
@@ -135,6 +135,12 @@ export async function runCli(
     return;
   }
   const group = groups[name];
+  const moved = MOVED_COMMANDS[name];
+  if (!group && moved) {
+    writeError(`error: ox ${name} moved to ${moved}`);
+    process.exitCode = 1;
+    return;
+  }
   if (!group) {
     writeError(`Unknown command: ${name}`);
     console.log("");
@@ -153,23 +159,32 @@ export async function runCli(
   catch (error) { writeError(`error: ${(error as Error).message}`); process.exitCode = 1; }
 }
 
+const MOVED_COMMANDS: Record<string, string> = {
+  profiles: "ox profile list",
+  memory: "ox profile memory",
+  soul: "ox profile soul",
+  skills: "ox profile skills, ox repository skills, or ox vm skills",
+  artifacts: "ox profile artifacts",
+  chats: "ox profile chats",
+  discover: "ox host discover",
+  logs: "ox host logs",
+  providers: "ox host providers",
+  service: "ox repository services|actions|test or ox host services|service",
+};
+
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
-  const profileCommands = new Set(["memory", "soul", "skills", "artifacts", "chats", "skill"]);
-  const hostCommands = new Set(["host", "discover", "chat", "agent", "logs", "vm"]);
-  const chatCommands = new Set(["chat", "agent", "vm"]);
-  const liveServiceCommands = new Set(["status", "invoke", "eval", "reload", "sync", "test"]);
-  const repositoryServiceCommands = new Set(["list", "inspect", "actions"]);
-  if (context.chat && !chatCommands.has(command)) throw new Error("--chat applies only to ox chat, ox agent, and ox vm");
-  if (context.chat && ((command === "chat" && subcommand === "list") || (command === "agent" && subcommand === "list"))) {
-    throw new Error(`--chat does not apply to ox ${command} list`);
+  if (context.chat && command !== "chat" && command !== "vm") throw new Error("--chat applies only to ox chat and ox vm");
+  if (context.chat && command === "chat" && (subcommand === "list" || subcommand === "new")) {
+    throw new Error(`--chat does not apply to ox chat ${subcommand}`);
   }
-  if (context.profile && !profileCommands.has(command)) throw new Error("--profile applies only to direct Profile administration commands");
-  if (context.host && !hostCommands.has(command) && !(command === "service" && (!subcommand || liveServiceCommands.has(subcommand)))) {
-    throw new Error("--host applies only to live Ox Host commands");
-  }
-  if (context.repository && command !== "repository" && command !== "skills" && !(command === "service" && (!subcommand || repositoryServiceCommands.has(subcommand)))) {
-    throw new Error("--repository applies only to ox repository, ox skills, and offline ox service commands");
-  }
+  if (context.profile && command !== "profile") throw new Error("--profile applies only to ox profile");
+  if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
+  const usesHost = command === "host" || command === "chat" || command === "vm" || (command === "repository" && subcommand === "test");
+  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox chat, ox vm, and ox repository test");
+}
+
+export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {
+  return { desc, subs, fn: (args, context) => dispatch(name, desc, subs, args, context) };
 }
 
 export async function dispatch(

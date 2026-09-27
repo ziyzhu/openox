@@ -150,13 +150,14 @@ final class ScheduledSkillScheduler {
             case .completed: .succeeded
             case .failed(let message): .failed(message)
             case .cancelled: .cancelled
+            case .needsAttention: .failed("The scheduled skill needs attention in Ox.")
             }
             do {
                 try ScheduledSkills.shared.record(id: schedule.id, outcome: runOutcome, chatID: chatID)
             } catch {
                 Log.app.error("ScheduledSkillScheduler.record failed id=\(schedule.id) error=\(error.localizedDescription)")
             }
-            if case .failed(let message) = outcome {
+            if case .failed(let message) = runOutcome {
                 await notifyFailure(schedule: schedule, message: message)
             }
         }

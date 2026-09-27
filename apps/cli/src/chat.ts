@@ -8,7 +8,7 @@ import {
   usageBreakdown,
   type ChatSnapshot,
 } from "./host-snapshot.ts";
-import { C, dispatch, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
+import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 
 type ChatOptions = {
   timeoutMs: number;
@@ -20,13 +20,13 @@ type ChatOptions = {
 
 export const SUBS: Record<string, SubCommand> = {
   list: { desc: "List chats exposed by the selected Host (--json)", fn: listChats },
+  new: { desc: "Start a chat and make it active, optionally temporary or on a chosen model", fn: newChat },
+  send: { desc: "Send a message through the real chat turn and wait for its outcome", fn: sendChat },
+  stop: { desc: "Stop the selected chat's running turn", fn: stopChat },
   inspect: { desc: "Inspect the selected chat's prompt, tools, messages, and blocks", fn: inspectChat },
   watch: { desc: "Watch the selected chat for changes, reconnecting between snapshots", fn: watchChat },
 };
 
-export async function chat(args: string[], context: CliContext): Promise<void> {
-  return dispatch("chat", "Inspect chats and their Host-owned VM context.", SUBS, args, context);
-}
 
 async function listChats(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args);
@@ -44,6 +44,43 @@ async function listChats(args: string[], context: CliContext): Promise<void> {
     return;
   }
   printChats(rows);
+}
+
+type SendResult = { chatId: string; outcome: string; text?: string; error?: string };
+
+async function newChat(args: string[], context: CliContext): Promise<void> {
+  const options = parseNewOptions(args);
+  if (Boolean(options.provider) !== Boolean(options.model)) fail("chat new requires --provider and --model together");
+  const result = await requireHost("chats.new", context, options.timeoutMs, {
+    ...(options.temporary ? { temporary: true } : {}),
+    ...(options.provider ? { providerId: options.provider, modelId: options.model } : {}),
+  });
+  if (options.attach.length) await requireHost("debug.chats.attachServices", context, options.timeoutMs, { domains: options.attach });
+  if (options.json) console.log(JSON.stringify({ ...result, attached: options.attach }, null, 2));
+  else console.log(result.chatId);
+}
+
+async function sendChat(args: string[], context: CliContext): Promise<void> {
+  const options = parseSendOptions(args);
+  const text = options.text === "-" ? (await Bun.stdin.text()).trim() : options.text;
+  if (!text) fail("chat send requires message text");
+  const result = await requireHost("chats.send", context, options.timeoutMs, { text, wait: options.wait }) as SendResult;
+  if (options.json) console.log(JSON.stringify(result, null, 2));
+  else if (result.outcome === "completed") console.log(result.text ?? "");
+  else if (result.outcome === "queued") console.log(result.chatId);
+  if (result.outcome === "completed" || result.outcome === "queued") return;
+  const detail = result.outcome === "needsAttention"
+    ? "chat is waiting for a user response in Ox; answer it in the app or run ox chat stop"
+    : result.error ?? result.outcome;
+  process.stderr.write(`chat send ${result.outcome}: ${detail} (chat ${result.chatId})\n`);
+  process.exitCode = 1;
+}
+
+async function stopChat(args: string[], context: CliContext): Promise<void> {
+  const options = parseListOptions(args, "stop");
+  const result = await requireHost("chats.stop", context, options.timeoutMs);
+  if (options.json) console.log(JSON.stringify(result, null, 2));
+  else console.log(result.wasRunning ? `stop requested ${result.chatId}` : `idle ${result.chatId}`);
 }
 
 async function inspectChat(args: string[], context: CliContext): Promise<void> {
@@ -93,7 +130,7 @@ async function fetchSnapshot(context: CliContext, timeoutMs: number): Promise<Ch
   return (result.data ?? null) as ChatSnapshot | null;
 }
 
-function parseListOptions(args: string[]): { timeoutMs: number; json: boolean } {
+function parseListOptions(args: string[], command: "list" | "stop" = "list"): { timeoutMs: number; json: boolean } {
   let timeoutMs = 30000;
   let json = false;
   for (let index = 0; index < args.length; index++) {
@@ -102,11 +139,66 @@ function parseListOptions(args: string[]): { timeoutMs: number; json: boolean } 
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox [--host <url>] chat list [--json] [--timeout 30000]");
+      const chat = command === "stop" ? " [--chat <id>]" : "";
+      console.log(`Usage: ox [--host <url>]${chat} chat ${command} [--json] [--timeout 30000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
   return { timeoutMs, json };
+}
+
+function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; temporary: boolean; provider: string; model: string; attach: string[] } {
+  let timeoutMs = 30000;
+  let json = false;
+  let temporary = false;
+  let provider = "";
+  let model = "";
+  const attach: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index]!;
+    if (argument === "--json") json = true;
+    else if (argument === "--temporary") temporary = true;
+    else if (argument === "--provider") provider = requiredValue(args[++index], "--provider");
+    else if (argument.startsWith("--provider=")) provider = argument.slice(11);
+    else if (argument === "--model") model = requiredValue(args[++index], "--model");
+    else if (argument.startsWith("--model=")) model = argument.slice(8);
+    else if (argument === "--attach") attach.push(...requiredValue(args[++index], "--attach").split(","));
+    else if (argument.startsWith("--attach=")) attach.push(...argument.slice(9).split(","));
+    else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
+    else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
+    else if (argument === "-h" || argument === "--help") {
+      console.log("Usage: ox [--host <url>] chat new [--temporary] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]");
+      console.log("       Prints the new chat id; use ox host providers for provider and model ids.");
+      process.exit(0);
+    } else fail(`unknown option: ${argument}`);
+  }
+  return { timeoutMs, json, temporary, provider, model, attach: attach.filter(Boolean) };
+}
+
+function parseSendOptions(args: string[]): { timeoutMs: number; json: boolean; wait: boolean; text: string } {
+  let timeoutMs = 600000;
+  let json = false;
+  let wait = true;
+  const words: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index]!;
+    if (argument === "--json") json = true;
+    else if (argument === "--no-wait") wait = false;
+    else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
+    else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
+    else if (argument === "-h" || argument === "--help") {
+      console.log("Usage: ox [--host <url>] [--chat <id>] chat send <text | -> [--no-wait] [--json] [--timeout 600000]");
+      console.log("       Runs a real chat turn with tools and services; - reads the message from stdin.");
+      console.log("       Exits 1 when the turn fails, is cancelled, or needs a user response in Ox.");
+      process.exit(0);
+    } else if (argument.startsWith("--")) fail(`unknown option: ${argument}`);
+    else words.push(argument);
+  }
+  return { timeoutMs, json, wait, text: words.join(" ") };
+}
+
+function requiredValue(value: string | undefined, flag: string): string {
+  return value || fail(`${flag} requires a value`);
 }
 
 function parseChatOptions(args: string[], watching: boolean): ChatOptions {

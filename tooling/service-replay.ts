@@ -145,7 +145,7 @@ try {
       await run(["bun", "run", "export", "--output", generatedRepository], { cwd: repository });
     }
     registry = Bun.spawn({
-      cmd: ["bun", "apps/cli/src/ox.ts", "repository", "serve", generatedRepository, "--port", String(config.registryPort)],
+      cmd: ["bun", "apps/cli/src/ox.ts", "--repository", generatedRepository, "repository", "serve", "--port", String(config.registryPort)],
       cwd: ROOT,
       env: Bun.env,
       stdout: "inherit",
@@ -179,11 +179,11 @@ try {
   const environment = {
     OX_QA_DEVICE: config.device,
     OX_DEBUG_ENDPOINT: config.debugEndpoint,
-    OX_SERVER_SOURCE: join(repository ?? resolve(ROOT, "repositories/builtin"), "web"),
   };
   await run([
     "bun", "apps/cli/src/ox.ts",
-    "service", "test",
+    "--repository", repository ?? resolve(ROOT, "repositories/builtin"),
+    "repository", "test",
     ...(selector ? [selector] : []),
     "--proxy-port", String(config.serviceProxyPort),
     "--allow-partial",

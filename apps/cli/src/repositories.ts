@@ -2,7 +2,7 @@ import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } f
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { C, dispatch, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
+import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { verifyRepository } from "./repository-verify.ts";
 import { inspectInstaller } from "@openox/service-sdk/installer";
 import { validateServiceManifest } from "@openox/service-sdk/manifest";
@@ -27,16 +27,13 @@ const SERVICE_ID = /^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
 const CONTENT_HASH = /^[a-f0-9]{64}$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-export const SUBS: Record<string, SubCommand> = {
+export const REPOSITORY_COMMANDS: Record<string, SubCommand> = {
   inspect: { desc: "Inspect a local, localhost, or HTTPS repository", fn: inspectRepository },
   validate: { desc: "Validate a local, localhost, or HTTPS repository", fn: validateRepository },
   verify: { desc: "Verify that a Git URL conforms to the Ox Server IR", fn: verifyRepository },
   serve: { desc: "Serve a local or remote repository on localhost", fn: serveRepository },
 };
 
-export async function repository(args: string[], context: CliContext): Promise<void> {
-  return dispatch("repository", "Inspect, validate, verify, or locally serve a repository.", SUBS, args, context);
-}
 
 function servicePath(id: string): string {
   const separator = id.indexOf(":");
@@ -257,18 +254,17 @@ async function uploadPack(gitDir: string, req: Request, url: URL): Promise<Respo
   }
 }
 
-function originArgument(args: string[], usage: string): string {
-  const values = args.filter(argument => argument !== "--json");
-  if (values.includes("-h") || values.includes("--help")) {
+function originArgument(args: string[], context: CliContext, usage: string): string {
+  if (args.includes("-h") || args.includes("--help")) {
     console.log(usage);
     process.exit(0);
   }
-  if (values.length !== 1) fail("expected one repository path or URL");
-  return values[0]!;
+  if (args.length) fail(`unexpected argument: ${args[0]}`);
+  return requireRepository(context);
 }
 
-async function inspectRepository(args: string[]): Promise<void> {
-  const origin = originArgument(args, "Usage: ox repository inspect <path-or-url>");
+async function inspectRepository(args: string[], context: CliContext): Promise<void> {
+  const origin = originArgument(args, context, "Usage: ox --repository <path-or-url> repository inspect");
   const selected = await checkout(origin);
   try {
     process.stdout.write(`${JSON.stringify(await readRepository(selected.root), null, 2)}\n`);
@@ -277,8 +273,8 @@ async function inspectRepository(args: string[]): Promise<void> {
   }
 }
 
-async function validateRepository(args: string[]): Promise<void> {
-  const origin = originArgument(args, "Usage: ox repository validate <path-or-url>");
+async function validateRepository(args: string[], context: CliContext): Promise<void> {
+  const origin = originArgument(args, context, "Usage: ox --repository <path-or-url> repository validate");
   const selected = await checkout(origin);
   try {
     const manifest = await readRepository(selected.root);
@@ -300,19 +296,17 @@ async function waitForTermination(): Promise<void> {
   });
 }
 
-async function serveRepository(args: string[]): Promise<void> {
-  let origin = "";
+async function serveRepository(args: string[], context: CliContext): Promise<void> {
   let port = 8100;
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--port") port = Number(args[++index]);
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox repository serve <path-or-url> [--port 8100]");
+      console.log("Usage: ox --repository <path-or-url> repository serve [--port 8100]");
       return;
-    } else if (!origin) origin = argument;
-    else fail(`unexpected argument: ${argument}`);
+    } else fail(`unexpected argument: ${argument}`);
   }
-  if (!origin) fail("expected a repository path or URL");
+  const origin = requireRepository(context);
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail("--port must be an integer from 0 through 65535");
   const selected = await checkout(origin);
   let snapshot: Snapshot | undefined;

@@ -267,7 +267,10 @@ final class ChatManager {
         hydrationOrdinal &+= 1
         records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
         let invocation = UserSkillInvocation(skill: schedule.skill, argument: schedule.argument)
-        let outcome = await scheduledOutcome(chat: chat, invocation: invocation)
+        let outcome = await chat.submitUntilAttention(
+            invocation.expandedIntent,
+            skillInvocation: invocation
+        )
         _ = await flushAllNow()
         Log.session.info("ChatManager.scheduled finished schedule=\(schedule.id) chat=\(chat.id) outcome=\(outcome.logLabel)")
         return (outcome, chat.id)
@@ -609,35 +612,6 @@ final class ChatManager {
         attachPersistence(chat)
         Log.session.info("ChatManager created chat=\(chat.id) retention=\(String(describing: retention))")
         return chat
-    }
-
-    private func scheduledOutcome(
-        chat: Chat,
-        invocation: UserSkillInvocation
-    ) async -> ChatSubmissionOutcome {
-        await withTaskGroup(of: ChatSubmissionOutcome.self) { group in
-            group.addTask { @MainActor in
-                await chat.submitAndWait(
-                    invocation.expandedIntent,
-                    skillInvocation: invocation
-                )
-            }
-            group.addTask { @MainActor in
-                while !Task.isCancelled {
-                    if chat.hasPendingInteraction {
-                        return .failed("The scheduled skill needs attention in Ox.")
-                    }
-                    try? await Task.sleep(for: .milliseconds(50))
-                }
-                return .cancelled
-            }
-            let outcome = await group.next() ?? .cancelled
-            group.cancelAll()
-            if case .failed = outcome, chat.hasPendingInteraction {
-                Log.session.info("ChatManager.scheduled paused chat=\(chat.id) reason=pendingInteraction")
-            }
-            return outcome
-        }
     }
 
     private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {

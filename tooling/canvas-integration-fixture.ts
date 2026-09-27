@@ -1,17 +1,14 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHerdrMCPHandler } from "../apps/cli/src/herdr.ts";
-import { mcpManagementFixture } from "./fixtures/mcp-management.ts";
+import { mcpArtifactFixture, mcpManagementFixture } from "./fixtures/mcp-management.ts";
 import { ROOT } from "./lib.ts";
 import { qaCommand } from "./qa-config.ts";
 
 const config = qaCommand({ usage: "Usage: bun tooling/canvas-integration-fixture.ts --device ox-qa-N" });
 const directory = await mkdtemp(join(tmpdir(), "ox-canvas-integration-"));
-await mkdir(join(directory, "artifacts"));
-await Bun.write(join(directory, "artifacts/canvas-export.txt"), "Ox canvas export fixture\nNo account data or credentials.\n");
-const repository = Bun.spawn(["ox", "repository", "serve", join(ROOT, "repositories/builtin"), "--port", "0"], {
+const repository = Bun.spawn(["ox", "--repository", join(ROOT, "repositories/builtin"), "repository", "serve", "--port", "0"], {
   stdout: "pipe", stderr: "inherit",
 });
 let server: ReturnType<typeof Bun.serve> | undefined;
@@ -36,10 +33,7 @@ try {
       upstream = output.match(/READY (http:\/\/127\.0\.0\.1:\d+)\/repository.git/)?.[1] ?? "";
     }
   } finally { clearTimeout(timeout); reader.releaseLock(); }
-  const mcp = createHerdrMCPHandler(async args => {
-    if (args.join(" ") !== "agent get canvas-fixture") throw new Error("Only the fixture workspace is available");
-    return { result: { agent: { cwd: directory } } };
-  });
+  const mcp = mcpArtifactFixture({ "artifacts/canvas-export.txt": "Ox canvas export fixture\nNo account data or credentials.\n" });
   server = Bun.serve({
     hostname: "127.0.0.1", port: config.registryPort,
     fetch: request => {

@@ -22,13 +22,13 @@ type Verification = {
   warn(check: string, detail: string): void;
 };
 
-export async function verifyRepository(args: string[], _context: CliContext): Promise<void> {
-  const origin = args[0];
-  if (!origin || origin === "-h" || origin === "--help") {
-    console.log("Usage: ox repository verify <git-url>");
+export async function verifyRepository(args: string[], context: CliContext): Promise<void> {
+  if (args.includes("-h") || args.includes("--help")) {
+    console.log("Usage: ox --repository <git-url> repository verify");
     return;
   }
-  if (args.length !== 1) fail("repository verify expects one Git URL");
+  if (args.length) fail(`unexpected argument: ${args[0]}`);
+  const origin = context.repository ?? fail("repository verify requires --repository <git-url>");
   validateOrigin(origin);
   const result = verification();
   const directory = await mkdtemp(join(tmpdir(), "ox-repository-verify-"));

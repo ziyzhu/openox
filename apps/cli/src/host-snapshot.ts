@@ -13,17 +13,7 @@ export type ChatSnapshot = {
 };
 
 export type ModelEntry = { id: string; displayName: string; maxTokens: number; maxContext: number };
-export type ClientEntry = { id: string; displayName: string; regions: string[]; supportsTools: boolean; models: ModelEntry[] };
-
-export type AgentRunResult = {
-  ok: boolean;
-  client?: { id: string; displayName: string };
-  model?: ModelEntry;
-  message?: any;
-  ttftMs?: number;
-  totalMs?: number;
-  error?: string;
-};
+export type ProviderEntry = { id: string; displayName: string; regions: string[]; supportsTools: boolean; models: ModelEntry[] };
 
 type Usage = { input: number; output: number; cachedInput: number; totalTokens: number };
 

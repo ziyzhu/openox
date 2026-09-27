@@ -13,12 +13,14 @@ extension OxHostProtocol {
         case syncServices = "services.sync"
         case listChats = "chats.list"
         case getChat = "chats.get"
-        case listModels = "models.list"
+        case newChat = "chats.new"
+        case sendChat = "chats.send"
+        case stopChat = "chats.stop"
+        case listProviders = "providers.list"
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
         case repositoryGate = "debug.repositories.saveGate"
         case replayStorageMigration = "debug.storage.replayMigration"
-        case runAgent = "agents.run"
         case evaluateAgent = "agents.evaluate"
         case vmInspect = "vm.inspect"
         case vmFunctions = "vm.functions"
@@ -61,24 +63,20 @@ extension OxHostProtocol {
         let domain: String
     }
 
-    struct RunAgentRequest: Decodable {
-        struct HistoryTurn: Decodable {
-            let user: String
-            let assistant: AssistantMessage
-        }
+    struct NewChatRequest: Decodable {
+        let temporary: Bool?
+        let providerId: String?
+        let modelId: String?
+    }
 
+    struct SendChatRequest: Decodable {
         let sessionId: String?
-        let clientId: String
-        let modelId: String
-        let prompt: String?
-        let systemPromptOverride: String?
-        let toolDescriptionOverrides: [String: String]?
-        let toolParameterOverrides: [String: JSONValue]?
-        let historyOverride: [HistoryTurn]?
+        let text: String
+        let wait: Bool?
     }
 
     struct SetKeyRequest: Decodable {
-        let clientId: String
+        let providerId: String
         let key: String?
         let region: LLMRegion?
     }
@@ -202,7 +200,7 @@ extension OxHostProtocol {
         let wireProtocol: String?
     }
 
-    struct ClientRow: Encodable {
+    struct ProviderRow: Encodable {
         let id: String
         let displayName: String
         let regions: [String]
@@ -215,9 +213,9 @@ extension OxHostProtocol {
         let models: [ModelRow]
     }
 
-    struct ListModelsResult: Encodable {
+    struct ListProvidersResult: Encodable {
         let region: String
-        let clients: [ClientRow]
+        let providers: [ProviderRow]
     }
 
     struct DebugLogRow: Encodable {

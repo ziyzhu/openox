@@ -1,13 +1,18 @@
 import { HostRPCClient } from "./host-rpc.ts";
-import { dispatch, fail, type CliContext, type SubCommand } from "./lib.ts";
+import { fail, type CliContext, type SubCommand } from "./lib.ts";
+import { discover } from "./discover.ts";
+import { logs } from "./logs.ts";
+import { providers } from "./providers.ts";
+import { hostService, serviceStatus } from "./services.ts";
 
-export const SUBS: Record<string, SubCommand> = {
+export const HOST_COMMANDS: Record<string, SubCommand> = {
   describe: { desc: "Show Host identity, supported protocol versions and methods (--json)", fn: describe },
+  discover: { desc: "Discover reachable Ox Hosts", fn: discover },
+  logs: { desc: "Read or follow structured Host logs", fn: logs },
+  providers: { desc: "List the Host's model providers and their models", fn: providers },
+  services: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
+  service: { desc: "Invoke, evaluate, reload, or sync live services on the Host", fn: hostService },
 };
-
-export async function host(args: string[], context: CliContext): Promise<void> {
-  return dispatch("host", "Inspect Host compatibility.", SUBS, args, context);
-}
 
 async function describe(args: string[], context: CliContext): Promise<void> {
   let json = false;
