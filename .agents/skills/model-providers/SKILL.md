@@ -41,6 +41,8 @@ Native API and subscription-provider artwork lives under `assets/model-providers
 
 Run `bun run typecheck` after provider or catalog changes. Build and exercise the iOS app with `sim` when runtime Swift changes.
 
+Provider picker icons use reviewed PNGs from `assets/providers`, published through OpenOx's CloudFront media path. Preserve source provenance in `assets/providers/README.md`, use content-hashed filenames, and update the domain mapping in `DomainFavicon.swift`. Prefer official square artwork at least 128×128; verify actual image dimensions and appearance. When publication is requested, use the separate infrastructure repository's `deploy:provider-assets` script with an explicit `--repository` checkout and verify the served bytes before completing picker QA.
+
 ## Updating models
 
 `bun run update:llms` refreshes metadata from models.dev for the sources already selected in `provider-models.json`; it does not discover or select newer releases. For a model refresh, review each selected provider's catalog for supported successors, update the source selections and any affected ID or display-name overrides, then run the command. Preserve intentional token caps and regional or subscription account boundaries. Do not infer a reseller's availability from the upstream vendor's catalog.
