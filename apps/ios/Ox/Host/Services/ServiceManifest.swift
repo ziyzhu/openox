@@ -317,7 +317,7 @@ nonisolated struct ServiceDefinition: Sendable {
     }
 
     var supportsModelGeneration: Bool {
-        !isAPI && !isIOS && !isMCP && ModelServiceContract.actionIDs.isSubset(of: Set(actionIndex.keys))
+        !isAPI && !isIOS && !isMCP && ModelServiceContract.requiredActionIDs.isSubset(of: Set(actionIndex.keys))
     }
 
     func isStandardAction(_ id: String) -> Bool {

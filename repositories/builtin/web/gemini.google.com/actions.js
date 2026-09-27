@@ -36,32 +36,99 @@ action('chat',{async invoke({message}){return send(message,null)}});
 action('continueChat',{async invoke({conversationId,message}){return send(message,conversationId)}});
 });
 
-function parseModelResponse(text) {
-  if (text.length > 4000000) throw Error('Gemini response exceeded the size limit');
-  let result = null;
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('[')) continue;
-    for (const row of JSON.parse(line)) {
+function modelStreamParser(state, emit) {
+  let pending = '', expected = null, size = 0, identity = null, answer = '', finished = false, sawFrame = false;
+  const parseFrame = line => {
+    let rows;
+    try { rows = JSON.parse(line); } catch { throw Error('Invalid Gemini stream frame'); }
+    if (!Array.isArray(rows)) throw Error('Invalid Gemini stream rows');
+    for (const row of rows) {
       if (row?.[0] !== 'wrb.fr' || typeof row[2] !== 'string') continue;
-      const data = JSON.parse(row[2]);
+      let data;
+      try { data = JSON.parse(row[2]); } catch { throw Error('Invalid Gemini response payload'); }
+      const pair = data?.[1];
+      if (!/^c_[a-f0-9]+$/.test(pair?.[0]) || !/^r_[a-f0-9]+$/.test(pair?.[1])) continue;
+      const next = {chatId: pair[0].slice(2), messageId: pair[1]};
+      if (identity && (identity.chatId !== next.chatId || identity.messageId !== next.messageId)) throw Error('Gemini stream identity changed');
+      identity = next;
       const candidate = data?.[4]?.[0];
-      if (data?.[14] !== true || candidate?.[8]?.[0] !== 2) continue;
-      const chatId = data?.[1]?.[0];
-      const messageId = data?.[1]?.[1];
-      const answer = candidate?.[1]?.[0];
-      if (typeof chatId !== 'string' || !/^c_[a-f0-9]+$/.test(chatId) || typeof messageId !== 'string' || !/^r_[a-f0-9]+$/.test(messageId) || typeof answer !== 'string' || !answer) throw Error('Invalid completed Gemini response');
-      if (result && (result.chatId !== chatId.slice(2) || result.messageId !== messageId || result.text !== answer)) throw Error('Gemini completion identity changed');
-      result = {chatId: chatId.slice(2), messageId, text: answer};
+      const text = candidate?.[1]?.[0];
+      if (typeof text === 'string' && text) {
+        if (!text.startsWith(answer)) throw Error('Gemini response revised published text');
+        if (text.length > 500000) throw Error('Gemini response exceeded the answer limit');
+        if (text.length > answer.length) {
+          answer = text;
+          if (!state.cancelPending && !state.cancelConfirmed) emit({id: state.id, type: 'snapshot', ...next, text});
+        }
+      }
+      if (!finished && data?.[14] === true && candidate?.[8]?.[0] === 2) {
+        if (state.cancelPending) {
+          // Gemini can finish a partial answer with a normal-looking terminal
+          // candidate after Stop. Do not publish it as a completed answer.
+          state.stopTerminal = true;
+          return;
+        }
+        if (!text || !answer || text !== answer) throw Error('Invalid completed Gemini response');
+        finished = true;
+      }
     }
-  }
-  if (!result) throw Error('Gemini stream ended without confirmed completion');
-  return result;
+  };
+  const lines = () => {
+    while (true) {
+      const n = pending.indexOf('\n');
+      if (n < 0) break;
+      const line = pending.slice(0, n);
+      pending = pending.slice(n + 1);
+      if (expected === null) {
+        if (/^\d+$/.test(line)) {
+          expected = Number(line);
+          if (expected > 4000000) throw Error('Gemini frame exceeded size limit');
+        } else if (line.trim() && line !== ")]}'") {
+          throw Error('Unexpected Gemini stream prefix');
+        }
+      } else {
+        // Gemini's length counts the JSON line plus its surrounding line
+        // delimiters. XHR responseText is already decoded, so use complete
+        // newline-delimited rows, never slice a partial UTF-16 character.
+        if (!line.startsWith('[')) throw Error('Invalid Gemini stream frame');
+        // Prefix accounting varies with escaped and non-ASCII payloads.
+        // Require a bounded plausible size, but trust the complete JSON line.
+        if (expected < line.length || expected > line.length * 4 + 16)
+          throw Error('Invalid Gemini stream frame length');
+        sawFrame = true;
+        parseFrame(line);
+        expected = null;
+      }
+    }
+  };
+  return {
+    push(chunk) {
+      size += chunk.length;
+      if (size > 4000000) throw Error('Gemini response exceeded the size limit');
+      pending += chunk;
+      if (pending.length > 4000000) throw Error('Gemini stream buffer exceeded the size limit');
+      lines();
+    },
+    end() {
+      if (expected !== null || pending.trim()) throw Error('Gemini stream ended with incomplete frame');
+      if (!sawFrame) throw Error('Gemini stream had no response frames');
+      if (!finished && !state.stopTerminal && !state.cancelConfirmed) throw Error('Gemini stream ended without confirmed completion');
+      if (state.cancelPending) {
+        if (!state.stopTerminal) throw Error('Gemini stop was not confirmed by its stream');
+        state.cancelConfirmed = true;
+        state.phase = 'stopped';
+      } else if (finished) { state.phase = 'completed'; emit({id: state.id, type: 'completed'}); }
+      return {finished, identity};
+    },
+  };
 }
 
 function createModelSite(emit) {
-  let active = null;
-  const fail = (state, error) => emit({id: state.id, type: 'failed', message: String(error.message || error)});
+  let active = null, observerInstalled = false;
+  const fail = (state, error) => { if (!state.cancelConfirmed) emit({id: state.id, type: 'failed', message: String(error.message || error)}); };
   function observeSubmission() {
+    if (observerInstalled) return;
+    observerInstalled = true;
     const matches = url => {
       const value = new URL(url, location.href);
       return active?.phase === 'submitted' && value.origin === location.origin && value.pathname === '/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate';
@@ -91,43 +158,44 @@ function createModelSite(emit) {
     };
     XMLHttpRequest.prototype.send = function(body) {
       if (matches(opened.get(this) || '') && claim()) {
-        const state = active;
+        const state = active, parser = modelStreamParser(state, emit);
         console.log('model capture', 'xhr');
+        let offset = 0;
+        this.addEventListener('progress', () => {
+          try {
+            const text = this.responseText;
+            if (text.length > offset) { const delta = text.slice(offset); offset = text.length; parser.push(delta); }
+          } catch (error) { fail(state, error); }
+        });
         this.addEventListener('loadend', () => {
-          void (async () => {
+          try {
             if (this.status !== 200) throw Error('Gemini generation HTTP ' + this.status);
-            await complete(this.responseText, state);
-          })().catch(error => fail(state, error));
+            const text = this.responseText;
+            if (text.length > offset) { const delta = text.slice(offset); offset = text.length; parser.push(delta); }
+            parser.end();
+            state.streamEnded = true;
+          } catch (error) { fail(state, error); }
         }, {once: true});
       }
       return originalSend.call(this, body);
     };
   }
-  async function complete(text, state) {
-    const result = parseModelResponse(text);
-    await wait(() => cid() === result.chatId && messages().some(message => message.role === 'user' && clean(message.text) === clean(state.prompt)));
-    if (state.canceled) return;
-    state.phase = 'completed';
-    emit({id: state.id, type: 'snapshot', ...result});
-    emit({id: state.id, type: 'completed'});
-  }
   async function collect(response, state) {
     if (!response.ok || response.redirected) throw Error('Gemini generation HTTP ' + response.status);
     const reader = response.body?.getReader();
     if (!reader) throw Error('Gemini generation response is unavailable');
-    const decoder = new TextDecoder();
-    let text = '';
+    const decoder = new TextDecoder(), parser = modelStreamParser(state, emit);
     const timeout = setTimeout(() => { state.expired = true; void reader.cancel(); }, 290000);
     try {
       while (true) {
         const part = await reader.read();
-        if (state.canceled || state.expired) throw Error(state.expired ? 'Gemini generation timed out' : 'Gemini generation observation canceled');
+        if (state.expired) throw Error('Gemini generation timed out');
         if (part.done) break;
-        text += decoder.decode(part.value, {stream: true});
-        if (text.length > 4000000) throw Error('Gemini response exceeded the size limit');
+        parser.push(decoder.decode(part.value, {stream: true}));
       }
-      text += decoder.decode();
-      await complete(text, state);
+      parser.push(decoder.decode());
+      parser.end();
+      state.streamEnded = true;
     } finally {
       clearTimeout(timeout);
       await reader.cancel().catch(() => {});
@@ -137,7 +205,7 @@ function createModelSite(emit) {
     start(id, prompt) {
       if (prompt.length > 32000) throw Error('Gemini context exceeds the website input limit of 32000 characters');
       console.log('model prompt', prompt.length);
-      const state = {id, prompt, phase: 'preparing', canceled: false, captured: false, expired: false};
+      const state = {id, prompt, phase: 'preparing', canceled: false, captured: false, expired: false, cancelPending: false, cancelConfirmed: false, stopTerminal: false, streamEnded: false};
       active = state;
       void (async () => {
         if (!(await signInState()).signedIn) throw Error('Sign in to Gemini');
@@ -150,17 +218,27 @@ function createModelSite(emit) {
         if (!state.captured && !state.canceled) throw Error('Gemini submission could not be correlated; it was not resubmitted');
       })().catch(error => fail(state, error));
     },
-    cancel(id) {
-      if (active?.id !== id) return 'unsupported';
-      if (active.phase === 'completed') return 'completed';
-      active.canceled = true;
-      return active.phase === 'preparing' ? 'cancelled' : 'unsupported';
+    async cancel(id) {
+      const state = active;
+      if (state?.id !== id) return 'unsupported';
+      if (state.phase === 'completed') return 'completed';
+      if (state.phase === 'preparing') { state.canceled = true; state.cancelConfirmed = true; return 'cancelled'; }
+      if (state.cancelConfirmed) return 'cancelled';
+      if (state.cancelPending) return 'requested';
+      if (!state.captured || state.streamEnded) return 'unsupported';
+      const stop = document.querySelector('button[aria-label="Stop response"]');
+      if (!stop || stop.disabled) return 'unsupported';
+      state.cancelPending = true;
+      try { stop.click(); } catch (error) { state.cancelPending = false; throw error; }
+      // The site may take seconds to finish its stream. Never hold the Host's
+      // short cancellation budget while waiting for that remote confirmation.
+      return 'requested';
     },
   };
 }
 
 async function modelCatalog() {
-  return [{id: 'website-default', name: 'Default', input: ['text'], contextTokens: null, outputTokens: null, streaming: false, cancellation: false, options: []}];
+  return [{id: 'website-default', name: 'Default', input: ['text'], contextTokens: null, outputTokens: null, streaming: true, cancellation: true, options: []}];
 }
 
 const modelGenerations = new Map();
@@ -180,7 +258,7 @@ function modelEvent(event) {
   if (event.chatId) state.chatId = event.chatId;
   if (event.messageId) state.messageId = event.messageId;
   if (event.type === 'snapshot') {
-    if (typeof event.text !== 'string' || event.text.length > 500000 || !event.text.startsWith(state.text.slice(0, state.emitted))) {
+    if (typeof event.text !== 'string' || event.text.length > 500000 || !event.text.startsWith(state.text)) {
       state.terminal = {type: 'failed', message: 'Model response revised published text or exceeded the size limit', kind: 'provider'};
     } else state.text = event.text;
   }
@@ -226,21 +304,20 @@ function registerModelActions(action) {
     if (state.events.length >= 4095 && !state.terminal) state.terminal = {type: 'failed', message: 'Model event history exceeded the limit', kind: 'provider'};
     if (state.emitted !== state.text.length && state.events.length < 4095) {
       state.emitted = state.text.length;
-      state.events.push({type: 'text', length: state.emitted});
+      state.events.push({type: 'text', text: state.text});
     }
     if (state.terminal && !state.publishedTerminal) {
       state.events.push(state.terminal);
       state.publishedTerminal = true;
       console.log('model terminal', generationId, state.terminal.type);
     }
-    const events = state.events.slice(after, after + 1000).map(event => event.type === 'text' ? {type: 'text', text: state.text.slice(0, event.length)} : event);
+    const events = state.events.slice(after, after + 1000);
     return {nextCursor: after + events.length, events};
   }});
   action('cancelModelGeneration', {async invoke({generationId}) {
     const state = modelGenerations.get(generationId);
     if (!state) throw Error('Unknown generation');
     if (state.terminal) return {status: 'completed'};
-    state.canceled = true;
     const result = await modelSite.cancel(generationId);
     const status = typeof result === 'string' ? result : result === true ? 'cancelled' : 'requested';
     console.log('model cancel', generationId, status);

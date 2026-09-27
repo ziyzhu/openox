@@ -59,32 +59,43 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
         streamingTask(model: model, messages: messages) { continuation in
             let instructions = [systemPrompt, WebsiteToolContract.instructions(tools)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
             let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: displayName)
-            let session = try await ModelServiceSession.open(service: service())
+            let prepared = input.messages.arrayValue ?? []
+            let chatID = options.sessionID.flatMap(UUID.init(uuidString:))
+            let (conversation, turn) = try await ModelConversation.checkout(service: service(), chatID: chatID, modelID: model.wireID, options: options, messages: prepared)
+            var generation: ModelConversation.Generation?
             do {
-                try await session.start(model: model, input: input, options: options)
+                let started = try await conversation.start(turn: turn, attachments: input.attachments)
+                generation = started
                 var assembler = StreamAssembler(model: model, continuation: continuation)
                 assembler.start()
                 var state = ModelServiceStreamState()
                 var emittedText = ""
+                let deadline = Date().addingTimeInterval(300)
                 while !state.completed {
-                    state = try await session.next()
+                    guard Date() < deadline else { throw WebsiteProviderError("Model generation timed out", kind: .network) }
+                    let cursor = state.cursor
+                    try state.accept(try await conversation.read(started, after: cursor))
+                    if state.cursor == cursor { try await Task.sleep(for: .milliseconds(100)) }
                     if !WebsiteToolContract.isPossibleCallPrefix(state.text) {
                         assembler.textDelta(String(state.text.dropFirst(emittedText.count)))
                         emittedText = state.text
                     }
                 }
+                let reply: String
                 if WebsiteToolContract.isPossibleCallPrefix(state.text) {
                     guard let call = try WebsiteToolContract.call(from: state.text, tools: tools) else {
                         throw WebsiteProviderError("Model service returned an incomplete Ox Action call")
                     }
+                    reply = WebsiteToolContract.text(for: call)
                     assembler.completeToolCall(call)
                     assembler.finish(reason: .toolUse, label: id, lines: state.cursor)
                 } else {
+                    reply = state.text
                     assembler.finish(reason: .stop, label: id, lines: state.cursor)
                 }
-                await session.close()
+                await conversation.finish(started, history: prepared + [ModelConversationHistory.assistantTurn(reply)], chatID: chatID)
             } catch {
-                await session.cancelAndClose()
+                await conversation.cancelAndClose(generation)
                 throw error
             }
         }

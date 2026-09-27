@@ -10,6 +10,9 @@ const array = (items: Schema): Schema => ({ type: "array", items });
 const choice = (...values: string[]): Schema => ({ type: "string", enum: values });
 const nullable = (schema: Schema): Schema => ({ anyOf: [schema, { type: "null" }] });
 const generation = { generationId: string };
+const messages = (roles: string[]) => array(object({ role: choice(...roles), text: string }));
+const attachments = array(object({ id: integer, name: string, mimeType: string }));
+const started = object({ ...generation, submission: choice("uncertain", "confirmed") });
 
 export const MODEL_ACTION_SCHEMAS: Record<string, { inputSchema: Schema; outputSchema: Schema }> = {
   listModels: {
@@ -25,11 +28,11 @@ export const MODEL_ACTION_SCHEMAS: Record<string, { inputSchema: Schema; outputS
   startModelGeneration: {
     inputSchema: object({
       modelId: string,
-      messages: array(object({ role: choice("system", "user", "assistant", "tool"), text: string })),
-      attachments: array(object({ id: integer, name: string, mimeType: string })),
+      messages: messages(["system", "user", "assistant", "tool"]),
+      attachments,
       options: object({ temperature: nullable({ type: "number" }), maxTokens: nullable(integer) }),
     }),
-    outputSchema: object({ ...generation, submission: choice("uncertain", "confirmed") }),
+    outputSchema: started,
   },
   readModelGeneration: {
     inputSchema: object({ ...generation, after: integer, waitMilliseconds: { ...integer, maximum: 1000 } }),
@@ -46,9 +49,18 @@ export const MODEL_ACTION_SCHEMAS: Record<string, { inputSchema: Schema; outputS
     inputSchema: object(generation),
     outputSchema: object({ status: choice("cancelled", "requested", "completed", "unsupported") }),
   },
+  continueModelGeneration: {
+    inputSchema: object({
+      previousGenerationId: { ...string, minLength: 1 },
+      messages: messages(["user", "tool"]),
+      attachments,
+    }),
+    outputSchema: started,
+  },
 };
 
 export const MODEL_ACTION_IDS = Object.keys(MODEL_ACTION_SCHEMAS);
+export const REQUIRED_MODEL_ACTION_IDS = MODEL_ACTION_IDS.filter(id => id !== "continueModelGeneration");
 export const MODEL_GENERATION_ACTION_IDS = MODEL_ACTION_IDS.filter(id => id !== "listModels");
 
 export function normalizedModelSchema(value: unknown, definitions: Record<string, Schema> = {}, depth = 0): unknown {
@@ -82,7 +94,10 @@ export function validateModelActions(
   const errors: string[] = [];
   for (const id of MODEL_ACTION_IDS) {
     const action = actions.find(action => action.id === id);
-    if (!action) { errors.push(`actions: model service requires ${id}`); continue; }
+    if (!action) {
+      if (REQUIRED_MODEL_ACTION_IDS.includes(id)) errors.push(`actions: model service requires ${id}`);
+      continue;
+    }
     if (action.blocking) errors.push(`actions.${id}: model Actions cannot block cancellation`);
     for (const field of ["inputSchema", "outputSchema"] as const) {
       try {

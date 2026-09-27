@@ -71,7 +71,7 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
 try {
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelServiceActions.json"), `${JSON.stringify(MODEL_ACTION_SCHEMAS, null, 2)}\n`);
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle/manage-services/references/model-schemas.md"),
-    `# Standard model Action schemas\n\nGenerated from packages/service-sdk/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action.\n\n\`\`\`json\n${JSON.stringify(MODEL_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
+    `# Standard model Action schemas\n\nGenerated from packages/service-sdk/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action. continueModelGeneration is optional; the other four Actions are required for model services.\n\n\`\`\`json\n${JSON.stringify(MODEL_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
   const repository = await buildArtifacts(staging, { name: "Built-in" });
   await addLocalRepositorySeed(staging);
   await rm(backup, { recursive: true, force: true });

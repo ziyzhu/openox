@@ -3,6 +3,9 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function json(path){const r=await fetch(path,{credentials:'include',cache:'no-store'});if(r.redirected||r.status!==200)throw Error('Claude request failed: HTTP '+r.status);if(!(r.headers.get('content-type')||'').includes('json'))throw Error('Unexpected Claude response type');return r.json();}
 async function account(){const j=await json(BOOT);if(j.account===null)return null;if(j.account&&typeof j.account.uuid==='string'&&Array.isArray(j.account.memberships))return j.account;throw Error('Unrecognized Claude session response');}
 async function org(id){const a=await account();if(!a)throw Error('Sign in to Claude first');const ms=a.memberships.map(x=>x.organization).filter(x=>x&&typeof x.uuid==='string');if(id){if(!ms.some(x=>x.uuid===id))throw Error('Organization is not available to this account');return id;}if(ms.length!==1)throw Error('Choose an organizationId from getCurrentUser');return ms[0].uuid;}
+// The new-chat page's resolved_org_uuid identifies the organization selected by Claude.
+// Do not relax org() for ordinary Actions, where the caller must disambiguate.
+async function modelActiveOrg(){const j=await json(BOOT);if(j.account===null)throw Error('Sign in to Claude first');const memberships=j.account?.memberships;if(!Array.isArray(memberships))throw Error('Unrecognized Claude session response');const active=j.resolved_org_uuid;if(typeof active!=='string'||!memberships.some(m=>m.organization?.uuid===active))throw Error('Claude active organization is unavailable');return active;}
 const url=id=>'https://claude.ai/chat/'+id;
 const summary=j=>({id:j.uuid,title:j.name||'',model:j.model||null,url:url(j.uuid),updatedAt:j.updated_at||null});
 async function detail(organizationId,id){const o=await org(organizationId);const j=await json('/api/organizations/'+encodeURIComponent(o)+'/chat_conversations/'+encodeURIComponent(id)+'?tree=True&rendering_mode=messages&render_all_tools=true&include_inline_comparison=true&consistency=strong');if(j.uuid!==id||!Array.isArray(j.chat_messages))throw Error('Conversation identity or message shape mismatch');return {id:j.uuid,title:j.name||'',model:j.model||null,url:url(j.uuid),messages:j.chat_messages.map(m=>({id:m.uuid,parentId:m.parent_message_uuid||null,role:m.sender,text:typeof m.text==='string'&&m.text?m.text:(m.content||[]).filter(c=>c.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'),createdAt:m.created_at||null}))};}
@@ -44,125 +47,224 @@ registerModelActions(action);
  action('continueChat',{async invoke({message,conversationId,organizationId}){return send(message,conversationId,organizationId);}});
 });
 
+
+// Observe the page-owned completion response; never send or retry a completion ourselves.
 function createModelSite(send) {
   const active = new Map();
-  const submit = async (prompt, state) => {
-const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const visible = element => !!element && element.getClientRects().length > 0;
-const editor = () => {
-  const element = document.querySelector('[data-testid="chat-input"][contenteditable="true"]');
-  return visible(element) ? element : null;
-};
-try {
-  if (location.pathname !== '/new') throw new Error('Claude is not on a fresh conversation');
-  let input;
-  for (let attempt = 0; attempt < 150 && !input; attempt++) { input = editor(); if (!input) await pause(100); }
-  if (!input) throw new Error('Claude editor did not load');
-  if (input.innerText.trim()) throw new Error('Claude has an existing draft; clear it on the website before retrying');
-  const files = window.__oxWebsiteFiles || [];
-  delete window.__oxWebsiteFiles;
-  const uploadInput = document.querySelector('input[data-testid="file-upload"]');
-  const tiles = () => [...(uploadInput?.closest('fieldset')?.querySelectorAll('[data-testid="file-thumbnail"]') || [])];
-  if (tiles().length) throw new Error('Claude contains existing draft attachments: ' + tiles().map(value => value.querySelector('button[aria-label^="Remove "]')?.getAttribute('aria-label') || value.innerText?.trim() || 'unknown file').join(', '));
-  if (files.length) {
-    if (!uploadInput) throw new Error('Claude attachment input is unavailable');
-    const transfer = new DataTransfer();
-    files.forEach(file => transfer.items.add(file));
-    uploadInput.files = transfer.files;
-    uploadInput.dispatchEvent(new Event('change', {bubbles: true}));
-    let ready = false;
-    for (let attempt = 0; attempt < 120 && !ready; attempt++) {
-      if (state.canceled) throw new Error('Claude attachment upload canceled');
-      const uploaded = tiles().flatMap(element => {
-        let fiber = element[Object.keys(element).find(key => key.startsWith('__reactFiber'))];
-        const candidates = [];
-        for (let depth = 0; fiber && depth < 20; depth++, fiber = fiber.return) {
-          for (const props of [fiber.memoizedProps, fiber.alternate?.memoizedProps]) {
-            if (props?.file && typeof props.pending === 'boolean') candidates.push(props);
+  const nativeFetch = window.fetch;
+  const nativeXHR = window.XMLHttpRequest;
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const pathId = path => String(path).match(/\/chat_conversations\/([a-f0-9-]{36})\/completion(?:\?|$)/)?.[1] || null;
+  const consume = async (response, generation) => {
+    try {
+      if (response.status !== 200 || !(response.headers.get('content-type') || '').includes('text/event-stream'))
+        throw Error('Claude completion rejected: HTTP ' + response.status);
+      generation.requestId = response.headers.get('x-completion-request-id') || '';
+      const reader = response.body?.getReader();
+      if (!reader) throw Error('Claude completion stream unavailable');
+      const decoder = new TextDecoder();
+      let pending = '', answer = '', finished = false, blockType = new Map(), textIndex = null;
+      const frame = raw => {
+        const lines = raw.replace(/\r/g, '').split('\n');
+        const type = lines.find(line => line.startsWith('event:'))?.slice(6).trim() || '';
+        const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+        if (!data) return;
+        const value = JSON.parse(data);
+        if (type === 'error' || value.type === 'error') throw Error('Claude completion stream reported an error');
+        if (type === 'content_block_start') {
+          const kind = value.content_block?.type;
+          blockType.set(value.index, kind);
+          if (kind === 'text' && textIndex === null) textIndex = value.index;
+        }
+        if (type === 'content_block_delta' && value.delta?.type === 'text_delta' && typeof value.delta.text === 'string') {
+          if (textIndex === null) textIndex = value.index;
+          if (value.index === textIndex && !generation.stopped) {
+            answer += value.delta.text;
+            send({id: generation.id, type: 'snapshot', text: answer, chatId: generation.chatId});
           }
         }
-        return candidates;
-      });
-      if (uploaded.some(value => value.file.success === false)) throw new Error('Claude could not process an attachment');
-      ready = tiles().length === files.length && files.every(file => uploaded.some(value =>
-        value.file.file_name === file.name && value.file.file_uuid && value.file.success === true && value.pending === false));
-      if (!ready) await pause(1000);
+        if (type === 'message_delta' && value.delta?.stop_reason === 'end_turn') finished = true;
+        if (type === 'message_stop' && !generation.stopped) {
+          if (!finished || !answer) throw Error('Claude stream ended without a finished text answer');
+          generation.finished = true;
+          send({id: generation.id, type: 'completed', chatId: generation.chatId});
+        }
+      };
+      while (!generation.finished && !generation.stopped) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, {stream: true});
+        let end;
+        while ((end = pending.indexOf('\n\n')) >= 0) {
+          const raw = pending.slice(0, end);
+          pending = pending.slice(end + 2);
+          frame(raw);
+          if (generation.finished || generation.stopped) break;
+        }
+        if (pending.length > 1000000) throw Error('Claude stream frame exceeded limit');
+      }
+      if (!generation.finished && !generation.stopped) throw Error('Claude completion stream ended without message_stop');
+    } catch (error) {
+      if (!generation.stopped) send({id: generation.id, type: 'failed', message: String(error.message || error)});
     }
-    if (!ready) throw new Error('Claude attachment processing timed out');
+  };
+  window.fetch = async function(...args) {
+    const request = args[0];
+    const destination = typeof request === 'string' ? request : request?.url || '';
+    const method = (args[1]?.method || request?.method || 'GET').toUpperCase();
+    const chatId = method === 'POST' ? pathId(destination) : null;
+    const generation = chatId && [...active.values()].find(item => item.phase === 'submitted' && !item.chatId && !item.stopped);
+    if (generation) generation.chatId = chatId;
+    try {
+      const result = await nativeFetch.apply(this, args);
+      if (generation) void consume(result.clone(), generation);
+      return result;
+    } catch (error) {
+      if (generation && !generation.stopped) send({id: generation.id, type: 'failed', message: 'Claude completion network request failed'});
+      throw error;
+    }
+  };
+  // Some fresh Claude pages use XHR rather than fetch for completion.
+  if (nativeXHR) {
+    const open = nativeXHR.prototype.open, sendXHR = nativeXHR.prototype.send;
+    nativeXHR.prototype.open = function(method, url, ...rest) {
+      this.__oxCompletionChat = String(method).toUpperCase() === 'POST' ? pathId(url) : null;
+      return open.call(this, method, url, ...rest);
+    };
+    nativeXHR.prototype.send = function(...args) {
+      const chatId = this.__oxCompletionChat;
+      const generation = chatId && [...active.values()].find(item => item.phase === 'submitted' && !item.chatId && !item.stopped);
+      if (generation) {
+        generation.chatId = chatId;
+        let length = 0, buffer = '', answer = '', finished = false;
+        this.addEventListener('progress', () => {
+          if (generation.stopped || generation.finished) return;
+          generation.requestId ||= this.getResponseHeader('x-completion-request-id') || '';
+          const chunk = this.responseText.slice(length); length = this.responseText.length; buffer += chunk;
+          let end; while ((end = buffer.indexOf('\n\n')) >= 0) {
+            const raw = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+            const type = raw.match(/(?:^|\n)event: ([^\n]+)/)?.[1];
+            let data; try { data = JSON.parse(raw.match(/(?:^|\n)data: (.+)/)?.[1] || '{}'); } catch { continue; }
+            if (type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+              answer += data.delta.text;
+              send({id: generation.id, type: 'snapshot', text: answer, chatId});
+            }
+            if (type === 'message_delta' && data.delta?.stop_reason === 'end_turn') finished = true;
+            if (type === 'message_stop') {
+              if (finished && answer) { generation.finished = true; send({id: generation.id, type: 'completed', chatId}); }
+              else send({id: generation.id, type: 'failed', message: 'Claude stream ended without finished text'});
+            }
+          }
+        });
+        this.addEventListener('loadend', () => {
+          generation.requestId ||= this.getResponseHeader('x-completion-request-id') || '';
+          if (!generation.finished && !generation.stopped) send({id: generation.id, type: 'failed', message: 'Claude completion stream ended without message_stop'});
+        });
+      }
+      return sendXHR.apply(this, args);
+    };
   }
-  input = undefined;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    input = editor();
-    if (input?.editor?.commands?.insertContent) break;
-    await pause(100);
-  }
-  if (!input?.editor?.commands?.insertContent) throw new Error('Claude editor is unavailable after attachment processing');
-  input.focus();
-  if (!input.editor.commands.insertContent({type: 'text', text: prompt})) throw new Error('Claude editor rejected the prompt');
-  await pause(0);
-  let button;
-  for (let attempt = 0; attempt < 30 && !button; attempt++) {
-    const candidate = document.querySelector('[data-testid="chat-input-send"]');
-    if (editor()?.editor?.state?.doc?.textContent === prompt && editor()?.innerText.trim() === prompt.trim() && visible(candidate) && !candidate.disabled && candidate.getAttribute('aria-disabled') !== 'true') button = candidate;
-    else await pause(100);
-  }
-  if (!button || editor()?.editor?.state?.doc?.textContent !== prompt || editor()?.innerText.trim() !== prompt.trim()) throw new Error('Claude submit form is unavailable');
-  if (state.canceled) throw new Error('Claude submission canceled');
-  state.phase = 'submitted';
-button.click();
-  return {status: 'submitted'};
-} catch (error) { return {status: 'failed', message: String(error?.message || error)}; }
+  const visible = element => !!element && element.getClientRects().length > 0;
+  const editor = () => { const e = document.querySelector('[data-testid="chat-input"][contenteditable="true"]'); return visible(e) ? e : null; };
+  const submit = async (prompt, state, modelId, systemText) => {
+    try {
+      if (location.pathname !== '/new') throw Error('Claude is not on a fresh conversation');
+      let input; for (let i = 0; i < 150 && !input; i++) { input = editor(); if (!input) await pause(100); }
+      if (!input) throw Error('Claude editor did not load');
+      if (input.innerText.trim()) throw Error('Claude has an existing draft; refusing to overwrite it');
+      // JSON escapes multiline system instructions; compare parsed messages, not source substrings.
+      if (systemText) {
+        const serialized = JSON.parse(prompt).conversation;
+        if (!Array.isArray(serialized) || serialized.filter(message => message.role === 'system').map(message => message.text).join('\n\n') !== systemText)
+          throw Error('System instructions missing from serialized prompt');
+      }
+      if (modelId) {
+        const choices = await openModels();
+        const option = choices.find(e => e.getAttribute('data-model-id') === modelId);
+        if (!option) { closeModels(); throw Error('Requested model is not selectable on Claude'); }
+        option.click();
+        await wait(() => picker()?.innerText.includes(modelName(option)), 3000);
+      }
+      const files = window.__oxWebsiteFiles || [];
+      delete window.__oxWebsiteFiles;
+      const uploadInput = document.querySelector('input[data-testid="file-upload"]');
+      const tiles = () => [...(uploadInput?.closest('fieldset')?.querySelectorAll('[data-testid="file-thumbnail"]') || [])];
+      if (tiles().length) throw Error('Claude contains existing draft attachments');
+      if (files.length) {
+        if (!uploadInput) throw Error('Claude attachment input is unavailable');
+        const transfer = new DataTransfer(); files.forEach(file => transfer.items.add(file));
+        uploadInput.files = transfer.files;
+        uploadInput.dispatchEvent(new Event('change', {bubbles: true}));
+        let ready = false;
+        for (let i = 0; i < 120 && !ready; i++) {
+          if (state.canceled) throw Error('Claude attachment upload canceled');
+          const uploaded = tiles().flatMap(element => {
+            let fiber = element[Object.keys(element).find(key => key.startsWith('__reactFiber'))];
+            const candidates = [];
+            for (let depth = 0; fiber && depth < 20; depth++, fiber = fiber.return)
+              for (const props of [fiber.memoizedProps, fiber.alternate?.memoizedProps])
+                if (props?.file && typeof props.pending === 'boolean') candidates.push(props);
+            return candidates;
+          });
+          if (uploaded.some(value => value.file.success === false)) throw Error('Claude could not process an attachment');
+          ready = tiles().length === files.length && files.every(file => uploaded.some(value => value.file.file_name === file.name && value.file.file_uuid && value.file.success === true && value.pending === false));
+          if (!ready) await pause(1000);
+        }
+        if (!ready) throw Error('Claude attachment processing timed out');
+      }
+      input = undefined;
+      for (let i = 0; i < 30; i++) { input = editor(); if (input?.editor?.commands?.insertContent) break; await pause(100); }
+      if (!input?.editor?.commands?.insertContent) throw Error('Claude editor unavailable after attachment processing');
+      input.focus();
+      if (!input.editor.commands.insertContent({type: 'text', text: prompt})) throw Error('Claude editor rejected prompt');
+      await pause(0);
+      let button;
+      for (let i = 0; i < 30 && !button; i++) {
+        const candidate = document.querySelector('[data-testid="chat-input-send"]');
+        if (editor()?.editor?.state?.doc?.textContent === prompt && editor()?.innerText.trim() === prompt.trim() && visible(candidate) && !candidate.disabled && candidate.getAttribute('aria-disabled') !== 'true') button = candidate;
+        else await pause(100);
+      }
+      if (!button) throw Error('Claude submit form unavailable');
+      if (state.canceled) throw Error('Claude submission canceled');
+      state.phase = 'submitted';
+      button.click(); // One submission only. An uncertain outcome is never retried.
+    } catch (error) { send({id: state.id, type: 'failed', message: String(error.message || error)}); }
   };
   return {
-    start(id, prompt) {
-      const state = {phase: 'preparing', canceled: false};
+    start(id, prompt, modelId, systemText) {
+      const state = {id, phase: 'preparing', canceled: false, stopped: false, finished: false, chatId: '', requestId: ''};
       active.set(id, state);
-      void submit(prompt, state).then(result => {
-        if (result.status === 'failed') send({id, type: 'failed', message: result.message});
-      }).catch(error => send({id, type: 'failed', message: String(error.message || error)}));
+      void submit(prompt, state, modelId, systemText);
     },
-    cancel(id) {
+    async cancel(id) {
       const state = active.get(id);
       if (!state) return 'unsupported';
+      if (state.finished) return 'completed';
+      if (state.phase === 'preparing') { state.canceled = true; state.stopped = true; return 'cancelled'; }
+      const until = Date.now() + 3000;
+      while ((!state.chatId || !state.requestId) && Date.now() < until && !state.finished) await pause(50);
+      if (state.finished) return 'completed';
+      if (!state.chatId || !state.requestId) return 'requested';
+      const organization = state.organization;
+      if (!organization) return 'requested';
+      const endpoint = '/api/organizations/' + encodeURIComponent(organization) + '/chat_conversations/' + encodeURIComponent(state.chatId) + '/stop_response';
+      let response;
+      try { response = await nativeFetch(endpoint, {method: 'POST', credentials: 'include', headers: {'content-type': 'application/json'}, body: JSON.stringify({completion_request_id: state.requestId})}); }
+      catch { return 'requested'; }
+      if (response.status !== 200 || !(response.headers.get('content-type') || '').includes('json')) return 'requested';
+      const value = await response.json();
+      if (typeof value.stop_uuid !== 'string' || !value.stop_uuid) return 'requested';
+      state.stopped = true;
       state.canceled = true;
-      return state.phase === 'preparing' ? 'cancelled' : 'unsupported';
+      return 'cancelled';
     },
-    async observe(prompt) {
-const path = location.pathname.match(/^\/chat\/([a-f0-9-]{36})$/);
-if (!path) return {status: 'pending'};
-const chatId = path[1];
-const request = async url => {
-  const response = await fetch(url, {credentials: 'include', cache: 'no-store'});
-  if (response.redirected || response.status !== 200) return null;
-  return response.json();
-};
-const bootstrap = await request('/edge-api/bootstrap?statsig_hashing_algorithm=djb2&growthbook_format=sdk&cache_bust=1&include_system_prompts=false');
-if (!bootstrap?.account) return {status: 'failed', message: 'Claude session ended during generation'};
-const organizations = bootstrap.account.memberships?.map(value => value.organization?.uuid).filter(value => typeof value === 'string') || [];
-if (!organizations.length) throw new Error('Claude organization is unavailable');
-let conversation;
-for (const organization of organizations) {
-  const path = '/api/organizations/' + encodeURIComponent(organization) + '/chat_conversations/' + encodeURIComponent(chatId) + '?tree=True&rendering_mode=messages&render_all_tools=true&include_inline_comparison=true&consistency=strong';
-  const value = await request(path);
-  if (value?.uuid === chatId && Array.isArray(value.chat_messages)) { conversation = value; break; }
-}
-if (!conversation) return {status: 'pending'};
-const messages = conversation.chat_messages;
-const messageText = value => typeof value?.text === 'string' && value.text ? value.text : (value?.content || []).filter(block => block.type === 'text' && typeof block.text === 'string').map(block => block.text).join('\n');
-const user = messages.find(value => value.sender === 'human' && messageText(value) === prompt);
-if (!user) return {status: 'failed', message: 'Claude conversation did not contain the submitted prompt'};
-const assistant = messages.find(value => value.sender === 'assistant' && value.parent_message_uuid === user.uuid);
-const text = messageText(assistant);
-if (!text || typeof assistant?.uuid !== 'string') return {status: 'pending'};
-const rendered = [...document.querySelectorAll('[data-testid="assistant-message"]')].at(-1);
-if (rendered?.getAttribute('data-is-streaming') !== 'false' || !rendered.innerText.trim()) return {status: 'pending'};
-return {status: 'complete', chatId, messageId: assistant.uuid, text};
-    }
+    setOrganization(id, organization) { const state = active.get(id); if (state) state.organization = organization; }
   };
 }
 
 async function modelCatalog() {
-  return [{id: 'website-default', name: 'Default', input: ['text', 'image', 'pdf'], contextTokens: null, outputTokens: null, streaming: false, cancellation: false, options: []}];
+  // The website-default is always available; other picker entries are deliberately not advertised.
+  return [{id: 'website-default', name: 'Default', input: ['text', 'image', 'pdf'], contextTokens: null, outputTokens: null, streaming: true, cancellation: true, options: []}];
 }
 
 const modelGenerations = new Map();
@@ -215,9 +317,11 @@ function registerModelActions(action) {
     const state = {id, prompt, text: '', emitted: 0, events: [], terminal: null, publishedTerminal: false, chatId: '', messageId: '', started: Date.now()};
     modelGenerations.set(id, state);
     console.log('model start', id, selected.id, files.length);
-    try { modelSite.start(id, prompt, selected.id === 'website-default' ? '' : selected.id, args.messages.filter(message => message.role === 'system').map(message => message.text).join('\n\n')); }
-    catch (error) { modelEvent({id, type: 'failed', message: String(error.message || error)}); }
-    void modelPollCompletion(state);
+    try {
+      const organization = await modelActiveOrg(); // One bootstrap request per generation, never per read.
+      modelSite.start(id, prompt, selected.id === 'website-default' ? '' : selected.id, args.messages.filter(message => message.role === 'system').map(message => message.text).join('\n\n'));
+      modelSite.setOrganization(id, organization);
+    } catch (error) { modelEvent({id, type: 'failed', message: String(error.message || error)}); }
     return {generationId: id, submission: 'uncertain'};
   }});
   action('readModelGeneration', {async invoke({generationId, after, waitMilliseconds}) {
@@ -243,24 +347,9 @@ function registerModelActions(action) {
     const state = modelGenerations.get(generationId);
     if (!state) throw Error('Unknown generation');
     if (state.terminal) return {status: 'completed'};
-    state.canceled = true;
-    const result = await modelSite.cancel(generationId);
-    const status = typeof result === 'string' ? result : result === true ? 'cancelled' : 'requested';
+    const status = await modelSite.cancel(generationId);
+    if (status === 'cancelled') state.canceled = true;
     console.log('model cancel', generationId, status);
     return {status};
   }});
-}
-
-async function modelPollCompletion(state) {
-  while (!state.terminal && !state.canceled && Date.now() - state.started < 300000) {
-    await modelDelay(2000);
-    if (state.terminal || state.canceled) return;
-    try {
-      const result = await modelSite.observe(state.prompt, state.chatId);
-      if (result.status === 'complete') {
-        modelEvent({id: state.id, type: 'snapshot', text: result.text, chatId: result.chatId, messageId: result.messageId});
-        modelEvent({id: state.id, type: 'completed'});
-      } else if (result.status === 'failed') modelEvent({id: state.id, type: 'failed', message: result.message});
-    } catch (error) { modelEvent({id: state.id, type: 'failed', message: String(error.message || error)}); }
-  }
 }

@@ -3,9 +3,11 @@ import Foundation
 nonisolated enum ModelServiceContract {
     static let list = "listModels"
     static let start = "startModelGeneration"
+    static let resume = "continueModelGeneration"
     static let read = "readModelGeneration"
     static let cancel = "cancelModelGeneration"
-    static let generationIDs: Set<String> = [start, read, cancel]
+    static let requiredActionIDs: Set<String> = [list, start, read, cancel]
+    static let generationIDs: Set<String> = [start, resume, read, cancel]
     static let actionIDs = generationIDs.union([list])
 
     private static let schemas: [String: JSONValue] = {
@@ -21,7 +23,11 @@ nonisolated enum ModelServiceContract {
         guard actions.contains(where: { generationIDs.contains($0.id) }) else { return }
         guard isWeb else { throw ServiceDefinition.ValidationError.invalid("model Actions require a web service") }
         for id in actionIDs {
-            guard let action = actions.first(where: { $0.id == id }), !action.blocking,
+            guard let action = actions.first(where: { $0.id == id }) else {
+                if requiredActionIDs.contains(id) { throw ServiceDefinition.ValidationError.invalid("standard model Action \(id)") }
+                continue
+            }
+            guard !action.blocking,
                   let expected = schemas[id]?.objectValue,
                   try normalized(action.inputSchema ?? .null, definitions: definitions) == normalized(expected["inputSchema"] ?? .null),
                   try normalized(action.outputSchema ?? .null, definitions: definitions) == normalized(expected["outputSchema"] ?? .null) else {

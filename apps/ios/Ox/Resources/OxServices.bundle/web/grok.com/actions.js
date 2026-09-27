@@ -72,11 +72,12 @@ action('continueChat',{async invoke({conversationId,prompt}){await openTarget(co
 
 function createModelSite(send) {
   const site = {};
-const active = new Map();
+  const active = new Map();
 
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const visible = element => !!element && element.getClientRects().length > 0;
   const editor = () => [...document.querySelectorAll('[contenteditable="true"][role="textbox"]')].find(element => visible(element) && element.getAttribute('aria-disabled') !== 'true');
+  const idFromPage = () => location.pathname.match(/^\/c\/([a-zA-Z0-9-]+)/)?.[1] || null;
   site.signedIn = async () => (await session()).signedIn;
   const fail = (generation, error) => {
     if (generation.terminal || generation.canceled) return;
@@ -108,6 +109,7 @@ const active = new Map();
     while (!generation.canceled && !generation.terminal && Date.now() - generation.started < 300000) {
       const chatId = generation.chatId || location.pathname.match(/^\/c\/([a-zA-Z0-9-]+)/)?.[1];
       if (!chatId) { await pause(250); continue; }
+      if (generation.continuation && idFromPage() !== chatId) throw new Error('Grok left the continued conversation');
       generation.chatId = chatId;
       const root = '/rest/app-chat/conversations/' + encodeURIComponent(chatId);
       const index = await checked(root + '/response-node');
@@ -119,9 +121,11 @@ const active = new Map();
       if (!data) { await pause(500); continue; }
       if (!Array.isArray(data.responses)) throw new Error('Grok message read changed');
       const messages = data.responses;
-      const user = messages.find(value => value.sender === 'human' && value.message === generation.prompt);
-      const assistants = messages.filter(value => value.sender === 'assistant' && typeof value.message === 'string' && value.message && value.partial !== true);
-      const assistant = generation.responseId ? assistants.find(value => value.responseId === generation.responseId) : assistants.at(-1);
+      const userNodes = index.responseNodes.filter(value => value.sender === 'human' && (generation.continuation ? value.parentResponseId === generation.parentResponseId : true));
+      const user = userNodes.find(value => messages.some(message => message.responseId === value.responseId && message.sender === 'human' && message.message === generation.prompt));
+      const assistantNodes = index.responseNodes.filter(value => value.parentResponseId === user?.responseId);
+      if (generation.responseId && assistantNodes.length && !assistantNodes.some(node => node.responseId === generation.responseId)) throw new Error('Grok stream response identity differs from turn chain');
+      const assistant = messages.find(value => assistantNodes.some(node => node.responseId === value.responseId) && value.sender === 'assistant' && typeof value.message === 'string' && value.message && value.partial !== true && (!generation.responseId || value.responseId === generation.responseId));
       if (!user || !assistant) { await pause(250); continue; }
       generation.responseId = assistant.responseId;
       if (!assistant.message.startsWith(generation.text)) throw new Error('Grok revised streamed output');
@@ -145,7 +149,10 @@ const active = new Map();
         if (value.error) throw new Error(String(value.error.message || value.error));
         const result = value.result || {};
         const response = result.response || result;
-        if (typeof result.conversation?.conversationId === 'string') generation.chatId = result.conversation.conversationId;
+        if (typeof result.conversation?.conversationId === 'string') {
+          if (generation.continuation && generation.chatId !== result.conversation.conversationId) throw new Error('Grok changed conversation during continuation');
+          generation.chatId = result.conversation.conversationId;
+        }
         if (typeof response.modelResponse?.responseId === 'string') generation.responseId = response.modelResponse.responseId;
         const token = response.token;
         if (typeof token === 'string' && token && response.isThinking !== true && !response.messageStepId) {
@@ -169,13 +176,13 @@ const active = new Map();
       if (buffer.trim()) frame(buffer);
     } catch (error) { fail(generation, error); }
   };
-  site.start = (id, prompt) => {
-    const generation = {id, prompt, text: '', chatId: '', responseId: '', submitting: false, captured: false, canceled: false, terminal: false, started: Date.now()};
+  site.start = (id, prompt, previous) => {
+    const generation = {id, prompt, text: '', chatId: previous?.chatId || '', parentResponseId: previous?.messageId || '', continuation: !!previous, responseId: '', submitting: false, captured: false, canceled: false, terminal: false, started: Date.now()};
     active.set(id, generation);
     void (async () => {
       try {
         if (!await site.signedIn()) throw new Error('Sign in to Grok in Ox provider settings');
-        if (location.pathname !== '/') throw new Error('Grok is not on a fresh conversation');
+        if (generation.continuation ? idFromPage() !== generation.chatId : location.pathname !== '/') throw new Error('Grok is not on the expected conversation');
         let input;
         for (let attempt = 0; attempt < 80 && !input; attempt++) { input = editor(); if (!input) await pause(100); }
         const documentText = input?.editor?.state?.doc?.textContent;
@@ -292,30 +299,45 @@ function modelEvent(event) {
 }
 function registerModelActions(action) {
   action('listModels', {async invoke() { return {models: await modelCatalog()}; }});
-  action('startModelGeneration', {async invoke(args) {
-    if (modelGenerations.size) throw Error('This page already owns a generation');
-    const models = await modelCatalog();
-    const selected = models.find(model => model.id === args.modelId);
-    if (!selected) throw Error('The selected website model is unavailable');
-    if (args.options.temperature !== null || args.options.maxTokens !== null) throw Error('This website does not support generation options');
+  function modelFiles(attachments, selected) {
     const staged = window.__oxWebsiteFiles || [];
-    const files = args.attachments.map(ref => {
+    const files = attachments.map(ref => {
       const file = staged[ref.id];
       if (!(file instanceof File) || file.name !== ref.name || file.type !== ref.mimeType) throw Error('Staged attachment does not match its reference');
       const modality = file.type === 'application/pdf' ? 'pdf' : file.type.startsWith('image/') ? 'image' : null;
       if (!modality || !selected.input.includes(modality)) throw Error('The selected model does not support this attachment');
       return file;
     });
-    if (new Set(args.attachments.map(ref => ref.id)).size !== files.length) throw Error('Duplicate attachment references');
+    if (new Set(attachments.map(ref => ref.id)).size !== files.length) throw Error('Duplicate attachment references');
+    return files;
+  }
+  function modelSubmit(messages, attachments, selected, previous) {
+    const files = modelFiles(attachments, selected);
     window.__oxWebsiteFiles = files;
     const id = crypto.randomUUID();
-    const prompt = JSON.stringify({task: 'Follow the supplied conversation and system instructions. Return only the assistant response.', conversation: args.messages});
-    const state = {id, prompt, text: '', emitted: 0, events: [], terminal: null, publishedTerminal: false, chatId: '', messageId: '', started: Date.now()};
+    const prompt = JSON.stringify({task: 'Follow the supplied conversation and system instructions. Return only the assistant response.', conversation: messages});
+    const state = {id, prompt, text: '', emitted: 0, events: [], terminal: null, publishedTerminal: false, chatId: '', messageId: '', modelId: selected.id, started: Date.now()};
     modelGenerations.set(id, state);
     console.log('model start', id, selected.id, files.length);
-    try { modelSite.start(id, prompt, selected.id === 'website-default' ? '' : selected.id, args.messages.filter(message => message.role === 'system').map(message => message.text).join('\n\n')); }
+    try { modelSite.start(id, prompt, previous); }
     catch (error) { modelEvent({id, type: 'failed', message: String(error.message || error)}); }
     return {generationId: id, submission: 'uncertain'};
+  }
+  action('startModelGeneration', {async invoke(args) {
+    if (modelGenerations.size) throw Error('This page already owns a generation');
+    const models = await modelCatalog();
+    const selected = models.find(model => model.id === args.modelId);
+    if (!selected) throw Error('The selected website model is unavailable');
+    if (args.options.temperature !== null || args.options.maxTokens !== null) throw Error('This website does not support generation options');
+    return modelSubmit(args.messages, args.attachments, selected, null);
+  }});
+  action('continueModelGeneration', {async invoke(args) {
+    if (!Array.isArray(args.messages) || !args.messages.length || args.messages.some(message => !message || !['user', 'tool'].includes(message.role) || typeof message.text !== 'string')) throw Error('Continuation requires nonempty user/tool messages');
+    const previous = modelGenerations.get(args.previousGenerationId);
+    if (!previous || [...modelGenerations.values()].at(-1) !== previous || previous.terminal?.type !== 'completed' || previous.canceled || !previous.chatId || !previous.messageId || location.pathname !== '/c/' + previous.chatId) throw Error('Continuation requires this page’s latest completed Grok generation');
+    const selected = (await modelCatalog()).find(model => model.id === previous.modelId);
+    if (!selected) throw Error('The previous website model is unavailable');
+    return modelSubmit(args.messages, args.attachments, selected, previous);
   }});
   action('readModelGeneration', {async invoke({generationId, after, waitMilliseconds}) {
     const state = modelGenerations.get(generationId);
@@ -340,9 +362,9 @@ function registerModelActions(action) {
     const state = modelGenerations.get(generationId);
     if (!state) throw Error('Unknown generation');
     if (state.terminal) return {status: 'completed'};
-    state.canceled = true;
     const result = await modelSite.cancel(generationId);
     const status = typeof result === 'string' ? result : result === true ? 'cancelled' : 'requested';
+    if (status === 'cancelled' || status === 'requested') state.canceled = true;
     console.log('model cancel', generationId, status);
     return {status};
   }});

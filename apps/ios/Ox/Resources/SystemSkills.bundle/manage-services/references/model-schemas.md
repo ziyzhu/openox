@@ -1,6 +1,6 @@
 # Standard model Action schemas
 
-Generated from packages/service-sdk/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action.
+Generated from packages/service-sdk/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action. continueModelGeneration is optional; the other four Actions are required for model services.
 
 ```json
 {
@@ -351,6 +351,90 @@ Generated from packages/service-sdk/src/model-actions.ts by bun run build:servic
       },
       "required": [
         "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "continueModelGeneration": {
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "previousGenerationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "tool"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "role",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "mimeType"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "previousGenerationId",
+        "messages",
+        "attachments"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "generationId": {
+          "type": "string"
+        },
+        "submission": {
+          "type": "string",
+          "enum": [
+            "uncertain",
+            "confirmed"
+          ]
+        }
+      },
+      "required": [
+        "generationId",
+        "submission"
       ],
       "additionalProperties": false
     }

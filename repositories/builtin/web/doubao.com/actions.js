@@ -109,31 +109,66 @@ window.ox.install(({action})=>{
  action('continueChat',{async invoke({conversationRef,message}){return await send(message,conversationRef);}});
 });
 
-function parseModelResponse(source, prompt) {
-  if (source.length > 4000000) throw Error('Doubao response exceeded the size limit');
-  let chatId = '', questionId = '', messageId = '', userConfirmed = false, messageFinished = false, answerFinished = false, streamFinished = false, finished = false;
+function createModelParser(prompt, onProgress) {
+  let pending = '', size = 0, chatId = '', questionId = '', messageId = '';
+  let userConfirmed = false, messageFinished = false, answerFinished = false, streamFinished = false, finished = false;
   const blocks = new Map();
-  let lastBlock = null;
+  let deltaTarget = null, published = '';
+  const text = () => Array.from(blocks.values()).map(block => block.text).filter(Boolean).join('\n\n');
   const addBlocks = entries => {
     for (const block of entries || []) {
-      if (block.block_type !== 10000) throw Error('Unsupported Doubao answer content');
-      if (!block.block_id || (block.patch_type !== undefined && block.patch_type !== 1)) throw Error('Unsupported Doubao text patch');
-      const value = blocks.get(block.block_id) || {text: '', finished: false};
-      const text = block.content?.text_block?.text;
-      if (text !== undefined && typeof text !== 'string') throw Error('Invalid Doubao text block');
-      value.text += text || '';
+      const type = block.block_type;
+      if (type !== 10000 && type !== 10008 && type !== 10055) throw Error('Unsupported Doubao answer block_type ' + String(type));
+      if (!block.block_id || (block.patch_type !== undefined && block.patch_type !== 1)) throw Error('Unsupported Doubao text patch for block_type ' + String(type));
+      const value = blocks.get(block.block_id) || {text: '', finished: false, type};
+      if (value.type !== type) throw Error('Doubao answer block type changed');
+      let part = '';
+      if (type === 10000) {
+        part = block.content?.text_block?.text;
+        if (part !== undefined && typeof part !== 'string') throw Error('Invalid Doubao text block');
+
+      } else if (type === 10008) {
+        // Doubao's code block stores its original fenced code verbatim.
+        // The actual tool stdout is a separate website artifact, not an Ox Action result.
+        const code = block.content?.code_block;
+        if (!code || typeof code.code !== 'string' || (code.text !== undefined && typeof code.text !== 'string')) throw Error('Invalid Doubao code block');
+        part = (code.text || '') + code.code;
+        if (part) {
+          // Initial notification may contain the whole code; subsequent patches
+          // may carry either cumulative code or only a new suffix. Never guess
+          // whether a repeated prefix is a replacement or a legitimate suffix.
+          if (!value.text) value.text = part;
+          else if (part.startsWith(value.text)) value.text = part;
+          else if (!value.text.endsWith(part)) value.text += part;
+        }
+        part = '';
+
+      } else {
+        if (!block.content?.memory_tag_block) throw Error('Invalid Doubao memory tag block');
+
+      }
+      value.text += part || '';
       value.finished = block.is_finish === true;
       blocks.set(block.block_id, value);
-      lastBlock = value;
     }
   };
-  for (const frame of source.replace(/\r\n/g, '\n').split('\n\n')) {
+  function frame(frame) {
     const lines = frame.split('\n');
     const event = lines.find(line => line.startsWith('event:'))?.slice(6).trim();
     const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
-    if (!event || !data) continue;
-    const value = JSON.parse(data);
-    if (/error/i.test(event)) throw Error('Doubao generation returned an error');
+    if (!event || !data) return;
+    let value;
+    try { value = JSON.parse(data); }
+    catch (error) {
+      if (event === 'gateway-error') throw Error('Doubao gateway-error: ' + data.slice(0, 500));
+      throw error;
+    }
+    if (/error/i.test(event)) {
+      const code = value?.error_code ?? value?.code ?? value?.error?.code;
+      const detail = value?.error_msg ?? value?.message ?? value?.error?.message ?? value?.msg ?? (typeof value === 'string' ? value : '');
+      const safe = String(detail || '').slice(0, 500);
+      throw Error('Doubao ' + event + (code !== undefined ? ' code ' + String(code).slice(0, 80) : '') + (safe ? ': ' + safe : ' (no message)'));
+    }
     if (event === 'SSE_ACK') {
       if (chatId || value.query_list?.length !== 1) throw Error('Ambiguous Doubao submission');
       chatId = value.ack_client_meta?.conversation_id;
@@ -153,14 +188,29 @@ function parseModelResponse(source, prompt) {
     }
     if (event === 'STREAM_CHUNK') {
       if (!messageId || value.message_id !== messageId) throw Error('Doubao answer identity changed');
-      for (const patch of value.patch_op || []) {
+      const patches = value.patch_op || [];
+      if (patches.length === 1 && patches[0].patch_object === 1 && patches[0].patch_value?.content_block?.length === 1) {
+        const b = patches[0].patch_value.content_block[0];
+        deltaTarget = {messageId: value.message_id, blockId: b.block_id, type: b.block_type};
+      }
+      for (const patch of patches) {
         if (patch.patch_object === 1) addBlocks(patch.patch_value?.content_block);
         if (patch.patch_object === 50 && patch.patch_value?.ext?.is_finish === '1') finished = true;
       }
     }
     if (event === 'CHUNK_DELTA') {
-      if (!lastBlock || lastBlock.finished || typeof value.text !== 'string') throw Error('Invalid Doubao text delta');
-      lastBlock.text += value.text;
+      if (!deltaTarget || deltaTarget.messageId !== messageId || !deltaTarget.blockId || ![10000, 10008, 10055].includes(deltaTarget.type)) throw Error('Invalid Doubao delta target');
+      const target = blocks.get(deltaTarget.blockId);
+      if (!target || target.type !== deltaTarget.type || target.finished) throw Error('Invalid Doubao delta target state');
+      if (deltaTarget.type === 10000) {
+        const part = value?.text_block?.text ?? value?.text;
+        if (typeof part !== 'string') throw Error('Invalid Doubao text delta payload');
+        target.text += part;
+      } else if (deltaTarget.type === 10008) {
+        const code = value?.code_block;
+        if (!code || (code.code !== undefined && typeof code.code !== 'string') || (code.text !== undefined && typeof code.text !== 'string')) throw Error('Invalid Doubao code delta payload');
+        target.text += (code.text || '') + (code.code || '');
+      } else if (!value?.memory_tag_block) throw Error('Invalid Doubao memory delta payload');
     }
     if (event === 'SSE_REPLY_END') {
       if (value.end_type === 1) {
@@ -170,15 +220,47 @@ function parseModelResponse(source, prompt) {
       if (value.end_type === 2) answerFinished = true;
       if (value.end_type === 3) streamFinished = true;
     }
+    if (userConfirmed && messageId) {
+      const next = text();
+      // If a later block is introduced, the separator changes the previous suffix;
+      // publish only after its structure is known. A replacement is never emitted.
+      if (!next.startsWith(published)) throw Error('Doubao revised published answer');
+      if (next.length > published.length) {
+        if (next.length > 500000) throw Error('Doubao answer exceeded the size limit');
+        published = next;
+        onProgress({chatId, messageId, text: next});
+      }
+    }
   }
-  const text = Array.from(blocks.values()).map(block => block.text).join('\n\n');
-  if (!userConfirmed || !finished || !messageFinished || !answerFinished || !streamFinished || !text.trim() || Array.from(blocks.values()).some(block => !block.finished)) throw Error('Doubao response ended without confirmed completion');
-  return {chatId, messageId, text};
+  function push(chunk, end = false) {
+    if (typeof chunk !== 'string') throw Error('Invalid Doubao stream chunk');
+    size += chunk.length;
+    if (size > 4000000) throw Error('Doubao response exceeded the size limit');
+    pending += chunk;
+    // Normalize CRLF after concatenation, so split CR/LF pairs are safe.
+    pending = pending.replace(/\r\n/g, '\n');
+    // A trailing CR remains pending until the next chunk supplies LF.
+    let at;
+    while ((at = pending.indexOf('\n\n')) >= 0) {
+      const raw = pending.slice(0, at);
+      pending = pending.slice(at + 2);
+      if (raw) frame(raw);
+    }
+    if (pending.length > 1000000) throw Error('Doubao event exceeded the size limit');
+    if (end) {
+      if (pending.trim()) frame(pending.replace(/\r/g, ''));
+      pending = '';
+      if (!userConfirmed || !finished || !messageFinished || !answerFinished || !streamFinished || !text().trim() || Array.from(blocks.values()).some(block => !block.finished)) throw Error('Doubao response ended without confirmed completion');
+      return {chatId, messageId, text: text()};
+    }
+  }
+  return {push};
 }
 
 function createModelSite(emit) {
   let active = null;
-  const fail = (state, error) => emit({id: state.id, type: 'failed', message: String(error.message || error)});
+  const fail = (state, error) => { if (!state.canceled && state.phase !== 'completed') emit({id: state.id, type: 'failed', message: String(error.message || error)}); };
+  const progress = state => result => { if (!state.canceled) emit({id: state.id, type: 'snapshot', ...result}); };
   function observeSubmission() {
     const matches = url => {
       const value = new URL(url, location.href);
@@ -210,20 +292,39 @@ function createModelSite(emit) {
     XMLHttpRequest.prototype.send = function(body) {
       if (matches(opened.get(this) || '') && claim()) {
         const state = active;
+        const parser = createModelParser(state.prompt, progress(state));
+        let observed = 0;
         console.log('model capture', 'xhr');
+        let broken = false;
+        const consume = () => {
+          if (broken) return;
+          if (state.canceled) return;
+          if (typeof this.responseText !== 'string') throw Error('Doubao XHR response is not text');
+          const next = this.responseText;
+          if (next.length < observed) throw Error('Doubao XHR response was reset');
+          parser.push(next.slice(observed));
+          observed = next.length;
+        };
+        this.addEventListener('progress', () => { try { consume(); } catch (error) { broken = true; fail(state, error); } });
         this.addEventListener('loadend', () => {
-          void (async () => {
+          try {
+            if (state.canceled || broken) return;
             if (this.status !== 200) throw Error('Doubao generation HTTP ' + this.status);
-            await complete(this.responseText, state);
-          })().catch(error => fail(state, error));
+            const next = this.responseText;
+            if (next.length < observed) throw Error('Doubao XHR response was reset');
+            parser.push(next.slice(observed));
+            observed = next.length;
+            void complete(parser.push('', true), state).catch(error => fail(state, error));
+          } catch (error) { fail(state, error); }
         }, {once: true});
       }
       return originalSend.call(this, body);
     };
   }
-  async function complete(text, state) {
-    const result = parseModelResponse(text, state.prompt);
-    await wait(() => currentRef() === result.chatId, 10000, 'confirmed conversation');
+  async function complete(result, state) {
+    if (state.canceled) return;
+    // SSE_ACK plus exact user echo and terminal stream markers are authoritative.
+    // The SPA route can update later; never block a finished stream on it.
     if (state.canceled) return;
     state.phase = 'completed';
     emit({id: state.id, type: 'snapshot', ...result});
@@ -234,21 +335,20 @@ function createModelSite(emit) {
     const reader = response.body?.getReader();
     if (!reader) throw Error('Doubao generation response is unavailable');
     const decoder = new TextDecoder();
-    let text = '';
+    const parser = createModelParser(state.prompt, progress(state));
     const timeout = setTimeout(() => { state.expired = true; void reader.cancel(); }, 290000);
     try {
       while (true) {
         const part = await reader.read();
         if (state.canceled || state.expired) throw Error(state.expired ? 'Doubao generation timed out' : 'Doubao generation observation canceled');
         if (part.done) break;
-        text += decoder.decode(part.value, {stream: true});
-        if (text.length > 4000000) throw Error('Doubao response exceeded the size limit');
+        parser.push(decoder.decode(part.value, {stream: true}));
       }
-      text += decoder.decode();
-      await complete(text, state);
+      parser.push(decoder.decode());
+      await complete(parser.push('', true), state);
     } finally {
       clearTimeout(timeout);
-      await reader.cancel().catch(() => {});
+      void reader.cancel().catch(() => {});
     }
   }
   return {
@@ -269,15 +369,35 @@ function createModelSite(emit) {
     },
     cancel(id) {
       if (active?.id !== id) return 'unsupported';
-      if (active.phase === 'completed') return 'completed';
-      active.canceled = true;
-      return active.phase === 'preparing' ? 'cancelled' : 'unsupported';
+      const state = active;
+      if (state.phase === 'completed') return 'completed';
+      state.canceled = true;
+      if (state.phase === 'preparing') return 'requested';
+      const stopRoute = location.pathname;
+      // Native local break delegates to Doubao's active chat request/store.
+      // Do not wait for its asynchronous network path before returning to Ox.
+      const stop = document.querySelector('[data-testid="chat_input_local_break_button"]');
+      if (stop && visible(stop) && !stop.classList.contains('!hidden')) {
+        setTimeout(() => { if (active === state && location.pathname === stopRoute) try { stop.click(); } catch (error) { console.log('Doubao stop control unavailable', String(error)); } }, 0);
+      } else {
+        const deadline = Date.now() + 1500;
+        const later = () => {
+          const control = document.querySelector('[data-testid="chat_input_local_break_button"]');
+          if (active !== state || location.pathname !== stopRoute) return;
+          if (control && visible(control) && !control.classList.contains('!hidden')) {
+            try { control.click(); } catch (error) { console.log('Doubao stop control unavailable', String(error)); }
+          } else if (Date.now() < deadline) setTimeout(later, 50);
+          else console.log('Doubao stop control did not appear');
+        };
+        setTimeout(later, 0);
+      }
+      return 'requested';
     },
   };
 }
 
 async function modelCatalog() {
-  return [{id: 'website-default', name: 'Default', input: ['text'], contextTokens: null, outputTokens: null, streaming: false, cancellation: false, options: []}];
+  return [{id: 'website-default', name: 'Default', input: ['text'], contextTokens: null, outputTokens: null, streaming: true, cancellation: false, options: []}];
 }
 
 const modelGenerations = new Map();
@@ -293,13 +413,14 @@ function modelFailure(message) {
 }
 function modelEvent(event) {
   const state = modelGenerations.get(event.id);
-  if (!state || state.terminal) return;
+  if (!state || state.terminal || state.canceled) return;
   if (event.chatId) state.chatId = event.chatId;
   if (event.messageId) state.messageId = event.messageId;
   if (event.type === 'snapshot') {
     if (typeof event.text !== 'string' || event.text.length > 500000 || !event.text.startsWith(state.text.slice(0, state.emitted))) {
       state.terminal = {type: 'failed', message: 'Model response revised published text or exceeded the size limit', kind: 'provider'};
-    } else state.text = event.text;
+    } else if (event.text.startsWith(state.text)) state.text = event.text;
+    else state.terminal = {type: 'failed', message: 'Doubao revised buffered answer', kind: 'provider'};
   }
   if (event.type === 'completed') state.terminal = {type: 'completed'};
   if (event.type === 'failed') {
@@ -356,10 +477,11 @@ function registerModelActions(action) {
   action('cancelModelGeneration', {async invoke({generationId}) {
     const state = modelGenerations.get(generationId);
     if (!state) throw Error('Unknown generation');
-    if (state.terminal) return {status: 'completed'};
+    if (state.terminal) return {status: state.terminal.type === 'completed' ? 'completed' : 'requested'};
     state.canceled = true;
-    const result = await modelSite.cancel(generationId);
+    const result = modelSite.cancel(generationId);
     const status = typeof result === 'string' ? result : result === true ? 'cancelled' : 'requested';
+    if (status !== 'completed') state.terminal = {type: 'failed', message: 'Generation stopped by Ox', kind: 'provider'};
     console.log('model cancel', generationId, status);
     return {status};
   }});

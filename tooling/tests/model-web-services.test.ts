@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { serviceSource } from "../fixtures/model-service-source";
 
-type Event = { id: string; type: string; text?: string; message?: string };
+type Event = { id: string; type: string; text?: string; message?: string; chatId?: string; messageId?: string };
 const domains = ["qwen.ai", "www.kimi.com", "grok.com", "claude.ai", "gemini.google.com", "doubao.com"];
 
 function session(domain: string) {
@@ -9,22 +9,27 @@ function session(domain: string) {
   let emit: (event: Event) => void = () => {};
   let submissions = 0;
   let submittedMessages = "";
+  let continued: any = null;
+  const location = {pathname: "/"};
   const window: any = { ox: { install(register: any) { register({action: (id: string, handler: any) => { handlers[id] = handler; }}); } } };
-  new Function("window", "siteFactory", "console", serviceSource(domain) + `
+  new Function("window", "siteFactory", "console", "location", serviceSource(domain) + `
     function createModelSite(send) { return siteFactory(send); }
     async function modelCatalog() { return [{id: 'website-default', input: ['text', 'image'], options: []}]; }
+    async function modelActiveOrg() { return 'organization'; }
   `)(window, (send: (event: Event) => void) => {
     emit = send;
     return {
-      start(_id: string, prompt: string) { submissions++; submittedMessages = prompt; },
+      start(_id: string, prompt: string, previous?: any) { submissions++; submittedMessages = prompt; continued = previous ?? null; },
+      setOrganization() {},
       cancel() { return "requested"; },
       async observe() { return {status: "pending"}; },
     };
-  }, {log() {}});
+  }, {log() {}}, location);
   const args = {modelId: "website-default", messages: [{role: "system", text: "Test instructions"}, {role: "user", text: "Test message"}], attachments: [], options: {temperature: null, maxTokens: null}};
   return {
-    handlers, args, window, emit: (event: Event) => emit(event),
+    handlers, args, window, location, continued: () => continued, emit: (event: Event) => emit(event),
     start: (input = args) => handlers.startModelGeneration!.invoke(input),
+    continue: (previousGenerationId: string, messages = [{role: "user", text: "Continue"}], attachments: any[] = []) => handlers.continueModelGeneration!.invoke({previousGenerationId, messages, attachments}),
     read: (generationId: string, after = 0) => handlers.readModelGeneration!.invoke({generationId, after, waitMilliseconds: 0}),
     submissions: () => submissions, submittedMessages: () => JSON.parse(submittedMessages),
   };
@@ -87,5 +92,49 @@ for (const domain of domains) {
     expect(result.nextCursor).toBe(4096);
     expect(result.events[0].type).toBe("failed");
     expect(await run.read(generationId, 4096)).toEqual({nextCursor: 4096, events: []});
+  });
+}
+
+test("only services implementing continuation expose its Action", () => {
+  for (const domain of domains) {
+    expect(typeof session(domain).handlers.continueModelGeneration?.invoke).toBe(domain === "grok.com" ? "function" : "undefined");
+  }
+});
+
+test("grok.com continues only its latest completed conversation", async () => {
+  const run = session("grok.com");
+  await expect(run.continue("unknown")).rejects.toThrow(/continu/i);
+  const first = await run.start();
+  await expect(run.continue(first.generationId)).rejects.toThrow(/continu/i);
+  run.emit({id: first.generationId, type: "snapshot", text: "ACK", chatId: "chat-1", messageId: "response-1"});
+  run.emit({id: first.generationId, type: "completed"});
+  await expect(run.continue(first.generationId)).rejects.toThrow(/continu/i);
+  run.location.pathname = "/c/chat-1";
+  await expect(run.continue(first.generationId, [])).rejects.toThrow();
+  await expect(run.continue(first.generationId, [{role: "system", text: "Changed instructions"}])).rejects.toThrow();
+  const earlier = await run.read(first.generationId);
+  const turn = [{role: "tool", text: "<ox_action_result>{}</ox_action_result>"}];
+  run.window.__oxWebsiteFiles = [new File(["synthetic"], "test.png", {type: "image/png"})];
+  const second = await run.continue(first.generationId, turn, [{id: 0, name: "test.png", mimeType: "image/png"}]);
+  expect(run.continued()).toMatchObject({chatId: "chat-1", messageId: "response-1"});
+  expect(run.submittedMessages().conversation).toEqual(turn);
+  expect(await run.read(first.generationId)).toEqual(earlier);
+  await expect(run.continue(first.generationId)).rejects.toThrow(/continu/i);
+  expect(second.generationId).not.toBe(first.generationId);
+  expect(run.submissions()).toBe(2);
+});
+
+for (const outcome of ["failed", "cancelled"]) {
+  test(`grok.com rejects ${outcome} generations before continuation submission`, async () => {
+    const run = session("grok.com");
+    const first = await run.start();
+    run.location.pathname = "/c/chat-1";
+    run.emit({id: first.generationId, type: "snapshot", text: "ACK", chatId: "chat-1", messageId: "response-1"});
+    if (outcome === "cancelled") {
+      await run.handlers.cancelModelGeneration!.invoke({generationId: first.generationId});
+      run.emit({id: first.generationId, type: "completed"});
+    } else run.emit({id: first.generationId, type: "failed", message: "Network failed"});
+    await expect(run.continue(first.generationId)).rejects.toThrow(/continu/i);
+    expect(run.submissions()).toBe(1);
   });
 }

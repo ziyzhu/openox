@@ -28,8 +28,61 @@ test.skipIf(process.platform !== "darwin")("Swift model streams reject invalid c
   } finally { await rm(directory, { recursive: true, force: true }); }
 }, 60_000);
 
+test.skipIf(process.platform !== "darwin")("Swift continues only after an unchanged history", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ox-model-history-"));
+  try {
+    const executable = join(directory, "history-tests");
+    const compiler = Bun.spawn(["xcrun", "swiftc", "-module-cache-path", join(directory, "cache"),
+      "apps/ios/Ox/Platform/Models/JSONValue.swift", "apps/ios/Ox/Host/Services/Web/ModelConversationHistory.swift",
+      "tooling/fixtures/model-conversation-history.swift", "-o", executable], { stdout: "pipe", stderr: "pipe" });
+    const diagnostics = await new Response(compiler.stderr).text();
+    expect(await compiler.exited, diagnostics).toBe(0);
+    const run = Bun.spawn([executable], { stdout: "pipe", stderr: "pipe" });
+    const errors = await new Response(run.stderr).text();
+    expect(await run.exited, errors).toBe(0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+}, 60_000);
+
+test.skipIf(process.platform !== "darwin")("Swift routes optional continuation and restarts changed conversations", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ox-model-conversation-"));
+  try {
+    const executable = join(directory, "history-tests");
+    const compiler = Bun.spawn(["xcrun", "swiftc", "-module-cache-path", join(directory, "cache"),
+      "apps/ios/Ox/Platform/Models/JSONValue.swift", "apps/ios/Ox/Host/Services/Web/ModelConversationHistory.swift",
+      "apps/ios/Ox/Host/Services/Web/ModelConversation.swift", "tooling/fixtures/model-conversation.swift", "-o", executable], { stdout: "pipe", stderr: "pipe" });
+    const diagnostics = await new Response(compiler.stderr).text();
+    expect(await compiler.exited, diagnostics).toBe(0);
+    const run = Bun.spawn([executable], { stdout: "pipe", stderr: "pipe" });
+    const errors = await new Response(run.stderr).text();
+    expect(await run.exited, errors).toBe(0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+}, 60_000);
+
 test("a complete model service uses the existing manifest shape", () => {
   expect(validateServiceManifest(manifest())).toMatchObject({ ok: true });
+});
+
+test("continuation is optional and start accepts no previous generation", () => {
+  const freshOnly = actions().filter(action => action.id !== "continueModelGeneration");
+  expect(validateServiceManifest({ ...manifest(), actions: freshOnly })).toMatchObject({ ok: true });
+  expect(MODEL_ACTION_SCHEMAS.startModelGeneration!.inputSchema.properties).not.toHaveProperty("previousGenerationId");
+});
+
+test("present continuation Actions must use the exact contract", () => {
+  const continuation = actions();
+  const action = continuation.find(action => action.id === "continueModelGeneration")!;
+  action.inputSchema.required = (action.inputSchema.required as string[]).filter(name => name !== "previousGenerationId");
+  expect(validateModelActions(continuation)).toContain("actions.continueModelGeneration.inputSchema: incompatible standard model Action schema");
+  expect(validateModelActions([action])).toContain("actions: model service requires startModelGeneration");
+});
+
+test("continuation shares the generation URL and cannot block cancellation", () => {
+  const blocking = actions().map(action => ({ ...action, blocking: action.id === "continueModelGeneration" }));
+  expect(validateModelActions(blocking).join(" ")).toContain("cannot block cancellation");
+  const differentURL = actions().map(action => ({ ...action, baseUrl: action.id === "continueModelGeneration" ? "https://example.com/continue" : "https://example.com/" }));
+  expect(validateModelActions(differentURL).join(" ")).toContain("must share a baseUrl");
+  const templatedURL = actions().map(action => ({ ...action, baseUrl: "https://example.com/{id}" }));
+  expect(validateModelActions(templatedURL).join(" ")).toContain("must be literal");
 });
 
 test("ordinary listModels Actions are not model providers", () => {
@@ -100,6 +153,7 @@ test.skipIf(process.platform !== "darwin")("Swift rejects the same incompatible 
     const executable = join(directory, "contract-tests");
     const compiler = Bun.spawn(["xcrun", "swiftc", "-module-cache-path", join(directory, "cache"),
       "apps/ios/Ox/Platform/Models/JSONValue.swift",
+      "apps/ios/Ox/Platform/Models/JSONSchemaValidator.swift",
       "apps/ios/Ox/Host/Services/Web/ModelServiceContract.swift",
       "tooling/fixtures/model-service-contract.swift", "-o", executable], { stdout: "pipe", stderr: "pipe" });
     const diagnostics = await new Response(compiler.stderr).text();
@@ -112,6 +166,10 @@ test.skipIf(process.platform !== "darwin")("Swift rejects the same incompatible 
     (extraProperty[2]!.outputSchema.properties as Record<string, unknown>).description = { type: "string" };
     const referenced = actions();
     referenced[1]!.inputSchema = { $ref: "#/$defs/startInput" };
+    const invalidContinuation = actions();
+    invalidContinuation[4]!.inputSchema.required = ["messages", "attachments"];
+    const blockingContinuation = actions().map(action => ({ ...action, blocking: action.id === "continueModelGeneration" }));
+    const differentURL = actions().map(action => ({ ...action, baseUrl: action.id === "continueModelGeneration" ? "https://example.com/continue" : "https://example.com/" }));
     const samples = [
       { actions: complete, definitions: {}, isWeb: true },
       { actions: complete.slice(0, 1), definitions: {}, isWeb: true },
@@ -121,11 +179,16 @@ test.skipIf(process.platform !== "darwin")("Swift rejects the same incompatible 
       { actions: extraProperty, definitions: {}, isWeb: true },
       { actions: referenced, definitions: { startInput: complete[1]!.inputSchema }, isWeb: true },
       { actions: referenced, definitions: { startInput: { $ref: "#/$defs/startInput" } }, isWeb: true },
+      { actions: complete.filter(action => action.id !== "continueModelGeneration"), definitions: {}, isWeb: true },
+      { actions: invalidContinuation, definitions: {}, isWeb: true },
+      { actions: blockingContinuation, definitions: {}, isWeb: true },
+      { actions: differentURL, definitions: {}, isWeb: true },
+      { actions: complete.slice(4), definitions: {}, isWeb: true },
     ];
     const run = Bun.spawn([executable], { stdin: new Blob([JSON.stringify(samples)]), stdout: "pipe", stderr: "pipe" });
     const output = await new Response(run.stdout).text();
     const errors = await new Response(run.stderr).text();
     expect(await run.exited, errors).toBe(0);
-    expect(JSON.parse(output)).toEqual([true, true, false, false, true, false, true, false]);
+    expect(JSON.parse(output)).toEqual([true, true, false, false, true, false, true, false, true, false, false, false, false]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 }, 60_000);

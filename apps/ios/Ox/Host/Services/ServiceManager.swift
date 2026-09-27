@@ -118,6 +118,7 @@ final class ServiceManager {
     }
 
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
+    @ObservationIgnored var modelConversations: [UUID: ModelConversation] = [:]
 
     nonisolated static let savedKey = "savedServices"
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
@@ -188,6 +189,7 @@ final class ServiceManager {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.actionScheduler.releaseIdle(reason: .memoryWarning)
+                self.closeModelConversations(reason: "memoryWarning")
             }
         }
     }
@@ -419,6 +421,10 @@ final class ServiceManager {
             }
     }
 
+    func isChatAttached(_ chatID: UUID) -> Bool {
+        attachedServiceDomainsByChat[chatID] != nil
+    }
+
     func isAttached(domain: String, to chatID: UUID) -> Bool {
         attachedServiceDomainsByChat[chatID]?.contains(domain) == true
     }
@@ -432,7 +438,16 @@ final class ServiceManager {
     func removeAttachedServices(for chatID: UUID) {
         let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         attachedServiceDomainsByChat.removeValue(forKey: chatID)
+        modelConversations.removeValue(forKey: chatID)?.close()
         updateMCPActivation(from: previous)
+    }
+
+    private func closeModelConversations(reason: String) {
+        guard !modelConversations.isEmpty else { return }
+        Log.service.info("ModelService.release reason=\(reason) count=\(modelConversations.count)")
+        let conversations = modelConversations.values
+        modelConversations.removeAll()
+        conversations.forEach { $0.close() }
     }
 
     private func updateMCPActivation(from previous: Set<String>) {

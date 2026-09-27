@@ -63,6 +63,8 @@ ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read --args '<json>'
 ```
 
+After reinstalling or relaunching the app, a saved chat may appear in `ox chat list` while `ox chat send --chat <id>` reports `unknown chat`. Open that chat through the app sidebar with `sim`, allow hydration to finish, and confirm `ox --chat <id> chat inspect` succeeds before sending. For an authorized approval in a long chat, scroll to the bottom and verify the button is `chat.confirm.Approve`; `chat.confirm.receipt.Approve` records an approval already completed.
+
 First-time `ox.service.attach` from an idle chat can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
 
 Prefer `ox vm call <ox.function> --args <json>` for normal operations. It

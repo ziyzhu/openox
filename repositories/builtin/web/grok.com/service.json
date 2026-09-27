@@ -922,6 +922,95 @@
       },
       "requireAuth": true,
       "requireApproval": true
+    },
+    {
+      "id": "continueModelGeneration",
+      "label": "Continue model generation",
+      "description": "Continue the latest completed generation in its website conversation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "previousGenerationId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "tool"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "mimeType"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "previousGenerationId",
+          "messages",
+          "attachments"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string"
+          },
+          "submission": {
+            "type": "string",
+            "enum": [
+              "uncertain",
+              "confirmed"
+            ]
+          }
+        },
+        "required": [
+          "generationId",
+          "submission"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true
     }
   ]
 }
