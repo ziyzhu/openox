@@ -2,8 +2,17 @@ import { expect, test } from "bun:test";
 import { serviceSource } from "../fixtures/model-service-source";
 
 const source = serviceSource("gemini.google.com");
-const parser = source.slice(source.indexOf("function parseModelResponse"), source.indexOf("function createModelSite"));
-const parse = new Function(parser + "; return parseModelResponse;")();
+const parser = source.slice(source.indexOf("function modelStreamParser"), source.indexOf("function createModelSite"));
+const createParser = new Function(parser + "; return modelStreamParser;")();
+function parse(wire: string) {
+  const events: any[] = [];
+  const parser = createParser({id: "generation-1"}, (event: any) => events.push(event));
+  parser.push(wire);
+  parser.end();
+  const {chatId, messageId, text} = events.findLast(event => event.type === "snapshot");
+  return {chatId, messageId, text};
+}
+const packet = (row: string) => `${row.length + 2}\n${row}\n`;
 
 function frame(text: string, complete = false, conversation = "c_1234", message = "r_abcd") {
   const candidate: any[] = ["rc_5678", [text]];
@@ -12,11 +21,11 @@ function frame(text: string, complete = false, conversation = "c_1234", message 
   data[1] = [conversation, message];
   data[4] = [candidate];
   data[14] = complete;
-  return JSON.stringify([["wrb.fr", null, JSON.stringify(data)]]);
+  return packet(JSON.stringify([["wrb.fr", null, JSON.stringify(data)]]));
 }
 
 test("Gemini requires native completion markers instead of visible text or EOF", () => {
-  const partial = frame("A visible answer");
+  const partial = frame("A finished");
   expect(() => parse(partial)).toThrow("without confirmed completion");
   expect(parse(partial + "\n" + frame("A finished answer", true))).toEqual({
     chatId: "1234", messageId: "r_abcd", text: "A finished answer",
@@ -25,26 +34,54 @@ test("Gemini requires native completion markers instead of visible text or EOF",
 
 test("Gemini preserves final answer formatting and ignores unrelated wire metadata", () => {
   const answer = '```json\n{"action":"test"}\n```';
-  expect(parse(")]}'\n\n100\n" + frame(answer, true) + '\n[["di",123]]\n')).toEqual({
+  expect(parse(")]}'\n\n" + frame(answer, true) + packet('[["di",123]]'))).toEqual({
     chatId: "1234", messageId: "r_abcd", text: answer,
   });
 });
 
+test("Gemini streams split frames and waits for the terminal marker", () => {
+  const events: any[] = [];
+  const state = {id: "generation-1", phase: "submitted"};
+  const parser = createParser(state, (event: any) => events.push(event));
+  for (const chunk of frame("Hello 世界")) parser.push(chunk);
+  expect(events).toEqual([{id: state.id, type: "snapshot", chatId: "1234", messageId: "r_abcd", text: "Hello 世界"}]);
+  for (const chunk of frame("Hello 世界!", true)) parser.push(chunk);
+  expect(events.map(event => event.type)).toEqual(["snapshot", "snapshot"]);
+  parser.end();
+  expect(events.at(-1)).toEqual({id: state.id, type: "completed"});
+  expect(state.phase).toBe("completed");
+});
+
+test("Gemini rejects revisions to published text", () => {
+  expect(() => parse(frame("Original") + frame("Replacement", true))).toThrow("revised published text");
+});
+
+test("Gemini confirms a pending stop without publishing a completed answer", () => {
+  const events: any[] = [];
+  const state = {id: "generation-1", phase: "submitted", cancelPending: true, cancelConfirmed: false};
+  const parser = createParser(state, (event: any) => events.push(event));
+  parser.push(frame("Stopped answer", true));
+  parser.end();
+  expect(events).toEqual([]);
+  expect(state.cancelConfirmed).toBe(true);
+  expect(state.phase).toBe("stopped");
+});
+
 test("Gemini rejects mismatched, malformed, empty, and oversized completions", () => {
-  expect(() => parse(frame("First", true) + "\n" + frame("Second", true, "c_9999"))).toThrow("identity changed");
+  expect(() => parse(frame("First", true) + "\n" + frame("First extended", true, "c_9999"))).toThrow("identity changed");
   expect(() => parse(frame("First", true) + "\n" + frame("First", true, "c_1234", "r_ffff"))).toThrow("identity changed");
   expect(() => parse(frame("", true))).toThrow("Invalid completed");
-  expect(() => parse(frame("Answer", true, "invalid"))).toThrow("Invalid completed");
+  expect(() => parse(frame("Answer", true, "invalid"))).toThrow("without confirmed completion");
   expect(() => parse("[invalid")).toThrow();
   expect(() => parse("a".repeat(4000001))).toThrow("size limit");
 });
 
 test("Gemini does not accept a partial candidate marked as a finished response", () => {
-  const row = JSON.parse(frame("Partial", true));
+  const row = JSON.parse(frame("Partial", true).split("\n")[1]!);
   const data = JSON.parse(row[0][2]);
   data[4][0][8][0] = 1;
   row[0][2] = JSON.stringify(data);
-  expect(() => parse(JSON.stringify(row))).toThrow("without confirmed completion");
+  expect(() => parse(packet(JSON.stringify(row)))).toThrow("without confirmed completion");
 });
 
 test("Gemini reports context overflow before touching the website composer", async () => {
@@ -93,7 +130,7 @@ for (const transport of ["fetch", "xhr"] as const) {
     expect(submissions).toBe(1);
     expect(events.map(event => event.type)).toEqual(["snapshot", "completed"]);
     expect(events[0].text).toBe("Verified answer");
-    expect(site.cancel("generation-1")).toBe("completed");
+    expect(await site.cancel("generation-1")).toBe("completed");
     expect(() => site.start("oversized", "a".repeat(32001))).toThrow("context exceeds");
     expect(submissions).toBe(1);
   });
@@ -105,15 +142,15 @@ for (const submitted of [false, true]) {
     const window = {fetch: (_url?: string) => new Promise<Response>(() => {})};
     class XHR { open() {} send() {} }
     const bridge = source.slice(source.indexOf("function createModelSite"), source.indexOf("async function modelCatalog"));
-    const make = new Function("window", "XMLHttpRequest", "location", "send", "signInState", "console", parser + bridge + ";return createModelSite;");
+    const make = new Function("window", "XMLHttpRequest", "location", "send", "signInState", "document", "console", parser + bridge + ";return createModelSite;");
     const site = make(window, XHR, {href: "https://gemini.google.com/app", origin: "https://gemini.google.com"}, async (_prompt: string, _id: string, beforeSubmit: () => void) => {
       beforeSubmit();
       submissions++;
       return await window.fetch("/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate");
-    }, async () => ({signedIn: true}), {log() {}})(() => {});
+    }, async () => ({signedIn: true}), {querySelector: () => null}, {log() {}})(() => {});
     site.start("generation-1", "Synthetic prompt");
     if (submitted) await Promise.resolve();
-    expect(site.cancel("generation-1")).toBe(submitted ? "unsupported" : "cancelled");
+    expect(await site.cancel("generation-1")).toBe(submitted ? "unsupported" : "cancelled");
     await Promise.resolve();
     expect(submissions).toBe(submitted ? 1 : 0);
   });

@@ -2,8 +2,9 @@ import { expect, test } from "bun:test";
 import { serviceSource } from "../fixtures/model-service-source";
 
 const source = serviceSource("doubao.com");
-const parser = source.slice(source.indexOf("function parseModelResponse"), source.indexOf("function createModelSite"));
-const parse = new Function(parser + "; return parseModelResponse;")();
+const parser = source.slice(source.indexOf("function createModelParser"), source.indexOf("function createModelSite"));
+const createParser = new Function(parser + "; return createModelParser;")();
+const parse = (wire: string, prompt: string) => createParser(prompt, () => {}).push(wire, true);
 const prompt = "Synthetic prompt";
 const frame = (event: string, data: object) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 const block = (text: string, finished = false) => ({block_type: 10000, block_id: "block-1", content: {text_block: {text}}, is_finish: finished, patch_type: 1});
@@ -41,8 +42,18 @@ test("Doubao rejects changed identities, unsupported patches, errors, and oversi
   expect(() => parse(valid.replace('"msgid":"333"', '"msgid":"999"'), prompt)).toThrow("identity changed");
   expect(() => parse(valid.replaceAll('"patch_type":1', '"patch_type":2'), prompt)).toThrow("text patch");
   expect(() => parse(valid.replaceAll('"block_type":10000', '"block_type":999'), prompt)).toThrow("Unsupported");
-  expect(() => parse(valid + frame("SSE_ERROR", {}), prompt)).toThrow("error");
+  expect(() => parse(valid + frame("SSE_ERROR", {}), prompt)).toThrow("SSE_ERROR");
   expect(() => parse("x".repeat(4000001), prompt)).toThrow("size limit");
+});
+
+test("Doubao streams split CRLF frames before confirmed completion", () => {
+  const snapshots: any[] = [];
+  const parser = createParser(prompt, (snapshot: any) => snapshots.push(snapshot));
+  const frames = response();
+  for (const chunk of frames.slice(0, 5).join("").replaceAll("\n", "\r\n")) parser.push(chunk);
+  expect(snapshots.map(snapshot => snapshot.text)).toEqual(["A", "Ans", "Answer\nwith formatting"]);
+  for (const chunk of frames.slice(5).join("").replaceAll("\n", "\r\n")) parser.push(chunk);
+  expect(parser.push("", true)).toEqual({chatId: "222", messageId: "333", text: "Answer\nwith formatting"});
 });
 
 for (const transport of ["fetch", "xhr"] as const) {
@@ -74,8 +85,8 @@ for (const transport of ["fetch", "xhr"] as const) {
     site.start("generation-1", prompt);
     await done;
     expect(submissions).toBe(1);
-    expect(events.map(event => event.type)).toEqual(["snapshot", "completed"]);
-    expect(events[0].text).toBe("Answer\nwith formatting");
+    expect(events.map(event => event.type)).toEqual(["snapshot", "snapshot", "snapshot", "snapshot", "completed"]);
+    expect(events.filter(event => event.type === "snapshot").map(event => event.text)).toEqual(["A", "Ans", "Answer\nwith formatting", "Answer\nwith formatting"]);
     expect(site.cancel("generation-1")).toBe("completed");
   });
 }
@@ -88,7 +99,7 @@ test("Doubao cancels before submission without sending", async () => {
   const create = new Function("signInState", "send", "console", bridge + ";return createModelSite;");
   const site = create(() => signedIn, async () => { submissions++; }, {log() {}})(() => {});
   site.start("generation-1", prompt);
-  expect(site.cancel("generation-1")).toBe("cancelled");
+  expect(site.cancel("generation-1")).toBe("requested");
   authenticate({signedIn: true});
   await Promise.resolve();
   expect(submissions).toBe(0);
@@ -100,14 +111,14 @@ test("Doubao does not claim remote cancellation after the native click", async (
   const clicked = new Promise<void>(resolve => { submitted = resolve; });
   const window = {fetch: async () => new Promise<Response>(() => {})};
   class XHR { open() {} send() {} }
-  const create = new Function("window", "XMLHttpRequest", "location", "signInState", "send", "console", bridge + ";return createModelSite;");
+  const create = new Function("window", "XMLHttpRequest", "location", "signInState", "send", "document", "setTimeout", "console", bridge + ";return createModelSite;");
   const site = create(window, XHR, {origin: "https://www.doubao.com", href: "https://www.doubao.com/chat/"}, async () => ({signedIn: true}), async (_prompt: string, _id: string, beforeSubmit: () => void) => {
     beforeSubmit();
     submitted();
-  }, {log() {}})(() => {});
+  }, {querySelector: () => null}, () => {}, {log() {}})(() => {});
   site.start("generation-1", prompt);
   await clicked;
-  expect(site.cancel("generation-1")).toBe("unsupported");
+  expect(site.cancel("generation-1")).toBe("requested");
 });
 
 test("Doubao hidden-page frame fallback runs once and honors cancellation", () => {
