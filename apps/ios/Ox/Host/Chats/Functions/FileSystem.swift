@@ -148,10 +148,10 @@ extension Chat {
             try await self.authorizeFileAccess(location, operation: .edit)
             return try await self.fileMutationCoordinator.perform(key: self.fileMutationKey(location)) {
                 let original = try await self.fileSystemUTF8Text(location)
-                let content = try self.virtualMachine.fileSystem.apply(edits, to: original)
-                let item = try await self.writeFileSystem(location, content: content)
-                Log.session.info("bridge.fs.edit path=\(location.path) edits=\(edits.count) chars=\(original.count)->\(content.count)")
-                return item
+                let applied = try ExactTextReplacement.apply(edits, to: original)
+                let item = try await self.writeFileSystem(location, content: applied.text)
+                Log.session.info("bridge.fs.edit path=\(location.path) edits=\(edits.count) chars=\(original.count)->\(applied.text.count) firstChangedLine=\(applied.firstChangedLine)")
+                return item.merging(["firstChangedLine": .int(applied.firstChangedLine)])
             }
         }
     }
@@ -727,15 +727,15 @@ extension Chat {
         }
     }
 
-    private func fileSystemEdits(_ value: JSONValue?) throws -> [VirtualFileSystem.Edit] {
-        guard let values = value?.arrayValue, !values.isEmpty else { throw VirtualFileSystem.Error.emptyEdits }
+    private func fileSystemEdits(_ value: JSONValue?) throws -> [ExactTextReplacement.Edit] {
+        guard let values = value?.arrayValue, !values.isEmpty else { throw ExactTextReplacement.Failure.emptyEdits }
         return try values.map { value in
             guard let fields = value.objectValue,
                   let oldText = fields["oldText"]?.stringValue,
                   let newText = fields["newText"]?.stringValue else {
                 throw RuntimeError.bridge("ox.fs.edit: each edit requires string oldText and newText fields.")
             }
-            return VirtualFileSystem.Edit(oldText: oldText, newText: newText)
+            return ExactTextReplacement.Edit(oldText: oldText, newText: newText)
         }
     }
 

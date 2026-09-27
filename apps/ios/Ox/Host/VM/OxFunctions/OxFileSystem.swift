@@ -51,7 +51,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.edit",
-                    "Atomically edit one UTF-8 file with exact replacements: `await ox.fs.edit({ path, edits, purpose })`. Every non-empty `oldText` must match exactly once in the original file and edits must not overlap. One empty `oldText` appends.",
+                    "Atomically edit one UTF-8 file with exact replacements: `await ox.fs.edit({ path, edits, purpose })`. Every edit is matched against the original file, not after earlier edits. Each non-empty `oldText` must match exactly once; keep it as small as possible while unique. Put several separate changes in one call, and merge nearby or overlapping changes into one edit. One empty `oldText` appends. Line endings are preserved. Returns the file item and the first changed line.",
                     input: object([
                         "path": path("Existing UTF-8 file path."),
                         "edits": .object([
@@ -63,7 +63,7 @@ nonisolated enum OxFileSystem {
                         ]),
                         "purpose": purpose,
                     ], required: ["path", "edits", "purpose"]),
-                    output: item
+                    output: edited
                 ),
                 entry(
                     "ox.fs.delete",
@@ -157,12 +157,19 @@ nonisolated enum OxFileSystem {
     Local service file operations enforce filesystem safety without validating service contents or reloading running attachments. Finish related source changes in any order, then call `ox.service.validate` to check the whole draft and `ox.service.attach` to reload this chat's attachment. Attach and Save require a valid complete service.
     """
 
-    private static let item = object([
+    private static let itemProperties: [String: JSONValue] = [
         "path": path("Full virtual path."),
         "name": string("Final path component."),
         "type": .object(["type": .string("string"), "enum": .array([.string("file"), .string("directory")])]),
         "size": .object(["type": .array([.string("integer"), .string("null")])]),
-    ], required: ["path", "name", "type", "size"])
+    ]
+
+    private static let item = object(itemProperties, required: ["path", "name", "type", "size"])
+
+    private static let edited = object(
+        itemProperties.merging(["firstChangedLine": integer("One-indexed line of the first change in the edited file.", minimum: 1, maximum: Int.max)]) { $1 },
+        required: ["path", "name", "type", "size", "firstChangedLine"]
+    )
 
     private static let listing = object([
         "items": .object(["type": .string("array"), "items": item]),

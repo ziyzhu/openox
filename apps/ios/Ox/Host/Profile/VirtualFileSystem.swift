@@ -92,21 +92,11 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case deviceFolder(String)
     }
 
-    struct Edit: Sendable {
-        let oldText: String
-        let newText: String
-    }
-
     enum Error: LocalizedError, Sendable {
         case invalidPath(String)
         case notDirectory(String)
         case notFile(String)
         case unsupportedMutation(String)
-        case emptyEdits
-        case appendAmbiguous
-        case textMissing
-        case textAmbiguous(Int)
-        case overlappingEdits
         case invalidPattern(String)
 
         var errorDescription: String? {
@@ -115,11 +105,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .notDirectory(let path): "Not a directory: \(path)"
             case .notFile(let path): "Not a file: \(path)"
             case .unsupportedMutation(let path): "This operation isn't supported for \(path)."
-            case .emptyEdits: "ox.fs.edit requires at least one edit."
-            case .appendAmbiguous: "ox.fs.edit accepts at most one append edit, and it cannot be combined with replacements."
-            case .textMissing: "The requested text was not found."
-            case .textAmbiguous(let count): "The requested text matched \(count) locations; make it more specific."
-            case .overlappingEdits: "ox.fs.edit edits must not overlap."
             case .invalidPattern(let pattern): "Invalid search pattern: \(pattern)"
             }
         }
@@ -208,46 +193,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
         let expression = try globExpression(pattern)
         let range = NSRange(path.startIndex..<path.endIndex, in: path)
         return expression.firstMatch(in: path, range: range) != nil
-    }
-
-    func apply(_ edits: [Edit], to original: String) throws -> String {
-        guard !edits.isEmpty else { throw Error.emptyEdits }
-        let appends = edits.filter { $0.oldText.isEmpty }
-        guard appends.isEmpty || edits.count == 1 else { throw Error.appendAmbiguous }
-        if let append = appends.first { return original + append.newText }
-
-        var resolved: [(Range<String.Index>, String)] = []
-        for edit in edits {
-            let ranges = ranges(of: edit.oldText, in: original)
-            guard !ranges.isEmpty else { throw Error.textMissing }
-            guard ranges.count == 1 else { throw Error.textAmbiguous(ranges.count) }
-            resolved.append((ranges[0], edit.newText))
-        }
-        for left in resolved.indices {
-            for right in resolved.indices where left < right {
-                let a = resolved[left].0
-                let b = resolved[right].0
-                if a.lowerBound < b.upperBound && b.lowerBound < a.upperBound {
-                    throw Error.overlappingEdits
-                }
-            }
-        }
-        var result = original
-        for edit in resolved.sorted(by: { $0.0.lowerBound > $1.0.lowerBound }) {
-            result.replaceSubrange(edit.0, with: edit.1)
-        }
-        return result
-    }
-
-    private func ranges(of needle: String, in text: String) -> [Range<String.Index>] {
-        var matches: [Range<String.Index>] = []
-        var start = text.startIndex
-        while start < text.endIndex,
-              let match = text.range(of: needle, range: start..<text.endIndex) {
-            matches.append(match)
-            start = match.upperBound
-        }
-        return matches
     }
 
     private func globExpression(_ pattern: String) throws -> NSRegularExpression {
