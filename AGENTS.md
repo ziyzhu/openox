@@ -1,15 +1,11 @@
 ## General Rules
 
 1. The app must remain neutral to LLM provider.
-1. When OpenOx functionality uses OAuth, use apps registered as OpenOx. Never reuse another product's OAuth client identity or share provider authentication with repository publication. Personal access tokens must be entered through secure UI, never chat or model inputs.
+1. When OpenOx functionality uses OAuth, use apps registered as OpenOx.
 1. Logs are user-owned on-device diagnostics.
-1. User data is allowed in logs; credentials and reusable secrets are not.
 1. Keep enough structured logs to diagnose production issues.
-1. Prefer composition, explicit state, and small changes.
-1. Use Action/actions consistently for Ox functionality in iOS UI copy, data models, and protocols. Preserve Apple's Shortcuts action terminology.
-1. Client-to-Host calls use JSON-RPC 2.0. Register methods in `OxHostProtocol.Method` and use the shared `HostRPCClient` in TypeScript callers; do not add alternate wire envelopes.
+1. Prefer composition and explicit state.
 1. Keep the three feature headings and descriptions identical across `README.md`, `apps/ios/Ox/Client/Features/Onboarding/OnboardingView.swift`, and the website at `../openox-dev/web/index.html`; update the onboarding translations when this copy changes.
-1. Use `.agents/skills/storage-migrations` for changes that affect persisted data or storage layout.
 1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.
@@ -43,23 +39,6 @@ Testing:
 Related:
 - <related references or None>
 ```
-
-## Repository Boundary
-
-1. This repository must build without private repositories or production credentials.
-1. Built-in service sources, sanitized replay fixtures, and the generated runtime bundle belong in this repository.
-1. Do not add deployment infrastructure, official signing configuration, raw captures, or unsanitized service data.
-1. Select external repositories explicitly with `--repository <path-or-url>`.
-1. Repository URLs must not contain credentials.
-1. Local provider keys belong in the gitignored `secrets/API_KEYS.json` and must never be printed, logged, committed, or passed through command-line arguments.
-
-## Uncommitted Local State
-
-1. Never force-add ignored local state or unreviewed generated artifacts.
-1. Keep credentials, signing material, production-only configuration, user data, and authenticated captures outside the repository.
-1. Store environment-specific overrides in ignored local files or the appropriate secret manager, and reconstruct them in CI from managed environment variables.
-1. Keep machine-specific state, build products, dependency caches, diagnostics, recordings, traces, and generated reports outside the repository unless they are intentionally reviewed fixtures.
-1. When collaborators need an uncommitted file, provide a sanitized example or generator that contains no private values.
 
 ## NPM Releases
 

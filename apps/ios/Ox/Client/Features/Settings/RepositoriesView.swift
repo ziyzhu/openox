@@ -224,7 +224,7 @@ struct RepositoriesView: View {
         with candidate: Repository.Conflict.Candidate
     ) {
         Task {
-            await manager.resolveConflict(
+            try? await manager.resolveConflict(
                 serviceID: conflict.serviceID,
                 repositoryID: candidate.repositoryID,
                 locale: locale

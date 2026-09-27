@@ -34,6 +34,14 @@ extension Chat: OxFunctionBridge {
         try await serviceOperations.connectRepository(origin: origin, purpose: purpose)
     }
 
+    public func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.repositoryConflicts(service: service, purpose: purpose)
+    }
+
+    public func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.resolveRepositoryConflict(service: service, repository: repository, purpose: purpose)
+    }
+
     public func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.syncRepository(repository: repository, purpose: purpose)
     }
@@ -195,6 +203,10 @@ extension Chat {
                 throw RuntimeError.bridge("ox.service.attach: failed to encode service snapshot")
             }
             result["reloaded"] = .bool(existing != nil)
+            if case .repository(let repository, let provenance) = service.definition.source {
+                result["repository"] = .string(repository)
+                result["repositoryProvenance"] = .string(provenance.rawValue)
+            }
             let snapshot = service.snapshot(attached: true)
             Log.session.info("bridge.service.attach domain=\(domain) reloaded=\(existing != nil) signIn=\(snapshot.signIn.rawValue)")
             return .object(result)

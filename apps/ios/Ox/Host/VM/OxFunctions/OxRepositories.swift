@@ -7,6 +7,36 @@ nonisolated enum OxRepositories {
         schema: {
             [
                 (
+                    "ox.repository.conflicts",
+                    .object([
+                        "description": .string("Read service source conflicts: `await ox.repository.conflicts({ service?, purpose })`. Returns up to 100 conflicts, each with service, selectedRepository (or null), and candidates with repository IDs and names. Only enabled, available repositories are candidates. If truncated, filter by the exact service identity. This includes conflicts with an already selected source."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "service": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
+                            ]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
+                    "ox.repository.resolve",
+                    .object([
+                        "description": .string("Select an existing service source: `await ox.repository.resolve({ service, repository, purpose })`. Use exact IDs from ox.repository.conflicts. Persists the device-wide choice through the normal Action policy without changing repository enablement or source files. Revalidates availability before saving. Returns service, selectedRepository, and reloadRequired for this chat. Selection refreshes the service catalog. Repair or validate Local source, then call ox.service.attach to reload this chat and verify its repository before invoking actions."),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "service": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
+                                "repository": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)]),
+                            ]),
+                            "required": .array([.string("service"), .string("repository")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object(["type": .string("object")]),
+                    ])
+                ),
+                (
                     "ox.repository.connect",
                     .object([
                         "description": .string("Install a public HTTPS Git repository: `await ox.repository.connect({ origin, purpose })`. The repository must contain repository.json at its root. Returns its ID for later disconnection; services and skills become available after the repository loads."),
@@ -206,6 +236,19 @@ nonisolated enum OxRepositories {
             ]
         },
         installNatives: { ctx, env in
+            let conflictsBlock: @convention(block) (JSValue, JSValue) -> JSValue = { serviceValue, purposeValue in
+                let service = serviceValue.isString ? serviceValue.toString() : nil
+                return env.call { try await $0.repositoryConflicts(service: service, purpose: purposeValue.toString()!) }
+            }
+            ctx.setObject(conflictsBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryConflicts" as NSString)
+
+            let resolveBlock: @convention(block) (String, String, JSValue) -> JSValue = { service, repository, purposeValue in
+                env.call(suspendingTimeout: true) {
+                    try await $0.resolveRepositoryConflict(service: service, repository: repository, purpose: purposeValue.toString()!)
+                }
+            }
+            ctx.setObject(resolveBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryResolve" as NSString)
+
             let connectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { origin, purposeValue in
                 env.call(suspendingTimeout: true) { try await $0.connectRepository(origin: origin, purpose: purposeValue.toString()!) }
             }
@@ -325,6 +368,8 @@ nonisolated enum OxRepositories {
 
         },
         jsFragment: """
+            conflicts: (value) => { const options = __oxOptions(value, 'ox.repository.conflicts'); return __nativeRepositoryConflicts(options.service ?? null, String(options.purpose)); },
+            resolve: (value) => { const options = __oxOptions(value, 'ox.repository.resolve'); return __nativeRepositoryResolve(String(options.service), String(options.repository), String(options.purpose)); },
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },

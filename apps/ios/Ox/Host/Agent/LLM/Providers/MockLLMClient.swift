@@ -333,6 +333,7 @@ extension Scenario {
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
             Entry("92", "MCP management — approve, connect, refresh, replace, and remove", .mcpManagement),
             Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
+            Entry("94", "repository conflicts — select and reload an existing Local source", .repositoryConflicts),
         ]),
     ]
 
@@ -1340,6 +1341,54 @@ extension Scenario {
             return [.say("Local service restart recovery failed: \(output)"), .stop(.stop)]
         }
         return [.say("PASS: incomplete draft survived restart, remained editable, validated after repair, and attached with unchanged saved history."), .stop(.stop)]
+    }
+
+    static let repositoryConflicts = Scenario(name: "repository-conflicts") { ctx in
+        guard let output = ctx.resultText("execute") else {
+            return [execute(#"""
+            const check = (value, message) => { if (!value) throw new Error(message); };
+            const service = "archive.ph";
+            const conflicts = async () => (await ox.repository.conflicts({ service, purpose: "Inspect fixture source choices" })).conflicts;
+            if (!(await conflicts()).some(item => item.candidates.some(candidate => candidate.repository === "local"))) {
+                await ox.service.copy({ domain: service, purpose: "Prepare Local conflict fixture" });
+            }
+            const available = (await conflicts())[0];
+            check(available.candidates.some(item => item.repository === "bundled"), "Bundled candidate missing");
+            const path = "services/web/" + service + "/actions.js";
+            await ox.repository.resolve({ service, repository: "local", purpose: "Read existing Local fixture" });
+            const source = (await ox.fs.read({ path, purpose: "Snapshot Local source" })).text;
+            const before = await ox.repository.git.status({ purpose: "Snapshot Local working state" });
+            await ox.repository.resolve({ service, repository: "bundled", purpose: "Reproduce hidden Local conflict" });
+            const bundled = await ox.service.attach({ domain: service, purpose: "Attach Bundled fixture" });
+            check(bundled.repository === "bundled", "Bundled source not attached");
+            let copyRejected = false;
+            try { await ox.service.copy({ domain: service, purpose: "Protect existing Local copy" }); }
+            catch { copyRejected = true; }
+            check(copyRejected, "Copy must preserve hidden Local files");
+            for (const [target, repository] of [[service, "missing"], ["missing.invalid", "local"]]) {
+                let rejected = false;
+                try { await ox.repository.resolve({ service: target, repository, purpose: "Reject unavailable source" }); }
+                catch { rejected = true; }
+                check(rejected, "Unavailable source must be rejected");
+            }
+            check((await conflicts())[0].selectedRepository === "bundled", "Failed resolution changed selection");
+            const resolved = await ox.repository.resolve({ service, repository: "local", purpose: "Select existing Local fixture" });
+            check(resolved.selectedRepository === "local" && resolved.reloadRequired, "Local selection must require attachment reload");
+            await ox.repository.resolve({ service, repository: "local", purpose: "Verify repeated selection" });
+            check((await ox.fs.read({ path, purpose: "Verify preserved Local source" })).text === source, "Source files changed");
+            const after = await ox.repository.git.status({ purpose: "Verify preserved Local working state" });
+            check(Object.keys(before).every(key => JSON.stringify(before[key]) === JSON.stringify(after[key])), "Local working state changed");
+            await ox.service.validate({ domain: service, purpose: "Validate selected Local fixture" });
+            const attached = await ox.service.attach({ domain: service, purpose: "Reload selected Local fixture" });
+            check(attached.repository === "local" && attached.reloaded, "Local attachment did not reload");
+            check((await conflicts())[0].selectedRepository === "local", "Local choice not retained");
+            console.log(JSON.stringify({ passed: true, copyRejected, resolved, attached }));
+            """#)]
+        }
+        guard JSONValue.parse(jsonString: output)?.objectValue?["passed"]?.boolValue == true else {
+            return [.say("Repository conflict regression failed: \(output)"), .stop(.stop)]
+        }
+        return [.say("PASS: hidden Local source selected, invalid choices rejected, files and working state preserved, and attachment reloaded from Local."), .stop(.stop)]
     }
 
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in

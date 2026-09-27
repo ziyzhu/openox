@@ -619,9 +619,18 @@ final class ServiceManager {
         }
     }
 
-    func resolveConflict(serviceID: String, repositoryID: String, locale: String?) async {
-        _ = await mutateRepositories(locale: locale) {
-            try await self.repository.setResolution(serviceID: serviceID, repositoryID: repositoryID)
+    func resolveConflict(serviceID: String, repositoryID: String, locale: String?) async throws {
+        do {
+            try await repository.setResolution(serviceID: serviceID, repositoryID: repositoryID)
+            _ = await loadRepositories(locale: locale)
+            guard case .ready = repositoryState,
+                  repositoryConflicts.first(where: { $0.serviceID == serviceID })?.selectedRepositoryID == repositoryID else {
+                throw Repository.Failure(message: "The service source could not be activated. Inspect ox.repository.conflicts before retrying.")
+            }
+        } catch {
+            repositoryState = .failed(error.localizedDescription)
+            Log.service.error("ServiceManager.repository resolve service=\(serviceID) repository=\(repositoryID) failed=\(error.localizedDescription)")
+            throw error
         }
     }
 

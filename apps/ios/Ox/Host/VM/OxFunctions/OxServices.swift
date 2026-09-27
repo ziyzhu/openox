@@ -70,7 +70,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.inspect",
                     .object([
-                        "description": .string("Inspect one attached service: `await ox.service.inspect({ domain, actions?, purpose })`. Omit `actions` for a compact index of exposed actions plus the complete `payment` contract when checkout is supported. Pass up to ten action IDs to receive their complete, self-contained input and output schemas."),
+                        "description": .string("Inspect one attached service: `await ox.service.inspect({ domain, actions?, purpose })`. Omit `actions` for a compact index of exposed actions. Pass up to ten exposed action IDs to receive their complete, self-contained input and output schemas. Both forms include `signIn`, `botControl`, and `payment` contracts when supported, with the ox.service helper to call, service-specific input schemas, and helper output schemas. Standard URL/state actions are handled by these helpers and cannot be requested in `actions`."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -95,7 +95,7 @@ nonisolated enum OxServices {
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object([
-                            "description": .string("The attached service snapshot and an action-keyed map of summaries or complete schemas."),
+                            "description": .string("The attached service snapshot, an action-keyed map of summaries or complete schemas, and supported signIn, botControl, and payment helper contracts. Unsupported helpers are omitted."),
                         ]),
                     ])
                 ),
@@ -279,7 +279,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.solve",
                     .object([
-                        "description": .string("Ask the user to complete a service's human verification and wait for completion: `await ox.service.solve({ domain, args, purpose })`. Pass the operation arguments requested by the service. Resolves after successful verification so dependent JavaScript can continue. Throws when the user cancels or verification fails. Never ask for challenge answers or tokens."),
+                        "description": .string("Ask the user to complete a service's human verification and wait for completion: `await ox.service.solve({ domain, args, purpose })`. Inspect the service's `botControl` contract with `ox.service.inspect` and pass args matching its inputSchema. Resolves after successful verification so dependent JavaScript can continue. Throws when the user cancels or verification fails. Never ask for challenge answers or tokens."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

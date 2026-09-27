@@ -502,9 +502,20 @@ actor Repository {
         Log.service.info("Repository.enabled id=\(repositoryID) enabled=\(enabled)")
     }
 
-    func setResolution(serviceID: String, repositoryID: String) throws {
+    func setResolution(serviceID: String, repositoryID: String) async throws {
+        let catalog = try await monoRepository()
+        guard let conflict = catalog.conflicts.first(where: { $0.serviceID == serviceID }),
+              conflict.candidates.contains(where: { $0.repositoryID == repositoryID }) else {
+            throw Failure(message: "Choose an available service source from ox.repository.conflicts.")
+        }
+        let previous = configuration.resolutions[serviceID]
         configuration.resolutions[serviceID] = repositoryID
-        try saveConfiguration()
+        do {
+            try saveConfiguration()
+        } catch {
+            configuration.resolutions[serviceID] = previous
+            throw error
+        }
         Log.service.info("Repository.resolution service=\(serviceID) repository=\(repositoryID)")
     }
 
@@ -657,7 +668,7 @@ actor Repository {
         _ = try editableLocalRepository()
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard !package.services.contains(where: { $0.id.runtimeID == id }) else {
-            throw Failure(message: "A Local service already exists for \(id).")
+            throw Failure(message: "A Local service already exists for \(id). Use ox.repository.conflicts and ox.repository.resolve to select it without replacing its files.")
         }
         let service = Package.Service(id: try ServiceID(kind: source.kind, runtimeID: id))
         let destination = localRoot.appendingPathComponent(service.id.path, isDirectory: true)

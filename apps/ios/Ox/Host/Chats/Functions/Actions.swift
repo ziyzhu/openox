@@ -49,6 +49,8 @@ nonisolated enum Actions {
     static let serviceCopy = "ox.service.copy"
     static let serviceDelete = "ox.service.delete"
     static let repositoryConnect = "ox.repository.connect"
+    static let repositoryConflicts = "ox.repository.conflicts"
+    static let repositoryResolve = "ox.repository.resolve"
     static let repositorySync = "ox.repository.sync"
     static let repositoryDisconnect = "ox.repository.disconnect"
     static let repositoryPropose = "ox.repository.propose"
@@ -102,7 +104,7 @@ nonisolated enum Actions {
         artifactAttach,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryDisconnect,
-        repositoryPropose,
+        repositoryPropose, repositoryConflicts, repositoryResolve,
         repositoryGitStatus, repositoryGitLog,
         repositoryGitShow, repositoryGitDiff, repositoryGitCheckout, repositoryGitCommit, repositoryGitRevert,
         repositoryGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
@@ -169,6 +171,8 @@ nonisolated enum Actions {
         case serviceCopy: L10n.string("Copy a service to Local")
         case serviceDelete: L10n.string("Delete a service")
         case repositoryConnect: L10n.string("Add Repository")
+        case repositoryConflicts: L10n.string("Conflicts")
+        case repositoryResolve: L10n.string("Choose")
         case repositorySync: L10n.string("Sync")
         case repositoryDisconnect: L10n.string("Remove Repository")
         case repositoryPropose: L10n.string("Share Service")

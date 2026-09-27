@@ -276,6 +276,41 @@ final class ServiceOperations {
         }
     }
 
+    func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue? {
+        let args: JSONValue = .object(service.map { ["service": .string($0)] } ?? [:])
+        return try await tracked(Actions.repositoryConflicts, args, purpose: purpose) {
+            let conflicts = self.serviceManager.repositoryConflicts.filter { service == nil || $0.serviceID == service }
+            return .object([
+                "conflicts": .array(conflicts.prefix(100).map { conflict in
+                    .object([
+                        "service": .string(conflict.serviceID),
+                        "selectedRepository": conflict.selectedRepositoryID.map(JSONValue.string) ?? .null,
+                        "candidates": .array(conflict.candidates.map { candidate in
+                            .object(["repository": .string(candidate.repositoryID), "name": .string(candidate.repositoryName)])
+                        }),
+                    ])
+                }),
+                "truncated": .bool(conflicts.count > 100),
+            ])
+        }
+    }
+
+    func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue? {
+        let args: JSONValue = .object(["service": .string(service), "repository": .string(repository)])
+        return try await tracked(Actions.repositoryResolve, args, purpose: purpose) {
+            try await self.serviceManager.resolveConflict(
+                serviceID: service,
+                repositoryID: repository,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            return .object([
+                "service": .string(service),
+                "selectedRepository": .string(repository),
+                "reloadRequired": .bool(self.attachedDomains().contains(service)),
+            ])
+        }
+    }
+
     func connectRepository(origin: String, purpose: String) async throws -> JSONValue? {
         let origin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: origin), url.scheme == "https", url.host != nil,
@@ -571,6 +606,12 @@ final class ServiceOperations {
                 "service": try self.serviceSnapshot(service),
                 "actions": .object(details),
             ]
+            if service.supportsAuthentication {
+                result["signIn"] = OxActions.signInDetail
+            }
+            if let botControl = OxActions.botControlDetail(definition: definition) {
+                result["botControl"] = botControl
+            }
             if let payment = OxActions.paymentDetail(definition: definition) {
                 result["payment"] = payment
             }
