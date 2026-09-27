@@ -1186,7 +1186,7 @@ extension Scenario {
     static let localServiceWorkflow = Scenario(name: "local-service") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service management workflow" });
+            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service management workflow" });
             const checks = [];
             const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
             const rejected = async (call, fragment) => {
@@ -1312,7 +1312,7 @@ extension Scenario {
     static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service recovery workflow" });
+            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service recovery workflow" });
             const check = (value, name) => { if (!value) throw new Error(name); };
             const domain = "example.test";
             const path = "services/web/" + domain + "/";
@@ -1394,7 +1394,7 @@ extension Scenario {
     static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in
         guard let output = ctx.resultText("execute") else {
             return [execute(#"""
-            await ox.fs.read({ path: "skills/manage-services/SKILL.md", purpose: "Load service copy workflow" });
+            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service copy workflow" });
             const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy validation fixture" });
             const path = "services/web/archive.ph/service.json";
             const before = (await ox.fs.read({ path, purpose: "Read copied manifest" })).text;
@@ -1558,7 +1558,7 @@ extension Scenario {
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].allSatisfy {
+        let hasStableSystemSkills = ["evolve", "import-memory", "manage-skills", "visualize"].allSatisfy {
             ctx.transientContext.contains("skills/\($0)/SKILL.md") && !ctx.systemPrompt.contains("- `skills/\($0)/SKILL.md` —")
         }
         let hasTimestamp = ctx.serializedUserText
@@ -1987,7 +1987,7 @@ extension Scenario {
             if let failure = contextBudgetRegressionFailure() { return [.say(failure), .stop(.stop)] }
             return [
                 execute("""
-                await ox.fs.read({ path: "skills/manage-artifacts/SKILL.md", purpose: "Activate skill before compaction" });
+                await ox.fs.read({ path: "skills/visualize/SKILL.md", purpose: "Activate skill before compaction" });
                 console.log("EARLY_STEP_" + "A".repeat(50000));
                 """),
             ]
@@ -2005,7 +2005,7 @@ extension Scenario {
                 case .toolResult(let result):
                     guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
                     if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
-                    skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/manage-artifacts/SKILL.md" }
+                    skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/visualize/SKILL.md" }
                 }
             }
             guard pending.isEmpty, skillRestored, ctx.resultText("execute")?.contains("RECENT_STEP_") == true else {

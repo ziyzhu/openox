@@ -8,7 +8,7 @@ Use when successful `ox.service.find` finds no suitable service for a website ta
 
 1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
 2. Answer reads as soon as evidence supports them; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. First attachment, live-mutation approval, and Save confirmation still apply.
+3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies, live-mutation approval, and Save confirmation still apply.
 4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is declined or blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
 Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
@@ -107,7 +107,7 @@ For deliberate service authoring, present:
 
 Include only actions with an observed extraction path in every authentication state needed for their implementation. Mark hypotheses and inaccessible capabilities as provisional or exclude them from the confirmed surface.
 
-End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace first-attachment or live-mutation approval, or final Save confirmation.
+End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace runtime attachment policies, live-mutation approval, or final Save confirmation.
 
 ## 4. Author service.json
 
@@ -203,7 +203,7 @@ window.ox.install(({ action }) => {
 });
 ```
 
-Register every declared action ID exactly once and no undeclared IDs. The runtime supplies dispatch, missing-argument normalization, and duplicate and unknown-action rejection. The installer passes only `action`. Read `skills/manage-services/references/helpers.js` for copyable `cleanText`, `pageCursor`, `cookie`, `retryFetch`, and `createFetchCapture` implementations; copy only what the service needs into `actions.js`. Do not import, fetch, or reference the skill file at runtime. Use `console.log` for concise diagnostics. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
+Register every declared action ID exactly once and no undeclared IDs. The runtime supplies dispatch, missing-argument normalization, and duplicate and unknown-action rejection. The installer passes only `action`. Read `skills/evolve/references/helpers.js` for copyable `cleanText`, `pageCursor`, `cookie`, `retryFetch`, and `createFetchCapture` implementations; copy only what the service needs into `actions.js`. Do not import, fetch, or reference the skill file at runtime. Use `console.log` for concise diagnostics. Install synchronously, keep work inside action handlers, and return narrow JSON-compatible results. Throw clear errors for HTTP, parsing, contract, stale-state, and semantic failures.
 
 Retries are not appropriate for an operation that may have caused a non-idempotent effect. Before copying `retryFetch`, decide whether the request is safe to repeat; otherwise use one `fetch` and inspect outcome before any retry. Install `createFetchCapture(window)` at document start and retain its returned function locally. It observes page fetch/XHR traffic, so use it only when direct requests cannot reproduce required page-owned signing or state.
 

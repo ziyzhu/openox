@@ -51,4 +51,4 @@ within the configured API base URL and returns parsed JSON. The Host injects
 credentials only when the action declares `requireAuth: true`. Writes require
 `requireApproval: true`; redirects and automatic retries are disabled. There is
 no DOM, ambient fetch, agent bridge, or token access. Source authoring and live
-verification happen inside Ox through manage-services.
+verification happen inside Ox through evolve.

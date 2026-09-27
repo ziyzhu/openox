@@ -164,7 +164,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.copy",
                     .object([
-                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. Edit its expanded source under `services/` with `ox.fs`."),
+                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. Edit its expanded source under `services/` with `ox.fs`. If a Local copy already exists, inspect ox.repository.conflicts and select that Local candidate with ox.repository.resolve; never overwrite it to resolve a conflict. iOS services are not authorable."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -183,7 +183,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.delete",
                     .object([
-                        "description": .string("Delete a Local web service or remove a saved MCP connection: `await ox.service.delete({ domain, purpose })`. The user approves deletion. For web services, source deletion becomes an uncommitted Local Git change and another repository candidate may become active. MCP removal is immediate, detaches it from this chat, clears local authorization and tool approvals, and does not revoke access at the server or delete a repository definition."),
+                        "description": .string("Delete a Local web service or remove a saved MCP connection: `await ox.service.delete({ domain, purpose })`. The user approves deletion. Inspect Local status and diff before deleting source and preserve unrelated changes. For web services, source deletion becomes an uncommitted Local Git change and another repository candidate may become active. MCP removal is immediate, detaches it from this chat, clears local authorization and tool approvals, and does not revoke access at the server or delete a repository definition."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

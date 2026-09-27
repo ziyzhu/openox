@@ -6,7 +6,7 @@ Use the web-service workflow for discovery, authoring, live verification, and Sa
 
 When an existing ordinary `listModels` Action uses another schema, preserve its handler and schema as `listWebsiteModels` before adding the standard model Action. Keep other ordinary Actions intact.
 
-Read `skills/manage-services/references/model-schemas.md` for the exact Action input/output schemas. Copy these schemas into the corresponding manifest Actions and provide the normal label, requireAuth, and requireApproval fields. Do not change the standard schemas. Register all four handlers in `actions.js` alongside existing ordinary Actions. Share website-specific helpers between the two surfaces.
+Read `skills/evolve/references/model-schemas.md` for the exact Action input/output schemas. Copy these schemas into the corresponding manifest Actions and provide the normal label, requireAuth, and requireApproval fields. Do not change the standard schemas. Register all four handlers in `actions.js` alongside existing ordinary Actions. Share website-specific helpers between the two surfaces.
 
 ## Execution contract
 

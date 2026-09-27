@@ -1,14 +1,15 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, runCheck } from "./lib.ts";
+import { SYSTEM_SKILL_NAMES } from "../packages/service-sdk/src/skills.ts";
 
 const systemSkillsRoot = join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const expectedPackages = ["import-memory", "manage-artifacts", "manage-services", "manage-skills"];
+const expectedPackages = SYSTEM_SKILL_NAMES;
 const expectedReferences = new Map([
   ["import-memory", []],
-  ["manage-artifacts", ["canvas.md", "note.md"]],
-  ["manage-services", ["api-service.md", "helpers.js", "model-schemas.md", "model-service.md", "web-service.md"]],
+  ["visualize", ["canvas.md"]],
+  ["evolve", ["api-service.md", "helpers.js", "model-schemas.md", "model-service.md", "web-service.md"]],
   ["manage-skills", ["repository-skill.md", "user-skill.md"]],
 ]);
 

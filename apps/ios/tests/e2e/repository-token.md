@@ -2,11 +2,11 @@
 
 Use an available numbered QA simulator with its matching debug port.
 Build and install with `sim` using bundled services.
-Use a verified Local service created through the manage-services workflow and
+Use a verified Local service created through the evolve workflow and
 saved to a Local commit. Never author a service directly for this test.
 
 Ask the Ox chat to propose the saved commit and service domain through
-manage-services, and approve the publication prompt. Verify an inline
+evolve, and approve the publication prompt. Verify an inline
 **Add Secret** card appears in the chat with the display name prefilled as
 **OpenOx GitHub publication token**, a field named `token`, and a secure value
 input. No OAuth device code or third-party consent page should appear.

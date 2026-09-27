@@ -27,7 +27,7 @@ nonisolated enum OxArtifacts {
                 ),
                 entry(
                     "ox.artifact.rename",
-                    "Rename an artifact and rewrite Ox-controlled chat references: `await ox.artifact.rename({ filename, newFilename, purpose })`. Fails on a case-insensitive collision.",
+                    "Rename an artifact and rewrite Ox-controlled chat references: `await ox.artifact.rename({ filename, newFilename, purpose })`. Inspect the existing artifact first. Fails on a case-insensitive collision.",
                     input: object(["filename": filename, "newFilename": filename, "purpose": purpose], required: ["filename", "newFilename", "purpose"]),
                     output: item
                 ),

@@ -25,6 +25,7 @@ nonisolated enum ProfileSchema {
         "2026-09-20-browser-functions",
         "2026-09-24-repository-skills",
         "2026-09-25-import-memory",
+        "2026-09-27-outcome-skills",
     ]
     static var current: String { versions.last! }
 
@@ -47,6 +48,7 @@ nonisolated enum ProfileSchema {
         { try StorageMigrator.removeBrowserServiceAttachments(at: $0) },
         { try StorageMigrator.migrateProfileSkillCatalog(at: $0) },
         { try StorageMigrator.migrateReservedImportMemorySkill(at: $0) },
+        { try StorageMigrator.migrateReservedOutcomeSkills(at: $0) },
     ]
 }
 
@@ -1211,7 +1213,7 @@ nonisolated enum StorageMigrator {
         for index in schedules.indices {
             guard var skill = schedules[index]["skill"] as? [String: Any], let instructions = skill["instructions"] as? String else { throw SkillError.invalidPackage }
             skill["instructions"] = migratedSkillInstructions(instructions)
-            if let name = skill["name"] as? String, SkillFiles.reservedNames.contains(name) { skill["name"] = "user-" + name }
+            if let name = skill["name"] as? String, ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].contains(name) { skill["name"] = "user-" + name }
             schedules[index]["skill"] = skill
         }
         document["version"] = 2
@@ -1232,7 +1234,7 @@ nonisolated enum StorageMigrator {
                 var skill = try SkillFiles.load(directory: directory)
                 skill.instructions = migratedSkillInstructions(skill.instructions)
                 var destination = directory
-                if SkillFiles.reservedNames.contains(skill.name) {
+                if ["import-memory", "manage-artifacts", "manage-services", "manage-skills"].contains(skill.name) {
                     skill.name = "user-" + skill.name
                     destination = skills.appendingPathComponent(skill.name)
                     if manager.fileExists(atPath: destination.path), try SkillFiles.load(directory: destination) != skill {
@@ -1250,17 +1252,27 @@ nonisolated enum StorageMigrator {
     }
 
     static func migrateReservedImportMemorySkill(at root: URL) throws {
+        try migrateReservedSkill("import-memory", at: root)
+    }
+
+    static func migrateReservedOutcomeSkills(at root: URL) throws {
+        for name in ["evolve", "visualize"] {
+            try migrateReservedSkill(name, at: root)
+        }
+    }
+
+    private static func migrateReservedSkill(_ name: String, at root: URL) throws {
         let manager = FileManager.default
-        let source = root.appendingPathComponent("skills/import-memory", isDirectory: true)
-        let destination = root.appendingPathComponent("skills/user-import-memory", isDirectory: true)
+        let source = root.appendingPathComponent("skills/\(name)", isDirectory: true)
+        let destination = root.appendingPathComponent("skills/user-\(name)", isDirectory: true)
         let sourceExists = manager.fileExists(atPath: source.path)
         let destinationExists = manager.fileExists(atPath: destination.path)
         if sourceExists {
             var skill = try SkillFiles.load(directory: source)
-            skill.name = "user-import-memory"
+            skill.name = "user-\(name)"
             if destinationExists {
                 guard try SkillFiles.load(directory: destination) == skill else {
-                    throw StorageMigrationError.collision("skills/user-import-memory")
+                    throw StorageMigrationError.collision("skills/user-\(name)")
                 }
             } else {
                 try SkillFiles.write(skill, directory: destination)
@@ -1270,19 +1282,19 @@ nonisolated enum StorageMigrator {
         if manager.fileExists(atPath: selectionsFile.path) {
             var selections = try JSONDecoder().decode(SkillSelections.self, from: Data(contentsOf: selectionsFile))
             guard selections.version == 1 else { throw SkillError.invalidPackage }
-            if selections.sources["import-memory"] == "user", sourceExists || destinationExists {
-                guard selections.sources["user-import-memory"].map({ $0 == "user" }) ?? true else {
-                    throw StorageMigrationError.collision("skill-selections.json:user-import-memory")
+            if selections.sources[name] == "user", sourceExists || destinationExists {
+                guard selections.sources["user-\(name)"].map({ $0 == "user" }) ?? true else {
+                    throw StorageMigrationError.collision("skill-selections.json:user-\(name)")
                 }
-                selections.sources["user-import-memory"] = "user"
-                selections.sources.removeValue(forKey: "import-memory")
+                selections.sources["user-\(name)"] = "user"
+                selections.sources.removeValue(forKey: name)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 try encoder.encode(selections).write(to: selectionsFile, options: .atomic)
             }
         }
         if sourceExists { try manager.removeItem(at: source) }
-        Log.app.info("StorageMigrator.reservedImportMemory renamed=\(sourceExists)")
+        Log.app.info("StorageMigrator.reservedSkill name=\(name) renamed=\(sourceExists)")
     }
 
     private static func migrateProfile(_ profile: Profile) async -> Bool {
@@ -2423,20 +2435,26 @@ nonisolated enum StorageMigrator {
         scheduleDecoder.dateDecodingStrategy = .iso8601
         let upgraded = try scheduleDecoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: scheduleFile)).validated()
         checks["legacyScheduledPackageMigrated"] = upgraded.schedules.first?.skill.name == "user-manage-skills" && upgraded.schedules.first?.skill.instructions == "Read skills/manage-services/SKILL.md." && upgraded.schedules.first?.skill.resources == original.resources
-        let collisionRoot = root.appendingPathComponent("import-memory-collision")
-        let source = collisionRoot.appendingPathComponent("skills/import-memory")
-        let destination = collisionRoot.appendingPathComponent("skills/user-import-memory")
-        let existing = Skill(name: "import-memory", description: "Existing user skill", instructions: "Keep this workflow")
-        var conflicting = existing
-        conflicting.name = "user-import-memory"
-        conflicting.instructions = "Independent workflow"
-        try SkillFiles.write(existing, directory: source)
-        try SkillFiles.write(conflicting, directory: destination)
-        do {
-            try migrateReservedImportMemorySkill(at: collisionRoot)
-            checks["reservedImportMemoryCollisionPreserved"] = false
-        } catch StorageMigrationError.collision {
-            checks["reservedImportMemoryCollisionPreserved"] = try SkillFiles.load(directory: source) == existing && SkillFiles.load(directory: destination) == conflicting
+        for name in ["import-memory", "evolve", "visualize"] {
+            let collisionRoot = root.appendingPathComponent("\(name)-collision")
+            let source = collisionRoot.appendingPathComponent("skills/\(name)")
+            let destination = collisionRoot.appendingPathComponent("skills/user-\(name)")
+            let existing = Skill(name: name, description: "Existing user skill", instructions: "Keep this workflow", resources: original.resources)
+            var conflicting = existing
+            conflicting.name = "user-\(name)"
+            conflicting.instructions = "Independent workflow"
+            try SkillFiles.write(existing, directory: source)
+            try SkillFiles.write(conflicting, directory: destination)
+            do {
+                try migrateReservedSkill(name, at: collisionRoot)
+                checks["reserved-\(name)-collisionPreserved"] = false
+            } catch StorageMigrationError.collision {
+                checks["reserved-\(name)-collisionPreserved"] = try SkillFiles.load(directory: source) == existing && SkillFiles.load(directory: destination) == conflicting
+            }
+            conflicting.instructions = existing.instructions
+            try SkillFiles.write(conflicting, directory: destination)
+            try migrateReservedSkill(name, at: collisionRoot)
+            checks["reserved-\(name)-interruptionResumed"] = try !manager.fileExists(atPath: source.path) && SkillFiles.load(directory: destination) == conflicting
         }
         return checks
     }

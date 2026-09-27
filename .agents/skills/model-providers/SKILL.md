@@ -11,7 +11,7 @@ Keep every provider integration easy to discover without turning documentation i
 
 - Provider references own official product and developer links, the purpose of human-facing account portals, and account or geography distinctions that affect setup.
 - Provider Swift files own exact client identifiers, display names, picker regions, endpoint URLs, portal deep links, credentials, transport selection, and request policy.
-- Model-capable web services own website authentication, submission, upload, completion, and model discovery behavior in `repositories/builtin/web/<domain>/actions.js`. They expose the standard model Actions described by the built-in `manage-services` skill; `WebServiceModelProvider.swift` owns their shared adapter and compatibility identities.
+- Model-capable web services own website authentication, submission, upload, completion, and model discovery behavior in `repositories/builtin/web/<domain>/actions.js`. They expose the standard model Actions described by the built-in `evolve` skill; `WebServiceModelProvider.swift` owns their shared adapter and compatibility identities.
 - `apps/ios/Ox/Host/ModelProviders/provider-models.json` owns bundled model metadata sourced from models.dev.
 - `CuratedProviderModels.swift` owns the smallest reviewed model set for providers absent from the shared catalog.
 
@@ -29,7 +29,7 @@ When adding a native API or subscription provider:
 4. Add the reference to the routing list below.
 5. Keep account-region boundaries explicit, especially when Global and China use different credentials or portals.
 
-When adding model capability to an existing web service, follow the built-in `manage-services` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file. Verify both fetch and XHR on a fresh owned generation page. A warm inspection page can use a different transport, and hidden-page animation state may lag completed server responses. Require a native completion marker correlated with the submitted conversation.
+When adding model capability to an existing web service, follow the built-in `evolve` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file. Verify both fetch and XHR on a fresh owned generation page. A warm inspection page can use a different transport, and hidden-page animation state may lag completed server responses. Require a native completion marker correlated with the submitted conversation.
 
 Test signed-out and expired-session behavior with synthetic fixtures or an isolated session. Do not remove authentication from a live signed-in website-client request: its unauthorized-response handler can clear the user’s session even when the request itself is read-only. Verify the signed-out-to-signed-in transition across a separate handoff page. Sign-in probes must read fresh shared state and avoid website-client handlers that clear credentials on an unauthorized response; a successful check on an already authenticated page is insufficient.
 

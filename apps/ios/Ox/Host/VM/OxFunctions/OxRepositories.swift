@@ -9,7 +9,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.conflicts",
                     .object([
-                        "description": .string("Read service source conflicts: `await ox.repository.conflicts({ service?, purpose })`. Returns up to 100 conflicts, each with service, selectedRepository (or null), and candidates with repository IDs and names. Only enabled, available repositories are candidates. If truncated, filter by the exact service identity. This includes conflicts with an already selected source."),
+                        "description": .string("Read service source conflicts: `await ox.repository.conflicts({ service?, purpose })`. Returns up to 100 conflicts, each with service, selectedRepository (or null), and candidates with repository IDs and names. Only enabled, available repositories are candidates. If truncated, filter by the exact service identity. This includes conflicts with an already selected source. Select the source identified by the user's task; ask only when the intended source is unclear. Do not detach services or disable a repository to resolve one service conflict."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -54,7 +54,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.sync",
                     .object([
-                        "description": .string("Refresh an installed Remote repository in place: `await ox.repository.sync({ repository, purpose })`. Find its ID with ox.app.repositories. Returns the refreshed service and skill counts."),
+                        "description": .string("Refresh an installed Remote repository in place: `await ox.repository.sync({ repository, purpose })`. Find its ID with ox.app.repositories. Returns the refreshed service and skill counts. Use sync rather than reconnecting to fetch newer services; the runtime handles approval."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -69,7 +69,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.disconnect",
                     .object([
-                        "description": .string("Remove an installed remote repository by ID: `await ox.repository.disconnect({ repository, purpose })`. Find its ID with ox.app.repositories. This removes the local snapshot, service definitions, and skills; website sign-ins and data remain."),
+                        "description": .string("Remove an installed remote repository by ID: `await ox.repository.disconnect({ repository, purpose })`. Find its ID with ox.app.repositories. This removes the local snapshot, service definitions, and skills; website sign-ins and data remain. Bundled, Development, and Local repositories cannot be disconnected; the runtime handles approval."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -84,7 +84,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.propose",
                     .object([
-                        "description": .string("Publish selected services and skills from one saved Local commit and create a change request in a configured target without cloning it: `await ox.repository.propose({ target, commitHash, services?, skills?, title, body, status, purpose })`. Use target `openox`. `status` must be `draft` or `open`. The user approves publication and may be asked to authorize the target provider."),
+                        "description": .string("Publish selected services and skills from one saved Local commit and create a change request in a configured target without cloning it: `await ox.repository.propose({ target, commitHash, services?, skills?, title, body, status, purpose })`. Use target `openox`. `status` must be `draft` or `open`. Validate and verify selected services, review Local status and diff, and Save the intended changes first. Never publish credentials, session data, raw captures, or machine-specific files. The user approves publication and may be asked to authorize the target provider."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -191,7 +191,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.commit",
                     .object([
-                        "description": .string("Validate, stage, and commit all Local service changes to its linear history: `await ox.repository.git.commit({ message, purpose })`. Local must be at its live tip and the call fails when there are no changes."),
+                        "description": .string("Validate, stage, and commit all Local service changes to its linear history: `await ox.repository.git.commit({ message, purpose })`. Local must be at its live tip and the call fails when there are no changes. Review status and diff first: this includes all Local changes, so preserve unrelated work. Present this operation as Save, keeping Git mechanics internal unless requested or needed for recovery."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -206,7 +206,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.revert",
                     .object([
-                        "description": .string("Revert one Local commit by applying its inverse and creating a new commit at the live tip: `await ox.repository.git.revert({ commitHash, message, purpose })`. This never rewrites history and requires a clean Local worktree."),
+                        "description": .string("Revert one Local commit by applying its inverse and creating a new commit at the live tip: `await ox.repository.git.revert({ commitHash, message, purpose })`. This never rewrites history and requires a clean Local worktree. Inspect status and diff first and keep abandoned work recoverable."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -222,7 +222,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.restore",
                     .object([
-                        "description": .string("Restore Local changes from its live tip: `await ox.repository.git.restore({ path?, purpose })`. With a changed file `path` from `ox.repository.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. It is unavailable in a historical checkout."),
+                        "description": .string("Restore Local changes from its live tip: `await ox.repository.git.restore({ path?, purpose })`. With a changed file `path` from `ox.repository.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. It is unavailable in a historical checkout. Inspect status and diff first; preserve unrelated changes and keep abandoned work recoverable."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

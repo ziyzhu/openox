@@ -402,6 +402,15 @@ bundled system skill. An existing Profile skill with that name moves to
 user source selection to the new name. An unequal destination collision stops
 the migration without replacing either package.
 
+The `2026-09-27-outcome-skills` Profile milestone reserves `evolve` and
+`visualize`, replacing the bundled `manage-services` and `manage-artifacts`
+packages. Existing Profile skills with either new name move to `user-<name>`
+with resources and explicit user source selections preserved. Unequal destination
+collisions stop migration without replacing either package. Existing repository
+packages using a newly reserved name fail catalog validation with their files
+untouched; their author must rename them. Saved invocations and schedules keep
+their frozen packages, and transcript bytes remain unchanged.
+
 `Application Support/scheduled-skills.json` is a version 2 device-owned document
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
 and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly

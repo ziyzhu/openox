@@ -69,7 +69,7 @@ The PSC button preserves a separate existing service failure: completing its
 fixture receipt causes `getPaymentState` to report `Can't find variable:
 cleanText`. Dismiss the sheet; do not treat the visible receipt as successful
 Host completion. Repair service behavior through the repository's Ox
-`manage-services` workflow.
+`evolve` workflow.
 
 Often Dining also cannot complete: `getPaymentUrl` uses the service base URL
 `/search.php`, while `getPaymentState` declares `/`. `ServiceFlowSession` rejects
