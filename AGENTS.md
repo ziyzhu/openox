@@ -13,12 +13,12 @@
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
-
-## Review Rules
-
+1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
+1. Prefer E2E tests instead of unit tests.
+1. Use `sim` and `ox` CLI for testing.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 
-## Commit Messages
+## Commit Rules
 
 1. Include the current iOS marketing version in every commit subject using `<imperative summary> (iOS <version>)`, including commits that do not modify the iOS app.
 1. Before committing, use `asc apps list --bundle-id ai.oxcraft.bot` to resolve the App Store Connect app and `asc versions list --app <app-id> --platform IOS` to inspect its iOS versions and states.
@@ -38,26 +38,6 @@ Testing:
 Related:
 - <related references or None>
 ```
-
-## NPM Releases
-
-1. Public npm package source, verification, and Trusted Publishing workflows belong in this repository so provenance resolves to the public source revision.
-1. Bootstrap an unregistered package only from an exact `package:check` tarball through an interactive npm session with two-factor authentication.
-1. After bootstrap, publish only through `.github/workflows/publish-npm.yml`; never store an npm publication token in this repository or `openox-dev`.
-1. For registered packages, never run `npm publish` locally; bump the package version, commit it to `main`, wait for CI, then create the matching release tag.
-1. Use the protected `npm-publish` environment and matching `ox-cli-v*`, `service-sdk-v*`, or `services-v*` tags from `main`.
-
-## Build and Test
-
-1. Use `bun run` scripts for repository operations and `ox` for service operations.
-1. Create, explore, repair, and verify web services by driving an Ox chat on the user-selected simulator through the built-in `manage-services` workflow.
-1. When delegating service authoring to Ox, actively look for opportunities to improve the authoring harness and fix issues encountered. Turn those findings into reusable improvements to tools, instructions, diagnostics, and verification so future authoring is faster and more reliable.
-1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
-1. A green build is not verification; use repository health, build, launch, exercise, fix, and repeat.
-1. Before pushing, run `bun run typecheck` and the smallest relevant tests.
-1. After updating an `.xcstrings` catalog, immediately run `bun run check:localizations` and resolve every missing, incomplete, or placeholder-mismatched required translation before committing it.
-1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/Ox/Resources/OxServices.bundle` changes.
-1. Use `ox` for chats, logs, and Server IR verification.
 
 ## iOS Simulator Setup
 
