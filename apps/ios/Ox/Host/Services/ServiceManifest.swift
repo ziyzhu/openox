@@ -320,7 +320,7 @@ nonisolated struct ServiceDefinition: Sendable {
         !isAPI && !isIOS && !isMCP && ModelServiceContract.actionIDs.isSubset(of: Set(actionIndex.keys))
     }
 
-    private func isStandardAction(_ id: String) -> Bool {
+    func isStandardAction(_ id: String) -> Bool {
         Manifest.STANDARD_ACTION_IDS.contains(id) || (supportsModelGeneration && ModelServiceContract.actionIDs.contains(id))
     }
 }

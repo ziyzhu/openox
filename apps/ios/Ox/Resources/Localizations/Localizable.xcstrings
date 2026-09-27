@@ -9906,6 +9906,17 @@
         }
       }
     },
+    "Standard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准"
+          }
+        }
+      }
+    },
     "Start chat" : {
       "extractionState" : "manual",
       "localizations" : {

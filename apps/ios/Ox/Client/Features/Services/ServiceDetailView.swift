@@ -45,7 +45,7 @@ struct ServiceDetailView: View {
 
     private var capabilities: ServiceDetailCapabilities { service.detailCapabilities }
 
-    private var actions: [Manifest.Action] { service.definition.exposedActions }
+    private var actions: [Manifest.Action] { service.definition.actions }
     private var loadingManifest: Bool { service.capabilityState == .unloaded || service.capabilityState == .loading }
     @State private var signInRequestActive = false
     @State private var signingOut = false
@@ -656,7 +656,8 @@ struct ServiceDetailView: View {
     }
 
     private func actionRow(_ action: Manifest.Action) -> some View {
-        actionCard {
+        let isStandard = service.definition.isStandardAction(action.id)
+        return actionCard {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: Theme.Spacing.sm) {
                     Text(action.label)
@@ -664,6 +665,7 @@ struct ServiceDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurface)
                         .accessibilityIdentifier(A11yID.Chat.Attach.action(action.id))
                     Spacer(minLength: 0)
+                    if isStandard { chip("Standard") }
                     if action.requireAuth { chip("Authenticated") }
                 }
                 if let desc = action.description, !desc.isEmpty {
@@ -672,10 +674,12 @@ struct ServiceDetailView: View {
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                approvalControl(
-                    actionID: service.definition.qualifiedActionName(action.id),
-                    defaultPolicy: action.requireApproval ? .ask : .allow
-                )
+                if !isStandard {
+                    approvalControl(
+                        actionID: service.definition.qualifiedActionName(action.id),
+                        defaultPolicy: action.requireApproval ? .ask : .allow
+                    )
+                }
             }
         }
     }
