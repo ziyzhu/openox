@@ -37,33 +37,41 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .web }
 
+    @MainActor private func service() throws -> Service {
+        guard let service = IOSHost.shared.services.service(domain: domain), service.definition.supportsModelGeneration else {
+            throw WebsiteProviderError("The selected model service is unavailable. Resolve its service source or choose another model.")
+        }
+        return service
+    }
+
     func websiteSessionIsAuthenticated() async throws -> Bool? {
-        try await ModelServiceSession.isSignedIn(domain: domain)
+        let state = try await service().checkAccess(policy: .current, reason: .modelSignIn)
+        guard state != .unknown else { throw WebsiteProviderError("Model service sign-in could not be verified", kind: .authentication) }
+        return state.isAuthenticated || state == .notRequired
     }
 
     func loadModels() async throws -> [ProviderModel] {
-        try await ModelServiceSession.loadModels(domain: domain).map(\.model)
+        let value = try await service().invokeAction(ModelServiceContract.list, args: .object([:]), role: .modelGeneration).get()
+        return try ModelServiceContract.models(from: value).map(\.model)
     }
 
     func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {
         streamingTask(model: model, messages: messages) { continuation in
             let instructions = [systemPrompt, WebsiteToolContract.instructions(tools)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
             let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: displayName)
-            let session = try await ModelServiceSession.open(domain: domain)
+            let session = try await ModelServiceSession.open(service: service())
             do {
-                try await session.start(model: model, input: input, options: options, modalities: requiredInputModalities(in: messages))
+                try await session.start(model: model, input: input, options: options)
                 var assembler = StreamAssembler(model: model, continuation: continuation)
                 assembler.start()
                 var state = ModelServiceStreamState()
                 var emittedText = ""
                 while !state.completed {
-                    try Task.checkCancellation()
-                    try state.accept(await session.read(after: state.cursor))
+                    state = try await session.next()
                     if !WebsiteToolContract.isPossibleCallPrefix(state.text) {
                         assembler.textDelta(String(state.text.dropFirst(emittedText.count)))
                         emittedText = state.text
                     }
-                    if !state.completed { try await Task.sleep(for: .milliseconds(100)) }
                 }
                 if WebsiteToolContract.isPossibleCallPrefix(state.text) {
                     guard let call = try WebsiteToolContract.call(from: state.text, tools: tools) else {
@@ -80,5 +88,31 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
                 throw error
             }
         }
+    }
+}
+
+nonisolated extension ModelServiceContract {
+    struct Model: Decodable, Sendable {
+        let id: String
+        let name: String
+        let input: Set<ProviderModelModality>
+        let contextTokens: Int?
+        let outputTokens: Int?
+
+        var model: ProviderModel {
+            WebServiceModelProvider.model(id: id, name: name, input: input, contextTokens: contextTokens, outputTokens: outputTokens)
+        }
+    }
+
+    static func models(from value: JSONValue) throws -> [Model] {
+        struct Response: Decodable { let models: [Model] }
+        let response = try JSONDecoder().decode(Response.self, from: JSONEncoder().encode(value))
+        guard !response.models.isEmpty, response.models.count <= 100,
+              response.models.contains(where: { $0.id == "website-default" }),
+              Set(response.models.map(\.id)).count == response.models.count,
+              response.models.allSatisfy({ !$0.id.isEmpty && $0.id.count <= 100 && !$0.name.isEmpty && $0.name.count <= 100 && $0.input.contains(.text) && ($0.contextTokens ?? 1) > 0 && ($0.outputTokens ?? 1) > 0 }) else {
+            throw WebsiteProviderError("Model service returned an invalid model list")
+        }
+        return response.models
     }
 }

@@ -5,23 +5,29 @@ nonisolated struct ModelServiceStreamState {
     private(set) var text = ""
     private(set) var completed = false
 
-    mutating func accept(_ update: WebsiteGenerationUpdate) throws {
-        guard !completed, update.nextCursor >= cursor,
-              update.nextCursor - cursor == update.events.count else {
+    mutating func accept(_ batch: JSONValue) throws {
+        guard let fields = batch.objectValue, case .int(let nextCursor) = fields["nextCursor"],
+              let events = fields["events"]?.arrayValue, events.count <= 1000 else {
+            throw WebsiteProviderError("Model service returned an invalid event batch")
+        }
+        guard !completed, nextCursor >= cursor, nextCursor - cursor == events.count else {
             throw WebsiteProviderError("Model service returned out-of-order events")
         }
-        var next = self
-        for event in update.events {
-            guard !next.completed else { throw WebsiteProviderError("Model service returned events after completion") }
-            switch event {
-            case .textSnapshot(let snapshot):
-                guard snapshot.hasPrefix(next.text) else { throw WebsiteProviderError("Model service revised already streamed text") }
-                next.text = snapshot
-            case .completed: next.completed = true
-            case .failed(let message, let kind): throw WebsiteProviderError(message, kind: kind)
+        var updated = self
+        for value in events {
+            guard !updated.completed else { throw WebsiteProviderError("Model service returned events after completion") }
+            guard let event = value.objectValue else { throw WebsiteProviderError("Invalid model event") }
+            switch event["type"]?.stringValue {
+            case "text":
+                guard let snapshot = event["text"]?.stringValue, snapshot.utf8.count <= 2_000_000 else { throw WebsiteProviderError("Model response is too large") }
+                guard snapshot.hasPrefix(updated.text) else { throw WebsiteProviderError("Model service revised already streamed text") }
+                updated.text = snapshot
+            case "completed": updated.completed = true
+            case "failed": throw WebsiteProviderError(event["message"]?.stringValue ?? "Model generation failed", kind: LLMFailureKind(rawValue: event["kind"]?.stringValue ?? "") ?? .provider)
+            default: throw WebsiteProviderError("Unknown model event")
             }
         }
-        next.cursor = update.nextCursor
-        self = next
+        updated.cursor = nextCursor
+        self = updated
     }
 }

@@ -10,17 +10,6 @@ nonisolated struct WebsiteProviderError: ProviderClientError {
     }
 }
 
-nonisolated enum WebsiteGenerationEvent: Sendable {
-    case textSnapshot(String)
-    case completed
-    case failed(String, LLMFailureKind)
-}
-
-nonisolated struct WebsiteGenerationUpdate: Sendable {
-    let nextCursor: Int
-    let events: [WebsiteGenerationEvent]
-}
-
 nonisolated enum WebsiteToolContract {
     static let start = "<ox_action_call>"
     static let end = "</ox_action_call>"

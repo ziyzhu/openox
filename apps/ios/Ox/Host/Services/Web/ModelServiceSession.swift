@@ -2,21 +2,6 @@ import Foundation
 
 @MainActor
 final class ModelServiceSession {
-    nonisolated struct Model: Decodable, Sendable {
-        let id: String
-        let name: String
-        let input: Set<ProviderModelModality>
-        let contextTokens: Int?
-        let outputTokens: Int?
-        let streaming: Bool
-        let cancellation: Bool
-        let options: Set<String>
-
-        var model: ProviderModel {
-            WebServiceModelProvider.model(id: id, name: name, input: input, contextTokens: contextTokens, outputTokens: outputTokens)
-        }
-    }
-
     private enum State {
         case ready
         case starting
@@ -28,6 +13,7 @@ final class ModelServiceSession {
     private let page: Service.ServiceWebPage
     private let navigationGeneration: Int
     private var state = State.ready
+    private var stream = ModelServiceStreamState()
 
     private init(service: Service, page: Service.ServiceWebPage) {
         self.service = service
@@ -35,39 +21,7 @@ final class ModelServiceSession {
         navigationGeneration = page.navigationGeneration
     }
 
-    private static func service(domain: String) throws -> Service {
-        guard let service = IOSHost.shared.services.service(domain: domain), service.definition.supportsModelGeneration else {
-            throw WebsiteProviderError("The selected model service is unavailable. Resolve its service source or choose another model.")
-        }
-        return service
-    }
-
-    static func isSignedIn(domain: String) async throws -> Bool {
-        let service = try service(domain: domain)
-        let state = await service.checkAccess(policy: .current, reason: .modelSignIn)
-        guard state != .unknown else { throw WebsiteProviderError("Model service sign-in could not be verified", kind: .authentication) }
-        return state.isAuthenticated || state == .notRequired
-    }
-
-    static func loadModels(domain: String) async throws -> [Model] {
-        let service = try service(domain: domain)
-        return try decodeModels(try await service.invokeAction(ModelServiceContract.list, args: .object([:]), role: .modelGeneration).get())
-    }
-
-    private static func decodeModels(_ value: JSONValue) throws -> [Model] {
-        struct Response: Decodable { let models: [Model] }
-        let response = try JSONDecoder().decode(Response.self, from: JSONEncoder().encode(value))
-        guard !response.models.isEmpty, response.models.count <= 100,
-              response.models.contains(where: { $0.id == "website-default" }),
-              Set(response.models.map(\.id)).count == response.models.count,
-              response.models.allSatisfy({ !$0.id.isEmpty && $0.id.count <= 100 && !$0.name.isEmpty && $0.name.count <= 100 && $0.input.contains(.text) && ($0.contextTokens ?? 1) > 0 && ($0.outputTokens ?? 1) > 0 }) else {
-            throw WebsiteProviderError("Model service returned an invalid model list")
-        }
-        return response.models
-    }
-
-    static func open(domain: String) async throws -> ModelServiceSession {
-        let service = try service(domain: domain)
+    static func open(service: Service) async throws -> ModelServiceSession {
         guard let action = await service.resolvedAction(ModelServiceContract.start, role: .modelGeneration) else {
             throw WebsiteProviderError("Model service source is unavailable")
         }
@@ -76,25 +30,16 @@ final class ModelServiceSession {
             service.closeOwnedPage(page)
             throw CancellationError()
         }
-        Log.service.info("ModelService.open domain=\(domain) source=\(service.definition.repositoryID ?? "unknown") page=\(page.logLabel)")
+        Log.service.info("ModelService.open domain=\(service.domain) source=\(service.definition.repositoryID ?? "unknown") page=\(page.logLabel)")
         return ModelServiceSession(service: service, page: page)
     }
 
-    func start(model: ProviderModel, input: WebsiteProviderInput, options: StreamOptions, modalities: Set<ProviderModelModality>) async throws {
+    func start(model: ProviderModel, input: WebsiteProviderInput, options: StreamOptions) async throws {
         guard case .ready = state else { throw WebsiteProviderError("Model generation has already started") }
-        let available = try Self.decodeModels(try await invoke(ModelServiceContract.list, .object([:])))
-        guard let selected = available.first(where: { $0.id == model.wireID }), modalities.isSubset(of: selected.input) else {
-            throw WebsiteProviderError("The selected model or input is unavailable", kind: .unsupportedInput)
-        }
-        guard options.temperature == nil || selected.options.contains("temperature"),
-              options.maxTokens == nil || selected.options.contains("maxTokens") else {
-            throw WebsiteProviderError("The selected website model does not support these generation options")
-        }
         try await WebsiteAttachmentTransfer.stage(input.attachments, on: page.page)
-        try checkPage()
         state = .starting
         let value = try await invoke(ModelServiceContract.start, .object([
-            "modelId": .string(selected.id), "messages": input.messages,
+            "modelId": .string(model.wireID), "messages": input.messages,
             "attachments": .array(input.attachments.enumerated().map { index, attachment in
                 .object(["id": .int(index), "name": .string(attachment.name), "mimeType": .string(attachment.mimeType)])
             }),
@@ -108,28 +53,15 @@ final class ModelServiceSession {
         Log.service.info("ModelService.start domain=\(service.domain) generation=\(id) submission=\(fields["submission"]?.stringValue ?? "uncertain")")
     }
 
-    func read(after cursor: Int) async throws -> WebsiteGenerationUpdate {
+    func next() async throws -> ModelServiceStreamState {
         guard case .running(let id, let started) = state else { throw WebsiteProviderError("Model generation is unavailable") }
         guard Date().timeIntervalSince(started) < 300 else { throw WebsiteProviderError("Model generation timed out", kind: .network) }
-        let result = try await invoke(ModelServiceContract.read, .object([
+        let cursor = stream.cursor
+        try stream.accept(try await invoke(ModelServiceContract.read, .object([
             "generationId": .string(id), "after": .int(cursor), "waitMilliseconds": .int(1000),
-        ]))
-        guard let fields = result.objectValue, case .int(let next) = fields["nextCursor"],
-              let values = fields["events"]?.arrayValue, values.count <= 1000 else {
-            throw WebsiteProviderError("Model service returned an invalid event batch")
-        }
-        let events = try values.map { value -> WebsiteGenerationEvent in
-            guard let event = value.objectValue else { throw WebsiteProviderError("Invalid model event") }
-            switch event["type"]?.stringValue {
-            case "text":
-                guard let text = event["text"]?.stringValue, text.utf8.count <= 2_000_000 else { throw WebsiteProviderError("Model response is too large") }
-                return .textSnapshot(text)
-            case "completed": return .completed
-            case "failed": return .failed(event["message"]?.stringValue ?? "Model generation failed", LLMFailureKind(rawValue: event["kind"]?.stringValue ?? "") ?? .provider)
-            default: throw WebsiteProviderError("Unknown model event")
-            }
-        }
-        return WebsiteGenerationUpdate(nextCursor: next, events: events)
+        ])))
+        if stream.cursor == cursor { try await Task.sleep(for: .milliseconds(100)) }
+        return stream
     }
 
     private func checkPage() throws {

@@ -18,7 +18,7 @@ test.skipIf(process.platform !== "darwin")("Swift model streams reject invalid c
     const support = readFileSync("apps/ios/Ox/Host/Agent/LLM/Providers/WebsiteProviderSupport.swift", "utf8").split("nonisolated enum WebsiteToolContract")[0]!;
     await Bun.write(join(directory, "Support.swift"), support);
     const compiler = Bun.spawn(["xcrun", "swiftc", "-module-cache-path", join(directory, "cache"),
-      join(directory, "Support.swift"), "apps/ios/Ox/Host/Services/Web/ModelServiceStreamState.swift",
+      join(directory, "Support.swift"), "apps/ios/Ox/Platform/Models/JSONValue.swift", "apps/ios/Ox/Host/Services/Web/ModelServiceStreamState.swift",
       "tooling/fixtures/model-service-stream.swift", "-o", executable], { stdout: "pipe", stderr: "pipe" });
     const diagnostics = await new Response(compiler.stderr).text();
     expect(await compiler.exited, diagnostics).toBe(0);
