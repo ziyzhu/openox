@@ -79,11 +79,11 @@ extension Chat {
                     )
                 }
             case .chats:
-                items = await repository.chatSummaries(in: scope).map {
+                items = await fileSystemChatSummaries().map {
                     fileSystemItem(path: "chats/\(ChatID($0.id))", type: "directory", size: nil)
                 }
             case .chat(let id):
-                _ = try await repository.virtualChatMetadata(id, in: scope)
+                _ = try await virtualChatMetadata(id)
                 items = [
                     fileSystemItem(path: "chats/\(id)/chat.json", type: "file", size: nil),
                     fileSystemItem(path: "chats/\(id)/turns.jsonl", type: "file", size: nil),
@@ -109,6 +109,20 @@ extension Chat {
                 "truncated": .bool(sorted.count > limit),
             ])
         }
+    }
+
+    private func virtualChatMetadata(_ id: ChatID) async throws -> Data {
+        try await repository.virtualChatMetadata(id, in: scope, snapshot: chatManager?.readableChatState(id, in: scope))
+    }
+
+    private func virtualChatTranscript(_ id: ChatID) async throws -> Data {
+        try await repository.virtualChatTranscript(id, in: scope, snapshot: chatManager?.readableChatState(id, in: scope))
+    }
+
+    private func fileSystemChatSummaries() async -> [ChatMeta] {
+        let saved = await repository.chatSummaries(in: scope)
+        let loaded = chatManager?.readableChatSummaries(in: scope) ?? []
+        return Array(Dictionary(saved.map { ($0.id, $0) } + loaded.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest }).values)
     }
 
     public func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
@@ -465,10 +479,10 @@ extension Chat {
                 maxBytes: maxBytes
             )
         case .chatMetadata(let id):
-            let data = try await repository.virtualChatMetadata(id, in: scope)
+            let data = try await virtualChatMetadata(id)
             return try fileSystemTextRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
         case .chatTurns(let id):
-            let data = try await repository.virtualChatTranscript(id, in: scope)
+            let data = try await virtualChatTranscript(id)
             return try fileSystemTextRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
         case .deviceItem:
             let readOptions = ArtifactLibrary.readOptions(from: options)
@@ -513,9 +527,9 @@ extension Chat {
         case .serviceItem(let kind, let domain, let path):
             return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
         case .chatMetadata(let id):
-            return String(decoding: try await repository.virtualChatMetadata(id, in: scope), as: UTF8.self)
+            return String(decoding: try await virtualChatMetadata(id), as: UTF8.self)
         case .chatTurns(let id):
-            return String(decoding: try await repository.virtualChatTranscript(id, in: scope), as: UTF8.self)
+            return String(decoding: try await virtualChatTranscript(id), as: UTF8.self)
         case .deviceItem:
             return try await withDeviceFile(location, mode: .read) { url in
                 let data = try Data(contentsOf: url)
@@ -612,7 +626,7 @@ extension Chat {
             }
             return [base.path]
         case .chat(let id):
-            _ = try await repository.virtualChatMetadata(id, in: scope)
+            _ = try await virtualChatMetadata(id)
             return ["chats/\(id)/chat.json", "chats/\(id)/turns.jsonl"]
         case .chatMetadata, .chatTurns:
             return [base.path]
@@ -661,7 +675,7 @@ extension Chat {
     }
 
     private func chatFileSystemPaths() async -> [String] {
-        await repository.chatSummaries(in: scope).flatMap { summary -> [String] in
+        await fileSystemChatSummaries().flatMap { summary -> [String] in
             let directory = "chats/\(ChatID(summary.id))"
             return ["\(directory)/chat.json", "\(directory)/turns.jsonl"]
         }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
@@ -703,9 +717,9 @@ extension Chat {
         case .serviceItem(let kind, let domain, let path):
             return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
         case .chatMetadata(let id):
-            return String(decoding: try await repository.virtualChatMetadata(id, in: scope), as: UTF8.self)
+            return String(decoding: try await virtualChatMetadata(id), as: UTF8.self)
         case .chatTurns(let id):
-            return String(decoding: try await repository.virtualChatTranscript(id, in: scope), as: UTF8.self)
+            return String(decoding: try await virtualChatTranscript(id), as: UTF8.self)
         case .artifact(let name):
             let artifact = try await repository.artifact(named: name, in: scope)
             guard artifact.exists, artifact.kind == .text || artifact.kind == .html else { return nil }

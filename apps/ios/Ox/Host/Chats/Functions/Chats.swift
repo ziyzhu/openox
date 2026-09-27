@@ -1,6 +1,23 @@
 import Foundation
 
 extension Chat {
+    public func startChat(prompt: String, title: String, purpose: String) async throws -> JSONValue? {
+        try requireProfileMutation(Actions.chatStart)
+        guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw RuntimeError.bridge("ox.chat.start: prompt must not be empty.")
+        }
+        let args: JSONValue = .object(["prompt": .string(prompt), "title": .string(title)])
+        return try await tracked(Actions.chatStart, args, purpose: purpose) {
+            try Task.checkCancellation()
+            try self.requireProfileMutation(Actions.chatStart)
+            guard let manager = self.chatManager else {
+                throw RuntimeError.bridge("ox.chat.start: an active Profile is required.")
+            }
+            let id = try manager.startChat(prompt: prompt, title: title, requestedBy: self)
+            return .object(["id": .string(id.uuidString)])
+        }
+    }
+
     public func deleteChat(id: String, purpose: String) async throws -> JSONValue? {
         try requireProfileMutation(Actions.chatDelete)
         guard let targetID = UUID(uuidString: id), let manager = chatManager else {

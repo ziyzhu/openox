@@ -303,8 +303,8 @@ services/
 
 chats/
 └── <chat-uuid>/
-    ├── chat.json                                read-only, stored metadata
-    └── turns.jsonl                              read-only, stored transcript
+    ├── chat.json                                read-only, current or stored metadata
+    └── turns.jsonl                              read-only, current or stored transcript
 ```
 
 The mount resolves permissions from the selected source, never frontmatter. System,
@@ -316,8 +316,11 @@ its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
 `services/<kind>/<id>/` path. Repository host paths, markers,
 `chats/<chat-uuid>/context.json`, and unrelated secret contents are not
-addressable. The chat mount returns the canonical files already persisted by
-`ProfileRepository`; it does not introduce a second transcript representation.
+addressable. The chat mount returns a current snapshot for loaded persisted chats and the saved
+files for unloaded chats. `ProfileRepository` encodes both with the same metadata
+and transcript format; reads do not write snapshots or change storage checkpoints.
+Temporary chats remain excluded. `ox.chat.start` creates a normal persisted chat
+without selecting it, and its ID is immediately readable through this mount.
 System-skill JavaScript references are readable as source by the agent, but are not installed,
 importable, or resolvable from a service action runtime.
 Unscoped root grep excludes chat files, while an explicit `chats` path searches

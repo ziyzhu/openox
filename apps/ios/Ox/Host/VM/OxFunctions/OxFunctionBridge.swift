@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 public protocol OxFunctionBridge: AnyObject {
+    func startChat(prompt: String, title: String, purpose: String) async throws -> JSONValue?
     func deleteChat(id: String, purpose: String) async throws -> JSONValue?
     func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func secretOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?

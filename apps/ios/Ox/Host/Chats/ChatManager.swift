@@ -92,7 +92,6 @@ final class ChatManager {
     @ObservationIgnored private let providerRegistry: ProviderRegistry
     @ObservationIgnored private let serviceManager: ServiceManager
     @ObservationIgnored private var repositoryScope: ProfileScope
-    @ObservationIgnored private var virtualMachine: VirtualMachine
     @ObservationIgnored private let presentations: AppPresentations
     @ObservationIgnored var profilePreparation: @MainActor () async -> Void = {}
     #if targetEnvironment(simulator)
@@ -109,7 +108,6 @@ final class ChatManager {
         presentations: AppPresentations
     ) {
         repositoryScope = storage.scope
-        virtualMachine = VirtualMachine()
         self.repository = repository
         self.storage = storage
         self.providerRegistry = providerRegistry
@@ -218,6 +216,32 @@ final class ChatManager {
         return chat
     }
 
+    func startChat(prompt: String, title: String, requestedBy caller: Chat) throws -> UUID {
+        guard caller.scope == repositoryScope, caller.scope == storage.scope,
+              contains(caller.id) else {
+            throw RuntimeError.bridge("ox.chat.start: the calling chat must belong to the active Profile.")
+        }
+        let chat = makeChat()
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty { chat.rename(to: title) }
+        hydrationOrdinal &+= 1
+        records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
+        chat.enqueue(prompt)
+        Log.session.info("bridge.chat.start caller=\(caller.id) target=\(chat.id)")
+        return chat.id
+    }
+
+    func readableChatState(_ id: ChatID, in scope: ProfileScope) -> ChatState? {
+        guard scope == repositoryScope, scope == storage.scope, contains(id.rawValue),
+              let chat = records[id]?.hydration.chat, !chat.isTemporary else { return nil }
+        return chat.state
+    }
+
+    func readableChatSummaries(in scope: ProfileScope) -> [ChatMeta] {
+        guard scope == repositoryScope, scope == storage.scope else { return [] }
+        return summaries.filter { records[ChatID($0.id)]?.hydration.chat != nil }
+    }
+
     func importPackage(_ payload: ChatPackagePayload) async throws -> Chat {
         ensureRepositoryScope()
         let scope = repositoryScope
@@ -294,7 +318,7 @@ final class ChatManager {
             selection: selection,
             repository: repository,
             scope: repositoryScope,
-            virtualMachine: virtualMachine,
+            virtualMachine: VirtualMachine(),
             presentations: presentations,
             serviceManager: serviceManager,
             retention: .temporary
@@ -386,7 +410,7 @@ final class ChatManager {
             selection: selection,
             repository: repository,
             scope: repositoryScope,
-            virtualMachine: virtualMachine,
+            virtualMachine: VirtualMachine(),
             presentations: presentations,
             serviceManager: serviceManager
         )
@@ -602,7 +626,7 @@ final class ChatManager {
             selection: selection,
             repository: repository,
             scope: repositoryScope,
-            virtualMachine: virtualMachine,
+            virtualMachine: VirtualMachine(),
             presentations: presentations,
             serviceManager: serviceManager,
             retention: retention,
@@ -627,7 +651,7 @@ final class ChatManager {
             selection: selection,
             repository: repository,
             scope: scope,
-            virtualMachine: virtualMachine,
+            virtualMachine: VirtualMachine(),
             presentations: presentations,
             serviceManager: serviceManager
         )
@@ -645,7 +669,6 @@ final class ChatManager {
             ? ProfileScope(profileID: currentScope.profileID, root: currentScope.root, location: currentScope.location)
             : currentScope
         repositoryScope = scope
-        virtualMachine = VirtualMachine()
         Log.session.info("ChatManager.repository root=\(scope.root.path) generation=\(scope.generation)")
     }
 

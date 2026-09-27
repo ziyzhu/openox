@@ -1,6 +1,7 @@
 import Foundation
 
 nonisolated enum Actions {
+    static let chatStart = "ox.chat.start"
     static let chatDelete = "ox.chat.delete"
     static let providerDefault = "ox.provider.default"
     static let providerList = "ox.provider.list"
@@ -93,7 +94,7 @@ nonisolated enum Actions {
     static let userReportProgress = "ox.user.reportProgress"
 
     static let builtIn = [
-        chatDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
+        chatStart, chatDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appVoice,
         appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appRepositories,
@@ -126,6 +127,7 @@ nonisolated enum Actions {
             return "Browser: \(browser.label)"
         }
         return switch action {
+        case chatStart: L10n.string("Start chat")
         case chatDelete: L10n.string("Delete Chat")
         case providerDefault: L10n.string("Default model")
         case providerList: L10n.string("List model providers")

@@ -365,12 +365,12 @@ actor ProfileRepository {
         }
     }
 
-    func virtualChatMetadata(_ id: ChatID, in scope: ProfileScope) throws -> Data {
-        try virtualChatData(id, in: scope, file: .metadata)
+    func virtualChatMetadata(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) throws -> Data {
+        try virtualChatData(id, in: scope, file: .metadata, snapshot: snapshot)
     }
 
-    func virtualChatTranscript(_ id: ChatID, in scope: ProfileScope) throws -> Data {
-        try virtualChatData(id, in: scope, file: .transcript)
+    func virtualChatTranscript(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) throws -> Data {
+        try virtualChatData(id, in: scope, file: .transcript, snapshot: snapshot)
     }
 
     func loadChat(_ id: ChatID, in scope: ProfileScope) -> ChatLoadResult? {
@@ -686,9 +686,18 @@ actor ProfileRepository {
         case transcript
     }
 
-    private func virtualChatData(_ id: ChatID, in scope: ProfileScope, file: VirtualChatFile) throws -> Data {
+    private func virtualChatData(_ id: ChatID, in scope: ProfileScope, file: VirtualChatFile, snapshot: ChatState?) throws -> Data {
         try requireProfile(in: scope)
         guard deleted[scope]?.contains(id) != true else { throw ProfileRepositoryError.missingChat(id) }
+        if let snapshot, snapshot.meta.id == id.rawValue {
+            try validate(snapshot.meta)
+            let data = try switch file {
+            case .metadata: encoder().encode(snapshot.meta)
+            case .transcript: blob(snapshot.turns[...])
+            }
+            Log.session.info("ProfileRepository.virtualChatRead chat=\(id) source=live bytes=\(data.count)")
+            return data
+        }
         _ = try canonicalMetadata(in: chatURL(id, in: scope), scope: scope)
         let url = switch file {
         case .metadata: metaURL(id, in: scope)
