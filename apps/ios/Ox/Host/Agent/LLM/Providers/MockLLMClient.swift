@@ -1988,8 +1988,11 @@ extension Scenario {
             }
             return [.say("<intent>29</intent> SPLIT_TURN_REPEATED: Earlier progress was summarized again; verify the retained recent step and activated skill."), .stop(.stop)]
         }
-        if ctx.messages.contains(where: { if case .toolResult(let result) = $0 { result.content.concatenatedText.hasPrefix("EARLY_STEP_") } else { false } }) {
-            guard ctx.latestUserSaid("partway through an ongoing turn") else {
+        if ctx.latestUserSaid("[Tool result]: EARLY_STEP_") {
+            guard ctx.messages.count == 1, ctx.latestUserSaid("more characters truncated") else {
+                return [.say("Compaction sent unbounded history to the summarizer."), .stop(.stop)]
+            }
+            guard ctx.latestUserSaid("earlier context from an ongoing request") else {
                 return [.say("Missing split-turn summarization instructions."), .stop(.stop)]
             }
             return [.say("<intent>29</intent> SPLIT_TURN_CHECKPOINT: The original request is to verify split-turn compaction. The early step completed; recent work is retained separately."), .stop(.stop)]
@@ -2007,7 +2010,7 @@ extension Scenario {
         if ctx.messages.count <= 3 {
             return [.say("Recovered after one context-overflow compaction."), .stop(.stop)]
         }
-        return [.usage(input: 990_000, output: 0), .stop(.length)]
+        return [.say("This reply ran out of context and was cut off mid"), .usage(input: 995_000, output: 4_000), .stop(.length)]
     }
 
     static let overflowFailure = Scenario(name: "overflow-failure", steps: [

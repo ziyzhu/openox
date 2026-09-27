@@ -105,7 +105,11 @@ nonisolated enum AgentRunner {
                     ? assistant.usage.totalTokens
                     : assistant.usage.input + assistant.usage.output
             }
-            let contextOverflow = isContextOverflow(assistant, contextWindow: snapshot.model.maxContext)
+            let contextOverflow = isContextOverflow(
+                assistant,
+                contextWindow: snapshot.model.maxContext,
+                requestedOutput: snapshot.streamOptions.maxTokens ?? snapshot.model.maxTokens
+            )
 
             if contextOverflow, assistant.stopReason != .stop {
                 errorMessage = assistant.errorMessage ?? "Model context overflow."
@@ -129,11 +133,11 @@ nonisolated enum AgentRunner {
                     if !recovery.cancelled, recovery.compacted {
                         errorMessage = nil
                         failureKind = nil
-                        Log.agent.info("Agent.run retrying once after context overflow")
+                        Log.agent.info("Agent.run retrying once after context overflow trigger=\(assistant.stopReason)")
                         continue loop
                     }
                 } else {
-                    Log.agent.warning("Agent.run context overflow recovery exhausted after one retry")
+                    Log.agent.warning("Agent.run context overflow recovery exhausted after one retry trigger=\(assistant.stopReason)")
                     errorMessage = errorMessage
                         ?? "Context overflow recovery failed after one compact-and-retry attempt."
                 }
