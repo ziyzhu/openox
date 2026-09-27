@@ -235,10 +235,10 @@ before being served; credentials are never embedded in the URL.
 The repository harness owns the complete iOS replay lifecycle:
 
 ```sh
-bun run test:services --device ox-qa-1
-bun run test:services <domain>:<action>:<case> --device ox-qa-1
+bun run test:services --device ox-1
+bun run test:services <domain>:<action>:<case> --device ox-1
 bun run test:services <domain>:<action>:<case> \
-  --repository /path/to/repository --device ox-qa-1
+  --repository /path/to/repository --device ox-1
 ```
 
 Replay uses bundled services by default. Pass `--repository` to exercise loading

@@ -2,17 +2,17 @@
 
 These fixtures exercise the generated HTML SDK, native approval and handoff UI,
 and production MCP artifact decoding without credentials or purchases. Use a
-numbered QA simulator with its matching ports; the commands below use `ox-qa-2`.
+numbered QA simulator with its matching ports; the commands below use `ox-2`.
 
 Start the repository and fixture MCP endpoint:
 
 ```sh
-bun run tooling/canvas-integration-fixture.ts --device ox-qa-2
+bun run tooling/canvas-integration-fixture.ts --device ox-2
 curl --fail http://127.0.0.1:8102/health
 ```
 
 The command prints a temporary bootstrap profile. Import it with
-`bun run sim:bootstrap --device ox-qa-2 --profile <printed-profile>`.
+`bun run sim:bootstrap --device ox-2 --profile <printed-profile>`.
 In Services, select the MCP filter and connect `http://127.0.0.1:8102/mcp`.
 The server exposes one `artifact_get` tool that returns fixture files as MCP
 resources. The only supplied file is `artifacts/canvas-export.txt`.
@@ -24,7 +24,7 @@ mitmdump --listen-host 127.0.0.1 --listen-port 7102 \
   --set confdir=/tmp/ox-canvas-integration-ca \
   --set connection_strategy=lazy --set upstream_cert=false --set flow_detail=0 \
   -s tooling/fixtures/canvas-network.py
-sim --device ox-qa-2 keychain add-root-cert /tmp/ox-canvas-integration-ca/mitmproxy-ca-cert.pem
+sim --device ox-2 keychain add-root-cert /tmp/ox-canvas-integration-ca/mitmproxy-ca-cert.pem
 ```
 
 All requests receive local responses; unmatched requests return 503. No upstream
@@ -36,7 +36,7 @@ Build with `sim build --project apps/ios/Ox.xcodeproj --scheme ios` and launch
 the resulting app:
 
 ```sh
-sim run ai.oxcraft.bot --device ox-qa-2 --app <built-app> \
+sim run ai.oxcraft.bot --device ox-2 --app <built-app> \
   --env OX_SERVICES_ENDPOINT=http://127.0.0.1:8102/repository.git \
   --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9102 \
   --env OX_SERVICE_PROXY=http://127.0.0.1:7102 --disable-icloud

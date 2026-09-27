@@ -1,10 +1,10 @@
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 
-export const targetedQaDevice = "ox-qa-1";
+export const targetedQaDevice = "ox-1";
 
 export function qaConfig(device: string) {
-  const index = Number(/^ox-qa-([1-5])$/.exec(device)?.[1]);
-  if (!index) throw new Error(`QA device must be ox-qa-N for N from 1 to 5, got ${device}; ox-qa is reserved for the human operator`);
+  const index = Number(/^ox-([1-5])$/.exec(device)?.[1]);
+  if (!index) throw new Error(`QA device must be ox-N for N from 1 to 5, got ${device}`);
   return {
     device,
     serviceProxyPort: 7100 + index,
@@ -37,6 +37,6 @@ export function qaCommand<T extends ParseArgsOptionsConfig>(command: QaCommand<T
     process.exit(0);
   }
   if (positionals.length > (command.positionals ?? 0)) throw new Error(`Unexpected argument ${positionals.at(-1)}\n${command.usage}`);
-  if (!device) throw new Error("Pass --device ox-qa-N or set OX_QA_DEVICE");
+  if (!device) throw new Error("Pass --device ox-N or set OX_QA_DEVICE");
   return { ...qaConfig(device), values, positionals };
 }

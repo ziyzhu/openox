@@ -60,10 +60,10 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 4. Run `bun run typecheck` and the smallest domain-specific tests.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
-For `ox-qa-1`, the standard commands are:
+For `ox-1`, the standard commands are:
 
 ```sh
-sim --device ox-qa-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
+sim --device ox-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
 OX_HOST_ENDPOINT=ws://127.0.0.1:9101 bun run test:storage-migration
 bun run typecheck
 ```

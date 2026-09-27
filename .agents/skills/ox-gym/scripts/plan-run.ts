@@ -236,7 +236,7 @@ Options:
   --sessions <n>                  Total user sessions (default 6)
   --seed <value>                  Reproducible campaign seed
   --target <client:model>         Ox provider target; repeat as needed
-  --device <ox-qa-N>              Numbered QA simulator; repeat as needed
+  --device <ox-N>                 Numbered QA simulator; repeat as needed
   --app-language <locale>         Discovered Ox UI locale; repeat as needed
   --dimension <key=v1,v2>         Eligible additional axis; repeat as needed
   --authorize-real                Record authorization for bounded real-provider calls
@@ -273,10 +273,10 @@ function addDimension(options: Options, specification: string): void {
 
 function finalized(options: Options): Options {
   options.targets = options.targets.length > 0 ? [...new Set(options.targets)] : ["mock:mock"];
-  options.devices = options.devices.length > 0 ? [...new Set(options.devices)] : ["ox-qa-1", "ox-qa-2", "ox-qa-3"];
+  options.devices = options.devices.length > 0 ? [...new Set(options.devices)] : ["ox-1", "ox-2", "ox-3"];
   options.appLanguages = options.appLanguages.length > 0 ? [...new Set(options.appLanguages)] : ["en", "zh-Hans"];
   for (const device of options.devices) {
-    if (!/^ox-qa-[1-5]$/.test(device)) throw new Error(`invalid numbered QA simulator ${device}`);
+    if (!/^ox-[1-5]$/.test(device)) throw new Error(`invalid numbered QA simulator ${device}`);
   }
   if (options.mode === "compare" && options.targets.length < 2) throw new Error("compare mode requires at least two --target values");
   if (options.mode === "compare" && options.sessions % options.targets.length !== 0) {

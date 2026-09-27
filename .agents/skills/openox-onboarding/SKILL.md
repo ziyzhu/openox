@@ -22,7 +22,7 @@ Help the contributor reach a verified working environment. First determine wheth
 
 ## First simulator run
 
-- Use an available iOS 26 `ox-qa-1` through `ox-qa-5` simulator. Check its runtime with `sim devices` before testing. Read `tooling/qa-config.ts` for its debug port and optional repository port. Keep QA names within the fixed pool; if replacing a device from another runtime, retain it under a backup name and verify the replacement before removing the backup. Rebuild and reinstall after switching worktrees.
+- Follow the Simulator Setup section in `AGENTS.md`: reserve an available `ox-1` through `ox-5`, verify its assigned runtime (1–3: iOS 26; 4–5: iOS 27), and use its matching ports from `tooling/qa-config.ts`. Initialize the shared website/provider baseline before testing. Rebuild and reinstall after switching worktrees.
 - Build, install, and launch bundled services with `sim --device <simulator> run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:<debug-port> --force`.
 - To test loading a local repository separately, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `--env OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git`.
 - Confirm the normal UI with `sim describe` or a screenshot, then use `ox host discover` or the selected Host endpoint to check that the Host is available. If UI automation cannot start `idb_companion`, distinguish that from an app startup failure using the screenshot and logs. Keep diagnostics outside the repository.

@@ -115,7 +115,7 @@ function staleClaim(path: string): boolean {
 }
 
 const config = qaCommand({
-  usage: "Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-qa-N]",
+  usage: "Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-N]",
   options: { repository: { type: "string" } },
   positionals: 1,
   defaultDevice: targetedQaDevice,

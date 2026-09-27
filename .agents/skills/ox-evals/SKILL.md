@@ -15,7 +15,7 @@ user's authorized target and provider choices. Running the suite invokes that
 provider and consumes tokens; listing, validation, comparison, and scoring tests
 are local. Mock responses cannot establish prompt quality.
 
-Prepare the numbered iOS 26 QA simulator with the sim-cli and ox-cli workflows.
+Follow the Simulator Setup reservation, assigned runtime, and baseline rules in `AGENTS.md`; prepare an available numbered simulator with the sim-cli and ox-cli workflows.
 Rebuild and install the current checkout, use bundled services and an empty chat
 in a sanitized QA Profile, and preserve simulator settings. No service repository
 server is needed. The runner copies prompt and tool definitions into isolated

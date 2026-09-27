@@ -53,16 +53,19 @@ Related:
 1. Create, explore, repair, and verify web services by driving an Ox chat on the user-selected simulator through the built-in `manage-services` workflow.
 1. When delegating service authoring to Ox, actively look for opportunities to improve the authoring harness and fix issues encountered. Turn those findings into reusable improvements to tools, instructions, diagnostics, and verification so future authoring is faster and more reliable.
 1. Do not author service behavior directly from Codex or use terminal browser capture as an alternate development path.
-1. Build iOS only with `sim`, never `xcodebuild`.
-1. Use bundled services for ordinary simulator testing. Start a repository server and verify its `/health` endpoint only when testing repository installation or sync.
-1. Each concurrent process must use its own numbered simulator and matching service and debug ports; reserve its repository port when that test uses a repository server.
-1. Reuse the fixed `ox-qa-1` through `ox-qa-5` simulator pool; do not allocate QA names beyond that pool.
-1. Run the QA simulator pool on an iOS 26 runtime. Check each selected simulator's runtime before testing; if iOS 26 is unavailable, install it before continuing. When replacing a pool device, retain the old simulator under a backup name until the replacement is verified.
-1. Rebuild and install after switching worktrees.
 1. A green build is not verification; use repository health, build, launch, exercise, fix, and repeat.
-1. For iOS and UX behavior, exercise the flow manually with `sim` and preserve screenshots or videos outside the repository.
-1. Record simulator settings before changing them for a test, including Dynamic Type, appearance, and accessibility options, and restore their previous values when finished, including after failures. Keep standard text size for ordinary QA runs unless the test explicitly requires another size.
 1. Before pushing, run `bun run typecheck` and the smallest relevant tests.
 1. After updating an `.xcstrings` catalog, immediately run `bun run check:localizations` and resolve every missing, incomplete, or placeholder-mismatched required translation before committing it.
 1. After changing built-in services or their compiler, run `bun run build:services` and commit the resulting `apps/ios/Ox/Resources/OxServices.bundle` changes.
 1. Use `ox` for chats, logs, and Server IR verification.
+
+## iOS Simulator Setup
+
+1. Use the fixed five-simulator pool: `ox-1`, `ox-2`, and `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Verify with `sim devices` before testing. Keep replaced devices as backups until their replacements are verified.
+1. Before using a simulator, check other agents' sessions and recent `sim` activity. Coordinate ownership and choose another device if it is in use. Never interrupt or change another agent's simulator.
+1. Each concurrent agent uses its own simulator and matching ports from `tooling/qa-config.ts`. Always pass `--device` explicitly.
+1. Start tests with the same website and provider state on all five simulators, using `ox-1` as the baseline. Copy only when both source and target are free; verify website logins, provider credentials, configuration, and default model afterward.
+1. Use `bun run sim:bootstrap --help` for state-copy options. It copies cookies/local storage and installs provider API keys; other website data and provider settings require separate setup. See [website state](.agents/skills/storage-migrations/references/storage.md#website-state).
+1. Build and exercise iOS flows with `sim`, never `xcodebuild`. Rebuild and install after switching worktrees; keep screenshots and recordings outside the repository.
+1. Use bundled services normally. Start a repository server on the matching port and verify `/health` only when testing repository installation or sync.
+1. Use standard text size for ordinary QA. Record settings before changing them and restore them afterward, including after failures.

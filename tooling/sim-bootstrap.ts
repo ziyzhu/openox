@@ -15,15 +15,15 @@ type BootstrapProfile = {
   websiteData: boolean;
 };
 
-const usage = `Usage: bun run sim:bootstrap --device ox-qa-N [options]
+const usage = `Usage: bun run sim:bootstrap --device ox-N [options]
 
 Bootstraps credentials, artifacts, and optional website data into a running DEBUG app.
 
 Options:
-  --device <ox-qa-N>             Target numbered simulator
+  --device <ox-N>                Target numbered simulator
   --keys <path>                  API key file (default secrets/API_KEYS.json)
   --profile <path>               Bootstrap profile describing artifacts, providers, and website data
-  --website-data-from <ox-qa-N>  Copy website data from another running simulator
+  --website-data-from <ox-N>     Copy website data from another running simulator
   -h, --help                     Display this help`;
 
 function requiredString(value: unknown, label: string): string {
@@ -143,7 +143,7 @@ async function bootstrap(): Promise<void> {
   const needsCredentials = configuredProfile === undefined || configuredProfile.providers.length > 0;
   const apiKeys = needsCredentials ? parseAPIKeys(await readJSON(apiKeysPath, "API key file")) : {};
   const profile = configuredProfile ?? { version: 1, artifacts: [], providers: Object.keys(apiKeys), websiteData: false };
-  if (profile.websiteData && !source) throw new Error("profile websiteData requires --website-data-from ox-qa-N");
+  if (profile.websiteData && !source) throw new Error("profile websiteData requires --website-data-from ox-N");
   if (!profile.websiteData && source) throw new Error("--website-data-from requires websiteData: true in the profile");
 
   await requireBooted([target.device, ...(source ? [source.device] : [])]);

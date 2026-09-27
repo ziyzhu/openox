@@ -6,7 +6,7 @@ import { mcpArtifactFixture, mcpManagementFixture } from "./fixtures/mcp-managem
 import { ROOT } from "./lib.ts";
 import { qaCommand } from "./qa-config.ts";
 
-const config = qaCommand({ usage: "Usage: bun tooling/canvas-integration-fixture.ts --device ox-qa-N" });
+const config = qaCommand({ usage: "Usage: bun tooling/canvas-integration-fixture.ts --device ox-N" });
 const directory = await mkdtemp(join(tmpdir(), "ox-canvas-integration-"));
 const repository = Bun.spawn(["ox", "--repository", join(ROOT, "repositories/builtin"), "repository", "serve", "--port", "0"], {
   stdout: "pipe", stderr: "inherit",
