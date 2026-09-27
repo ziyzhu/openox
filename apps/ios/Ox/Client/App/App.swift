@@ -34,15 +34,15 @@ struct OxApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if onboarded {
-                    RootView(
-                        client: client,
-                        skillImports: skillImports,
-                        chatImports: chatImports
-                    )
+                #if DEBUG && targetEnvironment(simulator)
+                if let mode = ProcessInfo.processInfo.environment["OX_PERMISSION_PROTOTYPE"] {
+                    PermissionPrototypeScreen(mode: mode)
                 } else {
-                    OnboardingView { onboarded = true }
+                    appContent
                 }
+                #else
+                appContent
+                #endif
             }
             .themed()
             .appPresentations(presentations)
@@ -90,6 +90,15 @@ struct OxApp: App {
                     ScheduledSkillScheduler.shared.refresh()
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var appContent: some View {
+        if onboarded {
+            RootView(client: client, skillImports: skillImports, chatImports: chatImports)
+        } else {
+            OnboardingView { onboarded = true }
         }
     }
 }

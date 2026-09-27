@@ -115,31 +115,52 @@ struct PermissionRequestCard: View {
     let request: PermissionRequest
     var selection: String? = nil
     var resolution: String? = nil
+    var arguments: String? = nil
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.appTheme) private var appTheme
     @State private var submittedSelection: String?
+    @State private var showingArguments = false
 
     private var copy: RequestCardCopy { RequestCardCopy(request.prompt) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(spacing: 6) {
-                PermissionSourceIcon(
-                    sourceName: request.sourceName,
-                    actionIconKind: request.actionIconKind,
-                    isServiceAttach: copy.title.hasSuffix(" - \(L10n.string("Attach"))")
-                )
-                    .accessibilityHidden(true)
-                Text(verbatim: request.actionName)
-                    .font(Theme.Fonts.captionMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                HStack(spacing: 6) {
+                    PermissionSourceIcon(
+                        sourceName: request.sourceName,
+                        actionIconKind: request.actionIconKind,
+                        isServiceAttach: copy.title.hasSuffix(" - \(L10n.string("Attach"))")
+                    )
+                        .accessibilityHidden(true)
+                    Text(verbatim: request.actionName)
+                        .font(Theme.Fonts.captionMd)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(A11yID.Chat.permissionRequest(request.actionIconKind?.rawValue ?? "source"))
+
+                if arguments != nil {
+                    Spacer(minLength: Theme.Spacing.sm)
+                    Button {
+                        showingArguments = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .frame(width: 18, height: 18)
+                            .minimumTouchTarget()
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 18, height: 18)
+                    .accessibilityLabel("View arguments")
+                    .accessibilityIdentifier("chat.permissionArguments")
+                }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(A11yID.Chat.permissionRequest(request.actionIconKind?.rawValue ?? "source"))
 
             if let message = copy.message {
                 Text(message)
@@ -158,6 +179,29 @@ struct PermissionRequestCard: View {
                 .id(appTheme)
         }
         .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showingArguments) {
+            NavigationStack {
+                ScrollView {
+                    Text(verbatim: arguments ?? "")
+                        .font(.system(.subheadline, design: .monospaced))
+                        .foregroundStyle(Theme.Colors.onSurface)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Theme.Spacing.lg)
+                }
+                .background(Theme.Colors.surface)
+                .navigationTitle("Arguments")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingArguments = false }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .themed()
+        }
     }
 
     @ViewBuilder
@@ -242,7 +286,7 @@ private struct PermissionSourceIcon: View {
         case "Calendar": "calendar"
         case "Reminders": "checklist"
         case "Contacts": "person.crop.circle"
-        default: "app.fill"
+        default: "network"
         }
     }
 }
