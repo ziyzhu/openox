@@ -111,7 +111,7 @@ private struct SecretEntryDetailView: View {
                             if let fields {
                                 ForEach(Array(fields.enumerated()), id: \.element.id) { index, field in
                                     if index > 0 { Divider().settingsContentInset() }
-                                    HStack(spacing: Theme.Spacing.md) {
+                                    SecretFieldLayout(spacing: Theme.Spacing.md) {
                                         Text(verbatim: field.name)
                                             .font(Theme.Fonts.bodyMd)
                                             .lineLimit(1)

@@ -47,15 +47,17 @@ struct SecretFieldsEditor: View {
             ForEach(model.fields) { field in
                 let fieldBinding = binding(for: field)
                 HStack(spacing: Theme.Spacing.sm) {
-                    TextField("Field name", text: fieldBinding.name)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
-                    SecureField("Value", text: fieldBinding.value)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .privacySensitive()
-                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
+                    SecretFieldLayout(spacing: Theme.Spacing.sm) {
+                        TextField("Field name", text: fieldBinding.name)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
+                        SecureField("Value", text: fieldBinding.value)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .privacySensitive()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 44)
+                    }
                     Button {
                         model.fields.removeAll { $0.id == field.id }
                     } label: {
@@ -83,5 +85,35 @@ struct SecretFieldsEditor: View {
                 model.fields[index] = updated
             }
         )
+    }
+}
+
+struct SecretFieldLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.reduce(0, +) + spacing
+        let widths = fieldWidths(width)
+        let height = zip(subviews, widths).map { subview, width in
+            subview.sizeThatFits(ProposedViewSize(width: width, height: proposal.height)).height
+        }.max() ?? 0
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        for (subview, width) in zip(subviews, fieldWidths(bounds.width)) {
+            subview.place(
+                at: CGPoint(x: x, y: bounds.midY),
+                anchor: .leading,
+                proposal: ProposedViewSize(width: width, height: bounds.height)
+            )
+            x += width + spacing
+        }
+    }
+
+    private func fieldWidths(_ width: CGFloat) -> [CGFloat] {
+        let availableWidth = max(0, width - spacing)
+        return [availableWidth / 3, availableWidth * 2 / 3]
     }
 }
