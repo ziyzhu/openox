@@ -148,18 +148,12 @@ private struct ChatArtifactRow: View {
 }
 
 private struct ChatInteractiveRowSurface: ViewModifier {
-    @Environment(\.appTheme) private var appTheme
-
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
         content
             .padding(Theme.Spacing.md)
             .frame(minHeight: Theme.Size.minimumTouchTarget)
-            .background {
-                Color.clear
-                    .glassEffect(.regular.interactive(), in: shape)
-                    .id(appTheme)
-            }
+            .chatCardOutline()
             .contentShape(shape)
     }
 }

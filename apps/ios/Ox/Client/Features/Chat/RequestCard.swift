@@ -86,8 +86,6 @@ struct AgentChoiceRequestCard: View {
     let onCustomFocusChange: (Bool) -> Void
     let onSelect: (String) -> Void
 
-    @Environment(\.appTheme) private var appTheme
-
     var body: some View {
         let copy = RequestCardCopy(request.prompt)
         RequestCard(title: copy.title, message: copy.message) {
@@ -102,11 +100,7 @@ struct AgentChoiceRequestCard: View {
             )
         }
         .padding(Theme.Spacing.lg)
-        .background {
-            Color.clear
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                .id(appTheme)
-        }
+        .chatCardOutline()
         .accessibilityElement(children: .contain)
     }
 }
@@ -119,7 +113,6 @@ struct PermissionRequestCard: View {
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.appTheme) private var appTheme
     @State private var submittedSelection: String?
     @State private var showingArguments = false
 
@@ -173,11 +166,7 @@ struct PermissionRequestCard: View {
             permissionActions
         }
         .padding(Theme.Spacing.lg)
-        .background {
-            Color.clear
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                .id(appTheme)
-        }
+        .chatCardOutline()
         .accessibilityElement(children: .contain)
         .sheet(isPresented: $showingArguments) {
             NavigationStack {

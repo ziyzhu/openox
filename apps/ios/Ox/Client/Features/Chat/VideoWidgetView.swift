@@ -64,6 +64,7 @@ struct VideoWidgetView: View {
         }
         .aspectRatio(4 / 3, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .chatCardOutline(cornerRadius: Theme.Radius.md)
         .task { await load() }
     }
 

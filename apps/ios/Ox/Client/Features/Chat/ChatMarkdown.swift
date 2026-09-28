@@ -16,7 +16,8 @@ struct StreamingMarkdownText: View {
                 StreamingMarkdownTail(
                     source: split.tail,
                     resetKey: split.generation,
-                    previousBlock: split.lastSettledBlock
+                    previousBlock: split.lastSettledBlock,
+                    insideCodeFence: split.inFence
                 )
             }
         }
@@ -42,7 +43,8 @@ struct StreamingMarkdownText: View {
             settled: String,
             tail: String,
             generation: Int,
-            lastSettledBlock: MarkdownBlock?
+            lastSettledBlock: MarkdownBlock?,
+            inFence: Bool
         ) {
             let total = source.utf8.count
             if total < consumedUTF8 {
@@ -67,7 +69,7 @@ struct StreamingMarkdownText: View {
                     scan(tail)
                 }
             }
-            return (settled, tail, generation, lastSettledBlock)
+            return (settled, tail, generation, lastSettledBlock, inFence)
         }
 
         private func scan(_ delta: String) {
@@ -123,6 +125,22 @@ struct StreamingMarkdownText: View {
         if doubles % 2 == 1 { out += "**" }
         if (stars - doubles * 2) % 2 == 1 { out += "*" }
         return out
+    }
+
+    static func stableWords(_ source: String) -> String {
+        guard let last = source.last, !last.isWhitespace,
+              !canBreakBefore(last) else { return source }
+        let pending = source.reversed().prefix { character in
+            !character.isWhitespace && !canBreakBefore(character)
+        }
+        return String(source.dropLast(pending.count))
+    }
+
+    private static func canBreakBefore(_ character: Character) -> Bool {
+        character.unicodeScalars.contains { scalar in
+            scalar.properties.isIdeographic || scalar.properties.isEmojiPresentation
+                || (0x3000...0xD7FF).contains(scalar.value)
+        }
     }
 
     static func gateInlineLinks(_ source: String) -> String {
@@ -226,6 +244,7 @@ private struct StreamingMarkdownTail: View {
     let source: String
     let resetKey: Int
     let previousBlock: MarkdownBlock?
+    let insideCodeFence: Bool
     @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.chatLinkHandler) private var chatLinkHandler
     @State private var availableWidth: CGFloat = 0
@@ -236,11 +255,12 @@ private struct StreamingMarkdownTail: View {
     #endif
 
     var body: some View {
-        let plain = classifier.isPlain(source, reset: resetKey)
+        let visibleSource = insideCodeFence ? source : StreamingMarkdownText.stableWords(source)
+        let plain = classifier.isPlain(visibleSource, reset: resetKey)
         let _ = formattedBuffer.revision
-        let blocks = plain
-            ? [MarkdownBlock.paragraph(source)]
-            : formattedBuffer.blocks(for: source, reset: resetKey)
+        let blocks: [MarkdownBlock] = visibleSource.isEmpty ? [] : plain
+            ? [MarkdownBlock.paragraph(visibleSource)]
+            : formattedBuffer.blocks(for: visibleSource, reset: resetKey)
         #if DEBUG
         let _ = stability.check(blocks)
         #endif
@@ -730,6 +750,7 @@ private struct MarkdownListView: View {
                             .font(.system(size: markerPointSize))
                             .monospacedDigit()
                             .foregroundStyle(textColor)
+                            .fixedSize(horizontal: true, vertical: false)
                             .frame(width: markerColumnWidth, alignment: .trailing)
                         prose(
                             item.text,
@@ -758,9 +779,9 @@ private struct MarkdownListView: View {
     }
 
     private var markerColumnWidth: CGFloat {
-        let lastMarker = marker(for: max(0, list.items.count - 1))
+        let widestMarker = list.kind == .ordered ? "99." : "•"
         let font = UIFont.monospacedDigitSystemFont(ofSize: markerPointSize, weight: .regular)
-        return ceil((lastMarker as NSString).size(withAttributes: [.font: font]).width)
+        return ceil((widestMarker as NSString).size(withAttributes: [.font: font]).width)
     }
 
     private func marker(for index: Int) -> String {

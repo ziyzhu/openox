@@ -85,6 +85,14 @@ enum Theme {
 }
 
 extension View {
+    func chatCardOutline(cornerRadius: CGFloat = Theme.Radius.lg) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.18), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+    }
+
     func chipSurface<S: ShapeStyle>(_ fill: S) -> some View {
         frame(height: Theme.Size.chipHeight)
             .background(fill, in: Capsule(style: .continuous))

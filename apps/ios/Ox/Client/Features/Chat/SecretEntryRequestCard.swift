@@ -5,7 +5,6 @@ struct SecretEntryRequestCard: View {
     let onSaved: () -> Void
     let onCancel: () -> Void
 
-    @Environment(\.appTheme) private var appTheme
     @State private var displayName: String
     @StateObject private var fieldModel: SecretFieldsModel
     @State private var error: String?
@@ -71,11 +70,7 @@ struct SecretEntryRequestCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Spacing.lg)
-        .background {
-            Color.clear
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                .id(appTheme)
-        }
+        .chatCardOutline()
         .accessibilityElement(children: .contain)
     }
 

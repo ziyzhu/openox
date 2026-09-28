@@ -10,6 +10,7 @@ public struct MockLLMClient: ProviderClient {
         public var betweenDeltas: Duration = .milliseconds(20)
         public var beforeToolCall: Duration = .milliseconds(80)
         public var beforeDone: Duration = .milliseconds(40)
+        public var streamCharacters = false
         public init() {}
     }
 
@@ -246,6 +247,14 @@ public struct Scenario: Sendable {
         return scenario
     }
 
+    func characterStreaming() -> Scenario {
+        var scenario = self
+        var clock = scenario.clock ?? MockLLMClient.Clock()
+        clock.streamCharacters = true
+        scenario.clock = clock
+        return scenario
+    }
+
 }
 
 extension Scenario {
@@ -280,6 +289,9 @@ extension Scenario {
             Entry("20", "clearance — response near the focused composer", .composerClearance),
             Entry("21", "focusstream — stream while the composer is focused", .focusedStream),
             Entry("79", "formatstress — long single-block formatted stream", .formattedStreamStress),
+            Entry("95", "paragraphstream — consecutive paragraphs while streaming", .paragraphStream),
+            Entry("96", "listcount — ordered list through item ten", .listCount),
+            Entry("97", "characterstream — partial words near a line break", .characterStream),
         ]),
         ("Tool loops & interaction", [
             Entry("22", "parallel — two reads, synthesize", .parallelTools),
@@ -539,6 +551,21 @@ extension Scenario {
         .say("**" + Array(repeating: "A long formatted paragraph keeps growing without a settling boundary.", count: 120).joined(separator: " ") + "**"),
         .stop(.stop)
     ])
+
+    static let paragraphStream = Scenario(name: "paragraphstream", steps: [
+        .say("First paragraph.\n\nSecond paragraph.\n\nThird paragraph."),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(500))
+
+    static let listCount = Scenario(name: "listcount", steps: [
+        .say((1...10).map { "\($0). Item \($0)" }.joined(separator: "\n")),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(250))
+
+    static let characterStream = Scenario(name: "characterstream", steps: [
+        .say("The opening phrase is almost full: extraordinaryphenomenon arrives next."),
+        .stop(.stop)
+    ]).pacing(betweenDeltas: .milliseconds(80)).characterStreaming()
 
     static let focusedStream = Scenario(name: "focusstream") { _ in
         let prefix = (1...20).map { "Focus setup line \($0)." }.joined(separator: "\n")
@@ -2242,7 +2269,7 @@ nonisolated private final class Replayer: @unchecked Sendable {
         clock: MockLLMClient.Clock,
         continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
     ) async {
-        for chunk in s.tokenizedForStreaming() {
+        for chunk in clock.streamCharacters ? s.map(String.init) : s.tokenizedForStreaming() {
             if Task.isCancelled { return }
             switch partial.content[idx] {
             case .text(var t):
