@@ -51,6 +51,6 @@ Install synchronously exactly once and register every declared action exactly on
 3. Create or copy the service, edit through `ox.fs`, then call `ox.service.validate` and `ox.service.attach`.
 4. Complete setup through `ox.service.signIn`. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.
 5. Verify successful reads, empty results, continuation, missing resources, and auth errors. Exercise mutations only with authorization. Report inaccessible or unverified capabilities explicitly.
-6. Inspect Local status and diff, then request **Save** for the verified service. Preserve unrelated changes and use the existing Local Git workflow internally.
+6. Inspect Local status and diff, then **Save** the verified service without a separate confirmation. Preserve unrelated changes, resolve ambiguous Save scope, and use the existing Local Git workflow internally. Honor any runtime Action policy gate.
 
 Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and replay fixtures must contain only public configuration and synthetic or sanitized examples.

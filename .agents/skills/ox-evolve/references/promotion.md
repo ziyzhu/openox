@@ -9,7 +9,7 @@ Require all of the following before changing built-in service source:
 - Ox created or copied the service into Local through `skills/evolve/SKILL.md`.
 - Ox explored the live site through `ox.web.browser.*` and followed the current `evolve` planning and approval rules, including its scoped missing-service bootstrap path.
 - Ox verified every promoted action and applicable authentication or handoff boundary in iOS.
-- The Local service has a user-approved saved revision with no unrelated pending Local changes.
+- The Local service has a verified, saved revision with no unrelated pending Local changes.
 - The user explicitly requested promotion into the official built-in repository.
 
 If any precondition is missing, return to Ox on the requested simulator. Do not substitute terminal Chrome, mitmproxy exploration, direct source editing, or inferred endpoint behavior.

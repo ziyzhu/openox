@@ -8,8 +8,8 @@ Use when a website task has no suitable service or action after successful disco
 
 1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
 2. Answer reads as soon as evidence supports them; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Create, extend, or repair the smallest action supported by the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies, live-mutation approval, and Save confirmation still apply.
-4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is declined or blocked, continue authorized Browser fulfillment and report the persistence limitation.
+3. Create, extend, or repair the smallest action supported by the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies and live-mutation approval still apply.
+4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
 Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
 
@@ -92,22 +92,21 @@ https://www.google.com/s2/favicons?domain_url=<percent-encoded-origin>&sz=128&al
 
 Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. Navigate Browser to the resolver and wait for the URL to settle. Because the service image loader does not follow redirects, save the final direct HTTPS `tN.gstatic.com/faviconV2` URL rather than the `google.com` resolver URL. Accept the result only when it returns `200`, is a square supported raster, visibly matches the product, and renders as the service avatar after reload. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at the rendered avatar size. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
 
-A customer-facing service is not complete without a visible verified icon when a qualifying first-party or Google-cached result exists. Omit `faviconUrl` only after exhausting both sources, and report whether the selected icon is first-party, a Google fallback, or unavailable.
+A customer-facing service is not complete without a visible verified icon when a qualifying first-party or Google-cached result exists. Omit `faviconUrl` only after exhausting both sources. Record the icon source internally; mention a missing icon to the user only when it affects the delivered experience.
 
-## 3. Present the action plan
+## 3. Explain the plan
 
 For deliberate service authoring, present:
 
-- Service domain, concise product name, description, top-level base URL, and favicon evidence, including whether it is first-party or a Google fallback.
-- Every action ID, purpose, and action-specific base URL when needed.
-- Inputs, narrow returned data, and pagination behavior.
-- Authentication, approval, bot-control, and payment requirements.
-- The observed behavior supporting each action.
-- Useful observed capabilities excluded from this version.
+- The recognizable product name and what Ox will be able to do there.
+- What information the user will provide and what results Ox will return, including whether more results can be fetched.
+- Any sign-in, human verification, review, approval, or payment the user will need to complete.
+- What was observed on the website, what remains unverified, and useful capabilities left for later.
+- Any decision the user must make about the proposed scope.
 
-Include only actions with an observed extraction path in every authentication state needed for their implementation. Mark hypotheses and inaccessible capabilities as provisional or exclude them from the confirmed surface.
+Keep action IDs, domains, base URLs, schemas, and icon sourcing out of the plan unless the user requests them or needs a specific detail to decide. Include only capabilities with an observed way to obtain the result in every sign-in state needed for implementation. Describe uncertain or inaccessible capabilities as unverified or leave them out of the confirmed plan.
 
-End the response after this plan; continue only after a later user message confirms it. Bootstrap skips this checkpoint within the original request's scope. Plan confirmation does not replace runtime attachment policies, live-mutation approval, or final Save confirmation.
+End the response after this plan; continue only after a later user message confirms it. Task-driven evolution skips this checkpoint within the original request's scope. Plan confirmation does not replace runtime attachment policies or live-mutation approval.
 
 ## 4. Author service.json
 
@@ -238,7 +237,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
 13. Verify the favicon URL is a direct supported image without redirects, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying first-party or Google-cached icon exists.
-14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, requesting Save approval, saving, or ending an abandoned or blocked run.
+14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
 
@@ -247,9 +246,9 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 1. Inspect complete Local Git status and diff.
 2. Re-read the final manifest and actions.
 3. Correct unintended changes.
-4. Ask the user to **Save**, describing verified and unverified boundaries. Keep Git mechanics internal; use a purpose such as `Save Outlook service`.
-5. After approval, use Local Git internally to persist the reviewed service with a concise message describing what changed and why.
-6. Report that the service was saved, plus verified actions and boundaries, visible icon evidence, authentication or interaction requirements, excluded capabilities, and remaining limitations. Mention files or revision identifiers only when the user asks for technical details.
+4. Save the intended verified Local changes without a separate confirmation. If unrelated pending Local changes make the Save scope ambiguous, resolve the scope before committing. Keep Git mechanics internal; use a purpose such as `Save Outlook service`.
+5. Use Local Git internally to persist the reviewed service with a concise message describing what changed and why. Honor any runtime Action policy gate.
+6. Tell the user the capability was saved for future use, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Mention a missing visible icon when relevant. Keep action IDs, files, revision identifiers, and implementation details internal unless the user asks for them.
 
 ## Recovery
 
