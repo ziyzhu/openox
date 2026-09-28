@@ -415,7 +415,7 @@ struct RequestCardOptions: View {
     }
 
     private var binaryChoiceOptions: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Theme.Spacing.sm) {
             ForEach(options, id: \.self) { option in
                 RequestActionButton(
                     title: option,
