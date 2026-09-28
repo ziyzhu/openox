@@ -2,13 +2,13 @@
 
 Deliver a useful Local service from live website evidence and report its verified boundaries. Work inside Ox with awaited `ox.*` calls, `ox.web.browser`, the virtual filesystem, and Local Git. Author plain JavaScript against the service installer directly; the iOS workflow has no shell, build, TypeScript, HAR, or replay step.
 
-## Missing-service bootstrap
+## Task-driven evolution
 
-Use when successful `ox.service.find` finds no suitable service for a website task, not when discovery fails. General public-information questions need no service.
+Use when a website task has no suitable service or action after successful discovery, when an existing action is confirmed broken, or when Browser fulfillment reveals a useful missing action. If discovery fails, report that blocker instead of claiming a capability is missing. Diagnose sign-in, human verification, rate limiting, missing resources, and temporary website failures before treating an action as broken. General public-information questions need no service.
 
 1. Inspect the needed `ox.web.browser.*` contracts. Fulfill the original request while collecting evidence for only the needed actions and handoffs.
 2. Answer reads as soon as evidence supports them; do not wait for creation or Save. For mutations, prefer observation followed by one approved service invocation; Browser may execute instead when practical. Preserve approval and human-handoff boundaries either way.
-3. Build from the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies, live-mutation approval, and Save confirmation still apply.
+3. Create, extend, or repair the smallest action supported by the observed flow. The original request establishes minimal action scope, so skip separate plan confirmation unless a decision or expanded scope needs it. Runtime attachment policies, live-mutation approval, and Save confirmation still apply.
 4. Validate and verify the service using the workflow below. Browser success alone does not verify a handler. If creation or Save is declined or blocked, continue authorized Browser fulfillment and report the persistence limitation.
 
 Never repeat a completed mutation for evidence or testing. Track pending, completed, and uncertain effects; inspect resulting state before retrying uncertain effects, and ask if uncertainty remains. Disclose unexecuted handlers as partially verified at Save and completion.
