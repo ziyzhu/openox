@@ -1060,6 +1060,7 @@ struct UserBubble: View {
     let attachments: [Artifact]
     let sourcePrefix: String
     let onOpenAttachment: (Artifact, String) -> Void
+    var onTextFrameChange: ((CGRect) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
@@ -1081,6 +1082,9 @@ struct UserBubble: View {
                 Text(text)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                        onTextFrameChange?(frame)
+                    }
                     // Body font metrics add vertical whitespace around glyphs, so 12 pt reads like 14 pt horizontally.
                     .padding(.horizontal, 14)
                     .padding(.vertical, Theme.Spacing.md)
@@ -1191,6 +1195,7 @@ struct BlockView: View, Equatable {
     let onOpenAttachment: (Artifact, String) -> Void
     let onOpenSkill: (Skill) -> Void
     let onOpenLink: (URL) -> Void
+    let onUserTextFrameChange: (UUID, CGRect) -> Void
 
     static func == (lhs: BlockView, rhs: BlockView) -> Bool {
         lhs.block == rhs.block
@@ -1242,7 +1247,8 @@ struct BlockView: View, Equatable {
                 text: text,
                 attachments: attachments,
                 sourcePrefix: "block:\(block.id.uuidString)",
-                onOpenAttachment: onOpenAttachment
+                onOpenAttachment: onOpenAttachment,
+                onTextFrameChange: { onUserTextFrameChange(block.id, $0) }
             )
                 .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
                 .contextMenu {
