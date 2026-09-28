@@ -1,7 +1,7 @@
 {
   "domain": "www.kimi.com",
   "name": "Kimi",
-  "description": "Chat with Kimi, search and open saved conversations, read rendered messages, list model choices, and read basic account information.",
+  "description": "Chat with Kimi, search and open saved conversations, read rendered messages, list model choices, and read basic account information. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://www.kimi.com/",
   "actions": [
     {
@@ -32,7 +32,7 @@
     {
       "id": "getSignInState",
       "label": "Check sign-in",
-      "description": "Check a fresh server account response through Kimi\u2019s page-owned request client. Unexpected responses throw.",
+      "description": "Check a fresh server account response through Kimi’s page-owned request client. Unexpected responses throw.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -317,7 +317,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current chat",
-      "description": "Read bounded rendered user and assistant messages, not the complete stored history.",
+      "description": "Read bounded rendered user and assistant messages, not the complete stored history. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -354,11 +354,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -386,7 +393,7 @@
     {
       "id": "listWebsiteModels",
       "label": "List model choices",
-      "description": "Read the model options currently exposed by Kimi\u2019s picker.",
+      "description": "Read the model options currently exposed by Kimi’s picker.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -469,7 +476,10 @@
             "type": "string"
           },
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -478,13 +488,20 @@
               "responding",
               "submissionUnconfirmed"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "conversationRef",
           "url",
           "response",
-          "status"
+          "status",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -526,7 +543,10 @@
             "type": "string"
           },
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -535,13 +555,20 @@
               "responding",
               "submissionUnconfirmed"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "conversationRef",
           "url",
           "response",
-          "status"
+          "status",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -920,5 +947,100 @@
       "requireAuth": true,
       "requireApproval": true
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/www.kimi.com/favicon.png",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

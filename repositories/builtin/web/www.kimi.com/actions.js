@@ -1,3 +1,4 @@
+// Kimi's request client owns authentication and transport. No credentials are read or copied.
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const text = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 const visible = el => !!el && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
@@ -16,38 +17,20 @@ const service = async typeName => {
     return entry && [...entry.serviceMap.entries()].find(([d]) => d.typeName === typeName)?.[1];
   }, 'Kimi request client');
 };
-const identityWaiters = new Set();
-const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
-if (originalFetch) window.fetch = function(input, init) {
-  const url = input instanceof Request ? input.url : String(input);
-  const matched = /\/apiv2\/kimi\.gateway\.account\.v1\.UserService\/GetCurrentUser(?:\?|$)/.test(url)
-    ? [...identityWaiters] : [];
-  return originalFetch(input, init).then(response => {
-    if (matched.length) {
-      response.clone().json().then(body => {
-        for (const w of matched) { if (identityWaiters.delete(w)) { clearTimeout(w.timer); w.resolve({status: response.status, body}); } }
-      }, error => { for (const w of matched) { if (identityWaiters.delete(w)) { clearTimeout(w.timer); w.reject(new Error('Invalid account response JSON')); } } });
-    }
-    return response;
-  }, error => {
-    for (const w of matched) { if (identityWaiters.delete(w)) { clearTimeout(w.timer); w.reject(new Error('Account network request failed')); } }
-    throw error;
-  });
-};
+// The page-owned client performs a fresh server request and returns the decoded response.
+// This avoids racing a global fetch interceptor while preserving the website's own transport.
 const identity = async () => {
   const client = await service('kimi.gateway.account.v1.UserService');
-  let registration;
-  const observed = new Promise((resolve, reject) => {
-    registration = {resolve, reject};
-    registration.timer = setTimeout(() => { identityWaiters.delete(registration); reject(new Error('Fresh account response was not observed')); }, 8000);
-    identityWaiters.add(registration);
-  });
-  const request = Promise.resolve().then(() => client.getCurrentUser({}, {timeoutMs: 7500}));
-  void request.catch(() => {});
-  const result = await observed;
-  if (result.status === 401 && result.body?.code === 'unauthenticated') return null;
-  if (result.status === 200 && typeof result.body?.user?.id === 'string' && result.body.user.id) return result.body.user;
-  throw new Error('Unclassified account response: HTTP ' + result.status);
+  try {
+    const result = await client.getCurrentUser({}, {timeoutMs: 9000});
+    if (typeof result?.user?.id === 'string' && result.user.id) return result.user;
+    throw new Error('Unclassified Kimi account response');
+  } catch (error) {
+    const status = Number(error?.status ?? error?.code ?? error?.rawResponse?.status ?? error?.response?.status);
+    const code = error?.body?.code ?? error?.rawResponse?.body?.code ?? error?.response?.data?.code ?? error?.details?.code;
+    if (status === 401 && code === 'unauthenticated') return null;
+    throw new Error('Kimi account request failed: ' + String(error?.message || error));
+  }
 };
 const router = async () => wait(() => values().find(v => v && typeof v.push === 'function' && typeof v.resolve === 'function'), 'Kimi navigation');
 const composer = () => [...document.querySelectorAll('.chat-input-editor[contenteditable="true"]')].find(visible);
@@ -56,11 +39,14 @@ const chatId = () => { const m = location.pathname.match(/^\/chat\/([A-Za-z0-9_-
 const homeRef = 'new-' + Math.random().toString(36).slice(2);
 const destination = () => ({conversationRef: chatId() || homeRef, url: location.origin + location.pathname});
 const ensureNoDraft = () => { const e = composer(); if (e && text(e.innerText)) throw new Error('An existing Kimi draft is present; it was not changed.'); };
+const richInt = v => Number.isSafeInteger(v) && v >= 0 ? v : null;
+const richUrl = v => {if(typeof v !== 'string'||!v)return null;try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:null;}catch{return null;}};
+const richFiles = (el,source) => {const out=[];for(const img of el.querySelectorAll('img[src]')){const u=richUrl(img.currentSrc||img.src);if(!u||img.getAttribute('aria-hidden')==='true'||(img.naturalWidth&&img.naturalWidth<64))continue;out.push({id:null,name:img.alt||'',kind:'image',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:richInt(img.naturalWidth),height:richInt(img.naturalHeight),pageCount:null,tokenCount:null,source,downloadable:true});}for(const x of el.querySelectorAll('a[href][download],a[href*="download"],a[href*="/file"],a[href$=".pdf"],a[href$=".docx"],a[href$=".csv"],a[href$=".zip"]')){const u=richUrl(x.href);if(!u)continue;out.push({id:null,name:x.getAttribute('download')||(x.textContent||'').trim(),kind:/\.pdf(?:$|\?)/i.test(u)?'document':'file',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source,downloadable:true});}const seen=new Set;return out.filter(f=>{if(seen.has(f.url))return false;seen.add(f.url);return true;});};
 const readMessages = () => [...document.querySelectorAll('.segment-user, .segment-assistant')].map(el => {
   const user = el.classList.contains('segment-user');
   const parts = user ? [...el.querySelectorAll('.user-content__text')] : [...el.querySelectorAll('.markdown')];
-  return {role: user ? 'user' : 'assistant', text: parts.map(p => p.innerText || '').join('\n').trim()};
-}).filter(x => x.text);
+  return {role: user ? 'user' : 'assistant', text: parts.map(p => p.innerText || '').join('\n').trim(), files: richFiles(el,user?'attachment':'generated')};
+}).filter(x => x.text || x.files.length);
 const readConversation = async limit => {
   await ready();
   const id = chatId();
@@ -115,11 +101,11 @@ const send = async message => {
       const lastUser = segments.lastIndexOf(last);
       response = segments.slice(lastUser + 1).filter(e => e.classList.contains('segment-assistant')).flatMap(e => [...e.querySelectorAll('.markdown')].map(x => x.innerText)).join('\n').trim();
       const live = findContext('segments');
-      if (response && live && !live.isStreaming?.value && !live.isLoading?.value) return {...destination(), response, status: 'complete'};
+      if (live && !live.isStreaming?.value && !live.isLoading?.value) {const responseFiles=segments.slice(lastUser + 1).filter(e=>e.classList.contains('segment-assistant')).flatMap(e=>richFiles(e,'generated'));if(response||responseFiles.length)return {...destination(), response:response||null, responseFiles, status:'complete'};}
     }
     await sleep(150);
   } while (Date.now() < deadline);
-  return {...destination(), response, status: confirmed ? 'responding' : 'submissionUnconfirmed'};
+  return {...destination(), response:response||null, responseFiles:[], status: confirmed ? 'responding' : 'submissionUnconfirmed'};
 };
 window.ox.install(({action}) => {
 registerModelActions(action);

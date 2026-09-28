@@ -1,7 +1,7 @@
 {
   "domain": "muse.ai",
   "name": "Muse",
-  "description": "Search saved Muse chat-message excerpts, read the current conversation, and send messages with approval.",
+  "description": "Search saved Muse chat-message excerpts, read the current conversation, and send messages with approval. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://muse.ai/",
   "faviconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://muse.ai&size=128",
   "actions": [
@@ -58,7 +58,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current conversation",
-      "description": "Read currently rendered messages, not full conversation history.",
+      "description": "Read currently rendered messages, not full conversation history. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -87,11 +87,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -171,11 +178,18 @@
                     },
                     "text": {
                       "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/file"
+                      }
                     }
                   },
                   "required": [
                     "role",
-                    "text"
+                    "text",
+                    "files"
                   ],
                   "additionalProperties": false
                 }
@@ -197,13 +211,20 @@
               "pending"
             ],
             "additionalProperties": false
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "submitted",
           "status",
           "reply",
-          "conversation"
+          "conversation",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -264,11 +285,18 @@
                     },
                     "text": {
                       "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/file"
+                      }
                     }
                   },
                   "required": [
                     "role",
-                    "text"
+                    "text",
+                    "files"
                   ],
                   "additionalProperties": false
                 }
@@ -290,13 +318,20 @@
               "pending"
             ],
             "additionalProperties": false
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "submitted",
           "status",
           "reply",
-          "conversation"
+          "conversation",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -376,5 +411,99 @@
       "requireApproval": false,
       "blocking": true
     }
-  ]
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

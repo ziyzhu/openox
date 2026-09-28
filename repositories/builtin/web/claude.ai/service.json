@@ -1,7 +1,7 @@
 {
   "domain": "claude.ai",
   "name": "Claude",
-  "description": "Chat with Claude using your signed-in website account, read paginated conversation history, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
+  "description": "Chat with Claude using your signed-in website account, read paginated conversation history including image and document metadata, and choose a model. Sending messages requires approval. Continuing chats requires a loaded sidebar entry.",
   "baseUrl": "https://claude.ai/robots.txt",
   "actions": [
     {
@@ -192,7 +192,7 @@
     {
       "id": "getConversation",
       "label": "Read conversation",
-      "description": "Read message text from a conversation. Parent IDs preserve branch relationships; tool and attachment contents are excluded.",
+      "description": "Read conversation text plus safe image and document metadata. Parent IDs preserve branches; hidden thinking and general tool contents remain excluded.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -254,6 +254,98 @@
                     "string",
                     "null"
                   ]
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "mimeType": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sizeBytes": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "url": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Session-bound Claude URL when the source exposes one."
+                      },
+                      "thumbnailUrl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "width": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "height": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "pageCount": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "tokenCount": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "attachment",
+                          "generated"
+                        ]
+                      },
+                      "downloadable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "mimeType",
+                      "sizeBytes",
+                      "url",
+                      "thumbnailUrl",
+                      "width",
+                      "height",
+                      "pageCount",
+                      "tokenCount",
+                      "source",
+                      "downloadable"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -261,7 +353,8 @@
                 "parentId",
                 "role",
                 "text",
-                "createdAt"
+                "createdAt",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -364,7 +457,7 @@
     {
       "id": "chat",
       "label": "Start chat",
-      "description": "Send one text message in a new chat. Refuses to overwrite an existing draft. A pending result must be checked with getConversation, not resent. Submission outcomes are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
+      "description": "Send one text message in a new chat. Refuses to overwrite an existing draft. A pending result must be checked with getConversation, not resent. Submission outcomes, including file-only replies, are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -409,13 +502,106 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Session-bound Claude URL when the source exposes one."
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "pageCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "tokenCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "attachment",
+                    "generated"
+                  ]
+                },
+                "downloadable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "mimeType",
+                "sizeBytes",
+                "url",
+                "thumbnailUrl",
+                "width",
+                "height",
+                "pageCount",
+                "tokenCount",
+                "source",
+                "downloadable"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "status",
           "conversationId",
           "url",
-          "response"
+          "response",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -426,7 +612,7 @@
     {
       "id": "continueChat",
       "label": "Continue chat",
-      "description": "Send one text message to an exact conversation loaded in the sidebar. Refuses existing drafts and does not retry submissions. Submission outcomes are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
+      "description": "Send one text message to an exact conversation loaded in the sidebar. Refuses existing drafts and does not retry submissions. Submission outcomes, including file-only replies, are confirmed against new server message IDs. Pending or unconfirmed outcomes must be read before any retry.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -476,13 +662,106 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Session-bound Claude URL when the source exposes one."
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "pageCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "tokenCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "attachment",
+                    "generated"
+                  ]
+                },
+                "downloadable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "mimeType",
+                "sizeBytes",
+                "url",
+                "thumbnailUrl",
+                "width",
+                "height",
+                "pageCount",
+                "tokenCount",
+                "source",
+                "downloadable"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "status",
           "conversationId",
           "url",
-          "response"
+          "response",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -985,5 +1264,7 @@
       "requireApproval": true,
       "baseUrl": "https://claude.ai/new"
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/claude.ai/favicon.png",
+  "$defs": {}
 }

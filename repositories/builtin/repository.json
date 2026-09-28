@@ -1,7 +1,6 @@
 {
-  "version": 3,
-  "name": "Built-in",
-  "services": [
+  "name" : "Built-in",
+  "services" : [
     "ios:bluetooth",
     "ios:calendar",
     "ios:contacts",
@@ -63,5 +62,8 @@
     "web:x.com",
     "web:xiaohongshu.com"
   ],
-  "skills": []
+  "skills" : [
+
+  ],
+  "version" : 3
 }

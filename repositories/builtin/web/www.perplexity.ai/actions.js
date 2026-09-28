@@ -128,6 +128,24 @@ window.ox.install(({ action: register }) => {
             phone: typeof place.phone === "string" ? place.phone : null,
         }));
     };
+    const richInt = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+    const richUrl = value => { if (typeof value !== "string" || !value) return null; try { const url = new URL(value, ORIGIN); return ["http:", "https:"].includes(url.protocol) ? url.href : null; } catch { return null; } };
+    const richKind = mime => typeof mime === "string" && mime.startsWith("image/") ? "image" : typeof mime === "string" && /(pdf|document|text|sheet|presentation)/i.test(mime) ? "document" : "file";
+    const filesFrom = (record, blocks) => {
+        const out = [];
+        const add = (value, source = "inline") => {
+            if (typeof value === "string") { const url = richUrl(value); if (url) out.push({ id: null, name: "", kind: /\.(png|jpe?g|gif|webp|svg)(?:$|\?)/i.test(url) ? "image" : "file", mimeType: null, sizeBytes: null, url, thumbnailUrl: null, width: null, height: null, pageCount: null, tokenCount: null, source, downloadable: true }); return; }
+            if (!value || typeof value !== "object") return;
+            const mime = typeof value.mime_type === "string" ? value.mime_type : typeof value.mimeType === "string" ? value.mimeType : typeof value.content_type === "string" ? value.content_type : null;
+            const url = richUrl(value.download_url) || richUrl(value.asset_url) || richUrl(value.image_url) || richUrl(value.content_url) || richUrl(value.url);
+            const thumb = richUrl(value.thumbnail_url) || richUrl(value.preview_url);
+            if (url || value.asset_id || value.file_id || value.uuid || value.filename || value.file_name) out.push({ id: String(value.asset_id || value.file_id || value.uuid || value.id || "") || null, name: String(value.filename || value.file_name || value.name || value.title || ""), kind: richKind(mime || String(value.type || "")), mimeType: mime, sizeBytes: richInt(value.size_bytes || value.size), url, thumbnailUrl: thumb, width: richInt(value.width), height: richInt(value.height), pageCount: richInt(value.page_count), tokenCount: richInt(value.token_count), source, downloadable: !!url });
+            for (const [key, child] of Object.entries(value)) if (/image|media|asset|file|attachment/i.test(key)) { if (Array.isArray(child)) child.forEach(item => add(item, source)); else if (child !== value) add(child, source); }
+        };
+        for (const block of blocks || []) for (const [key, value] of Object.entries(block || {})) if (/media_items|inline_images|inline_assets|unified_assets|canvas_mode/i.test(key)) add(value, "inline");
+        for (const item of Array.isArray(record?.attachments) ? record.attachments : []) add(item, "attachment");
+        const seen = new Set(); return out.filter(file => { const key = file.id || file.url || file.name; if (!key || seen.has(key)) return false; seen.add(key); return true; });
+    };
     const answerFrom = (record, threadId) => {
         const blocks = Array.isArray(record?.blocks) ? record.blocks : [];
         const answerBlock = blocks.find((block) => typeof block?.markdown_block?.answer === "string");
@@ -140,6 +158,7 @@ window.ox.install(({ action: register }) => {
             answer: answerBlock?.markdown_block?.answer || "",
             sources: sourcesFrom(blocks),
             places: placesFrom(blocks),
+            files: filesFrom(record, blocks),
             relatedQueries: Array.isArray(record?.related_queries)
                 ? record.related_queries.filter((value) => typeof value === "string")
                 : [],

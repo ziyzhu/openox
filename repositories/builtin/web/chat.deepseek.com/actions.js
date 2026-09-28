@@ -13,26 +13,23 @@ async function client() {
   return c.http.http;
 }
 async function identity(){
-  let stored;
-  try { stored = JSON.parse(localStorage.getItem('userToken') || 'null'); }
-  catch { throw new Error('Invalid DeepSeek sign-in storage'); }
-  if(stored === null || stored.value === null)return {signedIn:false};
-  if(typeof stored.value !== 'string' || !stored.value.length)throw new Error('Invalid DeepSeek sign-in storage');
-  let r, j;
+  const c=await client();
+  let timer;
   try {
-    r = await fetch('/api/v0/users/current', {
-      headers:{Authorization:'Bearer '+stored.value},
-      credentials:'include',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(7000)
-    });
-    j = await r.json();
-  } catch { throw new Error('DeepSeek identity check failed'); }
-  if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
-  if(r.status===200&&j?.code===40002)return {signedIn:false};
-  throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
+    const r=await Promise.race([c.get('/api/v0/users/current'),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
+    const j=r.json;
+    if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
+    if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};
+    throw new Error('Unrecognized DeepSeek identity response');
+  }finally{clearTimeout(timer);}
 }
-
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}
-function messages(){return Array.from(document.querySelectorAll('.ds-message')).slice(-100).flatMap(e=>{const a=e.querySelector('.ds-assistant-message-main-content');const user=e.classList.contains('d29f3d7d');if(!a&&!user)return [];return [{role:a?'assistant':'user',text:((a||e).innerText||(a||e).textContent||'').trim()}];}).filter(m=>m.text);}
+const richInt=v=>Number.isSafeInteger(v)&&v>=0?v:null;
+const richUrl=v=>{if(typeof v!=='string'||!v)return null;try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:null;}catch{return null;}};
+const richKind=m=>typeof m==='string'&&m.startsWith('image/')?'image':typeof m==='string'&&/(pdf|document|text|sheet|presentation)/i.test(m)?'document':'file';
+function domFiles(e,source){const out=[];for(const i of e.querySelectorAll('img[src]')){const u=richUrl(i.currentSrc||i.src);if(!u||i.getAttribute('aria-hidden')==='true'||(i.naturalWidth&&i.naturalWidth<64))continue;out.push({id:null,name:i.alt||'',kind:'image',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:richInt(i.naturalWidth),height:richInt(i.naturalHeight),pageCount:null,tokenCount:null,source,downloadable:true});}for(const x of e.querySelectorAll('a[href][download],a[href*="/file"],a[href*="download"]')){const u=richUrl(x.href);if(!u)continue;out.push({id:null,name:x.getAttribute('download')||x.textContent.trim(),kind:'file',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source,downloadable:true});}return out;}
+function fragmentFiles(m){const out=[];for(const f of (m.fragments||[])){if(!f||['REQUEST','RESPONSE','THINK'].includes(f.type))continue;const xs=[f,...(Array.isArray(f.files)?f.files:[]),...(Array.isArray(f.attachments)?f.attachments:[])];for(const x of xs){if(!x||typeof x!=='object')continue;const mime=typeof x.mime_type==='string'?x.mime_type:typeof x.mimeType==='string'?x.mimeType:null,u=richUrl(x.url)||richUrl(x.file_url)||richUrl(x.download_url)||richUrl(x.content_url);if(!u&&!x.file_id&&!x.id&&!x.filename&&!x.file_name)continue;out.push({id:String(x.file_id||x.id||x.uuid||'')||null,name:String(x.filename||x.file_name||x.name||''),kind:richKind(mime||String(x.type||f.type||'')),mimeType:mime,sizeBytes:richInt(x.size||x.size_bytes),url:u,thumbnailUrl:richUrl(x.thumbnail_url)||richUrl(x.preview_url),width:richInt(x.width),height:richInt(x.height),pageCount:richInt(x.page_count),tokenCount:richInt(x.token_count),source:m.role==='ASSISTANT'?'generated':'attachment',downloadable:!!u});}}return out;}
+function messages(){return Array.from(document.querySelectorAll('.ds-message')).slice(-100).flatMap(e=>{const a=e.querySelector('.ds-assistant-message-main-content');const user=e.classList.contains('d29f3d7d');if(!a&&!user)return [];const role=a?'assistant':'user';return [{role,text:((a||e).innerText||(a||e).textContent||'').trim(),files:domFiles(e,role==='assistant'?'generated':'attachment')}];}).filter(m=>m.text||m.files.length);}
 function guardDraft(){if(document.querySelector('textarea')?.value.trim())throw new Error('Existing draft must be handled before navigating or sending');}
 async function read(){
  await until(()=>document.querySelector('textarea'),'DeepSeek composer');
@@ -77,7 +74,7 @@ async function send(message){
   if(confirmed){const last=extra.filter(m=>m.role==='assistant').at(-1);if(last?.text){reply=last.text;break;}}
   await sleep(200);
  }
- return {status:confirmed?'accepted':'pending',submissionConfirmed:confirmed,url:chatPath()?location.href:null,reply};
+ const responseFiles=confirmed?(messages().filter(m=>m.role==='assistant').at(-1)?.files||[]):[];return {status:confirmed?'accepted':'pending',submissionConfirmed:confirmed,url:chatPath()?location.href:null,reply,responseFiles};
 }
 
 async function searchHistory({query,cursor}){
@@ -100,7 +97,7 @@ async function searchHistory({query,cursor}){
  if(close==='timeout'&&!nextCursor)throw Error('Search timed out without continuation');
  return {items,nextCursor,partial:close==='timeout'};
 }
-async function serverHistory(conversationId){const c=await client();const r=await c.get('/api/v0/chat/history_messages',{query:{chat_session_id:conversationId,cache_version:null,cache_reset_at:null},signal:AbortSignal.timeout(8000)});const j=r.json,d=j?.data?.biz_data;if(r.status!==200||j.code!==0||j.data?.biz_code!==0||d?.chat_session?.id!==conversationId||!Array.isArray(d.chat_messages)||d.cache_control!=='REPLACE')throw Error('Unexpected DeepSeek history response');const map=new Map(d.chat_messages.map(m=>[String(m.message_id),m]));let p=d.chat_session.current_message_id;const path=[],seen=new Set();while(p!=null&&path.length<100){const key=String(p),m=map.get(key);if(!m||seen.has(key))throw Error('Incomplete or cyclic message history');seen.add(key);path.unshift(m);p=m.parent_id;}return {id:conversationId,title:String(d.chat_session.title||''),url:'https://chat.deepseek.com/a/chat/s/'+encodeURIComponent(conversationId),messages:path.map(m=>{if(!['USER','ASSISTANT'].includes(m.role)||!Array.isArray(m.fragments))throw Error('Unsupported message shape');return {id:String(m.message_id),role:m.role==='USER'?'user':'assistant',text:m.fragments.filter(f=>['REQUEST','RESPONSE'].includes(f.type)&&typeof f.content==='string').map(f=>f.content).join(String.fromCharCode(10))};}),truncated:p!=null};}
+async function serverHistory(conversationId){const c=await client();const r=await c.get('/api/v0/chat/history_messages',{query:{chat_session_id:conversationId,cache_version:null,cache_reset_at:null},signal:AbortSignal.timeout(8000)});const j=r.json,d=j?.data?.biz_data;if(r.status!==200||j.code!==0||j.data?.biz_code!==0||d?.chat_session?.id!==conversationId||!Array.isArray(d.chat_messages)||d.cache_control!=='REPLACE')throw Error('Unexpected DeepSeek history response');const map=new Map(d.chat_messages.map(m=>[String(m.message_id),m]));let p=d.chat_session.current_message_id;const path=[],seen=new Set();while(p!=null&&path.length<100){const key=String(p),m=map.get(key);if(!m||seen.has(key))throw Error('Incomplete or cyclic message history');seen.add(key);path.unshift(m);p=m.parent_id;}return {id:conversationId,title:String(d.chat_session.title||''),url:'https://chat.deepseek.com/a/chat/s/'+encodeURIComponent(conversationId),messages:path.map(m=>{if(!['USER','ASSISTANT'].includes(m.role)||!Array.isArray(m.fragments))throw Error('Unsupported message shape');return {id:String(m.message_id),role:m.role==='USER'?'user':'assistant',text:m.fragments.filter(f=>['REQUEST','RESPONSE'].includes(f.type)&&typeof f.content==='string').map(f=>f.content).join(String.fromCharCode(10)),files:fragmentFiles(m)};}),truncated:p!=null};}
 
 window.ox.install(({action})=>{
  action('searchConversations',{async invoke(args){return searchHistory(args);}});

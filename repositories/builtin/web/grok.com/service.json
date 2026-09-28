@@ -1,7 +1,7 @@
 {
   "domain": "grok.com",
   "name": "Grok",
-  "description": "Search saved Grok conversations, browse recent history, read messages, and send prompts with approval.",
+  "description": "Search saved Grok conversations, browse recent history, read messages, and send prompts with approval. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://grok.com/",
   "actions": [
     {
@@ -173,11 +173,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -204,7 +211,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current conversation",
-      "description": "Read a conversation by ID directly from Grok, without waiting for the sidebar. Returns message text and complete or pending status. Up to 200 messages; branched histories are not supported.",
+      "description": "Read a conversation by ID directly from Grok, without waiting for the sidebar. Returns message text and complete or pending status. Up to 200 messages; branched histories are not supported. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -246,11 +253,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -319,11 +333,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -403,11 +424,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -1012,5 +1040,100 @@
       "requireAuth": true,
       "requireApproval": true
     }
-  ]
+  ],
+  "faviconUrl": "https://openox.ai/assets/services/grok.com/favicon.png",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  }
 }
