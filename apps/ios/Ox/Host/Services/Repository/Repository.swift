@@ -1538,6 +1538,9 @@ actor Repository {
     }
 
     private static func loadPackage(at root: URL, provenance: Descriptor.Provenance) throws -> Package {
+        guard FileManager.default.fileExists(atPath: repositoryManifestURL(at: root).path) else {
+            throw Failure(message: "The repository is missing repository.json at its root.")
+        }
         let root = try StorageMigrator.prepareRepository(at: root, local: provenance == .local)
         let packageURL = repositoryManifestURL(at: root)
         let values = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
