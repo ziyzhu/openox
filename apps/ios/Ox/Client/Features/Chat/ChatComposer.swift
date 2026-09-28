@@ -169,20 +169,6 @@ private final class ComposerTextViewReference {
     var hasMarkedText: Bool {
         textView?.markedTextRange != nil
     }
-
-    var textFrame: CGRect? {
-        guard let textView,
-              let window = textView.window,
-              let range = textView.textRange(
-                from: textView.beginningOfDocument,
-                to: textView.endOfDocument
-              ) else { return nil }
-        let frame = textView.firstRect(for: range)
-        let endFrame = textView.caretRect(for: textView.endOfDocument)
-        guard !frame.isEmpty,
-              abs(endFrame.midY - frame.midY) < (textView.font?.lineHeight ?? 22) / 2 else { return nil }
-        return textView.convert(frame, to: window)
-    }
 }
 
 struct ChatComposer: View, Equatable {
@@ -250,7 +236,7 @@ struct ChatComposer: View, Equatable {
     let onSubmitSkill: (Skill, String) -> Void
     let onPreparationIntent: (Bool) -> Void
     let onCancelEdit: () -> Void
-    let onSend: (CGRect?) -> Void
+    let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
 
@@ -911,12 +897,12 @@ struct ChatComposer: View, Equatable {
 
     private func submit() {
         if isEditingMessage {
-            onSend(nil)
+            onSend()
             return
         }
         guard let invocation = composer.slashInvocation else {
             composer.delayStopControl()
-            onSend(textViewReference.textFrame)
+            onSend()
             return
         }
         onSubmitSkill(invocation.skill, invocation.argument)

@@ -247,35 +247,6 @@ private struct ChatTranscriptProjection<Content: View>: View {
 }
 
 struct ChatPage: View {
-    private struct SendFlightMotion: GeometryEffect {
-        let source: CGPoint
-        let destination: CGPoint
-        var progress: CGFloat
-
-        var animatableData: CGFloat {
-            get { progress }
-            set { progress = newValue }
-        }
-
-        func effectValue(size: CGSize) -> ProjectionTransform {
-            let horizontal = progress + 0.8 * progress * (1 - progress)
-            let vertical = progress * progress * progress
-            return ProjectionTransform(CGAffineTransform(
-                translationX: (destination.x - source.x) * horizontal,
-                y: (destination.y - source.y) * vertical
-            ))
-        }
-    }
-
-    private struct SendFlight {
-        let id: UUID
-        let blockID: UUID
-        let text: String
-        let source: CGRect
-        var destination: CGRect?
-        var progress: CGFloat = 0
-    }
-
     let chat: Chat
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
@@ -297,7 +268,6 @@ struct ChatPage: View {
     @State private var speechInput = ChatSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
-    @State private var sendFlight: SendFlight?
     @FocusState private var composerFocused: Bool
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
@@ -494,33 +464,6 @@ struct ChatPage: View {
                 }
         }
         .background(Theme.Colors.chatSurface)
-        .overlay {
-            GeometryReader { geometry in
-                if let sendFlight {
-                    let source = sendFlight.source.offsetBy(
-                        dx: -geometry.frame(in: .global).minX,
-                        dy: -geometry.frame(in: .global).minY
-                    )
-                    let destination = (sendFlight.destination ?? sendFlight.source).offsetBy(
-                        dx: -geometry.frame(in: .global).minX,
-                        dy: -geometry.frame(in: .global).minY
-                    )
-                    Text(sendFlight.text)
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                        .fixedSize()
-                        .position(x: source.midX, y: source.midY)
-                        .modifier(SendFlightMotion(
-                            source: CGPoint(x: source.midX, y: source.midY),
-                            destination: CGPoint(x: destination.midX, y: destination.midY),
-                            progress: sendFlight.progress
-                        ))
-                        .transition(.opacity)
-                }
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
     }
 
     private var page: some View {
@@ -665,7 +608,6 @@ struct ChatPage: View {
             if !visible { composerFocused = false }
         }
         .onChange(of: chat.id) { _, _ in
-            sendFlight = nil
             speechInput.cancel(reason: "chatChanged")
             cancelEditing(reason: "chatChanged", keepFocus: false)
         }
@@ -1291,10 +1233,7 @@ struct ChatPage: View {
             artifactControls: artifactControls,
             onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
             onOpenSkill: { openSkill($0) },
-            onOpenLink: { openLink($0) },
-            onUserTextFrameChange: { blockID, frame in
-                beginSendFlight(to: frame, blockID: blockID)
-            }
+            onOpenLink: { openLink($0) }
         )
     }
 
@@ -1317,8 +1256,7 @@ struct ChatPage: View {
         identified: Bool = true
     ) -> some View {
         let row = chatBlockHost(block)
-            .opacity(sendFlight?.blockID == block.id ? 0 : 1)
-            .padding(.top, block.id == chat.transcript.first?.id ? 0 : block.spacingBefore)
+            .padding(.top, block.spacingBefore)
 
         if identified {
             row.id(block.id)
@@ -1692,7 +1630,7 @@ struct ChatPage: View {
             onSubmitSkill: submitSkill,
             onPreparationIntent: chat.setModelPreparationIntent,
             onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
-            onSend: { send(sourceFrame: $0) },
+            onSend: { send() },
             onStop: {
                 Log.ui.info("ChatPage.stop chat=\(chat.id)")
                 chat.stopCurrentTurn()
@@ -1808,52 +1746,14 @@ struct ChatPage: View {
         toast = Toast(message: L10n.string("Message copied", comment: "Toast shown after the user copies a chat message to the clipboard."))
     }
 
-    private func send(sourceFrame: CGRect? = nil) {
+    private func send() {
         if let editedBlockID {
             commitEdit(blockID: editedBlockID)
             return
         }
         prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
-        let receipt = enqueue(message)
-        guard !reduceMotion,
-              message.attachments.isEmpty,
-              !message.text.contains("\n"),
-              let sourceFrame,
-              !sourceFrame.isEmpty,
-              case .turn(let blockID, _) = chat.anchor(forSubmissionID: receipt.id) else { return }
-        sendFlight = SendFlight(
-            id: message.id,
-            blockID: blockID,
-            text: message.text,
-            source: sourceFrame
-        )
-        Log.ui.info("ChatUX.sendFlight chat=\(chat.id) phase=waiting block=\(blockID)")
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1))
-            guard sendFlight?.id == message.id, sendFlight?.destination == nil else { return }
-            Log.ui.warning("ChatUX.sendFlight chat=\(chat.id) phase=fallback reason=missingDestination")
-            sendFlight = nil
-        }
-    }
-
-    private func beginSendFlight(to destination: CGRect, blockID: UUID) {
-        guard var flight = sendFlight,
-              flight.blockID == blockID,
-              flight.destination == nil,
-              !destination.isEmpty else { return }
-        flight.destination = destination
-        flight.progress = 1
-        Log.ui.info("ChatUX.sendFlight chat=\(chat.id) phase=moving block=\(blockID)")
-        withAnimation(.spring(duration: 0.4, bounce: 0), completionCriteria: .logicallyComplete) {
-            sendFlight = flight
-        } completion: {
-            guard sendFlight?.id == flight.id else { return }
-            withAnimation(Theme.Animation.quick) {
-                sendFlight = nil
-            }
-            Log.ui.info("ChatUX.sendFlight chat=\(chat.id) phase=settled block=\(blockID)")
-        }
+        enqueue(message)
     }
 
     private func beginSpeech(accessible: Bool) {
@@ -1887,8 +1787,7 @@ struct ChatPage: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    @discardableResult
-    private func enqueue(_ message: ChatComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) -> Chat.SubmissionReceipt {
+    private func enqueue(_ message: ChatComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) {
         let receipt = chat.enqueue(
             message.text,
             attachments: message.attachments,
@@ -1896,7 +1795,6 @@ struct ChatPage: View {
         )
         latestSubmissionID = receipt.id
         Log.ui.info("ChatPage.send chat=\(chat.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
-        return receipt
     }
 
     private func submitSkill(_ skill: Skill, argument: String) {

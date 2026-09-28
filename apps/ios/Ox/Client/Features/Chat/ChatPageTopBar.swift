@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct ChatPageTopBar: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let chat: Chat
     let blockCount: Int
     let hasArtifacts: Bool
@@ -19,23 +18,16 @@ struct ChatPageTopBar: View {
             SidebarMenuButton(action: onShowSidebar)
             if showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
                 modelPill(chat: chat)
-                    .transition(.opacity)
             }
             Spacer()
             if chat.canChangeRetention {
                 temporaryModeButton
-                    .transition(.opacity)
             } else {
                 overflowMenu(chat: chat)
-                    .transition(.opacity)
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.bottom, Theme.Spacing.xs)
-        .animation(
-            reduceMotion ? nil : .spring(duration: 0.3, bounce: 0),
-            value: blockCount == 0
-        )
     }
 
     private var temporaryModeButton: some View {
