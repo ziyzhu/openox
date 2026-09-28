@@ -260,7 +260,7 @@ final class ProviderRegistry {
         for service in modelServices {
             let id = WebServiceModelProvider.providerID(domain: service.domain)
             let models = discoveredServiceModels[id] ?? [WebServiceModelProvider.model(id: "website-default", name: "Default")]
-            resolved.append(WebServiceModelProvider(id: id, domain: service.domain, displayName: service.name,
+            resolved.append(WebServiceModelProvider(id: id, domain: service.domain, displayName: "\(service.name) Web",
                                                     website: service.baseURL, models: models,
                                                     regions: WebServiceModelProvider.regions(domain: service.domain)))
         }
