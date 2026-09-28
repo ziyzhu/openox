@@ -18,3 +18,7 @@ The provider picker uses the official GitHub Copilot extension mark, hosted on O
 - OAuth: [GitHubCopilotOAuth.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotOAuth.swift)
 - Account state: [GitHubCopilotSubscriptionAccount.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/GitHubCopilot/GitHubCopilotSubscriptionAccount.swift)
 - Curated candidate models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+
+## Implementation comparison
+
+- [Pi's GitHub Copilot OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/github-copilot.ts) is a reference for reviewing Ox's device sign-in.

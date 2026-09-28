@@ -1,6 +1,21 @@
 import Foundation
 
 nonisolated enum CuratedProviderModels {
+    static let kimiCoding = [
+        ProviderModel(id: "kimi-for-coding", displayName: "Kimi For Coding", maxTokens: 16_384,
+                      maxContext: 1_048_576, supportsTools: true, reasoning: true,
+                      modalities: ProviderModelModalities(input: [.text, .image], output: [.text])),
+        ProviderModel(id: "k3", displayName: "Kimi K3", maxTokens: 16_384,
+                      maxContext: 1_048_576, supportsTools: true, reasoning: true,
+                      modalities: ProviderModelModalities(input: [.text, .image], output: [.text])),
+        ProviderModel(id: "k3-256k", displayName: "Kimi K3 256K", maxTokens: 16_384,
+                      maxContext: 262_144, supportsTools: true, reasoning: true,
+                      modalities: ProviderModelModalities(input: [.text, .image], output: [.text])),
+        ProviderModel(id: "kimi-for-coding-highspeed", displayName: "Kimi For Coding HighSpeed", maxTokens: 16_384,
+                      maxContext: 262_144, supportsTools: true, reasoning: true,
+                      modalities: ProviderModelModalities(input: [.text, .image], output: [.text])),
+    ]
+
     static let arkGlobal = [
         seedModel(
             id: "dola-seed-2-1-turbo-260628",

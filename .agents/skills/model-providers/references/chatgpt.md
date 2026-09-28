@@ -11,9 +11,15 @@
 
 Ox presents ChatGPT in Global. Treat it as a subscription-backed provider identity separate from the OpenAI API provider, even though both reuse the OpenAI Responses transport.
 
+The current Ox flow uses the Codex CLI OAuth client identity. Resolve this against the project requirement for an OpenOx-registered app before changing or extending the sign-in flow.
+
 ## Runtime sources
 
 - Provider composition: [ChatGPTProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTProvider.swift)
 - OAuth: [ChatGPTOAuth.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTOAuth.swift)
 - Account state: [ChatGPTSubscriptionAccount.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/ChatGPT/ChatGPTSubscriptionAccount.swift)
 - Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
+
+## Implementation comparison
+
+- [Pi's OpenAI Codex OAuth flow](https://github.com/earendil-works/pi/blob/main/packages/ai/src/auth/oauth/openai-codex.ts) is a reference for reviewing Ox's ChatGPT sign-in.

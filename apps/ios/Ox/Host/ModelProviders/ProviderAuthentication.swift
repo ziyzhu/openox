@@ -141,10 +141,12 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
               let code = OAuthSupport.queryValue("code", in: callback), !code.isEmpty else {
             throw RuntimeError.bridge("OAuth returned an invalid callback")
         }
-        let response = try await post(auth.tokenURL!, fields: [
+        var fields = [
             "grant_type": "authorization_code", "code": code, "client_id": auth.clientID!,
             "redirect_uri": auth.redirectURI!, "code_verifier": pkce.verifier,
-        ])
+        ]
+        if definition.id == "claude-subscription" { fields["state"] = state }
+        let response = try await post(auth.tokenURL!, fields: fields)
         return try decodeTokens(response)
     }
 
@@ -157,12 +159,13 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
     }
 
     private func requestDeviceGrant() async throws -> DeviceGrant {
-        let response = try await post(definition.auth.deviceAuthorizationURL!, fields: [
-            "client_id": definition.auth.clientID!, "scope": (definition.auth.scopes ?? []).joined(separator: " "),
-        ])
+        var fields = ["client_id": definition.auth.clientID!]
+        if let scopes = definition.auth.scopes, !scopes.isEmpty { fields["scope"] = scopes.joined(separator: " ") }
+        let response = try await post(definition.auth.deviceAuthorizationURL!, fields: fields)
         guard let code = response["device_code"]?.stringValue, !code.isEmpty,
               let userCode = response["user_code"]?.stringValue, !userCode.isEmpty,
-              let uri = response["verification_uri"]?.stringValue, let url = URL(string: uri),
+              let uri = response["verification_uri"]?.stringValue,
+              let url = URL(string: uri),
               let expires = response["expires_in"]?.doubleValue, expires > 0 else {
             throw RuntimeError.bridge("OAuth returned an invalid device authorization")
         }
@@ -218,7 +221,7 @@ nonisolated final class ProviderOAuthAccount: SubscriptionAccount, @unchecked Se
 
     private func decodeTokens(_ response: [String: JSONValue], previous: Tokens? = nil) throws -> Tokens {
         guard let access = response["access_token"]?.stringValue, !access.isEmpty,
-              response["token_type"]?.stringValue?.lowercased() == "bearer" else {
+              (response["token_type"]?.stringValue?.lowercased() ?? "bearer") == "bearer" else {
             throw RuntimeError.bridge("OAuth returned an invalid bearer-token response")
         }
         let expires = response["expires_in"]?.doubleValue

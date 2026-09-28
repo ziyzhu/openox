@@ -8,12 +8,16 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
     let regions: Set<LLMRegion>
     let iconURL: URL?
     let website: URL?
+    let usesAPIKey: Bool
+    let acceptsAPIKey: Bool
+    let subscriptionAccount: (any SubscriptionAccount)?
     let credentialKind: LLMCredentialKind
     let credentialID: String
     let adaptiveThinkingModelIDs: Set<String>
     let requestAuthentication: ProviderRequestAuthentication?
     let version: String
     let beta: [String]
+    let systemIdentity: String?
     let extraBody: [String: JSONValue]
     let reasoningPolicy: LLMReasoningPolicy = .low
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .anthropicMessages }
@@ -26,12 +30,16 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         regions: Set<LLMRegion> = [.global],
         iconURL: URL? = nil,
         website: URL? = nil,
+        usesAPIKey: Bool = true,
+        acceptsAPIKey: Bool? = nil,
+        subscriptionAccount: (any SubscriptionAccount)? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
         credentialID: String? = nil,
         adaptiveThinkingModelIDs: Set<String> = [],
         requestAuthentication: ProviderRequestAuthentication? = nil,
         version: String = "2023-06-01",
         beta: [String] = [],
+        systemIdentity: String? = nil,
         extraBody: [String: JSONValue] = [:]
     ) {
         self.id = id
@@ -41,12 +49,16 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         self.regions = regions
         self.iconURL = iconURL
         self.website = website
+        self.usesAPIKey = usesAPIKey
+        self.acceptsAPIKey = acceptsAPIKey ?? usesAPIKey
+        self.subscriptionAccount = subscriptionAccount
         self.credentialKind = credentialKind
         self.credentialID = credentialID ?? id
         self.adaptiveThinkingModelIDs = adaptiveThinkingModelIDs
         self.requestAuthentication = requestAuthentication
         self.version = version
         self.beta = beta
+        self.systemIdentity = systemIdentity
         self.extraBody = extraBody
     }
 
@@ -77,13 +89,6 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         options: StreamOptions,
         continuation: AsyncThrowingStream<AssistantEvent, Error>.Continuation
     ) async throws {
-        let headers: [String: String]
-        if let requestAuthentication { headers = try await requestAuthentication.headers() }
-        else {
-            guard let key = Credentials.key(for: credentialID) else { throw OpenAIAuthError.missingAPIKey(displayName) }
-            headers = ["x-api-key": key]
-        }
-        LogContext.latency?.mark(.authReady)
         let body = try buildBody(
             model: model,
             systemPrompt: systemPrompt,
@@ -93,30 +98,46 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         )
         LogContext.latency?.mark(.requestBodyReady)
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue(version, forHTTPHeaderField: "anthropic-version")
-        if !beta.isEmpty { request.setValue(beta.joined(separator: ","), forHTTPHeaderField: "anthropic-beta") }
-        for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        request.httpBody = body
-
         let label = "\(displayName).messages"
         let toolNames = tools.map(\.name).joined(separator: ",")
         Log.network.info("\(label) POST \(LogPrivacy.url(endpoint.absoluteString)) model=\(model.id) msgs=\(messages.count) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") bodyBytes=\(body.count)")
         Log.network.info("\(label) wire=[\(messages.wireSignature)]")
 
-        let response = try await StreamingHTTP.open(request, label: label) {
-            AnthropicMessagesError(message: "No HTTP response from \(displayName)")
+        let maxAttempts = requestAuthentication?.canRefresh == true ? 2 : 1
+        for attempt in 1...maxAttempts {
+            let headers: [String: String]
+            if let requestAuthentication { headers = try await requestAuthentication.headers(forceRefresh: attempt > 1) }
+            else {
+                guard let key = Credentials.key(for: credentialID) else { throw OpenAIAuthError.missingAPIKey(displayName) }
+                headers = ["x-api-key": key]
+            }
+            LogContext.latency?.mark(.authReady)
+
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.setValue(version, forHTTPHeaderField: "anthropic-version")
+            if !beta.isEmpty { request.setValue(beta.joined(separator: ","), forHTTPHeaderField: "anthropic-beta") }
+            for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+            request.httpBody = body
+
+            let response = try await StreamingHTTP.open(request, label: label) {
+                AnthropicMessagesError(message: "No HTTP response from \(displayName)")
+            }
+            if response.statusCode == 401, attempt < maxAttempts {
+                Log.network.warning("\(label) 401; refreshing token and retrying")
+                continue
+            }
+            try await response.requireSuccess { _, text in
+                AnthropicMessagesError(
+                    message: "\(displayName) HTTP \(response.statusCode): \(text)",
+                    failureKind: llmFailureKind(statusCode: response.statusCode, message: text)
+                )
+            }
+            try await consume(response.bytes, model: model, label: label, continuation: continuation)
+            return
         }
-        try await response.requireSuccess { _, text in
-            AnthropicMessagesError(
-                message: "\(displayName) HTTP \(response.statusCode): \(text)",
-                failureKind: llmFailureKind(statusCode: response.statusCode, message: text)
-            )
-        }
-        try await consume(response.bytes, model: model, label: label, continuation: continuation)
     }
 
     private func consume(
@@ -280,12 +301,15 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
             "messages": wireMessages,
             "stream": true,
         ]
-        if let systemPrompt, !systemPrompt.isEmpty {
-            var system: [String: Any] = ["type": "text", "text": systemPrompt]
-            if options.promptCachePolicy == .standard {
-                system["cache_control"] = ["type": "ephemeral"]
+        let systemPrompts = [systemIdentity, systemPrompt].compactMap { $0 }.filter { !$0.isEmpty }
+        if !systemPrompts.isEmpty {
+            body["system"] = systemPrompts.map { prompt -> [String: Any] in
+                var system: [String: Any] = ["type": "text", "text": prompt]
+                if options.promptCachePolicy == .standard {
+                    system["cache_control"] = ["type": "ephemeral"]
+                }
+                return system
             }
-            body["system"] = [system]
         }
         if !tools.isEmpty {
             body["tools"] = tools.map {

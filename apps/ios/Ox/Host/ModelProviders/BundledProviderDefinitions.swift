@@ -26,6 +26,20 @@ nonisolated extension BuiltInProviders {
         entries.append(entry(openai, url: (openai.auth as! OpenAIResponsesAPIKeyAuth).baseURL, api: .openAIResponses,
                              auth: .init(kind: .bearer), options: .init(reasoningEffort: openai.reasoningEffort.rawValue)))
         entries.append(messages(AnthropicProvider.client(models: modelLookup("anthropic", .global))))
+        let claude = AnthropicProvider.subscriptionClient(models: modelLookup("anthropic", .global))
+        entries.append(entry(claude, url: claude.endpoint.deletingLastPathComponent(), api: .anthropicMessages,
+                             auth: .init(kind: .oauth, flow: .authorizationCode,
+                                         clientID: AnthropicProvider.subscriptionClientID,
+                                         scopes: AnthropicProvider.subscriptionScopes,
+                                         tokenURL: URL(string: "https://platform.claude.com/v1/oauth/token"),
+                                         requestEncoding: .json,
+                                         authorizeURL: URL(string: "https://claude.ai/oauth/authorize"),
+                                         redirectURI: AnthropicProvider.subscriptionRedirectURI,
+                                         authorizeParams: ["code": "true"]),
+                             options: .init(headers: ["User-Agent": "claude-cli/2.1.280", "x-app": "cli",
+                                                      "anthropic-dangerous-direct-browser-access": "true"],
+                                            beta: ["claude-code-20250219", "oauth-2025-04-20"]),
+                             models: claude.models.map { .init($0, options: claude.adaptiveThinkingModelIDs.contains($0.wireID) ? .init(adaptiveThinking: true) : nil) }))
         let bedrock = AmazonBedrockProvider(models: modelLookup("amazon-bedrock", .global))
         var bedrockResponses = entry(bedrock.responses, url: (bedrock.responses.auth as! OpenAIResponsesAPIKeyAuth).baseURL,
                                     api: .openAIResponses, auth: .init(kind: .bearer))
@@ -42,6 +56,12 @@ nonisolated extension BuiltInProviders {
         bedrockMessages.legacyCredentialID = bedrock.id
         entries.append(bedrockMessages)
         entries.append(custom(XAIProvider.client(models: modelLookup("xai", .global)), url: XAIOAuth.responsesBaseURL, api: .openAIResponses))
+        let kimiCoding = KimiProvider.codingClient(models: CuratedProviderModels.kimiCoding)
+        entries.append(entry(kimiCoding, url: KimiProvider.codingBaseURL, api: .anthropicMessages,
+                             auth: .init(kind: .oauth, flow: .deviceCode, clientID: KimiProvider.codingClientID,
+                                         tokenURL: URL(string: "https://auth.kimi.com/api/oauth/token"),
+                                         deviceAuthorizationURL: URL(string: "https://auth.kimi.com/api/oauth/device_authorization")),
+                             options: .init(headers: ["User-Agent": "Ox/iOS"])))
         entries += profiles(trailingProfiles, modelLookup: modelLookup)
         return entries
     }

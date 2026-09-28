@@ -52,8 +52,8 @@ private final class DeviceAuthorizationSession: NSObject, SFSafariViewController
             return
         }
         let prompt = UIAlertController(
-            title: "Authorize with GitHub",
-            message: "Enter this code on GitHub:\n\n\(userCode)\n\nContinue will copy the code and open GitHub.",
+            title: "Authorize account",
+            message: "Enter this code on the authorization page:\n\n\(userCode)\n\nContinue will copy the code and open the page.",
             preferredStyle: .alert
         )
         prompt.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
