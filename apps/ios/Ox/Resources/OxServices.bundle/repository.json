@@ -1,7 +1,7 @@
 {
   "version": 3,
   "name": "Built-in",
-  "contentHash": "6e422528736933f9d1798ddd86f1c01d6251f1084c5fcf71bc822188a56fb1aa",
+  "contentHash": "85c1dafb584a2c0fcbc357d15b7553ebc6fc997167294936e156c3a62745f96a",
   "services": [
     "ios:bluetooth",
     "ios:calendar",
@@ -55,12 +55,10 @@
     "web:www.flightaware.com",
     "web:www.google.com",
     "web:www.kimi.com",
-    "web:www.namecheap.com",
     "web:www.nature.com",
     "web:www.ncbi.nlm.nih.gov",
     "web:www.nejm.org",
     "web:www.perplexity.ai",
-    "web:www.qbitai.com",
     "web:www.uscis.gov",
     "web:www.usta.com",
     "web:x.com",
