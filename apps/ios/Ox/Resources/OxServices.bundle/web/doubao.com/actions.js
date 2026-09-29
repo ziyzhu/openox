@@ -1,33 +1,3 @@
-function scheduleHiddenPageFrames() {
-  if (typeof window.requestAnimationFrame !== 'function') return;
-  const request = window.requestAnimationFrame.bind(window);
-  const cancel = window.cancelAnimationFrame.bind(window);
-  const pending = new Map();
-  let next = 0;
-  window.requestAnimationFrame = callback => {
-    const id = ++next;
-    const state = {native: null, timer: null};
-    const finish = time => {
-      if (!pending.delete(id)) return;
-      cancel(state.native);
-      clearTimeout(state.timer);
-      callback(time);
-    };
-    pending.set(id, state);
-    state.native = request(finish);
-    if (document.hidden) state.timer = setTimeout(() => finish(performance.now()), 100);
-    return id;
-  };
-  window.cancelAnimationFrame = id => {
-    const state = pending.get(id);
-    if (!state) return;
-    pending.delete(id);
-    cancel(state.native);
-    clearTimeout(state.timer);
-  };
-}
-scheduleHiddenPageFrames();
-
 let lastSubmissionEvents=[];
 const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
 const visible = e => !!e && e.getClientRects().length > 0;
@@ -38,7 +8,10 @@ const draftText = () => editor()?.editor?.view?.state?.doc?.textContent ?? edito
 async function wait(check, ms=7000, label='interface') { const end=Date.now()+ms; do { const v=check();if(v)return v;await sleep(120); }while(Date.now()<end);throw new Error('Doubao '+label+' not ready; no automatic retry.'); }
 const currentRef = () => location.pathname.match(/^\/chat\/(\d+)\/?$/)?.[1] || '';
 const blankRoute = () => /^\/chat\/?$/.test(location.pathname);
-function messages(){return Array.from(document.querySelectorAll(sel('send_message')+','+sel('receive_message'))).filter(visible).map(e=>({role:e.getAttribute('data-testid')==='send_message'?'user':'assistant',text:Array.from(e.querySelectorAll(sel('message_text_content'))).map(x=>(x.innerText||x.textContent||'').trim()).join('\n\n')})).filter(x=>x.text);}
+const richInt=v=>Number.isSafeInteger(v)&&v>=0?v:null;
+const richUrl=v=>{if(typeof v!=='string'||!v)return null;try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:null;}catch{return null;}};
+function richFiles(e,source){const out=[];for(const img of e.querySelectorAll('img[src]')){const u=richUrl(img.currentSrc||img.src);if(!u||img.getAttribute('aria-hidden')==='true'||(img.naturalWidth&&img.naturalWidth<64))continue;out.push({id:null,name:img.alt||'',kind:'image',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:richInt(img.naturalWidth),height:richInt(img.naturalHeight),pageCount:null,tokenCount:null,source,downloadable:true});}for(const x of e.querySelectorAll('a[href][download],a[href*="download"],a[href*="/file"],a[href$=".pdf"],a[href$=".docx"],a[href$=".csv"],a[href$=".zip"]')){const u=richUrl(x.href);if(!u)continue;out.push({id:null,name:x.getAttribute('download')||(x.textContent||'').trim(),kind:/\.pdf(?:$|\?)/i.test(u)?'document':'file',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source,downloadable:true});}const seen=new Set;return out.filter(f=>{if(seen.has(f.url))return false;seen.add(f.url);return true;});}
+function messages(){return Array.from(document.querySelectorAll(sel('send_message')+','+sel('receive_message'))).filter(visible).map(e=>{const role=e.getAttribute('data-testid')==='send_message'?'user':'assistant';return {role,text:Array.from(e.querySelectorAll(sel('message_text_content'))).map(x=>(x.innerText||x.textContent||'').trim()).join('\n\n'),files:richFiles(e,role==='assistant'?'generated':'attachment')};}).filter(x=>x.text||x.files.length);}
 function recent(){return Array.from(document.querySelectorAll(sel('conversation-list-v2-item'))).map(e=>({element:e,title:norm(e.children[1]?.innerText||e.children[1]?.textContent),conversationRef:e.getAttribute('data-conversation-id')||''})).filter(x=>x.title&&x.conversationRef);}
 async function ready(){await wait(()=>editor(),6000,'editor');if(!blankRoute()&&!currentRef())throw Error('Unsupported Doubao route.');if(currentRef())await wait(()=>messages().length>0,6000,'conversation messages');}
 function assertEmpty(){const e=editor();if(!e)throw Error('Composer unavailable.');if(norm(draftText()))throw Error('Existing draft: refusing to overwrite or discard it.');}
@@ -53,13 +26,15 @@ async function signInState(){
   if(scripts.length!==1)throw Error('Session response schema changed.');
   const b=JSON.parse(scripts[0].textContent.slice(prefix.length).trim().replace(/;$/,''));
   const c=b?.loaderData?.chat_layout?.chat_layout;const a=c?.accountInfo;const s=c?.userSetting;
+  // Observed fresh server responses: anonymous account error/id=0 and setting code 671000007;
+  // signed in: account success, nonvisitor string ID, setting code 0 and is_login=true.
   if(a?.message==='error'&&a?.data?.user_id===0&&String(s?.code)==='671000007')return {signedIn:false};
   if(a?.message==='success'&&a?.data?.is_visitor_account===false&&typeof a?.data?.user_id_str==='string'&&a.data.user_id_str.length>0&&s?.code===0&&s?.data?.is_login===true)return {signedIn:true};
   throw Error('Unclassified Doubao session response.');
  }finally{clearTimeout(timer);}
 }
 async function open(title){await ready();assertEmpty();const matches=recent().filter(x=>x.title===norm(title));if(matches.length!==1)throw Error(matches.length?'Ambiguous title in loaded sidebar.':'Title not found in loaded sidebar; older unloaded chats unsupported.');const target=matches[0];if(currentRef()===target.conversationRef)return {url:location.href,conversationRef:currentRef()};const old=document.querySelector(sel('message-list'));const before=JSON.stringify(messages());target.element.click();await wait(()=>currentRef()===target.conversationRef&&editor()&&messages().length>0&&document.querySelector(sel('message-list'))&&(document.querySelector(sel('message-list'))!==old||JSON.stringify(messages())!==before),10000,'target conversation');return {url:location.href,conversationRef:currentRef()};}
-async function send(message,ref,beforeSubmit=()=>{}){
+async function send(message,ref){
  if(!norm(message))throw Error('Message must contain text.');await ready();assertEmpty();
  if(ref!==null&&(!ref||currentRef()!==ref))throw Error('Stale conversationRef; reopen or read current chat first.');
  if(ref===null&&!blankRoute()){const previousEditor=editor();const previousView=previousEditor?.editor?.view;const button=document.querySelector(sel('create_conversation_button')+' > div');if(!button)throw Error('New-chat control unavailable.');button.click();await wait(()=>blankRoute()&&editor()&&messages().length===0&&(editor()!==previousEditor||editor()?.editor?.view!==previousView),6000,'new chat editor');assertEmpty();}
@@ -72,18 +47,17 @@ async function send(message,ref,beforeSubmit=()=>{}){
  if(location.pathname!==route)throw Error('Conversation changed before submission; draft not sent.');
  lastSubmissionEvents=[];const originalFetch=window.fetch;const originalOpen=XMLHttpRequest.prototype.open;const originalSend=XMLHttpRequest.prototype.send;const tracked=new WeakMap();const add=(method,url,status)=>{try{const u=new URL(url,location.href);if(u.origin===location.origin&&lastSubmissionEvents.length<30)lastSubmissionEvents.push({method:String(method),path:u.pathname.replace(/\d{8,}/g,'<id>'),status:Number(status)||0});}catch{}};window.fetch=function(...args){const request=args[0];const method=args[1]?.method||request?.method||'GET';const url=typeof request==='string'?request:request?.url;return originalFetch.apply(this,args).then(r=>{add(method,url,r.status);return r;});};XMLHttpRequest.prototype.open=function(method,url,...rest){tracked.set(this,{method,url});return originalOpen.call(this,method,url,...rest);};XMLHttpRequest.prototype.send=function(...args){const t=tracked.get(this);if(t)this.addEventListener('loadend',()=>add(t.method,t.url,this.status),{once:true});return originalSend.apply(this,args);};
  try{
- beforeSubmit();
- button.click();
- const deadline=Date.now()+12000;let confirmed=false;let response='';let last='';let stableSince=Date.now();
+ button.click(); // Exactly once. All following work is read-only.
+ const deadline=Date.now()+12000;let confirmed=false;let response='';let responseFiles=[];let last='';let stableSince=Date.now();
  while(Date.now()<deadline){
   const now=messages();const users=now.filter(x=>x.role==='user');const oldUsers=before.filter(x=>x.role==='user');
   confirmed=users.length>oldUsers.length&&norm(users[users.length-1]?.text)===norm(message);
-  if(confirmed){const lastUser=now.map(x=>x.role).lastIndexOf('user');response=now.slice(lastUser+1).filter(x=>x.role==='assistant').map(x=>x.text).join('\n\n');}
+  responseFiles=[];if(confirmed){const lastUser=now.map(x=>x.role).lastIndexOf('user');const assistants=now.slice(lastUser+1).filter(x=>x.role==='assistant');response=assistants.map(x=>x.text).filter(Boolean).join('\n\n');responseFiles=assistants.flatMap(x=>x.files);}
   if(response!==last){last=response;stableSince=Date.now();}
-  if(confirmed&&response&&Date.now()-stableSince>1200)break;
+  if(confirmed&&(response||responseFiles.length)&&Date.now()-stableSince>1200)break;
   await sleep(180);
  }
- return {url:location.href,conversationRef:currentRef(),response,status:response?'reply_observed':'pending',submissionConfirmed:confirmed};
+ return {url:location.href,conversationRef:currentRef(),response:response||null,responseFiles,status:response||responseFiles.length?'reply_observed':'pending',submissionConfirmed:confirmed};
  }finally{window.fetch=originalFetch;XMLHttpRequest.prototype.open=originalOpen;XMLHttpRequest.prototype.send=originalSend;}
 }
 
@@ -98,7 +72,7 @@ async function searchChats({query}){
 }
 
 window.ox.install(({action})=>{
- registerModelActions(action);
+registerModelActions(action);
  action('searchConversations',{invoke:searchChats});
  action('getSignInUrl',{async invoke(){return {url:'https://www.doubao.com/chat/'};}});
  action('getSignInState',{async invoke(){return await signInState();}});
@@ -108,154 +82,6 @@ window.ox.install(({action})=>{
  action('chat',{async invoke({message}){return await send(message,null);}});
  action('continueChat',{async invoke({conversationRef,message}){return await send(message,conversationRef);}});
 });
-
-function createModelParser(prompt, onProgress) {
-  let pending = '', size = 0, chatId = '', questionId = '', messageId = '';
-  let userConfirmed = false, messageFinished = false, answerFinished = false, streamFinished = false, finished = false;
-  const blocks = new Map();
-  let deltaTarget = null, published = '';
-  const text = () => Array.from(blocks.values()).map(block => block.text).filter(Boolean).join('\n\n');
-  const addBlocks = entries => {
-    for (const block of entries || []) {
-      const type = block.block_type;
-      if (type !== 10000 && type !== 10008 && type !== 10055) throw Error('Unsupported Doubao answer block_type ' + String(type));
-      if (!block.block_id || (block.patch_type !== undefined && block.patch_type !== 1)) throw Error('Unsupported Doubao text patch for block_type ' + String(type));
-      const value = blocks.get(block.block_id) || {text: '', finished: false, type};
-      if (value.type !== type) throw Error('Doubao answer block type changed');
-      let part = '';
-      if (type === 10000) {
-        part = block.content?.text_block?.text;
-        if (part !== undefined && typeof part !== 'string') throw Error('Invalid Doubao text block');
-
-      } else if (type === 10008) {
-        // Doubao's code block stores its original fenced code verbatim.
-        // The actual tool stdout is a separate website artifact, not an Ox Action result.
-        const code = block.content?.code_block;
-        if (!code || typeof code.code !== 'string' || (code.text !== undefined && typeof code.text !== 'string')) throw Error('Invalid Doubao code block');
-        part = (code.text || '') + code.code;
-        if (part) {
-          // Initial notification may contain the whole code; subsequent patches
-          // may carry either cumulative code or only a new suffix. Never guess
-          // whether a repeated prefix is a replacement or a legitimate suffix.
-          if (!value.text) value.text = part;
-          else if (part.startsWith(value.text)) value.text = part;
-          else if (!value.text.endsWith(part)) value.text += part;
-        }
-        part = '';
-
-      } else {
-        if (!block.content?.memory_tag_block) throw Error('Invalid Doubao memory tag block');
-
-      }
-      value.text += part || '';
-      value.finished = block.is_finish === true;
-      blocks.set(block.block_id, value);
-    }
-  };
-  function frame(frame) {
-    const lines = frame.split('\n');
-    const event = lines.find(line => line.startsWith('event:'))?.slice(6).trim();
-    const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
-    if (!event || !data) return;
-    let value;
-    try { value = JSON.parse(data); }
-    catch (error) {
-      if (event === 'gateway-error') throw Error('Doubao gateway-error: ' + data.slice(0, 500));
-      throw error;
-    }
-    if (/error/i.test(event)) {
-      const code = value?.error_code ?? value?.code ?? value?.error?.code;
-      const detail = value?.error_msg ?? value?.message ?? value?.error?.message ?? value?.msg ?? (typeof value === 'string' ? value : '');
-      const safe = String(detail || '').slice(0, 500);
-      throw Error('Doubao ' + event + (code !== undefined ? ' code ' + String(code).slice(0, 80) : '') + (safe ? ': ' + safe : ' (no message)'));
-    }
-    if (event === 'SSE_ACK') {
-      if (chatId || value.query_list?.length !== 1) throw Error('Ambiguous Doubao submission');
-      chatId = value.ack_client_meta?.conversation_id;
-      questionId = value.query_list[0].question_id;
-      if (!/^\d+$/.test(chatId || '') || !/^\d+$/.test(questionId || '')) throw Error('Invalid Doubao submission identity');
-    }
-    if (event === 'FULL_MSG_NOTIFY' && value.message?.user_type === 1) {
-      const message = value.message;
-      if (message.conversation_id !== chatId || message.message_id !== questionId) throw Error('Doubao submitted conversation changed');
-      userConfirmed = message.content_block?.map(block => block.content?.text_block?.text || '').join('\n') === prompt;
-    }
-    if (event === 'STREAM_MSG_NOTIFY') {
-      const meta = value.meta;
-      if (!userConfirmed || messageId || meta?.user_type !== 2 || meta.conversation_id !== chatId || meta.bot_reply_message_id !== questionId || !/^\d+$/.test(meta.message_id || '')) throw Error('Doubao answer identity changed');
-      messageId = meta.message_id;
-      addBlocks(value.content?.content_block);
-    }
-    if (event === 'STREAM_CHUNK') {
-      if (!messageId || value.message_id !== messageId) throw Error('Doubao answer identity changed');
-      const patches = value.patch_op || [];
-      if (patches.length === 1 && patches[0].patch_object === 1 && patches[0].patch_value?.content_block?.length === 1) {
-        const b = patches[0].patch_value.content_block[0];
-        deltaTarget = {messageId: value.message_id, blockId: b.block_id, type: b.block_type};
-      }
-      for (const patch of patches) {
-        if (patch.patch_object === 1) addBlocks(patch.patch_value?.content_block);
-        if (patch.patch_object === 50 && patch.patch_value?.ext?.is_finish === '1') finished = true;
-      }
-    }
-    if (event === 'CHUNK_DELTA') {
-      if (!deltaTarget || deltaTarget.messageId !== messageId || !deltaTarget.blockId || ![10000, 10008, 10055].includes(deltaTarget.type)) throw Error('Invalid Doubao delta target');
-      const target = blocks.get(deltaTarget.blockId);
-      if (!target || target.type !== deltaTarget.type || target.finished) throw Error('Invalid Doubao delta target state');
-      if (deltaTarget.type === 10000) {
-        const part = value?.text_block?.text ?? value?.text;
-        if (typeof part !== 'string') throw Error('Invalid Doubao text delta payload');
-        target.text += part;
-      } else if (deltaTarget.type === 10008) {
-        const code = value?.code_block;
-        if (!code || (code.code !== undefined && typeof code.code !== 'string') || (code.text !== undefined && typeof code.text !== 'string')) throw Error('Invalid Doubao code delta payload');
-        target.text += (code.text || '') + (code.code || '');
-      } else if (!value?.memory_tag_block) throw Error('Invalid Doubao memory delta payload');
-    }
-    if (event === 'SSE_REPLY_END') {
-      if (value.end_type === 1) {
-        if (!messageId || value.msg_finish_attr?.msgid !== messageId) throw Error('Doubao completion identity changed');
-        messageFinished = true;
-      }
-      if (value.end_type === 2) answerFinished = true;
-      if (value.end_type === 3) streamFinished = true;
-    }
-    if (userConfirmed && messageId) {
-      const next = text();
-      // If a later block is introduced, the separator changes the previous suffix;
-      // publish only after its structure is known. A replacement is never emitted.
-      if (!next.startsWith(published)) throw Error('Doubao revised published answer');
-      if (next.length > published.length) {
-        if (next.length > 500000) throw Error('Doubao answer exceeded the size limit');
-        published = next;
-        onProgress({chatId, messageId, text: next});
-      }
-    }
-  }
-  function push(chunk, end = false) {
-    if (typeof chunk !== 'string') throw Error('Invalid Doubao stream chunk');
-    size += chunk.length;
-    if (size > 4000000) throw Error('Doubao response exceeded the size limit');
-    pending += chunk;
-    // Normalize CRLF after concatenation, so split CR/LF pairs are safe.
-    pending = pending.replace(/\r\n/g, '\n');
-    // A trailing CR remains pending until the next chunk supplies LF.
-    let at;
-    while ((at = pending.indexOf('\n\n')) >= 0) {
-      const raw = pending.slice(0, at);
-      pending = pending.slice(at + 2);
-      if (raw) frame(raw);
-    }
-    if (pending.length > 1000000) throw Error('Doubao event exceeded the size limit');
-    if (end) {
-      if (pending.trim()) frame(pending.replace(/\r/g, ''));
-      pending = '';
-      if (!userConfirmed || !finished || !messageFinished || !answerFinished || !streamFinished || !text().trim() || Array.from(blocks.values()).some(block => !block.finished)) throw Error('Doubao response ended without confirmed completion');
-      return {chatId, messageId, text: text()};
-    }
-  }
-  return {push};
-}
 
 function createModelSite(emit) {
   let active = null;
