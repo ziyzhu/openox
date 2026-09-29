@@ -332,7 +332,12 @@ nonisolated struct ChatDocument {
     }
 
     private mutating func replayPrompt(_ prompt: AgentPrompt, choice: Bool, id: StepID) {
-        let pending = AgentPrompt(prompt: prompt.prompt, options: prompt.options, outcome: .pending)
+        let pending = AgentPrompt(
+            prompt: prompt.prompt,
+            options: prompt.options,
+            outcome: .pending,
+            permission: prompt.permission
+        )
         apply(.appendPrompt(pending, choice: choice, id: id))
         switch prompt.outcome {
         case .pending:

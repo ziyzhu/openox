@@ -8,10 +8,16 @@ struct PermissionRequest: Identifiable, Equatable {
     let alwaysApprove: String?
     let deny: String
     let actionIconKind: OxActionIconKind?
+    let presentation: PermissionPresentation
 
     @MainActor private static var actionIconKindsByTitle: [String: OxActionIconKind] = [:]
 
-    @MainActor init?(id: UUID, prompt: String, options: [String]) {
+    @MainActor init?(
+        id: UUID,
+        prompt: String,
+        options: [String],
+        presentation: PermissionPresentation? = nil
+    ) {
         guard let approve = options.first,
               let deny = options.last,
               approve != deny else { return nil }
@@ -20,7 +26,8 @@ struct PermissionRequest: Identifiable, Equatable {
         self.approve = approve
         alwaysApprove = options.count == 3 ? options[1] : nil
         self.deny = deny
-        let title = RequestCardCopy(prompt).title
+        self.presentation = presentation ?? PermissionPresentation(prompt: prompt)
+        let title = self.presentation.title
         actionIconKind = title.contains(" - ")
             ? nil
             : Self.actionIconKind(for: title)
@@ -32,7 +39,8 @@ struct PermissionRequest: Identifiable, Equatable {
         approve = request.approve
         alwaysApprove = request.alwaysApprove
         deny = request.deny
-        let title = RequestCardCopy(request.prompt).title
+        presentation = request.presentation
+        let title = presentation.title
         actionIconKind = title.contains(" - ") ? nil : Self.actionIconKind(for: title)
     }
 
@@ -45,18 +53,16 @@ struct PermissionRequest: Identifiable, Equatable {
         return kind
     }
 
-    private var copy: RequestCardCopy { RequestCardCopy(prompt) }
-
     var sourceName: String {
         let separator = " - "
-        guard let range = copy.title.range(of: separator) else { return "Ox" }
-        return String(copy.title[..<range.lowerBound])
+        guard let range = presentation.title.range(of: separator) else { return "Ox" }
+        return String(presentation.title[..<range.lowerBound])
     }
 
     var actionName: String {
         let separator = " - "
-        guard let range = copy.title.range(of: separator) else { return "Ox · \(copy.title)" }
-        return "\(copy.title[..<range.lowerBound]) · \(copy.title[range.upperBound...])"
+        guard let range = presentation.title.range(of: separator) else { return "Ox · \(presentation.title)" }
+        return "\(presentation.title[..<range.lowerBound]) · \(presentation.title[range.upperBound...])"
     }
 
     var options: [String] {
@@ -109,14 +115,11 @@ struct PermissionRequestCard: View {
     let request: PermissionRequest
     var selection: String? = nil
     var resolution: String? = nil
-    var arguments: String? = nil
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var submittedSelection: String?
     @State private var showingArguments = false
-
-    private var copy: RequestCardCopy { RequestCardCopy(request.prompt) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -125,7 +128,7 @@ struct PermissionRequestCard: View {
                     PermissionSourceIcon(
                         sourceName: request.sourceName,
                         actionIconKind: request.actionIconKind,
-                        isServiceAttach: copy.title.hasSuffix(" - \(L10n.string("Attach"))")
+                        isServiceAttach: request.presentation.title.hasSuffix(" - \(L10n.string("Attach"))")
                     )
                         .accessibilityHidden(true)
                     Text(verbatim: request.actionName)
@@ -137,7 +140,7 @@ struct PermissionRequestCard: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(A11yID.Chat.permissionRequest(request.actionIconKind?.rawValue ?? "source"))
 
-                if arguments != nil {
+                if request.presentation.arguments != nil {
                     Spacer(minLength: Theme.Spacing.sm)
                     Button {
                         showingArguments = true
@@ -155,11 +158,18 @@ struct PermissionRequestCard: View {
                 }
             }
 
-            if let message = copy.message {
-                Text(message)
+            if let purpose = request.presentation.purpose {
+                Text(purpose)
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurface)
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let disclosure = request.presentation.disclosure {
+                Text(disclosure)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurface)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -171,7 +181,7 @@ struct PermissionRequestCard: View {
         .sheet(isPresented: $showingArguments) {
             NavigationStack {
                 ScrollView {
-                    Text(verbatim: arguments ?? "")
+                    Text(verbatim: request.presentation.arguments ?? "")
                         .font(.system(.subheadline, design: .monospaced))
                         .foregroundStyle(Theme.Colors.onSurface)
                         .textSelection(.enabled)

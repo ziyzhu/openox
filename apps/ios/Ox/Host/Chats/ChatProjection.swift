@@ -286,12 +286,12 @@ nonisolated enum ChatProjection {
                         flushBubble()
                         let kind: ChatPromptKind = step.toolCall?.name == "ask_user_confirmation" ? .choice : .permission
                         out.append((Block(id: promptSlot(step.id), createdAt: createdAt,
-                                          kind: .prompt(kind: kind, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution)), entry))
+                                          kind: .prompt(kind: kind, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution, permission: prompt.permission)), entry))
                     case let .choice(prompt):
                         flushTrace()
                         flushBubble()
                         out.append((Block(id: promptSlot(step.id), createdAt: createdAt,
-                                          kind: .prompt(kind: .choice, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution)), entry))
+                                          kind: .prompt(kind: .choice, prompt: prompt.prompt, options: prompt.options, answer: prompt.answer, resolution: prompt.resolution, permission: nil)), entry))
                     case let .contextCompaction(value):
                         flushTrace()
                         flushBubble()

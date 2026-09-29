@@ -6,7 +6,8 @@ extension Chat {
         try await requireApproval(
             action: Actions.userFollow,
             defaultPolicy: Actions.defaultPolicy(for: Actions.userFollow),
-            args: ["count": parsed.count]
+            args: ["count": parsed.count],
+            purpose: purpose
         )
         publishFollowIntents(parsed)
         Log.session.info("Chat.follow id=\(id) count=\(parsed.count) purposeChars=\(purpose.count)")

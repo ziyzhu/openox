@@ -1062,7 +1062,8 @@ struct ChatPage: View {
             if let request = PermissionRequest(
                 id: sourceBlockID,
                 prompt: prompt.prompt,
-                options: prompt.options
+                options: prompt.options,
+                presentation: prompt.permission
             ) {
                 PermissionRequestCard(
                     request: request,

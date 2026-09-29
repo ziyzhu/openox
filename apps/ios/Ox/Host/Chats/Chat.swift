@@ -527,8 +527,14 @@ final class Chat: Identifiable {
             },
             resolveAction: { [unowned self] name in try resolveTarget(name, label: "ox.service.invoke") },
             attachedDomains: { [unowned self] in Set(attachedServices.map(\.domain)) },
-            approve: { [unowned self] action, defaultPolicy, args, prompt in
-                try await requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt)
+            approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in
+                try await requireApproval(
+                    action: action,
+                    defaultPolicy: defaultPolicy,
+                    args: args,
+                    purpose: purpose,
+                    prompt: prompt
+                )
             },
             presentControl: { [unowned self] control, _ in
                 let pending = embedServiceControl(control)
@@ -1510,11 +1516,16 @@ final class Chat: Identifiable {
         presentation: ChatPromptPresentation = .conversation,
         autoApproval: PendingPrompt.AutoApproval? = nil,
         secretEntry: SecretEntryRequest? = nil,
+        permission: PermissionPresentation? = nil,
         resolution: ((String) -> String?)? = nil
     ) async -> String {
         defer { secretEntry?.cancel() }
         let stepID = StepID()
-        document.apply(.appendPrompt(AgentPrompt(prompt: prompt, options: options, outcome: .pending), choice: kind == .choice, id: stepID))
+        document.apply(.appendPrompt(
+            AgentPrompt(prompt: prompt, options: options, outcome: .pending, permission: permission),
+            choice: kind == .choice,
+            id: stepID
+        ))
         markActivity()
         let blockId = stepID.rawValue
         guard transcript.contains(where: { block in
@@ -1666,7 +1677,12 @@ final class Chat: Identifiable {
         let standalone = ensureExecutionContext()
         let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
-            try await requireApproval(action: action, defaultPolicy: Actions.defaultPolicy(for: action), args: args.toAny())
+            try await requireApproval(
+                action: action,
+                defaultPolicy: Actions.defaultPolicy(for: action),
+                args: args.toAny(),
+                purpose: purpose
+            )
             let value = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
@@ -1688,7 +1704,12 @@ final class Chat: Identifiable {
         let standalone = ensureExecutionContext()
         let invocationID = appendInvocation(name: action, purpose: purpose, args: args)
         do {
-            try await requireApproval(action: action, defaultPolicy: Actions.defaultPolicy(for: action), args: args.toAny())
+            try await requireApproval(
+                action: action,
+                defaultPolicy: Actions.defaultPolicy(for: action),
+                args: args.toAny(),
+                purpose: purpose
+            )
             let (value, effect) = try await body()
             resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             apply(effect)
@@ -1738,9 +1759,16 @@ final class Chat: Identifiable {
         action: String,
         defaultPolicy: ActionPolicy,
         args: Any? = nil,
+        purpose: String? = nil,
         prompt: String? = nil
     ) async throws {
-        switch await requestApproval(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt) {
+        switch await requestApproval(
+            action: action,
+            defaultPolicy: defaultPolicy,
+            args: args,
+            purpose: purpose,
+            prompt: prompt
+        ) {
         case .approved: return
         case .denied: throw RuntimeError.bridge("\(action): the user declined.")
         case .blocked: throw RuntimeError.bridge("\(action): the user blocked this Action in Settings.")
@@ -1758,12 +1786,14 @@ final class Chat: Identifiable {
     func confirmScheduledSkillChange(action: String, prompt: String) async throws {
         runState.backgroundExecution?.updatePhase(.permissionNeeded)
         let cancel = L10n.string("Cancel")
+        let permission = PermissionPresentation(title: "Ox - \(action)", purpose: prompt)
         let answer = await awaitPrompt(
-            prompt: prompt,
+            prompt: permission.prompt,
             options: [action, cancel],
             kind: .permission,
             presentation: .application,
-            autoApproval: nil
+            autoApproval: nil,
+            permission: permission
         )
         guard answer == action else {
             throw RuntimeError.bridge("The scheduled skill change was cancelled.")
@@ -1774,9 +1804,16 @@ final class Chat: Identifiable {
         action: String,
         defaultPolicy: ActionPolicy,
         args: Any? = nil,
+        purpose: String? = nil,
         prompt: String? = nil
     ) async -> ApprovalOutcome {
-        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(action: action, defaultPolicy: defaultPolicy, args: args, prompt: prompt) { request in
+        await ActionApproval(serviceManager: serviceManager, ownerID: id, resolveService: { self.attachedService(domain: $0) }).request(
+            action: action,
+            defaultPolicy: defaultPolicy,
+            args: args,
+            purpose: purpose,
+            prompt: prompt
+        ) { request in
             runState.backgroundExecution?.updatePhase(.permissionNeeded)
             let answer = await awaitPrompt(
                 prompt: request.prompt,
@@ -1789,7 +1826,8 @@ final class Chat: Identifiable {
                     approve: request.approve,
                     alwaysApprove: request.alwaysApprove,
                     deny: request.deny
-                )
+                ),
+                permission: request.presentation
             )
             return answer == Self.abortedAnswer ? nil : answer
         }

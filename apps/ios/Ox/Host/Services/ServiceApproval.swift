@@ -1,6 +1,44 @@
 import Foundation
 import WebKit
 
+nonisolated struct PermissionPresentation: Codable, Equatable, Sendable {
+    let title: String
+    let purpose: String?
+    let disclosure: String?
+    let arguments: String?
+
+    init(title: String, purpose: String? = nil, disclosure: String? = nil, arguments: String? = nil) {
+        self.title = title
+        self.purpose = Self.nonempty(purpose)
+        self.disclosure = Self.nonempty(disclosure)
+        self.arguments = Self.nonempty(arguments)
+    }
+
+    init(prompt: String) {
+        let lines = prompt
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        title = lines.first ?? prompt
+        purpose = Self.nonempty(lines.dropFirst().joined(separator: "\n"))
+        disclosure = nil
+        arguments = nil
+    }
+
+    var message: String? {
+        let parts = [purpose, disclosure].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n")
+    }
+
+    var prompt: String {
+        [title, message].compactMap { $0 }.joined(separator: "\n")
+    }
+
+    private static func nonempty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 @MainActor
 struct ActionApproval {
     enum Outcome {
@@ -11,10 +49,11 @@ struct ActionApproval {
     struct Request: Identifiable {
         let id = UUID()
         let action: String
-        let prompt: String
+        let presentation: PermissionPresentation
         let approve = L10n.string("Approve")
         let alwaysApprove = L10n.string("Always allow")
         let deny = L10n.string("Deny")
+        var prompt: String { presentation.prompt }
         var requiresExplicitApproval: Bool { action == Actions.chatDelete }
         var options: [String] { requiresExplicitApproval ? [approve, deny] : [approve, alwaysApprove, deny] }
     }
@@ -28,6 +67,7 @@ struct ActionApproval {
         action: String,
         defaultPolicy: ActionPolicy,
         args: Any? = nil,
+        purpose: String? = nil,
         prompt override: String? = nil,
         choose: (Request) async -> String?
     ) async -> Outcome {
@@ -43,18 +83,19 @@ struct ActionApproval {
             break
         }
         let display = approvalLabel(for: action)
-        let details = Self.approvalDetails(args)
-        var prompt = override ?? (details.isEmpty ? display : "\(display)\n\(details)")
+        let overridePresentation = override.map(PermissionPresentation.init(prompt:))
+        var title = overridePresentation?.title ?? display
+        var disclosure = overridePresentation?.message
         if override == nil, action == Actions.appLogs {
-            prompt = "\(display)\n\(L10n.string("Logs may include private data from other chats and Profiles and become available to the current model. Always allow applies to all app logs."))"
+            disclosure = L10n.string("Logs may include private data from other chats and Profiles and become available to the current model. Always allow applies to all app logs.")
         } else if override == nil, action == "ox.web.browser.exportPdf" {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
             let savesArtifact = (args as? [String: Any])?["filename"] is String
-            let disclosure = savesArtifact
+            title = "\(display) - \(destination)"
+            disclosure = savesArtifact
                 ? L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area, is saved to the current Profile as an artifact, and becomes available to the current model. Always allow applies to every page Browser visits.")
                 : L10n.string("The exported PDF may include signed-in or sensitive information beyond the visible area and becomes available to the current model. Always allow applies to every page Browser visits.")
-            prompt = "\(display) - \(destination)\n\(disclosure)"
         } else if override == nil, [
             "ox.web.browser.executeScript",
             "ox.web.browser.injectScript",
@@ -62,10 +103,21 @@ struct ActionApproval {
         ].contains(action) {
             let page = serviceManager.browserActionSessions.existingSession(for: ownerID)?.webPage
             let destination = page?.url?.host(percentEncoded: false) ?? L10n.string("Current page")
-            prompt = "\(display) - \(destination)\n\(L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always allow applies to every page Web visits."))"
+            title = "\(display) - \(destination)"
+            disclosure = L10n.string("Dangerous mode gives the agent full control of this website, including signed-in data and network access. Always allow applies to every page Web visits.")
         }
-        if let callerName { prompt += "\n\(callerName)" }
-        let request = Request(action: action, prompt: prompt)
+        if let callerName {
+            disclosure = [disclosure, callerName].compactMap { $0 }.joined(separator: "\n")
+        }
+        let request = Request(
+            action: action,
+            presentation: PermissionPresentation(
+                title: title,
+                purpose: purpose,
+                disclosure: disclosure,
+                arguments: Self.approvalArguments(args)
+            )
+        )
         guard let answer = await choose(request), !Task.isCancelled else { return .stopped }
         Log.service.info("ActionApproval.answer action=\(action) caller=\(ownerID) answer=\(answer)")
         if answer == request.alwaysApprove, !request.requiresExplicitApproval {
@@ -75,36 +127,18 @@ struct ActionApproval {
         return answer == request.approve ? .approved : .denied
     }
 
-    private static func approvalDetails(_ args: Any?) -> String {
-        guard let args, !(args is NSNull) else { return "" }
-        guard let dict = args as? [String: Any] else { return approvalValue(args) }
-        return dict.keys.sorted()
-            .compactMap { key -> String? in
-                guard let value = dict[key] else { return nil }
-                let text = approvalValue(value)
-                return text.isEmpty ? nil : "\(key): \(text)"
-            }
-            .joined(separator: "\n")
-    }
-
-    private static func approvalValue(_ value: Any) -> String {
-        switch value {
-        case is NSNull: return ""
-        case let s as String: return clip(s)
-        case let n as NSNumber: return n.stringValue
-        case let arr as [Any]: return clip(arr.map { approvalValue($0) }.joined(separator: ", "))
-        case let dict as [String: Any]:
-            return clip(dict.keys.sorted().compactMap { key in
-                guard let v = dict[key] else { return nil }
-                let text = approvalValue(v)
-                return text.isEmpty ? nil : "\(key): \(text)"
-            }.joined(separator: ", "))
-        default: return clip(String(describing: value))
+    private static func approvalArguments(_ args: Any?) -> String? {
+        guard let args, !(args is NSNull) else { return nil }
+        if let dict = args as? [String: Any], dict.isEmpty { return nil }
+        if let array = args as? [Any], array.isEmpty { return nil }
+        guard JSONSerialization.isValidJSONObject(args),
+              let data = try? JSONSerialization.data(
+                withJSONObject: args,
+                options: [.fragmentsAllowed, .prettyPrinted, .sortedKeys]
+              ) else {
+            return String(describing: args)
         }
-    }
-
-    private static func clip(_ value: String, _ max: Int = 140) -> String {
-        value.count > max ? String(value.prefix(max)) + "…" : value
+        return String(data: data, encoding: .utf8)
     }
 
     private func approvalLabel(for action: String) -> String {

@@ -12,7 +12,14 @@ nonisolated struct Block: Identifiable, Equatable, Codable {
 
         case agentContent([ContentItem])
 
-        case prompt(kind: ChatPromptKind, prompt: String, options: [String], answer: String?, resolution: String?)
+        case prompt(
+            kind: ChatPromptKind,
+            prompt: String,
+            options: [String],
+            answer: String?,
+            resolution: String?,
+            permission: PermissionPresentation?
+        )
 
         case thinking(ThinkingTrace)
 
@@ -199,7 +206,7 @@ nonisolated struct Invocation: Identifiable, Equatable, Hashable, Codable, Senda
 
 nonisolated extension Block.Kind {
     private enum CodingKeys: String, CodingKey {
-        case type, text, attachments, skillInvocation, promptKind, prompt, options, answer, resolution, items, trace, contextCompaction
+        case type, text, attachments, skillInvocation, promptKind, prompt, options, answer, resolution, permission, items, trace, contextCompaction
     }
 
     init(from decoder: Decoder) throws {
@@ -223,7 +230,8 @@ nonisolated extension Block.Kind {
                 prompt: try c.decode(String.self, forKey: .prompt),
                 options: try c.decode([String].self, forKey: .options),
                 answer: try c.decodeIfPresent(String.self, forKey: .answer),
-                resolution: try c.decodeIfPresent(String.self, forKey: .resolution)
+                resolution: try c.decodeIfPresent(String.self, forKey: .resolution),
+                permission: try c.decodeIfPresent(PermissionPresentation.self, forKey: .permission)
             )
         case "thinking":
             self = .thinking(try c.decode(ThinkingTrace.self, forKey: .trace))
@@ -248,13 +256,14 @@ nonisolated extension Block.Kind {
         case let .agentContent(items):
             try c.encode("agentContent", forKey: .type)
             try c.encode(items, forKey: .items)
-        case let .prompt(kind, prompt, options, answer, resolution):
+        case let .prompt(kind, prompt, options, answer, resolution, permission):
             try c.encode("confirm", forKey: .type)
             try c.encode(kind, forKey: .promptKind)
             try c.encode(prompt, forKey: .prompt)
             try c.encode(options, forKey: .options)
             try c.encodeIfPresent(answer, forKey: .answer)
             try c.encodeIfPresent(resolution, forKey: .resolution)
+            try c.encodeIfPresent(permission, forKey: .permission)
         case let .thinking(trace):
             try c.encode("thinking", forKey: .type)
             try c.encode(trace, forKey: .trace)

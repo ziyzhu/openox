@@ -171,6 +171,7 @@ nonisolated struct AgentPrompt: Codable, Equatable, Sendable {
     var prompt: String
     var options: [String]
     var outcome: PromptOutcome
+    var permission: PermissionPresentation? = nil
 
     var answer: String? {
         switch outcome {
