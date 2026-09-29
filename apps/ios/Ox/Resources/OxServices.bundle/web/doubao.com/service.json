@@ -876,7 +876,6 @@
       "baseUrl": "https://www.doubao.com/chat/"
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/doubao.com/favicon.png",
   "$defs": {
     "file": {
       "type": "object",
@@ -970,5 +969,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/doubao.com/favicon.png"
 }
