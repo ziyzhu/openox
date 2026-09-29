@@ -948,7 +948,6 @@
       "requireApproval": true
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/www.kimi.com/favicon.png",
   "$defs": {
     "file": {
       "type": "object",
@@ -1042,5 +1041,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/www.kimi.com/favicon.png"
 }
