@@ -1583,6 +1583,7 @@ final class Chat: Identifiable {
         ensureExecutionContext()
         let invocation = Invocation(name: name, purpose: purpose, args: args)
         document.apply(.appendInvocation(invocation))
+        runState.backgroundExecution?.updateStep(purpose)
         Log.session.info("Chat.invocation appended id=\(invocation.id) name=\(name) purpose=\(purpose)")
         return invocation.id
     }
@@ -1592,6 +1593,9 @@ final class Chat: Identifiable {
         guard !trimmed.isEmpty else { return }
         runState.backgroundExecution?.updatePhase(.thinking)
         document.apply(.appendReasoning(trimmed))
+        if let paragraph = Reasoning.paragraphs(trimmed).last {
+            runState.backgroundExecution?.updateStep(paragraph)
+        }
         runState.backgroundExecution?.advance()
     }
 

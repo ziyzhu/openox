@@ -31,6 +31,7 @@ final class ChatBackgroundExecution {
     private let runID: RunID
     private var task: BGContinuedProcessingTask?
     private var phase = Phase.thinking
+    private var stepSubtitle: String?
     private var submittedAt: Date?
     private var terminalResult: Bool?
     private var completedUnits: Int64 = 0
@@ -69,7 +70,7 @@ final class ChatBackgroundExecution {
         let request = BGContinuedProcessingTaskRequest(
             identifier: identifier,
             title: Self.title,
-            subtitle: phase.subtitle
+            subtitle: subtitle
         )
         request.strategy = .queue
         do {
@@ -95,11 +96,21 @@ final class ChatBackgroundExecution {
     }
 
     func updatePhase(_ phase: Phase) {
-        guard self.phase != phase else { return }
+        guard self.phase != phase || stepSubtitle != nil else { return }
         self.phase = phase
+        stepSubtitle = nil
         Log.session.info("ChatBackground.phase chat=\(chatID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
         guard terminalResult == nil else { return }
-        task?.updateTitle(Self.title, subtitle: phase.subtitle)
+        task?.updateTitle(Self.title, subtitle: subtitle)
+    }
+
+    func updateStep(_ text: String) {
+        let value = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !value.isEmpty, terminalResult == nil else { return }
+        let subtitle = value.count > 120 ? String(value.prefix(119)) + "…" : value
+        guard stepSubtitle != subtitle else { return }
+        stepSubtitle = subtitle
+        task?.updateTitle(Self.title, subtitle: subtitle)
     }
 
     func finish(success: Bool) {
@@ -141,7 +152,7 @@ final class ChatBackgroundExecution {
                 self.advance()
             }
         }
-        task.updateTitle(Self.title, subtitle: phase.subtitle)
+        task.updateTitle(Self.title, subtitle: subtitle)
         task.progress.totalUnitCount = max(completedUnits + 1, 1)
         task.progress.completedUnitCount = completedUnits
         advance()
@@ -167,4 +178,6 @@ final class ChatBackgroundExecution {
         let elapsedMs = submittedAt.map { Int(Date().timeIntervalSince($0) * 1_000) } ?? -1
         Log.session.warning("ChatBackground.expire chat=\(chatID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) elapsedMs=\(elapsedMs) completedUnits=\(completedUnits)")
     }
+
+    private var subtitle: String { stepSubtitle ?? phase.subtitle }
 }
