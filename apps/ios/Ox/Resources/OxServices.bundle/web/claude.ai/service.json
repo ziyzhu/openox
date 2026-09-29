@@ -1265,6 +1265,6 @@
       "baseUrl": "https://claude.ai/new"
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/claude.ai/favicon.png",
-  "$defs": {}
+  "$defs": {},
+  "faviconUrl": "https://openox.ai/assets/services/claude.ai/favicon.png"
 }
