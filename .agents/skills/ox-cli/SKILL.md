@@ -33,6 +33,8 @@ or tab session IDs; a live service is addressed by its domain.
 - Use `ox repository` for offline repository, service manifest, action, and
   skill inspection, and `ox repository test` for fixture replay.
 - Use `ox host services` and `ox host service` for live service operations.
+- Use `ox serve` to expose selected local Herdr actions as MCP tools; `--action`
+  replaces its default agent actions with an explicit allowlist.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
   agent in a chat actually sees).
@@ -77,6 +79,19 @@ Read a function contract before calling an unfamiliar function:
 ```sh
 ox vm functions --json
 ox vm help <ox.function>
+```
+
+## Expose local Herdr actions
+
+`ox serve` runs a foreground MCP bridge to the local Herdr session. It uses
+Tailscale Serve by default; use `--local-only` for a loopback endpoint. Run
+`ox serve --help` to see the available actions. Specify repeated `--action`
+flags to expose only those actions, then add the printed MCP endpoint as an Ox
+service.
+
+```sh
+ox serve --action agent_list --action agent_read --local-only
+ox serve --herdr-session work
 ```
 
 ## Delegate service authoring to Ox

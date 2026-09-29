@@ -11,6 +11,8 @@ Ox CLI is an Ox Client for the terminal. Commands are grouped by the resource
 they act on: a Profile on disk, a service repository, an Ox Host, a chat on that
 Host, or the chat's VM.
 
+`ox serve` exposes selected local Herdr actions to Ox as MCP tools.
+
 The CLI never selects a web-page runtime. The Host owns service adapters and
 decides how each service page is implemented and managed.
 
@@ -84,7 +86,8 @@ ox
 ├── repository   --repository <path-or-url>   Service repository
 ├── host         --host <ws-url>              Ox Host control endpoint
 ├── chat         --host, --chat <chat-id>     Chat on that Host
-└── vm           --host, --chat <chat-id>     The chat's VM
+├── vm           --host, --chat <chat-id>     The chat's VM
+└── serve                                     Local Herdr MCP bridge
 ```
 
 - `--host` defaults to `OX_HOST_ENDPOINT`, then the compatibility
@@ -95,11 +98,30 @@ ox
 - `--profile` applies only to `ox profile` and bypasses any Host.
 - `--repository` applies only to `ox repository`. It never chooses the Host's
   live service implementation.
+- `ox serve` has no Host selector; it runs beside the local Herdr session.
 
 Global flags are position-independent. Skills appear in three groups because
 they come from three sources: `ox profile skills` reads a Profile's files,
 `ox repository skills` reads a repository's files, and `ox vm skills` shows what
 the agent in a chat actually sees.
+
+## Expose Herdr actions to Ox
+
+`ox serve` starts a foreground MCP bridge on loopback and publishes it through
+Tailscale Serve. It exposes `agent_list`, `agent_get`, `agent_read`,
+`agent_prompt`, and `agent_wait` by default. Repeat `--action` to replace that
+set with an explicit allowlist; `ox serve --help` lists every available action.
+
+```sh
+ox serve
+ox serve --action agent_list --action agent_read
+ox serve --herdr-session work --local-only
+```
+
+`--local-only` prints a loopback MCP URL instead of starting Tailscale Serve.
+The bridge refuses to replace an existing Tailscale Serve route and stops its
+own route when the command exits. Add the printed MCP endpoint as a service in
+Ox to make the selected tools available to a chat.
 
 ## Inspect and operate a Host
 
