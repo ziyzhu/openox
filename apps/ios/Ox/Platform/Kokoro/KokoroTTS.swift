@@ -19,6 +19,7 @@ public actor KokoroTTS {
     private var playback: KokoroAudioPlayback?
     private var generation = UUID()
     private var audioSessionID: UUID?
+    private var activeOperations = 0
 
     public init() {}
 
@@ -53,6 +54,8 @@ public actor KokoroTTS {
         if MandarinG2P.containsHanzi(text) {
             return try await KokoroMandarinTTS.shared.synthesize(text, speed: speed)
         }
+        activeOperations += 1
+        defer { activeOperations -= 1 }
         try await prepare()
         guard let runtime else { throw KokoroAssetError.missing("runtime") }
         let chunks = try runtime.segmenter.split(text, speed: speed)
@@ -73,6 +76,8 @@ public actor KokoroTTS {
             try await KokoroMandarinTTS.shared.speak(text, speed: speed)
             return
         }
+        activeOperations += 1
+        defer { activeOperations -= 1 }
         try await prepare()
         try Task.checkCancellation()
         guard let runtime, let playback else { throw KokoroAssetError.missing("runtime") }
@@ -122,10 +127,27 @@ public actor KokoroTTS {
         Log.ui.info("Kokoro.stop")
     }
 
-    func unload() async {
-        await stop()
+    func unload(reason: String = "modelReplaced") async {
+        generation = UUID()
+        let stoppedPlayback = playback
+        let stoppedSessionID = audioSessionID
         runtime = nil
         playback = nil
+        audioSessionID = nil
+        await stoppedPlayback?.stop()
+        if let stoppedSessionID {
+            AppAudioSession.deactivate(owner: stoppedSessionID, reason: "kokoro.unloaded")
+        }
+        Log.ui.info("Kokoro.unload reason=\(reason)")
+    }
+
+    func unloadIfIdle(reason: String) async -> Bool {
+        guard activeOperations == 0 else {
+            Log.ui.info("Kokoro.unload skipped reason=\(reason) active=\(activeOperations)")
+            return false
+        }
+        await unload(reason: reason)
+        return true
     }
 
     private func render(_ text: String, runtime: Runtime, speed: Float, depth: Int = 0) throws -> [Float] {
@@ -181,5 +203,17 @@ public actor KokoroTTS {
             }
         }
         return buffer
+    }
+}
+
+enum KokoroRuntimeLifecycle {
+    static func enterBackground() async {
+        await KokoroTTS.shared.unload(reason: "background")
+        await KokoroMandarinTTS.shared.unload(reason: "background")
+    }
+
+    static func receiveMemoryWarning() async {
+        _ = await KokoroTTS.shared.unloadIfIdle(reason: "memoryWarning")
+        _ = await KokoroMandarinTTS.shared.unloadIfIdle(reason: "memoryWarning")
     }
 }

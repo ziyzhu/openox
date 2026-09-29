@@ -45,26 +45,30 @@ struct OnDeviceModelsView: View {
         switch store.state {
         case .notInstalled, .failed:
             Button { store.download() } label: {
-                Image(systemName: "arrow.down")
+                Image(systemName: "icloud.and.arrow.down")
                     .font(Theme.Icons.md)
                     .frame(width: 32, height: 32)
                     .overlay(Circle().stroke(Theme.Colors.primary, lineWidth: 1.5))
             }
             .accessibilityLabel("Download Gemma 4 E2B")
         case .downloading(let fraction):
-            Image(systemName: "arrow.down")
-                .font(Theme.Icons.md)
-                .frame(width: 32, height: 32)
-                .overlay {
-                    Circle()
-                        .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: fraction ?? 0)
-                        .stroke(Theme.Colors.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-            .accessibilityLabel("Downloading Gemma 4 E2B")
-            .accessibilityValue(fraction.map { "\(Int($0 * 100))%" } ?? "Downloading")
+            if let fraction {
+                Circle()
+                    .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
+                    .overlay {
+                        Circle()
+                            .trim(from: 0, to: fraction)
+                            .stroke(Theme.Colors.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                    .frame(width: 32, height: 32)
+                    .accessibilityLabel("Downloading Gemma 4 E2B")
+                    .accessibilityValue("\(Int(fraction * 100))%")
+            } else {
+                ProgressView()
+                    .frame(width: 32, height: 32)
+                    .accessibilityLabel("Downloading Gemma 4 E2B")
+            }
         case .verifying:
             ProgressView()
                 .frame(width: 32, height: 32)

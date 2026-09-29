@@ -69,7 +69,7 @@ struct VoiceSettingsView: View {
         switch store.state {
         case .notInstalled, .failed:
             Button { store.download() } label: {
-                Image(systemName: "arrow.down")
+                Image(systemName: "icloud.and.arrow.down")
                     .font(Theme.Icons.md)
                     .frame(width: 32, height: 32)
                     .overlay(Circle().stroke(Theme.Colors.primary, lineWidth: 1.5))
@@ -77,17 +77,15 @@ struct VoiceSettingsView: View {
             .accessibilityLabel("Download Heart voice")
             .accessibilityIdentifier(A11yID.Settings.voiceDownload)
         case .downloading(let fraction):
-            Image(systemName: "arrow.down")
-                .font(Theme.Icons.md)
-                .frame(width: 32, height: 32)
+            Circle()
+                .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
                 .overlay {
-                    Circle()
-                        .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
                     Circle()
                         .trim(from: 0, to: fraction)
                         .stroke(Theme.Colors.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
+                .frame(width: 32, height: 32)
                 .accessibilityLabel("Downloading Heart voice")
                 .accessibilityValue("\(Int(fraction * 100))%")
         case .preparing:
@@ -108,24 +106,22 @@ struct VoiceSettingsView: View {
         switch mandarinStore.state {
         case .notInstalled, .failed:
             Button { mandarinStore.download() } label: {
-                Image(systemName: "arrow.down")
+                Image(systemName: "icloud.and.arrow.down")
                     .font(Theme.Icons.md)
                     .frame(width: 32, height: 32)
                     .overlay(Circle().stroke(Theme.Colors.primary, lineWidth: 1.5))
             }
             .accessibilityLabel("Download Mandarin voice")
         case .downloading(let fraction):
-            Image(systemName: "arrow.down")
-                .font(Theme.Icons.md)
-                .frame(width: 32, height: 32)
+            Circle()
+                .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
                 .overlay {
-                    Circle()
-                        .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 2)
                     Circle()
                         .trim(from: 0, to: fraction)
                         .stroke(Theme.Colors.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
+                .frame(width: 32, height: 32)
                 .accessibilityLabel("Downloading Mandarin voice")
                 .accessibilityValue("\(Int(fraction * 100))%")
         case .ready:

@@ -15,6 +15,7 @@ actor KokoroMandarinTTS {
     private var playback: KokoroAudioPlayback?
     private var generation = UUID()
     private var audioSessionID: UUID?
+    private var activeOperations = 0
 
     func prepare() async throws {
         guard runtime == nil else { return }
@@ -34,6 +35,8 @@ actor KokoroMandarinTTS {
 
     func synthesize(_ text: String, speed: Float = 1) async throws -> AVAudioPCMBuffer {
         guard speed.isFinite, speed > 0 else { throw KokoroAssetError.invalid("speed") }
+        activeOperations += 1
+        defer { activeOperations -= 1 }
         try await prepare()
         guard let runtime else { throw KokoroAssetError.missing("Mandarin runtime") }
         var samples: [Float] = []
@@ -46,6 +49,8 @@ actor KokoroMandarinTTS {
 
     func speak(_ text: String, speed: Float = 1) async throws {
         guard speed.isFinite, speed > 0 else { throw KokoroAssetError.invalid("speed") }
+        activeOperations += 1
+        defer { activeOperations -= 1 }
         try await prepare()
         guard let runtime, let playback else { throw KokoroAssetError.missing("Mandarin runtime") }
         let parts = try chunks(text, runtime: runtime)
@@ -87,10 +92,27 @@ actor KokoroMandarinTTS {
         if let sessionID { AppAudioSession.deactivate(owner: sessionID, reason: "kokoro.mandarin.stopped") }
     }
 
-    func unload() async {
-        await stop()
+    func unload(reason: String = "modelReplaced") async {
+        generation = UUID()
+        let stoppedPlayback = playback
+        let stoppedSessionID = audioSessionID
         runtime = nil
         playback = nil
+        audioSessionID = nil
+        await stoppedPlayback?.stop()
+        if let stoppedSessionID {
+            AppAudioSession.deactivate(owner: stoppedSessionID, reason: "kokoro.mandarin.unloaded")
+        }
+        Log.ui.info("KokoroMandarin.unload reason=\(reason)")
+    }
+
+    func unloadIfIdle(reason: String) async -> Bool {
+        guard activeOperations == 0 else {
+            Log.ui.info("KokoroMandarin.unload skipped reason=\(reason) active=\(activeOperations)")
+            return false
+        }
+        await unload(reason: reason)
+        return true
     }
 
     private func chunks(_ text: String, runtime: Runtime) throws -> [String] {

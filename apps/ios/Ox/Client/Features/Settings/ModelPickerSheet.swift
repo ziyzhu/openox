@@ -885,7 +885,7 @@ struct ModelPickerContent: View {
             } label: {
                 Label(
                     OnDeviceModelStore.modelName,
-                    systemImage: OnDeviceModelStore.shared.state == .ready ? "checkmark" : "arrow.down"
+                    systemImage: OnDeviceModelStore.shared.state == .ready ? "checkmark" : "icloud.and.arrow.down"
                 )
             }
             .accessibilityIdentifier(A11yID.Chat.modelOption(OnDeviceModelStore.modelID))

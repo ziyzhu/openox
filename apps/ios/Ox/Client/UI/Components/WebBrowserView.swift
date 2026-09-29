@@ -84,44 +84,48 @@ struct WebBrowserView: View {
     private var currentURL: URL? { page.url ?? initialURL }
 
     var body: some View {
-        VStack(spacing: 0) {
+        GeometryReader { geometry in
             websiteContent
+                .ignoresSafeArea(.container, edges: .bottom)
                 .overlay { errorOverlay }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            browserBar
-                .background(Theme.Colors.surface)
-        }
-        .safeAreaPadding(.top, 44)
-        .toolbarBackground(Theme.Colors.surface, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .onChange(of: currentURL, initial: true) { _, _ in
-            scrollChrome = .expanded(anchor: 0)
-            guard !addressFocused else { return }
-            syncAddress()
-        }
-        .onChange(of: addressFocused) { _, focused in
-            syncAddress()
-            if focused {
-                scrollChrome = .expanded(anchor: 0)
-                Task { @MainActor in
-                    await Task.yield()
-                    guard addressFocused else { return }
-                    UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+                .padding(.top, Theme.Spacing.md)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    browserBar
+                        .offset(y: scrollChrome.isCompact && !addressFocused ? max(0, geometry.safeAreaInsets.bottom - Theme.Spacing.lg) : 0)
+                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: addressFocused)
+                        .animation(reduceMotion ? nil : Theme.Animation.handoff, value: scrollChrome.isCompact)
                 }
-            }
+                .onChange(of: currentURL, initial: true) { _, _ in
+                    scrollChrome = .expanded(anchor: 0)
+                    guard !addressFocused else { return }
+                    syncAddress()
+                }
+                .onChange(of: addressFocused) { _, focused in
+                    syncAddress()
+                    if focused {
+                        scrollChrome = .expanded(anchor: 0)
+                        Task { @MainActor in
+                            await Task.yield()
+                            guard addressFocused else { return }
+                            UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+                        }
+                    }
+                }
+                .alert("Couldn’t Load Page", isPresented: Binding(
+                    get: { addressError != nil },
+                    set: { if !$0 { addressError = nil } }
+                )) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    if let addressError { Text(addressError.message) }
+                }
         }
-        .alert("Couldn’t Load Page", isPresented: Binding(
-            get: { addressError != nil },
-            set: { if !$0 { addressError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            if let addressError { Text(addressError.message) }
-        }
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private var websiteContent: some View {
         WebContentView(page: page)
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .simultaneousGesture(DragGesture().onChanged { _ in scrollChrome.beginScrolling() })
             .webViewOnScrollGeometryChange(for: CGFloat.self) { geometry in
                 let maximum = max(0, geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height)

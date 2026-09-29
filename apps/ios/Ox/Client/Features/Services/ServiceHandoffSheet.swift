@@ -42,7 +42,7 @@ struct BotControlSheetView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) {
+                    SheetDismissToolbarButton {
                         session.cancel()
                         dismiss()
                     }
@@ -88,11 +88,16 @@ struct ServiceSessionSheetView<Session: ServiceSheetSession>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button(returnsInline ? String(localized: "Done") : String(localized: "Cancel")) {
-                            if !returnsInline { session.cancel() }
-                            dismiss()
+                        if returnsInline {
+                            Button("Done") { dismiss() }
+                                .accessibilityIdentifier(A11yID.ServiceHandoff.done)
+                        } else {
+                            SheetDismissToolbarButton {
+                                session.cancel()
+                                dismiss()
+                            }
+                            .accessibilityIdentifier(A11yID.ServiceHandoff.done)
                         }
-                        .accessibilityIdentifier(A11yID.ServiceHandoff.done)
                     }
                 }
         }
