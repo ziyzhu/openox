@@ -13,15 +13,22 @@ async function client() {
   return c.http.http;
 }
 async function identity(){
-  const c=await client();
-  let timer;
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem('userToken') || 'null'); }
+  catch { throw new Error('Invalid DeepSeek sign-in storage'); }
+  if(stored === null || stored.value === null)return {signedIn:false};
+  if(typeof stored.value !== 'string' || !stored.value.length)throw new Error('Invalid DeepSeek sign-in storage');
+  let r, j;
   try {
-    const r=await Promise.race([c.get('/api/v0/users/current'),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('DeepSeek identity request timed out')),7000);})]);
-    const j=r.json;
-    if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
-    if(r.status===200&&j?.code===40002&&j.msg==='Missing Token')return {signedIn:false};
-    throw new Error('Unrecognized DeepSeek identity response');
-  }finally{clearTimeout(timer);}
+    r = await fetch('/api/v0/users/current', {
+      headers:{Authorization:'Bearer '+stored.value},
+      credentials:'include',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(7000)
+    });
+    j = await r.json();
+  } catch { throw new Error('DeepSeek identity check failed'); }
+  if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
+  if(r.status===200&&j?.code===40002)return {signedIn:false};
+  throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
 }
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}
 const richInt=v=>Number.isSafeInteger(v)&&v>=0?v:null;
