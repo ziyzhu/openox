@@ -249,9 +249,11 @@ struct ChatComposer: View, Equatable {
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
     @State private var hasShownImportMemory = false
+    @State private var speechLayoutState: LayoutState?
     @AppStorage("chat.importMemoryIntentDisplays") private var importMemoryIntentDisplays = 0
 
     @Environment(\.appTheme) private var appTheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
         lhs.composer === rhs.composer
@@ -322,6 +324,9 @@ struct ChatComposer: View, Equatable {
                 hasShownImportMemory = true
                 importMemoryIntentDisplays += 1
                 Log.ui.info("ChatComposer.importMemoryIntent shown chat=\(sessionID) display=\(importMemoryIntentDisplays)")
+            }
+            .onChange(of: speech.isPresented) { _, isPresented in
+                if !isPresented { speechLayoutState = nil }
             }
             .onDisappear { hasShownImportMemory = false }
     }
@@ -400,7 +405,8 @@ struct ChatComposer: View, Equatable {
     }
 
     private var layoutState: LayoutState {
-        isEmbedded || isFieldFocused || !empty ? .active : .resting
+        if speech.isPresented, let speechLayoutState { return speechLayoutState }
+        return isEmbedded || isFieldFocused || !empty ? .active : .resting
     }
 
     private var isResting: Bool {
@@ -460,6 +466,12 @@ struct ChatComposer: View, Equatable {
 
     private var composerCluster: some View {
         VStack(alignment: .leading, spacing: Self.topStripSpacing) {
+            if speech.isPresented {
+                HoldToTalkCard(speech: speech)
+                    .padding(.bottom, Self.surfaceSpacing - Self.topStripSpacing)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             if showsTopStrip && !floatsTopStrip {
                 composerTopStrip
                     .transition(topStripTransition)
@@ -470,6 +482,7 @@ struct ChatComposer: View, Equatable {
                 followIntentStrip
                 composerRow
             }
+            .accessibilityHidden(speech.isPresented)
             .frame(maxWidth: .infinity, alignment: .leading)
             .clipShape(composerShape)
             .background {
@@ -478,6 +491,10 @@ struct ChatComposer: View, Equatable {
                     .id(appTheme)
             }
         }
+        .animation(
+            reduceMotion ? nil : .spring(duration: 0.28, bounce: 0),
+            value: speech.isPresented
+        )
         .overlay(alignment: .topLeading) {
             if showsTopStrip && floatsTopStrip {
                 composerTopStrip
@@ -779,7 +796,11 @@ struct ChatComposer: View, Equatable {
             .overlay {
                 HoldToTalkArea(
                     canBegin: !composer.isImporting && !speech.isPresented,
-                    onTap: showHoldToTalkHint,
+                    onTouchDown: { speechLayoutState = layoutState },
+                    onTap: {
+                        speechLayoutState = nil
+                        showHoldToTalkHint()
+                    },
                     onBegin: { onSpeechBegin(false) },
                     onMove: { speech.move(to: $0, distance: $1) },
                     onRelease: { speech.release() },

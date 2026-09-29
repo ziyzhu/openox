@@ -3,6 +3,7 @@ import UIKit
 
 struct HoldToTalkArea: UIViewRepresentable {
     let canBegin: Bool
+    let onTouchDown: () -> Void
     let onTap: () -> Void
     let onBegin: () -> Void
     let onMove: (CGPoint, CGFloat) -> Void
@@ -15,6 +16,7 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     func updateUIView(_ view: Probe, context: Context) {
         view.canBegin = canBegin
+        view.onTouchDown = onTouchDown
         view.onTap = onTap
         view.onBegin = onBegin
         view.onMove = onMove
@@ -28,6 +30,7 @@ struct HoldToTalkArea: UIViewRepresentable {
 
     final class Probe: UIView, UIGestureRecognizerDelegate {
         var canBegin = true
+        var onTouchDown: (() -> Void)?
         var onTap: (() -> Void)?
         var onBegin: (() -> Void)?
         var onMove: ((CGPoint, CGFloat) -> Void)?
@@ -68,7 +71,9 @@ struct HoldToTalkArea: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard canBegin, window != nil, bounds.contains(touch.location(in: self)),
                   let controller = owningViewController, let touchedView = touch.view else { return false }
-            return touchedView.isDescendant(of: controller.view)
+            let receivesTouch = touchedView.isDescendant(of: controller.view)
+            if receivesTouch, gestureRecognizer === hold { onTouchDown?() }
+            return receivesTouch
         }
 
         private var owningViewController: UIViewController? {
@@ -107,7 +112,25 @@ struct HoldToTalkArea: UIViewRepresentable {
     }
 }
 
-struct HoldToTalkOverlay: View {
+struct HoldToTalkBackdrop: View {
+    @Environment(\.appTheme) private var appTheme
+
+    var body: some View {
+        ZStack {
+            Theme.Colors.chatSurface.color(for: appTheme).opacity(0.6)
+            LinearGradient(
+                colors: [.clear, Theme.Colors.background.color(for: appTheme)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+struct HoldToTalkCard: View {
     let speech: ChatSpeechInput
     @Environment(\.appTheme) private var appTheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -130,30 +153,16 @@ struct HoldToTalkOverlay: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                Theme.Colors.chatSurface.color(for: appTheme).opacity(0.6)
-                    .contentShape(Rectangle())
-                LinearGradient(
-                    colors: [.clear, Theme.Colors.background.color(for: appTheme)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                recordingCard
-                    .frame(maxWidth: 480)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.bottom, geometry.safeAreaInsets.bottom + Theme.Size.minimumTouchTarget + Theme.Spacing.lg)
-                    .frame(maxWidth: .infinity)
+        recordingCard
+            .frame(maxWidth: 480)
+            .frame(maxWidth: .infinity)
+            .accessibilityAddTraits(.isModal)
+            .accessibilityAction(.escape) { speech.cancel(reason: "accessibilityEscape") }
+            .onAppear {
+                if speech.usesAccessibleControls {
+                    UIAccessibility.post(notification: .screenChanged, argument: nil)
+                }
             }
-        }
-        .ignoresSafeArea()
-        .accessibilityAddTraits(.isModal)
-        .accessibilityAction(.escape) { speech.cancel(reason: "accessibilityEscape") }
-        .onAppear {
-            if speech.usesAccessibleControls {
-                UIAccessibility.post(notification: .screenChanged, argument: nil)
-            }
-        }
     }
 
     private var recordingCard: some View {

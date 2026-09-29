@@ -553,6 +553,12 @@ struct ChatPage: View {
                 toast = Toast(message: message, role: .error, duration: 4)
             }
         return transcript
+            .accessibilityHidden(speechInput.isPresented)
+            .overlay {
+                if speechInput.isPresented {
+                    HoldToTalkBackdrop()
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if showsComposer {
                     composerDock(
@@ -568,7 +574,6 @@ struct ChatPage: View {
                 }
         }
         .background(Theme.Colors.chatSurface)
-        .accessibilityHidden(speechInput.isPresented)
         .overlay(alignment: .bottom) {
             if !showsComposer, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
@@ -587,11 +592,6 @@ struct ChatPage: View {
         .overlay(alignment: .bottom) {
             if showsComposer {
                 slashPickerOverlay(floatsTopStrip: floatsTopStrip)
-            }
-        }
-        .overlay {
-            if speechInput.isPresented {
-                HoldToTalkOverlay(speech: speechInput)
             }
         }
         .onChange(of: speechInput.notice) { _, message in
