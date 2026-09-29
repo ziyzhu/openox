@@ -1,7 +1,7 @@
 {
   "domain": "gemini.google.com",
   "name": "Gemini",
-  "description": "Search saved Gemini chats, open search results and recent conversations, read messages, and chat with approval.",
+  "description": "Search saved Gemini chats, open search results and recent conversations, read messages, and chat with approval. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://gemini.google.com/app",
   "actions": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read Gemini conversation",
-      "description": "Read up to 100 currently rendered messages. Not full-history pagination.",
+      "description": "Read up to 100 currently rendered messages. Not full-history pagination. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -95,11 +95,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -169,11 +176,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -291,6 +305,12 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -298,7 +318,8 @@
           "url",
           "submissionConfirmed",
           "status",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -359,6 +380,12 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -366,7 +393,8 @@
           "url",
           "submissionConfirmed",
           "status",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -486,11 +514,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -890,5 +925,99 @@
       "baseUrl": "https://gemini.google.com/app"
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/gemini.google.com/favicon.png"
+  "faviconUrl": "https://openox.ai/assets/services/gemini.google.com/favicon.png",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  }
 }
