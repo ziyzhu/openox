@@ -129,27 +129,70 @@ private struct AppPresentationModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: Binding(
-                get: { coordinator.presented },
-                set: { if $0 == nil { coordinator.dismissPresented() } }
-            )) { presented in
-                switch presented.content {
-                case .browser(let session):
-                    ServiceBrowserView(session: session)
-                case .serviceSignIn(let session):
-                    ServiceSessionSheetView(session: session, mode: .signIn)
-                case .serviceHandoff(let session):
-                    ServiceSessionSheetView(session: session, mode: .handoff)
-                case .providerAuthentication(let session):
-                    ProviderAuthenticationSheet(session: session)
-                }
-            }
+            .modifier(AppFullScreenPresentationModifier(coordinator: coordinator))
+            .modifier(AppProviderAuthenticationPresentationModifier(coordinator: coordinator))
             .onChange(of: scenePhase, initial: true) { _, phase in
                 coordinator.setHostActive(phase == .active)
             }
             .onDisappear {
                 coordinator.detachHost()
             }
+    }
+}
+
+private struct AppFullScreenPresentationModifier: ViewModifier {
+    let coordinator: AppPresentationCoordinator
+
+    func body(content: Content) -> some View {
+        content.fullScreenCover(item: presentation) { presented in
+            switch presented.content {
+            case .browser(let session):
+                ServiceBrowserView(session: session)
+            case .serviceSignIn(let session):
+                ServiceSessionSheetView(session: session, mode: .signIn)
+            case .serviceHandoff(let session):
+                ServiceSessionSheetView(session: session, mode: .handoff)
+            case .providerAuthentication:
+                EmptyView()
+            }
+        }
+    }
+
+    private var presentation: Binding<AppPresentationCoordinator.Presented?> {
+        Binding(
+            get: {
+                guard let presented = coordinator.presented else { return nil }
+                if case .providerAuthentication = presented.content { return nil }
+                return presented
+            },
+            set: { if $0 == nil { coordinator.dismissPresented() } }
+        )
+    }
+}
+
+private struct AppProviderAuthenticationPresentationModifier: ViewModifier {
+    private struct Presentation: Identifiable {
+        let id: UUID
+        let session: ProviderAuthenticationSession
+    }
+
+    let coordinator: AppPresentationCoordinator
+
+    func body(content: Content) -> some View {
+        content.sheet(item: presentation) { presented in
+            ProviderAuthenticationSheet(session: presented.session)
+        }
+    }
+
+    private var presentation: Binding<Presentation?> {
+        Binding(
+            get: {
+                guard let presented = coordinator.presented,
+                      case .providerAuthentication(let session) = presented.content else { return nil }
+                return Presentation(id: presented.id, session: session)
+            },
+            set: { if $0 == nil { coordinator.dismissPresented() } }
+        )
     }
 }
 

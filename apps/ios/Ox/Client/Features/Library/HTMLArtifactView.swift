@@ -206,7 +206,7 @@ private struct HTMLArtifactWebView: View {
             .safeAreaInset(edge: .bottom) {
                 CanvasInteractionView(canvas: canvas)
             }
-            .sheet(item: $canvas.browser) { browser in
+            .fullScreenCover(item: $canvas.browser) { browser in
                 NavigationStack {
                     ServicePageInspector(service: browser.service, browserSessionID: browser.id)
                         .safeAreaInset(edge: .bottom) { CanvasInteractionView(canvas: canvas) }
@@ -239,7 +239,7 @@ private enum HTMLArtifactNavigation {
 }
 
 @MainActor
-private enum HTMLArtifactPage {
+enum HTMLArtifactPage {
     static let resourceScheme = "ox-artifact"
     static let mapHandler = "oxMap"
     static let baseURL = CanvasWebBridge.documentURL

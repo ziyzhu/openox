@@ -125,9 +125,10 @@ struct WebPageMount {
 
 struct MountedWebPageView: View {
     let mount: WebPageMount
+    var mode: WebContentView.Mode = .browser
 
     var body: some View {
-        WebContentView(page: mount.page)
+        WebContentView(page: mount.page, mode: mode)
             .onAppear {
                 mount.coordinator.didMount(page: mount.page, ownerID: mount.ownerID)
             }

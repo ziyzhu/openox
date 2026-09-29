@@ -118,10 +118,10 @@ struct ProviderAuthenticationView: View {
             if revision > 0, state.isAuthenticated { onAuthenticated?() }
         }
         .onChange(of: websiteService?.auth) { _, _ in onChange() }
-        .sheet(item: $websiteSignIn, onDismiss: {
+        .fullScreenCover(item: $websiteSignIn, onDismiss: {
             websiteAuthenticationRevision &+= 1
         }) { signIn in
-            ServiceBrowserView(session: signIn.session, reservesWebsiteSpace: true)
+            ServiceBrowserView(session: signIn.session)
         }
         .appPresentations(presentations)
     }

@@ -6,6 +6,7 @@ struct ChatPromptBlock: Equatable {
     let options: [String]
     let answer: String?
     let resolution: String?
+    let permission: PermissionPresentation?
     let allowsCustomAnswer: Bool
     let isActive: Bool
     let secretEntry: SecretEntryRequest?
@@ -107,7 +108,7 @@ extension ChatBlock {
                 projectedTurns.append(ProjectedTurn(id: source.turnID))
             }
             let turnIndex = projectedTurns.count - 1
-            if case let .prompt(kind, prompt, options, answer, resolution) = block.kind {
+            if case let .prompt(kind, prompt, options, answer, resolution, permission) = block.kind {
                 let activePrompt = pendingPrompt?.id == block.id ? pendingPrompt : nil
                 projectedTurns[turnIndex].blocks.append(ChatBlock(
                     id: block.id,
@@ -119,6 +120,7 @@ extension ChatBlock {
                         options: options,
                         answer: answer,
                         resolution: resolution,
+                        permission: permission,
                         allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
                         isActive: activePrompt != nil,
                         secretEntry: activePrompt?.secretEntry
@@ -173,7 +175,7 @@ extension ChatBlock {
                 }
             }
             for (index, item) in visibleItems {
-                let id = StableID.uuid("chat.block.\(block.id.uuidString).item.\(index)")
+                let id = contentItemID(blockID: block.id, index: index)
                 let kind: Kind
                 if case .serviceControl(let control) = item {
                     let isActive = serviceControlLocation == ServiceControlLocation(blockID: block.id, itemIndex: index)
@@ -258,6 +260,22 @@ extension ChatBlock {
                 sourceInvocations: block.sourceInvocations
             )
         }
+    }
+
+    static func latestCanvasBlockIDs(in blocks: [Block]) -> [URL: UUID] {
+        var latest: [URL: UUID] = [:]
+        for block in blocks {
+            guard case .agentContent(let items) = block.kind else { continue }
+            for (index, item) in items.enumerated() {
+                guard case .artifact(let artifact) = item, artifact.kind == .html else { continue }
+                latest[artifact.fileURL] = contentItemID(blockID: block.id, index: index)
+            }
+        }
+        return latest
+    }
+
+    private static func contentItemID(blockID: UUID, index: Int) -> UUID {
+        StableID.uuid("chat.block.\(blockID.uuidString).item.\(index)")
     }
 
     private static func thinkingID(turnID: TurnID, index: Int) -> UUID {

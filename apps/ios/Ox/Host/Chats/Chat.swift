@@ -1402,6 +1402,7 @@ final class Chat: Identifiable {
         let standalone = ensureExecutionContext()
         appendExecutionArtifact(artifact)
         document.apply(.embedArtifact(artifact))
+        NotificationCenter.default.post(name: .artifactChanged, object: artifact.fileURL)
         if standalone { finishStandaloneExecution() }
         Log.session.info("Chat.embedArtifact filename=\(artifact.fileName)")
     }

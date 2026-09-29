@@ -230,7 +230,8 @@ private struct ChatInteractiveRowSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
         content
-            .padding(Theme.Spacing.md)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
             .frame(minHeight: Theme.Size.minimumTouchTarget)
             .chatCardOutline()
             .contentShape(shape)
@@ -1261,6 +1262,7 @@ struct QueuedBubble: View {
 
 struct BlockView: View, Equatable {
     let block: ChatBlock
+    let isLatestCanvas: Bool
     let isStreamingTail: Bool
     let chatID: UUID
     let browserPageMount: WebPageMountCoordinator
@@ -1273,6 +1275,7 @@ struct BlockView: View, Equatable {
 
     static func == (lhs: BlockView, rhs: BlockView) -> Bool {
         lhs.block == rhs.block
+            && lhs.isLatestCanvas == rhs.isLatestCanvas
             && lhs.isStreamingTail == rhs.isStreamingTail
             && lhs.isThinkingTail == rhs.isThinkingTail
             && lhs.controls.isCopied == rhs.controls.isCopied
@@ -1430,13 +1433,14 @@ struct BlockView: View, Equatable {
                     case let .artifact(artifact):
                         if artifact.exists {
                             let sourceID = "block:\(block.id.uuidString):\(index):\(artifact.id)"
-                            Button { onOpenAttachment(artifact, sourceID) } label: {
-                                ChatArtifactRow(artifact: artifact, previewSourceID: sourceID)
+                            Group {
+                                if artifact.kind == .html && isLatestCanvas {
+                                    InlineCanvasCard(artifact: artifact, rowID: block.id)
+                                } else {
+                                    artifactRow(artifact, sourceID: sourceID)
+                                }
                             }
-                            .buttonStyle(.plain)
                             .padding(.horizontal, 4)
-                            .accessibilityLabel(artifact.userFacingAccessibilityLabel)
-                            .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))
                             .contextMenuPreviewShape()
                             .contextMenu {
                                 ArtifactContextMenu(artifact: artifact, canMutate: artifactControls.canMutate) {
@@ -1471,6 +1475,16 @@ struct BlockView: View, Equatable {
             }
             .animation(Theme.Animation.standard, value: isStreamingTail)
         }
+    }
+
+    private func artifactRow(_ artifact: Artifact, sourceID: String) -> some View {
+        Button { onOpenAttachment(artifact, sourceID) } label: {
+            ChatArtifactRow(artifact: artifact, previewSourceID: sourceID)
+        }
+        .buttonStyle(.plain)
+        .modifier(ChatInteractiveRowSurface())
+        .accessibilityLabel(artifact.userFacingAccessibilityLabel)
+        .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))
     }
 
     @ViewBuilder

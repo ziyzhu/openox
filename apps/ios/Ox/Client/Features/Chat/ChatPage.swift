@@ -168,6 +168,7 @@ private struct ChatTranscriptProjectionSnapshot {
     let sourceRange: Range<Int>
     let sourceBlockIDs: [UUID]
     let blocks: [ChatBlock]
+    let latestCanvasBlockIDs: [URL: UUID]
 
     init(key: ChatTranscriptProjectionKey, chat: Chat) {
         self.key = key
@@ -193,6 +194,7 @@ private struct ChatTranscriptProjectionSnapshot {
         sourceRange = key.requestedSourceRange
         sourceBlockIDs = requestedSourceIDs
         self.blocks = blocks
+        latestCanvasBlockIDs = ChatBlock.latestCanvasBlockIDs(in: chat.transcript)
     }
 }
 
@@ -290,11 +292,6 @@ struct ChatPage: View {
         case botControl(ServiceHandoffSession)
         case serviceAuth(ServiceAuthSession)
 
-        var isServiceAuth: Bool {
-            if case .serviceAuth = self { return true }
-            return false
-        }
-
         var id: String {
             switch self {
             case .modelPicker: "modelPicker"
@@ -377,7 +374,7 @@ struct ChatPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker, .botControl, .serviceAuth: modalPresentation
+                case .modelPicker, .serviceDetail, .artifacts, .artifactPicker: modalPresentation
                 default: nil
                 }
             },
@@ -389,7 +386,7 @@ struct ChatPage: View {
         Binding(
             get: {
                 switch modalPresentation {
-                case .camera: modalPresentation
+                case .camera, .botControl, .serviceAuth: modalPresentation
                 default: nil
                 }
             },
@@ -515,6 +512,7 @@ struct ChatPage: View {
         }
         let transcript = transcript(
             blocks: blocks,
+            latestCanvasBlockIDs: projection.latestCanvasBlockIDs,
             totalBlockCount: totalBlockCount,
             sourceRange: requestedSourceRange,
             sourceBlockIDs: requestedSourceIDs,
@@ -711,25 +709,25 @@ struct ChatPage: View {
                         Log.ui.info("ChatPage.attachArtifacts chat=\(chat.id) count=\(picked.count)")
                     }
                     .presentationDetents([.medium, .large])
-                case .botControl(let session):
-                    BotControlSheetView(session: session)
-                case .serviceAuth(let session):
-                    ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
-                case .camera, .photos, .files, .attachment:
+                case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
                     EmptyView()
                 }
             }
-            .presentationDragIndicator(presented.isServiceAuth ? .hidden : .visible)
+            .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.background)
         }
-        .fullScreenCover(item: fullScreenModal) { presented in
+        .fullScreenCover(item: fullScreenModal, onDismiss: sheetDidDismiss) { presented in
             switch presented {
             case .camera:
                 CameraPicker { image in
                     if let image { ingestCameraImage(image) }
                 }
                 .ignoresSafeArea()
-            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker, .botControl, .serviceAuth:
+            case .botControl(let session):
+                BotControlSheetView(session: session)
+            case .serviceAuth(let session):
+                ServiceSessionSheetView(session: session, mode: .signIn, returnsInline: true)
+            case .modelPicker, .serviceDetail, .photos, .files, .attachment, .artifacts, .artifactPicker:
                 EmptyView()
             }
         }
@@ -1018,7 +1016,7 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func chatBlockHost(_ block: ChatBlock) -> some View {
+    private func chatBlockHost(_ block: ChatBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
         switch block.kind {
         case .responseFooter(let text, let phase):
             ResponseFooterBlockView(
@@ -1045,7 +1043,7 @@ struct ChatPage: View {
             serviceControlBlock(control, interactionID: interactionID)
                 .padding(.horizontal, 4)
         case .userText, .userSkill, .agentContent, .thinking, .contextCompaction:
-            transcriptContentBlock(block)
+            transcriptContentBlock(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
         }
     }
 
@@ -1218,10 +1216,17 @@ struct ChatPage: View {
             }
     }
 
-    private func transcriptContentBlock(_ block: ChatBlock) -> some View {
+    private func transcriptContentBlock(_ block: ChatBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
         let isTail = block.sourceBlockID == chat.transcript.last?.id
+        let isLatestCanvas: Bool = if case .agentContent(.artifact(let artifact)) = block.kind,
+                                      artifact.kind == .html {
+            latestCanvasBlockIDs[artifact.fileURL] == block.id
+        } else {
+            false
+        }
         return BlockView(
             block: block,
+            isLatestCanvas: isLatestCanvas,
             isStreamingTail: chat.isBusy && isTail,
             chatID: chat.id,
             browserPageMount: browserPageMount,
@@ -1253,9 +1258,10 @@ struct ChatPage: View {
     @ViewBuilder
     private func blockRow(
         _ block: ChatBlock,
+        latestCanvasBlockIDs: [URL: UUID],
         identified: Bool = true
     ) -> some View {
-        let row = chatBlockHost(block)
+        let row = chatBlockHost(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
             .padding(.top, block.spacingBefore)
 
         if identified {
@@ -1314,6 +1320,7 @@ struct ChatPage: View {
 
     private func transcript(
         blocks: [ChatBlock],
+        latestCanvasBlockIDs: [URL: UUID],
         totalBlockCount: Int,
         sourceRange: Range<Int>,
         sourceBlockIDs: [UUID],
@@ -1329,6 +1336,7 @@ struct ChatPage: View {
                     transcriptRows(
                         blocks: blocks,
                         renderedBlocks: blocks,
+                        latestCanvasBlockIDs: latestCanvasBlockIDs,
                         anchoredViewportHeight: anchoredViewportHeight,
                         scrollToTurn: { id in
                             scroller.rideToTurn(id, animated: true) {
@@ -1436,6 +1444,7 @@ struct ChatPage: View {
     private func transcriptRows(
         blocks: [ChatBlock],
         renderedBlocks: [ChatBlock],
+        latestCanvasBlockIDs: [URL: UUID],
         anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) -> Void
     ) -> some View {
@@ -1446,7 +1455,7 @@ struct ChatPage: View {
             earlierWindowBoundary(blocks: blocks)
             if let anchor = anchoredQueuedMessage {
                 ForEach(renderedBlocks) { block in
-                    blockRow(block)
+                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
                 }
                 activityRow(blocks: renderedBlocks)
                 stoppedRow
@@ -1469,16 +1478,17 @@ struct ChatPage: View {
             } else if let anchorID = anchoredTurnID,
                       let anchorIndex = renderedBlocks.firstIndex(where: { $0.id == anchorID }) {
                 ForEach(Array(renderedBlocks[..<anchorIndex])) { block in
-                    blockRow(block)
+                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
                 }
                 VStack(spacing: 0) {
                     blockRow(
                         renderedBlocks[anchorIndex],
+                        latestCanvasBlockIDs: latestCanvasBlockIDs,
                         identified: false
                     )
                     .id(anchorID)
                     ForEach(Array(renderedBlocks.dropFirst(anchorIndex + 1))) { block in
-                        blockRow(block, identified: false)
+                        blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs, identified: false)
                     }
                     activityRow(blocks: renderedBlocks)
                     stoppedRow
@@ -1495,7 +1505,7 @@ struct ChatPage: View {
                 }
             } else {
                 ForEach(renderedBlocks) { block in
-                    blockRow(block)
+                    blockRow(block, latestCanvasBlockIDs: latestCanvasBlockIDs)
                 }
                 activityRow(blocks: renderedBlocks)
                 stoppedRow

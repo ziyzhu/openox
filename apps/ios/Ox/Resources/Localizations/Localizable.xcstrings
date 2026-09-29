@@ -2512,6 +2512,26 @@
         }
       }
     },
+    "Expand canvas" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开画布"
+          }
+        }
+      }
+    },
+    "Loading canvas…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载画布…"
+          }
+        }
+      }
+    },
     "Change a scheduled skill" : {
       "localizations" : {
         "zh-Hans" : {

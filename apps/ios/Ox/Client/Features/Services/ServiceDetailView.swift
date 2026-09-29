@@ -128,8 +128,10 @@ struct ServiceDetailView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showPageInspector) {
-            ServicePageInspector(service: service, browserSessionID: browserSessionID)
+        .fullScreenCover(isPresented: $showPageInspector) {
+            NavigationStack {
+                ServicePageInspector(service: service, browserSessionID: browserSessionID)
+            }
         }
         .alert("Clear website data?", isPresented: $confirmClearWebData) {
             Button("Clear data", role: .destructive) {

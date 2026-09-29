@@ -32,6 +32,7 @@ Calls are serialized per canvas, with at most 16 pending calls, 120 admissions p
 
 ## Compose for iPhone and iPad
 
+- Design for the bounded inline chat card first, then the expanded view. Keep the main visual and its primary control visible at phone width without requiring expansion.
 - Use a transparent or neutral page and one readable column by default. Favor a few large, legible elements over dense layouts.
 - Support widths from 320 px through iPad without horizontal page scrolling, clipped labels, fixed viewport heights, or fixed outer widths. Let controls wrap or stack with a media query.
 - Use native body type around 17 px, no more than two type sizes per visible region, an 8 px spacing rhythm, 12-18 px radii, and touch targets at least 44 px tall.

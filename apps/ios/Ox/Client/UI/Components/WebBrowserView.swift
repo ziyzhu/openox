@@ -3,11 +3,6 @@ import WebKit
 import UIKit
 
 struct WebBrowserView: View {
-    enum ChromeLayout {
-        case overlay
-        case reserved
-    }
-
     enum Mode {
         case browse
         case inspection
@@ -72,7 +67,6 @@ struct WebBrowserView: View {
 
     let page: WebPage
     let mode: Mode
-    var chromeLayout: ChromeLayout = .overlay
     let fallbackHost: String
     var initialURL: URL? = nil
     var errorMessage: String? = nil
@@ -90,52 +84,39 @@ struct WebBrowserView: View {
     private var currentURL: URL? { page.url ?? initialURL }
 
     var body: some View {
-        GeometryReader { geometry in
-            Group {
-                if chromeLayout == .reserved {
-                    VStack(spacing: 0) {
-                        websiteContent
-                            .overlay { errorOverlay }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        browserBar
-                            .background(Theme.Colors.surface)
-                    }
-                } else {
-                    websiteContent
-                        .ignoresSafeArea(.container, edges: .bottom)
-                        .overlay { errorOverlay }
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            browserBar
-                                .offset(y: scrollChrome.isCompact && !addressFocused ? max(0, geometry.safeAreaInsets.bottom - 16) : 0)
-                                .animation(reduceMotion ? nil : Theme.Animation.handoff, value: addressFocused)
-                                .animation(reduceMotion ? nil : Theme.Animation.handoff, value: scrollChrome.isCompact)
-                        }
-                }
-            }
-            .onChange(of: currentURL, initial: true) { _, _ in
+        VStack(spacing: 0) {
+            websiteContent
+                .overlay { errorOverlay }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            browserBar
+                .background(Theme.Colors.surface)
+        }
+        .safeAreaPadding(.top, 44)
+        .toolbarBackground(Theme.Colors.surface, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .onChange(of: currentURL, initial: true) { _, _ in
+            scrollChrome = .expanded(anchor: 0)
+            guard !addressFocused else { return }
+            syncAddress()
+        }
+        .onChange(of: addressFocused) { _, focused in
+            syncAddress()
+            if focused {
                 scrollChrome = .expanded(anchor: 0)
-                guard !addressFocused else { return }
-                syncAddress()
-            }
-            .onChange(of: addressFocused) { _, focused in
-                syncAddress()
-                if focused {
-                    scrollChrome = .expanded(anchor: 0)
-                    Task { @MainActor in
-                        await Task.yield()
-                        guard addressFocused else { return }
-                        UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
-                    }
+                Task { @MainActor in
+                    await Task.yield()
+                    guard addressFocused else { return }
+                    UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
                 }
             }
-            .alert("Couldn’t Load Page", isPresented: Binding(
-                get: { addressError != nil },
-                set: { if !$0 { addressError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                if let addressError { Text(addressError.message) }
-            }
+        }
+        .alert("Couldn’t Load Page", isPresented: Binding(
+            get: { addressError != nil },
+            set: { if !$0 { addressError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let addressError { Text(addressError.message) }
         }
     }
 

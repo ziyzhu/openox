@@ -49,7 +49,6 @@ enum LinkOpener {
 
 struct ServiceBrowserView: View {
     let session: ServiceBrowserSession
-    var reservesWebsiteSpace = false
     @Environment(\.dismiss) private var dismiss
 
     private var title: String {
@@ -57,29 +56,14 @@ struct ServiceBrowserView: View {
     }
 
     var body: some View {
-        Group {
-            if reservesWebsiteSpace {
-                VStack(spacing: 0) {
-                    Text(title)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .frame(height: 56)
-                        .frame(maxWidth: .infinity)
-                        .background(Theme.Colors.surface)
-                    browser
+        NavigationStack {
+            browser
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) { doneButton }
                 }
-            } else {
-                NavigationStack {
-                    browser
-                        .navigationTitle(title)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) { doneButton }
-                        }
-                }
-            }
         }
-        .presentationDragIndicator(.visible)
         .onAppear(perform: session.start)
         .onDisappear(perform: session.stop)
     }
@@ -88,7 +72,6 @@ struct ServiceBrowserView: View {
         WebBrowserView(
             page: session.page,
             mode: .browse,
-            chromeLayout: reservesWebsiteSpace ? .reserved : .overlay,
             fallbackHost: session.serviceDomain,
             initialURL: session.initialURL,
             errorMessage: session.errorMessage,

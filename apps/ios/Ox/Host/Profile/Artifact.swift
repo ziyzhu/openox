@@ -4,6 +4,10 @@ import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
+extension Notification.Name {
+    static let artifactChanged = Notification.Name("ai.oxcraft.artifactChanged")
+}
+
 nonisolated extension CodingUserInfoKey {
     static let profileScope = CodingUserInfoKey(rawValue: "profileScope")!
 }

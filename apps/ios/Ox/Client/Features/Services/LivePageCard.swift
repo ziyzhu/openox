@@ -29,6 +29,8 @@ struct LivePageCard: View {
     let accessibilityIdentifier: String
     let expandAccessibilityIdentifier: String
     let cancelAccessibilityIdentifier: String
+    var webContentMode: WebContentView.Mode = .browser
+    var expandAccessibilityLabel: String = String(localized: "View live page")
 
     var body: some View {
         VStack(spacing: 0) {
@@ -90,7 +92,7 @@ struct LivePageCard: View {
                 if let expand {
                     actionButton(
                         systemImage: "arrow.up.left.and.arrow.down.right",
-                        accessibilityLabel: String(localized: "View live page"),
+                        accessibilityLabel: expandAccessibilityLabel,
                         accessibilityIdentifier: expandAccessibilityIdentifier,
                         action: expand
                     )
@@ -138,7 +140,7 @@ struct LivePageCard: View {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    MountedWebPageView(mount: mount)
+                    MountedWebPageView(mount: mount, mode: webContentMode)
                 }
         } else {
             placeholderView

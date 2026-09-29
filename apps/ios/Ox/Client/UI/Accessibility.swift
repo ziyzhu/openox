@@ -279,6 +279,7 @@ nonisolated enum A11yID {
         static func composerAttachment(_ filename: String) -> String { "chat.composerAttachment.\(filename)" }
         static func mention(_ domain: String) -> String { "chat.mention.\(domain)" }
         static func skill(_ name: String) -> String { "chat.skill.\(name)" }
+        static func canvasExpand(_ filename: String) -> String { "chat.canvas.expand.\(filename)" }
 
         static func permissionRequest(_ icon: String) -> String { "chat.permissionRequest.\(icon)" }
         static func step(_ icon: String) -> String { "chat.step.\(icon)" }
