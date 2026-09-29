@@ -3,7 +3,6 @@
   "name": "ChatGPT",
   "description": "Chat with ChatGPT, search saved conversations, open and continue chats, read rendered messages, inspect models, and access account information. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chatgpt.com/",
-  "faviconUrl": "https://chatgpt.com/unauth-mweb/apple-touch-icon.png",
   "actions": [
     {
       "id": "getSignInUrl",
@@ -721,5 +720,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://chatgpt.com/unauth-mweb/apple-touch-icon.png"
 }
