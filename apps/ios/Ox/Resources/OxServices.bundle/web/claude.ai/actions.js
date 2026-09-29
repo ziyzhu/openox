@@ -3,12 +3,19 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function json(path){const r=await fetch(path,{credentials:'include',cache:'no-store'});if(r.redirected||r.status!==200)throw Error('Claude request failed: HTTP '+r.status);if(!(r.headers.get('content-type')||'').includes('json'))throw Error('Unexpected Claude response type');return r.json();}
 async function account(){const j=await json(BOOT);if(j.account===null)return null;if(j.account&&typeof j.account.uuid==='string'&&Array.isArray(j.account.memberships))return j.account;throw Error('Unrecognized Claude session response');}
 async function org(id){const a=await account();if(!a)throw Error('Sign in to Claude first');const ms=a.memberships.map(x=>x.organization).filter(x=>x&&typeof x.uuid==='string');if(id){if(!ms.some(x=>x.uuid===id))throw Error('Organization is not available to this account');return id;}if(ms.length!==1)throw Error('Choose an organizationId from getCurrentUser');return ms[0].uuid;}
-// The new-chat page's resolved_org_uuid identifies the organization selected by Claude.
-// Do not relax org() for ordinary Actions, where the caller must disambiguate.
-async function modelActiveOrg(){const j=await json(BOOT);if(j.account===null)throw Error('Sign in to Claude first');const memberships=j.account?.memberships;if(!Array.isArray(memberships))throw Error('Unrecognized Claude session response');const active=j.resolved_org_uuid;if(typeof active!=='string'||!memberships.some(m=>m.organization?.uuid===active))throw Error('Claude active organization is unavailable');return active;}
 const url=id=>'https://claude.ai/chat/'+id;
 const summary=j=>({id:j.uuid,title:j.name||'',model:j.model||null,url:url(j.uuid),updatedAt:j.updated_at||null});
-async function detail(organizationId,id){const o=await org(organizationId);const j=await json('/api/organizations/'+encodeURIComponent(o)+'/chat_conversations/'+encodeURIComponent(id)+'?tree=True&rendering_mode=messages&render_all_tools=true&include_inline_comparison=true&consistency=strong');if(j.uuid!==id||!Array.isArray(j.chat_messages))throw Error('Conversation identity or message shape mismatch');return {id:j.uuid,title:j.name||'',model:j.model||null,url:url(j.uuid),messages:j.chat_messages.map(m=>({id:m.uuid,parentId:m.parent_message_uuid||null,role:m.sender,text:typeof m.text==='string'&&m.text?m.text:(m.content||[]).filter(c=>c.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'),createdAt:m.created_at||null}))};}
+const nullableString=value=>typeof value==='string'&&value?value:null;
+const absoluteUrl=value=>{const v=nullableString(value);return v?new URL(v,location.origin).href:null;};
+const nullableInteger=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+const basename=value=>typeof value==='string'?value.split(/[\\/]/).filter(Boolean).pop()||'':'';
+function files(m){
+ const uploaded=(Array.isArray(m.files)?m.files:[]).map(f=>{const preview=f.preview_asset&&typeof f.preview_asset==='object'?f.preview_asset:null,document=f.document_asset&&typeof f.document_asset==='object'?f.document_asset:null,thumb=f.thumbnail_asset&&typeof f.thumbnail_asset==='object'?f.thumbnail_asset:null;return {id:String(f.file_uuid||f.uuid||''),name:String(f.file_name||''),kind:String(f.file_kind||'file'),mimeType:null,sizeBytes:nullableInteger(f.size_bytes),url:absoluteUrl(document?.url)||absoluteUrl(preview?.url)||absoluteUrl(f.preview_url),thumbnailUrl:absoluteUrl(thumb?.url)||absoluteUrl(f.thumbnail_url),width:nullableInteger(preview?.image_width)||nullableInteger(thumb?.image_width),height:nullableInteger(preview?.image_height)||nullableInteger(thumb?.image_height),pageCount:nullableInteger(document?.page_count),tokenCount:nullableInteger(document?.token_count),source:'attachment',downloadable:!!(document?.url||preview?.url||f.preview_url)};});
+ const generated=[];
+ for(const block of (Array.isArray(m.content)?m.content:[])){if(block?.type!=='tool_result'||!['present_files','send_user_file','mcp__cowork__present_files'].includes(block.name)||!Array.isArray(block.content))continue;for(const item of block.content){if(item?.type!=='local_resource'||typeof item.uuid!=='string')continue;generated.push({id:item.uuid,name:basename(item.file_path)||String(item.name||''),kind:'file',mimeType:nullableString(item.mime_type),sizeBytes:null,url:null,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source:'generated',downloadable:true});}}
+ const seen=new Set;return [...uploaded,...generated].filter(f=>f.id&&!seen.has(f.id)&&seen.add(f.id));
+}
+async function detail(organizationId,id){const o=await org(organizationId);const j=await json('/api/organizations/'+encodeURIComponent(o)+'/chat_conversations/'+encodeURIComponent(id)+'?tree=True&rendering_mode=messages&render_all_tools=true&include_inline_comparison=true&consistency=strong');if(j.uuid!==id||!Array.isArray(j.chat_messages))throw Error('Conversation identity or message shape mismatch');return {id:j.uuid,title:j.name||'',model:j.model||null,url:url(j.uuid),messages:j.chat_messages.map(m=>({id:m.uuid,parentId:m.parent_message_uuid||null,role:m.sender,text:typeof m.text==='string'&&m.text?m.text:(m.content||[]).filter(c=>c.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'),createdAt:m.created_at||null,files:files(m)}))};}
 const visible=e=>!!e&&e.getClientRects().length>0;
 async function wait(fn,ms=7000){const end=Date.now()+ms;while(Date.now()<end){const v=fn();if(v)return v;await pause(120);}throw Error('Claude interface not ready; no submission retried');}
 const editor=()=>{const e=document.querySelector('[data-testid="chat-input"][contenteditable="true"]');return visible(e)?e:null;};
@@ -30,8 +37,8 @@ async function send(message,target,organizationId){
  const button=await wait(()=>{const b=document.querySelector('[data-testid="chat-input-send"]');return editor()?.innerText.trim()===message.trim()&&visible(b)&&!b.disabled&&b.getAttribute('aria-disabled')!=='true'?b:null;},2500);
  button.click();
  const end=Date.now()+12000;let confirmed=false;let observedId=null;
- while(Date.now()<end){const id=conversationId();if(id&&(!target||id===target)){observedId=id;try{const state=await detail(organization,id);const sent=state.messages.find(m=>m.role==='human'&&!known.has(m.id)&&m.text.trim()===message.trim());if(sent){confirmed=true;const reply=state.messages.find(m=>m.role==='assistant'&&!known.has(m.id)&&m.parentId===sent.id);const elements=Array.from(document.querySelectorAll('[data-testid="assistant-message"]'));const last=elements.at(-1);if(reply?.text&&last?.getAttribute('data-is-streaming')==='false'&&last.innerText.includes(reply.text.trim()))return {status:'response_available',conversationId:id,url:url(id),response:reply.text};}}catch(error){console.log('Claude response read pending');}}await pause(600);}
- return {status:confirmed?'submitted_pending':'submission_unconfirmed',conversationId:observedId,url:location.href,response:null};
+ while(Date.now()<end){const id=conversationId();if(id&&(!target||id===target)){observedId=id;try{const state=await detail(organization,id);const sent=state.messages.find(m=>m.role==='human'&&!known.has(m.id)&&m.text.trim()===message.trim());if(sent){confirmed=true;const reply=state.messages.find(m=>m.role==='assistant'&&!known.has(m.id)&&m.parentId===sent.id);const elements=Array.from(document.querySelectorAll('[data-testid="assistant-message"]'));const last=elements.at(-1);if(reply&&last?.getAttribute('data-is-streaming')==='false'&&(reply.text?last.innerText.includes(reply.text.trim()):reply.files.length))return {status:'response_available',conversationId:id,url:url(id),response:reply.text||null,responseFiles:reply.files};}}catch(error){console.log('Claude response read pending');}}await pause(600);}
+ return {status:confirmed?'submitted_pending':'submission_unconfirmed',conversationId:observedId,url:location.href,response:null,responseFiles:[]};
 }
 window.ox.install(({action})=>{
 registerModelActions(action);
@@ -47,8 +54,6 @@ registerModelActions(action);
  action('continueChat',{async invoke({message,conversationId,organizationId}){return send(message,conversationId,organizationId);}});
 });
 
-
-// Observe the page-owned completion response; never send or retry a completion ourselves.
 function createModelSite(send) {
   const active = new Map();
   const nativeFetch = window.fetch;
