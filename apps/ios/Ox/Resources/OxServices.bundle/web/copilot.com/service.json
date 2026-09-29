@@ -1,8 +1,9 @@
 {
   "domain": "copilot.com",
   "name": "Microsoft Copilot",
-  "description": "Search saved Copilot chats, read conversations and recent history, and choose response modes. Broad searches requiring additional pages must be narrowed. Automated sending remains experimental and unconfirmed.",
+  "description": "Search saved Copilot chats, read conversations and recent history, and choose response modes. Broad searches requiring additional pages must be narrowed. Automated sending remains experimental and unconfirmed. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://copilot.com/",
+  "faviconUrl": "https://res.cdn.office.net/officehub/images/content/images/unauth-copilotcom/copilot-mobile-logo-static-286643fc8c.png",
   "actions": [
     {
       "id": "getSignInUrl",
@@ -87,7 +88,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current conversation",
-      "description": "Read up to 100 rendered messages; not full history.",
+      "description": "Read up to 100 rendered messages; not full history. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -120,11 +121,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -243,11 +251,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -399,11 +414,18 @@
                     },
                     "text": {
                       "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/file"
+                      }
                     }
                   },
                   "required": [
                     "role",
-                    "text"
+                    "text",
+                    "files"
                   ],
                   "additionalProperties": false
                 }
@@ -499,11 +521,18 @@
                     },
                     "text": {
                       "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/file"
+                      }
                     }
                   },
                   "required": [
                     "role",
-                    "text"
+                    "text",
+                    "files"
                   ],
                   "additionalProperties": false
                 }
@@ -599,5 +628,98 @@
       "baseUrl": "https://copilot.com/chat/all"
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/copilot.com/favicon.png"
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  }
 }
