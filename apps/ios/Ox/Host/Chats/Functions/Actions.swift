@@ -22,7 +22,6 @@ nonisolated enum Actions {
     static let appLanguage = "ox.app.language"
     static let appTheme = "ox.app.theme"
     static let appVoice = "ox.app.voice"
-    static let appVoiceOptions = "ox.app.voiceOptions"
     static let appModel = "ox.app.model"
     static let appDefaultModel = "ox.app.defaultModel"
     static let appActionPolicies = "ox.app.actionPolicies"
@@ -97,7 +96,7 @@ nonisolated enum Actions {
         chatStart, chatDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appVoice,
-        appVoiceOptions, appModel, appDefaultModel, appActionPolicies, appRepositories,
+        appModel, appDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameChat,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
@@ -146,7 +145,7 @@ nonisolated enum Actions {
         case appNotifications: L10n.string("Notifications")
         case appLanguage: L10n.string("Language")
         case appTheme: L10n.string("Theme")
-        case appVoice, appVoiceOptions: L10n.string("Voice")
+        case appVoice: L10n.string("Voice")
         case appModel: L10n.string("Model")
         case appDefaultModel: L10n.string("Default model")
         case appActionPolicies: L10n.string("Actions")

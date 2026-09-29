@@ -1770,7 +1770,6 @@ extension Scenario {
             const language = await ox.app.language({ purpose: "Read language" });
             const theme = await ox.app.theme({ purpose: "Read theme" });
             const voice = await ox.app.voice({ purpose: "Read voice" });
-            const voiceOptions = await ox.app.voiceOptions({ purpose: "List voice options" });
             const model = await ox.app.model({ purpose: "Read model" });
             const defaultModel = await ox.app.defaultModel({ purpose: "Read default model" });
             const actionPolicies = await ox.app.actionPolicies({ action: "ox.app.info", limit: 2, purpose: "Read Action policy" });
@@ -1787,18 +1786,17 @@ extension Scenario {
             assert(theme.appearance === (theme.selection === "dark" ? "dark" : "light"), "Incorrect theme appearance");
             assert(voice.selection === null || typeof voice.selection === "string", "Invalid voice selection");
             assert(voice.effective === null || ["id", "name", "language"].every(key => typeof voice.effective[key] === "string" && voice.effective[key].length > 0), "Invalid effective voice");
-            assert(voiceOptions.options.length <= 100 && voiceOptions.options.every(item => ["id", "name", "language", "quality", "selected", "effective"].every(key => key in item)), "Invalid voice options");
             assert(typeof defaultModel.configured === "boolean" && ["global", "china"].includes(defaultModel.region) && typeof defaultModel.provider.name === "string" && typeof defaultModel.model.name === "string", "Invalid default model");
             assert((actionPolicies.defaultPolicy === null || ["ask", "allow", "block"].includes(actionPolicies.defaultPolicy)) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default", "actionDefault"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
             assert(["idle", "syncing", "ready", "failed"].includes(repositories.status) && repositories.repositories.length <= 50 && repositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,id,name,provenance,serviceCount,skillCount,state"), "Invalid repositories");
             assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateRepository === "undefined", "Human-controlled settings must not expose mutations");
-            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["voiceOptions", { limit: 1 }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["repositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
+            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["repositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
               let rejected = false;
               try { await ox.app[name]({ ...options, purpose: "Reject invalid input" }); }
               catch { rejected = true; }
               assert(rejected, name + " must reject invalid input");
             }
-            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, voiceOptionCount: voiceOptions.options.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: repositories.repositories.length }));
+            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: repositories.repositories.length }));
             """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
@@ -1813,7 +1811,6 @@ extension Scenario {
               result["defaultModel"]?.objectValue?["configured"]?.boolValue != nil,
               result["actionPolicy"]?.objectValue?["action"]?.stringValue == "ox.app.info",
               result["profileCount"]?.intValue != nil,
-              result["voiceOptionCount"]?.intValue != nil,
               result["repositoryCount"]?.intValue != nil,
               !output.contains("credential"),
               !output.contains("accountLabel"),

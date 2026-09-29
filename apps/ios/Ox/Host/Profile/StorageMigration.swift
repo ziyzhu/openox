@@ -108,6 +108,7 @@ nonisolated struct StorageMigrationReplay: Sendable {
     let actionPolicyResolutionValid: Bool
     let skillChecks: [String: Bool]
     let secretsIndexRenamed: Bool
+    let modelsDirectoryMigrated: Bool
     let fixtureResults: [StorageMigrationFixtureReplay]
 }
 
@@ -184,6 +185,7 @@ nonisolated enum StorageMigrator {
     static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
         Log.app.info("StorageMigrator.prepare start")
         try validateApplicationStorage()
+        try migrateOnDeviceModels(in: AppStoragePaths.applicationSupport)
         try migrateLegacySecrets()
         try migrateManagedOAuthAccounts()
         try migratePublicationToken()
@@ -195,6 +197,46 @@ nonisolated enum StorageMigrator {
         try migrateAPIServiceOAuthAccounts(manifests: manifests)
         try migrateSecretAPIServiceCredentials(manifests: manifests)
         Log.app.info("StorageMigrator.prepare done profile=\(storage.activeId?.uuidString ?? "nil")")
+    }
+
+    private static func migrateOnDeviceModels(in support: URL) throws {
+        let manager = FileManager.default
+        let source = support.appendingPathComponent("on-device-models", isDirectory: true)
+        let destination = support.appendingPathComponent("models", isDirectory: true)
+        var sourceIsDirectory: ObjCBool = false
+        guard manager.fileExists(atPath: source.path, isDirectory: &sourceIsDirectory) else { return }
+        guard sourceIsDirectory.boolValue else {
+            throw StorageMigrationError.invalidApplicationStorage("on-device models")
+        }
+        Log.app.info("StorageMigrator.modelsDirectory start")
+        do {
+            try AppStoragePaths.excludeFromBackup(source)
+            var destinationIsDirectory: ObjCBool = false
+            let moved: Int
+            if manager.fileExists(atPath: destination.path, isDirectory: &destinationIsDirectory) {
+                guard destinationIsDirectory.boolValue else {
+                    throw StorageMigrationError.collision(destination.path)
+                }
+                try AppStoragePaths.excludeFromBackup(destination)
+                let entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil)
+                for entry in entries where manager.fileExists(atPath: destination.appendingPathComponent(entry.lastPathComponent).path) {
+                    throw StorageMigrationError.collision(entry.lastPathComponent)
+                }
+                for entry in entries {
+                    try manager.moveItem(at: entry, to: destination.appendingPathComponent(entry.lastPathComponent))
+                }
+                try manager.removeItem(at: source)
+                moved = entries.count
+            } else {
+                let count = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil).count
+                try manager.moveItem(at: source, to: destination)
+                moved = count
+            }
+            Log.app.info("StorageMigrator.modelsDirectory done moved=\(moved)")
+        } catch {
+            Log.app.error("StorageMigrator.modelsDirectory failed error=\(error.localizedDescription)")
+            throw error
+        }
     }
 
     private static func migrateLegacySecrets() throws {
@@ -2349,8 +2391,48 @@ nonisolated enum StorageMigrator {
             actionPolicyResolutionValid: actionPolicyResolutionValid,
             skillChecks: try replayRepositorySkills(),
             secretsIndexRenamed: try replaySecretsIndexRename(),
+            modelsDirectoryMigrated: try replayModelsDirectoryMigration(),
             fixtureResults: fixtureResults
         )
+    }
+
+    private static func replayModelsDirectoryMigration() throws -> Bool {
+        let manager = FileManager.default
+        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "models-directory-replay")
+        defer { FileStaging.cleanup(root, operation: "models-directory-replay") }
+        let source = root.appendingPathComponent("on-device-models", isDirectory: true)
+        let destination = root.appendingPathComponent("models", isDirectory: true)
+        try manager.createDirectory(at: source, withIntermediateDirectories: true)
+        let legacyModel = source.appendingPathComponent("gemma.litertlm")
+        let legacyBytes = Data("model".utf8)
+        try legacyBytes.write(to: legacyModel)
+        try migrateOnDeviceModels(in: root)
+        let migrated = try !manager.fileExists(atPath: source.path)
+            && Data(contentsOf: destination.appendingPathComponent("gemma.litertlm")) == legacyBytes
+        try migrateOnDeviceModels(in: root)
+        let secondRunNoOp = (try Data(contentsOf: destination.appendingPathComponent("gemma.litertlm"))) == legacyBytes
+
+        try manager.createDirectory(at: source, withIntermediateDirectories: true)
+        let remaining = source.appendingPathComponent("kokoro")
+        try Data("voice".utf8).write(to: remaining)
+        try migrateOnDeviceModels(in: root)
+        let resumed = try !manager.fileExists(atPath: source.path)
+            && Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
+
+        try manager.createDirectory(at: source, withIntermediateDirectories: true)
+        try Data("other".utf8).write(to: source.appendingPathComponent("kokoro"))
+        var collisionRejected = false
+        do {
+            try migrateOnDeviceModels(in: root)
+        } catch StorageMigrationError.collision(let path) {
+            collisionRejected = path == "kokoro"
+        } catch {
+            collisionRejected = false
+        }
+        collisionRejected = try collisionRejected
+            && Data(contentsOf: source.appendingPathComponent("kokoro")) == Data("other".utf8)
+            && Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
+        return migrated && secondRunNoOp && resumed && collisionRejected
     }
 
     private static func replayRepositorySkills() throws -> [String: Bool] {

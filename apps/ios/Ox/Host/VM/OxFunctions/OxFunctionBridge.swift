@@ -14,7 +14,6 @@ public protocol OxFunctionBridge: AnyObject {
     func appLanguage(purpose: String) async throws -> JSONValue?
     func appTheme(purpose: String) async throws -> JSONValue?
     func appVoice(purpose: String) async throws -> JSONValue?
-    func appVoiceOptions(purpose: String) async throws -> JSONValue?
     func appModel(purpose: String) async throws -> JSONValue?
     func appDefaultModel(purpose: String) async throws -> JSONValue?
     func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue?

@@ -1,5 +1,38 @@
 # Third-Party Notices
 
+## LiteRT-LM and Gemma 4 E2B
+
+LiteRT-LM is by Google and contributors, licensed under Apache License 2.0.
+The Gemma 4 E2B LiteRT-LM model is downloaded on demand from the LiteRT
+Community model repository, which lists its license as Apache 2.0. Ox pins
+the model revision and verifies the downloaded file before use.
+
+Sources:
+- https://github.com/google-ai-edge/LiteRT-LM
+- https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm
+
+## Kokoro offline speech synthesis
+
+Kokoro-82M model weights and the `af_heart` and `zf_001` voices are by hexgrad and contributors,
+licensed under Apache License 2.0. The staged Core ML conversion, Swift alignment,
+harmonic DSP, and tensor code are adapted from mattmireles/kokoro-coreml,
+licensed under Apache License 2.0. The English pronunciation dictionary and
+phonemizer are adapted from FluidInference/FluidAudio, licensed under Apache
+License 2.0. The four English Core ML packages are downloaded on demand from a pinned
+mattmireles/kokoro-coreml revision and compiled on the device. The Mandarin
+seven-stage Core ML conversion and pronunciation dictionaries are adapted from
+FluidInference/FluidAudio and downloaded on demand from a pinned
+FluidInference/kokoro-82m-coreml revision. The license text is included in
+`Ox.app/Kokoro.bundle/LICENSE`.
+
+Sources:
+- https://huggingface.co/hexgrad/Kokoro-82M
+- https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh
+- https://huggingface.co/mattmireles/kokoro-coreml
+- https://github.com/mattmireles/kokoro-coreml
+- https://huggingface.co/FluidInference/kokoro-82m-coreml
+- https://github.com/FluidInference/FluidAudio
+
 ## Apple device service artwork
 
 The device service icons reproduce artwork published by Apple for Apple Maps,

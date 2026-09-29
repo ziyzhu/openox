@@ -73,7 +73,7 @@ nonisolated enum OxAppInformation {
             ), (
                 "ox.app.voice",
                 .object([
-                    "description": .string("Read Ox's selected speech voice identifier and effective voice for its current locale: `await ox.app.voice({ purpose })`. A null selection means automatic. An unavailable or incompatible selection falls back to an automatic voice. The effective voice is null when no voice is available. Does not change settings or speak."),
+                    "description": .string("Read Ox's fixed offline English read-aloud voice: `await ox.app.voice({ purpose })`. The effective voice is null until the model is installed in Settings → Voice. Does not speak."),
                     "inputSchema": object([:]),
                     "outputSchema": object([
                         "selection": nullable(string),
@@ -83,25 +83,6 @@ nonisolated enum OxAppInformation {
                             "language": string,
                         ], required: ["id", "name", "language"])),
                     ], required: ["selection", "effective"]),
-                ])
-            ), (
-                "ox.app.voiceOptions",
-                .object([
-                    "description": .string("List the speech voices shown by Ox for its current locale: `await ox.app.voiceOptions({ purpose })`. Returns the selected identifier, effective voice, and at most 100 filtered voice options in Settings order. Does not change the selection or speak."),
-                    "inputSchema": object([:]),
-                    "outputSchema": object([
-                        "selection": nullable(string),
-                        "effective": nullable(voiceInformation),
-                        "options": array(object([
-                            "id": string,
-                            "name": string,
-                            "language": string,
-                            "quality": enumeration(["basic", "enhanced", "premium", "unknown"]),
-                            "selected": boolean,
-                            "effective": boolean,
-                        ], required: ["id", "name", "language", "quality", "selected", "effective"]), maximum: 100),
-                        "truncated": boolean,
-                    ], required: ["selection", "effective", "options", "truncated"]),
                 ])
             ), (
                 "ox.app.model",
@@ -262,9 +243,6 @@ nonisolated enum OxAppInformation {
             let voice: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appVoice(purpose: purpose) }
             }
-            let voiceOptions: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appVoiceOptions(purpose: purpose) }
-            }
             let model: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appModel(purpose: purpose) }
             }
@@ -292,7 +270,6 @@ nonisolated enum OxAppInformation {
             context.setObject(language as AnyObject, forKeyedSubscript: "__nativeAppLanguage" as NSString)
             context.setObject(theme as AnyObject, forKeyedSubscript: "__nativeAppTheme" as NSString)
             context.setObject(voice as AnyObject, forKeyedSubscript: "__nativeAppVoice" as NSString)
-            context.setObject(voiceOptions as AnyObject, forKeyedSubscript: "__nativeAppVoiceOptions" as NSString)
             context.setObject(model as AnyObject, forKeyedSubscript: "__nativeAppModel" as NSString)
             context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
             context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
@@ -308,7 +285,6 @@ nonisolated enum OxAppInformation {
           language: (value) => { const options = __oxOptions(value, 'ox.app.language'); return __nativeAppLanguage(String(options.purpose)); },
           theme: (value) => { const options = __oxOptions(value, 'ox.app.theme'); return __nativeAppTheme(String(options.purpose)); },
           voice: (value) => { const options = __oxOptions(value, 'ox.app.voice'); return __nativeAppVoice(String(options.purpose)); },
-          voiceOptions: (value) => { const options = __oxOptions(value, 'ox.app.voiceOptions'); return __nativeAppVoiceOptions(String(options.purpose)); },
           model: (value) => { const options = __oxOptions(value, 'ox.app.model'); return __nativeAppModel(String(options.purpose)); },
           defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
           actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },
@@ -330,13 +306,6 @@ nonisolated enum OxAppInformation {
         "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired"]),
         "settingsPath": string,
     ], required: ["method", "status", "settingsPath"])
-    private static let voiceInformation = object([
-        "id": string,
-        "name": string,
-        "language": string,
-        "quality": enumeration(["basic", "enhanced", "premium", "unknown"]),
-    ], required: ["id", "name", "language", "quality"])
-
     private static let modelInformation = object([
         "provider": namedValue,
         "model": namedValue,

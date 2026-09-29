@@ -41,5 +41,7 @@ nonisolated enum AppAudioSession {
         try session.setCategory(category, mode: mode, options: options)
         try session.setActive(true)
         activeOwner.withLock { $0 = owner }
+        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
+        Log.ui.info("AudioSession.activated category=\(category.rawValue) mode=\(mode.rawValue) outputs=\(outputs) volume=\(session.outputVolume)")
     }
 }

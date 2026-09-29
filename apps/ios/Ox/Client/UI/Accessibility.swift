@@ -80,10 +80,7 @@ nonisolated enum A11yID {
         static func customProviderModel(_ id: String) -> String { "settings.customProviderModel.\(id)" }
         static let language = "settings.language"
         static let voice = "settings.voice"
-        static let voiceAutomatic = "settings.voice.automatic"
-        static let voiceAutomaticPreview = "settings.voice.automatic.preview"
-        static func voiceOption(_ identifier: String) -> String { "settings.voice.option.\(identifier)" }
-        static func voicePreview(_ identifier: String) -> String { "settings.voice.preview.\(identifier)" }
+        static let voiceDownload = "settings.voice.download"
         static let theme = "settings.theme"
         static let actions = "settings.actions"
         static let services = "settings.services"

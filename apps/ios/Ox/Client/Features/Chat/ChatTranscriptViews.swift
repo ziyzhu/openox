@@ -1,21 +1,21 @@
 import SwiftUI
 import AVFAudio
+import NaturalLanguage
 import Observation
 import WebKit
 
 @MainActor
 @Observable
-final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizerDelegate {
-    private(set) var speakingBlockID: UUID?
-    @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
-    @ObservationIgnored private let audioSession = AVAudioSession.sharedInstance()
-    @ObservationIgnored private let audioSessionID = UUID()
-    @ObservationIgnored private var activeUtterance: AVSpeechUtterance?
-
-    override init() {
-        super.init()
-        synthesizer.delegate = self
+final class MessageSpeechPlayback {
+    private enum Voice {
+        case onDevice(name: String)
+        case system(language: String?)
     }
+
+    private(set) var speakingBlockID: UUID?
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var pendingStop: Task<Void, Never>?
+    @ObservationIgnored private let systemSpeech = SystemSpeechPlayback()
 
     func toggle(text: String, blockID: UUID) {
         if speakingBlockID == blockID {
@@ -28,59 +28,138 @@ final class MessageSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizer
         let spoken = rendered.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !spoken.isEmpty else { return }
 
-        let utterance = AVSpeechUtterance(string: spoken)
-        let voice = SpeechVoiceSettings.shared.preferredVoice(for: AppLocale.shared.locale)
-        utterance.voice = voice
-        guard activateAudioSession() else { return }
-        activeUtterance = utterance
+        let voice = voice(for: spoken)
         speakingBlockID = blockID
-        Log.ui.info("MessageSpeech.start block=\(blockID) chars=\(spoken.count) voice=\(voice?.identifier ?? "default") quality=\(voice?.quality.rawValue ?? 0)")
-        synthesizer.speak(utterance)
+        let priorStop = pendingStop
+        switch voice {
+        case .onDevice(let name):
+            Log.ui.info("MessageSpeech.start block=\(blockID) chars=\(spoken.count) voice=\(name)")
+        case .system(let language):
+            Log.ui.info("MessageSpeech.start block=\(blockID) chars=\(spoken.count) voice=system language=\(language ?? "default")")
+        }
+        task = Task { [weak self] in
+            await priorStop?.value
+            do {
+                switch voice {
+                case .onDevice:
+                    try await KokoroTTS.shared.speak(spoken)
+                case .system(let language):
+                    try await self?.systemSpeech.speak(spoken, language: language)
+                }
+                self?.finish(blockID: blockID, outcome: "finished")
+            } catch is CancellationError {
+                self?.finish(blockID: blockID, outcome: "canceled")
+            } catch {
+                Log.ui.error("MessageSpeech.failed block=\(blockID) error=\(error.localizedDescription)")
+                self?.finish(blockID: blockID, outcome: "failed")
+            }
+        }
     }
 
     func stop(reason: String) {
         guard let blockID = speakingBlockID else { return }
-        activeUtterance = nil
+        task?.cancel()
+        task = nil
         speakingBlockID = nil
-        synthesizer.stopSpeaking(at: .immediate)
-        deactivateAudioSession(reason: reason)
+        pendingStop = Task {
+            await KokoroTTS.shared.stop()
+            systemSpeech.stop()
+        }
         Log.ui.info("MessageSpeech.stop block=\(blockID) reason=\(reason)")
     }
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        finish(utterance, outcome: "finished")
+    private func voice(for text: String) -> Voice {
+        let language = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+        let languageRoot = language?.split(separator: "-").first.map(String.init)
+        let isMandarin = languageRoot == "zh" || (language == nil && MandarinG2P.containsHanzi(text))
+        if isMandarin {
+            return KokoroMandarinModelStore.shared.state == .ready
+                ? .onDevice(name: "mandarin")
+                : .system(language: language ?? "zh-CN")
+        }
+        let isEnglish = languageRoot == "en" || (language == nil && KokoroTextNormalizer.supportsEnglish(text))
+        if isEnglish {
+            return KokoroModelStore.shared.state == .ready
+                ? .onDevice(name: "heart")
+                : .system(language: language ?? "en-US")
+        }
+        return .system(language: language)
     }
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        finish(utterance, outcome: "canceled")
-    }
-
-    private func finish(_ utterance: AVSpeechUtterance, outcome: String) {
-        guard activeUtterance === utterance, let blockID = speakingBlockID else { return }
-        activeUtterance = nil
+    private func finish(blockID: UUID, outcome: String) {
+        guard speakingBlockID == blockID else { return }
+        task = nil
         speakingBlockID = nil
-        deactivateAudioSession(reason: outcome)
         Log.ui.info("MessageSpeech.\(outcome) block=\(blockID)")
     }
+}
 
-    private func activateAudioSession() -> Bool {
-        do {
-            try AppAudioSession.activatePlayback(owner: audioSessionID)
-            let route = audioSession.currentRoute.outputs
-                .map { "\($0.portType.rawValue):\($0.portName)" }
-                .joined(separator: ",")
-            Log.ui.info("MessageSpeech.audioSession activated category=\(audioSession.category.rawValue) mode=\(audioSession.mode.rawValue) route=\(route)")
-            return true
-        } catch {
-            Log.ui.error("MessageSpeech.audioSession activation failed error=\(error.localizedDescription)")
-            return false
+@MainActor
+private final class SystemSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizerDelegate {
+    private struct ActiveSpeech {
+        let utterance: AVSpeechUtterance
+        let audioSessionID: UUID
+        let continuation: CheckedContinuation<Void, Error>
+    }
+
+    private let synthesizer = AVSpeechSynthesizer()
+    private var activeSpeech: ActiveSpeech?
+
+    override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    func speak(_ text: String, language: String?) async throws {
+        stop()
+        try Task.checkCancellation()
+        let utterance = AVSpeechUtterance(string: text)
+        if let language {
+            utterance.voice = AVSpeechSynthesisVoice(language: language)
+        }
+        let audioSessionID = UUID()
+        try AppAudioSession.activatePlayback(owner: audioSessionID)
+        Log.ui.info("SystemSpeech.start language=\(utterance.voice?.language ?? language ?? "default") voice=\(utterance.voice?.identifier ?? "default")")
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                activeSpeech = ActiveSpeech(
+                    utterance: utterance,
+                    audioSessionID: audioSessionID,
+                    continuation: continuation
+                )
+                if Task.isCancelled {
+                    complete(utterance, result: .failure(CancellationError()), reason: "canceled")
+                } else {
+                    synthesizer.speak(utterance)
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.stop() }
         }
     }
 
-    private func deactivateAudioSession(reason: String) {
-        AppAudioSession.deactivate(owner: audioSessionID, reason: "messageSpeech.\(reason)")
+    func stop() {
+        guard let activeSpeech else { return }
+        self.activeSpeech = nil
+        synthesizer.stopSpeaking(at: .immediate)
+        AppAudioSession.deactivate(owner: activeSpeech.audioSessionID, reason: "systemSpeech.stopped")
+        activeSpeech.continuation.resume(throwing: CancellationError())
     }
 
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        complete(utterance, result: .success(()), reason: "finished")
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        complete(utterance, result: .failure(CancellationError()), reason: "canceled")
+    }
+
+    private func complete(_ utterance: AVSpeechUtterance, result: Result<Void, Error>, reason: String) {
+        guard let activeSpeech, activeSpeech.utterance === utterance else { return }
+        self.activeSpeech = nil
+        AppAudioSession.deactivate(owner: activeSpeech.audioSessionID, reason: "systemSpeech.\(reason)")
+        activeSpeech.continuation.resume(with: result)
+    }
 }
 
 private struct AttachmentThumb: View {

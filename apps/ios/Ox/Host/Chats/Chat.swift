@@ -245,6 +245,7 @@ final class Chat: Identifiable {
     func switchModel(to client: any ProviderClient, model: ProviderModel, selection: ModelSelection) {
         self.client = client
         self.model = model
+        if isSelected { LiteRTModelActivation.select(chatID: id, clientID: client.id, modelID: model.id) }
         publishFollowIntents([])
         modelSelection = ModelSelection(
             region: selection.region,
@@ -326,6 +327,7 @@ final class Chat: Identifiable {
     func select() {
         guard !isSelected else { return }
         isSelected = true
+        LiteRTModelActivation.select(chatID: id, clientID: client.id, modelID: model.id)
         Log.session.info("Chat.selection id=\(id) selected=true busy=\(isBusy)")
         outputDelivery.setVisibility(.visible)
         if outputDelivery.needsFrames { startStreamLink() }
@@ -358,6 +360,7 @@ final class Chat: Identifiable {
     func deselect() {
         guard isSelected else { return }
         isSelected = false
+        LiteRTModelActivation.deselect(chatID: id)
         Log.session.info("Chat.selection id=\(id) selected=false busy=\(isBusy)")
         setTranscriptVisible(false)
         browserRestoreTask?.cancel()

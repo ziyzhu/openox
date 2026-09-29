@@ -46,7 +46,6 @@ struct SettingsSheet: View {
     @State private var profileOpenErrorMessage: String?
     private var registry: ProviderRegistry { ProviderRegistry.shared }
     private var appLocale: AppLocale { AppLocale.shared }
-    private var speechVoice: SpeechVoiceSettings { .shared }
     private var storage: StorageRoot { .shared }
 
     private var theme: ThemeManager { .shared }
@@ -87,6 +86,21 @@ struct SettingsSheet: View {
         let client = registry.client(for: selection)
         let model = registry.model(for: selection, client: client)
         return Text(verbatim: "\(client.displayName) · \(model.displayName)")
+    }
+
+    private var voiceStatus: Text {
+        let readyCount = (KokoroModelStore.shared.state == .ready ? 1 : 0)
+            + (KokoroMandarinModelStore.shared.state == .ready ? 1 : 0)
+        if readyCount > 0 { return Text("\(readyCount) of 2 ready") }
+        if case .downloading = KokoroMandarinModelStore.shared.state { return Text("Downloading") }
+        if case .failed = KokoroMandarinModelStore.shared.state { return Text("Needs attention") }
+        switch KokoroModelStore.shared.state {
+        case .notInstalled: return Text("Not installed")
+        case .downloading: return Text("Downloading")
+        case .preparing: return Text("Preparing")
+        case .ready: return Text("Ready")
+        case .failed: return Text("Needs attention")
+        }
     }
 
     var body: some View {
@@ -191,15 +205,13 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.language)
                     }
 
-                    SettingsSection(
-                        "Voice",
-                        footer: "Used to read agent responses aloud. For higher quality, go to Settings › Accessibility › Read & Speak › Voices and download an Enhanced or Premium voice."
-                    ) {
+                    SettingsSection("Voice", layout: .row) {
                         NavigationLink {
-                            SpeechVoicePickerView()
+                            VoiceSettingsView()
                         } label: {
-                            SettingsValueRow(
-                                value: Text(verbatim: speechVoice.selectedVoiceName(for: appLocale.locale))
+                            SettingsDisclosureRow(
+                                title: "On-device voices",
+                                value: voiceStatus
                             )
                         }
                         .buttonStyle(.plain)
@@ -538,7 +550,7 @@ struct ModelPickerContent: View {
     private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
-    @State private var choosingProvider = false
+    @State private var showingOnDeviceModels = false
     @State private var authRevision = 0
     @State private var selectedRegion: LLMRegion
     @State private var providerSelection: ProviderSelection
@@ -638,6 +650,7 @@ struct ModelPickerContent: View {
         switch providerSelection {
         case .client:
             selectedClient != nil && selectedModel != nil && isAuthenticated
+                && (selectedClient?.inferenceLocation != .onDevice || selectedClient?.id == "mock" || OnDeviceModelStore.shared.state == .ready)
         case .custom:
             !customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && CustomLLMProviderDiscovery.normalizedBaseURL(customURL) != nil
@@ -659,6 +672,9 @@ struct ModelPickerContent: View {
             }
             .onChange(of: authRevision) { _, _ in selectAvailableModel() }
             .onChange(of: registry.customProviders) { _, _ in selectAvailableClient() }
+            .onChange(of: OnDeviceModelStore.shared.state) { _, state in
+                if state == .ready, selectedClient?.id == LiteRTGemmaProvider().id { applySelection() }
+            }
             .toolbar {
                 if case .authentication(let session) = mode {
                     ToolbarItem(placement: .topBarLeading) {
@@ -703,11 +719,17 @@ struct ModelPickerContent: View {
                         customAuthenticationSection
                         selectionSection("Model") { customModelControl }
                     } else if let selectedClient {
-                        authenticationSection(selectedClient)
-                        if !isAuthenticating {
-                            selectionSection("Model") { modelMenu }
-                            if !reasoningEfforts.isEmpty {
-                                selectionSection("Thinking level") { reasoningEffortMenu }
+                        if selectedClient.inferenceLocation == .onDevice && selectedClient.id != "mock" {
+                            if !isAuthenticating {
+                                selectionSection("Model") { onDeviceModelRow }
+                            }
+                        } else {
+                            authenticationSection(selectedClient)
+                            if !isAuthenticating {
+                                selectionSection("Model") { modelMenu }
+                                if !reasoningEfforts.isEmpty {
+                                    selectionSection("Thinking level") { reasoningEffortMenu }
+                                }
                             }
                         }
                     }
@@ -756,11 +778,31 @@ struct ModelPickerContent: View {
     }
 
     private var providerMenu: some View {
-        Button { choosingProvider = true } label: {
+        let directClients = displayedClients.filter { $0.inferenceLocation == .onDevice }
+            + displayedClients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey && !isWebsite($0) }
+            + displayedClients.filter(isWebsite)
+        let directIDs = Set(directClients.map(\.id))
+        let apiClients = displayedClients.filter { !directIDs.contains($0.id) }
+            .sorted { ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max) }
+
+        return Menu {
+            ForEach(directClients, id: \.id) { client in
+                providerOption(client)
+            }
+            if !apiClients.isEmpty {
+                Menu("API provider") {
+                    ForEach(apiClients, id: \.id) { client in
+                        providerOption(client)
+                    }
+                }
+                .accessibilityIdentifier(A11yID.Chat.modelAPIProviders)
+            }
+            Button("Custom provider") { selectProvider(nil) }
+                .accessibilityIdentifier(A11yID.Chat.modelCustomProviders)
+        } label: {
             selectionRow(providerSelection == .custom
                 ? "Custom provider"
-                : selectedClient?.displayName ?? "Choose a provider",
-                indicator: "chevron.right")
+                : selectedClient?.displayName ?? "Choose a provider")
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Provider")
@@ -768,71 +810,90 @@ struct ModelPickerContent: View {
             ? "Custom provider"
             : selectedClient?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelProvider)
-        .navigationDestination(isPresented: $choosingProvider) {
-            ProviderPickerView(
-                clients: displayedClients,
-                selectedClientID: Binding(
-                    get: { selectedClientID },
-                    set: {
-                        providerSelection = $0.map(ProviderSelection.client) ?? .custom
-                        providerDidChange()
-                        applySelection()
-                    }
-                ),
-                onSelect: { choosingProvider = false }
-            )
+    }
+
+    private func providerOption(_ client: any ProviderClient) -> some View {
+        Button {
+            selectProvider(client.id)
+        } label: {
+            if selectedClientID == client.id {
+                Label(client.displayName, systemImage: "checkmark")
+            } else {
+                Text(client.displayName)
+            }
         }
+        .accessibilityIdentifier(A11yID.Chat.modelProviderOption(client.id))
+    }
+
+    private func selectProvider(_ id: String?) {
+        providerSelection = id.map(ProviderSelection.client) ?? .custom
+        providerDidChange()
+        applySelection()
+    }
+
+    private func isWebsite(_ client: any ProviderClient) -> Bool {
+        client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
     }
 
     private var modelMenu: some View {
-        NavigationLink {
-            SettingsSelectionPickerView(
-                title: "Model",
-                options: (selectedClient?.models ?? []).map { model in
-                    SettingsSelectionOption(
-                        id: model.id,
-                        value: model.id,
-                        title: model.displayName,
-                        accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
-                    )
-                },
-                selection: Binding(
-                    get: { selectedModelID },
-                    set: { modelID in
-                        selectedModelID = modelID
-                        selectDefaultReasoningEffort()
-                        applySelection()
-                    }
-                )
-            )
-            .toolbar {
-                if let selectedClient, selectedClient.canLoadModels {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { loadProviderModels(selectedClient) } label: {
-                            if providerModelsLoading {
-                                CellularAutomatonLoader.small
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
-                        .disabled(providerModelsLoading)
-                        .accessibilityLabel(providerModelsLoading ? "Loading models…" : "Load models")
+        Menu {
+            ForEach(selectedClient?.models ?? [], id: \.id) { model in
+                Button {
+                    selectedModelID = model.id
+                    selectDefaultReasoningEffort()
+                    applySelection()
+                } label: {
+                    if selectedModelID == model.id {
+                        Label(model.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(model.displayName)
                     }
                 }
+                .accessibilityIdentifier(A11yID.Chat.modelOption(model.id))
             }
-            .alert("Load models", isPresented: Binding(
-                get: { providerModelsError != nil },
-                set: { if !$0 { providerModelsError = nil } }
-            )) {
-                Button("OK", role: .cancel) { providerModelsError = nil }
-            } message: {
-                Text(verbatim: providerModelsError ?? "")
+            if let selectedClient, selectedClient.canLoadModels {
+                Divider()
+                Button("Load models", systemImage: "arrow.clockwise") { loadProviderModels(selectedClient) }
+                    .disabled(providerModelsLoading)
             }
         } label: {
-            selectionRow(selectedModel?.displayName ?? "No models available", indicator: "chevron.right")
+            selectionRow(selectedModel?.displayName ?? "No models available")
         }
         .buttonStyle(.plain)
         .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
+        .alert("Load models", isPresented: Binding(
+            get: { providerModelsError != nil },
+            set: { if !$0 { providerModelsError = nil } }
+        )) {
+            Button("OK", role: .cancel) { providerModelsError = nil }
+        } message: {
+            Text(verbatim: providerModelsError ?? "")
+        }
+        .accessibilityLabel("Model")
+        .accessibilityValue(selectedModel?.displayName ?? "")
+        .accessibilityIdentifier(A11yID.Chat.modelSelection)
+    }
+
+    private var onDeviceModelRow: some View {
+        Menu {
+            Button {
+                if OnDeviceModelStore.shared.state == .ready {
+                    applySelection()
+                } else {
+                    showingOnDeviceModels = true
+                }
+            } label: {
+                Label(
+                    OnDeviceModelStore.modelName,
+                    systemImage: OnDeviceModelStore.shared.state == .ready ? "checkmark" : "arrow.down"
+                )
+            }
+            .accessibilityIdentifier(A11yID.Chat.modelOption(OnDeviceModelStore.modelID))
+        } label: {
+            selectionRow(selectedModel?.displayName ?? "No models available")
+        }
+        .buttonStyle(.plain)
+        .navigationDestination(isPresented: $showingOnDeviceModels) { OnDeviceModelsView() }
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelSelection)
@@ -943,29 +1004,23 @@ struct ModelPickerContent: View {
             .disabled(!customModelsCanLoad)
             .accessibilityIdentifier(A11yID.Chat.modelSelection)
         } else {
-            NavigationLink {
-                SettingsSelectionPickerView(
-                    title: "Model",
-                    options: customModels.map { model in
-                        SettingsSelectionOption(
-                            id: model.id,
-                            value: model.id,
-                            title: model.displayName,
-                            accessibilityIdentifier: A11yID.Chat.modelOption(model.id)
-                        )
-                    },
-                    selection: Binding(
-                        get: { customModelID },
-                        set: { modelID in
-                            customModelID = modelID
-                            applySelection()
+            Menu {
+                ForEach(customModels, id: \.id) { model in
+                    Button {
+                        customModelID = model.id
+                        applySelection()
+                    } label: {
+                        if customModelID == model.id {
+                            Label(model.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(model.displayName)
                         }
-                    )
-                )
+                    }
+                    .accessibilityIdentifier(A11yID.Chat.modelOption(model.id))
+                }
             } label: {
                 selectionRow(
-                    customModels.first { $0.id == customModelID }?.displayName ?? "Choose a model",
-                    indicator: "chevron.right"
+                    customModels.first { $0.id == customModelID }?.displayName ?? "Choose a model"
                 )
             }
             .buttonStyle(.plain)
@@ -1222,70 +1277,6 @@ struct ModelPickerContent: View {
 
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    }
-}
-
-private struct ProviderPickerView: View {
-    let clients: [any ProviderClient]
-    @Binding var selectedClientID: String?
-    let onSelect: () -> Void
-
-    var body: some View {
-        let directClients = clients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey && !isWebsite($0) }
-            + clients.filter(isWebsite)
-        let directIDs = Set(directClients.map(\.id))
-        let apiClients = clients.filter { !directIDs.contains($0.id) }
-            .sorted { ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max) }
-        let visibleClients = directClients + apiClients.filter { $0.id == selectedClientID }
-        let apiOption = SettingsSelectionOption<String?>(
-            id: "api",
-            value: nil,
-            title: L10n.string("API provider"),
-            systemImage: "plus",
-            accessibilityIdentifier: A11yID.Chat.modelAPIProviders,
-            children: apiClients.map { providerOption($0, showsSubtitle: true) }
-        )
-        let customOption = SettingsSelectionOption<String?>(
-            id: "custom",
-            value: nil,
-            title: L10n.string("Custom provider"),
-            systemImage: "plus",
-            accessibilityIdentifier: A11yID.Chat.modelCustomProviders
-        )
-
-        SettingsSelectionPickerView(
-            title: "Provider",
-            options: visibleClients.map { providerOption($0) }
-                + (apiClients.isEmpty ? [] : [apiOption]) + [customOption],
-            selection: $selectedClientID,
-            onSelect: {
-                selectedClientID = $0
-                onSelect()
-            }
-        )
-    }
-
-    private func isWebsite(_ client: any ProviderClient) -> Bool {
-        client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
-    }
-
-    private func providerOption(_ client: any ProviderClient, showsSubtitle: Bool = false) -> SettingsSelectionOption<String?> {
-        SettingsSelectionOption(
-            id: client.id,
-            value: client.id,
-            title: client.displayName,
-            faviconDomain: client.website?.host,
-            faviconURL: client.iconURL,
-            serviceDomain: (client as? WebServiceModelProvider)?.domain,
-            subtitle: showsSubtitle ? subtitle(for: client) : nil,
-            accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
-        )
-    }
-
-    private func subtitle(for client: any ProviderClient) -> String {
-        if let offer = client.gettingStartedOffer { return offer.summary }
-        if !client.acceptsAPIKey { return "Not required" }
-        return client.credentialKind == .subscriptionKey ? "Subscription key" : "API key"
     }
 }
 

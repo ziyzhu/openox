@@ -1,4 +1,3 @@
-import AVFAudio
 import Foundation
 
 extension Chat {
@@ -103,38 +102,14 @@ extension Chat {
 
     public func appVoice(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appVoice, .object([:]), purpose: purpose) {
-            let settings = SpeechVoiceSettings.shared
-            let voice = settings.preferredVoice(for: AppLocale.shared.locale)
+            let installed = await KokoroModelStore.shared.state == .ready
             return .object([
-                "selection": settings.selectedVoiceIdentifier.map(JSONValue.string) ?? .null,
-                "effective": voice.map {
-                    .object([
-                        "id": .string($0.identifier),
-                        "name": .string($0.name),
-                        "language": .string($0.language),
-                    ])
-                } ?? .null,
-            ])
-        }
-    }
-
-    public func appVoiceOptions(purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.appVoiceOptions, .object([:]), purpose: purpose) {
-            let settings = SpeechVoiceSettings.shared
-            let locale = AppLocale.shared.locale
-            let voices = settings.availableVoices(for: locale)
-            let effective = settings.preferredVoice(for: locale)
-            let limit = 100
-            return .object([
-                "selection": settings.selectedVoiceIdentifier.map(JSONValue.string) ?? .null,
-                "effective": effective.map(Self.voiceInformation) ?? .null,
-                "options": .array(voices.prefix(limit).map { voice in
-                    var information = Self.voiceInformation(voice).objectValue ?? [:]
-                    information["selected"] = .bool(voice.identifier == settings.selectedVoiceIdentifier)
-                    information["effective"] = .bool(voice.identifier == effective?.identifier)
-                    return .object(information)
-                }),
-                "truncated": .bool(voices.count > limit),
+                "selection": .null,
+                "effective": installed ? .object([
+                    "id": .string("af_heart"),
+                    "name": .string("Heart"),
+                    "language": .string("en-US"),
+                ]) : .null,
             ])
         }
     }
@@ -250,20 +225,6 @@ extension Chat {
         ])
     }
 
-    private static func voiceInformation(_ voice: AVSpeechSynthesisVoice) -> JSONValue {
-        let quality = switch voice.quality {
-        case .default: "basic"
-        case .enhanced: "enhanced"
-        case .premium: "premium"
-        @unknown default: "unknown"
-        }
-        return .object([
-            "id": .string(voice.identifier),
-            "name": .string(voice.name),
-            "language": .string(voice.language),
-            "quality": .string(quality),
-        ])
-    }
 }
 
 nonisolated struct AppActionPolicyQuery {
