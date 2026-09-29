@@ -17,6 +17,7 @@
 1. Prefer E2E tests instead of unit tests.
 1. Use `sim` and `ox` CLI for testing.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
+1. Show screenshots after making UI changes for human to review.
 
 ## Commit Rules
 
