@@ -925,7 +925,6 @@
       "baseUrl": "https://gemini.google.com/app"
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/gemini.google.com/favicon.png",
   "$defs": {
     "file": {
       "type": "object",
@@ -1019,5 +1018,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/gemini.google.com/favicon.png"
 }
