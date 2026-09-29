@@ -1041,7 +1041,6 @@
       "requireApproval": true
     }
   ],
-  "faviconUrl": "https://openox.ai/assets/services/grok.com/favicon.png",
   "$defs": {
     "file": {
       "type": "object",
@@ -1135,5 +1134,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/grok.com/favicon.png"
 }
