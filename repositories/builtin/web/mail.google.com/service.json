@@ -297,6 +297,30 @@
       "requireAuth": false
     },
     {
+      "id": "getAddAccountUrl",
+      "label": "Sign in another Gmail account",
+      "description": "Returns Google’s additional-account sign-in URL without signing out existing accounts. Open the URL in Browser and let the user complete sign-in, then call listAccounts to verify the account was added.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
       "id": "listAccounts",
       "label": "List Gmail accounts",
       "description": "Lists the Gmail accounts available in your current Google sign-in session.",
@@ -701,8 +725,13 @@
         "discardDraft": {
           "label": "丢弃 Gmail 草稿",
           "description": "永久丢弃现有 Gmail 草稿。"
+        },
+        "getAddAccountUrl": {
+          "label": "登录另一个 Gmail 账号",
+          "description": "返回 Google 添加账号的登录链接，不退出已有账号。在浏览器中由用户完成登录后，列出 Gmail 账号以验证新增账号。"
         }
       }
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/mail.google.com/favicon.png"
 }

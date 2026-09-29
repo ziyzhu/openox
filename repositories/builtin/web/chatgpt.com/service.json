@@ -1,7 +1,7 @@
 {
   "domain": "chatgpt.com",
   "name": "ChatGPT",
-  "description": "Chat with ChatGPT, search saved conversations, open and continue chats, read rendered messages, inspect models, and access account information.",
+  "description": "Chat with ChatGPT, search saved conversations, open and continue chats, read rendered messages, inspect models, and access account information. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chatgpt.com/",
   "actions": [
     {
@@ -115,19 +115,29 @@
         "type": "object",
         "properties": {
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "conversationRef": {
             "type": "string"
           },
           "url": {
             "type": "string"
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "response",
           "conversationRef",
-          "url"
+          "url",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -163,19 +173,29 @@
         "type": "object",
         "properties": {
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "conversationRef": {
             "type": "string"
           },
           "url": {
             "type": "string"
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "response",
           "conversationRef",
-          "url"
+          "url",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -186,7 +206,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current chat",
-      "description": "Read bounded rendered messages in the currently loaded chat, not the complete saved history.",
+      "description": "Read bounded rendered messages in the currently loaded chat, not the complete saved history. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -223,11 +243,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -599,5 +626,100 @@
         "additionalProperties": false
       }
     }
-  ]
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "faviconUrl": "https://chatgpt.com/unauth-mweb/apple-touch-icon.png"
 }

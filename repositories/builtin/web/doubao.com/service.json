@@ -1,7 +1,7 @@
 {
   "domain": "doubao.com",
   "name": "Doubao",
-  "description": "Search saved message content, read rendered chats, reopen recent Doubao conversations, and send with approval. Search continuation and title-only matching are not supported.",
+  "description": "Search saved message content, read rendered chats, reopen recent Doubao conversations, and send with approval. Search continuation and title-only matching are not supported. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://www.doubao.com/chat/",
   "actions": [
     {
@@ -59,7 +59,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current chat",
-      "description": "Read bounded rendered messages and loaded sidebar titles. Does not return complete history or paginate older chats.",
+      "description": "Read bounded rendered messages and loaded sidebar titles. Does not return complete history or paginate older chats. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -96,11 +96,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -272,7 +279,10 @@
             "type": "string"
           },
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -283,6 +293,12 @@
           },
           "submissionConfirmed": {
             "type": "boolean"
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -290,7 +306,8 @@
           "conversationRef",
           "response",
           "status",
-          "submissionConfirmed"
+          "submissionConfirmed",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -332,7 +349,10 @@
             "type": "string"
           },
           "response": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -343,6 +363,12 @@
           },
           "submissionConfirmed": {
             "type": "boolean"
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -350,7 +376,8 @@
           "conversationRef",
           "response",
           "status",
-          "submissionConfirmed"
+          "submissionConfirmed",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -848,5 +875,100 @@
       "requireApproval": true,
       "baseUrl": "https://www.doubao.com/chat/"
     }
-  ]
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/doubao.com/favicon.png"
 }

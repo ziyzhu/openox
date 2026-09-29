@@ -1,7 +1,7 @@
 {
   "domain": "chat.deepseek.com",
   "name": "DeepSeek",
-  "description": "Search saved DeepSeek chats, read server-backed conversation history, reopen recent chats, and send text with approval.",
+  "description": "Search saved DeepSeek chats, read server-backed conversation history, reopen recent chats, and send text with approval. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chat.deepseek.com/",
   "actions": [
     {
@@ -57,7 +57,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current chat",
-      "description": "Read up to 100 currently rendered messages. Does not load older messages.",
+      "description": "Read up to 100 currently rendered messages. Does not load older messages. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -84,11 +84,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -146,11 +153,18 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -212,13 +226,20 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "status",
           "submissionConfirmed",
           "url",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -274,13 +295,20 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
           "status",
           "submissionConfirmed",
           "url",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -368,7 +396,7 @@
     {
       "id": "getConversation",
       "label": "Read saved conversation",
-      "description": "Read the latest 100 messages of the current server branch by ID, including older chats returned by search. Excludes reasoning fragments; does not navigate or send.",
+      "description": "Read the latest 100 messages of the current server branch by ID, including older chats returned by search. Excludes reasoning fragments; does not navigate or send. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -412,12 +440,19 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "id",
                 "role",
-                "text"
+                "text",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -439,5 +474,100 @@
       "requireApproval": false,
       "blocking": true
     }
-  ]
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "faviconUrl": "https://fe-static.deepseek.com/chat/icon-180.png"
 }

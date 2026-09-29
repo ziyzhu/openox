@@ -422,20 +422,23 @@ window.ox.install(({ action }) => {
         }
     };
     const ensureComposeExpanded = async (dialog) => {
-        const body = composeBody(dialog);
-        if (!body)
-            throw new Error("Gmail message editor was unavailable");
-        if (body.getClientRects().length > 0)
-            return dialog;
-        const maximize = [...dialog.querySelectorAll('[role="button"], button')]
-            .find((element) => element.getClientRects().length > 0
-            && (cleanText(element.getAttribute("aria-label")) === "Maximize"
-                || cleanText(element.getAttribute("data-tooltip")) === "Maximize"));
-        if (!maximize)
-            throw new Error("Gmail draft was minimized and could not be expanded");
-        maximize.click();
-        await waitFor(() => body.getClientRects().length > 0, "Gmail draft expanded");
-        return dialog;
+        let expanded = false;
+        return waitFor(() => {
+            if (!document.contains(dialog))
+                throw new Error("Gmail draft editor was detached before sending; no send attempted");
+            const body = composeBody(dialog);
+            if (body && body.getClientRects().length > 0)
+                return dialog;
+            const maximize = [...dialog.querySelectorAll('[role="button"], button')]
+                .find(element => element.getClientRects().length > 0
+                    && (cleanText(element.getAttribute("aria-label")) === "Maximize"
+                        || cleanText(element.getAttribute("data-tooltip")) === "Maximize"));
+            if (maximize && !expanded) {
+                expanded = true;
+                maximize.click();
+            }
+            return null;
+        }, "Gmail draft editor ready (no send attempted)");
     };
     const composeIdentity = (dialog) => {
         const id = cleanText(dialog.querySelector('input[name="draft"]')?.value);
@@ -639,6 +642,11 @@ window.ox.install(({ action }) => {
         async invoke() {
             const continueUrl = encodeURIComponent(`${MAIL_ROOT}#inbox`);
             return { url: `https://accounts.google.com/ServiceLogin?service=mail&continue=${continueUrl}` };
+        },
+    });
+    action("getAddAccountUrl", {
+        async invoke() {
+            return { url: "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&sacu=1&service=mail&flowName=WebLiteSignIn&flowEntry=AddSession" };
         },
     });
     action("getSignInState", {

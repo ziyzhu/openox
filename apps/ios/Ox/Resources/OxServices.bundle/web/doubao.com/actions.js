@@ -38,7 +38,10 @@ const draftText = () => editor()?.editor?.view?.state?.doc?.textContent ?? edito
 async function wait(check, ms=7000, label='interface') { const end=Date.now()+ms; do { const v=check();if(v)return v;await sleep(120); }while(Date.now()<end);throw new Error('Doubao '+label+' not ready; no automatic retry.'); }
 const currentRef = () => location.pathname.match(/^\/chat\/(\d+)\/?$/)?.[1] || '';
 const blankRoute = () => /^\/chat\/?$/.test(location.pathname);
-function messages(){return Array.from(document.querySelectorAll(sel('send_message')+','+sel('receive_message'))).filter(visible).map(e=>({role:e.getAttribute('data-testid')==='send_message'?'user':'assistant',text:Array.from(e.querySelectorAll(sel('message_text_content'))).map(x=>(x.innerText||x.textContent||'').trim()).join('\n\n')})).filter(x=>x.text);}
+const richInt=v=>Number.isSafeInteger(v)&&v>=0?v:null;
+const richUrl=v=>{if(typeof v!=='string'||!v)return null;try{const u=new URL(v,location.origin);return ['http:','https:'].includes(u.protocol)?u.href:null;}catch{return null;}};
+function richFiles(e,source){const out=[];for(const img of e.querySelectorAll('img[src]')){const u=richUrl(img.currentSrc||img.src);if(!u||img.getAttribute('aria-hidden')==='true'||(img.naturalWidth&&img.naturalWidth<64))continue;out.push({id:null,name:img.alt||'',kind:'image',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:richInt(img.naturalWidth),height:richInt(img.naturalHeight),pageCount:null,tokenCount:null,source,downloadable:true});}for(const x of e.querySelectorAll('a[href][download],a[href*="download"],a[href*="/file"],a[href$=".pdf"],a[href$=".docx"],a[href$=".csv"],a[href$=".zip"]')){const u=richUrl(x.href);if(!u)continue;out.push({id:null,name:x.getAttribute('download')||(x.textContent||'').trim(),kind:/\.pdf(?:$|\?)/i.test(u)?'document':'file',mimeType:null,sizeBytes:null,url:u,thumbnailUrl:null,width:null,height:null,pageCount:null,tokenCount:null,source,downloadable:true});}const seen=new Set;return out.filter(f=>{if(seen.has(f.url))return false;seen.add(f.url);return true;});}
+function messages(){return Array.from(document.querySelectorAll(sel('send_message')+','+sel('receive_message'))).filter(visible).map(e=>{const role=e.getAttribute('data-testid')==='send_message'?'user':'assistant';return {role,text:Array.from(e.querySelectorAll(sel('message_text_content'))).map(x=>(x.innerText||x.textContent||'').trim()).join('\n\n'),files:richFiles(e,role==='assistant'?'generated':'attachment')};}).filter(x=>x.text||x.files.length);}
 function recent(){return Array.from(document.querySelectorAll(sel('conversation-list-v2-item'))).map(e=>({element:e,title:norm(e.children[1]?.innerText||e.children[1]?.textContent),conversationRef:e.getAttribute('data-conversation-id')||''})).filter(x=>x.title&&x.conversationRef);}
 async function ready(){await wait(()=>editor(),6000,'editor');if(!blankRoute()&&!currentRef())throw Error('Unsupported Doubao route.');if(currentRef())await wait(()=>messages().length>0,6000,'conversation messages');}
 function assertEmpty(){const e=editor();if(!e)throw Error('Composer unavailable.');if(norm(draftText()))throw Error('Existing draft: refusing to overwrite or discard it.');}
@@ -74,16 +77,16 @@ async function send(message,ref,beforeSubmit=()=>{}){
  try{
  beforeSubmit();
  button.click();
- const deadline=Date.now()+12000;let confirmed=false;let response='';let last='';let stableSince=Date.now();
+ const deadline=Date.now()+12000;let confirmed=false;let response='';let responseFiles=[];let last='';let stableSince=Date.now();
  while(Date.now()<deadline){
   const now=messages();const users=now.filter(x=>x.role==='user');const oldUsers=before.filter(x=>x.role==='user');
   confirmed=users.length>oldUsers.length&&norm(users[users.length-1]?.text)===norm(message);
-  if(confirmed){const lastUser=now.map(x=>x.role).lastIndexOf('user');response=now.slice(lastUser+1).filter(x=>x.role==='assistant').map(x=>x.text).join('\n\n');}
+  responseFiles=[];if(confirmed){const lastUser=now.map(x=>x.role).lastIndexOf('user');const assistants=now.slice(lastUser+1).filter(x=>x.role==='assistant');response=assistants.map(x=>x.text).filter(Boolean).join('\n\n');responseFiles=assistants.flatMap(x=>x.files);}
   if(response!==last){last=response;stableSince=Date.now();}
-  if(confirmed&&response&&Date.now()-stableSince>1200)break;
+  if(confirmed&&(response||responseFiles.length)&&Date.now()-stableSince>1200)break;
   await sleep(180);
  }
- return {url:location.href,conversationRef:currentRef(),response,status:response?'reply_observed':'pending',submissionConfirmed:confirmed};
+ return {url:location.href,conversationRef:currentRef(),response:response||null,responseFiles,status:response||responseFiles.length?'reply_observed':'pending',submissionConfirmed:confirmed};
  }finally{window.fetch=originalFetch;XMLHttpRequest.prototype.open=originalOpen;XMLHttpRequest.prototype.send=originalSend;}
 }
 

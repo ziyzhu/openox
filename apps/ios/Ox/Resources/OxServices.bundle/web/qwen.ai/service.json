@@ -1,7 +1,7 @@
 {
   "domain": "qwen.ai",
   "name": "Qwen",
-  "description": "Chat with Qwen, search and read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry.",
+  "description": "Chat with Qwen, search and read saved conversations, browse history and models, and select a model. Sending requires approval. Opening and continuing require a loaded sidebar entry. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chat.qwen.ai/",
   "actions": [
     {
@@ -246,7 +246,7 @@
     {
       "id": "getConversation",
       "label": "Read conversation",
-      "description": "Read up to 100 messages from the server-returned history window.",
+      "description": "Read up to 100 messages from the server-returned history window. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -847,13 +847,20 @@
               },
               "done": {
                 "type": "boolean"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/file"
+                }
               }
             },
             "required": [
               "id",
               "role",
               "text",
-              "done"
+              "done",
+              "files"
             ],
             "additionalProperties": false
           }
@@ -868,6 +875,98 @@
         "url",
         "messages",
         "hasEarlierMessages"
+      ],
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
       ],
       "additionalProperties": false
     }

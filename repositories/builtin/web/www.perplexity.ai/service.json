@@ -1,7 +1,7 @@
 {
   "domain": "www.perplexity.ai",
   "name": "Perplexity",
-  "description": "Search saved sessions, ask cited questions, start and continue conversations, read history, and inspect the model catalog.",
+  "description": "Search saved sessions, ask cited questions, start and continue conversations, read history, and inspect the model catalog. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://www.perplexity.ai/",
   "$defs": {
     "nullableString": {
@@ -147,6 +147,12 @@
         },
         "url": {
           "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          }
         }
       },
       "required": [
@@ -159,7 +165,8 @@
         "relatedQueries",
         "status",
         "createdAt",
-        "url"
+        "url",
+        "files"
       ],
       "additionalProperties": false
     },
@@ -192,6 +199,98 @@
         "status",
         "answerPreview",
         "url"
+      ],
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
       ],
       "additionalProperties": false
     }
@@ -303,7 +402,7 @@
     {
       "id": "getThread",
       "label": "Get search thread",
-      "description": "Gets answers, cited sources, related questions, and place results from a Perplexity search thread. Sign-in required. Repeated source cursors raise an error rather than returning duplicate pages.",
+      "description": "Gets answers, cited sources, related questions, and place results from a Perplexity search thread. Sign-in required. Repeated source cursors raise an error rather than returning duplicate pages. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -438,7 +537,7 @@
     {
       "id": "getConversation",
       "label": "Get conversation",
-      "description": "Reads a saved thread with citations and source pagination. Repeated source cursors raise an error rather than returning duplicate pages.",
+      "description": "Reads a saved thread with citations and source pagination. Repeated source cursors raise an error rather than returning duplicate pages. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -568,7 +667,7 @@
     {
       "id": "getCurrentConversation",
       "label": "Read current conversation",
-      "description": "Reads up to 20 entries from the active thread; null on home.",
+      "description": "Reads up to 20 entries from the active thread; null on home. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -886,5 +985,6 @@
       "requireAuth": true,
       "requireApproval": false
     }
-  ]
+  ],
+  "faviconUrl": "https://www.perplexity.ai/apple-touch-icon.png"
 }

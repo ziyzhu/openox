@@ -1,7 +1,7 @@
 {
   "domain": "chat.z.ai",
   "name": "Z.ai",
-  "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval.",
+  "description": "Search saved Z.ai chat titles, read conversations, open recent chats, and send messages with approval. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chat.z.ai/",
   "actions": [
     {
@@ -195,7 +195,7 @@
     {
       "id": "getConversation",
       "label": "Read saved chat",
-      "description": "Read the latest branch of a saved conversation, up to 100 messages; excludes reasoning blocks.",
+      "description": "Read the latest branch of a saved conversation, up to 100 messages; excludes reasoning blocks. Image and file metadata is included when available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -239,13 +239,20 @@
                 },
                 "done": {
                   "type": "boolean"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "id",
                 "role",
                 "text",
-                "done"
+                "done",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -313,13 +320,20 @@
                 },
                 "done": {
                   "type": "boolean"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
                 }
               },
               "required": [
                 "id",
                 "role",
                 "text",
-                "done"
+                "done",
+                "files"
               ],
               "additionalProperties": false
             }
@@ -387,6 +401,12 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -394,7 +414,8 @@
           "submissionConfirmed",
           "url",
           "conversationId",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -455,6 +476,12 @@
               "string",
               "null"
             ]
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
           }
         },
         "required": [
@@ -462,7 +489,8 @@
           "submissionConfirmed",
           "url",
           "conversationId",
-          "reply"
+          "reply",
+          "responseFiles"
         ],
         "additionalProperties": false
       },
@@ -542,5 +570,100 @@
       "requireApproval": false,
       "blocking": true
     }
-  ]
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thumbnailUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokenCount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "attachment",
+            "generated",
+            "inline"
+          ]
+        },
+        "downloadable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "thumbnailUrl",
+        "width",
+        "height",
+        "pageCount",
+        "tokenCount",
+        "source",
+        "downloadable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://chat.z.ai&size=128"
 }
