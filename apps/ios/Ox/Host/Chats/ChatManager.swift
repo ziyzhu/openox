@@ -780,13 +780,8 @@ final class ChatManager {
         if case .active(let current) = selection, current === chat { return }
         let outgoing = current
         selection = .active(chat)
-        outgoing?.deselect()
         chat.select()
-        Task {
-            await chat.attach()
-            if let outgoing, self.current !== outgoing { outgoing.detach() }
-            if self.current !== chat { chat.detach() }
-        }
+        outgoing?.deselect()
         if let outgoing, outgoing.isTemporary {
             discardTemporary(ChatID(outgoing.id))
         }

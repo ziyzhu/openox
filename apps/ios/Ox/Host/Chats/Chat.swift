@@ -320,13 +320,16 @@ final class Chat: Identifiable {
     private(set) var isSelected = false
     private(set) var isTranscriptVisible = false
     private(set) var hasUnreadResponse = false
-    @ObservationIgnored private var servicesAttached = false
     @ObservationIgnored private var browserURLToRestore: URL?
     @ObservationIgnored private var browserRestoreTask: Task<Void, Never>?
 
     func select() {
         guard !isSelected else { return }
         isSelected = true
+        serviceManager.setAttachedServices(attachedServices, for: id)
+        for service in attachedServices {
+            Task { _ = await service.loadManifest() }
+        }
         LiteRTModelActivation.select(chatID: id, clientID: client.id, modelID: model.id)
         Log.session.info("Chat.selection id=\(id) selected=true busy=\(isBusy)")
         outputDelivery.setVisibility(.visible)
@@ -360,6 +363,7 @@ final class Chat: Identifiable {
     func deselect() {
         guard isSelected else { return }
         isSelected = false
+        serviceManager.removeAttachedServices(for: id)
         LiteRTModelActivation.deselect(chatID: id)
         Log.session.info("Chat.selection id=\(id) selected=false busy=\(isBusy)")
         setTranscriptVisible(false)
@@ -385,7 +389,6 @@ final class Chat: Identifiable {
         deselect()
         serviceManager.browserActionSessions.closeSession(for: id)
         if cancelling { cancelAll() }
-        detach()
     }
 
     var customTitle: String?
@@ -2851,7 +2854,7 @@ final class Chat: Identifiable {
         cancelServiceInteractions(domains: Set(removed.map(\.domain)))
         attachedServices = services
         Log.session.info("Chat.setAttachedServices id=\(id) attached=\(services.map(\.domain).joined(separator: ",")) selected=\(isSelected)")
-        if servicesAttached {
+        if isSelected {
             serviceManager.setAttachedServices(services, for: id)
             for service in added {
                 Task { await service.checkAccess(reason: .attach) }
@@ -2866,25 +2869,6 @@ final class Chat: Identifiable {
 
     var serviceBootstrapRevision: String {
         "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
-    }
-
-    // MARK: - Session lifecycle
-
-    func attach() async {
-        guard !servicesAttached else { return }
-        servicesAttached = true
-        serviceManager.setAttachedServices(attachedServices, for: id)
-        await withTaskGroup(of: Void.self) { group in
-            for svc in attachedServices {
-                group.addTask { _ = await svc.loadManifest() }
-            }
-        }
-    }
-
-    func detach() {
-        guard servicesAttached else { return }
-        servicesAttached = false
-        serviceManager.removeAttachedServices(for: id)
     }
 
     func allDefinitions() -> [ServiceDefinition] { attachedServices.map(\.definition) }
