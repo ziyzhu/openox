@@ -1,16 +1,5 @@
 # Third-Party Notices
 
-## LiteRT-LM and Gemma 4 E2B
-
-LiteRT-LM is by Google and contributors, licensed under Apache License 2.0.
-The Gemma 4 E2B LiteRT-LM model is downloaded on demand from the LiteRT
-Community model repository, which lists its license as Apache 2.0. Ox pins
-the model revision and verifies the downloaded file before use.
-
-Sources:
-- https://github.com/google-ai-edge/LiteRT-LM
-- https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm
-
 ## Kokoro offline speech synthesis
 
 Kokoro-82M model weights and the `af_heart` and `zf_001` voices are by hexgrad and contributors,

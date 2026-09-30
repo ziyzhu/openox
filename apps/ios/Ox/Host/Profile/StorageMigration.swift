@@ -165,6 +165,8 @@ nonisolated enum StorageMigrator {
             key: ProviderRegistry.customProvidersKey
         )
         _ = migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
+        do { _ = try removeRetiredGemma() }
+        catch { Log.app.error("StorageMigrator.retiredGemma failed error=\(error.localizedDescription)") }
         do { try migrateProviderCatalog(defaults: .standard) }
         catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
         migrateActionApprovalPolicies()
@@ -237,6 +239,33 @@ nonisolated enum StorageMigrator {
             Log.app.error("StorageMigrator.modelsDirectory failed error=\(error.localizedDescription)")
             throw error
         }
+    }
+
+    private static func removeRetiredGemma(
+        defaults: UserDefaults = .standard,
+        support: URL = AppStoragePaths.applicationSupport
+    ) throws -> (files: Int, defaultModel: Bool) {
+        let providerID = "on-device-gemma"
+        let names = ["gemma-4-e2b-it.litertlm", "gemma-4-e2b-it.json"]
+        let manager = FileManager.default
+        var removedFiles = 0
+        for directory in ["models", "on-device-models"] {
+            let root = support.appendingPathComponent(directory, isDirectory: true)
+            for name in names {
+                let url = root.appendingPathComponent(name)
+                guard manager.fileExists(atPath: url.path) else { continue }
+                try manager.removeItem(at: url)
+                removedFiles += 1
+            }
+        }
+        let selection = defaults.data(forKey: ProviderRegistry.defaultModelKey)
+            .flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
+        let clearedDefault = selection?.providerID == providerID
+        if clearedDefault { defaults.removeObject(forKey: ProviderRegistry.defaultModelKey) }
+        if removedFiles > 0 || clearedDefault {
+            Log.app.info("StorageMigrator.retiredGemma removedFiles=\(removedFiles) clearedDefault=\(clearedDefault)")
+        }
+        return (removedFiles, clearedDefault)
     }
 
     private static func migrateLegacySecrets() throws {
@@ -2400,17 +2429,21 @@ nonisolated enum StorageMigrator {
         let manager = FileManager.default
         let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "models-directory-replay")
         defer { FileStaging.cleanup(root, operation: "models-directory-replay") }
+        let defaultsName = "ai.openox.retired-gemma-replay"
+        guard let defaults = UserDefaults(suiteName: defaultsName) else { throw CocoaError(.fileWriteUnknown) }
+        defaults.removePersistentDomain(forName: defaultsName)
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
         let source = root.appendingPathComponent("on-device-models", isDirectory: true)
         let destination = root.appendingPathComponent("models", isDirectory: true)
         try manager.createDirectory(at: source, withIntermediateDirectories: true)
-        let legacyModel = source.appendingPathComponent("gemma.litertlm")
+        let legacyModel = source.appendingPathComponent("legacy-model.bin")
         let legacyBytes = Data("model".utf8)
         try legacyBytes.write(to: legacyModel)
         try migrateOnDeviceModels(in: root)
         let migrated = try !manager.fileExists(atPath: source.path)
-            && Data(contentsOf: destination.appendingPathComponent("gemma.litertlm")) == legacyBytes
+            && Data(contentsOf: destination.appendingPathComponent("legacy-model.bin")) == legacyBytes
         try migrateOnDeviceModels(in: root)
-        let secondRunNoOp = (try Data(contentsOf: destination.appendingPathComponent("gemma.litertlm"))) == legacyBytes
+        let secondRunNoOp = (try Data(contentsOf: destination.appendingPathComponent("legacy-model.bin"))) == legacyBytes
 
         try manager.createDirectory(at: source, withIntermediateDirectories: true)
         let remaining = source.appendingPathComponent("kokoro")
@@ -2429,10 +2462,23 @@ nonisolated enum StorageMigrator {
         } catch {
             collisionRejected = false
         }
-        collisionRejected = try collisionRejected
-            && Data(contentsOf: source.appendingPathComponent("kokoro")) == Data("other".utf8)
-            && Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
-        return migrated && secondRunNoOp && resumed && collisionRejected
+        let sourcePreserved = try Data(contentsOf: source.appendingPathComponent("kokoro")) == Data("other".utf8)
+        let destinationPreserved = try Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
+        collisionRejected = collisionRejected && sourcePreserved && destinationPreserved
+        try Data("model".utf8).write(to: destination.appendingPathComponent("gemma-4-e2b-it.litertlm"))
+        try Data("receipt".utf8).write(to: destination.appendingPathComponent("gemma-4-e2b-it.json"))
+        let retiredSelection = ModelSelection(providerID: "on-device-gemma", modelID: "gemma-4-e2b-it", reasoningEffort: nil)
+        defaults.set(try JSONEncoder().encode(retiredSelection), forKey: ProviderRegistry.defaultModelKey)
+        let cleanup = try removeRetiredGemma(defaults: defaults, support: root)
+        let unrelatedModelPreserved = try Data(contentsOf: destination.appendingPathComponent("legacy-model.bin")) == legacyBytes
+        let retiredRemoved = cleanup.files == 2 && cleanup.defaultModel
+            && !manager.fileExists(atPath: destination.appendingPathComponent("gemma-4-e2b-it.litertlm").path)
+            && !manager.fileExists(atPath: destination.appendingPathComponent("gemma-4-e2b-it.json").path)
+            && defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil
+            && unrelatedModelPreserved
+        let cleanupAgain = try removeRetiredGemma(defaults: defaults, support: root)
+        return migrated && secondRunNoOp && resumed && collisionRejected && retiredRemoved
+            && cleanupAgain.files == 0 && !cleanupAgain.defaultModel
     }
 
     private static func replayRepositorySkills() throws -> [String: Bool] {

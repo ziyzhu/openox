@@ -32,9 +32,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── device-folder-grants.json         security-scoped folder bookmarks
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
 │   │   ├── models/                          downloaded model binaries, excluded from backup
-│   │   │   ├── gemma-4-e2b-it.litertlm       pinned Gemma 4 E2B LiteRT-LM artifact
-│   │   │   ├── gemma-4-e2b-it.json           verified hash and source revision
-│   │   │   └── kokoro-af-heart-v1/           verified and compiled English voice model
+│   │   │   ├── kokoro-af-heart-v1/           verified and compiled English voice model
 │   │   │       ├── Models/*.mlmodelc         four Core ML stages
 │   │   │       └── receipt.json              pinned upstream revision
 │   │   │   └── kokoro-zh-zf-001-v1/          verified Mandarin voice model, excluded from backup
@@ -87,7 +85,8 @@ legacy bundle-derived identifiers.
 
 At startup, `StorageMigrator` moves downloaded files from the former
 `on-device-models/` directory into `models/`. If both directories contain the same
-filename, migration stops and retains both copies.
+filename, migration stops and retains both copies. It also removes retired Gemma 4
+model artifacts and clears that provider when it was the saved default.
 
 Primary owners:
 
@@ -95,7 +94,7 @@ Primary owners:
 - UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
-- On-device model files and receipts — owners: Host/ModelProviders/OnDeviceModelStore.swift, Host/ModelProviders/KokoroModelStore.swift, and Host/ModelProviders/KokoroMandarinModelStore.swift
+- On-device model files and receipts — owners: Host/ModelProviders/KokoroModelStore.swift and Host/ModelProviders/KokoroMandarinModelStore.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
 - Legacy read-aloud voice preference — retained in UserDefaults and ignored after Kokoro replaces voice selection
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift

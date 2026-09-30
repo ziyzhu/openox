@@ -150,9 +150,6 @@ final class ProviderRegistry {
             let id = selection.modelID.hasPrefix("website:") ? String(selection.modelID.dropFirst(8)) : selection.modelID
             return WebServiceModelProvider.model(id: id, name: selection.modelID, input: [.text, .image, .pdf])
         }
-        if client is LiteRTGemmaProvider {
-            return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 2_048, maxContext: LiteRTGemmaProvider.contextTokens, supportsTools: false)
-        }
         return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
     }
 
@@ -232,7 +229,6 @@ final class ProviderRegistry {
     }
 
     func authenticationStatus(id: String) -> String {
-        if id == LiteRTGemmaProvider().id { return "not-required" }
         guard let definition = try? definition(id: id) else { return "unavailable" }
         if definition.api == .web { return "browser-session" }
         if definition.auth.kind == .none { return "not-required" }
@@ -257,7 +253,6 @@ final class ProviderRegistry {
     private func rebuildClients() {
         var resolved: [any ProviderClient] = []
         if MockLLMClient.isEnabled { resolved.append(MockLLMClient()) }
-        resolved.append(LiteRTGemmaProvider())
         for definition in catalogDefinitions {
             do { resolved.append(try ProviderClientFactory.make(definition, presentation: presentation(for: definition))) }
             catch { Log.agent.error("ProviderRegistry.resolve provider=\(definition.id) error=\(error.localizedDescription)") }

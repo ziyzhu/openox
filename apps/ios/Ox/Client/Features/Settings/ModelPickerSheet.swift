@@ -550,7 +550,6 @@ struct ModelPickerContent: View {
     private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
-    @State private var showingOnDeviceModels = false
     @State private var choosingProvider = false
     @State private var authRevision = 0
     @State private var selectedRegion: LLMRegion
@@ -651,7 +650,6 @@ struct ModelPickerContent: View {
         switch providerSelection {
         case .client:
             selectedClient != nil && selectedModel != nil && isAuthenticated
-                && (selectedClient?.inferenceLocation != .onDevice || selectedClient?.id == "mock" || OnDeviceModelStore.shared.state == .ready)
         case .custom:
             !customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && CustomLLMProviderDiscovery.normalizedBaseURL(customURL) != nil
@@ -673,9 +671,6 @@ struct ModelPickerContent: View {
             }
             .onChange(of: authRevision) { _, _ in selectAvailableModel() }
             .onChange(of: registry.customProviders) { _, _ in selectAvailableClient() }
-            .onChange(of: OnDeviceModelStore.shared.state) { _, state in
-                if state == .ready, selectedClient?.id == LiteRTGemmaProvider().id { applySelection() }
-            }
             .toolbar {
                 if case .authentication(let session) = mode {
                     ToolbarItem(placement: .topBarLeading) {
@@ -720,17 +715,11 @@ struct ModelPickerContent: View {
                         customAuthenticationSection
                         selectionSection("Model") { customModelControl }
                     } else if let selectedClient {
-                        if selectedClient.inferenceLocation == .onDevice && selectedClient.id != "mock" {
-                            if !isAuthenticating {
-                                selectionSection("Model") { onDeviceModelRow }
-                            }
-                        } else {
-                            authenticationSection(selectedClient)
-                            if !isAuthenticating {
-                                selectionSection("Model") { modelMenu }
-                                if !reasoningEfforts.isEmpty {
-                                    selectionSection("Thinking level") { reasoningEffortMenu }
-                                }
+                        authenticationSection(selectedClient)
+                        if !isAuthenticating {
+                            selectionSection("Model") { modelMenu }
+                            if !reasoningEfforts.isEmpty {
+                                selectionSection("Thinking level") { reasoningEffortMenu }
                             }
                         }
                     }
@@ -856,31 +845,6 @@ struct ModelPickerContent: View {
         }
         .buttonStyle(.plain)
         .disabled(selectedClient?.models.isEmpty != false && selectedClient?.canLoadModels != true)
-        .accessibilityLabel("Model")
-        .accessibilityValue(selectedModel?.displayName ?? "")
-        .accessibilityIdentifier(A11yID.Chat.modelSelection)
-    }
-
-    private var onDeviceModelRow: some View {
-        Menu {
-            Button {
-                if OnDeviceModelStore.shared.state == .ready {
-                    applySelection()
-                } else {
-                    showingOnDeviceModels = true
-                }
-            } label: {
-                Label(
-                    OnDeviceModelStore.modelName,
-                    systemImage: OnDeviceModelStore.shared.state == .ready ? "checkmark" : "icloud.and.arrow.down"
-                )
-            }
-            .accessibilityIdentifier(A11yID.Chat.modelOption(OnDeviceModelStore.modelID))
-        } label: {
-            selectionRow(selectedModel?.displayName ?? "No models available")
-        }
-        .buttonStyle(.plain)
-        .navigationDestination(isPresented: $showingOnDeviceModels) { OnDeviceModelsView() }
         .accessibilityLabel("Model")
         .accessibilityValue(selectedModel?.displayName ?? "")
         .accessibilityIdentifier(A11yID.Chat.modelSelection)
@@ -1323,7 +1287,6 @@ private struct ProviderPickerView: View {
             id: client.id,
             value: client.id,
             title: client.displayName,
-            assetImage: client is LiteRTGemmaProvider ? "OxIcon" : nil,
             faviconDomain: client.website?.host,
             faviconURL: client.iconURL,
             serviceDomain: (client as? WebServiceModelProvider)?.domain,
@@ -1344,7 +1307,6 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let value: Value
     let title: String
     var systemImage: String? = nil
-    var assetImage: String? = nil
     var faviconDomain: String? = nil
     var faviconURL: URL? = nil
     var serviceDomain: String? = nil
@@ -1420,13 +1382,6 @@ private struct SettingsSelectionPickerView<Value: Hashable>: View {
         HStack(spacing: SettingsLayout.horizontalInset) {
             if let domain = option.serviceDomain, let service = serviceManager.service(domain: domain) {
                 ServiceAvatar(service: service, size: 24, shape: .roundedRect(3))
-            } else if let assetImage = option.assetImage {
-                Image(assetImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 24, height: 24)
-                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                    .accessibilityHidden(true)
             } else if let faviconDomain = option.faviconDomain {
                 DomainFavicon(domain: faviconDomain, size: 24, overrideURL: option.faviconURL)
             }
