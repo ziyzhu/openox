@@ -209,6 +209,7 @@ final class Chat: Identifiable {
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationIntent = false
     @ObservationIgnored private var contextCheckpoint: AgentContextCheckpoint?
+    @ObservationIgnored private var memorySnapshot: String?
     @ObservationIgnored private var pendingCompactionTokens: Int?
     @ObservationIgnored private var pendingContextCompactions: [ContextCompaction] = []
 
@@ -2506,7 +2507,7 @@ final class Chat: Identifiable {
         runState.setActiveSubmission(submission, runID: runID)
         defer { runState.setActiveSubmission(nil, runID: runID) }
         await Soul.shared.waitUntilCurrent()
-        await UserMemory.shared.waitUntilCurrent()
+        await freezeMemorySnapshot()
         await Skills.shared.waitUntilCurrent()
         skillSession.snapshots = [:]
         if let invocation = submission.skillInvocation { skillSession.snapshots[invocation.skill.name] = invocation.skill }
@@ -2916,6 +2917,18 @@ final class Chat: Identifiable {
         ChatPromptComposer.turnContext(state)
     }
 
+    var systemPromptMemory: String {
+        memorySnapshot ?? UserMemory.shared.text
+    }
+
+    private func freezeMemorySnapshot() async {
+        guard memorySnapshot == nil else { return }
+        await UserMemory.shared.waitUntilCurrent()
+        let memory = UserMemory.shared.text
+        memorySnapshot = memory
+        Log.session.info("Chat.memorySnapshot id=\(id) chars=\(memory.count)")
+    }
+
     private func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
         let serviceManager = serviceManager
         let chatID = id
@@ -2923,7 +2936,7 @@ final class Chat: Identifiable {
             client: client,
             model: model,
             systemPrompt: Self.composeSystemPrompt(
-                memory: UserMemory.shared.text,
+                memory: systemPromptMemory,
                 userSkills: Skills.shared.all
             ),
             tools: [ChatJavaScriptTool(chat: self)],

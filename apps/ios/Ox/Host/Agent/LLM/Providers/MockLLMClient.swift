@@ -325,7 +325,7 @@ extension Scenario {
             Entry("70", "helper schemas — callable help and service inspection", .help),
             Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
             Entry("72", "prompt context — unified skills and current service and artifact state", .skillCatalog),
-            Entry("73", "memory — read durable context on demand", .memoryOnDemand),
+            Entry("73", "memory — freeze prompt context and read updates on demand", .memoryOnDemand),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "shoveler — display non-interactive cards", .shoveler),
             Entry("76", "video — display inline artifact video", .video),
@@ -1680,10 +1680,19 @@ extension Scenario {
             return [.say("Memory was injected into transient context."), .stop(.stop)]
         }
         if ctx.latestUserSaid("current") {
-            guard ctx.systemPrompt.contains("current-memory-must-be-injected") else {
-                return [.say("Current memory was missing from the system prompt."), .stop(.stop)]
+            guard !ctx.systemPrompt.contains("current-memory-must-be-injected") else {
+                return [.say("Current memory replaced the frozen system-prompt snapshot."), .stop(.stop)]
             }
-            return [.say("Current memory refreshed in the system prompt."), .stop(.stop)]
+            if ctx.resultText("execute") == nil {
+                return [
+                    execute(#"console.log(await ox.fs.read({ path: "MEMORY.md", purpose: "Read current memory" }));"#),
+                    .stop(.toolUse),
+                ]
+            }
+            guard ctx.resultText("execute")?.contains("current-memory-must-be-injected") == true else {
+                return [.say("Current memory could not be read on demand."), .stop(.stop)]
+            }
+            return [.say("Memory stayed frozen in the system prompt and current memory remained available on demand."), .stop(.stop)]
         }
         if ctx.resultText("execute") == nil {
             return [

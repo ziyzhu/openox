@@ -30,7 +30,7 @@ struct DebugSnapshot: Encodable {
         let agent = chat.agentSnapshot
         id = chat.id.uuidString
         model = agent?.model ?? chat.model
-        let currentMemory = UserMemory.shared.text
+        let currentMemory = chat.systemPromptMemory
         let userSkills = Skills.shared.all
         let breakdown = Chat.systemPromptBreakdown(
             memory: currentMemory,
