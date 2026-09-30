@@ -84,11 +84,12 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.propose",
                     .object([
-                        "description": .string("Publish selected services and skills from one saved Local commit and create a change request in a configured target without cloning it: `await ox.repository.propose({ target, commitHash, services?, skills?, title, body, status, purpose })`. Use target `openox`. `status` must be `draft` or `open`. Validate and verify selected services, review Local status and diff, and Save the intended changes first. Never publish credentials, session data, raw captures, or machine-specific files. The user approves publication and may be asked to authorize the target provider."),
+                        "description": .string("Publish selected services and skills from one saved Local commit and create a pull request in a GitHub repository without cloning or forking it: `await ox.repository.propose({ repository, base?, commitHash, services?, skills?, title, body, status, purpose })`. `repository` is an HTTPS GitHub repository URL. `base` defaults to its default branch. The signed-in user must have permission to push the proposal ref. `status` must be `draft` or `open`. Validate and verify selected services, review Local status and diff, and Save the intended changes first. Never publish credentials, session data, raw captures, or machine-specific files. The user approves publication and may be asked to authorize GitHub."),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "target": .object(["type": .string("string"), "enum": .array([.string("openox")])]),
+                                "repository": .object(["type": .string("string"), "pattern": .string("^https://github\\.com/[^/]+/[^/]+(?:\\.git)?$"), "maxLength": .int(2048)]),
+                                "base": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(255)]),
                                 "commitHash": .object(["type": .string("string"), "pattern": .string("^[a-f0-9]{40}$")]),
                                 "services": .object([
                                     "type": .string("array"),
@@ -108,7 +109,7 @@ nonisolated enum OxRepositories {
                                 "body": .object(["type": .string("string"), "maxLength": .int(20_000)]),
                                 "status": .object(["type": .string("string"), "enum": .array([.string("draft"), .string("open")])]),
                             ]),
-                            "required": .array([.string("target"), .string("commitHash"), .string("title"), .string("body"), .string("status")]),
+                            "required": .array([.string("repository"), .string("commitHash"), .string("title"), .string("body"), .string("status")]),
                             "additionalProperties": .bool(false),
                         ]),
                         "outputSchema": .object(["type": .string("object")]),
@@ -264,13 +265,15 @@ nonisolated enum OxRepositories {
             }
             ctx.setObject(disconnectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryDisconnect" as NSString)
 
-            let proposeRepositoryBlock: @convention(block) (String, String, JSValue, JSValue, String, String, String, JSValue) -> JSValue = {
-                target, commitHash, servicesValue, skillsValue, title, body, status, purposeValue in
+            let proposeRepositoryBlock: @convention(block) (String, JSValue, String, JSValue, JSValue, String, String, String, JSValue) -> JSValue = {
+                repository, baseValue, commitHash, servicesValue, skillsValue, title, body, status, purposeValue in
                 let services = servicesValue.toArray().compactMap { $0 as? String }
                 let skills = skillsValue.toArray().compactMap { $0 as? String }
+                let base = baseValue.isString ? baseValue.toString() : nil
                 return env.call(suspendingTimeout: true) {
                     try await $0.proposeRepository(
-                        target: target,
+                        repository: repository,
+                        base: base,
                         commitHash: commitHash,
                         services: services,
                         skills: skills,
@@ -373,7 +376,7 @@ nonisolated enum OxRepositories {
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },
-            propose: (value) => { const options = __oxOptions(value, 'ox.repository.propose'); return __nativeRepositoryPropose(String(options.target), String(options.commitHash), options.services ?? [], options.skills ?? [], String(options.title), String(options.body), String(options.status), String(options.purpose)); },
+            propose: (value) => { const options = __oxOptions(value, 'ox.repository.propose'); return __nativeRepositoryPropose(String(options.repository), options.base ?? null, String(options.commitHash), options.services ?? [], options.skills ?? [], String(options.title), String(options.body), String(options.status), String(options.purpose)); },
           git: {
             status: (value) => { const options = __oxOptions(value, 'ox.repository.git.status'); return __nativeRepositoryGitStatus(String(options.repository ?? 'local'), String(options.purpose)); },
             log: (value) => { const options = __oxOptions(value, 'ox.repository.git.log'); return __nativeRepositoryGitLog(String(options.repository ?? 'local'), Number(options.limit ?? 20), options.cursor ?? null, String(options.purpose)); },

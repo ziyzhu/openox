@@ -1017,7 +1017,7 @@ actor Repository {
         )
     }
 
-    func proposalSnapshot(commitHash: String, services requested: [String], skills requestedSkills: [String]) throws -> RepositoryProposalSnapshot {
+    func proposalSnapshot(commitHash: String, services requested: [String], skills requestedSkills: [String]) throws -> RepositoryProposalContent {
         let loaded = try gitRepository(Self.localID)
         let repository = try SwiftGitX.Repository.open(at: loaded.root)
         let commit = try Self.historyCommit(commitHash, in: repository)
@@ -1032,21 +1032,21 @@ actor Repository {
         let blobs = try Self.gitBlobs(in: commit.tree, repository: repository)
         let services = selected.map { service in
             let prefix = service.id.path + "/"
-            let files = blobs.compactMap { path, blob -> RepositoryProposalSnapshot.File? in
+            let files = blobs.compactMap { path, blob -> RepositoryProposalContent.File? in
                 guard path.hasPrefix(prefix) else { return nil }
                 return .init(path: path, data: blob.content)
             }
-            return RepositoryProposalSnapshot.Service(
+            return RepositoryProposalContent.Service(
                 id: service.id.rawValue,
                 kind: service.id.kind,
                 domain: service.id.runtimeID,
                 files: files.sorted { $0.path < $1.path }
             )
         }
-        let skills = try requestedSkills.map { name -> RepositoryProposalSnapshot.SharedSkill in
+        let skills = try requestedSkills.map { name -> RepositoryProposalContent.SharedSkill in
             guard package.skills.contains(name) else { throw SkillError.missing(name) }
             let prefix = "skills/\(name)/"
-            let files = blobs.compactMap { path, blob -> RepositoryProposalSnapshot.File? in
+            let files = blobs.compactMap { path, blob -> RepositoryProposalContent.File? in
                 path.hasPrefix(prefix) ? .init(path: path, data: blob.content) : nil
             }.sorted { $0.path < $1.path }
             guard let main = files.first(where: { $0.path == prefix + "SKILL.md" }),
@@ -1065,7 +1065,7 @@ actor Repository {
         guard files.count <= 1_000, files.reduce(0, { $0 + $1.data.count }) <= 32 * 1_024 * 1_024 else {
             throw Failure(message: "The selected contents exceed the publication size limit")
         }
-        return RepositoryProposalSnapshot(commitHash: commit.id.hex, services: services, skills: skills)
+        return RepositoryProposalContent(commitHash: commit.id.hex, services: services, skills: skills)
     }
 
     func gitDiff(

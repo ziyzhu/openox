@@ -51,7 +51,8 @@ extension Chat: OxFunctionBridge {
     }
 
     public func proposeRepository(
-        target: String,
+        repository: String,
+        base: String?,
         commitHash: String,
         services: [String],
         skills: [String],
@@ -61,7 +62,8 @@ extension Chat: OxFunctionBridge {
         purpose: String
     ) async throws -> JSONValue? {
         try await serviceOperations.proposeRepository(
-            target: target,
+            repository: repository,
+            base: base,
             commitHash: commitHash,
             services: services,
             skills: skills,

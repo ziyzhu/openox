@@ -810,7 +810,7 @@ final class ServiceManager {
         return commit
     }
 
-    func repositoryProposalSnapshot(commitHash: String, services: [String], skills: [String]) async throws -> RepositoryProposalSnapshot {
+    func repositoryProposalSnapshot(commitHash: String, services: [String], skills: [String]) async throws -> RepositoryProposalContent {
         let snapshot = try await repository.proposalSnapshot(commitHash: commitHash, services: services, skills: skills)
         for service in snapshot.services {
             guard let kind = ServicesMount.Kind(rawValue: service.kind.rawValue) else {

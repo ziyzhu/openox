@@ -389,7 +389,8 @@ final class ServiceOperations {
     }
 
     func proposeRepository(
-        target: String,
+        repository: String,
+        base: String?,
         commitHash: String,
         services: [String],
         skills: [String],
@@ -398,18 +399,15 @@ final class ServiceOperations {
         status: String,
         purpose: String
     ) async throws -> JSONValue? {
-        let target = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        let target = try RepositoryProposalTarget(repository: repository, baseRef: base)
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard target == RepositoryProposal.targetID else {
-            throw RuntimeError.bridge("ox.repository.propose: target must be openox")
-        }
         guard commitHash.range(of: "^[a-f0-9]{40}$", options: .regularExpression) != nil else {
             throw RuntimeError.bridge("ox.repository.propose: commitHash must be a full Local commit hash")
         }
         guard (1...20).contains(services.count + skills.count), Set(services).count == services.count,
               Set(skills).count == skills.count, skills.allSatisfy(SkillFiles.isLocalName),
               services.allSatisfy({ !$0.isEmpty && $0.count <= 500 }) else {
-            throw RuntimeError.bridge("ox.repository.propose: services must contain 1-20 unique Local service domains")
+            throw RuntimeError.bridge("ox.repository.propose: services and skills must select 1-20 unique Local items")
         }
         guard !title.isEmpty, title.count <= 200 else {
             throw RuntimeError.bridge("ox.repository.propose: title must contain 1-200 characters")
@@ -421,23 +419,24 @@ final class ServiceOperations {
             throw RuntimeError.bridge("ox.repository.propose: status must be draft or open")
         }
         let snapshot = try await serviceManager.repositoryProposalSnapshot(commitHash: commitHash, services: services, skills: skills)
-        let args: JSONValue = .object([
-            "target": .string(target),
+        var fields: [String: JSONValue] = [
+            "repository": .string(target.url),
             "commitHash": .string(commitHash),
             "services": .array(services.map(JSONValue.string)),
             "skills": .array(skills.map(JSONValue.string)),
             "title": .string(title),
             "body": .string(body),
             "status": .string(status),
-        ])
-        return try await tracked(Actions.repositoryPropose, args, purpose: purpose) {
+        ]
+        if let base = target.requestedBaseRef { fields["base"] = .string(base) }
+        return try await tracked(Actions.repositoryPropose, .object(fields), purpose: purpose) {
             let result = try await RepositoryProposal.shared.propose(
                 .init(
                     target: target,
                     title: title,
                     body: body,
                     status: proposalStatus,
-                    snapshot: snapshot
+                    content: snapshot
                 ),
                 authorization: self.repositoryAuthorization
             )

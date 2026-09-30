@@ -66,7 +66,8 @@ extension ServiceOperations {
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.propose":
             return try await proposeRepository(
-                target: fields["target"]?.stringValue ?? "",
+                repository: fields["repository"]?.stringValue ?? "",
+                base: fields["base"]?.stringValue,
                 commitHash: fields["commitHash"]?.stringValue ?? "",
                 services: fields["services"]?.arrayValue?.compactMap(\.stringValue) ?? [],
                 skills: fields["skills"]?.arrayValue?.compactMap(\.stringValue) ?? [],

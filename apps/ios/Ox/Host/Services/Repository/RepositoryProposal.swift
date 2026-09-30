@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-nonisolated struct RepositoryProposalSnapshot: Sendable {
+nonisolated struct RepositoryProposalContent: Sendable {
     struct Service: Sendable {
         let id: String
         let kind: Repository.ServiceKind
@@ -30,21 +30,22 @@ nonisolated struct RepositoryProposalRequest: Sendable {
         case open
     }
 
-    let target: String
+    let target: RepositoryProposalTarget
     let title: String
     let body: String
     let status: Status
-    let snapshot: RepositoryProposalSnapshot
+    let content: RepositoryProposalContent
 }
 
 nonisolated struct RepositoryProposalResult: Encodable, Sendable {
-    let target: String
+    let repository: String
     let provider: String
     let kind: String
     let identifier: String
     let url: String
     let status: String
     let baseRef: String
+    let baseCommit: String
     let headRef: String
     let sourceCommitHash: String
     let publishedCommitHash: String
@@ -53,10 +54,60 @@ nonisolated struct RepositoryProposalResult: Encodable, Sendable {
     let operation: String
 }
 
+nonisolated struct RepositoryProposalTarget: Sendable {
+    let url: String
+    let owner: String
+    let name: String
+    let requestedBaseRef: String?
+    let rootPath: String
+
+    init(repository: String, baseRef: String?) throws {
+        let repository = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: repository),
+              components.scheme == "https", components.host?.lowercased() == "github.com",
+              components.user == nil, components.password == nil, components.port == nil,
+              components.query == nil, components.fragment == nil else {
+            throw RuntimeError.bridge("ox.repository.propose: repository must be an HTTPS GitHub repository URL")
+        }
+        let path = components.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard path.count == 2 else {
+            throw RuntimeError.bridge("ox.repository.propose: repository must identify one GitHub owner and repository")
+        }
+        let owner = path[0]
+        let name = path[1].hasSuffix(".git") ? String(path[1].dropLast(4)) : path[1]
+        let validComponent = "^[A-Za-z0-9_.-]+$"
+        guard !owner.isEmpty, !name.isEmpty,
+              owner.range(of: validComponent, options: .regularExpression) != nil,
+              name.range(of: validComponent, options: .regularExpression) != nil else {
+            throw RuntimeError.bridge("ox.repository.propose: repository contains an invalid GitHub owner or repository name")
+        }
+        let base = baseRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let base, !Self.validBaseRef(base) {
+            throw RuntimeError.bridge("ox.repository.propose: base must be a valid branch name")
+        }
+        self.url = "https://github.com/\(owner)/\(name)"
+        self.owner = owner
+        self.name = name
+        self.requestedBaseRef = base
+        self.rootPath = owner.lowercased() == "ziyzhu" && name.lowercased() == "openox" ? "repositories/builtin" : ""
+    }
+
+    func path(_ relativePath: String) -> String {
+        rootPath.isEmpty ? relativePath : "\(rootPath)/\(relativePath)"
+    }
+
+    private static func validBaseRef(_ value: String) -> Bool {
+        guard !value.isEmpty, value.utf8.count <= 255,
+              value.range(of: "^[A-Za-z0-9][A-Za-z0-9._/-]*$", options: .regularExpression) != nil,
+              !value.contains(".."), !value.contains("//"), !value.contains("@{"),
+              !value.hasSuffix("/"), !value.hasSuffix("."), !value.hasSuffix(".lock") else { return false }
+        return value.split(separator: "/").allSatisfy { !$0.hasPrefix(".") && !$0.hasSuffix(".lock") }
+    }
+}
+
 @MainActor
 final class RepositoryProposal {
     static let shared = RepositoryProposal()
-    nonisolated static let targetID = "openox"
 
     private let github = GitHubRepositoryProposalProvider()
 
@@ -64,9 +115,6 @@ final class RepositoryProposal {
         _ request: RepositoryProposalRequest,
         authorization: RepositoryTokenPresenter?
     ) async throws -> RepositoryProposalResult {
-        guard request.target == Self.targetID else {
-            throw RuntimeError.bridge("Unknown repository publication target: \(request.target)")
-        }
         return try await github.propose(request, authorization: authorization)
     }
 }
@@ -75,18 +123,15 @@ typealias RepositoryTokenValidation = @Sendable (_ token: String, _ displayName:
 typealias RepositoryTokenPresenter = @MainActor @Sendable (@escaping RepositoryTokenValidation) async -> Bool
 
 nonisolated private final class GitHubRepositoryAccount: Sendable {
-    struct Tokens: Sendable {
+    struct Credential: Sendable {
         let accessToken: String
-        let login: String
     }
 
-    func credential(authorization: RepositoryTokenPresenter?) async throws -> Tokens {
+    func credential(authorization: RepositoryTokenPresenter?) async throws -> Credential {
         if let token = Secret.publicationToken() {
             do {
                 return try await validate(token)
             } catch GitHubRepositoryError.unauthorized {
-                try Secret.clearPublicationToken()
-            } catch GitHubRepositoryError.missingScope {
                 try Secret.clearPublicationToken()
             }
         }
@@ -105,34 +150,29 @@ nonisolated private final class GitHubRepositoryAccount: Sendable {
         return try await validate(token)
     }
 
-    private func validate(_ token: String) async throws -> Tokens {
-        guard token.hasPrefix("ghp_"), token.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }) else {
+    private func validate(_ token: String) async throws -> Credential {
+        let supportedPrefix = token.hasPrefix("ghp_") || token.hasPrefix("github_pat_")
+        guard supportedPrefix, token.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }) else {
             throw GitHubRepositoryError.invalidToken
         }
-        let login = try await GitHubRepositoryAPI(accessToken: token).tokenLogin()
-        return Tokens(accessToken: token, login: login)
+        try await GitHubRepositoryAPI(accessToken: token).validateCredential()
+        return Credential(accessToken: token)
     }
 }
 
 nonisolated private enum GitHubRepositoryError: LocalizedError {
     case invalidToken
     case unauthorized
-    case missingScope
 
     var errorDescription: String? {
         switch self {
-        case .invalidToken: "Enter a GitHub personal access token (classic), beginning with ghp_."
+        case .invalidToken: "Enter a GitHub personal access token beginning with ghp_ or github_pat_."
         case .unauthorized: "This GitHub token is invalid, expired, or revoked. Create a new token and try again."
-        case .missingScope: "This GitHub token needs the public_repo scope to propose repository changes."
         }
     }
 }
 
 nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sendable {
-    private let owner = "ziyzhu"
-    private let repository = "openox"
-    private let baseRef = "main"
-    private let rootPath = "repositories/builtin"
     private let account = GitHubRepositoryAccount()
 
     func propose(
@@ -141,15 +181,19 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
     ) async throws -> RepositoryProposalResult {
         let credential = try await account.credential(authorization: authorization)
         let api = GitHubRepositoryAPI(accessToken: credential.accessToken)
-        let targetRepository = try await api.object(method: "GET", path: "/repos/\(owner)/\(repository)")
+        let target = request.target
+        let targetRepository = try await api.object(method: "GET", path: "/repos/\(target.owner)/\(target.name)")
         let canPush = ((targetRepository["permissions"] as? [String: Any])?["push"] as? Bool) == true
-        let publishingOwner = try await publishingOwner(api: api, login: credential.login, canPush: canPush)
-        let base = try await baseCommit(api: api)
-        let files = try await proposalFiles(api: api, base: base, snapshot: request.snapshot)
-        let branch = branchName(snapshot: request.snapshot)
+        guard canPush else {
+            throw RuntimeError.bridge("The signed-in GitHub account cannot push a proposal to \(target.owner)/\(target.name). Ox does not create a fork.")
+        }
+        let baseRef = try target.requestedBaseRef ?? defaultBranch(targetRepository)
+        let base = try await baseCommit(api: api, target: target, baseRef: baseRef)
+        let files = try await proposalFiles(api: api, target: target, base: base, baseRef: baseRef, content: request.content)
+        let branch = branchName(content: request.content)
         let publishedCommit = try await createCommit(
             api: api,
-            publishingOwner: publishingOwner,
+            target: target,
             base: base,
             branch: branch,
             title: request.title,
@@ -157,7 +201,8 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
         )
         let pullRequest = try await createOrUpdatePullRequest(
             api: api,
-            publishingOwner: publishingOwner,
+            target: target,
+            baseRef: baseRef,
             branch: branch,
             request: request
         )
@@ -165,48 +210,42 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
               let url = pullRequest.object["html_url"] as? String else {
             throw RuntimeError.bridge("GitHub returned an invalid pull request response.")
         }
-        Log.service.info("RepositoryProposal completed provider=github target=\(RepositoryProposal.targetID) pull=\(number.intValue) services=\(request.snapshot.services.count)")
+        Log.service.info("RepositoryProposal completed provider=github repository=\(target.owner)/\(target.name) pull=\(number.intValue) services=\(request.content.services.count)")
         return RepositoryProposalResult(
-            target: RepositoryProposal.targetID,
+            repository: target.url,
             provider: "github",
             kind: "pullRequest",
             identifier: String(number.intValue),
             url: url,
             status: request.status.rawValue,
             baseRef: baseRef,
+            baseCommit: base.commit,
             headRef: branch,
-            sourceCommitHash: request.snapshot.commitHash,
+            sourceCommitHash: request.content.commitHash,
             publishedCommitHash: publishedCommit,
-            services: request.snapshot.services.map(\.domain),
-            skills: request.snapshot.skills.map(\.name),
+            services: request.content.services.map(\.domain),
+            skills: request.content.skills.map(\.name),
             operation: pullRequest.created ? "created" : "updated"
         )
     }
 
-    private func publishingOwner(api: GitHubRepositoryAPI, login: String, canPush: Bool) async throws -> String {
-        if canPush { return owner }
-        if let existing = try await api.objectIfFound(path: "/repos/\(login)/\(repository)"),
-           existing["fork"] as? Bool == true,
-           ((existing["parent"] as? [String: Any])?["full_name"] as? String)?.lowercased() == "\(owner)/\(repository)".lowercased() {
-            return login
+    private func defaultBranch(_ repository: [String: Any]) throws -> String {
+        guard let branch = repository["default_branch"] as? String, !branch.isEmpty else {
+            throw RuntimeError.bridge("GitHub did not return the target repository's default branch.")
         }
-        _ = try await api.object(method: "POST", path: "/repos/\(owner)/\(repository)/forks", body: [:])
-        for _ in 0..<12 {
-            try await Task.sleep(for: .seconds(2))
-            if let fork = try await api.objectIfFound(path: "/repos/\(login)/\(repository)"),
-               fork["fork"] as? Bool == true {
-                return login
-            }
-        }
-        throw RuntimeError.bridge("GitHub is still preparing the fork. Try again in a moment.")
+        return branch
     }
 
-    private func baseCommit(api: GitHubRepositoryAPI) async throws -> (commit: String, tree: String) {
-        let reference = try await api.object(method: "GET", path: "/repos/\(owner)/\(repository)/git/ref/heads/\(baseRef)")
+    private func baseCommit(
+        api: GitHubRepositoryAPI,
+        target: RepositoryProposalTarget,
+        baseRef: String
+    ) async throws -> (commit: String, tree: String) {
+        let reference = try await api.object(method: "GET", path: "/repos/\(target.owner)/\(target.name)/git/ref/heads/\(baseRef)")
         guard let commit = (reference["object"] as? [String: Any])?["sha"] as? String else {
             throw RuntimeError.bridge("GitHub did not return the target branch head.")
         }
-        let object = try await api.object(method: "GET", path: "/repos/\(owner)/\(repository)/git/commits/\(commit)")
+        let object = try await api.object(method: "GET", path: "/repos/\(target.owner)/\(target.name)/git/commits/\(commit)")
         guard let tree = (object["tree"] as? [String: Any])?["sha"] as? String else {
             throw RuntimeError.bridge("GitHub did not return the target Git tree.")
         }
@@ -215,17 +254,20 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
 
     private func proposalFiles(
         api: GitHubRepositoryAPI,
+        target: RepositoryProposalTarget,
         base: (commit: String, tree: String),
-        snapshot: RepositoryProposalSnapshot
+        baseRef: String,
+        content: RepositoryProposalContent
     ) async throws -> [String: Data?] {
         var files: [String: Data?] = [:]
-        let serviceRoots = Set(snapshot.services.map { "\(rootPath)/\($0.kind.rawValue)/\($0.domain)" } + snapshot.skills.map { "\(rootPath)/skills/\($0.name)" })
-        for file in snapshot.services.flatMap(\.files) + snapshot.skills.flatMap(\.files) {
-            files["\(rootPath)/\(file.path)"] = file.data
+        let serviceRoots = Set(content.services.map { target.path("\($0.kind.rawValue)/\($0.domain)") }
+            + content.skills.map { target.path("skills/\($0.name)") })
+        for file in content.services.flatMap(\.files) + content.skills.flatMap(\.files) {
+            files[target.path(file.path)] = file.data
         }
         let tree = try await api.object(
             method: "GET",
-            path: "/repos/\(owner)/\(repository)/git/trees/\(base.tree)?recursive=1"
+            path: "/repos/\(target.owner)/\(target.name)/git/trees/\(base.tree)?recursive=1"
         )
         guard tree["truncated"] as? Bool != true, let entries = tree["tree"] as? [[String: Any]] else {
             throw RuntimeError.bridge("GitHub could not return the complete target tree.")
@@ -235,10 +277,11 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
                   serviceRoots.contains(where: { path.hasPrefix($0 + "/") }) else { continue }
             if files[path] == nil { files[path] = .some(nil) }
         }
-        let manifestPath = "\(rootPath)/repository.json"
+        let manifestPath = target.path("repository.json")
+        let encodedBase = baseRef.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? baseRef
         let manifestResponse = try await api.object(
             method: "GET",
-            path: "/repos/\(owner)/\(repository)/contents/\(manifestPath)?ref=\(baseRef)"
+            path: "/repos/\(target.owner)/\(target.name)/contents/\(manifestPath)?ref=\(encodedBase)"
         )
         guard let encoded = manifestResponse["content"] as? String,
               let manifestData = Data(base64Encoded: encoded.filter { !$0.isWhitespace }),
@@ -248,9 +291,9 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
               let skills = manifest["skills"] as? [String] else {
             throw RuntimeError.bridge("The target repository manifest is invalid.")
         }
-        services.append(contentsOf: snapshot.services.map(\.id))
+        services.append(contentsOf: content.services.map(\.id))
         manifest["services"] = Array(Set(services)).sorted()
-        manifest["skills"] = Array(Set(skills + snapshot.skills.map(\.name))).sorted()
+        manifest["skills"] = Array(Set(skills + content.skills.map(\.name))).sorted()
         manifest.removeValue(forKey: "contentHash")
         var updatedManifest = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
         updatedManifest.append(0x0A)
@@ -260,7 +303,7 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
 
     private func createCommit(
         api: GitHubRepositoryAPI,
-        publishingOwner: String,
+        target: RepositoryProposalTarget,
         base: (commit: String, tree: String),
         branch: String,
         title: String,
@@ -272,7 +315,7 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
             if let data = value {
                 let blob = try await api.object(
                     method: "POST",
-                    path: "/repos/\(publishingOwner)/\(repository)/git/blobs",
+                    path: "/repos/\(target.owner)/\(target.name)/git/blobs",
                     body: ["content": data.base64EncodedString(), "encoding": "base64"]
                 )
                 guard let sha = blob["sha"] as? String else {
@@ -285,7 +328,7 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
         }
         let tree = try await api.object(
             method: "POST",
-            path: "/repos/\(publishingOwner)/\(repository)/git/trees",
+            path: "/repos/\(target.owner)/\(target.name)/git/trees",
             body: ["base_tree": base.tree, "tree": entries]
         )
         guard let treeSHA = tree["sha"] as? String else {
@@ -293,19 +336,19 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
         }
         let commit = try await api.object(
             method: "POST",
-            path: "/repos/\(publishingOwner)/\(repository)/git/commits",
+            path: "/repos/\(target.owner)/\(target.name)/git/commits",
             body: ["message": title, "tree": treeSHA, "parents": [base.commit]]
         )
         guard let commitSHA = commit["sha"] as? String else {
             throw RuntimeError.bridge("GitHub did not return the proposal commit.")
         }
-        let refPath = "/repos/\(publishingOwner)/\(repository)/git/refs/heads/\(branch)"
+        let refPath = "/repos/\(target.owner)/\(target.name)/git/refs/heads/\(branch)"
         if try await api.objectIfFound(path: refPath) != nil {
             _ = try await api.object(method: "PATCH", path: refPath, body: ["sha": commitSHA, "force": true])
         } else {
             _ = try await api.object(
                 method: "POST",
-                path: "/repos/\(publishingOwner)/\(repository)/git/refs",
+                path: "/repos/\(target.owner)/\(target.name)/git/refs",
                 body: ["ref": "refs/heads/\(branch)", "sha": commitSHA]
             )
         }
@@ -314,20 +357,21 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
 
     private func createOrUpdatePullRequest(
         api: GitHubRepositoryAPI,
-        publishingOwner: String,
+        target: RepositoryProposalTarget,
+        baseRef: String,
         branch: String,
         request: RepositoryProposalRequest
     ) async throws -> (object: [String: Any], created: Bool) {
-        let head = "\(publishingOwner):\(branch)"
+        let head = "\(target.owner):\(branch)"
         let encodedHead = head.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? head
         let existing = try await api.array(
             method: "GET",
-            path: "/repos/\(owner)/\(repository)/pulls?state=open&head=\(encodedHead)"
+            path: "/repos/\(target.owner)/\(target.name)/pulls?state=open&head=\(encodedHead)"
         ).first
         if let existing, let number = existing["number"] as? NSNumber {
             let updated = try await api.object(
                 method: "PATCH",
-                path: "/repos/\(owner)/\(repository)/pulls/\(number.intValue)",
+                path: "/repos/\(target.owner)/\(target.name)/pulls/\(number.intValue)",
                 body: ["title": request.title, "body": request.body, "base": baseRef]
             )
             let isDraft = updated["draft"] as? Bool == true
@@ -338,7 +382,7 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
         }
         let created = try await api.object(
             method: "POST",
-            path: "/repos/\(owner)/\(repository)/pulls",
+            path: "/repos/\(target.owner)/\(target.name)/pulls",
             body: [
                 "title": request.title,
                 "body": request.body,
@@ -350,10 +394,10 @@ nonisolated private final class GitHubRepositoryProposalProvider: @unchecked Sen
         return (created, true)
     }
 
-    private func branchName(snapshot: RepositoryProposalSnapshot) -> String {
-        let identity = (snapshot.services.map(\.id) + snapshot.skills.map { "skill:\($0.name)" }).sorted().joined(separator: "\n")
+    private func branchName(content: RepositoryProposalContent) -> String {
+        let identity = (content.services.map(\.id) + content.skills.map { "skill:\($0.name)" }).sorted().joined(separator: "\n")
         let digest = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
-        return "ox/repository-\(snapshot.commitHash.prefix(12))-\(digest.prefix(8))"
+        return "ox/repository-\(content.commitHash.prefix(12))-\(digest.prefix(8))"
     }
 }
 
@@ -365,12 +409,8 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         self.accessToken = accessToken
     }
 
-    func tokenLogin() async throws -> String {
-        let value = try await request(method: "GET", path: "/user", body: nil, allowNotFound: false, validateScope: true)
-        guard let object = value as? [String: Any], let login = object["login"] as? String, !login.isEmpty else {
-            throw RuntimeError.bridge("GitHub did not return the token's account.")
-        }
-        return login
+    func validateCredential() async throws {
+        _ = try await object(method: "GET", path: "/user")
     }
 
     func object(method: String, path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
@@ -401,7 +441,7 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
         return array
     }
 
-    private func request(method: String, path: String, body: [String: Any]?, allowNotFound: Bool, validateScope: Bool = false) async throws -> Any? {
+    private func request(method: String, path: String, body: [String: Any]?, allowNotFound: Bool) async throws -> Any? {
         guard let url = URL(string: path, relativeTo: root)?.absoluteURL,
               url.host == root.host else { throw RuntimeError.bridge("GitHub request URL is invalid.") }
         var request = URLRequest(url: url)
@@ -422,11 +462,6 @@ nonisolated private struct GitHubRepositoryAPI: Sendable {
             let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
             Log.network.error("RepositoryProposal GitHub method=\(method) path=\(url.path) status=\(status)")
             throw RuntimeError.bridge("GitHub returned HTTP \(status)\(message.map { ": \($0)" } ?? ".")")
-        }
-        if validateScope {
-            let scopes = Set(((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-OAuth-Scopes") ?? "")
-                .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-            guard scopes.contains("public_repo") || scopes.contains("repo") else { throw GitHubRepositoryError.missingScope }
         }
         return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
     }
