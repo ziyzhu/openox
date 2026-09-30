@@ -1,166 +1,6 @@
 import SwiftUI
-import AVFAudio
-import NaturalLanguage
 import Observation
 import WebKit
-
-@MainActor
-@Observable
-final class MessageSpeechPlayback {
-    private enum Voice {
-        case onDevice(name: String)
-        case system(language: String?)
-    }
-
-    private(set) var speakingBlockID: UUID?
-    @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var pendingStop: Task<Void, Never>?
-    @ObservationIgnored private let systemSpeech = SystemSpeechPlayback()
-
-    func toggle(text: String, blockID: UUID) {
-        if speakingBlockID == blockID {
-            stop(reason: "toggle")
-            return
-        }
-
-        stop(reason: "replacement")
-        let rendered = (try? AttributedString(markdown: text)).map { String($0.characters) } ?? text
-        let spoken = rendered.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !spoken.isEmpty else { return }
-
-        let voice = voice(for: spoken)
-        speakingBlockID = blockID
-        let priorStop = pendingStop
-        switch voice {
-        case .onDevice(let name):
-            Log.ui.info("MessageSpeech.start block=\(blockID) chars=\(spoken.count) voice=\(name)")
-        case .system(let language):
-            Log.ui.info("MessageSpeech.start block=\(blockID) chars=\(spoken.count) voice=system language=\(language ?? "default")")
-        }
-        task = Task { [weak self] in
-            await priorStop?.value
-            do {
-                switch voice {
-                case .onDevice:
-                    try await KokoroTTS.shared.speak(spoken)
-                case .system(let language):
-                    try await self?.systemSpeech.speak(spoken, language: language)
-                }
-                self?.finish(blockID: blockID, outcome: "finished")
-            } catch is CancellationError {
-                self?.finish(blockID: blockID, outcome: "canceled")
-            } catch {
-                Log.ui.error("MessageSpeech.failed block=\(blockID) error=\(error.localizedDescription)")
-                self?.finish(blockID: blockID, outcome: "failed")
-            }
-        }
-    }
-
-    func stop(reason: String) {
-        guard let blockID = speakingBlockID else { return }
-        task?.cancel()
-        task = nil
-        speakingBlockID = nil
-        pendingStop = Task {
-            await KokoroTTS.shared.stop()
-            systemSpeech.stop()
-        }
-        Log.ui.info("MessageSpeech.stop block=\(blockID) reason=\(reason)")
-    }
-
-    private func voice(for text: String) -> Voice {
-        let language = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
-        let languageRoot = language?.split(separator: "-").first.map(String.init)
-        let isMandarin = languageRoot == "zh" || (language == nil && MandarinG2P.containsHanzi(text))
-        if isMandarin {
-            return KokoroMandarinModelStore.shared.state == .ready
-                ? .onDevice(name: "mandarin")
-                : .system(language: language ?? "zh-CN")
-        }
-        let isEnglish = languageRoot == "en" || (language == nil && KokoroTextNormalizer.supportsEnglish(text))
-        if isEnglish {
-            return KokoroModelStore.shared.state == .ready
-                ? .onDevice(name: "heart")
-                : .system(language: language ?? "en-US")
-        }
-        return .system(language: language)
-    }
-
-    private func finish(blockID: UUID, outcome: String) {
-        guard speakingBlockID == blockID else { return }
-        task = nil
-        speakingBlockID = nil
-        Log.ui.info("MessageSpeech.\(outcome) block=\(blockID)")
-    }
-}
-
-@MainActor
-private final class SystemSpeechPlayback: NSObject, @preconcurrency AVSpeechSynthesizerDelegate {
-    private struct ActiveSpeech {
-        let utterance: AVSpeechUtterance
-        let audioSessionID: UUID
-        let continuation: CheckedContinuation<Void, Error>
-    }
-
-    private let synthesizer = AVSpeechSynthesizer()
-    private var activeSpeech: ActiveSpeech?
-
-    override init() {
-        super.init()
-        synthesizer.delegate = self
-    }
-
-    func speak(_ text: String, language: String?) async throws {
-        stop()
-        try Task.checkCancellation()
-        let utterance = AVSpeechUtterance(string: text)
-        if let language {
-            utterance.voice = AVSpeechSynthesisVoice(language: language)
-        }
-        let audioSessionID = UUID()
-        try AppAudioSession.activatePlayback(owner: audioSessionID)
-        Log.ui.info("SystemSpeech.start language=\(utterance.voice?.language ?? language ?? "default") voice=\(utterance.voice?.identifier ?? "default")")
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                activeSpeech = ActiveSpeech(
-                    utterance: utterance,
-                    audioSessionID: audioSessionID,
-                    continuation: continuation
-                )
-                if Task.isCancelled {
-                    complete(utterance, result: .failure(CancellationError()), reason: "canceled")
-                } else {
-                    synthesizer.speak(utterance)
-                }
-            }
-        } onCancel: {
-            Task { @MainActor [weak self] in self?.stop() }
-        }
-    }
-
-    func stop() {
-        guard let activeSpeech else { return }
-        self.activeSpeech = nil
-        synthesizer.stopSpeaking(at: .immediate)
-        AppAudioSession.deactivate(owner: activeSpeech.audioSessionID, reason: "systemSpeech.stopped")
-        activeSpeech.continuation.resume(throwing: CancellationError())
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        complete(utterance, result: .success(()), reason: "finished")
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        complete(utterance, result: .failure(CancellationError()), reason: "canceled")
-    }
-
-    private func complete(_ utterance: AVSpeechUtterance, result: Result<Void, Error>, reason: String) {
-        guard let activeSpeech, activeSpeech.utterance === utterance else { return }
-        self.activeSpeech = nil
-        AppAudioSession.deactivate(owner: activeSpeech.audioSessionID, reason: "systemSpeech.\(reason)")
-        activeSpeech.continuation.resume(with: result)
-    }
-}
 
 private struct AttachmentThumb: View {
     let attachment: Artifact
@@ -1120,8 +960,6 @@ private enum InvocationFormat {
 struct MessageControls {
     let onCopy: (String) -> Void
     let isCopied: Bool
-    let onReadAloud: (String) -> Void
-    let isSpeaking: Bool
     let canMutate: Bool
     let onBranch: () -> Void
     let onRetry: () -> Void
@@ -1279,7 +1117,6 @@ struct BlockView: View, Equatable {
             && lhs.isStreamingTail == rhs.isStreamingTail
             && lhs.isThinkingTail == rhs.isThinkingTail
             && lhs.controls.isCopied == rhs.controls.isCopied
-            && lhs.controls.isSpeaking == rhs.controls.isSpeaking
             && lhs.controls.canMutate == rhs.controls.canMutate
             && lhs.artifactControls.revision == rhs.artifactControls.revision
             && lhs.artifactControls.canMutate == rhs.artifactControls.canMutate
@@ -1516,7 +1353,6 @@ struct ResponseFooterBlockView: View, Equatable {
             && lhs.text == rhs.text
             && lhs.isVisible == rhs.isVisible
             && lhs.controls.isCopied == rhs.controls.isCopied
-            && lhs.controls.isSpeaking == rhs.controls.isSpeaking
             && lhs.controls.canMutate == rhs.controls.canMutate
     }
 
@@ -1536,15 +1372,6 @@ struct ResponseFooterBlockView: View, Equatable {
             .buttonStyle(.plain)
             .accessibilityLabel(A11yLabel.shareMessage)
             .accessibilityIdentifier(A11yID.Chat.Message.share)
-            if !text.isEmpty {
-                iconButton(
-                    systemName: controls.isSpeaking ? "stop.fill" : "speaker.wave.2",
-                    label: controls.isSpeaking ? A11yLabel.stopReading : A11yLabel.readAloud,
-                    id: A11yID.Chat.Message.readAloud
-                ) {
-                    controls.onReadAloud(text)
-                }
-            }
             if controls.canMutate {
                 iconButton(
                     systemName: "arrow.branch",

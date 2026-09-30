@@ -108,7 +108,7 @@ nonisolated struct StorageMigrationReplay: Sendable {
     let actionPolicyResolutionValid: Bool
     let skillChecks: [String: Bool]
     let secretsIndexRenamed: Bool
-    let modelsDirectoryMigrated: Bool
+    let retiredGemmaRemoved: Bool
     let fixtureResults: [StorageMigrationFixtureReplay]
 }
 
@@ -187,7 +187,6 @@ nonisolated enum StorageMigrator {
     static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
         Log.app.info("StorageMigrator.prepare start")
         try validateApplicationStorage()
-        try migrateOnDeviceModels(in: AppStoragePaths.applicationSupport)
         try migrateLegacySecrets()
         try migrateManagedOAuthAccounts()
         try migratePublicationToken()
@@ -199,46 +198,6 @@ nonisolated enum StorageMigrator {
         try migrateAPIServiceOAuthAccounts(manifests: manifests)
         try migrateSecretAPIServiceCredentials(manifests: manifests)
         Log.app.info("StorageMigrator.prepare done profile=\(storage.activeId?.uuidString ?? "nil")")
-    }
-
-    private static func migrateOnDeviceModels(in support: URL) throws {
-        let manager = FileManager.default
-        let source = support.appendingPathComponent("on-device-models", isDirectory: true)
-        let destination = support.appendingPathComponent("models", isDirectory: true)
-        var sourceIsDirectory: ObjCBool = false
-        guard manager.fileExists(atPath: source.path, isDirectory: &sourceIsDirectory) else { return }
-        guard sourceIsDirectory.boolValue else {
-            throw StorageMigrationError.invalidApplicationStorage("on-device models")
-        }
-        Log.app.info("StorageMigrator.modelsDirectory start")
-        do {
-            try AppStoragePaths.excludeFromBackup(source)
-            var destinationIsDirectory: ObjCBool = false
-            let moved: Int
-            if manager.fileExists(atPath: destination.path, isDirectory: &destinationIsDirectory) {
-                guard destinationIsDirectory.boolValue else {
-                    throw StorageMigrationError.collision(destination.path)
-                }
-                try AppStoragePaths.excludeFromBackup(destination)
-                let entries = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil)
-                for entry in entries where manager.fileExists(atPath: destination.appendingPathComponent(entry.lastPathComponent).path) {
-                    throw StorageMigrationError.collision(entry.lastPathComponent)
-                }
-                for entry in entries {
-                    try manager.moveItem(at: entry, to: destination.appendingPathComponent(entry.lastPathComponent))
-                }
-                try manager.removeItem(at: source)
-                moved = entries.count
-            } else {
-                let count = try manager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil).count
-                try manager.moveItem(at: source, to: destination)
-                moved = count
-            }
-            Log.app.info("StorageMigrator.modelsDirectory done moved=\(moved)")
-        } catch {
-            Log.app.error("StorageMigrator.modelsDirectory failed error=\(error.localizedDescription)")
-            throw error
-        }
     }
 
     private static func removeRetiredGemma(
@@ -2420,65 +2379,38 @@ nonisolated enum StorageMigrator {
             actionPolicyResolutionValid: actionPolicyResolutionValid,
             skillChecks: try replayRepositorySkills(),
             secretsIndexRenamed: try replaySecretsIndexRename(),
-            modelsDirectoryMigrated: try replayModelsDirectoryMigration(),
+            retiredGemmaRemoved: try replayRetiredGemmaRemoval(),
             fixtureResults: fixtureResults
         )
     }
 
-    private static func replayModelsDirectoryMigration() throws -> Bool {
+    private static func replayRetiredGemmaRemoval() throws -> Bool {
         let manager = FileManager.default
-        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "models-directory-replay")
-        defer { FileStaging.cleanup(root, operation: "models-directory-replay") }
+        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "retired-gemma-replay")
+        defer { FileStaging.cleanup(root, operation: "retired-gemma-replay") }
         let defaultsName = "ai.openox.retired-gemma-replay"
         guard let defaults = UserDefaults(suiteName: defaultsName) else { throw CocoaError(.fileWriteUnknown) }
         defaults.removePersistentDomain(forName: defaultsName)
         defer { defaults.removePersistentDomain(forName: defaultsName) }
-        let source = root.appendingPathComponent("on-device-models", isDirectory: true)
-        let destination = root.appendingPathComponent("models", isDirectory: true)
-        try manager.createDirectory(at: source, withIntermediateDirectories: true)
-        let legacyModel = source.appendingPathComponent("legacy-model.bin")
-        let legacyBytes = Data("model".utf8)
-        try legacyBytes.write(to: legacyModel)
-        try migrateOnDeviceModels(in: root)
-        let migrated = try !manager.fileExists(atPath: source.path)
-            && Data(contentsOf: destination.appendingPathComponent("legacy-model.bin")) == legacyBytes
-        try migrateOnDeviceModels(in: root)
-        let secondRunNoOp = (try Data(contentsOf: destination.appendingPathComponent("legacy-model.bin"))) == legacyBytes
-
-        try manager.createDirectory(at: source, withIntermediateDirectories: true)
-        let remaining = source.appendingPathComponent("kokoro")
-        try Data("voice".utf8).write(to: remaining)
-        try migrateOnDeviceModels(in: root)
-        let resumed = try !manager.fileExists(atPath: source.path)
-            && Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
-
-        try manager.createDirectory(at: source, withIntermediateDirectories: true)
-        try Data("other".utf8).write(to: source.appendingPathComponent("kokoro"))
-        var collisionRejected = false
-        do {
-            try migrateOnDeviceModels(in: root)
-        } catch StorageMigrationError.collision(let path) {
-            collisionRejected = path == "kokoro"
-        } catch {
-            collisionRejected = false
-        }
-        let sourcePreserved = try Data(contentsOf: source.appendingPathComponent("kokoro")) == Data("other".utf8)
-        let destinationPreserved = try Data(contentsOf: destination.appendingPathComponent("kokoro")) == Data("voice".utf8)
-        collisionRejected = collisionRejected && sourcePreserved && destinationPreserved
-        try Data("model".utf8).write(to: destination.appendingPathComponent("gemma-4-e2b-it.litertlm"))
-        try Data("receipt".utf8).write(to: destination.appendingPathComponent("gemma-4-e2b-it.json"))
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let legacyModels = root.appendingPathComponent("on-device-models", isDirectory: true)
+        try manager.createDirectory(at: models, withIntermediateDirectories: true)
+        try manager.createDirectory(at: legacyModels, withIntermediateDirectories: true)
+        let unrelatedBytes = Data("unrelated".utf8)
+        try unrelatedBytes.write(to: models.appendingPathComponent("unrelated.bin"))
+        try Data("model".utf8).write(to: models.appendingPathComponent("gemma-4-e2b-it.litertlm"))
+        try Data("receipt".utf8).write(to: legacyModels.appendingPathComponent("gemma-4-e2b-it.json"))
         let retiredSelection = ModelSelection(providerID: "on-device-gemma", modelID: "gemma-4-e2b-it", reasoningEffort: nil)
         defaults.set(try JSONEncoder().encode(retiredSelection), forKey: ProviderRegistry.defaultModelKey)
         let cleanup = try removeRetiredGemma(defaults: defaults, support: root)
-        let unrelatedModelPreserved = try Data(contentsOf: destination.appendingPathComponent("legacy-model.bin")) == legacyBytes
+        let unrelatedModelPreserved = try Data(contentsOf: models.appendingPathComponent("unrelated.bin")) == unrelatedBytes
         let retiredRemoved = cleanup.files == 2 && cleanup.defaultModel
-            && !manager.fileExists(atPath: destination.appendingPathComponent("gemma-4-e2b-it.litertlm").path)
-            && !manager.fileExists(atPath: destination.appendingPathComponent("gemma-4-e2b-it.json").path)
+            && !manager.fileExists(atPath: models.appendingPathComponent("gemma-4-e2b-it.litertlm").path)
+            && !manager.fileExists(atPath: legacyModels.appendingPathComponent("gemma-4-e2b-it.json").path)
             && defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil
             && unrelatedModelPreserved
         let cleanupAgain = try removeRetiredGemma(defaults: defaults, support: root)
-        return migrated && secondRunNoOp && resumed && collisionRejected && retiredRemoved
-            && cleanupAgain.files == 0 && !cleanupAgain.defaultModel
+        return retiredRemoved && cleanupAgain.files == 0 && !cleanupAgain.defaultModel
     }
 
     private static func replayRepositorySkills() throws -> [String: Bool] {

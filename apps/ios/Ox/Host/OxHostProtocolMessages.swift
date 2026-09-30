@@ -258,6 +258,7 @@ extension OxHostProtocol {
         let actionPolicyResolutionValid: Bool?
         let skillChecks: [String: Bool]?
         let secretsIndexRenamed: Bool?
+        let retiredGemmaRemoved: Bool?
         let fixtureResults: [StorageMigrationFixtureReplay]?
     }
 

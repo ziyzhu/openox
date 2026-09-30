@@ -88,21 +88,6 @@ struct SettingsSheet: View {
         return Text(verbatim: "\(client.displayName) · \(model.displayName)")
     }
 
-    private var voiceStatus: Text {
-        let readyCount = (KokoroModelStore.shared.state == .ready ? 1 : 0)
-            + (KokoroMandarinModelStore.shared.state == .ready ? 1 : 0)
-        if readyCount > 0 { return Text("\(readyCount) of 2 ready") }
-        if case .downloading = KokoroMandarinModelStore.shared.state { return Text("Downloading") }
-        if case .failed = KokoroMandarinModelStore.shared.state { return Text("Needs attention") }
-        switch KokoroModelStore.shared.state {
-        case .notInstalled: return Text("Not installed")
-        case .downloading: return Text("Downloading")
-        case .preparing: return Text("Preparing")
-        case .ready: return Text("Ready")
-        case .failed: return Text("Needs attention")
-        }
-    }
-
     var body: some View {
         NavigationStack(path: $profilePath) {
             ScrollView {
@@ -203,19 +188,6 @@ struct SettingsSheet: View {
                             )
                         }
                         .accessibilityIdentifier(A11yID.Settings.language)
-                    }
-
-                    SettingsSection("Voice", layout: .row) {
-                        NavigationLink {
-                            VoiceSettingsView()
-                        } label: {
-                            SettingsDisclosureRow(
-                                title: "On-device voices",
-                                value: voiceStatus
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier(A11yID.Settings.voice)
                     }
 
                     SettingsSection("Theme") {

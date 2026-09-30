@@ -31,16 +31,6 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── external-profiles.json           external profile folder bookmarks
 │   │   ├── device-folder-grants.json         security-scoped folder bookmarks
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
-│   │   ├── models/                          downloaded model binaries, excluded from backup
-│   │   │   ├── kokoro-af-heart-v1/           verified and compiled English voice model
-│   │   │       ├── Models/*.mlmodelc         four Core ML stages
-│   │   │       └── receipt.json              pinned upstream revision
-│   │   │   └── kokoro-zh-zf-001-v1/          verified Mandarin voice model, excluded from backup
-│   │   │       ├── Kokoro*.mlmodelc          seven Core ML stages
-│   │   │       ├── assets/pinyin_*.bin        offline Mandarin pronunciation dictionaries
-│   │   │       ├── voices/zf_001.bin          fixed Mandarin voice embedding
-│   │   │       ├── vocab.json                 Mandarin phoneme vocabulary
-│   │   │       └── receipt.json              pinned upstream revision
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
@@ -83,10 +73,8 @@ website-data namespace directly from that bundle identifier. Agent skill and cha
 packages use canonical OpenOx type identifiers; the app continues importing the
 legacy bundle-derived identifiers.
 
-At startup, `StorageMigrator` moves downloaded files from the former
-`on-device-models/` directory into `models/`. If both directories contain the same
-filename, migration stops and retains both copies. It also removes retired Gemma 4
-model artifacts and clears that provider when it was the saved default.
+At startup, `StorageMigrator` removes retired Gemma 4 model artifacts and clears
+that provider when it was the saved default.
 
 Primary owners:
 
@@ -94,9 +82,8 @@ Primary owners:
 - UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
-- On-device model files and receipts — owners: Host/ModelProviders/KokoroModelStore.swift and Host/ModelProviders/KokoroMandarinModelStore.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
-- Legacy read-aloud voice preference — retained in UserDefaults and ignored after Kokoro replaces voice selection
+- Retired read-aloud voice preference — retained in UserDefaults and ignored
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
 - Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift

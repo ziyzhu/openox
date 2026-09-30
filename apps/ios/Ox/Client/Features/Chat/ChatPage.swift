@@ -329,7 +329,6 @@ struct ChatPage: View {
     @State private var alertPresentation: AlertPresentation?
 
     @State private var copiedBlockId: UUID?
-    @State private var messageSpeech = MessageSpeechPlayback()
     @State private var toast: Toast?
     @State private var choiceInputFocused = false
     @State private var showsDelayedActivity = false
@@ -638,7 +637,6 @@ struct ChatPage: View {
             #endif
         }
         .onDisappear {
-            messageSpeech.stop(reason: "pageDisappear")
             speechInput.cancel(reason: "pageDisappear")
             #if targetEnvironment(simulator)
             DebugUIAPI.setEditDraft = nil
@@ -997,8 +995,6 @@ struct ChatPage: View {
         MessageControls(
             onCopy: { text in copyMessage(text, blockId: sourceBlockID) },
             isCopied: copiedBlockId == sourceBlockID,
-            onReadAloud: { text in messageSpeech.toggle(text: text, blockID: sourceBlockID) },
-            isSpeaking: messageSpeech.speakingBlockID == sourceBlockID,
             canMutate: !chat.isBusy && !chat.isTemporary,
             onBranch: { alertPresentation = .branch(sourceBlockID) },
             onRetry: { alertPresentation = .retry(sourceBlockID) },
@@ -1774,7 +1770,6 @@ struct ChatPage: View {
         prepareComposerSubmission()
         let draftID = composer.draftID
         let draft = composer.attributedDraft
-        messageSpeech.stop(reason: "speechInput")
         composer.setAttachmentMenuPresented(false)
         speechInput.begin(accessible: accessible) { text, action in
             guard composer.draftID == draftID, composer.attributedDraft == draft else {

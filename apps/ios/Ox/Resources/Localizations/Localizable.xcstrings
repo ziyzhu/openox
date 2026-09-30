@@ -1,166 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Heart" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heart"
-          }
-        }
-      }
-    },
-    "Mandarin" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "普通话"
-          }
-        }
-      }
-    },
-    "On-device voices" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设备端语音"
-          }
-        }
-      }
-    },
-    "Download Heart voice" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下载 Heart 语音"
-          }
-        }
-      }
-    },
-    "Download Mandarin voice" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下载普通话语音"
-          }
-        }
-      }
-    },
-    "Downloading Heart voice" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在下载 Heart 语音"
-          }
-        }
-      }
-    },
-    "Downloading Mandarin voice" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在下载普通话语音"
-          }
-        }
-      }
-    },
-    "Preparing Heart voice" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在准备 Heart 语音"
-          }
-        }
-      }
-    },
-    "Heart voice ready" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heart 语音已就绪"
-          }
-        }
-      }
-    },
-    "Mandarin voice ready" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "普通话语音已就绪"
-          }
-        }
-      }
-    },
-    "Not installed" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未安装"
-          }
-        }
-      }
-    },
-    "Downloading" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在下载"
-          }
-        }
-      }
-    },
-    "Verifying" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在验证"
-          }
-        }
-      }
-    },
-    "Ready" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "就绪"
-          }
-        }
-      }
-    },
-    "Needs attention" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要处理"
-          }
-        }
-      }
-    },
-    "Status" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "状态"
-          }
-        }
-      }
-    },
     "GitHub publication requires a single token field." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1767,17 +1607,6 @@
         }
       }
     },
-    "Automatic" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动"
-          }
-        }
-      }
-    },
     "Awaiting approval" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1851,17 +1680,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回聊天"
-          }
-        }
-      }
-    },
-    "Basic" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基础"
           }
         }
       }
@@ -4319,17 +4137,6 @@
         }
       }
     },
-    "Enhanced" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "增强"
-          }
-        }
-      }
-    },
     "Enter a valid website address." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4977,17 +4784,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "健康：读取体能训练"
-          }
-        }
-      }
-    },
-    "Hello, this is how I’ll read Ox’s responses." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你好，我会用这个声音朗读 Ox 的回复。"
           }
         }
       }
@@ -7761,17 +7557,6 @@
         }
       }
     },
-    "Premium" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高品质"
-          }
-        }
-      }
-    },
     "Preparing speech…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7834,17 +7619,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "预览版"
-          }
-        }
-      }
-    },
-    "Preview voice" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "试听声音"
           }
         }
       }
@@ -8053,17 +7827,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "读取活动数据"
-          }
-        }
-      }
-    },
-    "Read aloud" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "朗读"
           }
         }
       }
@@ -10207,28 +9970,6 @@
         }
       }
     },
-    "Stop preview" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停止试听"
-          }
-        }
-      }
-    },
-    "Stop reading" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停止朗读"
-          }
-        }
-      }
-    },
     "Stopped" : {
       "localizations" : {
         "zh-Hans" : {
@@ -11569,17 +11310,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生命体征"
-          }
-        }
-      }
-    },
-    "Voice" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "声音"
           }
         }
       }

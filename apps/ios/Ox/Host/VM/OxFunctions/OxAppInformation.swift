@@ -71,20 +71,6 @@ nonisolated enum OxAppInformation {
                     ], required: ["selection", "appearance"]),
                 ])
             ), (
-                "ox.app.voice",
-                .object([
-                    "description": .string("Read Ox's fixed offline English read-aloud voice: `await ox.app.voice({ purpose })`. The effective voice is null until the model is installed in Settings → Voice. Does not speak."),
-                    "inputSchema": object([:]),
-                    "outputSchema": object([
-                        "selection": nullable(string),
-                        "effective": nullable(object([
-                            "id": string,
-                            "name": string,
-                            "language": string,
-                        ], required: ["id", "name", "language"])),
-                    ], required: ["selection", "effective"]),
-                ])
-            ), (
                 "ox.app.model",
                 .object([
                     "description": .string("Read this chat's current model, provider, tool support, and authentication readiness: `await ox.app.model({ purpose })`. Returns status only, never credentials or account labels. Does not change the model."),
@@ -240,9 +226,6 @@ nonisolated enum OxAppInformation {
             let theme: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appTheme(purpose: purpose) }
             }
-            let voice: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appVoice(purpose: purpose) }
-            }
             let model: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appModel(purpose: purpose) }
             }
@@ -269,7 +252,6 @@ nonisolated enum OxAppInformation {
             context.setObject(notifications as AnyObject, forKeyedSubscript: "__nativeAppNotifications" as NSString)
             context.setObject(language as AnyObject, forKeyedSubscript: "__nativeAppLanguage" as NSString)
             context.setObject(theme as AnyObject, forKeyedSubscript: "__nativeAppTheme" as NSString)
-            context.setObject(voice as AnyObject, forKeyedSubscript: "__nativeAppVoice" as NSString)
             context.setObject(model as AnyObject, forKeyedSubscript: "__nativeAppModel" as NSString)
             context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
             context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
@@ -284,7 +266,6 @@ nonisolated enum OxAppInformation {
           notifications: (value) => { const options = __oxOptions(value, 'ox.app.notifications'); return __nativeAppNotifications(String(options.purpose)); },
           language: (value) => { const options = __oxOptions(value, 'ox.app.language'); return __nativeAppLanguage(String(options.purpose)); },
           theme: (value) => { const options = __oxOptions(value, 'ox.app.theme'); return __nativeAppTheme(String(options.purpose)); },
-          voice: (value) => { const options = __oxOptions(value, 'ox.app.voice'); return __nativeAppVoice(String(options.purpose)); },
           model: (value) => { const options = __oxOptions(value, 'ox.app.model'); return __nativeAppModel(String(options.purpose)); },
           defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
           actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },

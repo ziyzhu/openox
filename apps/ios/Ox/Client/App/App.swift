@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 @main
 struct OxApp: App {
@@ -84,20 +83,11 @@ struct OxApp: App {
                 Text(verbatim: serviceImports.importedDomain ?? "")
             }
             .task { await AppRegion.shared.refresh() }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
-                Task { await KokoroRuntimeLifecycle.receiveMemoryWarning() }
-            }
             .onChange(of: scenePhase) { _, phase in
-                switch phase {
-                case .active:
-                    Task {
-                        await AppRegion.shared.refresh()
-                        ScheduledSkillScheduler.shared.refresh()
-                    }
-                case .background:
-                    Task { await KokoroRuntimeLifecycle.enterBackground() }
-                default:
-                    break
+                guard phase == .active else { return }
+                Task {
+                    await AppRegion.shared.refresh()
+                    ScheduledSkillScheduler.shared.refresh()
                 }
             }
         }

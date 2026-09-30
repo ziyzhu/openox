@@ -6,12 +6,6 @@ nonisolated enum AppAudioSession {
     private static let queue = DispatchQueue(label: "ai.openox.audio-session", qos: .userInitiated)
     private static let activeOwner = Mutex<UUID?>(nil)
 
-    static func activatePlayback(owner: UUID) throws {
-        try queue.sync {
-            try activate(owner: owner, category: .playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
-        }
-    }
-
     static func activateRecording(owner: UUID) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
@@ -41,7 +35,5 @@ nonisolated enum AppAudioSession {
         try session.setCategory(category, mode: mode, options: options)
         try session.setActive(true)
         activeOwner.withLock { $0 = owner }
-        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
-        Log.ui.info("AudioSession.activated category=\(category.rawValue) mode=\(mode.rawValue) outputs=\(outputs) volume=\(session.outputVolume)")
     }
 }

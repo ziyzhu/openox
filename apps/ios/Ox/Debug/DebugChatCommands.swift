@@ -273,6 +273,7 @@ extension OxHostProtocol {
                     actionPolicyResolutionValid: replay.actionPolicyResolutionValid,
                     skillChecks: replay.skillChecks,
                     secretsIndexRenamed: replay.secretsIndexRenamed,
+                    retiredGemmaRemoved: replay.retiredGemmaRemoved,
                     fixtureResults: replay.fixtureResults
                 ))
             } catch {

@@ -79,8 +79,6 @@ nonisolated enum A11yID {
         static func customProvider(_ id: String) -> String { "settings.customProvider.\(id)" }
         static func customProviderModel(_ id: String) -> String { "settings.customProviderModel.\(id)" }
         static let language = "settings.language"
-        static let voice = "settings.voice"
-        static let voiceDownload = "settings.voice.download"
         static let theme = "settings.theme"
         static let actions = "settings.actions"
         static let services = "settings.services"
@@ -222,7 +220,6 @@ nonisolated enum A11yID {
             static let agent = "chat.message.agent"
             static let copy = "chat.message.copy"
             static let share = "chat.message.share"
-            static let readAloud = "chat.message.readAloud"
             static let branch = "chat.message.branch"
             static let retry = "chat.message.retry"
             static let contextCompaction = "chat.contextCompacted"
@@ -346,8 +343,6 @@ enum A11yLabel {
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
     static var copyMessage: String { L10n.string("Copy message", comment: "") }
     static var shareMessage: String { L10n.string("Share message", comment: "") }
-    static var readAloud: String { L10n.string("Read aloud", comment: "") }
-    static var stopReading: String { L10n.string("Stop reading", comment: "") }
     static var shareArtifact: String { L10n.string("Share artifact", comment: "") }
     static var copyCode: String { L10n.string("Copy code", comment: "") }
     static var branchMessage: String { L10n.string("Branch from this reply", comment: "") }

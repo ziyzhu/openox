@@ -100,20 +100,6 @@ extension Chat {
         }
     }
 
-    public func appVoice(purpose: String) async throws -> JSONValue? {
-        try await tracked(Actions.appVoice, .object([:]), purpose: purpose) {
-            let installed = await KokoroModelStore.shared.state == .ready
-            return .object([
-                "selection": .null,
-                "effective": installed ? .object([
-                    "id": .string("af_heart"),
-                    "name": .string("Heart"),
-                    "language": .string("en-US"),
-                ]) : .null,
-            ])
-        }
-    }
-
     public func appModel(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appModel, .object([:]), purpose: purpose) {
             .object([
