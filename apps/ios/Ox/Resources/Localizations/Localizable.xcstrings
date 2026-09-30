@@ -879,22 +879,12 @@
         }
       }
     },
-    "Active %@" : {
+    "Just now" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "活跃于%@"
-          }
-        }
-      }
-    },
-    "Active just now" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刚刚活跃"
+            "value" : "刚刚"
           }
         }
       }

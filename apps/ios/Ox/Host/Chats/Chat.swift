@@ -123,6 +123,7 @@ final class Chat: Identifiable {
         enum Idle: Equatable {
             case read
             case unread
+            case stopped
         }
 
         enum AwaitingAction: Equatable {
@@ -475,6 +476,7 @@ final class Chat: Identifiable {
     var activity: Activity {
         switch runState {
         case .idle:
+            if showsStoppedTurn { return .idle(.stopped) }
             return .idle(hasUnreadResponse ? .unread : .read)
         case .running(let run):
             switch run.phase {

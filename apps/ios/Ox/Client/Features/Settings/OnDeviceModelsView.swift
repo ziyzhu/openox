@@ -48,7 +48,6 @@ struct OnDeviceModelsView: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .font(Theme.Icons.md)
                     .frame(width: 32, height: 32)
-                    .overlay(Circle().stroke(Theme.Colors.primary, lineWidth: 1.5))
             }
             .accessibilityLabel("Download Gemma 4 E2B")
         case .downloading(let fraction):

@@ -277,7 +277,7 @@ private struct SidebarRow: View {
         let week = 7 * day
         let month = 30 * day
         let elapsed = max(0, now.timeIntervalSince(meta.activityDate))
-        guard elapsed >= minute else { return L10n.string("Active just now") }
+        guard elapsed >= minute else { return L10n.string("Just now") }
 
         let components: DateComponents
         switch elapsed {
@@ -296,7 +296,7 @@ private struct SidebarRow: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = AppLocale.resolvedLocale
         formatter.unitsStyle = .full
-        return L10n.string("Active \(formatter.localizedString(from: components))")
+        return formatter.localizedString(from: components)
     }
 
     private var accessibilityValue: String {
@@ -326,6 +326,12 @@ private struct SidebarRow: View {
                 .frame(width: 8, height: 8)
                 .padding(.horizontal, Theme.Spacing.sm - 2)
                 .accessibilityHidden(true)
+        case .idle(.stopped):
+            Text("Stopped")
+                .font(Theme.Fonts.captionSm)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityHidden(true)
         case .running(.thinking), .running(.streaming):
             CellularAutomatonLoader.small
                 .frame(width: 20, height: 20)
@@ -346,6 +352,7 @@ private struct SidebarRow: View {
         switch activity {
         case .idle(.read): ""
         case .idle(.unread): L10n.string("Unread")
+        case .idle(.stopped): L10n.string("Stopped")
         case .running(.thinking), .running(.streaming): L10n.string("Plowing")
         case .running(.awaiting(let action)): action.accessibilityValue
         }

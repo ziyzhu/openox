@@ -71,7 +71,7 @@ Preserve a resource-scoped URL only when it is the observed opaque identifier re
 
 Use `ox.web.browser.waitForUserInteraction` for credentials, challenges, account choices, and other human-only steps.
 
-When proposed actions require authentication, let the user complete the website's sign-in flow through Browser and collect signed-in evidence before presenting a confirmable action plan. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
+When proposed actions require authentication, collect both sides of the transition around one user interaction. While the user is still signed out, start Browser capture, record the bounded signed-out evidence needed for the authentication decision table and sign-in handoff URL, then call `ox.web.browser.waitForUserInteraction` once. That call stops capture and clears injected scripts before the user enters credentials. After the user finishes, start a fresh capture and collect the corresponding bounded signed-in evidence before presenting a confirmable action plan. Never capture the human sign-in interaction itself. Inspect only the requests, redirects, statuses, and response shapes needed to distinguish the two states; never inspect or retain credential fields, authorization values, cookies, private bodies, or reusable tokens. Without evidence from both sides of the transition, keep the authentication handoff and dependent actions provisional rather than inventing them from the signed-in state alone. If the user cannot complete sign-in, present the findings as provisional and clearly separate unverified actions rather than asking for plan confirmation.
 
 ### Choose a favicon
 
