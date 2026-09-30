@@ -1093,10 +1093,22 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "number": { "type": ["string", "integer"], "description": "Pull-request number within the repository." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
         },
-        "required": ["repo", "number"],
+        "required": [
+          "repo",
+          "number"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1107,24 +1119,60 @@
             "items": {
               "type": "object",
               "properties": {
-                "path": { "type": "string" },
-                "status": { "type": "string" },
-                "additions": { "type": "integer" },
-                "deletions": { "type": "integer" },
-                "isBinary": { "type": "boolean" },
-                "isTooBig": { "type": "boolean" },
-                "truncatedReason": { "type": ["string", "null"] }
+                "path": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "additions": {
+                  "type": "integer"
+                },
+                "deletions": {
+                  "type": "integer"
+                },
+                "isBinary": {
+                  "type": "boolean"
+                },
+                "isTooBig": {
+                  "type": "boolean"
+                },
+                "truncatedReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
               },
-              "required": ["path", "status", "additions", "deletions", "isBinary", "isTooBig", "truncatedReason"],
+              "required": [
+                "path",
+                "status",
+                "additions",
+                "deletions",
+                "isBinary",
+                "isTooBig",
+                "truncatedReason"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "number": "2983" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1135,10 +1183,22 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "number": { "type": ["string", "integer"], "description": "Pull-request number within the repository." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
         },
-        "required": ["repo", "number"],
+        "required": [
+          "repo",
+          "number"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1149,22 +1209,49 @@
             "items": {
               "type": "object",
               "properties": {
-                "oid": { "type": "string" },
-                "message": { "type": "string" },
-                "author": { "type": "string" },
-                "authoredDate": { "type": "string" },
-                "url": { "type": "string" }
+                "oid": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "authoredDate": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["oid", "message", "author", "authoredDate", "url"],
+              "required": [
+                "oid",
+                "message",
+                "author",
+                "authoredDate",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "number": "2983" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1175,10 +1262,22 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "number": { "type": ["string", "integer"], "description": "Pull-request number within the repository." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          }
         },
-        "required": ["repo", "number"],
+        "required": [
+          "repo",
+          "number"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1189,23 +1288,53 @@
             "items": {
               "type": "object",
               "properties": {
-                "name": { "type": "string" },
-                "workflow": { "type": "string" },
-                "status": { "type": "string" },
-                "runId": { "type": "string" },
-                "jobId": { "type": "string" },
-                "url": { "type": "string" }
+                "name": {
+                  "type": "string"
+                },
+                "workflow": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "jobId": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["name", "workflow", "status", "runId", "jobId", "url"],
+              "required": [
+                "name",
+                "workflow",
+                "status",
+                "runId",
+                "jobId",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "number": "2983" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2983"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1216,11 +1345,26 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "number": { "type": ["string", "integer"], "description": "Pull-request number within the repository." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "Pull-request number within the repository."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
-        "required": ["repo", "number"],
+        "required": [
+          "repo",
+          "number"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1231,36 +1375,83 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "subjectType": { "type": "string" },
-                "isResolved": { "type": "boolean" },
-                "resolvedBy": { "type": ["string", "null"] },
+                "id": {
+                  "type": "string"
+                },
+                "subjectType": {
+                  "type": "string"
+                },
+                "isResolved": {
+                  "type": "boolean"
+                },
+                "resolvedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "comments": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "string" },
-                      "author": { "type": "string" },
-                      "body": { "type": "string" },
-                      "createdAt": { "type": ["string", "null"] },
-                      "url": { "type": "string" }
+                      "id": {
+                        "type": "string"
+                      },
+                      "author": {
+                        "type": "string"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "url": {
+                        "type": "string"
+                      }
                     },
-                    "required": ["id", "author", "body", "createdAt", "url"],
+                    "required": [
+                      "id",
+                      "author",
+                      "body",
+                      "createdAt",
+                      "url"
+                    ],
                     "additionalProperties": false
                   }
                 }
               },
-              "required": ["id", "subjectType", "isResolved", "resolvedBy", "comments"],
+              "required": [
+                "id",
+                "subjectType",
+                "isResolved",
+                "resolvedBy",
+                "comments"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "number": "2016" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "number": "2016"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1271,11 +1462,22 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "workflow": { "type": "string", "description": "Workflow file name or workflow path. Omit to include every workflow." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "workflow": {
+            "type": "string",
+            "description": "Workflow file name or workflow path. Omit to include every workflow."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1286,25 +1488,69 @@
             "items": {
               "type": "object",
               "properties": {
-                "runId": { "type": "string" },
-                "title": { "type": "string" },
-                "workflow": { "type": "string" },
-                "status": { "type": "string" },
-                "branch": { "type": ["string", "null"] },
-                "createdAt": { "type": ["string", "null"] },
-                "duration": { "type": ["string", "null"] },
-                "url": { "type": "string" }
+                "runId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "workflow": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "duration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["runId", "title", "workflow", "status", "branch", "createdAt", "duration", "url"],
+              "required": [
+                "runId",
+                "title",
+                "workflow",
+                "status",
+                "branch",
+                "createdAt",
+                "duration",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1315,45 +1561,126 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "runId": { "type": ["string", "integer"], "description": "GitHub Actions run identifier." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "runId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions run identifier."
+          }
         },
-        "required": ["repo", "runId"],
+        "required": [
+          "repo",
+          "runId"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "runId": { "type": "string" },
-          "title": { "type": "string" },
-          "workflow": { "type": "string" },
-          "status": { "type": "string" },
-          "event": { "type": ["string", "null"] },
-          "branch": { "type": ["string", "null"] },
-          "commitSha": { "type": ["string", "null"] },
-          "createdAt": { "type": ["string", "null"] },
-          "duration": { "type": ["string", "null"] },
+          "runId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "workflow": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commitSha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "jobs": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "jobId": { "type": "string" },
-                "name": { "type": "string" },
-                "status": { "type": "string" },
-                "duration": { "type": ["string", "null"] },
-                "url": { "type": "string" }
+                "jobId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["jobId", "name", "status", "duration", "url"],
+              "required": [
+                "jobId",
+                "name",
+                "status",
+                "duration",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "url": { "type": "string" }
+          "url": {
+            "type": "string"
+          }
         },
-        "required": ["runId", "title", "workflow", "status", "event", "branch", "commitSha", "createdAt", "duration", "jobs", "url"],
+        "required": [
+          "runId",
+          "title",
+          "workflow",
+          "status",
+          "event",
+          "branch",
+          "commitSha",
+          "createdAt",
+          "duration",
+          "jobs",
+          "url"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "runId": "30693303910" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "runId": "30693303910"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1364,44 +1691,127 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "runId": { "type": ["string", "integer"], "description": "GitHub Actions run identifier." },
-          "jobId": { "type": ["string", "integer"], "description": "GitHub Actions job identifier." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "runId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions run identifier."
+          },
+          "jobId": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "GitHub Actions job identifier."
+          }
         },
-        "required": ["repo", "runId", "jobId"],
+        "required": [
+          "repo",
+          "runId",
+          "jobId"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "runId": { "type": "string" },
-          "jobId": { "type": "string" },
-          "name": { "type": "string" },
-          "status": { "type": "string" },
-          "startedAt": { "type": ["string", "null"] },
-          "completedAt": { "type": ["string", "null"] },
-          "duration": { "type": ["string", "null"] },
+          "runId": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "steps": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "number": { "type": "integer" },
-                "name": { "type": "string" },
-                "conclusion": { "type": ["string", "null"] },
-                "startedAt": { "type": ["string", "null"] },
-                "completedAt": { "type": ["string", "null"] }
+                "number": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "conclusion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "completedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
               },
-              "required": ["number", "name", "conclusion", "startedAt", "completedAt"],
+              "required": [
+                "number",
+                "name",
+                "conclusion",
+                "startedAt",
+                "completedAt"
+              ],
               "additionalProperties": false
             }
           },
-          "url": { "type": "string" }
+          "url": {
+            "type": "string"
+          }
         },
-        "required": ["runId", "jobId", "name", "status", "startedAt", "completedAt", "duration", "steps", "url"],
+        "required": [
+          "runId",
+          "jobId",
+          "name",
+          "status",
+          "startedAt",
+          "completedAt",
+          "duration",
+          "steps",
+          "url"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "github/github-mcp-server", "runId": "30693303910", "jobId": "91351791568" },
+      "defaultArgs": {
+        "repo": "github/github-mcp-server",
+        "runId": "30693303910",
+        "jobId": "91351791568"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1473,14 +1883,26 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "query": { "type": "string", "description": "GitHub issue search query. Qualifiers such as repo:owner/repository, is:pr, is:open, and label:bug are supported." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "query": {
+            "type": "string",
+            "description": "GitHub issue search query. Qualifiers such as repo:owner/repository, is:pr, is:open, and label:bug are supported."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "additionalProperties": false
       },
-      "outputSchema": { "$ref": "#/$defs/threadList" },
-      "defaultArgs": { "query": "repo:cli/cli is:issue is:open label:bug" },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
+      "defaultArgs": {
+        "query": "repo:cli/cli is:issue is:open label:bug"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1491,13 +1913,33 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "filter": { "type": "string", "enum": ["assigned", "created", "mentioned"], "description": "Relationship to the signed-in user. Defaults to assigned." },
-          "state": { "type": "string", "enum": ["open", "closed"], "description": "Issue state to list. Defaults to open." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "filter": {
+            "type": "string",
+            "enum": [
+              "assigned",
+              "created",
+              "mentioned"
+            ],
+            "description": "Relationship to the signed-in user. Defaults to assigned."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Issue state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
         "additionalProperties": false
       },
-      "outputSchema": { "$ref": "#/$defs/threadList" },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": true
@@ -1509,13 +1951,34 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "filter": { "type": "string", "enum": ["created", "assigned", "review-requested", "involves"], "description": "Relationship to the signed-in user. Defaults to created." },
-          "state": { "type": "string", "enum": ["open", "closed"], "description": "Pull-request state to list. Defaults to open." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "filter": {
+            "type": "string",
+            "enum": [
+              "created",
+              "assigned",
+              "review-requested",
+              "involves"
+            ],
+            "description": "Relationship to the signed-in user. Defaults to created."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Pull-request state to list. Defaults to open."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
         "additionalProperties": false
       },
-      "outputSchema": { "$ref": "#/$defs/threadList" },
+      "outputSchema": {
+        "$ref": "#/$defs/threadList"
+      },
       "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": true
@@ -1527,40 +1990,95 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "sha": { "type": "string", "description": "Full or abbreviated commit SHA." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "sha": {
+            "type": "string",
+            "description": "Full or abbreviated commit SHA."
+          }
         },
-        "required": ["repo", "sha"],
+        "required": [
+          "repo",
+          "sha"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "oid": { "type": "string" },
-          "message": { "type": "string" },
-          "author": { "type": "string" },
-          "authoredDate": { "type": ["string", "null"] },
-          "parents": { "type": "array", "items": { "type": "string" } },
+          "oid": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authoredDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "files": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "path": { "type": "string" },
-                "changeType": { "type": ["string", "null"] },
-                "additions": { "type": ["number", "null"] },
-                "deletions": { "type": ["number", "null"] }
+                "path": {
+                  "type": "string"
+                },
+                "changeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "additions": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "deletions": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
               },
-              "required": ["path"],
+              "required": [
+                "path"
+              ],
               "additionalProperties": false
             }
           },
-          "url": { "type": "string" }
+          "url": {
+            "type": "string"
+          }
         },
-        "required": ["oid", "message", "author", "files", "url"],
+        "required": [
+          "oid",
+          "message",
+          "author",
+          "files",
+          "url"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "cli/cli", "sha": "0274077b56a5ef8e575358721149cd02888b2a5f" },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "sha": "0274077b56a5ef8e575358721149cd02888b2a5f"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1571,10 +2089,22 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "number": { "type": ["string", "number"], "description": "Issue or pull-request number within the repository." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "number": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Issue or pull-request number within the repository."
+          }
         },
-        "required": ["repo", "number"],
+        "required": [
+          "repo",
+          "number"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1585,20 +2115,43 @@
             "items": {
               "type": "object",
               "properties": {
-                "author": { "type": "string" },
-                "createdAt": { "type": ["string", "null"] },
-                "body": { "type": "string" }
+                "author": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "body": {
+                  "type": "string"
+                }
               },
-              "required": ["author", "body"],
+              "required": [
+                "author",
+                "body"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "cli/cli", "number": "13261" },
+      "defaultArgs": {
+        "repo": "cli/cli",
+        "number": "13261"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1609,10 +2162,18 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "cursor": { "type": "string", "description": "Cursor returned by the previous page; omit for the first page." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous page; omit for the first page."
+          }
         },
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1623,20 +2184,40 @@
             "items": {
               "type": "object",
               "properties": {
-                "tag": { "type": "string" },
-                "name": { "type": "string" },
-                "url": { "type": "string" }
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["tag", "name", "url"],
+              "required": [
+                "tag",
+                "name",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "cli/cli" },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1646,8 +2227,15 @@
       "description": "Lists the repository's visible tags with display name and release link, newest first.",
       "inputSchema": {
         "type": "object",
-        "properties": { "repo": { "type": "string", "description": "Full repository name in owner/repository form." } },
-        "required": ["repo"],
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          }
+        },
+        "required": [
+          "repo"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -1658,20 +2246,40 @@
             "items": {
               "type": "object",
               "properties": {
-                "tag": { "type": "string" },
-                "name": { "type": "string" },
-                "url": { "type": "string" }
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "required": ["tag", "name", "url"],
+              "required": [
+                "tag",
+                "name",
+                "url"
+              ],
               "additionalProperties": false
             }
           },
-          "nextCursor": { "type": ["string", "null"] }
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         },
-        "required": ["items", "nextCursor"],
+        "required": [
+          "items",
+          "nextCursor"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "cli/cli" },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
       "requireApproval": false,
       "requireAuth": false
     },
@@ -1682,25 +2290,459 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string", "description": "Full repository name in owner/repository form." },
-          "ref": { "type": "string", "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch." }
+          "repo": {
+            "type": "string",
+            "description": "Full repository name in owner/repository form."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA. Omit to use the repository's default branch."
+          }
         },
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "repo": { "type": "string" },
-          "path": { "type": "string" },
-          "content": { "type": "string" }
+          "repo": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
         },
-        "required": ["repo", "path", "content"],
+        "required": [
+          "repo",
+          "path",
+          "content"
+        ],
         "additionalProperties": false
       },
-      "defaultArgs": { "repo": "cli/cli" },
+      "defaultArgs": {
+        "repo": "cli/cli"
+      },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "repairUpload",
+      "label": "Repair PR bundle files",
+      "description": "Temporarily upload generated files to the authorized PR branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetDirectory": {
+            "type": "string"
+          },
+          "sourceDirectory": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetDirectory",
+          "sourceDirectory",
+          "names",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "verifyGeneratedBundle",
+      "label": "Verify generated bundle",
+      "description": "Compare PR source and generated service files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "domains"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "matches": {
+                  "type": "boolean"
+                },
+                "sourceStatus": {
+                  "type": "integer"
+                },
+                "targetStatus": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "matches",
+                "sourceStatus",
+                "targetStatus"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "repairState",
+      "label": "Read repair page state",
+      "description": "Read the temporary GitHub upload page state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fileInput": {
+            "type": "boolean"
+          },
+          "staged": {
+            "type": "integer"
+          },
+          "commitButton": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "fileInput",
+          "staged",
+          "commitButton"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "stageRepairFiles",
+      "label": "Stage repair files",
+      "description": "Stage authorized PR repair files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceDirectory": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "sourceDirectory",
+          "names"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "staged": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "staged",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "commitRepairFiles",
+      "label": "Commit repair files",
+      "description": "Commit staged authorized PR repair files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clicked": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clicked",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "blocking": true
+    },
+    {
+      "id": "debugBundleCompare",
+      "label": "Compare bundle files",
+      "description": "Compare one source and generated PR file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceLength": {
+            "type": "integer"
+          },
+          "targetLength": {
+            "type": "integer"
+          },
+          "firstDifference": {
+            "type": "integer"
+          },
+          "sourceExcerpt": {
+            "type": "string"
+          },
+          "targetExcerpt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceLength",
+          "targetLength",
+          "firstDifference",
+          "sourceExcerpt",
+          "targetExcerpt"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "resetRepairPage",
+      "label": "Reset repair page",
+      "description": "Reload the temporary GitHub upload page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reloading": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reloading"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "clearRepairFiles",
+      "label": "Clear repair files",
+      "description": "Clear staged temporary GitHub upload files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          },
+          "remaining": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed",
+          "remaining"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "repairPageText",
+      "label": "Read repair result",
+      "description": "Read current temporary GitHub repair page text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "openRepairDirectory",
+      "label": "Open repair directory",
+      "description": "Open an authorized GitHub upload directory.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetDirectory": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetDirectory"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "blocking": true
+    },
+    {
+      "id": "stageNormalizedBundleManifest",
+      "label": "Stage normalized bundle manifest",
+      "description": "Normalize and stage the generated bundle manifest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "blocking": true
     }
   ],
   "locales": {
@@ -1842,5 +2884,6 @@
         }
       }
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/github.com/favicon.png"
 }

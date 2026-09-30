@@ -544,6 +544,24 @@ window.ox.install(({ action }) => {
             };
         },
     });
+    action("getTweet", {
+        async invoke({ tweetId }) {
+            const ct0 = requireCt0();
+            const id = parseTweetId(tweetId);
+            const op = await resolveTweetOp("TweetResultByRestId");
+            const vars = { tweetId: id, withCommunity: true, includePromotedContent: false, withVoice: true };
+            const data = await graphqlGet(op, "TweetResultByRestId", vars, ct0);
+            if (data?.__http_error)
+                throw new Error(`getTweet HTTP ${data.__http_error} for post ${id} (not found or queryId stale)`);
+            const result = data?.data?.tweetResult?.result;
+            if (!result)
+                throw new Error(`getTweet: post ${id} not found`);
+            const row = tweetRow(result, new Set());
+            if (!row)
+                throw new Error(`getTweet: post ${id} could not be parsed`);
+            return row;
+        },
+    });
     const collectTweets = async (startCursor, limit, fetchPage, selectInstructions, errLabel) => {
         const rows = [];
         const seen = new Set();
@@ -589,6 +607,30 @@ window.ox.install(({ action }) => {
             }, (d) => d?.data?.user?.result?.timeline_v2?.timeline?.instructions ||
                 d?.data?.user?.result?.timeline?.timeline?.instructions ||
                 [], `listTweets @${screen}`);
+        },
+    });
+    const listUserTimeline = async (operation, username, startCursor, limit) => {
+        const ct0 = requireCt0();
+        const screen = await resolveTargetHandle(username);
+        const userId = await lookupUserId(screen, ct0);
+        const op = await resolveTweetOp(operation);
+        return await collectTweets(startCursor ?? null, limit, (cursor, count) => {
+            const vars = { userId, count, includePromotedContent: false, withCommunity: true, withClientEventToken: false, withBirdwatchNotes: false, withVoice: true };
+            if (cursor)
+                vars.cursor = cursor;
+            return graphqlGet(op, operation, vars, ct0);
+        }, (d) => d?.data?.user?.result?.timeline_v2?.timeline?.instructions ||
+            d?.data?.user?.result?.timeline?.timeline?.instructions ||
+            [], `${operation} @${screen}`);
+    };
+    action("listUserReplies", {
+        async invoke({ username, cursor: startCursor, limit = 20 } = {}) {
+            return await listUserTimeline("UserRepliesTimeline", username, startCursor, limit);
+        },
+    });
+    action("listUserMedia", {
+        async invoke({ username, cursor: startCursor, limit = 20 } = {}) {
+            return await listUserTimeline("UserVideoTimeline", username, startCursor, limit);
         },
     });
     action("searchTweets", {
@@ -799,7 +841,7 @@ window.ox.install(({ action }) => {
             followers: Number(legacy.followers_count || legacy.normal_followers_count) || null,
         };
     };
-    const collectUsers = async (startCursor, limit, fetchPage, errLabel) => {
+    const collectUsers = async (startCursor, limit, fetchPage, errLabel, selectInstructions) => {
         const rows = [];
         const seen = new Set();
         let cursor = startCursor;
@@ -812,9 +854,10 @@ window.ox.install(({ action }) => {
                     throw new Error(`${errLabel}: HTTP ${data.__http_error} (queryId may be stale or list private)`);
                 break;
             }
-            const instructions = data?.data?.user?.result?.timeline_v2?.timeline?.instructions ||
+            const instructions = selectInstructions ? (selectInstructions(data) || []) : (
+                data?.data?.user?.result?.timeline_v2?.timeline?.instructions ||
                 data?.data?.user?.result?.timeline?.timeline?.instructions ||
-                [];
+                []);
             const before = rows.length;
             const { nextCursor } = walkInstructions(instructions, (n) => {
                 if (n.user_results?.result) {
@@ -848,6 +891,20 @@ window.ox.install(({ action }) => {
             }, `listVerifiedFollowers @${screen}`);
         },
     });
+    action("listFollowers", {
+        async invoke({ username, cursor: startCursor, limit = 50 } = {}) {
+            const ct0 = requireCt0();
+            const screen = await resolveTargetHandle(username);
+            const userId = await lookupUserId(screen, ct0);
+            const op = await resolveTweetOp("Followers");
+            return await collectUsers(startCursor ?? null, limit, (cursor, count) => {
+                const vars = { userId, count, includePromotedContent: false, withGrokTranslatedBio: true };
+                if (cursor)
+                    vars.cursor = cursor;
+                return graphqlPost(op, "Followers", vars, ct0);
+            }, `listFollowers @${screen}`);
+        },
+    });
     action("listFollowing", {
         async invoke({ username, cursor: startCursor, limit = 50 } = {}) {
             const ct0 = requireCt0();
@@ -860,6 +917,21 @@ window.ox.install(({ action }) => {
                     vars.cursor = cursor;
                 return graphqlGet(op, "Following", vars, ct0);
             }, `listFollowing @${screen}`);
+        },
+    });
+    action("searchUsers", {
+        async invoke({ query, cursor: startCursor, limit = 20 }) {
+            const ct0 = requireCt0();
+            const rawQuery = String(query || "").trim();
+            if (!rawQuery)
+                throw new Error("searchUsers: empty query");
+            const op = await resolveTweetOp("SearchTimeline");
+            return await collectUsers(startCursor ?? null, limit, (cursor, count) => {
+                const vars = { rawQuery, count, querySource: "typed_query", product: "People", withGrokTranslatedBio: true, withQuickPromoteEligibilityTweetFields: false };
+                if (cursor)
+                    vars.cursor = cursor;
+                return graphqlPost(op, "SearchTimeline", vars, ct0);
+            }, `searchUsers ${JSON.stringify(rawQuery)}`, (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || []);
         },
     });
     action("listNotifications", {
@@ -936,6 +1008,234 @@ window.ox.install(({ action }) => {
             }
             const windowed = out.slice(0, limit);
             return { items: windowed, nextCursor: windowed.length >= limit ? nextCursor : null };
+        },
+    });
+    action("listMentions", {
+        async invoke({ cursor: startCursor, limit = 20 } = {}) {
+            const ct0 = requireCt0();
+            const op = await resolveTweetOp("NotificationsTimeline");
+            return await collectTweets(startCursor ?? null, limit, (cursor, count) => {
+                const vars = { timeline_type: "Mentions", count };
+                if (cursor)
+                    vars.cursor = cursor;
+                return graphqlGet(op, "NotificationsTimeline", vars, ct0);
+            }, (d) => d?.data?.viewer?.notification_mentions_list?.timeline?.instructions ||
+                d?.data?.viewer?.notification_all_list?.timeline?.instructions ||
+                d?.data?.viewer?.timeline_response?.timeline?.instructions ||
+                d?.data?.viewer_v2?.user_results?.result?.notification_timeline?.timeline?.instructions ||
+                d?.data?.timeline?.instructions ||
+                [], "listMentions");
+        },
+    });
+    const listRow = (value) => {
+        const result = value?.list || value?.list_results?.result || value;
+        if (!result || typeof result !== "object") return null;
+        const id = String(result.rest_id || result.id_str || result.id || "");
+        const name = String(result.name || "").trim();
+        if (!/^\d+$/.test(id) || !name) return null;
+        const ownerResult = result.user_results?.result || result.user || result.owner_results?.result || {};
+        const owner = ownerResult.core?.screen_name || ownerResult.legacy?.screen_name || ownerResult.screen_name || "";
+        return { id, name, description: String(result.description || ""), owner: String(owner), member_count: Number(result.member_count) || 0, subscriber_count: Number(result.subscriber_count) || 0, private: result.mode === "private", url: "https://x.com/i/lists/" + id };
+    };
+    const walkObjects = (root, visit) => {
+        const seen = new Set();
+        const walk = (value) => {
+            if (!value || typeof value !== "object" || seen.has(value)) return;
+            seen.add(value); visit(value);
+            if (Array.isArray(value)) for (const item of value) walk(item);
+            else for (const item of Object.values(value)) walk(item);
+        };
+        walk(root);
+    };
+    const getProfileRecord = async (screen, ct0) => {
+        const op = await resolveUserOp("UserByScreenName");
+        const d = await graphqlGet(op, "UserByScreenName", { screen_name: screen, withSafetyModeUserFields: true }, ct0);
+        if (d?.__http_error) throw new Error("getCurrentUser HTTP " + d.__http_error + " for @" + screen);
+        const result = d?.data?.user?.result;
+        if (!result) throw new Error("X user @" + screen + " not found");
+        const legacy = result.legacy || {}; const core = result.core || {};
+        return { screen_name: core.screen_name || legacy.screen_name || screen, name: core.name || legacy.name || "", bio: legacy.description || "", location: legacy.location || "", url: legacy.entities?.url?.urls?.[0]?.expanded_url || "", followers: Number(legacy.followers_count) || 0, following: Number(legacy.friends_count) || 0, tweets: Number(legacy.statuses_count) || 0, likes: Number(legacy.favourites_count) || 0, verified: Boolean(result.is_blue_verified || legacy.verified), created_at: legacy.created_at || "" };
+    };
+    action("getCurrentUser", { async invoke() { const ct0 = requireCt0(); const screen = await resolveTargetHandle(); return await getProfileRecord(screen, ct0); } });
+    action("getVideo", {
+        async invoke({ tweetId }) {
+            const ct0 = requireCt0(); const id = parseTweetId(tweetId); const op = await resolveTweetOp("TweetResultByRestId");
+            const data = await graphqlGet(op, "TweetResultByRestId", { tweetId: id, withCommunity: true, includePromotedContent: false, withVoice: true }, ct0);
+            if (data?.__http_error) throw new Error("getVideo HTTP " + data.__http_error + " for post " + id);
+            const result = data?.data?.tweetResult?.result; const tw = result?.tweet || result;
+            if (!tw) throw new Error("getVideo: post " + id + " not found");
+            const tweet = tweetRow(result, new Set()); if (!tweet) throw new Error("getVideo: post " + id + " could not be parsed");
+            const media = [...(tw.legacy?.extended_entities?.media || []), ...(tw.legacy?.entities?.media || [])];
+            const video = media.find((x) => x?.type === "video" || x?.type === "animated_gif");
+            if (!video) throw new Error("getVideo: post " + id + " has no video");
+            const variants = []; const urls = new Set();
+            for (const v of video.video_info?.variants || []) if (v?.url && !urls.has(v.url)) { urls.add(v.url); variants.push({ url: v.url, content_type: String(v.content_type || ""), bitrate: Number.isFinite(v.bitrate) ? v.bitrate : null }); }
+            return { tweet, duration_ms: Number.isFinite(video.video_info?.duration_millis) ? video.video_info.duration_millis : null, aspect_ratio: Array.isArray(video.video_info?.aspect_ratio) ? video.video_info.aspect_ratio.slice(0, 2).map(Number) : [0, 0], poster_url: video.media_url_https || null, variants };
+        },
+    });
+    action("listUserHighlights", { async invoke({ username, cursor: startCursor, limit = 20 } = {}) { return await listUserTimeline("UserHighlightsTweets", username, startCursor, limit); } });
+    action("listUserArticles", { async invoke({ username, cursor: startCursor, limit = 20 } = {}) { return await listUserTimeline("UserArticlesTweets", username, startCursor, limit); } });
+    action("listLists", {
+        async invoke({ username, kind = "all", cursor, limit = 20 } = {}) {
+            const ct0 = requireCt0(); const screen = await resolveTargetHandle(username); let apiPath;
+            if (kind === "owned") apiPath = "/i/api/1.1/lists/ownerships.json?screen_name=" + encodeURIComponent(screen) + "&count=" + limit;
+            else if (kind === "member") apiPath = "/i/api/1.1/lists/memberships.json?screen_name=" + encodeURIComponent(screen) + "&count=" + limit;
+            else apiPath = "/i/api/1.1/lists/list.json?screen_name=" + encodeURIComponent(screen);
+            if (cursor && kind !== "all") apiPath += "&cursor=" + encodeURIComponent(cursor);
+            const data = await fetchJson(apiPath, { headers: authHeaders(ct0), credentials: "include" });
+            if (data?.__http_error) throw new Error("listLists HTTP " + data.__http_error + " for @" + screen);
+            const source = Array.isArray(data) ? data : (Array.isArray(data?.lists) ? data.lists : []);
+            const items = source.map(listRow).filter(Boolean).slice(0, limit); const next = kind === "all" ? null : String(data?.next_cursor_str || "0");
+            return { items, nextCursor: next && next !== "0" ? next : null };
+        },
+    });
+    action("getList", {
+        async invoke({ listId }) {
+            const ct0 = requireCt0(); const id = String(listId || "");
+            const data = await fetchJson("/i/api/1.1/lists/show.json?list_id=" + encodeURIComponent(id), { headers: authHeaders(ct0), credentials: "include" });
+            if (data?.__http_error) throw new Error("getList HTTP " + data.__http_error + " for List " + id);
+            const row = listRow(data); if (!row) throw new Error("getList: List " + id + " not found or unsupported"); return row;
+        },
+    });
+    action("getListTimeline", {
+        async invoke({ listId, cursor: startCursor, limit = 20 }) {
+            const ct0 = requireCt0(); const id = String(listId); const op = await resolveTweetOp("ListLatestTweetsTimeline");
+            return await collectTweets(startCursor ?? null, limit, (cursor, count) => { const vars = { listId: id, count }; if (cursor) vars.cursor = cursor; return graphqlGet(op, "ListLatestTweetsTimeline", vars, ct0); }, (d) => d?.data?.list?.tweets_timeline?.timeline?.instructions || d?.data?.list?.tweets_timeline?.instructions || d?.data || [], "getListTimeline " + id);
+        },
+    });
+    action("listListMembers", {
+        async invoke({ listId, cursor: startCursor, limit = 50 }) {
+            const ct0 = requireCt0(); const id = String(listId); const op = await resolveTweetOp("ListMembers");
+            return await collectUsers(startCursor ?? null, limit, (cursor, count) => { const vars = { listId: id, count }; if (cursor) vars.cursor = cursor; return graphqlGet(op, "ListMembers", vars, ct0); }, "listListMembers " + id, (d) => d?.data || []);
+        },
+    });
+    const communityRow = (root, expectedId) => {
+        let hit = null;
+        walkObjects(root, (value) => { if (hit) return; const id = String(value.rest_id || value.id_str || ""); const name = String(value.name || value.title || "").trim(); if (id && name && (!expectedId || id === expectedId) && (value.member_count != null || value.members_count != null || value.__typename === "Community")) hit = value; });
+        if (!hit) return null; const id = String(hit.rest_id || hit.id_str);
+        return { id, name: String(hit.name || hit.title || ""), description: String(hit.description || hit.purpose || ""), member_count: Number(hit.member_count ?? hit.members_count) || 0, created_at: String(hit.created_at || ""), url: "https://x.com/i/communities/" + id, join_policy: String(hit.join_policy || hit.join_policy_type || hit.access || "") };
+    };
+    action("listCommunities", {
+        async invoke({ cursor: startCursor, limit = 20 } = {}) {
+            const ct0 = requireCt0();
+            const op = { queryId: "Niv8SWd6ikTjIEqpVh394w", features: {}, fieldToggles: {} };
+            const vars = { count: Math.min(100, Math.max(limit, 20)) };
+            if (startCursor) vars.cursor = startCursor;
+            const data = await graphqlGet(op, "CommunityDiscoveryTimeline", vars, ct0);
+            if (data?.__http_error) throw new Error("listCommunities HTTP " + data.__http_error);
+            const items = []; const seen = new Set();
+            walkObjects(data?.data, (value) => { const row = communityRow(value); if (row && !seen.has(row.id) && items.length < limit) { seen.add(row.id); items.push(row); } });
+            const cursor = walkInstructions(data?.data, () => {}).nextCursor;
+            return { items, nextCursor: cursor && cursor !== startCursor ? cursor : null };
+        },
+    });
+    action("getCommunity", {
+        async invoke({ communityId }) {
+            const ct0 = requireCt0(); const id = String(communityId); const op = { queryId: "uBpODvS60xZ1q2L88d-W2A", features: { c9s_list_members_action_api_enabled: false, c9s_superc9s_indication_enabled: false }, fieldToggles: {} };
+            const data = await graphqlGet(op, "CommunityQuery", { communityId: id }, ct0); if (data?.__http_error) throw new Error("getCommunity HTTP " + data.__http_error + " for Community " + id);
+            const row = communityRow(data?.data, id); if (!row) throw new Error("getCommunity: Community " + id + " not found or response unsupported"); return row;
+        },
+    });
+    action("getCommunityTimeline", {
+        async invoke({ communityId, cursor: startCursor, limit = 20 }) {
+            const ct0 = requireCt0(); const id = String(communityId); const op = await resolveTweetOp("CommunityTweetsTimeline");
+            return await collectTweets(startCursor ?? null, limit, (cursor, count) => { const vars = { communityId: id, count, rankingMode: "Recency" }; if (cursor) vars.cursor = cursor; return graphqlGet(op, "CommunityTweetsTimeline", vars, ct0); }, (d) => d?.data || [], "getCommunityTimeline " + id);
+        },
+    });
+    action("listCommunityMembers", {
+        async invoke({ communityId, cursor: startCursor, limit = 50 }) {
+            const ct0 = requireCt0(); const id = String(communityId); const op = await resolveTweetOp("CommunityAboutTimeline");
+            return await collectUsers(startCursor ?? null, limit, (cursor, count) => { const vars = { communityId: id, count }; if (cursor) vars.cursor = cursor; return graphqlGet(op, "CommunityAboutTimeline", vars, ct0); }, "listCommunityMembers " + id, (d) => d?.data || []);
+        },
+    });
+    const parseSpaceId = (raw) => { const value = String(raw || "").trim(); const match = value.match(/\/i\/spaces\/([A-Za-z0-9_-]+)/); const id = match ? match[1] : value; if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("Invalid X Space id or URL: " + JSON.stringify(raw)); return id; };
+    const spaceRow = (root, expectedId) => {
+        let hit = null;
+        walkObjects(root, (value) => { if (hit) return; const meta = value.metadata || value; const id = String(meta.rest_id || meta.id || ""); if (id && (!expectedId || id === expectedId) && (meta.state || meta.title) && (value.metadata || meta.creator_results || meta.creator)) hit = meta; });
+        if (!hit) return null; const id = String(hit.rest_id || hit.id); const creator = hit.creator_results?.result || hit.creator || {}; const host = creator.core?.screen_name || creator.legacy?.screen_name || creator.screen_name || "";
+        const iso = (value) => value == null ? null : (typeof value === "number" || /^\d+$/.test(String(value)) ? new Date(Number(value)).toISOString() : String(value));
+        return { id, title: String(hit.title || ""), state: String(hit.state || ""), host: String(host), participant_count: Number(hit.total_live_listeners ?? hit.participant_count ?? hit.total_participants) || 0, started_at: iso(hit.started_at), scheduled_at: iso(hit.scheduled_start), ended_at: iso(hit.ended_at), url: "https://x.com/i/spaces/" + id };
+    };
+    const fetchSpaceById = async (id, ct0) => {
+        const op = { queryId: "fYAuJHiY3TmYdBmrRtIKhA", features: {}, fieldToggles: {} };
+        const vars = { id, isMetatagsQuery: false, withReplays: true, withListeners: true };
+        const data = await graphqlGet(op, "AudioSpaceById", vars, ct0);
+        if (data?.__http_error) throw new Error("getSpace HTTP " + data.__http_error + " for Space " + id);
+        const row = spaceRow(data?.data, id);
+        if (!row) throw new Error("getSpace: Space " + id + " not found or response unsupported");
+        return row;
+    };
+    action("listSpaces", {
+        async invoke({ query = "", filter = "top", limit = 20 } = {}) {
+            const ct0 = requireCt0();
+            const rawQuery = (String(query || "").trim() + " filter:spaces").trim();
+            const op = await resolveTweetOp("SearchTimeline");
+            const search = await collectTweets(null, Math.min(100, Math.max(limit * 3, 20)), (cursor, count) => graphqlPost(op, "SearchTimeline", { rawQuery, count, querySource: "typed_query", product: filter === "top" ? "Top" : "Latest", withGrokTranslatedBio: true, withQuickPromoteEligibilityTweetFields: false, ...(cursor ? { cursor } : {}) }, ct0), (d) => d?.data?.search_by_raw_query?.search_timeline?.timeline?.instructions || [], "listSpaces");
+            const ids = [];
+            for (const tweet of search.items) {
+                const match = String(tweet.card?.url || "").match(/\/i\/spaces\/([A-Za-z0-9_-]+)/);
+                if (match && !ids.includes(match[1])) ids.push(match[1]);
+                if (ids.length >= limit * 2) break;
+            }
+            const items = [];
+            for (const id of ids) {
+                try {
+                    const row = await fetchSpaceById(id, ct0);
+                    const state = row.state.toLowerCase();
+                    if (filter === "live" && state !== "running") continue;
+                    if (filter === "upcoming" && !["notstarted", "prepublished"].includes(state)) continue;
+                    items.push(row);
+                    if (items.length >= limit) break;
+                }
+                catch (error) { console.log("listSpaces detail " + id + ": " + (error?.message || error)); }
+            }
+            return { items, nextCursor: null };
+        },
+    });
+    action("getSpace", { async invoke({ spaceId }) { const ct0 = requireCt0(); return await fetchSpaceById(parseSpaceId(spaceId), ct0); } });
+    action("getTweetAnalytics", {
+        async invoke({ tweetId, from, to }) {
+            const ct0 = requireCt0(); const id = parseTweetId(tweetId);
+            let createdMs;
+            try { createdMs = Number((BigInt(id) >> 22n) + 1288834974657n); }
+            catch { throw new Error("getTweetAnalytics: invalid post id"); }
+            const fromDate = from ? new Date(from) : new Date(Math.floor(createdMs / 3600000) * 3600000);
+            const toDate = to ? new Date(to) : new Date();
+            if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime()) || fromDate >= toDate) throw new Error("getTweetAnalytics: invalid time range");
+            const first48 = new Date(fromDate.getTime() + 48 * 3600000);
+            const op = { queryId: "vnwexpl0q33_Bky-SROVww", features: { responsive_web_tweet_analytics_m3_enabled: false }, fieldToggles: {} };
+            const vars = { restId: id, from_time: fromDate.toISOString(), to_time: toDate.toISOString(), first_48_hours_time: first48.toISOString(), requested_organic_metrics: ["DetailExpands", "Engagements", "Follows", "Impressions", "LinkClicks", "ProfileVisits"], requested_promoted_metrics: ["DetailExpands", "Engagements", "Follows", "Impressions", "LinkClicks", "ProfileVisits", "CostPerFollower"] };
+            const data = await graphqlGet(op, "TweetActivityQuery", vars, ct0);
+            if (data?.__http_error) throw new Error("getTweetAnalytics HTTP " + data.__http_error + " for post " + id);
+            const result = data?.data?.tweet_result_by_rest_id?.result;
+            if (!result) throw new Error("getTweetAnalytics: analytics unavailable for post " + id + " (it may not belong to the signed-in account)");
+            const metrics = {};
+            for (const row of result.datapoints_grid || []) metrics[row.metric_type] = Number(row.metric_value) || 0;
+            let videoViews = 0; walkObjects(result.video || [], (value) => { if (/video.*view/i.test(String(value.metric_type || ""))) videoViews += Number(value.metric_value) || 0; });
+            return { tweetId: id, impressions: metrics.Impressions || 0, engagements: metrics.Engagements || 0, detail_expands: metrics.DetailExpands || 0, profile_visits: metrics.ProfileVisits || 0, link_clicks: metrics.LinkClicks || 0, follows: metrics.Follows || 0, video_views: videoViews, from: fromDate.toISOString(), to: toDate.toISOString() };
+        },
+    });
+    action("getAccountAnalytics", {
+        async invoke() {
+            const deadline = Date.now() + 8000;
+            let text = "";
+            while (Date.now() < deadline) {
+                text = String(document.body?.innerText || "");
+                if (/Account overview/i.test(text) || /Detailed engagement metrics/i.test(text)) break;
+                await new Promise((resolve) => setTimeout(resolve, 200));
+            }
+            if (!/Analytics/i.test(text)) throw new Error("getAccountAnalytics: X analytics page did not become ready");
+            const blocked = text.match(/Detailed engagement metrics[^\n.]*(?:[.]|\n|$)/i);
+            if (blocked) return { available: false, reason: blocked[0].trim(), period: null, impressions: null, engagements: null, profile_visits: null, followers_change: null };
+            const parseNumber = (label) => {
+                const patterns = [new RegExp(label + "\\s*\\n\\s*([+-]?[0-9.,]+[KMB]?)", "i"), new RegExp("([+-]?[0-9.,]+[KMB]?)\\s*\\n\\s*" + label, "i")];
+                for (const re of patterns) { const m = text.match(re); if (!m) continue; const raw = m[1].replace(/,/g, "").toUpperCase(); const factor = raw.endsWith("K") ? 1e3 : raw.endsWith("M") ? 1e6 : raw.endsWith("B") ? 1e9 : 1; const value = Number(raw.replace(/[KMB]$/, "")); if (Number.isFinite(value)) return Math.round(value * factor); }
+                return null;
+            };
+            const period = text.match(/(?:Last|Past)\s+\d+\s+days?/i)?.[0] || null;
+            const result = { available: true, reason: null, period, impressions: parseNumber("Impressions"), engagements: parseNumber("Engagements"), profile_visits: parseNumber("Profile visits"), followers_change: parseNumber("New followers") };
+            if (Object.values(result).slice(2).every((x) => x == null)) throw new Error("getAccountAnalytics: analytics layout is unsupported");
+            return result;
         },
     });
     action("getArticle", {

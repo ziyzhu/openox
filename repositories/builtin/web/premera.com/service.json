@@ -1,0 +1,284 @@
+{
+  "domain": "premera.com",
+  "name": "Premera Blue Cross",
+  "description": "Read the signed-in member's coverage balances, personal information, and recent claims. Read-only.",
+  "baseUrl": "https://member.premera.com/robots.txt",
+  "faviconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/2b/54/b7/2b54b723-681f-ac29-ca44-cb8bac40d666/AppIcon_release-1x_U007ephone-0-1-0-85-220-0.png/512x512bb.jpg",
+  "$defs": {
+    "amountProgress": {
+      "type": "object",
+      "properties": {
+        "maximum": {
+          "type": "number"
+        },
+        "paid": {
+          "type": "number"
+        },
+        "remaining": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "maximum",
+        "paid",
+        "remaining"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Sign in to Premera",
+      "description": "Opens the Premera member sign-in page.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check Premera sign-in",
+      "description": "Checks the current Premera member session.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCoverageSummary",
+      "label": "Get coverage summary",
+      "description": "Reads the active medical plan, deductible, out-of-pocket maximum, and reset date.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "planName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "deductible": {
+            "$ref": "#/$defs/amountProgress"
+          },
+          "individualOutOfPocket": {
+            "$ref": "#/$defs/amountProgress"
+          },
+          "familyOutOfPocket": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/amountProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "sourceUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "planName",
+          "status",
+          "deductible",
+          "individualOutOfPocket",
+          "familyOutOfPocket",
+          "resetDate",
+          "currency",
+          "sourceUrl"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getPersonalInfo",
+      "label": "Get personal information",
+      "description": "Reads the member's contact details and account preferences.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "streetAddress": {
+            "type": "string"
+          },
+          "cityStatePostalCode": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "accountEmail": {
+            "type": "string"
+          },
+          "planName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paperlessEob": {
+            "type": "boolean"
+          },
+          "demographicQuestionnaireStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "addressUpdateNote": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "dateOfBirth",
+          "streetAddress",
+          "cityStatePostalCode",
+          "phone",
+          "accountEmail",
+          "planName",
+          "planStatus",
+          "paperlessEob",
+          "demographicQuestionnaireStatus",
+          "addressUpdateNote",
+          "sourceUrl"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listRecentClaims",
+      "label": "List recent claims",
+      "description": "Lists the three claims shown on the dashboard without returning claim identifiers.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceDate": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "memberResponsibility": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string",
+                  "enum": [
+                    "USD"
+                  ]
+                }
+              },
+              "required": [
+                "serviceDate",
+                "provider",
+                "status",
+                "memberResponsibility",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "sourceUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "complete",
+          "sourceUrl"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {},
+      "requireAuth": true,
+      "requireApproval": false
+    }
+  ]
+}

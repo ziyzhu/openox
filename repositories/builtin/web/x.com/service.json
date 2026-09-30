@@ -1,7 +1,7 @@
 {
   "domain": "x.com",
   "name": "X",
-  "description": "The real-time public conversation network. Read profiles, tweets, timelines, threads, search, trending, bookmarks, likes, verified-blue followers, following, notifications, and long-form articles. All actions are read-only; bookmarks, notifications, and the home timeline are scoped to the signed-in account.",
+  "description": "The real-time public conversation network. Read accounts, posts, replies, media and video, timelines, Lists, Communities, Spaces, Highlights, Articles, search, trends, bookmarks, likes, followers, mentions, notifications, and private post/account analytics. All actions are read-only; private account feeds require sign-in.",
   "baseUrl": "https://x.com/home",
   "$defs": {
     "quotedTweet": {
@@ -466,6 +466,343 @@
         "nextCursor"
       ],
       "additionalProperties": false
+    },
+    "listRow": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "member_count": {
+          "type": "integer"
+        },
+        "subscriber_count": {
+          "type": "integer"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "owner",
+        "member_count",
+        "subscriber_count",
+        "private",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "listPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/listRow"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "community": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "member_count": {
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "join_policy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "member_count",
+        "created_at",
+        "url",
+        "join_policy"
+      ],
+      "additionalProperties": false
+    },
+    "space": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "participant_count": {
+          "type": "integer"
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scheduled_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ended_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "state",
+        "host",
+        "participant_count",
+        "started_at",
+        "scheduled_at",
+        "ended_at",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "video": {
+      "type": "object",
+      "properties": {
+        "tweet": {
+          "$ref": "#/$defs/tweet"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "aspect_ratio": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "poster_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "bitrate": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "content_type",
+              "bitrate"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "tweet",
+        "duration_ms",
+        "aspect_ratio",
+        "poster_url",
+        "variants"
+      ],
+      "additionalProperties": false
+    },
+    "communityPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/community"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "additionalProperties": false
+    },
+    "tweetAnalytics": {
+      "type": "object",
+      "properties": {
+        "tweetId": {
+          "type": "string"
+        },
+        "impressions": {
+          "type": "integer"
+        },
+        "engagements": {
+          "type": "integer"
+        },
+        "detail_expands": {
+          "type": "integer"
+        },
+        "profile_visits": {
+          "type": "integer"
+        },
+        "link_clicks": {
+          "type": "integer"
+        },
+        "follows": {
+          "type": "integer"
+        },
+        "video_views": {
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tweetId",
+        "impressions",
+        "engagements",
+        "detail_expands",
+        "profile_visits",
+        "link_clicks",
+        "follows",
+        "video_views",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "accountAnalytics": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "impressions": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "engagements": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "profile_visits": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "followers_change": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "available",
+        "reason",
+        "period",
+        "impressions",
+        "engagements",
+        "profile_visits",
+        "followers_change"
+      ],
+      "additionalProperties": false
     }
   },
   "actions": [
@@ -541,9 +878,99 @@
       "requireAuth": true
     },
     {
+      "id": "getTweet",
+      "label": "Get post",
+      "description": "Fetches one X post by post ID or status URL, including media, quoted-post, card, and engagement metadata.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tweetId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "tweetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweet"
+      },
+      "defaultArgs": {
+        "tweetId": "20"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
       "id": "listTweets",
       "label": "List user tweets",
       "description": "Recent tweets from a user (excludes pinned). Defaults to the logged-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserReplies",
+      "label": "List user replies",
+      "description": "Recent posts and replies from an X user. Defaults to the logged-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserMedia",
+      "label": "List user media",
+      "description": "Recent media posts from an X user’s Media tab. Defaults to the logged-in user.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -853,6 +1280,38 @@
       "requireAuth": true
     },
     {
+      "id": "listFollowers",
+      "label": "List followers",
+      "description": "Accounts following an X user, including both verified and unverified followers. Defaults to the logged-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
       "id": "listFollowing",
       "label": "List following",
       "description": "Accounts a user follows. Defaults to the logged-in user.",
@@ -880,6 +1339,41 @@
       },
       "defaultArgs": {
         "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "searchUsers",
+      "label": "Search accounts",
+      "description": "Searches X accounts by name, username, bio, or topic.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "query": "OpenAI"
       },
       "requireApproval": false,
       "requireAuth": true
@@ -930,6 +1424,32 @@
       "requireAuth": true
     },
     {
+      "id": "listMentions",
+      "label": "List mentions",
+      "description": "Posts that mention or reply to the logged-in X account, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
       "id": "getArticle",
       "label": "Get article",
       "description": "Shows an X Article as clean, readable text with its cover and inline image links.",
@@ -954,12 +1474,511 @@
       },
       "requireApproval": false,
       "requireAuth": true
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get current account",
+      "description": "Returns the signed-in X account profile.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/profile"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getVideo",
+      "label": "Get video",
+      "description": "Returns video metadata and available playback variants for one X post.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tweetId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "tweetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/video"
+      },
+      "defaultArgs": {
+        "tweetId": "20"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserHighlights",
+      "label": "List user highlights",
+      "description": "Posts shown on a user’s Highlights tab. Defaults to the signed-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listUserArticles",
+      "label": "List user articles",
+      "description": "Posts containing long-form X Articles published by a user. Defaults to the signed-in user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listLists",
+      "label": "List X Lists",
+      "description": "Lists public X Lists owned by, followed by, or containing a user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^@?[A-Za-z0-9_]{1,15}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "all",
+              "owned",
+              "member"
+            ],
+            "default": "all"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/listPage"
+      },
+      "defaultArgs": {
+        "username": "elonmusk",
+        "kind": "all"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getList",
+      "label": "Get X List",
+      "description": "Returns details for one X List.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        },
+        "required": [
+          "listId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/listRow"
+      },
+      "defaultArgs": {
+        "listId": "1617772739917647876"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getListTimeline",
+      "label": "Get List timeline",
+      "description": "Returns posts from an X List with source pagination.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "required": [
+          "listId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "listId": "1617772739917647876"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listListMembers",
+      "label": "List List members",
+      "description": "Returns accounts included in an X List.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "required": [
+          "listId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "listId": "1617772739917647876"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCommunities",
+      "label": "List Communities",
+      "description": "Explores public X Communities with source pagination.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/communityPage"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCommunity",
+      "label": "Get Community",
+      "description": "Returns public details for one X Community.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "communityId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        },
+        "required": [
+          "communityId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/community"
+      },
+      "defaultArgs": {
+        "communityId": "1472105760389668865"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getCommunityTimeline",
+      "label": "Get Community timeline",
+      "description": "Returns recent posts from an X Community with source pagination.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "communityId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "required": [
+          "communityId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetPage"
+      },
+      "defaultArgs": {
+        "communityId": "1472105760389668865"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listCommunityMembers",
+      "label": "List Community members",
+      "description": "Returns visible member accounts from an X Community.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "communityId": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "required": [
+          "communityId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/userPage"
+      },
+      "defaultArgs": {
+        "communityId": "1472105760389668865"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "listSpaces",
+      "label": "List Spaces",
+      "description": "Searches live, upcoming, or top X Spaces.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "default": ""
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "top",
+              "live",
+              "upcoming"
+            ],
+            "default": "top"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/space"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "defaultArgs": {
+        "query": "AI",
+        "filter": "live"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getSpace",
+      "label": "Get Space",
+      "description": "Returns metadata for one X Space by ID or URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/space"
+      },
+      "defaultArgs": {
+        "spaceId": "1DXxy"
+      },
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getTweetAnalytics",
+      "label": "Get post analytics",
+      "description": "Returns private engagement metrics for one of the signed-in account’s posts.",
+      "baseUrl": "https://x.com/home",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tweetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "tweetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/tweetAnalytics"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
+    },
+    {
+      "id": "getAccountAnalytics",
+      "label": "Get account analytics",
+      "description": "Returns the signed-in account’s analytics overview or explains why X has not made it available.",
+      "baseUrl": "https://x.com/i/account_analytics",
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/accountAnalytics"
+      },
+      "defaultArgs": {},
+      "requireApproval": false,
+      "requireAuth": true
     }
   ],
   "locales": {
     "zh-Hans": {
       "name": "X",
-      "description": "实时公共对话网络。查看用户资料、帖子、时间线、讨论串、热门趋势、书签、点赞、关注、通知和长文。部分内容需登录；所有操作均为只读。",
+      "description": "实时公共对话网络。查看账户、帖子、回复、媒体和视频、时间线、列表、社群、Spaces、精选、长文、搜索、热门趋势、书签、点赞、粉丝、提及和通知。所有操作均为只读；私密账户信息流需登录。",
       "actions": {
         "getSignInUrl": {
           "label": "登录 X",
@@ -1016,8 +2035,97 @@
         "getArticle": {
           "label": "获取长文",
           "description": "以清晰易读的文本显示 X 长文，并提供封面和正文图片链接。"
+        },
+        "getTweet": {
+          "label": "获取帖子",
+          "description": "通过帖子 ID 或状态网址获取单条 X 帖子，包括媒体、引用帖子、卡片和互动数据。"
+        },
+        "listUserReplies": {
+          "label": "用户回复列表",
+          "description": "某位 X 用户最近发布的帖子和回复。未提供用户名时默认为已登录用户。"
+        },
+        "listUserMedia": {
+          "label": "用户媒体列表",
+          "description": "某位 X 用户“媒体”标签页中的近期媒体帖子。未提供用户名时默认为已登录用户。"
+        },
+        "listFollowers": {
+          "label": "粉丝列表",
+          "description": "关注某位 X 用户的账户，包括认证和未认证粉丝。未提供用户名时默认为已登录用户。"
+        },
+        "searchUsers": {
+          "label": "搜索账户",
+          "description": "按姓名、用户名、简介或主题搜索 X 账户。"
+        },
+        "listMentions": {
+          "label": "提及列表",
+          "description": "按时间倒序列出提及或回复已登录 X 账户的帖子。"
+        },
+        "getCurrentUser": {
+          "label": "获取当前账户",
+          "description": "返回已登录 X 账户的资料。"
+        },
+        "getVideo": {
+          "label": "获取视频",
+          "description": "返回某条 X 帖子的视频信息和可用播放地址。"
+        },
+        "listUserHighlights": {
+          "label": "用户精选列表",
+          "description": "列出某位用户“精选”标签页中的帖子。"
+        },
+        "listUserArticles": {
+          "label": "用户长文列表",
+          "description": "列出某位用户发布的 X 长文帖子。"
+        },
+        "listLists": {
+          "label": "X 列表列表",
+          "description": "列出某位用户拥有、关注或加入的公开 X 列表。"
+        },
+        "getList": {
+          "label": "获取 X 列表",
+          "description": "返回一个 X 列表的详细信息。"
+        },
+        "getListTimeline": {
+          "label": "获取列表时间线",
+          "description": "返回 X 列表中的帖子并支持继续翻页。"
+        },
+        "listListMembers": {
+          "label": "列表成员",
+          "description": "返回 X 列表中的账户。"
+        },
+        "getCommunity": {
+          "label": "获取社群",
+          "description": "返回一个 X 社群的公开信息。"
+        },
+        "getCommunityTimeline": {
+          "label": "获取社群时间线",
+          "description": "返回 X 社群中的近期帖子并支持继续翻页。"
+        },
+        "listCommunityMembers": {
+          "label": "社群成员",
+          "description": "返回 X 社群中可见的成员账户。"
+        },
+        "listSpaces": {
+          "label": "Spaces 列表",
+          "description": "搜索直播中、即将开始或热门的 X Spaces。"
+        },
+        "getSpace": {
+          "label": "获取 Space",
+          "description": "通过 ID 或网址返回一个 X Space 的信息。"
+        },
+        "listCommunities": {
+          "label": "社群列表",
+          "description": "探索公开 X 社群并支持继续翻页。"
+        },
+        "getTweetAnalytics": {
+          "label": "获取帖子分析",
+          "description": "返回已登录账户自己某条帖子的私密互动数据。"
+        },
+        "getAccountAnalytics": {
+          "label": "获取账户分析",
+          "description": "返回已登录账户的分析概览，或说明 X 尚未提供数据的原因。"
         }
       }
     }
-  }
+  },
+  "faviconUrl": "https://openox.ai/assets/services/x.com/favicon.png"
 }

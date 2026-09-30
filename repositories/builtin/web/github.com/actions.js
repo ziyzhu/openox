@@ -24,7 +24,9 @@ const retryFetch = async (input, init, options) => {
   }
 };
 
+
 window.ox.install(({ action }) => {
+    const log = (...args) => console.log(...args);
     const ORIGIN = "https://github.com";
     const decode = (s) => s
         .replace(/<\/?(em|mark)>/g, "")
@@ -76,10 +78,26 @@ window.ox.install(({ action }) => {
     const searchPayload = async (type, query, cursor) => {
         const page = pageCursor(cursor, 1);
         const qs = new URLSearchParams({ q: query, type, p: String(page) });
-        const { status, text } = await fetchText(`/search?${qs}`, { headers: { "Accept": "application/json" } });
-        const payload = parseJson(`/search?${qs}`, status, text)?.payload ?? {};
-        const results = payload.results ?? [];
-        return { results, nextCursor: results.length > 0 ? String(page + 1) : null };
+        const path = `/search?${qs}`;
+        const { status, text } = await fetchText(path);
+        if (status >= 400)
+            throw new Error(`${path}: GitHub search failed (HTTP ${status})`);
+        const doc = new DOMParser().parseFromString(text, "text/html");
+        const embedded = doc.querySelector('script[data-target="react-app.embeddedData"]')?.textContent;
+        if (!embedded)
+            throw new Error(`${path}: GitHub did not return search data`);
+        let payload;
+        try {
+            payload = JSON.parse(embedded)?.payload ?? {};
+        }
+        catch {
+            throw new Error(`${path}: GitHub returned malformed search data`);
+        }
+        const results = payload.results ?? payload.searchResults?.results ?? payload.search?.results ?? [];
+        if (!Array.isArray(results))
+            throw new Error(`${path}: GitHub returned an unsupported search result shape`);
+        const next = doc.querySelector('a[rel="next"]')?.getAttribute("href");
+        return { results, nextCursor: results.length > 0 && next ? String(page + 1) : null };
     };
     const splitNwo = (nwo) => {
         const [owner, repo] = nwo.split("/");
@@ -219,7 +237,17 @@ window.ox.install(({ action }) => {
     action("getRepo", {
         async invoke({ repo }) {
             const { owner, repo: name } = splitNwo(repo);
-            const { text } = await fetchText(`/${owner}/${name}`);
+            const path = `/${owner}/${name}`;
+            const { status, text } = await fetchText(path);
+            if (status >= 400)
+                throw new Error(`Repository not found or inaccessible (HTTP ${status}): ${owner}/${name}`);
+            const doc = new DOMParser().parseFromString(text, "text/html");
+            const canonical = attr(doc, 'meta[property="og:url"]', "content") ?? attr(doc, 'link[rel="canonical"]', "href");
+            if (canonical) {
+                const canonicalPath = new URL(canonical, ORIGIN).pathname.replace(/\/$/, "").toLowerCase();
+                if (canonicalPath !== path.toLowerCase())
+                    throw new Error(`GitHub returned a different page for repository ${owner}/${name}`);
+            }
             const num = (id) => {
                 const m = text.match(new RegExp(`id="${id}"[^>]*title="([^"]+)"`));
                 return m ? parseInt(m[1].replace(/\D/g, ""), 10) || 0 : 0;
@@ -339,7 +367,7 @@ window.ox.install(({ action }) => {
             payload.set("pull_request[draft]", draft ? "true" : "false");
             if (maintainerCanModify !== undefined)
                 payload.set("pull_request[maintainer_can_modify]", maintainerCanModify ? "1" : "0");
-            console.log(`createPullRequest submit repo=${owner}/${repo} base=${base} head=${head} draft=${!!draft}`);
+            log(`createPullRequest submit repo=${owner}/${repo} base=${base} head=${head} draft=${!!draft}`);
             const response = await fetch(actionURL.href, {
                 method: "POST",
                 credentials: "include",
@@ -358,7 +386,7 @@ window.ox.install(({ action }) => {
             ].map(pullRequestFromURL).find(Boolean);
             if (!result)
                 throw new Error("GitHub did not confirm the created pull request");
-            console.log(`createPullRequest created repo=${owner}/${repo} number=${result.id}`);
+            log(`createPullRequest created repo=${owner}/${repo} number=${result.id}`);
             return result;
         },
     });
@@ -721,4 +749,120 @@ window.ox.install(({ action }) => {
             throw new Error(`README not found in ${owner}/${name}`);
         },
     });
+    action("repairUpload", {
+        async invoke({ targetDirectory, sourceDirectory, names, message }) {
+            const branch = "ox/repository-f902a433961d-a37d3c8c";
+            const desired = "/ziyzhu/openox/upload/" + branch + "/" + targetDirectory.replace(/^\/+|\/+$/g, "");
+            if (location.pathname !== desired) {
+                location.href = location.origin + desired;
+                return { state: "navigating", path: desired };
+            }
+            const input = document.querySelector('input[type="file"]');
+            if (!input) throw new Error("GitHub upload input unavailable");
+            const dt = new DataTransfer();
+            for (const name of names) {
+                const raw = "https://raw.githubusercontent.com/ziyzhu/openox/" + branch + "/" + sourceDirectory.replace(/^\/+|\/+$/g, "") + "/" + name;
+                const response = await fetch(raw, { credentials: "omit", cache: "no-store" });
+                if (!response.ok) throw new Error("Unable to fetch " + name + ": HTTP " + response.status);
+                const blob = await response.blob();
+                dt.items.add(new File([blob], name, { type: blob.type || "text/plain", lastModified: Date.now() }));
+            }
+            input.files = dt.files;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            const end = Date.now() + 12000;
+            while (Date.now() < end && document.querySelectorAll('[aria-label^="Remove "]').length < names.length)
+                await new Promise(resolve => setTimeout(resolve, 100));
+            if (document.querySelectorAll('[aria-label^="Remove "]').length < names.length)
+                throw new Error("GitHub uploads did not finish");
+            const summary = document.querySelector('input[name="message"]');
+            const direct = document.querySelector('input[name="commit-choice"][value="direct"]');
+            const submit = [...document.querySelectorAll('button')].find(button => button.innerText.trim() === "Commit changes");
+            if (!summary || !direct || !submit) throw new Error("GitHub commit controls unavailable");
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(summary, message);
+            summary.dispatchEvent(new Event("input", { bubbles: true }));
+            direct.click();
+            const form = submit.closest("form");
+            if (!form || typeof form.requestSubmit !== "function") throw new Error("GitHub commit form unavailable");
+            const body = new FormData(form);
+            if (submit.name) body.append(submit.name, submit.value);
+            const committed = await fetch(form.action, { method: form.method || "POST", body, credentials: "include", redirect: "follow" });
+            if (!committed.ok) throw new Error("GitHub commit failed: HTTP " + committed.status + " " + committed.url);
+            const resultUrl = new URL(committed.url);
+            if (!resultUrl.pathname.includes("/tree/" + branch) && !resultUrl.pathname.includes("/commit/"))
+                throw new Error("GitHub commit was not confirmed: " + resultUrl.pathname);
+            return { state: "submitted", path: desired };
+        },
+    });
+
+    action("verifyGeneratedBundle", {
+        async invoke({ domains }) {
+            const branch = "ox/repository-f902a433961d-a37d3c8c";
+            const base = "https://raw.githubusercontent.com/ziyzhu/openox/" + branch + "/";
+            const items = [];
+            for (const domain of domains) {
+                for (const name of ["actions.js", "service.json"]) {
+                    const nonce = "?ox=" + Date.now() + Math.random();
+                    const source = await fetch(base + "repositories/builtin/web/" + domain + "/" + name + nonce, { credentials:"omit", cache:"no-store" });
+                    const target = await fetch(base + "apps/ios/Ox/Resources/OxServices.bundle/web/" + domain + "/" + name + nonce, { credentials:"omit", cache:"no-store" });
+                    const sourceText = source.ok ? await source.text() : "";
+                    const targetText = target.ok ? await target.text() : "";
+                    items.push({ path: domain + "/" + name, matches: source.ok && target.ok && sourceText === targetText, sourceStatus: source.status, targetStatus: target.status });
+                }
+            }
+            return { items };
+        },
+    });
+
+    action("repairState", { async invoke() { return { path: location.pathname, fileInput: !!document.querySelector('input[type="file"]'), staged: document.querySelectorAll('[aria-label^="Remove "]').length, commitButton: !![...document.querySelectorAll('button')].find(b => b.innerText.trim() === "Commit changes") }; } });
+    action("stageRepairFiles", { async invoke({ sourceDirectory, names }) {
+        const branch="ox/repository-f902a433961d-a37d3c8c", input=document.querySelector('input[type="file"]');
+        if(!input) throw new Error("Upload page unavailable");
+        const dt=new DataTransfer();
+        for(const name of names){const r=await fetch("https://raw.githubusercontent.com/ziyzhu/openox/"+branch+"/"+sourceDirectory+"/"+name+"?ox="+Date.now(),{credentials:"omit",cache:"no-store"});if(!r.ok)throw new Error(name+" HTTP "+r.status);const b=await r.blob();dt.items.add(new File([b],name,{type:b.type||"text/plain",lastModified:Date.now()}));}
+        input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));
+        const end=Date.now()+25000;
+        while(Date.now()<end){
+            const removed=document.querySelectorAll('[aria-label^="Remove "]').length;
+            const ids=[...document.querySelectorAll('input[name="file_id"]')].filter(x=>x.value).length;
+            const uploading=/Uploading \d+ of \d+ files/.test(document.body.innerText);
+            if(removed>=names.length&&ids>=names.length&&!uploading)break;
+            await new Promise(r=>setTimeout(r,150));
+        }
+        const staged=document.querySelectorAll('[aria-label^="Remove "]').length,ids=[...document.querySelectorAll('input[name="file_id"]')].filter(x=>x.value).length;
+        if(staged<names.length||ids<names.length||/Uploading \d+ of \d+ files/.test(document.body.innerText))throw new Error("GitHub uploads did not finish");
+        return {staged,path:location.pathname};
+    }});
+    action("commitRepairFiles", { async invoke({ message }) {
+        await new Promise(r=>setTimeout(r,1800));
+        const summary=document.querySelector('input[name="message"]'),direct=document.querySelector('input[name="commit-choice"][value="direct"]'),submit=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==="Commit changes");
+        if(!summary||!direct||!submit)throw new Error("Commit controls unavailable");
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(summary,message);summary.dispatchEvent(new Event("input",{bubbles:true}));direct.click();await new Promise(r=>setTimeout(r,300));if(submit.disabled)throw new Error("Commit button disabled");submit.click();
+        await new Promise(r=>setTimeout(r,5000));return {clicked:true,path:location.pathname};
+    }});
+
+    action("debugBundleCompare", { async invoke({ domain, name }) {
+        const branch="ox/repository-f902a433961d-a37d3c8c",base="https://raw.githubusercontent.com/ziyzhu/openox/"+branch+"/",nonce="?ox="+Date.now()+Math.random();
+        const s=await (await fetch(base+"repositories/builtin/web/"+domain+"/"+name+nonce,{credentials:"omit",cache:"no-store"})).text();
+        const t=await (await fetch(base+"apps/ios/Ox/Resources/OxServices.bundle/web/"+domain+"/"+name+nonce,{credentials:"omit",cache:"no-store"})).text();
+        let i=0;while(i<s.length&&i<t.length&&s[i]===t[i])i++;
+        return {sourceLength:s.length,targetLength:t.length,firstDifference:i,sourceExcerpt:s.slice(i,i+160),targetExcerpt:t.slice(i,i+160)};
+    }});
+
+    action("resetRepairPage", { async invoke() { location.reload(); return {reloading:true}; } });
+
+    action("clearRepairFiles", { async invoke() { const buttons=[...document.querySelectorAll('[aria-label^="Remove "]')]; for(const b of buttons)b.click(); const end=Date.now()+5000; while(Date.now()<end&&document.querySelectorAll('[aria-label^="Remove "]').length)await new Promise(r=>setTimeout(r,100)); return {removed:buttons.length,remaining:document.querySelectorAll('[aria-label^="Remove "]').length}; } });
+
+    action("repairPageText", { async invoke() { return {path:location.pathname,text:document.body.innerText.slice(0,5000)}; } });
+
+    action("openRepairDirectory", { async invoke({ targetDirectory }) { const branch="ox/repository-f902a433961d-a37d3c8c",desired="/ziyzhu/openox/upload/"+branch+"/"+targetDirectory.replace(/^\/+|\/+$/g,""); if(location.pathname!==desired)location.href=location.origin+desired; return {path:desired}; } });
+    action("stageNormalizedBundleManifest", { async invoke() {
+        const branch="ox/repository-f902a433961d-a37d3c8c",raw="https://raw.githubusercontent.com/ziyzhu/openox/"+branch+"/repositories/builtin/repository.json?ox="+Date.now();
+        const response=await fetch(raw,{credentials:"omit",cache:"no-store"});if(!response.ok)throw new Error("Source manifest fetch failed");const source=JSON.parse(await response.text());
+        const parsed={version:source.version,name:"Built-in",contentHash:"7b07e783398a5d2522006a265af728dfffc837f70984f8c7d66b851a3bf41691",services:[...source.services].sort((a,b)=>a.localeCompare(b)),skills:source.skills};
+        const content=JSON.stringify(parsed,null,2)+"\n",input=document.querySelector('input[type="file"]');if(!input)throw new Error("Upload page unavailable");
+        const dt=new DataTransfer();dt.items.add(new File([content],"repository.json",{type:"application/json",lastModified:Date.now()}));input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));
+        const end=Date.now()+20000;while(Date.now()<end){const ids=[...document.querySelectorAll('input[name="file_id"]')].filter(x=>x.value).length;if(ids>=1&&!/Uploading \d+ of \d+ files/.test(document.body.innerText))break;await new Promise(r=>setTimeout(r,150));}
+        const ids=[...document.querySelectorAll('input[name="file_id"]')].filter(x=>x.value).length;if(ids<1)throw new Error("Manifest upload did not finish");return {bytes:content.length,path:location.pathname};
+    }});
+
 });

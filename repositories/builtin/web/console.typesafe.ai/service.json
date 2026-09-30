@@ -1,0 +1,765 @@
+{
+  "domain": "console.typesafe.ai",
+  "name": "TypeSafe",
+  "description": "Use the signed-in TypeSafe console to run Jev typed decisions, inspect models and account details, and read usage and billing summaries without handling an API key.",
+  "baseUrl": "https://console.typesafe.ai/playground",
+  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://console.typesafe.ai&size=128",
+  "$defs": {
+    "state": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true
+        },
+        {
+          "type": "array",
+          "items": {}
+        }
+      ]
+    },
+    "probabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "answer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "noul",
+            "choice",
+            "score"
+          ]
+        },
+        "noul": {
+          "type": "number"
+        },
+        "choice": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number"
+        },
+        "probabilities": {
+          "$ref": "#/$defs/probabilities"
+        },
+        "legend": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/answer"
+          }
+        },
+        "inputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "model",
+        "answers",
+        "inputTokens",
+        "outputTokens"
+      ],
+      "additionalProperties": false
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "getSignInUrl",
+      "label": "Get sign-in URL",
+      "description": "Open TypeSafe sign-in and return to the Jev Playground.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getSignInState",
+      "label": "Check sign-in",
+      "description": "Check the current TypeSafe browser session with a fresh server request.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signedIn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signedIn"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": false,
+      "requireApproval": false
+    },
+    {
+      "id": "getCurrentUser",
+      "label": "Get current account",
+      "description": "Return the signed-in TypeSafe account and organization summaries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": "string"
+                },
+                "isAdmin": {
+                  "type": "boolean"
+                },
+                "isActive": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "plan",
+                "isAdmin",
+                "isActive"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "organizations"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "listModels",
+      "label": "List Jev models",
+      "description": "List Jev model aliases currently offered by the signed-in Playground.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getUsage",
+      "label": "Get usage",
+      "description": "Return aggregate TypeSafe requests, tokens, and estimated spend for a selected time window. Website statistics may be delayed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string",
+            "enum": [
+              "all",
+              "30d",
+              "7d",
+              "1d"
+            ],
+            "default": "30d"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "day",
+              "hour"
+            ],
+            "default": "day"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string"
+          },
+          "granularity": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimatedSpendUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "statsMayBeDelayed": {
+            "type": "boolean"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period": {
+                  "type": "string"
+                },
+                "requests": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "inputTokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimatedSpendUsd": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "period",
+                "requests",
+                "inputTokens",
+                "outputTokens",
+                "estimatedSpendUsd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "window",
+          "granularity",
+          "requests",
+          "inputTokens",
+          "outputTokens",
+          "totalTokens",
+          "estimatedSpendUsd",
+          "statsMayBeDelayed",
+          "series"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "getBillingSummary",
+      "label": "Get billing summary",
+      "description": "Return available credits, billing setup status, auto-recharge state, and recent billing history without exposing payment details.",
+      "baseUrl": "https://console.typesafe.ai/settings/billing",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "availableCreditsUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "includesExpiringCredits": {
+            "type": "boolean"
+          },
+          "autoRecharge": {
+            "type": "string",
+            "enum": [
+              "on",
+              "off",
+              "unknown"
+            ]
+          },
+          "paymentMethodOnFile": {
+            "type": "boolean"
+          },
+          "billingAddressOnFile": {
+            "type": "boolean"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "amountUsd": {
+                  "$ref": "#/$defs/nullableNumber"
+                },
+                "remainingUsd": {
+                  "$ref": "#/$defs/nullableNumber"
+                },
+                "expires": {
+                  "$ref": "#/$defs/nullableString"
+                },
+                "date": {
+                  "$ref": "#/$defs/nullableString"
+                },
+                "status": {
+                  "$ref": "#/$defs/nullableString"
+                },
+                "invoiceAvailable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "amountUsd",
+                "remainingUsd",
+                "expires",
+                "date",
+                "status",
+                "invoiceAvailable"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "historyTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "availableCreditsUsd",
+          "includesExpiringCredits",
+          "autoRecharge",
+          "paymentMethodOnFile",
+          "billingAddressOnFile",
+          "history",
+          "historyTruncated"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": false
+    },
+    {
+      "id": "evaluateState",
+      "label": "Evaluate state",
+      "description": "Evaluate one text or JSON state against several typed questions in a single Jev request. This consumes TypeSafe credits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/state"
+          },
+          "model": {
+            "type": "string",
+            "default": "jev-latest"
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "noul",
+                    "choice",
+                    "score"
+                  ]
+                },
+                "instructions": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "trueMeaning": {
+                  "type": "string"
+                },
+                "falseMeaning": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "levels": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "instructions"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "state",
+          "questions"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/$defs/evaluation"
+      },
+      "requireAuth": true,
+      "requireApproval": true
+    },
+    {
+      "id": "judgeYesNo",
+      "label": "Judge yes or no",
+      "description": "Estimate the probability that a statement about the supplied state is true. This consumes TypeSafe credits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/state"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trueMeaning": {
+            "type": "string"
+          },
+          "falseMeaning": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "default": "jev-latest"
+          }
+        },
+        "required": [
+          "state",
+          "question"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "probabilityYes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "model",
+          "probabilityYes",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true
+    },
+    {
+      "id": "chooseOption",
+      "label": "Choose an option",
+      "description": "Choose among named options and return the full probability distribution. This consumes TypeSafe credits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/state"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "object",
+            "minProperties": 2,
+            "maxProperties": 255,
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "model": {
+            "type": "string",
+            "default": "jev-latest"
+          }
+        },
+        "required": [
+          "state",
+          "question",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "probabilities": {
+            "$ref": "#/$defs/probabilities"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "model",
+          "choice",
+          "confidence",
+          "probabilities",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true
+    },
+    {
+      "id": "scoreState",
+      "label": "Score against a rubric",
+      "description": "Score a state against ordered rubric levels and return the distribution and confidence. This consumes TypeSafe credits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/state"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "levels": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "model": {
+            "type": "string",
+            "default": "jev-latest"
+          }
+        },
+        "required": [
+          "state",
+          "question",
+          "levels"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "probabilities": {
+            "$ref": "#/$defs/probabilities"
+          },
+          "legend": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "model",
+          "score",
+          "confidence",
+          "probabilities",
+          "legend",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "requireAuth": true,
+      "requireApproval": true
+    }
+  ]
+}
