@@ -253,6 +253,12 @@ private struct ChatTranscriptProjection<Content: View>: View {
 }
 
 struct ChatPage: View {
+    private enum SendHandoff: Equatable {
+        case idle
+        case waitingForAnchor(UUID)
+        case animating(submissionID: UUID, anchorID: UUID)
+    }
+
     let chat: Chat
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
@@ -274,6 +280,7 @@ struct ChatPage: View {
     @State private var speechInput = ChatSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
+    @State private var sendHandoff = SendHandoff.idle
     @FocusState private var composerFocused: Bool
     @State private var editedBlockID: UUID?
     @State private var editDraft = AttributedString()
@@ -606,6 +613,8 @@ struct ChatPage: View {
             if !visible { composerFocused = false }
         }
         .onChange(of: chat.id) { _, _ in
+            sendHandoff = .idle
+            scroller.endSendHandoff()
             speechInput.cancel(reason: "chatChanged")
             cancelEditing(reason: "chatChanged", keepFocus: false)
         }
@@ -1338,9 +1347,7 @@ struct ChatPage: View {
                         latestCanvasBlockIDs: latestCanvasBlockIDs,
                         anchoredViewportHeight: anchoredViewportHeight,
                         scrollToTurn: { id in
-                            scroller.rideToTurn(id, animated: true) {
-                                proxy.scrollTo(id, anchor: .top)
-                            }
+                            anchorBecameReady(id, proxy: proxy)
                         }
                     )
                 }
@@ -1523,6 +1530,40 @@ struct ChatPage: View {
         .frame(maxWidth: .infinity, minHeight: viewportLayout.contentFloorHeight, alignment: .top)
         .contentShape(Rectangle())
         .background(KeyboardDismissPadding(padding: viewportLayout.composerHeight))
+    }
+
+    private func anchorBecameReady(_ anchorID: TurnID, proxy: ScrollViewProxy) {
+        guard case .waitingForAnchor(let submissionID) = sendHandoff,
+              latestSubmissionID == submissionID,
+              submissionAnchor?.id == anchorID else {
+            scroller.rideToTurn(
+                anchorID,
+                animation: reduceMotion ? nil : Theme.Animation.ride
+            ) {
+                proxy.scrollTo(anchorID, anchor: .top)
+            }
+            return
+        }
+
+        scroller.beginSendHandoff()
+        sendHandoff = .animating(submissionID: submissionID, anchorID: anchorID)
+        Log.ui.info("ChatUX.sendHandoff chat=\(chat.id) phase=animating submission=\(submissionID) anchor=\(anchorID)")
+        let dismissesKeyboard = anyInputFocused
+        if dismissesKeyboard { prepareComposerSubmission() }
+        scroller.rideToTurn(
+            anchorID,
+            animation: reduceMotion ? nil : (dismissesKeyboard ? Theme.Animation.handoff : Theme.Animation.ride)
+        ) {
+            proxy.scrollTo(anchorID, anchor: .top)
+        } completion: {
+            guard sendHandoff == .animating(
+                submissionID: submissionID,
+                anchorID: anchorID
+            ) else { return }
+            sendHandoff = .idle
+            scroller.endSendHandoff()
+            Log.ui.info("ChatUX.sendHandoff chat=\(chat.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
+        }
     }
 
     @ViewBuilder
@@ -1760,7 +1801,6 @@ struct ChatPage: View {
             commitEdit(blockID: editedBlockID)
             return
         }
-        prepareComposerSubmission()
         guard let message = composer.takeMessage() else { return }
         enqueue(message)
     }
@@ -1802,6 +1842,7 @@ struct ChatPage: View {
             skillInvocation: skillInvocation
         )
         latestSubmissionID = receipt.id
+        sendHandoff = .waitingForAnchor(receipt.id)
         Log.ui.info("ChatPage.send chat=\(chat.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 
@@ -1812,7 +1853,6 @@ struct ChatPage: View {
         }
         Log.ui.info("ChatComposer.skillSubmit chat=\(chat.id) name=\(skill.name) argumentChars=\(argument.count)")
         let invocation = UserSkillInvocation(skill: skill, argument: argument)
-        prepareComposerSubmission()
         composer.draft = invocation.expandedIntent
         composer.delayStopControl()
         guard let message = composer.takeMessage() else { return }

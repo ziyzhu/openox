@@ -124,6 +124,7 @@ final class ChatViewportController {
     @ObservationIgnored private var pendingFrame: Frame?
     @ObservationIgnored private var pendingOpenCompletion: (() -> Void)?
     @ObservationIgnored private var bottomVisible = false
+    @ObservationIgnored private var sendHandoffActive = false
     @ObservationIgnored private var layoutLogStart: Frame?
     @ObservationIgnored private var layoutLogEnd: Frame?
     @ObservationIgnored private var layoutLogTask: Task<Void, Never>?
@@ -137,6 +138,7 @@ final class ChatViewportController {
         pendingFrame = nil
         geometryFrameDriver.cancel()
         viewportHold = nil
+        sendHandoffActive = false
         inputFocused = false
         visibleTargetID = nil
         pendingOpenCompletion = onSettled
@@ -162,12 +164,28 @@ final class ChatViewportController {
         Log.ui.info("ChatUX.lifecycle chat=\(chatID) phase=bottomVisible \(logSnapshot)")
     }
 
-    func rideToTurn(_ id: UUID, animated: Bool, scroll: () -> Void) {
+    func beginSendHandoff() {
+        sendHandoffActive = true
+        viewportHold = nil
+    }
+
+    func endSendHandoff() {
+        sendHandoffActive = false
+    }
+
+    func rideToTurn(
+        _ id: UUID,
+        animation: Animation?,
+        scroll: () -> Void,
+        completion: @escaping () -> Void = {}
+    ) {
         let target = Target.turnTop(id)
         move(to: target)
-        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=\(target.label) anchor=top animated=\(animated) \(logSnapshot)")
-        withAnimation(animated ? Theme.Animation.ride : nil) {
+        Log.ui.info("ChatUX.intent chat=\(chatID) kind=scroll target=\(target.label) anchor=top animated=\(animation != nil) \(logSnapshot)")
+        withAnimation(animation, completionCriteria: .logicallyComplete) {
             scroll()
+        } completion: {
+            completion()
         }
     }
 
@@ -312,6 +330,7 @@ final class ChatViewportController {
     }
 
     private func applyViewportHold() {
+        guard !sendHandoffActive else { return }
         guard let frame, let viewportHold else { return }
         let top = viewportHold.expectedTop(in: frame)
         guard abs(top - frame.visualTop) > 0.5 else { return }
