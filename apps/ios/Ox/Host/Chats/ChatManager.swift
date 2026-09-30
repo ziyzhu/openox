@@ -127,7 +127,7 @@ final class ChatManager {
                 break
             }
             if record.hydration.chat?.isTemporary == true { return nil }
-            if record.hydration.chat?.transcript.isEmpty == true { return nil }
+            if record.hydration.chat?.hasTranscript == false { return nil }
             return record.hydration.meta
         }
     }

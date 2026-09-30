@@ -839,6 +839,7 @@ actor ProfileRepository {
     private func decoder(scope: ProfileScope) -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
+        decoder.userInfo[.artifactDirectoryListing] = ArtifactDirectoryListing()
         return decoder
     }
 

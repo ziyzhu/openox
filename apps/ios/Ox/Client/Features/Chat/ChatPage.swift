@@ -194,7 +194,7 @@ private struct ChatTranscriptProjectionSnapshot {
         sourceRange = key.requestedSourceRange
         sourceBlockIDs = requestedSourceIDs
         self.blocks = blocks
-        latestCanvasBlockIDs = ChatBlock.latestCanvasBlockIDs(in: chat.transcript)
+        latestCanvasBlockIDs = ChatBlock.latestCanvasBlockIDs(in: sourceWindow.blocks.map(\.block))
     }
 }
 

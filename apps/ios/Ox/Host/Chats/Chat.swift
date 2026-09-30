@@ -658,9 +658,17 @@ final class Chat: Identifiable {
     // MARK: - Transcript (folded in from ChatManager)
 
     private var document = ChatDocument() {
-        didSet { transcriptRevision &+= 1 }
+        didSet {
+            transcriptRevision &+= 1
+            let transcriptPreview = document.preview
+            if self.transcriptPreview != transcriptPreview { self.transcriptPreview = transcriptPreview }
+            let hasTranscript = !document.projection.isEmpty
+            if self.hasTranscript != hasTranscript { self.hasTranscript = hasTranscript }
+        }
     }
     private(set) var transcriptRevision: UInt64 = 0
+    private(set) var transcriptPreview: String?
+    private(set) var hasTranscript = false
     private var currentExecutionArtifacts: [Artifact] = []
     var currentExecutionTransientAttachments: [(sequence: Int, attachment: TransientAttachment)] = []
     private var currentExecutionActivatedSkills: [String: ActivatedSkillContext] = [:]
@@ -1168,7 +1176,7 @@ final class Chat: Identifiable {
             model: modelSelection,
             monoRepositoryHash: monoRepositoryHash,
             attachedServiceDomains: attachedServiceDomains,
-            preview: document.preview,
+            preview: transcriptPreview,
             hasUnreadResponse: hasUnreadResponse,
             scheduledSkillID: scheduledSkillID
         )

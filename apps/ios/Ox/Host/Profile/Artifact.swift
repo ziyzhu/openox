@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import Synchronization
 import UIKit
 import UniformTypeIdentifiers
 
@@ -10,6 +11,21 @@ extension Notification.Name {
 
 nonisolated extension CodingUserInfoKey {
     static let profileScope = CodingUserInfoKey(rawValue: "profileScope")!
+    static let artifactDirectoryListing = CodingUserInfoKey(rawValue: "artifactDirectoryListing")!
+}
+
+nonisolated final class ArtifactDirectoryListing: Sendable {
+    private let names = Mutex<[URL: [String]]>([:])
+
+    func existingFilename(matching name: String, in directory: URL) -> String? {
+        let listed = names.withLock { names in
+            if let listed = names[directory] { return listed }
+            let listed = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+            names[directory] = listed
+            return listed
+        }
+        return listed.first { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
 }
 
 nonisolated public struct Artifact: Equatable, Sendable, Identifiable, Codable {
@@ -140,7 +156,8 @@ nonisolated public struct Artifact: Equatable, Sendable, Identifiable, Codable {
             throw CocoaError(.fileNoSuchFile)
         }
         let fileName = try decoder.singleValueContainer().decode(String.self)
-        self = try ArtifactStore.artifact(named: fileName, in: directory)
+        let listing = decoder.userInfo[.artifactDirectoryListing] as? ArtifactDirectoryListing ?? ArtifactDirectoryListing()
+        self = try ArtifactStore.artifact(named: fileName, in: directory, listing: listing)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -285,9 +302,13 @@ nonisolated enum ArtifactStore {
     static let metadataName = "artifact.json"
     private static let savedIndexName = ".saved.json"
 
-    static func artifact(named name: String, in directory: URL) throws -> Artifact {
+    static func artifact(
+        named name: String,
+        in directory: URL,
+        listing: ArtifactDirectoryListing = ArtifactDirectoryListing()
+    ) throws -> Artifact {
         let requested = try validatedFilename(name)
-        let resolved = existingFilename(matching: requested, in: directory) ?? requested
+        let resolved = listing.existingFilename(matching: requested, in: directory) ?? requested
         return Artifact(fileName: resolved, directory: directory)
     }
 
@@ -516,8 +537,7 @@ nonisolated enum ArtifactStore {
     }
 
     static func existingFilename(matching name: String, in directory: URL) -> String? {
-        let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
-        return names?.first { $0.caseInsensitiveCompare(name) == .orderedSame }
+        ArtifactDirectoryListing().existingFilename(matching: name, in: directory)
     }
 
     private static func requiredArtifact(named name: String, in directory: URL) throws -> Artifact {
