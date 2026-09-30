@@ -1,7 +1,6 @@
 {
-  "version": 3,
-  "name": "Built-in",
-  "services": [
+  "name" : "Built-in",
+  "services" : [
     "ios:bluetooth",
     "ios:calendar",
     "ios:contacts",
@@ -20,10 +19,12 @@
     "web:chat.z.ai",
     "web:chatgpt.com",
     "web:claude.ai",
+    "web:console.typesafe.ai",
     "web:copilot.com",
     "web:creator.xiaohongshu.com",
     "web:ctrip.com",
     "web:developer.apple.com",
+    "web:discord.com",
     "web:doubao.com",
     "web:en.wikipedia.org",
     "web:gemini.google.com",
@@ -35,6 +36,7 @@
     "web:job-boards.greenhouse.io",
     "web:linkedin.com",
     "web:mail.google.com",
+    "web:manus.im",
     "web:mixpanel.com",
     "web:models.dev",
     "web:mp.weixin.qq.com",
@@ -42,6 +44,7 @@
     "web:news.ycombinator.com",
     "web:ourworldindata.org",
     "web:outlook.live.com",
+    "web:premera.com",
     "web:qwen.ai",
     "web:secure.bankofamerica.com",
     "web:secure.chase.com",
@@ -63,5 +66,8 @@
     "web:x.com",
     "web:xiaohongshu.com"
   ],
-  "skills": []
+  "skills" : [
+
+  ],
+  "version" : 3
 }
