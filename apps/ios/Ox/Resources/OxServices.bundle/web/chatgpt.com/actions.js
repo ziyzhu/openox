@@ -4,7 +4,7 @@
   const visible = e => !!e && !!(e.getBoundingClientRect().width && e.getBoundingClientRect().height);
   const one = selector => [...document.querySelectorAll(selector)].find(visible);
   let pageRef;
-  const reference = () => location.pathname.startsWith('/c/') ? location.origin + location.pathname : (pageRef ||= 'page:' + crypto.randomUUID());
+  const reference = () => (location.pathname.startsWith('/c/') || /^\/dots\/(?!home$|new$)[^/]+$/.test(location.pathname)) ? location.origin + location.pathname : (pageRef ||= 'page:' + crypto.randomUUID());
   const pageUrl = () => location.origin + location.pathname;
   async function waitFor(get, message, timeout = 15000) {
     const end = Date.now() + timeout;
@@ -81,6 +81,91 @@
   const modelRows = menu => [...menu.querySelectorAll('[role="menuitemradio"]')].filter(visible).map(e => ({element:e,name:clean(e.innerText),selected:e.getAttribute('aria-checked')==='true',available:e.getAttribute('aria-disabled')!=='true' && !e.disabled}));
   const closeMenu = menu => menu.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',bubbles:true}));
 
+  // Observe only the page-owned Dot profile listing. ChatGPT adds its own request
+  // authentication; credentials and headers are neither copied nor retained.
+  let dotListObservation = null;
+  let dotObserverInstalled = false;
+  function installDotObserver() {
+    if (dotObserverInstalled) return;
+    if (typeof window.fetch !== 'function') throw new Error('ChatGPT request transport is unavailable');
+    dotObserverInstalled = true;
+    const dotFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+      let observesDots = false;
+      try {
+        const url = typeof input === 'string' ? input : input?.url;
+        const u = new URL(url, location.href);
+        const method = String(init?.method || (typeof input === 'object' && input?.method) || 'GET').toUpperCase();
+        observesDots = method === 'GET' && u.pathname === '/backend-api/tbo';
+      } catch {}
+      return dotFetch(input, init).then(response => {
+        if (observesDots) {
+          void response.clone().text().then(text => {
+            let body = null;
+            try { body = text ? JSON.parse(text) : null; } catch {}
+            dotListObservation = {status: response.status, body, observedAt: Date.now()};
+          });
+        }
+        return response;
+      });
+    };
+  }
+  const dotEligibility = () => {
+    const text = clean([...document.querySelectorAll('h1,h2,h3,p')].filter(visible).map(e=>e.innerText).join(' '));
+    const url = pageUrl();
+    if (/aren['’]t available on your plan yet/i.test(text)) return {available:false,state:'plan_rollout',message:'Dots are still rolling out to this plan.',url};
+    if (/aren['’]t available in your region yet/i.test(text)) return {available:false,state:'region_unavailable',message:'Dots are not available in this region yet.',url};
+    if (/require a Pro plan/i.test(text)) return {available:false,state:'upgrade_required',message:'Dots require an eligible Pro plan.',url};
+    if (/require a.*Business Premium seat/i.test(text)) return {available:false,state:'business_premium_required',message:'Dots require a Business Premium seat for this workspace.',url};
+    if (/aren['’]t available in your workspace yet/i.test(text)) return {available:false,state:'workspace_unavailable',message:'Dots are not available in this workspace yet.',url};
+    if (dotListObservation?.status === 200) return {available:true,state:'available',message:'Dots are available for this account.',url};
+    if (/Couldn['’]t load your dot/i.test(text)) return {available:false,state:'unknown',message:'ChatGPT could not load the Dot profile.',url};
+    return null;
+  };
+  async function triggerDotProfileRequest() {
+    installDotObserver();
+    if (dotListObservation && Date.now() - dotListObservation.observedAt < 30000) return;
+    if (location.pathname !== '/dots') {
+      history.pushState({},'', '/dots'); window.dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => location.pathname === '/dots' || location.pathname === '/dots/home', 'Dots landing route did not load', 8000);
+    }
+    if (location.pathname === '/dots') {
+      history.pushState({},'', '/dots/home'); window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  }
+  async function readDotAvailability() {
+    installDotObserver();
+    const immediate=dotEligibility();
+    if(immediate) return immediate;
+    await triggerDotProfileRequest();
+    try { return await waitFor(dotEligibility, 'ChatGPT did not expose a recognized Dots availability state', 10000); }
+    catch (error) {
+      if (dotListObservation?.status === 404) return {available:false,state:'unknown',message:'Dots are not enabled for this ChatGPT account yet.',url:pageUrl()};
+      if (dotListObservation?.status === 200) return {available:true,state:'available',message:'Dots are available for this account.',url:pageUrl()};
+      throw error;
+    }
+  }
+  async function observedDots() {
+    let availability;
+    try { availability=await readDotAvailability(); }
+    catch { throw new Error('Dot profiles are unavailable for this ChatGPT account or rollout state'); }
+    if(!availability.available) throw new Error(availability.message);
+    await triggerDotProfileRequest();
+    const observation = await waitFor(() => dotListObservation || dotEligibility(), 'ChatGPT did not issue its page-owned Dot profile request', 12000);
+    if(!('status' in observation)) { if(!observation.available) throw new Error(observation.message); throw new Error('Dot profile response was not observed'); }
+    if (observation.status === 404) throw new Error('Dots are not available for this ChatGPT account yet');
+    if (observation.status !== 200) throw new Error('ChatGPT Dot profile request failed: HTTP ' + observation.status);
+    const body = observation.body;
+    if (!body || !Array.isArray(body.items) || !(body.cursor == null || typeof body.cursor === 'string')) throw new Error('Unexpected ChatGPT Dot profile response');
+    if (body.items.length > 25) throw new Error('Dot profile page exceeds supported bound');
+    const items = body.items.map(item => {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id) throw new Error('Invalid ChatGPT Dot profile');
+      const threadRef = typeof item.active_root_thread_id === 'string' && item.active_root_thread_id ? item.active_root_thread_id : (typeof item.root_thread_id === 'string' && item.root_thread_id ? item.root_thread_id : null);
+      return {id:item.id,name:typeof item.display_name === 'string' ? item.display_name : null,status:typeof item.status === 'string' ? item.status : null,threadRef,url:threadRef ? location.origin + '/dots/' + encodeURIComponent(threadRef) : null};
+    });
+    return {items,complete:body.cursor == null};
+  }
+
   let searchSession = null;
   // Observe only search responses while this service owns a search session.
   // Request credentials and headers are neither copied nor retained.
@@ -153,6 +238,28 @@
   }
 
   window.ox.install(({action}) => {
+    action('getDotAvailability',{async invoke(){return readDotAvailability();}});
+    action('listDots',{async invoke(){return observedDots();}});
+    action('openDot',{async invoke(args){
+      const listed=await observedDots();
+      const item=listed.items.find(i=>i.threadRef===args.threadRef);
+      if(!item) throw new Error('Dot thread was not returned by the current profile list');
+      const target='/dots/'+encodeURIComponent(item.threadRef);
+      history.pushState({},'',target); window.dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(()=>location.pathname===target&&(composer()||roleNodes().length),'Dot thread did not finish loading',15000);
+      return {url:pageUrl(),conversationRef:reference()};
+    }});
+    action('getCurrentDotConversation',{async invoke(args){
+      if(!/^\/dots\/(?!home$|new$)[^/]+$/.test(location.pathname)) throw new Error('Open a Dot thread first');
+      await waitFor(()=>composer()||roleNodes().length,'Dot conversation is not ready',10000);
+      const all=messages(),limit=args.limit??50;
+      return {conversationRef:reference(),url:pageUrl(),messages:all.slice(-limit),renderedOnly:true,truncated:all.length>limit};
+    }});
+    action('continueDot',{async invoke(args){
+      if(!/^\/dots\/(?!home$|new$)[^/]+$/.test(location.pathname)) throw new Error('Open a Dot thread first');
+      if(args.conversationRef!==reference()) throw new Error('Stale Dot thread reference; read the current Dot conversation first');
+      return send(args.message,false);
+    }});
     action('getInterfaceState',{async invoke(){return {path:location.pathname,readyState:document.readyState,visibility:document.visibilityState,focused:document.hasFocus(),composer:!!composer(),composerKind:composer() ? composer().tagName+':'+(composer().getAttribute('aria-label')||'')+':'+(composer().id||'') : (document.querySelector('textarea[id^="pending-"]')?.id || 'unavailable'),composerControls:[...(composer()?.closest('form')?.querySelectorAll('button')||[])].map(e=>e.getAttribute('aria-label')||e.getAttribute('data-testid')||e.type),modelCandidates:[...document.querySelectorAll('button,[role=button]')].filter(e=>visible(e)&&/^(ChatGPT|GPT-|Auto$|Instant$|Thinking$|Pro$|Choose model|Select model)/.test(clean(e.innerText))).slice(0,8).map(e=>clean(e.innerText).slice(0,80)),dialogs:document.querySelectorAll('[role="dialog"]').length,inputs:document.querySelectorAll('input').length,viewport:innerWidth+'x'+innerHeight,controls:[...document.querySelectorAll('button[aria-label]')].filter(e=>/^(Search|Show sidebar|Hide sidebar|Select ChatGPT model|Close global search|Log in)$/.test(e.getAttribute('aria-label'))).map(e=>({label:e.getAttribute('aria-label'),visible:visible(e),disabled:!!e.disabled||e.getAttribute('aria-disabled')==='true',expanded:e.getAttribute('aria-expanded')}))};}});
     action('searchConversations',{async invoke(args){return searchPage(args);}});
     action('openSearchConversation',{async invoke(args){

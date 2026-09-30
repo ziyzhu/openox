@@ -634,9 +634,7 @@
           "type": "array",
           "items": {
             "type": "integer"
-          },
-          "minItems": 2,
-          "maxItems": 2
+          }
         },
         "poster_url": {
           "type": [
@@ -1937,12 +1935,10 @@
             "minLength": 1
           },
           "from": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"
           },
           "to": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"
           }
         },
         "required": [
@@ -1953,7 +1949,6 @@
       "outputSchema": {
         "$ref": "#/$defs/tweetAnalytics"
       },
-      "defaultArgs": {},
       "requireApproval": false,
       "requireAuth": true
     },

@@ -2329,6 +2329,428 @@
       },
       "requireApproval": false,
       "requireAuth": false
+    },
+    {
+      "id": "repairUpload",
+      "label": "Repair PR bundle files",
+      "description": "Temporarily upload generated files to the authorized PR branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetDirectory": {
+            "type": "string"
+          },
+          "sourceDirectory": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetDirectory",
+          "sourceDirectory",
+          "names",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "verifyGeneratedBundle",
+      "label": "Verify generated bundle",
+      "description": "Compare PR source and generated service files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "domains"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "matches": {
+                  "type": "boolean"
+                },
+                "sourceStatus": {
+                  "type": "integer"
+                },
+                "targetStatus": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "matches",
+                "sourceStatus",
+                "targetStatus"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "repairState",
+      "label": "Read repair page state",
+      "description": "Read the temporary GitHub upload page state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fileInput": {
+            "type": "boolean"
+          },
+          "staged": {
+            "type": "integer"
+          },
+          "commitButton": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "fileInput",
+          "staged",
+          "commitButton"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "stageRepairFiles",
+      "label": "Stage repair files",
+      "description": "Stage authorized PR repair files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceDirectory": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sourceDirectory",
+          "names"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "staged": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "staged",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "commitRepairFiles",
+      "label": "Commit repair files",
+      "description": "Commit staged authorized PR repair files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clicked": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clicked",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "debugBundleCompare",
+      "label": "Compare bundle files",
+      "description": "Compare one source and generated PR file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceLength": {
+            "type": "integer"
+          },
+          "targetLength": {
+            "type": "integer"
+          },
+          "firstDifference": {
+            "type": "integer"
+          },
+          "sourceExcerpt": {
+            "type": "string"
+          },
+          "targetExcerpt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceLength",
+          "targetLength",
+          "firstDifference",
+          "sourceExcerpt",
+          "targetExcerpt"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "resetRepairPage",
+      "label": "Reset repair page",
+      "description": "Reload the temporary GitHub upload page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reloading": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reloading"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "clearRepairFiles",
+      "label": "Clear repair files",
+      "description": "Clear staged temporary GitHub upload files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          },
+          "remaining": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed",
+          "remaining"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "repairPageText",
+      "label": "Read repair result",
+      "description": "Read current temporary GitHub repair page text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "openRepairDirectory",
+      "label": "Open repair directory",
+      "description": "Open an authorized GitHub upload directory.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetDirectory": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetDirectory"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": false,
+      "requireAuth": true,
+      "blocking": true
+    },
+    {
+      "id": "stageNormalizedBundleManifest",
+      "label": "Stage normalized bundle manifest",
+      "description": "Normalize and stage the generated bundle manifest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "requireApproval": true,
+      "requireAuth": true,
+      "blocking": true
     }
   ],
   "locales": {

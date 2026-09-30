@@ -1,7 +1,7 @@
 {
   "domain": "chatgpt.com",
   "name": "ChatGPT",
-  "description": "Chat with ChatGPT, search saved conversations, open and continue chats, read rendered messages, inspect models, and access account information. Rich image and file metadata is preserved when the website exposes it.",
+  "description": "Chat with ChatGPT, search saved conversations, open and continue chats, inspect models, access account information, and use OpenAI Dots when the account rollout permits. Rich image and file metadata is preserved when the website exposes it.",
   "baseUrl": "https://chatgpt.com/",
   "actions": [
     {
@@ -520,6 +520,297 @@
         "required": [
           "url",
           "conversationRef"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getDotAvailability",
+      "label": "Check Dots availability",
+      "description": "Check whether OpenAI Dots are available for the current ChatGPT account and report observed rollout, plan, region, or workspace restrictions.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://chatgpt.com/dots",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "plan_rollout",
+              "region_unavailable",
+              "upgrade_required",
+              "business_premium_required",
+              "workspace_unavailable",
+              "unknown"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "state",
+          "message",
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "listDots",
+      "label": "List dots",
+      "description": "List up to 25 Dot profiles returned by ChatGPT for the current account. This requires Dots access; rollout-ineligible accounts return a clear error.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://chatgpt.com/dots/home",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadRef": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status",
+                "threadRef",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "complete"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openDot",
+      "label": "Open dot",
+      "description": "Open a Dot thread returned by List dots. The Dot must still belong to the current signed-in account.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "baseUrl": "https://chatgpt.com/dots/home",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threadRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadRef"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "conversationRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "conversationRef"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "getCurrentDotConversation",
+      "label": "Read current dot conversation",
+      "description": "Read up to 100 rendered user and Dot messages from the currently loaded Dot thread. This is the visible window, not guaranteed complete history.",
+      "requireAuth": true,
+      "requireApproval": false,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/file"
+                  }
+                }
+              },
+              "required": [
+                "role",
+                "text",
+                "files"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "renderedOnly": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationRef",
+          "url",
+          "messages",
+          "renderedOnly",
+          "truncated"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "continueDot",
+      "label": "Message current dot",
+      "description": "Send a message to the currently loaded Dot thread. Sending requires approval; stale thread references are rejected.",
+      "requireAuth": true,
+      "requireApproval": true,
+      "blocking": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "conversationRef",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversationRef": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "responseFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file"
+            }
+          }
+        },
+        "required": [
+          "response",
+          "conversationRef",
+          "url",
+          "responseFiles"
         ],
         "additionalProperties": false
       }

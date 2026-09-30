@@ -3,7 +3,6 @@
   "name": "TypeSafe",
   "description": "Use the signed-in TypeSafe console to run Jev typed decisions, inspect models and account details, and read usage and billing summaries without handling an API key.",
   "baseUrl": "https://console.typesafe.ai/playground",
-  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://console.typesafe.ai&size=128",
   "$defs": {
     "state": {
       "oneOf": [
@@ -753,5 +752,6 @@
       "requireAuth": true,
       "requireApproval": true
     }
-  ]
+  ],
+  "faviconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://console.typesafe.ai&size=128"
 }
