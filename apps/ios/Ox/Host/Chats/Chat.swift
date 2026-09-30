@@ -2273,9 +2273,7 @@ final class Chat: Identifiable {
         botControlSource.release()
         let at = Date()
         let outcome: TurnOutcome
-        if runState.backgroundExecutionExpired {
-            outcome = .failed(at: at, message: "Background execution ended.")
-        } else if agentEventCycle.isCancelled || runState.task?.isCancelled == true || error == "aborted" {
+        if agentEventCycle.isCancelled || runState.task?.isCancelled == true || error == "aborted" {
             outcome = .cancelled(at: at)
         } else if let error {
             outcome = .failed(at: at, message: error)
@@ -2384,9 +2382,9 @@ final class Chat: Identifiable {
     private func finishWorker(_ runID: RunID) {
         guard runState.id == runID else { return }
         let backgroundExecutionExpired = runState.backgroundExecutionExpired
-        let chatFailed = !backgroundExecutionExpired && notice.errorMessage != nil
-        let chatSucceeded = !backgroundExecutionExpired && !agentEventCycle.isCancelled && notice.errorMessage == nil
-        let hasUnreadResult = chatSucceeded || chatFailed || backgroundExecutionExpired
+        let chatFailed = notice.errorMessage != nil
+        let chatSucceeded = !agentEventCycle.isCancelled && notice.errorMessage == nil
+        let hasUnreadResult = chatSucceeded || chatFailed
         let leaseSucceeded = !backgroundExecutionExpired
         if chatFailed { runState.backgroundExecution?.updatePhase(.failed) }
         let completionNotification = chatSucceeded ? runState.completionNotification : nil
@@ -2473,14 +2471,7 @@ final class Chat: Identifiable {
     private func expireBackgroundExecution(runID: RunID) {
         guard runState.id == runID else { return }
         runState.expireBackgroundExecution()
-        notice = .error("Run interrupted: background execution ended.")
-        let cancelled = drainSubmissions()
-        for submission in cancelled {
-            submission.latency.finish(outcome: "backgroundExpired", client: client.id, model: model.id)
-        }
-        enqueueAgentMutation { await $0.abort() }
-        runState.task?.cancel()
-        Log.session.warning("Chat.backgroundExpired id=\(id) run=\(runID.rawValue)")
+        Log.session.warning("Chat.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
     }
 
     private func drainSubmissions() -> [Submission] {

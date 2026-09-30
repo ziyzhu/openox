@@ -6,6 +6,10 @@ final class ChatBackgroundExecution {
     private static var title: String { String(localized: "Ox is on it") }
     private static let activityPulseInterval = Duration.seconds(15)
 
+    private final class CompletionState {
+        var result: Bool?
+    }
+
     enum Phase: String {
         case thinking
         case working
@@ -33,7 +37,7 @@ final class ChatBackgroundExecution {
     private var phase = Phase.thinking
     private var stepSubtitle: String?
     private var submittedAt: Date?
-    private var terminalResult: Bool?
+    private let completion = CompletionState()
     private var completedUnits: Int64 = 0
     private var lastProgressAt: Date?
     private var activityPulse: Task<Void, Never>?
@@ -48,21 +52,25 @@ final class ChatBackgroundExecution {
     }
 
     func submit() {
-        guard terminalResult == nil else { return }
+        guard completion.result == nil else { return }
+        let completion = self.completion
+        let identifier = self.identifier
         let registered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: identifier,
             using: .main
         ) { [weak self] task in
             MainActor.assumeIsolated {
                 guard let self else {
-                    task.setTaskCompleted(success: false)
+                    let result = completion.result ?? false
+                    task.setTaskCompleted(success: result)
+                    Log.session.info("ChatBackground.receive detached task=\(identifier) success=\(result)")
                     return
                 }
                 self.receive(task)
             }
         }
         guard registered else {
-            terminalResult = false
+            completion.result = false
             onExpiration = nil
             Log.session.error("ChatBackground.register rejected chat=\(chatID) run=\(runID.rawValue) task=\(identifier)")
             return
@@ -78,7 +86,7 @@ final class ChatBackgroundExecution {
             try BGTaskScheduler.shared.submit(request)
             Log.session.info("ChatBackground.submit chat=\(chatID) run=\(runID.rawValue) task=\(identifier) strategy=queue")
         } catch {
-            terminalResult = false
+            completion.result = false
             onExpiration = nil
             let failure = error as NSError
             Log.session.error("ChatBackground.submit failed chat=\(chatID) run=\(runID.rawValue) task=\(identifier) domain=\(failure.domain) code=\(failure.code) error=\(failure.localizedDescription)")
@@ -86,7 +94,7 @@ final class ChatBackgroundExecution {
     }
 
     func advance() {
-        guard terminalResult == nil else { return }
+        guard completion.result == nil else { return }
         let now = Date()
         if let lastProgressAt, now.timeIntervalSince(lastProgressAt) < 1 { return }
         lastProgressAt = now
@@ -100,13 +108,13 @@ final class ChatBackgroundExecution {
         self.phase = phase
         stepSubtitle = nil
         Log.session.info("ChatBackground.phase chat=\(chatID) run=\(runID.rawValue) task=\(identifier) phase=\(phase.rawValue) presented=\(task != nil)")
-        guard terminalResult == nil else { return }
+        guard completion.result == nil else { return }
         task?.updateTitle(Self.title, subtitle: subtitle)
     }
 
     func updateStep(_ text: String) {
         let value = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !value.isEmpty, terminalResult == nil else { return }
+        guard !value.isEmpty, completion.result == nil else { return }
         let subtitle = value.count > 120 ? String(value.prefix(119)) + "…" : value
         guard stepSubtitle != subtitle else { return }
         stepSubtitle = subtitle
@@ -114,8 +122,8 @@ final class ChatBackgroundExecution {
     }
 
     func finish(success: Bool) {
-        guard terminalResult == nil else { return }
-        terminalResult = success
+        guard completion.result == nil else { return }
+        completion.result = success
         onExpiration = nil
         activityPulse?.cancel()
         activityPulse = nil
@@ -136,8 +144,8 @@ final class ChatBackgroundExecution {
             rawTask.setTaskCompleted(success: false)
             return
         }
-        if let terminalResult {
-            task.setTaskCompleted(success: terminalResult)
+        if let result = completion.result {
+            task.setTaskCompleted(success: result)
             return
         }
         self.task = task
@@ -166,8 +174,8 @@ final class ChatBackgroundExecution {
     }
 
     private func expire() {
-        guard terminalResult == nil else { return }
-        terminalResult = false
+        guard completion.result == nil else { return }
+        completion.result = false
         activityPulse?.cancel()
         activityPulse = nil
         let expiration = onExpiration
