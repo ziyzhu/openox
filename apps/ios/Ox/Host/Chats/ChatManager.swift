@@ -462,7 +462,14 @@ final class ChatManager {
         ensureRepositoryScope()
         let scope = repositoryScope
         _ = try await repository.deleteArtifact(named: artifact.fileName, in: scope)
+        artifactFilesChanged()
         Log.session.info("ChatManager.deleteArtifact file=\(artifact.fileName)")
+    }
+
+    func artifactFilesChanged() {
+        for chat in records.values.compactMap({ $0.hydration.chat }) {
+            chat.artifactFilesChanged()
+        }
     }
 
     func toggleFavorite(_ rawID: UUID) {

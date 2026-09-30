@@ -214,23 +214,27 @@ private struct DelayedActivityKey: Equatable {
     let transcriptRevision: UInt64
 }
 
+private final class ChatTranscriptProjectionCache {
+    private var snapshot: ChatTranscriptProjectionSnapshot?
+
+    func snapshot(for key: ChatTranscriptProjectionKey, chat: Chat) -> ChatTranscriptProjectionSnapshot {
+        if let snapshot, snapshot.key == key { return snapshot }
+        let resolved = ChatTranscriptProjectionSnapshot(key: key, chat: chat)
+        snapshot = resolved
+        return resolved
+    }
+}
+
 private struct ChatTranscriptProjection<Content: View>: View {
     let chat: Chat
     let transcriptWindow: TranscriptWindow
     let interaction: Chat.Interaction?
     let content: (ChatTranscriptProjectionSnapshot) -> Content
 
-    @State private var cache: ChatTranscriptProjectionSnapshot?
+    @State private var cache = ChatTranscriptProjectionCache()
 
     var body: some View {
-        let key = projectionKey
-        let resolved = cache.flatMap { $0.key == key ? $0 : nil }
-            ?? ChatTranscriptProjectionSnapshot(key: key, chat: chat)
-        return content(resolved)
-            .onChange(of: key, initial: true) { _, key in
-                guard cache?.key != key else { return }
-                cache = resolved
-            }
+        content(cache.snapshot(for: projectionKey, chat: chat))
     }
 
     private var projectionKey: ChatTranscriptProjectionKey {
@@ -466,9 +470,6 @@ struct ChatPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let showsComposer = interaction == nil && isModelConfigured
-        let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
-        let dockClearance = ChatViewportLayout.responseComposerSpacing
-            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
         let authProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
@@ -485,8 +486,6 @@ struct ChatPage: View {
             projectedPage(
                 projection,
                 showsComposer: showsComposer,
-                floatsTopStrip: floatsTopStrip,
-                dockClearance: dockClearance,
                 authProbe: authProbe,
                 botControlProbe: botControlProbe
             )
@@ -496,11 +495,12 @@ struct ChatPage: View {
     private func projectedPage(
         _ projection: ChatTranscriptProjectionSnapshot,
         showsComposer: Bool,
-        floatsTopStrip: Bool,
-        dockClearance: CGFloat,
         authProbe: Chat.PendingServiceControl?,
         botControlProbe: Chat.PendingServiceControl?
     ) -> some View {
+        let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
+        let dockClearance = ChatViewportLayout.responseComposerSpacing
+            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
         let totalBlockCount = projection.totalBlockCount
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
@@ -985,7 +985,7 @@ struct ChatPage: View {
     }
 
     private var anchorSlack: CGFloat {
-        viewportLayout.slack(hasAnchor: anchoredTurnID != nil)
+        viewportLayout.slack(anchorContentHeight: anchoredTurnID == nil ? nil : scroller.anchorContentHeight)
     }
 
     private func floatsTopStrip(showsComposer: Bool) -> Bool {
@@ -1470,7 +1470,7 @@ struct ChatPage: View {
                         .id(anchor.id)
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                    viewportLayout.measureAnchorContent($0)
+                    scroller.measureAnchorContent($0)
                 }
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
                 .task(id: anchor.id) {
@@ -1498,7 +1498,7 @@ struct ChatPage: View {
                     queuedRows
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                    viewportLayout.measureAnchorContent($0)
+                    scroller.measureAnchorContent($0)
                 }
                 .frame(minHeight: anchoredViewportHeight, alignment: .top)
                 .task(id: anchorID) {

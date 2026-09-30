@@ -1190,6 +1190,7 @@ struct RootView: View {
         }
         if areas.contains(.artifacts) {
             artifactRefreshEpoch &+= 1
+            chats.artifactFilesChanged()
         }
         if areas.contains(.chats), reason != "filesystem" || showSidebar {
             await chats.loadSummariesNow()

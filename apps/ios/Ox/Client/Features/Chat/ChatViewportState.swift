@@ -6,7 +6,6 @@ struct ChatViewportLayout {
     var composerHeight: CGFloat = 0
     var contentFloorHeight: CGFloat = 0
     var anchorFloor: CGFloat = 0
-    var anchorContentHeight: CGFloat = 0
 
     mutating func measureComposerHeight(_ height: CGFloat) -> Bool {
         guard abs(composerHeight - height) > 0.5 else { return false }
@@ -19,11 +18,7 @@ struct ChatViewportLayout {
         if !focused { anchorFloor = max(anchorFloor, contentFloorHeight) }
     }
 
-    mutating func measureAnchorContent(_ height: CGFloat) {
-        anchorContentHeight = height
-    }
-
-    func slack(hasAnchor: Bool) -> CGFloat {
-        hasAnchor ? max(0, anchorFloor - anchorContentHeight) : 0
+    func slack(anchorContentHeight: CGFloat?) -> CGFloat {
+        anchorContentHeight.map { max(0, anchorFloor - $0) } ?? 0
     }
 }

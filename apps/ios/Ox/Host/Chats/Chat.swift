@@ -665,10 +665,33 @@ final class Chat: Identifiable {
     private var currentExecutionActivatedSkills: [String: ActivatedSkillContext] = [:]
     var currentExecutionFetchCount = 0
     var currentExecutionFetchBytes = 0
+
+    private struct ReferencedArtifactsCache {
+        struct Key: Equatable {
+            let references: UUID
+            let files: Int
+        }
+
+        let key: Key
+        let artifacts: [Artifact]
+    }
+
+    private var artifactFilesRevision = 0
+    @ObservationIgnored private var referencedArtifactsCache: ReferencedArtifactsCache?
     var transcript: [Block] { document.projection }
     var transcriptBlockCount: Int { document.blockCount }
-    var referencedArtifacts: [Artifact] { document.referencedArtifacts }
+    var referencedArtifacts: [Artifact] {
+        let key = ReferencedArtifactsCache.Key(references: document.artifactReferencesRevision, files: artifactFilesRevision)
+        if let cache = referencedArtifactsCache, cache.key == key { return cache.artifacts }
+        let artifacts = document.referencedArtifacts
+        referencedArtifactsCache = ReferencedArtifactsCache(key: key, artifacts: artifacts)
+        return artifacts
+    }
     var blocksWithTurnID: [(block: Block, turnID: TurnID)] { document.blocksWithTurnID() }
+
+    func artifactFilesChanged() {
+        artifactFilesRevision &+= 1
+    }
 
     func blocksWithTurnID(in range: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
         document.blocksWithTurnID(in: range)
@@ -773,11 +796,8 @@ final class Chat: Identifiable {
     }
 
     func anchor(forSubmissionID submissionID: UUID) -> SubmissionAnchor? {
-        if let entry = document.turns.firstIndex(where: { entry in
-            guard case .user(let turn, _) = entry else { return false }
-            return turn.submissionID?.rawValue == submissionID
-        }), let block = document.blocksWithTurn().first(where: { $0.1 == entry })?.0 {
-            return .turn(blockID: block.id, submissionID: submissionID)
+        if let blockID = document.firstBlockID(forSubmissionID: submissionID) {
+            return .turn(blockID: blockID, submissionID: submissionID)
         }
         if submissions.contains(where: { $0.id.rawValue == submissionID && $0.needsPosting }) {
             return .queued(submissionID)

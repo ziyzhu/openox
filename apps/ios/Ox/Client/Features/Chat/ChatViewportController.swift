@@ -114,6 +114,7 @@ final class ChatViewportController {
 
     var visibleBlockID: UUID? { position.viewID(type: UUID.self) }
 
+    @ObservationIgnored private(set) var anchorContentHeight: CGFloat = 0
     @ObservationIgnored private var chatID = ""
     @ObservationIgnored private var frame: Frame?
     @ObservationIgnored private var motion = Motion.stationary
@@ -214,6 +215,10 @@ final class ChatViewportController {
 
     func visibleTargetsChanged(_ ids: [UUID]) {
         visibleTargetID = ids.first
+    }
+
+    func measureAnchorContent(_ height: CGFloat) {
+        anchorContentHeight = height
     }
 
     func viewportResized() {

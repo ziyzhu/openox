@@ -37,6 +37,7 @@ nonisolated struct ChatDocument {
     private(set) var turns: [Turn]
     private(set) var projection: [Block]
     private(set) var sourceTurnIDs: [RenderBlockID: TurnID]
+    private(set) var artifactReferencesRevision = UUID()
     private var nextBlockOrdinal: Int
 
     init(turns: [Turn] = []) {
@@ -177,6 +178,17 @@ nonisolated struct ChatDocument {
     }
 
     var blockCount: Int { projection.count }
+
+    func firstBlockID(forSubmissionID submissionID: UUID) -> UUID? {
+        guard let turnID = turns.last(where: { entry in
+            guard case .user(let turn, _) = entry else { return false }
+            return turn.submissionID?.rawValue == submissionID
+        })?.id else { return nil }
+        return projection.reversed()
+            .drop { sourceTurnIDs[RenderBlockID($0.id)] != turnID }
+            .prefix { sourceTurnIDs[RenderBlockID($0.id)] == turnID }
+            .last?.id
+    }
 
     func blocksWithTurnID(in requestedRange: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
         let upperBound = min(max(0, requestedRange.upperBound), projection.count)
@@ -916,6 +928,7 @@ nonisolated struct ChatDocument {
             (RenderBlockID(block.id), turns[entry].id)
         })
         nextBlockOrdinal = projection.count
+        artifactReferencesRevision = UUID()
     }
 
     private mutating func reconcileTail() {
@@ -934,15 +947,17 @@ nonisolated struct ChatDocument {
             turnOffset: entryStart,
             ordinalOffset: blockStart
         )
+        for block in projection[blockStart...] { sourceTurnIDs[RenderBlockID(block.id)] = nil }
         projection.replaceSubrange(blockStart..<projection.endIndex, with: projected.map(\.0))
-        sourceTurnIDs = sourceTurnIDs.filter { id, _ in projection.prefix(blockStart).contains(where: { $0.id == id.rawValue }) }
         for (block, entry) in projected { sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id }
         nextBlockOrdinal = projection.count
+        artifactReferencesRevision = UUID()
     }
 
     private mutating func appendBlock(_ block: Block, entry: Int) {
         projection.append(block)
         sourceTurnIDs[RenderBlockID(block.id)] = turns[entry].id
+        artifactReferencesRevision = UUID()
     }
 
     private func validateIDs() {
