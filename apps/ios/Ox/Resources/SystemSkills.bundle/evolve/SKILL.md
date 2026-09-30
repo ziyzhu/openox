@@ -7,7 +7,7 @@ description: Create, extend, repair, and verify Local web and API services, incl
 
 Build useful service capabilities from observed behavior. Keep discovery, exploration, implementation, live verification, and Save in one workflow. Use existing services normally when their definitions already meet the request.
 
-Evolve a service when a requested capability is missing, an existing action is confirmed broken, or Ox completes a repeatable workflow without a suitable service action. Add or repair the smallest action supported by the observed workflow. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website failures. A general public-information question alone does not call for a service.
+Evolve a service when a requested capability is missing, an existing action is confirmed broken, or Browser reveals a stable way to make the service more complete, reliable, or efficient. Create or improve the smallest action supported by the observed workflow, and leave an action unchanged when it already handled the request cleanly. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website failures. A general public-information question alone does not call for a service.
 
 Read `skills/evolve/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
