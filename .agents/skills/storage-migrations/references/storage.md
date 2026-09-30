@@ -517,6 +517,11 @@ restore operations. Checkout detaches its working view without moving `main`;
 historical views are read-only until returning to the latest tip. Development
 and installed sources are read-only `HEAD` snapshots without Git metadata.
 Local Git objects and all service snapshots are excluded from device backup.
+Exporting Local creates a transient Files-shareable folder copy containing the
+complete working tree and `.git` directory, including history, index state,
+uncommitted changes, repository-root skills, and incomplete service drafts. The
+copy excludes repository enablement, conflict choices, credentials, and installed
+repository snapshots. Export does not validate or modify the source repository.
 
 Simulator builds may also load the launch-configured Ox Server `HEAD` snapshot at
 `Application Support/service-repositories/development/` as a separate development

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct RepositoriesView: View {
     @Environment(ServiceManager.self) private var manager
@@ -313,6 +314,10 @@ struct RepositoryDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceManager.self) private var manager
     @State private var confirmingRemoval = false
+    @State private var localExport: LocalRepositoryExport?
+    @State private var preparingLocalExport = false
+    @State private var presentingLocalExport = false
+    @State private var localExportError: String?
 
     private var repository: Repository.Descriptor? {
         manager.repositories.first { $0.id == repositoryID }
@@ -396,6 +401,7 @@ struct RepositoryDetailView: View {
                             }
                         }
                     }
+                    if repository.provenance == .local { localExportSection }
                     if canRemove { removalSection }
                 }
             }
@@ -405,6 +411,20 @@ struct RepositoryDetailView: View {
         .background(Theme.Colors.background)
         .navigationTitle(Text(verbatim: repository?.name ?? "Repository"))
         .navigationBarTitleDisplayMode(.inline)
+        .fileExporter(
+            isPresented: $presentingLocalExport,
+            item: localExport,
+            contentTypes: [.folder],
+            defaultFilename: "Local Repository"
+        ) { result in
+            if case .failure(let error) = result {
+                Log.ui.error("Repository.export save failed=\(error.localizedDescription)")
+                localExportError = error.localizedDescription
+            }
+            localExport = nil
+        } onCancellation: {
+            localExport = nil
+        }
         .toolbar {
             if canUpdate {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -434,6 +454,14 @@ struct RepositoryDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes the local snapshot. Website sign-ins and data are kept.")
+        }
+        .alert("Export Local Repository", isPresented: Binding(
+            get: { localExportError != nil },
+            set: { if !$0 { localExportError = nil } }
+        )) {
+            Button("OK") { localExportError = nil }
+        } message: {
+            Text(localExportError ?? "")
         }
     }
 
@@ -490,6 +518,43 @@ struct RepositoryDetailView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(A11yID.Settings.repositoryRemove(repositoryID))
+        }
+    }
+
+    private var localExportSection: some View {
+        SettingsSection("Manage", layout: .row) {
+            Button {
+                prepareLocalExport()
+            } label: {
+                HStack {
+                    Text("Export Local Repository…")
+                        .font(Theme.Fonts.bodyMd)
+                        .foregroundStyle(Theme.Colors.onSurface)
+                    Spacer(minLength: 0)
+                    if preparingLocalExport {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .settingsRowPadding()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(preparingLocalExport)
+            .accessibilityIdentifier(A11yID.Settings.repositoryExport)
+        }
+    }
+
+    private func prepareLocalExport() {
+        preparingLocalExport = true
+        Task {
+            defer { preparingLocalExport = false }
+            do {
+                localExport = LocalRepositoryExport(file: try await manager.exportLocalRepository())
+                presentingLocalExport = true
+            } catch {
+                Log.ui.error("Repository.export prepare failed=\(error.localizedDescription)")
+                localExportError = error.localizedDescription
+            }
         }
     }
 

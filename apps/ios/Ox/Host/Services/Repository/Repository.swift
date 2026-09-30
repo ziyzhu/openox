@@ -717,6 +717,22 @@ actor Repository {
         return data
     }
 
+    func exportLocalRepository() throws -> URL {
+        try materializeLocalRepository()
+        let manager = FileManager.default
+        let exportRoot = manager.temporaryDirectory
+            .appendingPathComponent("Ox Repository Export", isDirectory: true)
+        if manager.fileExists(atPath: exportRoot.path) {
+            try manager.removeItem(at: exportRoot)
+        }
+        try manager.createDirectory(at: exportRoot, withIntermediateDirectories: true)
+        let destination = exportRoot.appendingPathComponent("Local Repository", isDirectory: true)
+        try manager.copyItem(at: localRoot, to: destination)
+        let itemCount = manager.enumerator(at: destination, includingPropertiesForKeys: nil)?.allObjects.count ?? 0
+        Log.service.info("Repository.export repository=local items=\(itemCount)")
+        return destination
+    }
+
     func importLocalService(_ payload: ServicePackagePayload, replacing: Bool) throws {
         _ = try editableLocalRepository()
         let originalPackage = try Self.loadPackage(at: localRoot, provenance: .local)

@@ -137,6 +137,7 @@ nonisolated enum A11yID {
         static func repositoryEnabled(_ id: String) -> String { "settings.repositoryEnabled.\(id)" }
         static func repositoryUpdate(_ id: String) -> String { "settings.repositoryUpdate.\(id)" }
         static func repositoryRemove(_ id: String) -> String { "settings.repositoryRemove.\(id)" }
+        static let repositoryExport = "settings.repositoryExport"
         static func conflict(_ id: String) -> String { "settings.repositoryConflict.\(id)" }
         static func conflictCandidate(_ id: String, _ repositoryID: String) -> String {
             "settings.repositoryConflict.\(id).\(repositoryID)"
