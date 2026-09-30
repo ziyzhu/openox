@@ -1,3 +1,4 @@
+import ImageIO
 import PDFKit
 import SwiftUI
 import UIKit
@@ -55,6 +56,7 @@ struct ArtifactThumbnail: View {
     var background: DynamicColor? = nil
     var previewSourceID: String? = nil
     @State private var image: UIImage?
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         Group {
@@ -91,9 +93,13 @@ struct ArtifactThumbnail: View {
             let kind = attachment.kind
             guard kind == .image || kind == .pdf else { return }
             let size = CGSize(width: style.size * 3, height: style.size * 3)
+            let targetPixelSize = max(1, Int((style.size * displayScale).rounded(.up)))
             let loaded = await Task.detached(priority: .utility) {
                 if kind == .image {
-                    return UIImage(contentsOfFile: attachment.fileURL.path)
+                    return Self.thumbnail(
+                        at: attachment.fileURL,
+                        targetPixelSize: targetPixelSize
+                    )
                 }
                 return PDFDocument(url: attachment.fileURL)?
                     .page(at: 0)?
@@ -102,6 +108,26 @@ struct ArtifactThumbnail: View {
             guard !Task.isCancelled else { return }
             image = loaded
         }
+    }
+
+    nonisolated private static func thumbnail(
+        at fileURL: URL,
+        targetPixelSize: Int
+    ) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, sourceOptions) else { return nil }
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: targetPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            thumbnailOptions as CFDictionary
+        ) else { return nil }
+        return UIImage(cgImage: thumbnail)
     }
 
     private var shape: RoundedRectangle {
