@@ -146,7 +146,7 @@ actor LiteRTRuntime {
         temperature: Double?
     ) async throws -> LiteRTLM.Message {
         let engine = try await loadedEngine(at: modelURL)
-        var history = try messages.map(Self.convert)
+        var history = try messages.compactMap(Self.convert)
         guard let last = history.popLast() else { throw RuntimeError.bridge("The local model received an empty conversation.") }
         let sampler = try temperature.map { try SamplerConfig(topK: 40, topP: 0.95, temperature: Float($0)) }
         let config = ConversationConfig(
@@ -216,7 +216,7 @@ actor LiteRTRuntime {
         return (next, backend)
     }
 
-    private static func convert(_ message: Message) throws -> LiteRTLM.Message {
+    private static func convert(_ message: Message) throws -> LiteRTLM.Message? {
         switch message {
         case .user(let user):
             let text = UserMessageParts(user, label: "LiteRTGemma.user").text
@@ -229,6 +229,10 @@ actor LiteRTRuntime {
             let calls = assistant.content.compactMap { block -> LiteRTLM.ToolCall? in
                 guard case .toolCall(let call) = block else { return nil }
                 return LiteRTLM.ToolCall(name: call.name, id: call.id, arguments: call.arguments.objectValue?.mapValues { $0.toAny() } ?? [:])
+            }
+            guard !content.isEmpty || !calls.isEmpty else {
+                Log.agent.info("LiteRTGemma.history omitted assistant stopReason=\(assistant.stopReason) blocks=[\(assistant.content.blockKinds)]")
+                return nil
             }
             return LiteRTLM.Message(contents: content, role: .model, toolCalls: calls)
         case .toolResult(let result):
