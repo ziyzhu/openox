@@ -552,7 +552,7 @@ struct ChatPage: View {
                 )
                 toast = Toast(message: message, role: .error, duration: 4)
             }
-        return transcript
+        let composedTranscript = transcript
             .accessibilityHidden(speechInput.isPresented)
             .overlay {
                 if speechInput.isPresented {
@@ -594,6 +594,7 @@ struct ChatPage: View {
                 slashPickerOverlay(floatsTopStrip: floatsTopStrip)
             }
         }
+        let observedTranscript = composedTranscript
         .onChange(of: speechInput.notice) { _, message in
             guard let message else { return }
             toast = Toast(message: message, duration: 5)
@@ -675,6 +676,7 @@ struct ChatPage: View {
         )) {
             await updateDelayedActivity()
         }
+        return observedTranscript
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: sheetModal, onDismiss: sheetDidDismiss) { presented in
             Group {
