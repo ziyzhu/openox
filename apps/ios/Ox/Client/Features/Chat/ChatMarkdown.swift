@@ -4,10 +4,11 @@ import Observation
 
 struct StreamingMarkdownText: View {
     let source: String
+    var isStreaming = true
     @State private var splitter = StreamSplitter()
 
     var body: some View {
-        let split = splitter.absorb(source)
+        let split = splitter.absorb(source, isStreaming: isStreaming)
         VStack(alignment: .leading, spacing: 0) {
             if !split.settled.isEmpty {
                 MarkdownText(split.settled)
@@ -39,19 +40,20 @@ struct StreamingMarkdownText: View {
         private var inFence = false
         private var boundaryUTF8 = 0
 
-        func absorb(_ source: String) -> (
+        func absorb(_ source: String, isStreaming: Bool) -> (
             settled: String,
             tail: String,
             generation: Int,
             lastSettledBlock: MarkdownBlock?,
             inFence: Bool
         ) {
+            guard isStreaming else {
+                reset()
+                return (source, "", generation, nil, false)
+            }
             let total = source.utf8.count
             if total < consumedUTF8 {
-                (settled, tail, consumedUTF8) = ("", "", 0)
-                generation &+= 1
-                lastSettledBlock = nil
-                resetScanner()
+                reset()
             }
             if total > consumedUTF8 {
                 let delta = String(decoding: source.utf8.suffix(total - consumedUTF8), as: UTF8.self)
@@ -87,6 +89,13 @@ struct StreamingMarkdownText: View {
                     currentLine.append(character)
                 }
             }
+        }
+
+        private func reset() {
+            (settled, tail, consumedUTF8) = ("", "", 0)
+            generation &+= 1
+            lastSettledBlock = nil
+            resetScanner()
         }
 
         private func resetScanner() {

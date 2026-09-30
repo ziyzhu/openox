@@ -1117,9 +1117,13 @@ struct BlockView: View, Equatable {
             && lhs.isStreamingTail == rhs.isStreamingTail
             && lhs.isThinkingTail == rhs.isThinkingTail
             && lhs.controls.isCopied == rhs.controls.isCopied
-            && lhs.controls.canMutate == rhs.controls.canMutate
+            && lhs.editMenuCanMutate == rhs.editMenuCanMutate
             && lhs.artifactControls.revision == rhs.artifactControls.revision
             && lhs.artifactControls.canMutate == rhs.artifactControls.canMutate
+    }
+
+    private var editMenuCanMutate: Bool? {
+        if case .userText = block.kind { controls.canMutate } else { nil }
     }
 
     @ViewBuilder
@@ -1324,20 +1328,12 @@ struct BlockView: View, Equatable {
         .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))
     }
 
-    @ViewBuilder
     private func agentText(_ text: String) -> some View {
-        if isStreamingTail {
-            StreamingMarkdownText(source: text)
-                .environment(\.chatLinkHandler, onOpenLink)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier(A11yID.Chat.Message.agent)
-        } else {
-            MarkdownText(text)
-                .environment(\.chatLinkHandler, onOpenLink)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(text)
-                .accessibilityIdentifier(A11yID.Chat.Message.agent)
-        }
+        StreamingMarkdownText(source: text, isStreaming: isStreamingTail)
+            .environment(\.chatLinkHandler, onOpenLink)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(text, isEnabled: !isStreamingTail)
+            .accessibilityIdentifier(A11yID.Chat.Message.agent)
     }
 
 }
