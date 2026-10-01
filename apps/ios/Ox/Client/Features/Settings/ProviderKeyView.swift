@@ -110,12 +110,12 @@ struct ProviderAuthenticationView: View {
             guard let service = websiteService, websiteSignIn == nil else { return }
             let revision = websiteAuthenticationRevision
             let state = await service.checkAccess(
-                policy: revision == 0 ? .cached : .current,
+                policy: .current,
                 reason: .modelSignIn
             )
             guard !Task.isCancelled, websiteSignIn == nil,
                   websiteAuthenticationRevision == revision else { return }
-            if revision > 0, state.isAuthenticated { onAuthenticated?() }
+            if state.isAuthenticated || state == .notRequired { onAuthenticated?() }
         }
         .onChange(of: websiteService?.auth) { _, _ in onChange() }
         .fullScreenCover(item: $websiteSignIn, onDismiss: {

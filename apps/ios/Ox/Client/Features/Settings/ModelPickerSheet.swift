@@ -522,8 +522,10 @@ struct ModelPickerContent: View {
     private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ServiceManager.self) private var serviceManager
     @State private var choosingProvider = false
     @State private var authRevision = 0
+    @State private var verifiedWebsiteProviderID: String?
     @State private var selectedRegion: LLMRegion
     @State private var providerSelection: ProviderSelection
     @State private var selectedModelID: String
@@ -611,6 +613,11 @@ struct ModelPickerContent: View {
 
     private var isAuthenticated: Bool {
         guard let selectedClient else { return false }
+        if let provider = selectedClient as? WebServiceModelProvider {
+            guard verifiedWebsiteProviderID == provider.id,
+                  let service = serviceManager.service(domain: provider.domain) else { return false }
+            return service.signInState.isAuthenticated || service.signInState == .notRequired
+        }
         let hasKey = selectedClient.usesAPIKey
             && !apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let signedIn = selectedClient.subscriptionAccount?.isSignedIn == true
@@ -688,7 +695,7 @@ struct ModelPickerContent: View {
                         selectionSection("Model") { customModelControl }
                     } else if let selectedClient {
                         authenticationSection(selectedClient)
-                        if !isAuthenticating {
+                        if !isAuthenticating, isAuthenticated {
                             selectionSection("Model") { modelMenu }
                             if !reasoningEfforts.isEmpty {
                                 selectionSection("Thinking level") { reasoningEffortMenu }
@@ -1036,6 +1043,7 @@ struct ModelPickerContent: View {
 
     private func providerDidChange() {
         dismissKeyboard()
+        if verifiedWebsiteProviderID != selectedClientID { verifiedWebsiteProviderID = nil }
         customError = nil
         providerCredentialError = nil
         loadCredentialDraft()
@@ -1193,6 +1201,7 @@ struct ModelPickerContent: View {
     }
 
     private func authenticationDidComplete(for client: any ProviderClient) {
+        if client is WebServiceModelProvider { verifiedWebsiteProviderID = client.id }
         if case .selection = mode {
             applySelection()
             return

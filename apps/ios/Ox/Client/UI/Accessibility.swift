@@ -161,6 +161,7 @@ nonisolated enum A11yID {
         static let export = "chat.export"
         static let modelPicker = "chat.modelPicker"
         static let modelSetup = "chat.modelSetup"
+        static let modelAccessNotice = "chat.modelAccessNotice"
         static let modelRegion = "chat.modelRegion"
         static let modelProvider = "chat.modelProvider"
         static func modelProviderOption(_ clientId: String) -> String { "chat.modelProviderOption.\(clientId)" }

@@ -276,6 +276,16 @@ struct ChatPage: View {
     private var providerRegistry: ProviderRegistry { .shared }
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
+    private var modelService: Service? {
+        guard let provider = chat.client as? WebServiceModelProvider else { return nil }
+        return serviceManager.service(domain: provider.domain)
+    }
+
+    private var modelAccessNeedsAttention: Bool {
+        guard let service = modelService else { return false }
+        return !service.signInState.isAuthenticated && service.signInState != .notRequired
+    }
+
     @State var composer = ChatComposerModel()
     @State private var speechInput = ChatSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
@@ -532,7 +542,12 @@ struct ChatPage: View {
             }
             .toast($toast)
             .safeAreaBar(edge: .top, spacing: 0) {
-                pageTopBar(blockCount: totalBlockCount)
+                VStack(spacing: 0) {
+                    pageTopBar(blockCount: totalBlockCount)
+                    if modelAccessNeedsAttention {
+                        modelAccessNotice
+                    }
+                }
             }
             .onChange(of: toast?.id) { _, _ in
                 if toast == nil {
@@ -661,6 +676,10 @@ struct ChatPage: View {
                 toast = Toast(message: msg)
             }
             await refreshAttachedServiceAuth()
+        }
+        .task(id: "\(modelService?.domain ?? ""):\(scenePhase)") {
+            guard scenePhase == .active, let service = modelService else { return }
+            await service.checkAccess(policy: .current, reason: .modelSignIn)
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
@@ -1727,6 +1746,44 @@ struct ChatPage: View {
             )
     }
 
+    private var modelAccessNotice: some View {
+        Button { modalPresentation = .modelPicker } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(Theme.Colors.primary)
+                Text(verbatim: modelAccessNoticeTitle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+            .font(Theme.Fonts.bodySm)
+            .foregroundStyle(Theme.Colors.onSurface)
+            .alertGlassPill(in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .accessibilityIdentifier(A11yID.Chat.modelAccessNotice)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.sm)
+        .frame(maxWidth: Theme.ContainerWidth.readable)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var modelAccessNoticeTitle: String {
+        switch modelService?.auth {
+        case .unknown?, .checking?: L10n.string("Checking sign-in…")
+        case .unavailable?: L10n.string("Sign-in unavailable")
+        default: String(localized: "Sign in with \(chat.client.displayName)")
+        }
+    }
+
+    private func ensureModelAccess() -> Bool {
+        guard modelAccessNeedsAttention else { return true }
+        Log.ui.info("ChatPage.modelAccess blocked chat=\(chat.id) provider=\(chat.client.id) state=\(modelService?.signInState.rawValue ?? "unknown")")
+        modalPresentation = .modelPicker
+        return false
+    }
+
     private var activeInteraction: Chat.Interaction? {
         chat.interaction
     }
@@ -1797,6 +1854,7 @@ struct ChatPage: View {
     }
 
     private func send() {
+        guard ensureModelAccess() else { return }
         if let editedBlockID {
             commitEdit(blockID: editedBlockID)
             return
@@ -1847,6 +1905,7 @@ struct ChatPage: View {
     }
 
     private func submitSkill(_ skill: Skill, argument: String) {
+        guard ensureModelAccess() else { return }
         Log.ui.info("ChatComposer.skillSelect chat=\(chat.id) name=\(skill.name) services=\(skill.services.count)")
         if chat.attachServiceDomains(skill.services) {
             Haptics.impact(.serviceAttached)

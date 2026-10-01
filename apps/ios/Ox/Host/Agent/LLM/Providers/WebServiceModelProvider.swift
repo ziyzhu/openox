@@ -50,6 +50,26 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
         return state.isAuthenticated || state == .notRequired
     }
 
+    private var signInRequiredError: WebsiteProviderError {
+        WebsiteProviderError(String(localized: "Sign in with \(displayName) to use this model, or choose another model."), kind: .authentication)
+    }
+
+    private var signInVerificationError: WebsiteProviderError {
+        WebsiteProviderError(String(localized: "Couldn't verify sign-in with \(displayName). Try again or choose another model."), kind: .authentication)
+    }
+
+    @MainActor private func requireAuthenticatedSession() async throws {
+        let service = try service()
+        try await service.awaitAuthenticationAvailability(name: "\(domain):modelGeneration")
+        await service.checkAccess(policy: .current, reason: .modelSignIn)
+        if service.auth.isSignedOut { await service.attemptSilentSignIn(reason: .modelSignIn) }
+        try Task.checkCancellation()
+        let state = service.signInState
+        Log.service.info("ModelService.auth domain=\(domain) state=\(state.rawValue)")
+        if state == .unknown { throw signInVerificationError }
+        guard state.isAuthenticated || state == .notRequired else { throw signInRequiredError }
+    }
+
     func loadModels() async throws -> [ProviderModel] {
         let value = try await service().invokeAction(ModelServiceContract.list, args: .object([:]), role: .modelGeneration).get()
         return try ModelServiceContract.models(from: value).map(\.model)
@@ -57,6 +77,7 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
 
     func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {
         streamingTask(model: model, messages: messages) { continuation in
+            try await requireAuthenticatedSession()
             let instructions = [systemPrompt, WebsiteToolContract.instructions(tools)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
             let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: displayName)
             let prepared = input.messages.arrayValue ?? []
@@ -96,6 +117,13 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
                 await conversation.finish(started, history: prepared + [ModelConversationHistory.assistantTurn(reply)], chatID: chatID)
             } catch {
                 await conversation.cancelAndClose(generation)
+                if let invocationError = error as? Service.InvokeError {
+                    switch invocationError {
+                    case .requiresAuth: throw signInRequiredError
+                    case .authUnavailable: throw signInVerificationError
+                    default: break
+                    }
+                }
                 throw error
             }
         }
