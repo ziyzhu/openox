@@ -107,9 +107,8 @@ private struct PermissionPrototypeExample {
 
     var options: [String] {
         switch kind {
-        case .destructive: ["Approve", "Deny"]
         case .scheduled: ["Schedule", "Cancel"]
-        case .service, .disclosure, .attachment: ["Approve", "Always allow", "Deny"]
+        case .service, .disclosure, .destructive, .attachment: ["Approve", "Always allow", "Deny"]
         }
     }
 

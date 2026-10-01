@@ -10,11 +10,11 @@ Create two saved disposable chats and record their IDs using `ox chat list`.
 Call the function from one chat, targeting the other, with `ox vm call`. Use
 `sim` to answer the visible approval sheet.
 
-1. Deny deletion. Verify the target title and ID appear in the prompt, no
+1. Deny deletion. Verify the target title and ID appear in the prompt, the
    Always allow option appears, the call fails, and the target survives a relaunch.
-2. Set the global Action policy to Allow and repeat. The approval sheet must
-   still appear. Change the policy to Allow while the sheet is open and verify
-   it stays pending. Deny and verify the target remains.
+2. Select Always allow and verify the target is deleted. Create another target,
+   repeat the call, and verify deletion proceeds without another approval prompt.
+   Restore the deletion Action policy afterward.
 3. Set the deletion Action policy to Block. Verify deletion fails without a
    prompt and the target remains. Restore its policy.
 4. Approve deletion. Verify the result reports the target ID and `deleted: true`,

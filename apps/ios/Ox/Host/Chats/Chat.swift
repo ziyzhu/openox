@@ -1843,7 +1843,7 @@ final class Chat: Identifiable {
                 options: request.options,
                 kind: .permission,
                 presentation: .application,
-                autoApproval: request.requiresExplicitApproval ? nil : PendingPrompt.AutoApproval(
+                autoApproval: PendingPrompt.AutoApproval(
                     action: request.action,
                     defaultPolicy: defaultPolicy,
                     approve: request.approve,

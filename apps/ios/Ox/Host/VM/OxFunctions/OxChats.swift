@@ -21,7 +21,7 @@ nonisolated enum OxChats {
                     "required": .array([.string("id")]),
                 ]),
             ])), ("ox.chat.delete", .object([
-                "description": .string("Permanently delete another chat in the active Profile: `await ox.chat.delete({ id, purpose })`. Find chat IDs with ox.fs.list at chats/. Always requires user approval, even with Allow policies. Cannot delete the calling chat. Deletes its transcript and context; Profile artifacts remain available."),
+                "description": .string("Permanently delete another chat in the active Profile: `await ox.chat.delete({ id, purpose })`. Find chat IDs with ox.fs.list at chats/. Requires approval unless its Action policy is Allow. Cannot delete the calling chat. Deletes its transcript and context; Profile artifacts remain available."),
                 "inputSchema": .object([
                     "type": .string("object"),
                     "properties": .object(["id": .object(["type": .string("string"), "format": .string("uuid")])]),
