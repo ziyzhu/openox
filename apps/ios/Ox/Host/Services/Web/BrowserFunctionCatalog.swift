@@ -39,9 +39,9 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "navigate",
             label: "Navigate",
-            description: "Navigate Browser to an absolute HTTP or HTTPS URL.",
+            description: "Navigate Browser to an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.",
             inputSchema: object(
-                ["url": string(description: "Absolute HTTP or HTTPS URL.", minimum: 1, maximum: 8_192)],
+                ["url": string(description: "Absolute public HTTPS URL, or loopback HTTP in a simulator.", minimum: 1, maximum: 8_192)],
                 required: ["url"]
             ),
             outputSchema: object(["url": string()], required: ["url"])
@@ -182,7 +182,7 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "waitForUserInteraction",
             label: "Wait for User Interaction",
-            description: "Pause automation and let the user complete a human-only step in Browser after clearing capture and injected scripts.",
+            description: "Pause automation and let the user complete a human-only step only after capture and injected scripts are cleared from Browser.",
             inputSchema: object(
                 ["instructions": string(minimum: 1, maximum: 1_000)],
                 required: ["instructions"]
@@ -212,9 +212,23 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "startCapture",
             label: "Start Network Capture",
-            description: "Start a fresh redacted network capture at document start and reload Browser.",
-            inputSchema: object(),
-            outputSchema: object(["url": nullableString], required: ["url"])
+            description: "Start a fresh redacted network capture in Browser and future documents without delaying page requests.",
+            inputSchema: object([
+                "includeBodies": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Capture bounded request and response bodies. Defaults to false."),
+                ]),
+                "reload": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Reload after installing capture when initial document-load traffic is required. Defaults to false."),
+                ]),
+            ]),
+            outputSchema: object([
+                "active": boolean,
+                "includeBodies": boolean,
+                "reloaded": boolean,
+                "url": nullableString,
+            ], required: ["active", "includeBodies", "reloaded", "url"])
         ),
         Action(
             id: "markCapture",
@@ -232,11 +246,14 @@ nonisolated enum BrowserFunctionCatalog {
             description: "List captured event metadata without request or response bodies.",
             inputSchema: object(),
             outputSchema: object([
+                "active": boolean,
+                "dropped": integer(minimum: 0),
+                "evicted": integer(minimum: 0),
                 "events": .object([
                     "type": .string("array"),
                     "items": .object([:]),
                 ]),
-            ], required: ["events"])
+            ], required: ["active", "dropped", "evicted", "events"])
         ),
         Action(
             id: "readCapturedEvent",
@@ -251,8 +268,13 @@ nonisolated enum BrowserFunctionCatalog {
         Action(
             id: "stopCapture",
             label: "Stop Network Capture",
-            description: "Stop network capture while retaining its current records.",
-            inputSchema: object(),
+            description: "Stop network capture, optionally discarding its current records.",
+            inputSchema: object([
+                "discard": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Discard captured records after stopping. Defaults to false."),
+                ]),
+            ]),
             outputSchema: object(["stopped": boolean], required: ["stopped"])
         ),
     ]

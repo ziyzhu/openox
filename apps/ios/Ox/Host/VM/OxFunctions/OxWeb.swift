@@ -152,7 +152,7 @@ nonisolated enum OxWeb {
             let browser: @convention(block) (String, JSValue) -> JSValue = { action, options in
                 var fields = jsValueToJSON(options)?.objectValue ?? [:]
                 let purpose = fields.removeValue(forKey: "purpose")?.stringValue ?? ""
-                return env.call(suspendingTimeout: action == "waitForUserInteraction") {
+                return env.call(suspendingTimeout: action == "waitForUserInteraction" || action == "waitForNavigation") {
                     try await $0.browserOperation(action: action, arguments: .object(fields), purpose: purpose)
                 }
             }

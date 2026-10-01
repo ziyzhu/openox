@@ -65,9 +65,10 @@ final class NativeServiceOperations {
             guard let rawURL = fields["url"]?.stringValue,
                   let url = URL(string: rawURL),
                   let scheme = url.scheme?.lowercased(),
-                  (scheme == "http" || scheme == "https"),
-                  url.host?.isEmpty == false else {
-                throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute HTTP or HTTPS URL.")
+                  scheme == "http" || scheme == "https",
+                  url.host?.isEmpty == false,
+                  ServiceHandoffSession.allowsNavigation(to: url) else {
+                throw RuntimeError.bridge("ox.web.browser.navigate requires an absolute public HTTPS URL. Simulator builds also allow loopback HTTP.")
             }
             let landed: URL
             do {
@@ -156,8 +157,7 @@ final class NativeServiceOperations {
             ])
         case ("ios:browser", "waitForUserInteraction"):
             let session = serviceManager.browserActionSessions.session(for: browser, ownerID: id)
-            session.stopCapture()
-            _ = try await session.clearScripts()
+            try await session.prepareForUserInteraction()
             showBrowser(browser, id)
             let done = L10n.string("Done")
             let answer = try await chooseUser(
@@ -183,19 +183,26 @@ final class NativeServiceOperations {
                 .clearScripts()
             return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
         case ("ios:browser", "startCapture"):
-            let landed = try await serviceManager.browserActionSessions
+            let capture = try await serviceManager.browserActionSessions
                 .session(for: browser, ownerID: id)
-                .startCapture()
-            return .object(["url": landed.map { .string($0.absoluteString) } ?? .null])
+                .startCapture(
+                    includeBodies: fields["includeBodies"]?.boolValue ?? false,
+                    reload: fields["reload"]?.boolValue ?? false
+                )
+            return .object([
+                "active": .bool(true),
+                "includeBodies": .bool(fields["includeBodies"]?.boolValue ?? false),
+                "reloaded": .bool(capture.reloaded),
+                "url": capture.url.map { .string($0.absoluteString) } ?? .null,
+            ])
         case ("ios:browser", "markCapture"):
             guard let label = fields["label"]?.stringValue else {
                 throw RuntimeError.bridge("ox.web.browser.markCapture requires a label.")
             }
-            serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
-            return .object(["marked": .bool(true)])
+            let marked = serviceManager.browserActionSessions.session(for: browser, ownerID: id).markCapture(label)
+            return .object(["marked": .bool(marked)])
         case ("ios:browser", "listCapturedEvents"):
-            let events = serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents()
-            return .object(["events": .array(events)])
+            return serviceManager.browserActionSessions.session(for: browser, ownerID: id).listCapturedEvents()
         case ("ios:browser", "readCapturedEvent"):
             guard let eventID = fields["id"]?.stringValue,
                   let event = serviceManager.browserActionSessions
@@ -205,8 +212,10 @@ final class NativeServiceOperations {
             }
             return event
         case ("ios:browser", "stopCapture"):
-            serviceManager.browserActionSessions.session(for: browser, ownerID: id).stopCapture()
-            return .object(["stopped": .bool(true)])
+            let stopped = try await serviceManager.browserActionSessions
+                .session(for: browser, ownerID: id)
+                .stopCapture(discard: fields["discard"]?.boolValue ?? false)
+            return .object(["stopped": .bool(stopped)])
         case ("ios:location", "current"):
             return try await currentLocation(purpose: purpose)
         case ("ios:location", "searchNearby"):

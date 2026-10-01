@@ -140,7 +140,7 @@ nonisolated struct ServiceDefinition: Sendable {
         guard manifest.isValid else {
             throw ValidationError.invalid("iOS manifest")
         }
-        let baseURL = manifest.domain == "ios:browser" ? URL(string: "https://www.google.com/")! : nil
+        let baseURL = manifest.domain == "ios:browser" ? URL(string: "about:blank")! : nil
         let resolvedActions = try manifest.actions.map { value in
             guard let action = Manifest.Action(value, serviceBaseURL: baseURL),
                   action.id.range(of: #"^[A-Za-z_][A-Za-z0-9_.-]*$"#, options: .regularExpression) != nil,

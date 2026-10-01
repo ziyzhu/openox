@@ -37,6 +37,7 @@ struct ChatBlock: Identifiable, Equatable {
     let kind: Kind
     let spacingBefore: CGFloat
     var sourceInvocations: [Invocation] = []
+    var isLiveThinking = false
 
     var isUserInitiated: Bool {
         switch kind {
@@ -230,6 +231,7 @@ extension ChatBlock {
             }
             if let lastThinking = turnBlocks.lastIndex(where: \.isThinking) {
                 turnBlocks[lastThinking].sourceInvocations = invocations
+                turnBlocks[lastThinking].isLiveThinking = thinkingActivity?.turnID == turn.id
             }
             guard let sourceBlockID = turn.footerSourceBlockID,
                   let createdAt = turn.footerCreatedAt else { return turnBlocks }
@@ -257,7 +259,8 @@ extension ChatBlock {
                     ChatTranscriptMetrics.blockSpacing,
                     Theme.Size.minimumTouchTarget - ChatTranscriptMetrics.thinkingRowHeight
                 ),
-                sourceInvocations: block.sourceInvocations
+                sourceInvocations: block.sourceInvocations,
+                isLiveThinking: block.isLiveThinking
             )
         }
     }

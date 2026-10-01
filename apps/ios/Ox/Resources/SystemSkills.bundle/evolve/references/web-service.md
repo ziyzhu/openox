@@ -50,11 +50,11 @@ Inspect the selected manifest and relevant available source; Bundled `actions.js
 
 Use the smallest read-only Browser probes that reveal the required behavior; bootstrap execution follows the rules above.
 
-1. Start Browser capture in the target state and add a named mark.
+1. Start Browser capture in the target state without bodies or a reload and add a named mark. Reload only when initial document-load traffic is required. Enable bounded bodies only for a targeted exchange whose structure cannot be established from metadata or a narrow repeatable probe.
 2. Exercise one representative interaction through an inspected Browser action or narrow page JavaScript.
 3. Inspect only relevant exchanges.
 4. Record method, host, path shape, request shape, status, MIME type, response fields, authentication state, and pagination behavior.
-5. Stop capture when the evidence supports the action surface.
+5. Stop capture when the evidence supports the action surface. After inspecting the needed records, discard the capture unless another immediate authoring step still needs it.
 
 Cover applicable success, empty, terminal pagination, safe missing-resource, signed-in, and signed-out cases. Choose the lightest reproducible extraction strategy:
 
@@ -244,7 +244,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 11. Read existing service skills when action IDs or contracts changed and identify guidance that needs revision through `skills/manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
 13. Verify the favicon URL is a direct supported image without redirects, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying first-party or Google-cached icon exists.
-14. Stop capture and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
+14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
 

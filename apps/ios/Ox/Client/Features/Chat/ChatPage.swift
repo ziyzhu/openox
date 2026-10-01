@@ -1238,7 +1238,7 @@ struct ChatPage: View {
             isStreamingTail: chat.isBusy && isTail,
             chatID: chat.id,
             browserPageMount: browserPageMount,
-            isThinkingTail: chat.activity.isThinking && isTail,
+            isThinkingTail: block.isLiveThinking,
             controls: messageControls(
                 sourceBlockID: block.sourceBlockID,
                 editableBlock: editableBlock(block)
