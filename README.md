@@ -49,9 +49,10 @@ for Host connections, offline commands, and package-manager alternatives.
 
 ## Development setup
 
-For a new checkout, follow the [OpenOx onboarding skill](.agents/skills/openox-onboarding/SKILL.md).
-It covers local dependencies, iOS signing, bundled services, and a verified
-simulator launch. Local repository loading can be tested separately.
+For a new checkout, follow the [onboarding skill](.agents/skills/onboarding/SKILL.md).
+It covers CLI and skill dependencies, Pi setup, simulator provisioning, iOS
+signing, App Store authentication, bundled services, and a verified first launch.
+Local repository loading can be tested separately.
 
 ## Architecture
 

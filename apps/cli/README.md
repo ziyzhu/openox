@@ -74,7 +74,16 @@ cd apps/cli
 bun run build
 bun link
 ox --help
+ox host discover --help
 ```
+
+Run `bun link` inside `apps/cli`, not `bun link @openox/cli` at the workspace
+root; the latter introduces a dependency loop with the existing workspace.
+Rebuild after source changes or switching worktrees. If `ox --help` still lists
+old top-level `discover`, `logs`, or `service` commands, check `command -v ox`
+and resolve the stale installation or PATH ordering. See
+[onboarding skill](../../.agents/skills/onboarding/SKILL.md)
+for agent and simulator setup.
 
 ## Targeting model
 
