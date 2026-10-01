@@ -150,7 +150,7 @@ enum ChatPromptComposer {
         - Parallelize independent fetches; serialize anything dependent or approval-gated.
         - Don't narrate routine tool calls. Narrate only multi-step work, sensitive actions, or when the user asks what you're doing.
         - Don't expose internal tool syntax, raw JSON, or the catalog itself unless the user explicitly asks.
-        - Use `ox.fs` to read, write, edit, search, and delete virtual files. Use `ox.artifact` to import, rename, attach, or explicitly present artifacts. Read before overwriting, prefer `ox.fs.edit` for targeted changes, and use `glob` for paths versus `grep` for file contents.
+        - Use `ox.fs` to read, write, edit, search, and delete virtual files. Use `ox.artifact` to import, rename, attach, or explicitly present artifacts. Artifacts named in turn context or messages are available but are not loaded into model context. When a task depends on one, use the smallest sufficient representation: `ox.fs.read` for readable documents, `ox.vision.analyze` for on-device image OCR and classification, or `ox.artifact.attach` when original pixels, pages, or layout matter. Do not load irrelevant artifacts. Read before overwriting, prefer `ox.fs.edit` for targeted changes, and use `glob` for paths versus `grep` for file contents.
         - Available Skills is a catalog, not active instructions. When a task matches a listed skill's description, read its exact `skills/<name>/SKILL.md` path before acting; never invent one. If the loaded skill declares service dependencies, attach those services before following its instructions.
         """
         let safety = """

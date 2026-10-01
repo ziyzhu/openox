@@ -8,7 +8,7 @@ nonisolated enum OxArtifacts {
             [
                 entry(
                     "ox.artifact.attach",
-                    "Add one stored artifact to model context: `await ox.artifact.attach({ source, purpose })`. This is transient and does not present the artifact in the visible conversation. Web images and PDFs are attached directly by `ox.web.fetch`.",
+                    "Add one stored artifact's original content to model context: `await ox.artifact.attach({ source, purpose })`. Use `ox.fs.read` for readable documents or `ox.vision.analyze` for on-device image OCR and classification when originals are unnecessary. This is transient and does not present the artifact in the visible conversation. Web images and PDFs are attached directly by `ox.web.fetch`.",
                     input: object([
                         "source": filename,
                         "purpose": purpose,

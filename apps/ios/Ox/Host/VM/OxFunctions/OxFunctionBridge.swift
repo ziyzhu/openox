@@ -24,6 +24,7 @@ public protocol OxFunctionBridge: AnyObject {
     func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func attachArtifact(filename: String, purpose: String) async throws -> JSONValue?
+    func analyzeVision(filename: String, purpose: String) async throws -> JSONValue?
     func listFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue?

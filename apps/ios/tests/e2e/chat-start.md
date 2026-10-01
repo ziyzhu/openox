@@ -9,6 +9,7 @@ and restore those settings afterward. Keep captures outside the repository.
    with Mock prompt `2`. In the same VM execution, read the child's `chat.json`
    and `turns.jsonl` and list its directory. They must exist immediately, retain
    the supplied title, use the default model, and contain only the child's prompt.
+   Each listed file size must equal the byte length of its complete read result.
    The selected chat must remain the parent.
 2. Read the transcript while the child runs and after completion. Verify the
    agent outcome changes from `running` to `completed`. Check `ox.fs.list`,

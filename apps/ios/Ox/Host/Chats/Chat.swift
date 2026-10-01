@@ -2947,7 +2947,11 @@ final class Chat: Identifiable {
                     serviceManager: serviceManager,
                     chatID: chatID
                 )
-                return await ModelAdapterPipeline.transform(messages: messages, model: request.model)
+                return await ModelAdapterPipeline.transform(
+                    messages: messages,
+                    model: request.model,
+                    loadsArtifactsLazily: client.supportsTools(for: request.model)
+                )
             }
         )
     }

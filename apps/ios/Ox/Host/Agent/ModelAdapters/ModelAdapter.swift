@@ -12,9 +12,10 @@ nonisolated protocol ModelAdapter: Sendable {
 }
 
 nonisolated enum ModelAdapterPipeline {
-    private static let adapters: [any ModelAdapter] = [ToolExchangeAdapter(), VisionImageAdapter()]
-
-    static func transform(messages: [Message], model: ProviderModel) async -> [Message] {
+    static func transform(messages: [Message], model: ProviderModel, loadsArtifactsLazily: Bool) async -> [Message] {
+        var adapters: [any ModelAdapter] = [ToolExchangeAdapter()]
+        if loadsArtifactsLazily { adapters.append(ArtifactReferenceAdapter()) }
+        adapters.append(VisionImageAdapter())
         var transformed = messages
         for adapter in adapters {
             switch await adapter.transform(messages: transformed, model: model) {

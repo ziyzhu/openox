@@ -83,10 +83,14 @@ extension Chat {
                     fileSystemItem(path: "chats/\(ChatID($0.id))", type: "directory", size: nil)
                 }
             case .chat(let id):
-                _ = try await virtualChatMetadata(id)
+                let sizes = try await repository.virtualChatFileSizes(
+                    id,
+                    in: scope,
+                    snapshot: chatManager?.readableChatState(id, in: scope)
+                )
                 items = [
-                    fileSystemItem(path: "chats/\(id)/chat.json", type: "file", size: nil),
-                    fileSystemItem(path: "chats/\(id)/turns.jsonl", type: "file", size: nil),
+                    fileSystemItem(path: "chats/\(id)/chat.json", type: "file", size: sizes.metadata),
+                    fileSystemItem(path: "chats/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
                 ]
             case .files:
                 items = DeviceFolderStore.shared.grants.map {

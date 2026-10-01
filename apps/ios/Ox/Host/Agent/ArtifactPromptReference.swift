@@ -9,8 +9,8 @@ nonisolated enum ArtifactPromptReference {
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
-            return "Attached artifact: artifacts/\(artifact.fileName)"
+            return "Available artifact: artifacts/\(artifact.fileName)"
         }
-        return "Attached artifact: \(json)"
+        return "Available artifact: \(json)"
     }
 }

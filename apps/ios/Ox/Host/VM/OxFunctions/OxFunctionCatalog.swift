@@ -15,6 +15,7 @@ nonisolated enum OxFunctionCatalog {
         ("skill", "Create, customize, share, delete, and run skill helpers."),
         ("schedule", "Create, inspect, pause, resume, run, and delete scheduled skill invocations."),
         ("artifact", "Attach content, import files, rename artifacts, and show existing artifacts."),
+        ("vision", "Analyze stored images on device without attaching their pixels."),
         ("widget", "Display structured content in the conversation."),
     ]
 
@@ -33,6 +34,7 @@ nonisolated enum OxFunctionCatalog {
         OxSkills.function,
         OxSchedules.function,
         OxArtifacts.function,
+        OxVision.function,
         OxWidgets.function,
     ]
 

@@ -161,7 +161,10 @@ nonisolated enum OxFileSystem {
         "path": path("Full virtual path."),
         "name": string("Final path component."),
         "type": .object(["type": .string("string"), "enum": .array([.string("file"), .string("directory")])]),
-        "size": .object(["type": .array([.string("integer"), .string("null")])]),
+        "size": .object([
+            "type": .array([.string("integer"), .string("null")]),
+            "description": .string("File size in bytes, or null for a directory."),
+        ]),
     ]
 
     private static let item = object(itemProperties, required: ["path", "name", "type", "size"])

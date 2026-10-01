@@ -373,6 +373,25 @@ actor ProfileRepository {
         try virtualChatData(id, in: scope, file: .transcript, snapshot: snapshot)
     }
 
+    func virtualChatFileSizes(
+        _ id: ChatID,
+        in scope: ProfileScope,
+        snapshot: ChatState? = nil
+    ) throws -> (metadata: Int, transcript: Int) {
+        try requireProfile(in: scope)
+        guard deleted[scope]?.contains(id) != true else { throw ProfileRepositoryError.missingChat(id) }
+        if let snapshot, snapshot.meta.id == id.rawValue {
+            try validate(snapshot.meta)
+            return (try encoder().encode(snapshot.meta).count, try blob(snapshot.turns[...]).count)
+        }
+        _ = try canonicalMetadata(in: chatURL(id, in: scope), scope: scope)
+        let transcript = turnsURL(id, in: scope)
+        return (
+            try virtualChatFileSize(metaURL(id, in: scope), chatID: id),
+            try virtualChatFileSize(transcript, chatID: id)
+        )
+    }
+
     func loadChat(_ id: ChatID, in scope: ProfileScope) -> ChatLoadResult? {
         guard deleted[scope]?.contains(id) != true else { return nil }
         do {
@@ -837,6 +856,14 @@ actor ProfileRepository {
             output.append(try encoder.encode(turn))
             output.append(Self.newline)
         }
+    }
+
+    private func virtualChatFileSize(_ url: URL, chatID: ChatID) throws -> Int {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true, let size = values.fileSize else {
+            throw ProfileRepositoryError.missingChat(chatID)
+        }
+        return size
     }
 
     private func fileSize(_ url: URL) -> UInt64 {
