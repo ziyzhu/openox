@@ -16,3 +16,9 @@ persisted state, and Host integration. The root `evals/` suite measures real-mod
 Agent loop and fixture-backed tools. Run it with `bun run evals`. LLM-related prompt cases belong here when the
 behavior under test is the app experience, such as provider setup,
 authentication, model switching, or persistence across relaunch.
+
+Executable live Host RPC checks remain in `tooling/tests/`. Reserve a numbered
+QA simulator and set `OX_RPC_TEST_ENDPOINT` to its running Host endpoint, then run
+`bun run test:e2e`. Without an endpoint these checks skip; they do not use mock
+Hosts. The VPN-ingress check additionally needs `OX_RPC_DENIED_ENDPOINTS`, and the
+lifecycle check needs `OX_RPC_LIFECYCLE_DEVICE` set to the owned simulator.

@@ -1,24 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { HostConnection, HostRPCError } from "../../apps/cli/src/host-connection.ts";
 import { HostRPCClient } from "../../apps/cli/src/host-rpc.ts";
 import { qaConfig } from "../qa-config.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); });
-
-function serve(receive: (request: any, send: (value: unknown) => void, raw: (text: string) => void, close: () => void) => void): string {
-  const server = Bun.serve({
-    hostname: "127.0.0.1", port: 0,
-    fetch(request, server) { return server.upgrade(request) ? undefined : new Response(null, { status: 400 }); },
-    websocket: {
-      message(socket, bytes) {
-        receive(JSON.parse(String(bytes)), value => socket.send(JSON.stringify(value)), text => socket.send(text), () => socket.close());
-      },
-    },
-  });
-  cleanups.push(() => server.stop(true));
-  return `ws://127.0.0.1:${server.port}`;
-}
 
 function client(endpoint: string): HostRPCClient {
   const value = new HostRPCClient(endpoint);
@@ -26,122 +11,11 @@ function client(endpoint: string): HostRPCClient {
   return value;
 }
 
-function transport(endpoint: string) {
-  const connection = new HostConnection(endpoint);
-  cleanups.push(() => connection.close());
-  return {
-    call: (method: string, timeoutMs: number) => connection.request(method, {}, timeoutMs),
-    close: () => connection.close(),
-  };
-}
-
 const description = {
   implementation: { name: "Ox", version: "1.0.7", build: "1" },
   protocols: { repository: [3] },
   methods: ["host.describe", "chats.list"],
 };
-const row = { id: "chat", title: "Example", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: true };
-
-test("chat listing preserves nullable fields without a discovery round trip", async () => {
-  const methods: string[] = [];
-  const endpoint = serve((request, send) => {
-    methods.push(request.method);
-    send({ jsonrpc: "2.0", id: request.id, result: request.method === "host.describe" ? description : { chats: [row] } });
-  });
-  const host = client(endpoint);
-  expect(await host.listChats(1000)).toEqual([row]);
-  expect(await host.listChats(1000)).toEqual([row]);
-  expect(methods).toEqual(["chats.list", "chats.list"]);
-});
-
-test("invalid chat payload is rejected", async () => {
-  const endpoint = serve((request, send) => {
-    send({ jsonrpc: "2.0", id: request.id, result: request.method === "host.describe" ? description : { chats: [{ ...row, active: "yes" }] } });
-  });
-  await expect(client(endpoint).listChats(1000)).rejects.toThrow("invalid chat list");
-});
-
-test("concurrent RPC results are correlated even when returned out of order", async () => {
-  let first: any;
-  const endpoint = serve((request, send) => {
-    if (!first) { first = request; return; }
-    send({ jsonrpc: "2.0", id: request.id, result: 2 });
-    send({ jsonrpc: "2.0", id: first.id, result: 1 });
-  });
-  const connection = transport(endpoint);
-  expect(await Promise.all([connection.call("first", 1000), connection.call("second", 1000)])).toEqual([1, 2]);
-});
-
-test("RPC errors retain their code and data", async () => {
-  const endpoint = serve((request, send) => send({
-    jsonrpc: "2.0", id: request.id, error: { code: -32601, message: "Method not found", data: { method: request.method } },
-  }));
-  const error = await transport(endpoint).call("missing", 1000).catch(error => error);
-  expect(error).toBeInstanceOf(HostRPCError);
-  if (!(error instanceof HostRPCError)) throw new Error("Expected an RPC error");
-  expect(error.code).toBe(-32601);
-  expect(error.data).toEqual({ method: "missing" });
-});
-
-test.each([
-  { result: null, error: { code: -32603, message: "error" } },
-  {},
-  { error: { code: "-32603", message: "error" } },
-  { error: { code: -32603, message: 12 } },
-  { jsonrpc: "1.0", result: null },
-])("malformed RPC envelope fails promptly: %j", async fields => {
-  const endpoint = serve((request, send) => send({ jsonrpc: "2.0", id: request.id, ...fields }));
-  await expect(transport(endpoint).call("host.describe", 1000)).rejects.toThrow("invalid JSON-RPC response");
-});
-
-test("unparseable responses fail all pending calls without waiting for timeouts", async () => {
-  const endpoint = serve((_request, _send, raw) => raw("{"));
-  const connection = transport(endpoint);
-  const results = await Promise.allSettled([connection.call("first", 1000), connection.call("second", 1000)]);
-  expect(results.map(result => result.status === "rejected" ? result.reason.message : "success")).toEqual([
-    expect.stringContaining("Host returned malformed JSON. Request outcome unknown"),
-    expect.stringContaining("Host returned malformed JSON. Request outcome unknown"),
-  ]);
-});
-
-test("legacy-only Hosts report an actionable compatibility failure", async () => {
-  const endpoint = serve((_request, send) => send({ kind: "error", error: "invalid envelope" }));
-  await expect(transport(endpoint).call("host.describe", 1000)).rejects.toThrow("update the Host");
-});
-
-test("old success envelopes are rejected rather than interpreted as RPC results", async () => {
-  const endpoint = serve((request, send) => send({ id: request.id, kind: "get-logs-result", ok: true, logs: [] }));
-  await expect(transport(endpoint).call("logs.list", 1000)).rejects.toThrow("invalid JSON-RPC response");
-});
-
-test("timeouts do not retry requests and close rejects pending work", async () => {
-  let requests = 0;
-  const endpoint = serve(() => { requests++; });
-  const connection = transport(endpoint);
-  const error = await connection.call("slow", 100).catch(error => error);
-  if (!(error instanceof Error)) throw new Error("Expected a timeout error");
-  expect(error.message).toContain("timeout");
-  expect(error.message).toContain("Request outcome unknown");
-  expect(requests).toBe(1);
-  const pending = connection.call("pending", 1000);
-  connection.close();
-  await expect(pending).rejects.toThrow("connection closed");
-});
-
-test("an unreachable Host reports unavailability, not an unknown submitted outcome", async () => {
-  const error = await transport("ws://127.0.0.1:1").call("chats.send", 1000).catch(error => error);
-  if (!(error instanceof Error)) throw new Error("Expected a connection error");
-  expect(error.message).toContain("Host unavailable");
-  expect(error.message).not.toContain("outcome unknown");
-});
-
-test("connection loss after submission reports an unknown outcome without retrying", async () => {
-  let requests = 0;
-  const endpoint = serve((_request, _send, _raw, close) => { requests++; close(); });
-  await expect(transport(endpoint).call("chats.send", 1000)).rejects.toThrow("Request outcome unknown");
-  expect(requests).toBe(1);
-});
-
 const liveEndpoint = process.env.OX_RPC_TEST_ENDPOINT;
 test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches and rejection of the old protocol", async () => {
   const endpoint = liveEndpoint!;

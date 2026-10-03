@@ -14,7 +14,7 @@
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
-1. Prefer E2E tests instead of unit tests.
+1. Do not add unit tests; prefer E2E tests.
 1. Use `sim` and `ox` CLI for testing.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 1. Show screenshots after making UI changes for human to review.

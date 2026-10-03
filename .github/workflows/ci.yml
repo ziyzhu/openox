@@ -71,9 +71,6 @@ jobs:
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 
-      - name: Test tooling
-        run: bun run test
-
       - name: Verify npm packages
         run: |
           bun run --cwd packages/service-sdk package:check

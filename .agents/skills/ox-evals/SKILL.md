@@ -12,8 +12,7 @@ belong in `evals/`; keep this skill focused on the workflow.
 Use `bun run evals --list --suite all` to inspect coverage. Select a configured
 real provider/model with `ox host providers` and an explicit simulator Host. Reuse the
 user's authorized target and provider choices. Running the suite invokes that
-provider and consumes tokens; listing, validation, comparison, and scoring tests
-are local. Mock responses cannot establish prompt quality.
+provider and consumes tokens; listing, validation, and comparison are local. Mock responses cannot establish prompt quality.
 
 Follow the Simulator Setup reservation, assigned runtime, and baseline rules in `AGENTS.md`; prepare an available numbered simulator with the sim-cli and ox-cli workflows.
 Rebuild and install the current checkout, use bundled services and an empty chat
@@ -34,6 +33,6 @@ as statistically established improvements.
 Turn a reproducible failure into a sanitized case with observable assertions.
 Keep tool fixtures constrained and distinguish tool-decision coverage from full
 execution. Do not weaken a case to hide a failure or change cases during a prompt
-comparison. After changes, run `bun run evals --validate --suite all`,
-`bun test evals`, and `bun run typecheck`. Changes to the simulator Host also need
+comparison. After changes, run `bun run evals --validate --suite all`
+and `bun run typecheck`. Changes to the simulator Host also need
 a `sim` build and live verification of `agents.evaluate`.

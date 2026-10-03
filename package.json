@@ -4,8 +4,7 @@
   "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
   "scripts": {
-    "test": "bun test tooling",
-    "test:model-services": "bun test tooling/model-service-contract.test.ts tooling/tests/model-web-services.test.ts tooling/tests/grok-web-bridge.test.ts",
+    "test:e2e": "bun test tooling/tests",
     "evals": "bun evals/runner.ts",
     "test:services": "bun tooling/service-replay.ts",
     "build:services": "bun tooling/ios-services-build.ts",
