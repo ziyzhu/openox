@@ -519,7 +519,9 @@ The iOS service page pool uses one persistent app-wide `WKWebsiteDataStore`.
 WebKit's same-origin policy separates origin storage, while cookies follow
 normal browser domain rules. Signing out enumerates WebKit records and cookies,
 then removes only entries mapped to that website's Public Suffix List-aware
-registrable domain. Interactive sign-in and throwaway browsing use separate
+registrable domain. The list is shipped in `PublicSuffixList.bundle` and looked
+up by `WebsitePublicSuffixList`; see [bundled PSL maintenance](../../../../docs/public-suffix-list.md).
+Interactive sign-in and throwaway browsing use separate
 pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.
 

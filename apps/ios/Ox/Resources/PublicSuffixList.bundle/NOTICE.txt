@@ -1,0 +1,10 @@
+Public Suffix List
+https://publicsuffix.org/
+
+Source: https://github.com/publicsuffix/list/blob/e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20/public_suffix_list.dat
+Snapshot: e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20
+
+The unmodified source list contains both ICANN and PRIVATE rules and is
+licensed under the Mozilla Public License 2.0; see LICENSE.txt.
+This snapshot has the same 10,239 rules as swift-psl 1.1.161.
+The Swift lookup implementation is OpenOx code, not vendored swift-psl code.
