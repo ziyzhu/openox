@@ -1,0 +1,60 @@
+{
+  "params": [
+    { "method": "host.describe", "params": {}, "valid": true },
+    { "method": "host.describe", "params": [], "valid": true },
+    { "method": "host.describe", "params": { "extra": true }, "valid": false },
+    { "method": "host.describe", "params": null, "valid": false },
+    { "method": "chats.new", "params": {}, "valid": true },
+    { "method": "chats.new", "params": { "temporary": null, "providerId": null, "modelId": null }, "valid": true },
+    { "method": "chats.new", "params": { "temporary": "yes" }, "valid": false },
+    { "method": "chats.get", "params": { "sessionId": null, "extra": true }, "valid": true },
+    { "method": "chats.get", "params": { "sessionId": 42 }, "valid": false },
+    { "method": "chats.send", "params": { "text": "hello", "wait": false }, "valid": true },
+    { "method": "chats.send", "params": { "text": "", "wait": null, "extra": true }, "valid": true },
+    { "method": "chats.send", "params": {}, "valid": false },
+    { "method": "chats.send", "params": { "text": 42 }, "valid": false },
+    { "method": "services.invoke", "params": { "domain": "example", "action": "read", "args": null, "approve": null }, "valid": true },
+    { "method": "services.invoke", "params": { "domain": "example" }, "valid": false },
+    { "method": "vm.call", "params": { "function": "example", "arguments": null }, "valid": true },
+    { "method": "vm.call", "params": { "function": "example" }, "valid": false },
+    { "method": "debug.providers.setKey", "params": { "providerId": "example", "region": "global" }, "valid": true },
+    { "method": "debug.providers.setKey", "params": { "providerId": "example", "region": "other" }, "valid": false },
+    { "method": "debug.artifacts.write", "params": { "name": "example.txt", "data": "aGVsbG8=" }, "valid": true },
+    { "method": "debug.artifacts.write", "params": { "name": "example.txt", "data": 42 }, "valid": false },
+    { "method": "debug.storage.replayMigration", "params": { "turns": [], "fixtures": [] }, "valid": true },
+    { "method": "agents.evaluate", "params": { "sessionId": "chat", "providerId": "example", "modelId": "example", "prompts": [], "fixtures": [], "maxTurns": 1, "timeoutMs": 1000 }, "valid": true },
+    { "method": "agents.evaluate", "params": { "sessionId": "chat", "providerId": "example", "modelId": "example", "prompts": [], "fixtures": [], "maxTurns": 1.5, "timeoutMs": 1000 }, "valid": false }
+  ],
+  "results": [
+    { "method": "host.describe", "result": { "implementation": { "name": "Example", "version": "1", "build": "1" }, "protocols": { "rpc": [1] }, "methods": [] }, "valid": true },
+    { "method": "host.describe", "result": { "methods": [] }, "valid": false },
+    { "method": "chats.list", "result": { "chats": [] }, "valid": true },
+    { "method": "chats.list", "result": { "chats": [ { "id": "chat", "title": "Example", "model": null, "createdAt": "date", "lastActivity": null, "active": true } ] }, "valid": true },
+    { "method": "chats.list", "result": { "chats": [ { "id": "chat", "title": "Example", "model": null, "createdAt": "date", "lastActivity": null, "active": "yes" } ] }, "valid": false },
+    { "method": "chats.get", "result": {}, "valid": true },
+    { "method": "chats.get", "result": { "data": null }, "valid": false },
+    { "method": "chats.send", "result": { "chatId": "chat", "outcome": "queued" }, "valid": true },
+    { "method": "chats.send", "result": { "chatId": 42, "outcome": "queued" }, "valid": false },
+    { "method": "services.invoke", "result": { "value": null }, "valid": true },
+    { "method": "services.invoke", "result": {}, "valid": false },
+    { "method": "debug.websiteData.restore", "result": { "bytes": 10 }, "valid": true },
+    { "method": "vm.eval", "result": { "value": null, "logs": [] }, "valid": true }
+  ],
+  "requests": [
+    { "value": { "jsonrpc": "2.0", "id": "1", "method": "host.describe", "params": {} }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": null, "method": "host.describe" }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": 1.5, "method": "host.describe" }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "method": "host.describe", "params": [] }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": true, "method": "host.describe" }, "valid": false },
+    { "value": { "jsonrpc": "2.0", "method": "host.describe", "params": [1] }, "valid": false },
+    { "value": { "jsonrpc": "1.0", "method": "host.describe" }, "valid": false }
+  ],
+  "responses": [
+    { "value": { "jsonrpc": "2.0", "id": "1", "result": null }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": null, "error": { "code": -32600, "message": "Invalid Request" } }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": "1", "error": { "code": -32000, "message": "Failed", "data": { "reason": "example" } } }, "valid": true },
+    { "value": { "jsonrpc": "2.0", "id": "1" }, "valid": false },
+    { "value": { "jsonrpc": "2.0", "id": "1", "result": null, "error": { "code": -32000, "message": "Failed" } }, "valid": false },
+    { "value": { "jsonrpc": "2.0", "id": "1", "error": { "code": "-32000", "message": "Failed" } }, "valid": false }
+  ]
+}

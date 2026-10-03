@@ -27,7 +27,6 @@ test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches an
   expect((await host.call("providers.list", 5000)).providers).toBeArray();
   expect((await host.call("logs.list", 5000)).logs).toBeArray();
   expect((await host.call("services.list", 30000)).services).toBeArray();
-  await expect(host.call("debug.providers.setKey", 5000)).rejects.toMatchObject({ code: -32602 });
   await expect(host.call("vm.functions", 5000, { function: "ox.missing" })).rejects.toMatchObject({ code: -32000 });
   await expect(host.call("chats.send", 5000, { text: "" })).rejects.toMatchObject({ code: -32000 });
   await expect(host.call("chats.new", 5000, { providerId: "missing" })).rejects.toMatchObject({ code: -32000 });
@@ -47,6 +46,7 @@ test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches an
   }))))).error.code).toBe(-32600);
   expect((await exchange(JSON.stringify({ jsonrpc: "2.0", method: "missing", id: 7 }))).error.code).toBe(-32601);
   expect((await exchange(JSON.stringify({ jsonrpc: "2.0", method: "chats.list", params: { extra: true }, id: "params" }))).error.code).toBe(-32602);
+  expect((await exchange(JSON.stringify({ jsonrpc: "2.0", method: "debug.providers.setKey", params: {}, id: "key-params" }))).error.code).toBe(-32602);
   expect((await exchange(JSON.stringify({ jsonrpc: "2.0", method: "chats.list", id: true }))).id).toBeNull();
   const responses = await exchange(JSON.stringify([
     { jsonrpc: "2.0", method: "host.describe" },
@@ -59,7 +59,7 @@ test.skipIf(!liveEndpoint)("live Host methods, errors, notifications, batches an
   expect(responses[0].id).toBe(12);
   expect(responses[0].result.chats).toEqual(chats);
   expect(responses[1].id).toBeNull();
-  expect(responses[1].result.protocols).toEqual(description.protocols);
+  expect(responses[1].result.protocols).toMatchObject(description.protocols);
   expect(responses[2].error.code).toBe(-32600);
   for (let i = 0; i < 20; i++) socket.send(JSON.stringify({ jsonrpc: "2.0", method: "host.describe" }));
   socket.send(JSON.stringify([{ jsonrpc: "2.0", method: "host.describe" }]));

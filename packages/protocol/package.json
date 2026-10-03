@@ -1,0 +1,17 @@
+{
+  "name": "@openox/protocol",
+  "version": "0.1.0",
+  "description": "Shared OpenOx Host JSON-RPC contract, schemas, and validation",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": ["src", "schema.json", "methods.json", "fixtures.json", "README.md"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema.json": "./schema.json",
+    "./methods.json": "./methods.json",
+    "./fixtures.json": "./fixtures.json"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49"
+  }
+}

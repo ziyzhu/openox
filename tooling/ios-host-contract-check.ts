@@ -74,6 +74,7 @@ export async function check(): Promise<string> {
     "apps/ios/Ox/Host/OxHostRPC.swift",
     "apps/ios/Ox/Host/OxHostProtocol.swift",
     "apps/ios/Ox/Host/OxHostProtocolMessages.swift",
+    "apps/ios/Ox/Host/RPC/HostRPCRequests.swift",
     "apps/ios/Ox/Host/Profile/StorageRoot.swift",
     "apps/ios/Ox/Host/Services/ServiceDebug.swift",
     "apps/ios/Ox/Host/Profile/ProfileRepositorySaveGate.swift",

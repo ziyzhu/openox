@@ -1,25 +1,7 @@
-import { Type, type Static } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { validateParams, validateResult, type HostDescription, type HostChatRow } from "@openox/protocol";
 import { HostConnection, isObject } from "./host-connection.ts";
 
-const HostDescriptionSchema = Type.Object({
-  implementation: Type.Object({ name: Type.String(), version: Type.String(), build: Type.String() }),
-  protocols: Type.Record(Type.String(), Type.Array(Type.Integer({ minimum: 1 }))),
-  methods: Type.Array(Type.String()),
-});
-
-const ChatRowSchema = Type.Object({
-  id: Type.String(),
-  title: Type.String(),
-  model: Type.Union([Type.String(), Type.Null()]),
-  createdAt: Type.String(),
-  lastActivity: Type.Union([Type.String(), Type.Null()]),
-  active: Type.Boolean(),
-});
-
-const ChatListSchema = Type.Object({ chats: Type.Array(ChatRowSchema) });
-export type HostDescription = Static<typeof HostDescriptionSchema>;
-export type HostChatRow = Static<typeof ChatRowSchema>;
+export type { HostDescription, HostChatRow } from "@openox/protocol";
 
 export class HostRPCClient {
   private readonly connection: HostConnection;
@@ -29,22 +11,21 @@ export class HostRPCClient {
   }
 
   async call(method: string, timeoutMs: number, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-    if (method === "host.describe") return this.describe(timeoutMs);
+    if (!validateParams(method, params)) throw new Error(`Invalid ${method} parameters; request not sent`);
     const result = await this.connection.request(method, params, timeoutMs);
-    if (!isObject(result)) throw new Error(`Host returned an invalid ${method} result`);
+    if (!isObject(result) || !validateResult(method, result)) {
+      const label = method === "chats.list" ? "chat list" : `${method} result`;
+      throw new Error(`Host returned an invalid ${label}; request was sent, inspect Host state before retrying. This request was not automatically resent.`);
+    }
     return result;
   }
 
   async describe(timeoutMs: number): Promise<HostDescription> {
-    const result = await this.connection.request("host.describe", {}, timeoutMs);
-    if (!Value.Check(HostDescriptionSchema, result)) throw new Error("Host returned an invalid description");
-    return result;
+    return await this.call("host.describe", timeoutMs) as HostDescription;
   }
 
   async listChats(timeoutMs: number): Promise<HostChatRow[]> {
-    const result = await this.call("chats.list", timeoutMs);
-    if (!Value.Check(ChatListSchema, result)) throw new Error("Host returned an invalid chat list");
-    return result.chats;
+    return (await this.call("chats.list", timeoutMs)).chats as HostChatRow[];
   }
 
   close(): void { this.connection.close(); }

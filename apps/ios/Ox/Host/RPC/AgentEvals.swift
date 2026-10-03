@@ -1,16 +1,6 @@
 import Foundation
 
 extension OxHostProtocol {
-    struct EvaluateAgentRequest: Decodable {
-        let sessionId: String
-        let providerId: String
-        let modelId: String
-        let prompts: [String]
-        let fixtures: [AgentEvalFixture]
-        let maxTurns: Int
-        let timeoutMs: Int
-    }
-
     struct EvalToolSchema: Encodable {
         let name: String
         let description: String
@@ -88,14 +78,6 @@ extension OxHostProtocol {
                                               temperature: snapshot.streamOptions.temperature, maxTokens: snapshot.streamOptions.maxTokens, totalMs: elapsed, errors: errors, executionError: await state.executionError))
         }
     }
-}
-
-nonisolated struct AgentEvalFixture: Decodable, Sendable {
-    let tool: String
-    let sourceIncludes: [String]
-    let text: String
-    let isError: Bool
-    let terminate: Bool
 }
 
 private actor AgentEvalState {

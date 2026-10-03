@@ -2,7 +2,7 @@
   "private": true,
   "author": "Ziyuan Zhu",
   "license": "Apache-2.0",
-  "workspaces": ["apps/cli", "packages/service-sdk", "packages/services"],
+  "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services"],
   "scripts": {
     "test:e2e": "bun test tooling/tests",
     "evals": "bun evals/runner.ts",
@@ -16,6 +16,8 @@
     "update:llms": "bun tooling/provider-models.ts",
     "build:provider-schema": "bun tooling/provider-definitions.ts",
     "check:public-boundary": "bun tooling/public-boundary-check.ts",
+    "build:host-schema": "bun tooling/host-rpc-contract.ts --write",
+    "check:host-schema": "bun tooling/host-rpc-contract.ts",
     "typecheck": "bun tooling/typecheck.ts"
   },
   "dependencies": {

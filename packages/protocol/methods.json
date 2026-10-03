@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "methods": {
+    "host.describe": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/HostDescription"
+      }
+    },
+    "services.invoke": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ActionRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ValueResult"
+      }
+    },
+    "services.evaluate": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EvaluateRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ValueResult"
+      }
+    },
+    "services.reload": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ServiceRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ValueResult"
+      }
+    },
+    "services.refreshAuth": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ServiceRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ValueResult"
+      }
+    },
+    "services.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListServicesResult"
+      }
+    },
+    "services.sync": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/SyncServicesResult"
+      }
+    },
+    "chats.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListChatsResult"
+      }
+    },
+    "chats.get": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SessionRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/GetChatResult"
+      }
+    },
+    "chats.new": {
+      "params": {
+        "$ref": "./schema.json#/definitions/NewChatRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/NewChatResult"
+      }
+    },
+    "chats.send": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SendChatRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/SendChatResult"
+      }
+    },
+    "chats.stop": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SessionRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/StopChatResult"
+      }
+    },
+    "providers.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListProvidersResult"
+      }
+    },
+    "logs.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/GetLogsResult"
+      }
+    },
+    "debug.composer.formatting": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ComposerFormattingResult"
+      }
+    },
+    "debug.repositories.saveGate": {
+      "params": {
+        "$ref": "./schema.json#/definitions/RepositoryGateRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/RepositorySaveGateResult"
+      }
+    },
+    "debug.storage.replayMigration": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ReplayStorageMigrationRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/StorageMigrationReplayResult"
+      }
+    },
+    "agents.evaluate": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EvaluateAgentRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EvaluateAgentResult"
+      }
+    },
+    "vm.inspect": {
+      "params": {
+        "$ref": "./schema.json#/definitions/VMRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/VMControlResult"
+      }
+    },
+    "vm.functions": {
+      "params": {
+        "$ref": "./schema.json#/definitions/VMFunctionsRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/VMControlResult"
+      }
+    },
+    "vm.call": {
+      "params": {
+        "$ref": "./schema.json#/definitions/VMCallRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/VMControlResult"
+      }
+    },
+    "vm.eval": {
+      "params": {
+        "$ref": "./schema.json#/definitions/VMEvalRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/VMControlResult"
+      }
+    },
+    "debug.artifacts.bootstrap": {
+      "params": {
+        "$ref": "./schema.json#/definitions/BootstrapArtifactsRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/BootstrapArtifactsResult"
+      }
+    },
+    "debug.artifacts.write": {
+      "params": {
+        "$ref": "./schema.json#/definitions/WriteArtifactRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.websiteData.export": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/WebsiteDataResult"
+      }
+    },
+    "debug.websiteData.restore": {
+      "params": {
+        "$ref": "./schema.json#/definitions/RestoreWebsiteDataRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/WebsiteDataResult"
+      }
+    },
+    "debug.providers.setKey": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SetKeyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.region.set": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SetRegionRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.chats.attachServices": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SetAttachedServiceRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.composer.setDraft": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PromptRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.composer.setMarkedText": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PromptRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.pasteboard.setImage": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.pasteboard.setRichText": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PromptRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.share.stageNote": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PromptRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "debug.chat.setEditDraft": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PromptRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    }
+  }
+}

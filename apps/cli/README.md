@@ -16,7 +16,8 @@ Host, or the chat's VM.
 The CLI never selects a web-page runtime. The Host owns service adapters and
 decides how each service page is implemented and managed. The current wire
 protocol is JSON-RPC 2.0 over WebSocket; `ox host describe` reports the Host's
-identity and supported methods.
+identity and supported methods. The [shared RPC contract](../../packages/protocol/README.md)
+defines parameter/result schemas and reusable Host conformance fixtures.
 
 ## Install
 
@@ -176,6 +177,10 @@ request-based snapshots, tolerate Host restarts, and retry until interrupted.
 Mutations are never automatically retried: a connection failure before sending
 reports Host unavailability; a timeout or disconnect after sending reports an
 unknown outcome. Reconnect and inspect state before resubmitting work.
+Known method parameters are schema-validated before submission; successful results
+are validated against the same shared contract. Invalid mutation results do not
+cause resubmission. `host.describe` advertises supported RPC contract versions
+under `protocols.rpc`; older Hosts without that field remain supported.
 Connections are scoped to the Profile present when they connect; reconnect after
 a Profile switch. Service invocation respects the Host's action policies;
 `--approve` cannot override a Block policy.

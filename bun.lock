@@ -22,7 +22,15 @@
         "typescript": "^5",
       },
       "devDependencies": {
+        "@openox/protocol": "0.1.0",
         "@openox/service-sdk": "0.1.0",
+      },
+    },
+    "packages/protocol": {
+      "name": "@openox/protocol",
+      "version": "0.1.0",
+      "dependencies": {
+        "@sinclair/typebox": "^0.34.49",
       },
     },
     "packages/service-sdk": {
@@ -43,6 +51,8 @@
   },
   "packages": {
     "@openox/cli": ["@openox/cli@workspace:apps/cli"],
+
+    "@openox/protocol": ["@openox/protocol@workspace:packages/protocol"],
 
     "@openox/service-sdk": ["@openox/service-sdk@workspace:packages/service-sdk"],
 

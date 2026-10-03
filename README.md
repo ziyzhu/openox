@@ -65,6 +65,8 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 
 The network Client–Host protocol is JSON-RPC 2.0 over WebSocket inside Tailscale.
+The [shared RPC contract](packages/protocol/README.md) defines portable JSON
+Schema, method mappings, and generated iOS request models for Host implementations.
 iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
 and production logging under `Diagnostics`. Only simulator launch helpers,
 fixtures, and prototypes live under `Development`; these do not define a

@@ -1,3 +1,5 @@
+import { validateResponse } from "@openox/protocol";
+
 const DEFAULT_ENDPOINT = "ws://127.0.0.1:9876";
 
 export function hostEndpoint(): string {
@@ -96,14 +98,13 @@ export class HostConnection {
       this.disconnect("Host returned a response without a matching request ID");
       return;
     }
-    const hasResult = Object.hasOwn(message, "result");
-    const hasError = Object.hasOwn(message, "error");
     this.finish(message.id, pending => {
-      if (hasResult === hasError) pending.reject(new Error("Host returned an invalid JSON-RPC response"));
-      else if (hasResult) pending.resolve(message.result);
-      else if (isObject(message.error) && Number.isInteger(message.error.code) && typeof message.error.message === "string") {
-        pending.reject(new HostRPCError(message.error.message, message.error.code as number, message.error.data));
-      } else pending.reject(new Error("Host returned an invalid JSON-RPC response"));
+      if (!validateResponse(message)) pending.reject(requestFailure("Host returned an invalid JSON-RPC response", pending.sent));
+      else if (Object.hasOwn(message, "result")) pending.resolve(message.result);
+      else {
+        const error = message.error as { code: number; message: string; data?: unknown };
+        pending.reject(new HostRPCError(error.message, error.code, error.data));
+      }
     });
   }
 
