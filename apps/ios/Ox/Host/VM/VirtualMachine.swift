@@ -147,23 +147,29 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
 
                     var pendingException: String?
                     ctx.exceptionHandler = { _, exception in
-                        pendingException = exception?.toString() ?? "unknown JS exception"
+                        pendingException = exception.map(jsErrorString) ?? "unknown JS exception"
                     }
 
                     let resolve: @convention(block) (JSValue) -> Void = { value in
+                        let returned = value.isUndefined ? nil : jsValueToJSON(value) ?? .null
+                        guard handle.acceptsReturn(returned) else {
+                            Log.agent.error("snippet return exceeds output safety limit ms=\(elapsedMs()) logs=\(handle.snapshotLogs().count)")
+                            handle.settle(.failure(VirtualMachine.Error.js("JavaScript output, including the return value, exceeds the 32 MiB memory safety limit. Filter results before returning.", logs: handle.snapshotLogs())))
+                            return
+                        }
                         Log.agent.info("snippet run ok ms=\(elapsedMs()) logs=\(handle.snapshotLogs().count)")
-                        handle.settle(.success(VirtualMachineOutput(value: jsValueToJSON(value), logs: handle.snapshotLogs())))
+                        handle.settle(.success(VirtualMachineOutput(value: returned, logs: handle.snapshotLogs())))
                     }
                     let reject: @convention(block) (JSValue) -> Void = { err in
-                        let msg = err.toString() ?? "snippet rejected with non-Error"
+                        let msg = jsErrorString(err)
                         Log.agent.error("snippet rejected ms=\(elapsedMs()): \(msg)")
                         handle.settle(.failure(VirtualMachine.Error.js(msg, logs: handle.snapshotLogs())))
                     }
                     ctx.setObject(resolve as AnyObject, forKeyedSubscript: "__nativeResolve" as NSString)
                     ctx.setObject(reject  as AnyObject, forKeyedSubscript: "__nativeReject"  as NSString)
 
-                    let wrapped = "(async () => {\n\(source)\n})().then(__nativeResolve, __nativeReject);"
-                    ctx.evaluateScript(wrapped)
+                    let wrapped = "(async () => {\(source)\n})().then(__nativeResolve, __nativeReject);"
+                    ctx.evaluateScript(wrapped, withSourceURL: URL(string: "ox://execute.js"))
 
                     if let exc = pendingException {
                         Log.agent.error("snippet sync exception: \(exc)")
@@ -436,7 +442,18 @@ nonisolated private final class JSPromiseCallbacks: @unchecked Sendable {
     var reject: JSValue?
 }
 
+nonisolated private func jsErrorString(_ value: JSValue) -> String {
+    let message = value.toString() ?? "unknown JavaScript error"
+    guard value.isObject,
+          let stack = value.objectForKeyedSubscript("stack"), stack.isString,
+          let frames = stack.toString(), !frames.isEmpty else { return message }
+    return frames.hasPrefix(message) ? frames : "\(message)\n\(frames)"
+}
+
 nonisolated private func jsValueToLogString(_ v: JSValue) -> String {
+    if let context = v.context, let error = context.objectForKeyedSubscript("Error"), v.isInstance(of: error) {
+        return jsErrorString(v)
+    }
     if v.isUndefined { return "undefined" }
     if v.isNull { return "null" }
     if v.isString { return v.toString() ?? "" }
@@ -477,6 +494,12 @@ nonisolated private final class RunHandle: @unchecked Sendable {
         if exceeded {
             settle(.failure(VirtualMachine.Error.js("JavaScript console output exceeds the 32 MiB memory safety limit. Filter results before printing.", logs: snapshotLogs())))
         }
+    }
+
+    func acceptsReturn(_ value: JSONValue?) -> Bool {
+        guard let value else { return true }
+        let bytes = (value.stringValue ?? value.jsonString()).utf8.count
+        return state.withLock { $0.logBytes + bytes <= ArtifactLimits.fileBytes }
     }
 
     func snapshotLogs() -> [VirtualMachineLog] {

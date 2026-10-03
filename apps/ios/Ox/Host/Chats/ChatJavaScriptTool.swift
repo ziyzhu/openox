@@ -15,7 +15,7 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
     var parameters: JSONValue { Self.schema.parameters }
 
     private static let websiteDescription = """
-    Run JavaScript inside an async function. `await` works. Print model-visible results with `console.log`; return values are discarded. Use `ox.user` and service handoff helpers when the snippet must wait for the user.
+    Run JavaScript inside an async function. `await` works. Print model-visible results with `console.log` or a top-level `return`. Use `ox.user` and service handoff helpers when the snippet must wait for the user.
 
     The `ox` namespace provides these built-in capabilities:
 
@@ -23,7 +23,7 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
 
     Signatures shown above are callable contracts. Every built-in also has a synchronous `.help()` method for its complete description, input schema, and output schema. Inspect unfamiliar or nested options before use. Every operational `ox.*` call requires a short `purpose` describing the visible step; `.help()` does not.
 
-    Each execution is self-contained and has 60 seconds of active execution time. Waiting for a service action or user handoff does not consume that time. Keep intermediate results in JavaScript and print only concise model-visible output.
+    Each execution is self-contained. The runtime waits for up to 60 seconds of active execution time; this does not forcibly stop an infinite JavaScript loop. Waiting for a service action or user handoff does not consume that time. Keep intermediate results in JavaScript and print or return only concise model-visible output. Use `Promise.allSettled` for independent reads when partial success is useful; serialize writes and approval-dependent operations. Calls are not rolled back on failure; inspect outcomes before retrying writes.
     """
 
     static let schema = ToolSchema(
@@ -34,7 +34,7 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
             "properties": .object([
                 "source": .object([
                     "type": .string("string"),
-                    "description": .string("JavaScript snippet body. Use `await`; print model-visible data with `console.log`. Return values are discarded."),
+                    "description": .string("JavaScript snippet body. Use `await`; print model-visible data with `console.log` or a top-level `return`."),
                     "minLength": .int(1),
                     "maxLength": .int(100_000),
                 ])
@@ -46,7 +46,7 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
 
     private static func executeDescription() -> String {
         return """
-        Run JavaScript inside an async function. `await` works. Print model-visible results with `console.log`; return values are discarded. Use `ox.user` and service handoff helpers when the snippet must wait for the user.
+        Run JavaScript inside an async function. `await` works. Print model-visible results with `console.log` or a top-level `return`. Use `ox.user` and service handoff helpers when the snippet must wait for the user.
 
         The `ox` namespace provides these built-in capabilities:
 
@@ -56,11 +56,11 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
 
         Every operational `ox.*` call requires a short `purpose` describing the visible step; `.help()` does not. Attached-service summaries intentionally omit actions. Use `ox.service.list({ kind?, purpose })` to list all available services, or `ox.service.listAttached({ kind?, purpose })` when current attachment state is needed; `kind` filters `web`, `api`, `ios`, or `mcp` services. Call `ox.service.inspect({ domain, purpose })` for a compact exposed-action index and any user-controlled payment contract, then request the full action contracts needed with `ox.service.inspect({ domain, actions: ["<action-id>"], purpose })` before invoking them. Invoke only backend-qualified names returned by service inspection: `web:<domain>:<action>`, `api:<service>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>`. Use `ox.service.solve` only for a service-declared human-verification handoff, and `ox.service.pay` only after preparing and pricing the transaction through exposed actions. Copy returned identifiers and option shapes exactly. Never guess omitted fields or probe with intentionally invalid calls. If a built-in error includes `Full help`, correct the call directly from that schema.
 
-        JavaScript has 60 seconds of active execution time. Waiting for a service action, sign-in, verification, payment, or user choice does not consume that time. Each execution may call `ox.web.fetch` at most eight times and add at most four transient attachments to model context; presented artifacts do not count toward that attachment limit. Every execution is self-contained: never store state on `globalThis`. Batch larger work across executions and print concise progress, cursors, or partial results so the next execution can continue, or persist continuation state through an authorized virtual file.
+        The runtime waits for up to 60 seconds of active execution time; this does not forcibly stop an infinite JavaScript loop. Use bounded loops. Waiting for a service action, sign-in, verification, payment, or user choice does not consume that time. Each execution may call `ox.web.fetch` at most eight times and add at most four transient attachments to model context; presented artifacts do not count toward that attachment limit. Every execution is self-contained: never store state on `globalThis`. Batch larger work across executions and print concise progress, cursors, or partial results so the next execution can continue, or persist continuation state through an authorized virtual file.
 
-        Combine dependent operations in one snippet when they fit these budgets; parallelize independent operations within the same limits. Keep intermediate results in JavaScript; filter, aggregate, project fields, and limit rows before printing only what the next reasoning step needs. For web research, avoid fetching the same URL twice in one run and stop gathering when authoritative evidence answers the request. Surface thrown errors instead of retrying blindly.
+        Combine dependent operations in one snippet when they fit these budgets. Parallelize independent reads with `Promise.allSettled` when partial success is useful; an uncaught `Promise.all` rejection ends the execution and cancels pending calls. Serialize writes and approval-dependent operations. Await every call whose outcome matters; pending unawaited calls are cancelled when the snippet ends. Keep intermediate results in JavaScript; filter, aggregate, project fields, and limit rows before printing or returning only what the next reasoning step needs. Print caught errors as `error.message` or `console.error(error)`, not JSON. Calls are real and are not rolled back on script failure. Use the failure receipt and inspect external state before retrying a write; failed or incomplete calls may still have had an effect.
 
-        File reads return complete text into JavaScript by default. Combined console output is limited to the last \(JavaScriptOutputLimits.maxLines) lines or \(JavaScriptOutputLimits.maxBytes / 1024) KiB, whichever is reached first, independent of the model. Oversized output includes a reference for `ox.output.read`; retrieve the complete string, then print the relevant slice or filtered result. Do not treat a truncated preview as the complete record. Output references are chat-local and expire when the chat is unloaded.
+        File reads return complete text into JavaScript by default. Combined console and return output is limited to the last \(JavaScriptOutputLimits.maxLines) lines or \(JavaScriptOutputLimits.maxBytes / 1024) KiB, whichever is reached first, independent of the model. Oversized output includes a reference for `ox.output.read`; retrieve the complete string, then print the relevant slice or filtered result. Do not treat a truncated preview as the complete record. Output references are chat-local and expire when the chat is unloaded.
         """
     }
 
@@ -79,22 +79,29 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
         session.beginExecution(source: source)
         let output: ModelOutput
         let diagnosticContent: JSONValue?
-        let logs: [VirtualMachineLog]
+        var logs: [VirtualMachineLog]
         var failure: String?
         do {
             let out = try await session.virtualMachine.run(source: source, bridge: session)
             logs = out.logs
+            if let value = out.value {
+                logs.append(VirtualMachineLog(level: "log", message: value.stringValue ?? value.jsonString()))
+            }
         } catch {
             logs = (error as? VirtualMachine.Error)?.logs ?? []
             failure = error.localizedDescription
         }
         let attachments = session.executionAttachments()
         let activatedSkills = session.executionActivatedSkills()
+        let invocations = session.executionInvocations()
+        if let error = failure, !invocations.isEmpty {
+            failure = "\(error)\n\n\(Self.failureReceipt(invocations))"
+        }
         do {
             output = try modelOutput(logs: logs, error: failure, store: session.javaScriptOutputs)
         } catch {
             failure = error.localizedDescription
-            output = ModelOutput(text: "[error] \(error.localizedDescription)", truncated: true)
+            output = ModelOutput(text: "[error] \(error.localizedDescription)\n\n\(Self.failureReceipt(invocations))", truncated: true)
         }
         diagnosticContent = output.truncated ? nil : logOutput(logs: logs, error: failure)
         let failed = failure != nil
@@ -108,6 +115,27 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
             transientAttachments: attachments.transient,
             activatedSkills: activatedSkills
         )
+    }
+
+    private static func failureReceipt(_ invocations: [Invocation]) -> String {
+        func status(_ invocation: Invocation) -> String {
+            switch invocation.outcome {
+            case .succeeded: "succeeded"
+            case .failed: "failed"
+            case .running: "incomplete/unknown outcome"
+            }
+        }
+        let rows = invocations.count <= 20 ? invocations : Array(invocations.prefix(10)) + Array(invocations.suffix(10))
+        let counts = invocations.reduce(into: [String: Int]()) { $0[status($1), default: 0] += 1 }
+        let summary = counts.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")
+        var lines = ["Execution receipt (\(invocations.count) calls; \(summary)):"]
+        lines += rows.map { invocation in
+            let name = invocation.name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            return "- \(String(name.prefix(160))) [\(invocation.id.uuidString)]: \(status(invocation))"
+        }
+        if invocations.count > rows.count { lines.append("\(invocations.count - rows.count) middle calls omitted from this receipt.") }
+        lines.append("Calls are not rolled back. Verify external state before retrying writes, including failed or incomplete calls.")
+        return lines.joined(separator: "\n")
     }
 
     @MainActor

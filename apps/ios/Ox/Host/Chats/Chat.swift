@@ -1270,6 +1270,19 @@ final class Chat: Identifiable {
         )
     }
 
+    func executionInvocations() -> [Invocation] {
+        guard case let .agent(turn, _) = document.turns.last else { return [] }
+        for step in turn.steps.reversed() {
+            guard case let .execute(execution) = step.kind else { continue }
+            guard execution.outcome == .running else { return [] }
+            return execution.effects.compactMap {
+                if case let .invocation(invocation) = $0 { return invocation }
+                return nil
+            }
+        }
+        return []
+    }
+
     func executionActivatedSkills() -> [ActivatedSkillContext] {
         currentExecutionActivatedSkills.values.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending

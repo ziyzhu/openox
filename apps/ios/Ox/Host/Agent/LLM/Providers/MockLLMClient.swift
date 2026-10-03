@@ -301,6 +301,7 @@ extension Scenario {
             Entry("27", "truncated tool — reject incomplete arguments", .truncatedToolCall),
             Entry("28", "pending stop — reject missing terminal reason", .pendingStopReason),
             Entry("29", "compaction — estimate, isolate, and summarize", .compaction),
+            Entry("98", "execution — returns, error stacks, and partial-failure receipts", .executionOutput),
         ]),
         ("HTML artifacts", [
             Entry("30", "chart — inline JavaScript", .htmlChart),
@@ -1994,6 +1995,68 @@ extension Scenario {
         .say("Waiting inside JavaScript…\n"),
         execute("await new Promise(() => {});"),
     ])
+
+    static let executionOutput = Scenario(name: "execution-output") { ctx in
+        let text = ctx.resultText("execute") ?? ""
+        func checked(_ condition: Bool, _ source: String) -> [Step] {
+            condition ? [execute(source)] : [.say("Execution output regression failed at step \(ctx.turn): \(text)"), .stop(.stop)]
+        }
+        switch ctx.turn {
+        case 0:
+            return [execute("console.log('printed'); return { answer: 42 };")]
+        case 1:
+            return checked(text == "printed\n{\"answer\":42}", "return null;")
+        case 2:
+            return checked(text == "null", "return 'returned string';")
+        case 3:
+            return checked(text == "returned string", "console.log(new Error('CONSOLE_DETAIL')); function fail() { throw new Error('SCRIPT_DETAIL'); } fail();")
+        case 4:
+            return checked(ctx.toolResults.last?.isError == true && text.contains("Error: CONSOLE_DETAIL") && text.contains("Error: SCRIPT_DETAIL") && text.contains("execute.js"), """
+            await ox.app.info({ purpose: 'Check receipt success' });
+            await ox.fs.read({ path: 'chats/\(UUID().uuidString)/turns.jsonl', purpose: 'Check receipt failure' });
+            """)
+        case 5:
+            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (2 calls;") && text.contains("succeeded: 1") && text.contains("failed: 1") && text.contains("ox.app.info") && text.contains("ox.fs.read") && !text.contains("Check receipt success") && !text.contains("\"build\""), """
+            const results = await Promise.allSettled([
+              ox.app.info({ purpose: 'Read app independently' }),
+              ox.fs.read({ path: 'chats/\(UUID().uuidString)/turns.jsonl', purpose: 'Exercise partial read' })
+            ]);
+            return results.map(result => result.status === 'fulfilled' ? 'success' : result.reason.message);
+            """)
+        case 6:
+            return checked(ctx.toolResults.last?.isError == false && text.contains("success") && !text.contains("Execution receipt"), """
+            for (let i = 0; i < 25; i++) await ox.app.info({ purpose: 'Exercise bounded receipt' });
+            throw new Error('EXPECTED_BOUNDED_RECEIPT');
+            """)
+        case 7:
+            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (25 calls; succeeded: 25)") && text.contains("5 middle calls omitted") && text.components(separatedBy: "- ox.app.info [").count == 21, "return 'R'.repeat(60000) + 'RETURN_TAIL';")
+        case 8:
+            guard ctx.toolResults.last?.truncated == true,
+                  let marker = text.range(of: "Full output id: "),
+                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
+                return [.say("Returned output did not provide a recovery reference."), .stop(.stop)]
+            }
+            return [execute("""
+            const output = await ox.output.read({ id: '\(id.uuidString)', purpose: 'Recover returned output' });
+            if (output !== 'R'.repeat(60000) + 'RETURN_TAIL') throw new Error('Returned output was incomplete');
+            return 'Returned output recovered';
+            """)]
+        case 9:
+            return checked(text == "Returned output recovered" && ctx.toolResults.last?.isError == false, """
+            void ox.user.choose({ body: 'This test prompt should cancel automatically.', options: ['First', 'Second'], purpose: 'Exercise pending call receipt' });
+            await ox.app.info({ purpose: 'Ensure calls have started' });
+            throw new Error('EXPECTED_PENDING_RECEIPT');
+            """)
+        case 10:
+            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (2 calls;") && text.contains("ox.user.choose") && text.contains("ox.app.info") && text.contains("Calls are not rolled back"), "console.log('BEFORE_RETURN_LIMIT'); return 'L'.repeat(33554432);")
+        case 11:
+            return checked(ctx.toolResults.last?.isError == true && text.contains("BEFORE_RETURN_LIMIT") && text.contains("32 MiB memory safety limit"), "return undefined;")
+        default:
+            return [.say(text == "(no output)" && ctx.toolResults.last?.isError == false
+                ? "Execution returns, error stacks, partial results, bounded receipts, cancellation, and output recovery passed."
+                : "Execution recovery failed."), .stop(.stop)]
+        }
+    }
 
     static let truncatedToolCall = Scenario(name: "truncated-tool") { ctx in
         if ctx.turn == 0 {
