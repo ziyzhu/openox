@@ -55,6 +55,7 @@ try {
   if (!help.includes("chat send")) throw new Error("installed ox help omitted chat driving commands");
   if (!help.includes("host providers")) throw new Error("installed ox help omitted provider commands");
   if (help.includes("diagnostics")) throw new Error("installed ox help exposed removed diagnostic commands");
+  if (/^\s+serve\s/m.test(help)) throw new Error("installed ox help exposed the removed MCP bridge command");
   if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");
   if (!help.includes("vm inspect")) throw new Error("installed ox help omitted VM commands");
   if (!help.includes("--chat <chat-id>")) throw new Error("installed ox help omitted chat targeting");
