@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 nonisolated final class ProfileRepositorySaveGate: @unchecked Sendable {
@@ -42,4 +41,3 @@ nonisolated final class ProfileRepositorySaveGate: @unchecked Sendable {
         semaphore.wait()
     }
 }
-#endif

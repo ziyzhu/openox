@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 import WebKit
 
@@ -82,6 +81,15 @@ extension OxHostProtocol {
         }
         Log.agent.debug("OxHostRPC.services.invoke id=\(reply.id) \(domain):\(action)")
         withService(domain: domain, serviceManager: serviceManager, reply: reply) { svc in
+            let approve: @MainActor (String, Any?) async -> Bool = { _, _ in
+                let name = svc.definition.qualifiedActionName(action)
+                let actionDefault: ActionPolicy = svc.definition.action(action, includingStandard: true)?.requireApproval == false ? .allow : .ask
+                switch serviceManager.actionPolicy(for: name, default: actionDefault) {
+                case .allow: return command.approve != false
+                case .block: return false
+                case .ask: return command.approve == true
+                }
+            }
             if svc.isMCPService {
                 guard await svc.loadManifest(reason: .debug) != nil else {
                     return .failure(RuntimeError.bridge("service capabilities unavailable"))
@@ -89,7 +97,7 @@ extension OxHostProtocol {
             }
             if let apiService = svc.apiService {
                 return await apiService.invoke(service: svc, actionID: action, args: args,
-                    approve: { _, _ in command.approve ?? false })
+                    approve: approve)
             }
             if let iOSService = svc.iOSService {
                 guard let session = chatManager.current else {
@@ -99,8 +107,8 @@ extension OxHostProtocol {
                     service: svc,
                     actionID: action,
                     args: args,
-                    purpose: "Debug invocation",
-                    approve: { _, _ in command.approve ?? true },
+                    purpose: "Ox Client invocation",
+                    approve: approve,
                     nativeInvocation: { serviceID, actionID, args, purpose in
                         try await session.debugInvokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
                     }
@@ -111,10 +119,10 @@ extension OxHostProtocol {
                     service: svc,
                     actionID: action,
                     args: args,
-                    approve: { _, _ in command.approve ?? true }
+                    approve: approve
                 )
             }
-            return await svc.invokeAction(action, args: args, approve: { _, _ in command.approve ?? true })
+            return await svc.invokeAction(action, args: args, approve: approve)
         }
     }
 
@@ -272,4 +280,3 @@ extension OxHostProtocol {
     }
 
 }
-#endif

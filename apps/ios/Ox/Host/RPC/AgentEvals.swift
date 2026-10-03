@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 extension OxHostProtocol {
@@ -162,4 +161,3 @@ private nonisolated struct AgentEvalTool: AgentTool {
         await state.execute(name: name, args: args)
     }
 }
-#endif

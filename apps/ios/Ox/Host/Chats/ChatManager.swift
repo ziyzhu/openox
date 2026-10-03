@@ -94,9 +94,7 @@ final class ChatManager {
     @ObservationIgnored private var repositoryScope: ProfileScope
     @ObservationIgnored private let presentations: AppPresentations
     @ObservationIgnored var profilePreparation: @MainActor () async -> Void = {}
-    #if targetEnvironment(simulator)
     @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
-    #endif
     private static let saveDebounceNs: UInt64 = 1_000_000_000
     private static let maxHydratedChats = 5
 
@@ -112,9 +110,7 @@ final class ChatManager {
         self.storage = storage
         self.providerRegistry = providerRegistry
         self.serviceManager = serviceManager
-        #if targetEnvironment(simulator)
         debugRepositorySaveGate = repository.debugSaveGate
-        #endif
         self.presentations = presentations
     }
 
@@ -602,7 +598,6 @@ final class ChatManager {
         }
     }
 
-    #if targetEnvironment(simulator)
     func debugControlRepositorySaveGate(_ action: String) -> Bool? {
         switch action {
         case "hold":
@@ -618,7 +613,6 @@ final class ChatManager {
         }
     }
 
-    #endif
 
     private func makeChat(
         retention: ChatRetention = .persisted,

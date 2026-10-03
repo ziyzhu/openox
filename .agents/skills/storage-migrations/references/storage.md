@@ -19,6 +19,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── llm.providerCatalog              added provider definitions and bundled overrides
 │   │   ├── app.region                       last detected network region
 │   │   ├── app.language                     UI and agent language override
+│   │   ├── host.allowConnections             app-wide Host access toggle; absent means off
 │   │   ├── chat.importMemoryIntentDisplays   app-wide count of starter intent displays, capped at three
 │   │   ├── speech.voice.identifier          legacy read-aloud voice preference, ignored and retained
 │   │   ├── storage.activeProfile            active profile UUID
@@ -79,6 +80,7 @@ that provider when it was the saved default.
 Primary owners:
 
 - UserDefaults onboarding state — owner: App.swift
+- UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
 - UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
 - UserDefaults service state — owner: Services/ServiceManager.swift
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
@@ -93,7 +95,7 @@ Primary owners:
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
 - Service repositories — owner: Services/Repository/Repository.swift
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
-- App log file — owner: Debug/LogFile.swift
+- App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: tooling/sim-bootstrap.ts

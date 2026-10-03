@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 @MainActor
@@ -19,27 +18,35 @@ enum OxHostRPC {
 
     private static func versions(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }
 
-    static func handle(_ data: Data, host: any OxHost) async -> JSONValue? {
+    static func handle(
+        _ data: Data, host: any OxHost,
+        admit: @MainActor () -> String? = { nil }
+    ) async -> JSONValue? {
         guard let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {
             return failure(id: .null, code: -32700, message: "Parse error")
         }
         if case .array(let requests) = value {
-            guard !requests.isEmpty else { return failure(id: .null, code: -32600, message: "Invalid Request") }
+            guard !requests.isEmpty, requests.count <= 64 else { return failure(id: .null, code: -32600, message: "Invalid Request") }
             var responses: [JSONValue] = []
             for value in requests {
-                if let response = await request(value, host: host) { responses.append(response) }
+                if let response = await request(value, host: host, admit: admit) { responses.append(response) }
             }
             return responses.isEmpty ? nil : .array(responses)
         }
-        return await request(value, host: host)
+        return await request(value, host: host, admit: admit)
     }
 
-    private static func request(_ value: JSONValue, host: any OxHost) async -> JSONValue? {
+    private static func request(
+        _ value: JSONValue, host: any OxHost, admit: @MainActor () -> String?
+    ) async -> JSONValue? {
         guard let fields = value.objectValue,
               fields["jsonrpc"] == .string("2.0"),
               let name = fields["method"]?.stringValue,
               validID(fields["id"]) else {
             return failure(id: .null, code: -32600, message: "Invalid Request")
+        }
+        if let message = admit() {
+            return fields["id"] == nil ? nil : failure(id: fields["id"] ?? .null, code: -32001, message: message)
         }
         let response: JSONValue = await withCheckedContinuation { continuation in
             let reply = Reply(requestID: fields["id"] ?? .null, method: name) { continuation.resume(returning: $0) }
@@ -130,4 +137,3 @@ enum OxHostRPC {
         }
     }
 }
-#endif

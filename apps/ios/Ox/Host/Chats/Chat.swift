@@ -644,7 +644,6 @@ final class Chat: Identifiable {
         return try await nativeServiceOperations.invoke(service: service, actionID: actionID, args: args, purpose: purpose)
     }
 
-#if targetEnvironment(simulator)
     func debugInvokeIOSService(
         _ serviceID: String,
         actionID: String,
@@ -653,7 +652,6 @@ final class Chat: Identifiable {
     ) async throws -> JSONValue? {
         try await invokeIOSService(serviceID, actionID: actionID, args: args, purpose: purpose)
     }
-#endif
 
     // MARK: - Transcript (folded in from ChatManager)
 

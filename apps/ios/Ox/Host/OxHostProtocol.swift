@@ -1,11 +1,16 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 enum OxHostProtocol {
     @MainActor
-    static func handle(_ data: Data, host: any OxHost, reply: @escaping @MainActor (Data) -> Void) {
+    static func handle(
+        _ data: Data, host: any OxHost,
+        admit: @escaping @MainActor () -> String? = { nil },
+        finished: @escaping @MainActor () -> Void = {},
+        reply: @escaping @MainActor (Data) -> Void
+    ) {
         Task { @MainActor in
-            let response = await OxHostRPC.handle(data, host: host)
+            defer { finished() }
+            let response = await OxHostRPC.handle(data, host: host, admit: admit)
             guard let response else { return }
             do { reply(try JSONEncoder().encode(response)) }
             catch { Log.app.error("OxHostRPC response encoding failed error=\(error.localizedDescription)") }
@@ -40,7 +45,7 @@ enum OxHostProtocol {
         case .stopChat: handleStopChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)
         case .listProviders: handleListProviders(try decode(EmptyRequest.self), reply: reply)
         case .getLogs: handleGetLogs(try decode(EmptyRequest.self), reply: reply)
-        case .getComposerFormatting: DebugUIAPI.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
+        case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), chatManager: chats, reply: reply)
         case .replayStorageMigration: handleReplayStorageMigration(try decode(ReplayStorageMigrationRequest.self), reply: reply)
         case .evaluateAgent: handleEvaluateAgent(try decode(EvaluateAgentRequest.self), chatManager: chats, reply: reply)
@@ -55,12 +60,12 @@ enum OxHostProtocol {
         case .setKey: handleSetKey(try decode(SetKeyRequest.self), reply: reply)
         case .setRegion: handleSetRegion(try decode(SetRegionRequest.self), reply: reply)
         case .setAttachedService: handleSetAttachedService(try decode(SetAttachedServiceRequest.self), chatManager: chats, serviceManager: services, reply: reply)
-        case .setComposerDraft: DebugUIAPI.handleSetComposerDraft(try decode(PromptRequest.self), reply: reply)
-        case .setComposerMarkedText: DebugUIAPI.handleSetComposerMarkedText(try decode(PromptRequest.self), reply: reply)
-        case .setPasteboardImage: DebugUIAPI.handleSetPasteboardImage(try decode(EmptyRequest.self), reply: reply)
-        case .setPasteboardRichText: DebugUIAPI.handleSetPasteboardRichText(try decode(PromptRequest.self), reply: reply)
-        case .stageSharedNote: DebugUIAPI.handleStageSharedNote(try decode(PromptRequest.self), reply: reply)
-        case .setEditDraft: DebugUIAPI.handleSetEditDraft(try decode(PromptRequest.self), reply: reply)
+        case .setComposerDraft: ClientAutomation.handleSetComposerDraft(try decode(PromptRequest.self), reply: reply)
+        case .setComposerMarkedText: ClientAutomation.handleSetComposerMarkedText(try decode(PromptRequest.self), reply: reply)
+        case .setPasteboardImage: ClientAutomation.handleSetPasteboardImage(try decode(EmptyRequest.self), reply: reply)
+        case .setPasteboardRichText: ClientAutomation.handleSetPasteboardRichText(try decode(PromptRequest.self), reply: reply)
+        case .stageSharedNote: ClientAutomation.handleStageSharedNote(try decode(PromptRequest.self), reply: reply)
+        case .setEditDraft: ClientAutomation.handleSetEditDraft(try decode(PromptRequest.self), reply: reply)
         }
     }
 
@@ -68,4 +73,3 @@ enum OxHostProtocol {
 
     static func iso(_ date: Date) -> String { isoFormatter.string(from: date) }
 }
-#endif

@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 extension OxHostProtocol {
@@ -36,10 +35,15 @@ extension OxHostProtocol {
         if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
             roots.append("files")
         }
+        #if targetEnvironment(simulator)
+        let mode = "simulator"
+        #else
+        let mode = "device"
+        #endif
         let value = JSONValue.object([
             "host": .object([
                 "kind": .string("ios"),
-                "mode": .string("simulator"),
+                "mode": .string(mode),
                 "transport": .string("websocket"),
             ]),
             "vm": .object([
@@ -155,4 +159,3 @@ extension OxHostProtocol {
     }
 
 }
-#endif

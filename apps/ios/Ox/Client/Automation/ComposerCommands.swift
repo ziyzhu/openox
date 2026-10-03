@@ -1,9 +1,8 @@
-#if targetEnvironment(simulator)
 import Foundation
 import UIKit
 import UniformTypeIdentifiers
 
-extension DebugUIAPI {
+extension ClientAutomation {
     @MainActor
     static func handleSetComposerDraft(_ command: PromptRequest, reply: OxHostRPC.Reply) {
         guard let composer else {
@@ -157,4 +156,3 @@ extension DebugUIAPI {
     }
 
 }
-#endif

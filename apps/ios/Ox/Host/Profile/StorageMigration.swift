@@ -85,7 +85,6 @@ nonisolated enum StorageMigrationError: LocalizedError {
     }
 }
 
-#if targetEnvironment(simulator)
 nonisolated struct StorageMigrationReplay: Sendable {
     let currentVersion: String
     let versionUpdated: Bool
@@ -128,7 +127,6 @@ nonisolated struct StorageMigrationFixtureReplay: Codable, Sendable {
     let migratedAsExpected: Bool
     let secondRunNoOp: Bool
 }
-#endif
 
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
@@ -292,7 +290,6 @@ nonisolated enum StorageMigrator {
         return try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
     }
 
-    #if targetEnvironment(simulator)
     private static func replaySecretsIndexRename() throws -> Bool {
         let entry = SecretEntry(key: "example.login", displayName: "Example Login",
                                 origin: .named, usePolicy: .reusable)
@@ -311,7 +308,6 @@ nonisolated enum StorageMigrator {
         return result.entries.count == 1 && result.entries[0].key == entry.key
             && result.bindings.count == 1 && result.bindings[0].secretKey == entry.key
     }
-    #endif
 
     @MainActor
     private static func migrateSecretAPIServiceCredentials(manifests: [Repository.ManifestFile]) throws {
@@ -2066,7 +2062,6 @@ nonisolated enum StorageMigrator {
         return Locale.current.region?.identifier == "CN" ? .china : .global
     }
 
-    #if targetEnvironment(simulator)
     private enum StorageMigrationFixtureSnapshot: Equatable {
         case directory
         case file(Data)
@@ -2682,7 +2677,6 @@ nonisolated enum StorageMigrator {
         }
         return result
     }
-    #endif
 
     static func migrateLegacySkills(at root: URL) throws {
         let legacy = root.appendingPathComponent("COMMANDS.md")

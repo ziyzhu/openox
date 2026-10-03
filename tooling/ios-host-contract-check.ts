@@ -48,7 +48,7 @@ export async function check(): Promise<string> {
   }
 
   const app = await readFile(join(ROOT, "apps/ios/Ox/Client/App/App.swift"), "utf8");
-  if (!app.includes("OxClient(host: host)") || !app.includes("WebSocketOxHostTransport(host: host)")) {
+  if (!app.includes("OxClient(host: host)") || !app.includes("WebSocketOxHostTransport(host: host, access: access)")) {
     failures.push("apps/ios/Ox/Client/App/App.swift: composition root must connect in-process and WebSocket transports to one Host");
   }
 
@@ -58,7 +58,7 @@ export async function check(): Promise<string> {
   }
   for (const forbidden of ["viewportController", "ChatComposerModel", "var setEditDraft"]) {
     if (hostProtocol.includes(forbidden)) {
-      failures.push(`apps/ios/Ox/Host/OxHostProtocol.swift: UI automation state must remain in DebugUIAPI (${forbidden})`);
+      failures.push(`apps/ios/Ox/Host/OxHostProtocol.swift: UI automation state must remain in ClientAutomation (${forbidden})`);
     }
   }
 
@@ -66,8 +66,43 @@ export async function check(): Promise<string> {
     join(ROOT, "apps/ios/Ox/Host/WebSocketOxHostTransport.swift"),
     "utf8",
   );
-  if (!webSocketTransport.includes("OxHostProtocol.handle(data, host: self.host)")) {
+  if (!webSocketTransport.includes("OxHostProtocol.handle(data, host: self.host, admit:")) {
     failures.push("apps/ios/Ox/Host/WebSocketOxHostTransport.swift: WebSocket transport must dispatch through OxHostProtocol");
+  }
+  for (const path of [
+    "apps/ios/Ox/Host/WebSocketOxHostTransport.swift",
+    "apps/ios/Ox/Host/OxHostRPC.swift",
+    "apps/ios/Ox/Host/OxHostProtocol.swift",
+    "apps/ios/Ox/Host/OxHostProtocolMessages.swift",
+    "apps/ios/Ox/Host/Profile/StorageRoot.swift",
+    "apps/ios/Ox/Host/Services/ServiceDebug.swift",
+    "apps/ios/Ox/Host/Profile/ProfileRepositorySaveGate.swift",
+    ...["ChatCommands", "ServiceCommands", "BootstrapCommands", "AgentEvals"].map(name => `apps/ios/Ox/Host/RPC/${name}.swift`),
+    ...["ComposerCommands", "ClientAutomation"].map(name => `apps/ios/Ox/Client/Automation/${name}.swift`),
+  ]) {
+    const source = await readFile(join(ROOT, path), "utf8");
+    if (source.includes("#if targetEnvironment(simulator)") || source.includes("#if DEBUG")) {
+      failures.push(`${path}: Client–Host capabilities must not depend on build or Simulator`);
+    }
+  }
+  for (const required of ["parameters.requiredInterface = ingress.interface", "parameters.requiredLocalEndpoint = .hostPort", "TailscaleHostIngress.current(on:", "pathUpdateHandler", "self.hasCurrentIngress(client)"]) {
+    if (!webSocketTransport.includes(required)) failures.push(`WebSocket transport must enforce VPN-only ingress (${required})`);
+  }
+  if (webSocketTransport.includes(".loopback") || webSocketTransport.includes("NWListener(using: parameters, on:")) {
+    failures.push("WebSocket transport must not expose a loopback or unrestricted listener");
+  }
+  if (app.includes("WebSocketOxHostTransport.configuredPort != nil")) {
+    failures.push("Foreground Host access must not require launch configuration");
+  }
+  if (!webSocketTransport.includes("guard access.enabled, prepared") || !webSocketTransport.includes("access.onEnabledChange")) {
+    failures.push("Host access must be opt-in and stop immediately when disabled");
+  }
+  const ingress = await readFile(join(ROOT, "apps/ios/Ox/Host/TailscaleHostIngress.swift"), "utf8");
+  for (const required of ["interface.type == .other", "ipv4.count == 1, ipv6.count == 1", "candidates.count == 1", "path.availableInterfaces.allSatisfy({ $0.index == interface.index })"]) {
+    if (!ingress.includes(required)) failures.push(`Tailscale ingress must fail closed (${required})`);
+  }
+  if (ingress.includes("#if DEBUG") || ingress.includes("#if targetEnvironment(simulator)")) {
+    failures.push("Tailscale ingress must not depend on build or Simulator");
   }
   if (webSocketTransport.includes("onCommand")) {
     failures.push("apps/ios/Ox/Host/WebSocketOxHostTransport.swift: transport must bind directly to its Host");

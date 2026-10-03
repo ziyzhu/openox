@@ -43,9 +43,11 @@ Standalone downloads require a published `ox-cli-v<version>` GitHub Release.
 The installer verifies the download and installs into `~/.local/bin` without
 requiring Bun or Node.js. Run the same command to update.
 
-Live commands connect to a running Ox Host; the reference control endpoint is
-provided by a DEBUG iOS Simulator app. See the [CLI guide](apps/cli/README.md)
-for Host connections, offline commands, and package-manager alternatives.
+Live commands connect to a foreground iOS Host through Tailscale. Enable
+Settings → Host → Allow connections, then pass its tailnet endpoint to the CLI.
+Debug and Release builds use the same API and network restrictions. See the
+[CLI guide](apps/cli/README.md) for connections, offline commands, and
+package-manager alternatives.
 
 ## Development setup
 
@@ -61,6 +63,12 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 ![OpenOx components](docs/openox-components.svg)
 
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
+
+The network Client–Host protocol is JSON-RPC 2.0 over WebSocket inside Tailscale.
+iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
+and production logging under `Diagnostics`. Only simulator launch helpers,
+fixtures, and prototypes live under `Development`; these do not define a
+separate Host privilege tier.
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool. The Host binds VM execution to the selected conversation, its permissions, attached services, and virtual filesystem view.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.

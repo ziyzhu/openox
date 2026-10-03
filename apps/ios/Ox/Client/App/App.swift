@@ -8,27 +8,20 @@ struct OxApp: App {
     @State private var chatImports = ChatImportCoordinator()
     @State private var serviceImports = ServiceImportCoordinator(manager: IOSHost.shared.services)
     @State private var presentations = AppPresentationCoordinator.shared
+    @State private var hostAccess: HostAccess
     private let client: OxClient
-    #if targetEnvironment(simulator)
     private let webSocketTransport: WebSocketOxHostTransport
-    #endif
 
     init() {
         ScheduledSkillScheduler.shared.register()
         let host = IOSHost.shared
+        let access = HostAccess()
+        _hostAccess = State(initialValue: access)
         client = OxClient(host: host)
-        #if targetEnvironment(simulator)
-        let webSocketTransport = WebSocketOxHostTransport(host: host)
-        self.webSocketTransport = webSocketTransport
-        #endif
+        webSocketTransport = WebSocketOxHostTransport(host: host, access: access)
         AppRegion.shared.start()
         Log.app.info("Device.launch id=\(Device.id) internal=\(Device.isInternal)")
         PerfMonitor.shared.start()
-        #if targetEnvironment(simulator)
-        Task { @MainActor in
-            webSocketTransport.start()
-        }
-        #endif
     }
 
     var body: some Scene {
@@ -47,6 +40,7 @@ struct OxApp: App {
             .themed()
             .appPresentations(presentations)
             .environment(client.services)
+            .environment(hostAccess)
             .onOpenURL { url in
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)
@@ -83,9 +77,19 @@ struct OxApp: App {
                 Text(verbatim: serviceImports.importedDomain ?? "")
             }
             .task { await AppRegion.shared.refresh() }
-            .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                guard phase == .active else {
+                    webSocketTransport.stop()
+                    return
+                }
                 Task {
+                    do {
+                        try await client.prepare()
+                        guard UIApplication.shared.applicationState == .active else { return }
+                        webSocketTransport.activate()
+                    } catch {
+                        Log.app.warning("OxHost transport unavailable: preparation failed")
+                    }
                     await AppRegion.shared.refresh()
                     ScheduledSkillScheduler.shared.refresh()
                 }

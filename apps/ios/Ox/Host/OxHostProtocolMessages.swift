@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 import UIKit
 
@@ -263,4 +262,3 @@ extension OxHostProtocol {
     }
 
 }
-#endif

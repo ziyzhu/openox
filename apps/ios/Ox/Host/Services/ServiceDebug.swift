@@ -12,7 +12,6 @@ extension JSONValue {
     }
 }
 
-#if targetEnvironment(simulator)
 @MainActor
 final class ServiceDebugSession {
     let id: UUID
@@ -133,4 +132,3 @@ extension Service {
         }
     }
 }
-#endif

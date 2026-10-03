@@ -1,7 +1,6 @@
-#if targetEnvironment(simulator)
 import Foundation
 
-enum DebugUIAPI {
+enum ClientAutomation {
     typealias EmptyRequest = OxHostProtocol.EmptyRequest
     typealias PromptRequest = OxHostProtocol.PromptRequest
     typealias ComposerFormattingResult = OxHostProtocol.ComposerFormattingResult
@@ -11,4 +10,3 @@ enum DebugUIAPI {
 
 
 }
-#endif

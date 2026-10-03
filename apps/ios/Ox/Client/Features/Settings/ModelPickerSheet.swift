@@ -172,6 +172,8 @@ struct SettingsSheet: View {
 
                     capabilitiesSettingsSection
 
+                    HostSettingsSection()
+
                     SettingsSection("Language") {
                         Menu {
                             Picker(selection: languageBinding) {

@@ -446,9 +446,7 @@ final class Service: NSObject, Identifiable {
     @ObservationIgnored var ownedPages: [ObjectIdentifier: OwnedPage] = [:]
     @ObservationIgnored var attemptedSilentSignIn = false
     @ObservationIgnored private var capabilityTask: Task<Void, Never>?
-    #if targetEnvironment(simulator)
     @ObservationIgnored var debugSession: ServiceDebugSession?
-    #endif
     @ObservationIgnored unowned let manager: ServiceManager
 
     var resolutionState: ResolutionState {
@@ -817,10 +815,8 @@ final class Service: NSObject, Identifiable {
         }
         guard webService != nil else { return }
         manager.sessionCoordinator.cancel(for: self)
-        #if targetEnvironment(simulator)
         debugSession?.close()
         debugSession = nil
-        #endif
         closeOwnedPages(error: EvalError.contextInvalidated)
         manager.actionScheduler.invalidate(self)
         switch resolutionState {
@@ -835,10 +831,8 @@ final class Service: NSObject, Identifiable {
 
     func discardPages() {
         manager.sessionCoordinator.cancel(for: self)
-        #if targetEnvironment(simulator)
         debugSession?.close()
         debugSession = nil
-        #endif
         closeOwnedPages(error: CancellationError())
         manager.actionScheduler.discardPages(for: self)
     }

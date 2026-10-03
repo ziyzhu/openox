@@ -1,4 +1,3 @@
-#if targetEnvironment(simulator)
 import Foundation
 
 extension OxHostProtocol {
@@ -31,7 +30,7 @@ extension OxHostProtocol {
             return
         }
         Log.agent.debug("OxHostRPC.chats.get id=\(reply.id) session=\(session.id)")
-        reply.success(GetChatResult(data: DebugSnapshot(session)))
+        reply.success(GetChatResult(data: ChatSnapshot(session)))
     }
 
     @MainActor
@@ -166,7 +165,7 @@ extension OxHostProtocol {
     }
 
     struct GetChatResult: Encodable {
-        let data: DebugSnapshot?
+        let data: ChatSnapshot?
     }
 
     @MainActor
@@ -283,4 +282,3 @@ extension OxHostProtocol {
     }
 
 }
-#endif

@@ -287,7 +287,6 @@ final class StorageRoot {
     }
 }
 
-#if targetEnvironment(simulator)
 nonisolated extension StorageRoot {
     static func replayStorageMigration(
         turns: [Turn],
@@ -296,4 +295,3 @@ nonisolated extension StorageRoot {
         try await StorageMigrator.replayStorageMigration(turns: turns, fixtures: fixtures)
     }
 }
-#endif

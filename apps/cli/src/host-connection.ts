@@ -19,6 +19,7 @@ export class HostConnection {
   private disposed = false;
   private readonly pending = new Map<string, {
     request: { jsonrpc: "2.0"; id: string; method: string; params: Record<string, unknown> };
+    sent: boolean;
     resolve: (value: unknown) => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -31,13 +32,16 @@ export class HostConnection {
     const request = { jsonrpc: "2.0" as const, id: crypto.randomUUID(), method, params };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.finish(request.id, pending => pending.reject(new Error(`timeout after ${timeoutMs}ms`)));
+        this.finish(request.id, pending => pending.reject(requestFailure(`timeout after ${timeoutMs}ms`, pending.sent)));
         if (!this.pending.size) this.disconnect("connection timed out");
       }, timeoutMs);
-      this.pending.set(request.id, { request, resolve, reject, timer });
+      this.pending.set(request.id, { request, sent: false, resolve, reject, timer });
       try {
         const socket = this.connect();
-        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(request));
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(request));
+          this.pending.get(request.id)!.sent = true;
+        }
       } catch (error) {
         this.disconnect(`Host connection failed: ${(error as Error).message}`);
       }
@@ -55,11 +59,16 @@ export class HostConnection {
     this.socket = socket;
     socket.onopen = () => {
       if (this.socket !== socket) return;
-      try { for (const { request } of this.pending.values()) socket.send(JSON.stringify(request)); }
+      try {
+        for (const pending of this.pending.values()) {
+          socket.send(JSON.stringify(pending.request));
+          pending.sent = true;
+        }
+      }
       catch { this.disconnect("Host request could not be sent"); }
     };
     socket.onerror = () => {
-      if (this.socket === socket) this.disconnect("Host connection failed; is the Ox Host running?");
+      if (this.socket === socket) this.disconnect("Host connection failed");
     };
     socket.onclose = () => {
       if (this.socket === socket) this.disconnect("Host connection closed before response");
@@ -109,9 +118,15 @@ export class HostConnection {
   private disconnect(message: string): void {
     const socket = this.socket;
     this.socket = undefined;
-    for (const id of this.pending.keys()) this.finish(id, pending => pending.reject(new Error(message)));
+    for (const id of this.pending.keys()) this.finish(id, pending => pending.reject(requestFailure(message, pending.sent)));
     socket?.close();
   }
+}
+
+function requestFailure(message: string, sent: boolean): Error {
+  return new Error(`${message}. ${sent
+    ? "Request outcome unknown; reconnect and inspect state before retrying. This request was not automatically resent."
+    : "Host unavailable; connect Tailscale on both devices, open Ox on the Host device, and check the endpoint and tailnet grants."}`);
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {

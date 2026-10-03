@@ -1,6 +1,6 @@
 import Foundation
 
-struct DebugSnapshot: Encodable {
+struct ChatSnapshot: Encodable {
     let id: String
     let model: ProviderModel
     let systemPrompt: String

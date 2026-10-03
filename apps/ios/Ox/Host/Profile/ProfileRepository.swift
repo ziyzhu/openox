@@ -51,15 +51,11 @@ actor ProfileRepository {
     private var artifactRenames: [ProfileScope: [String: String]] = [:]
     private static let newline: UInt8 = 0x0A
 
-    #if targetEnvironment(simulator)
     nonisolated let debugSaveGate: ProfileRepositorySaveGate
 
     private init(debugSaveGate: ProfileRepositorySaveGate = ProfileRepositorySaveGate()) {
         self.debugSaveGate = debugSaveGate
     }
-    #else
-    private init() {}
-    #endif
 
     nonisolated static func localDocuments() -> URL {
         let manager = FileManager.default
@@ -411,9 +407,7 @@ actor ProfileRepository {
     }
 
     func saveChat(_ request: ChatSaveRequest, in scope: ProfileScope) -> ChatSaveReceipt {
-        #if targetEnvironment(simulator)
         debugSaveGate.pass()
-        #endif
         guard deleted[scope]?.contains(request.chatID) != true else {
             return ChatSaveReceipt(saveID: request.saveID, succeeded: false)
         }

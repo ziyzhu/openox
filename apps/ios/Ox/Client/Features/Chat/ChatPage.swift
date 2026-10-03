@@ -634,13 +634,11 @@ struct ChatPage: View {
             cancelEditing(reason: "chatChanged", keepFocus: false)
         }
         .onChange(of: editedBlockID) { _, blockID in
-            #if targetEnvironment(simulator)
             if blockID == nil {
-                DebugUIAPI.setEditDraft = nil
+                ClientAutomation.setEditDraft = nil
             } else {
-                DebugUIAPI.setEditDraft = { editDraft = AttributedString($0) }
+                ClientAutomation.setEditDraft = { editDraft = AttributedString($0) }
             }
-            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
             speechInput.interrupt()
@@ -656,15 +654,11 @@ struct ChatPage: View {
         }
         .quickLookPreview(previewAttachmentURL)
         .onAppear {
-            #if targetEnvironment(simulator)
-            DebugUIAPI.composer = composer
-            #endif
+            ClientAutomation.composer = composer
         }
         .onDisappear {
             speechInput.cancel(reason: "pageDisappear")
-            #if targetEnvironment(simulator)
-            DebugUIAPI.setEditDraft = nil
-            #endif
+            ClientAutomation.setEditDraft = nil
         }
         .task(id: chat.serviceBootstrapRevision) {
             let updated = await chat.syncToMonoRepository()

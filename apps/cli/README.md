@@ -14,7 +14,9 @@ Host, or the chat's VM.
 `ox serve` exposes selected local Herdr actions to Ox as MCP tools.
 
 The CLI never selects a web-page runtime. The Host owns service adapters and
-decides how each service page is implemented and managed.
+decides how each service page is implemented and managed. The current wire
+protocol is JSON-RPC 2.0 over WebSocket; `ox host describe` reports the Host's
+identity and supported methods.
 
 ## Install
 
@@ -134,8 +136,31 @@ Ox to make the selected tools available to a chat.
 
 ## Inspect and operate a Host
 
-A running DEBUG iOS Simulator app exposes the reference Host on a loopback
-WebSocket:
+The iOS Host uses the same JSON-RPC WebSocket API in Debug and Release builds,
+on Simulator and device. Enable **Settings → Host → Allow connections** first;
+the saved choice defaults off when absent. After Host preparation it listens
+while Ox is active, restricted to the device's configured **Tailscale VPN
+interface and local addresses**. Turning the toggle off immediately closes
+listeners and connected Clients. The inline Host section has only the toggle
+and foreground/Tailscale guidance. Find the phone's tailnet address or hostname
+in Tailscale. Connect Tailscale on both devices, keep Ox open, and pass
+its tailnet hostname or address explicitly:
+
+```sh
+ox --host ws://<phone-name>.<tailnet>.ts.net:9876 host describe
+```
+
+Port 9876 is the default. A `ws://` launch endpoint with an explicit port
+(`OX_HOST_ENDPOINT`, or compatibility `OX_DEBUG_ENDPOINT`) overrides only the
+port; it cannot select a LAN or loopback interface. Tailnet grants authorize the
+intended Clients; no separate Ox pairing credentials are required. There is no
+LAN, public-internet, loopback, or USB-forwarding fallback. Missing or ambiguous
+VPN ingress disables networking. Browser-origin handshakes are rejected.
+Simulator QA also requires the same VPN ingress; old loopback launch URLs do
+not create a bypass. The CLI's legacy loopback default is not a reachable iOS
+Host under this policy. Ingress discovery trusts the device's configured VPN;
+local address ranges are not remote peer credentials. Authentication and access
+grants remain Tailscale's responsibility.
 
 ```sh
 ox host discover
@@ -148,6 +173,12 @@ ox host providers
 One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
 `host logs --follow --json` emit one JSON object per line. Watch commands use
 request-based snapshots, tolerate Host restarts, and retry until interrupted.
+Mutations are never automatically retried: a connection failure before sending
+reports Host unavailability; a timeout or disconnect after sending reports an
+unknown outcome. Reconnect and inspect state before resubmitting work.
+Connections are scoped to the Profile present when they connect; reconnect after
+a Profile switch. Service invocation respects the Host's action policies;
+`--approve` cannot override a Block policy.
 
 ## Drive a chat
 

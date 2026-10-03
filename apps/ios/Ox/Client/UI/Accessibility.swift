@@ -80,6 +80,7 @@ nonisolated enum A11yID {
         static func customProviderModel(_ id: String) -> String { "settings.customProviderModel.\(id)" }
         static let language = "settings.language"
         static let theme = "settings.theme"
+        static let hostEnabled = "settings.host.enabled"
         static let actions = "settings.actions"
         static let services = "settings.services"
         static let builtInActions = "settings.actions.builtIn"

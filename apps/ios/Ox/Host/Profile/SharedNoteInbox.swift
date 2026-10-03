@@ -36,7 +36,6 @@ nonisolated enum SharedNoteInbox {
         return Outcome(imported: imported, failures: failures)
     }
 
-    #if targetEnvironment(simulator)
     static func stageForTesting(title: String, text: String) throws {
         let directory = try pendingDirectory()
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -44,7 +43,6 @@ nonisolated enum SharedNoteInbox {
         let name = ArtifactStore.sanitizedFilename(title) + ".md"
         try Data(text.utf8).write(to: directory.appendingPathComponent(name), options: .atomic)
     }
-    #endif
 
     private static func pendingPayloads() throws -> [(directory: URL, file: URL)] {
         let manager = FileManager.default
