@@ -77,7 +77,7 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
   if (version !== packageMetadata.version) throw new Error(`Unexpected version: ${version}`);
   const help = await run([executable, "--help"]);
   if (!help.includes("vm inspect")) throw new Error("Standalone help omitted VM commands");
-  if (!/^\s+serve\s/m.test(help)) throw new Error("Standalone help omitted the MCP server command");
+  if (/^\s+serve\s/m.test(help)) throw new Error("Standalone help exposed the extracted Pi MCP server command");
   const services = JSON.parse(await run([executable, "--repository", repositoryDirectory, "repository", "services", "--json"]));
   if (!services.some((service: { domain: string }) => service.domain === "example.com")) {
     throw new Error("Standalone executable could not inspect the example repository");

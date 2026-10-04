@@ -676,25 +676,23 @@ Sign out unbinds static credentials or removes the managed OAuth envelope.
 Replacing a static credential writes a dedicated Secret entry for that service.
 Auth status is observed at runtime rather than persisted.
 
-## CLI-managed Pi sessions
+## External Pi session server
 
-`ox serve` owns a separate, on-device CLI store at `~/.openox/serve` (or the
-explicit `--data-dir`). It is not an iOS Profile and does not sync through Ox.
-Each `sessions/<uuid>/session.json` is a version-1 metadata document containing
-its UUID, working directory, optional name, and optional model selection.
-`session.json` is atomically published before launch; a failed launch retains a
-resumable catalog entry. `sessions/<uuid>/pi/` contains Pi-owned durable JSONL
-sessions; Ox does not rewrite or migrate their format. Metadata has no predecessor
-representation, and incompatible documents fail validation without rewriting
-bytes. No additional migrator or legacy-format fallback is introduced.
+The former `ox serve` implementation now lives in the independent
+[pi-mcp repository](https://github.com/ziyzhu/pi-mcp). Ox is only an MCP client;
+pi-mcp owns session processes, storage, and optional Tailscale publication.
+This is not an iOS Profile and does not sync through Ox.
 
-`serve.lock/owner.json` records the running server PID and ingress address. The
-lock prevents concurrent writers and is removed on clean shutdown; crash recovery
-requires the operator to confirm no server or orphaned agent remains before
-removing it. Runtime identities, deduplication results, and conversation
-projections are memory-only. Saved sessions remain until the user removes them
-from disk. Host backup behavior is user-controlled; no automatic backup or cloud
-synchronization is configured. Tailscale Serve owns TLS certificates; Ox stores
-no certificate material. Publication is foreground-only and Ox does not replace
-existing Serve configuration. CLI diagnostics are structured stderr output, with
-retention controlled by the caller's redirection.
+Existing `~/.openox/serve` stores are retained unchanged. With the old server
+stopped, pi-mcp can open one in place using `--data-dir ~/.openox/serve` and the
+original allowed working-directory root. Version-1 `sessions/<uuid>/session.json`
+metadata, Pi-owned `sessions/<uuid>/pi/` JSONL files, and `serve.lock/owner.json`
+retain their formats and layout. There is no automatic copying, relocation,
+legacy fallback, or new app migration. pi-mcp defaults new stores to `~/.pi-mcp`.
+Its E2E verifies a sanitized predecessor-produced store across two startups.
+
+The lock still prevents concurrent writers; after a crash, confirm no server or
+orphaned Pi process remains before removing it. Retention and backup remain
+operator-controlled. Runtime identities and deduplication are memory-only.
+Tailscale owns certificates; diagnostics remain structured stderr output.
+See pi-mcp's documentation for the current external storage and server contract.

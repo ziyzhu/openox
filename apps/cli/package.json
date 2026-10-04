@@ -43,10 +43,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.0",
     "@sinclair/typebox": "^0.34.49",
-    "typescript": "^5",
-    "zod": "^4.6.5"
+    "typescript": "^5"
   },
   "devDependencies": {
     "@openox/protocol": "0.1.0",

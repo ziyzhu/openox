@@ -86,87 +86,18 @@ and resolve the stale installation or PATH ordering. See
 [onboarding skill](../../.agents/skills/onboarding/SKILL.md)
 for agent and simulator setup.
 
-## Serve Pi sessions over MCP
+## Connect to Pi through MCP
 
-Run a private MCP server that launches and manages the installed Pi coding agent:
+The Pi session server lives in the independent public
+[pi-mcp repository](https://github.com/ziyzhu/pi-mcp), not the Ox CLI. Run its
+standalone launcher with optional Tailscale publication and add the printed
+Streamable HTTP `/mcp` URL through Ox's existing remote MCP connection settings.
+Ox remains an ordinary MCP client; it does not own Pi processes or publication.
 
-```sh
-ox serve
-# Or allow sessions in a broader project directory:
-ox serve --directory ~/work --port 9877
-```
-
-Prerequisites: Pi on `PATH`, provider credentials configured in Pi, and a connected
-Tailscale installation with MagicDNS and HTTPS/Serve enabled. Configure Tailscale
-grants/ACLs to allow only the intended callers to reach HTTPS port 443 **before**
-starting. There is no pairing, bearer token, or public Funnel endpoint.
-`ox serve` binds HTTP only to `127.0.0.1` and launches foreground
-`tailscale serve --yes 127.0.0.1:9877`. Tailscale handles HTTPS and certificate
-management. Add the printed `https://…ts.net/mcp` endpoint through Ox's existing
-remote MCP connection settings. `--port` selects the backend loopback port, not
-the public HTTPS port.
-
-Ox refuses to replace any existing Tailscale Serve configuration. It checks the
-published route and HTTPS health endpoint before announcing readiness, stops its
-own foreground Serve process on shutdown, and shuts down if that process exits
-unexpectedly. It never runs `tailscale serve reset` or enables Funnel. If another
-route exists, preserve it until you explicitly decide to free it before starting
-Ox. There is no local-only or non-Tailscale serving mode.
-
-The server exposes seven tools, without a provider prefix:
-
-| Tool | Behavior |
-| --- | --- |
-| `list_sessions` | List managed live and saved sessions |
-| `create_session` | Create a session and start its Pi RPC process; no prompt is submitted |
-| `resume_session` | Start a saved session or reuse its running process |
-| `read_session` | Read active-branch messages, state, latest activity, and pending dialogs |
-| `send_message` | Submit `prompt`, `steer`, or `follow_up` input |
-| `stop_session` | Clear queued input and interrupt work; retain the process and conversation |
-| `respond_to_interaction` | Answer a supported pending Pi confirmation, selection, or text dialog |
-
-`send_message`, `stop_session`, and `respond_to_interaction` require the current
-`runtimeId` and a caller-generated UUID `commandId`. Identical retries return the
-same outcome during the server lifetime; reused IDs with different inputs are
-rejected. Deduplication is in memory, capped at 10,000 mutations, and does not
-survive restart. Do not blindly resend a mutation after unknown delivery.
-`create_session` is not deduplicated: reconcile with `list_sessions` after an
-ambiguous creation outcome rather than creating again.
-
-Prompt acceptance is not task completion. Poll `read_session` for state and
-results; `ox://sessions` and `ox://sessions/{sessionId}` resources also expose
-snapshots. Resource subscriptions, remote process attachment, terminal rendering,
-and push notifications are not implemented. Messages are paginated by current
-active-branch index, which can change after compaction. Large message projections
-are explicitly truncated. Resume an inactive session before reading its history.
-Custom terminal-only Pi dialogs are unavailable in RPC mode.
-
-Each active session owns one Pi subprocess (maximum 16). Disconnecting the MCP
-client leaves processes running. Ctrl+C shuts down the server and its processes;
-saved sessions remain resumable, but unfinished tasks are not restarted
-automatically. Pi retains its own credentials, tools, project trust checks, and
-session format. Set up trust locally; the server never passes `--approve`.
-
-The default initial working-directory root is the launch directory. This is **not
-a sandbox**: Pi's tools run with your account's filesystem and network access.
-Only expose this service to identities permitted to execute code as your user.
-
-Storage defaults to `~/.openox/serve`; use `--data-dir` to select an isolated store.
-It contains version-1 session metadata and Pi-owned JSONL sessions. A storage lock
-prevents two servers from managing the same files. After a crash, confirm no
-server or orphaned Pi processes remain before removing `serve.lock`. No sessions
-are deleted or migrated automatically. Diagnostics are structured JSON on stderr;
-redirect them to an on-device file if desired. Prompt bodies and Pi stderr are not
-forwarded into server diagnostics.
-
-Run the E2E check from the checkout root. It starts an internal loopback network
-harness with the production MCP handler and real Pi processes, without modifying
-Tailscale configuration. It does not verify live Tailscale publication:
-
-```sh
-bun apps/cli/serve-e2e.ts          # Real MCP and Pi processes; no model request
-bun apps/cli/serve-e2e.ts --prompt # Also runs one short real-model prompt
-```
+Existing `~/.openox/serve` stores remain untouched. Stop the old server, then use
+pi-mcp's `--data-dir ~/.openox/serve` and the original `--directory` root to resume
+saved sessions in place. See pi-mcp's README for security, storage compatibility,
+launcher options, and verification. Do not run both servers against one store.
 
 ## Targeting model
 
