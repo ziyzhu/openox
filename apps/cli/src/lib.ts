@@ -166,7 +166,7 @@ const MOVED_COMMANDS: Record<string, string> = {
   skills: "ox profile skills, ox repository skills, or ox vm skills",
   artifacts: "ox profile artifacts",
   chats: "ox profile chats",
-  discover: "ox host discover",
+  discover: "ox host list",
   logs: "ox host logs",
   providers: "ox host providers",
   service: "ox repository services|actions|test or ox host services|service",

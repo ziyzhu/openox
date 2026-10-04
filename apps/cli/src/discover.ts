@@ -19,7 +19,7 @@ export async function discover(args: string[], context: CliContext): Promise<voi
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox host discover [--all] [--json] [--timeout 3000]");
+      console.log("Usage: ox host list [--all] [--json] [--timeout 3000]");
       return;
     } else fail(`unknown option: ${argument}`);
   }

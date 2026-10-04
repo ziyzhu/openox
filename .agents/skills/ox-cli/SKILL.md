@@ -23,7 +23,7 @@ or tab session IDs; a live service is addressed by its domain.
 
 ## Choose the correct surface
 
-- Use `ox host discover` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
+- Use `ox host list` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
 - Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
 - Use `ox chat` to create, open, drive, respond to, stop, inspect, and watch chats; `ox chat send`
   runs the real chat turn, including tools, services, and compaction.

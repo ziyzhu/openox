@@ -94,7 +94,7 @@ Requires a running simulator Host built from this checkout; never executes gener
     console.log(`Validated ${cases.length} cases`);
     return;
   }
-  if (!values.host || !values.provider || !values.model) throw new Error("Specify --host, --provider, and --model; use ox host discover and ox host providers to select them");
+  if (!values.host || !values.provider || !values.model) throw new Error("Specify --host, --provider, and --model; use ox host list and ox host providers to select them");
   if (values.provider.toLowerCase() === "mock") throw new Error("Mock responses cannot measure prompt quality");
   const repetitions = integer(values.repeat!, 20);
   const timeoutMs = integer(values.timeout!, 300_000);

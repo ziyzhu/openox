@@ -16,7 +16,7 @@ bun install
 bun run typecheck
 (cd apps/cli && bun run build && bun link)
 ox --help
-ox host discover --help
+ox host list --help
 ```
 
 - Use `bun run typecheck` as the first source check. Follow [apps/cli/README.md](../../../apps/cli/README.md) for standalone installation or package checks.
@@ -72,7 +72,7 @@ Use `ox-1` as the common website/provider baseline. Cloning does not establish t
 - Reserve an available numbered simulator and use its matching ports. Initialize the shared website/provider baseline before testing. Rebuild and reinstall after switching worktrees.
 - Build, install, and launch bundled services with `sim --device <simulator> run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:<debug-port> --force`.
 - To test loading a local repository separately, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `--env OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git`.
-- Confirm the normal UI with `sim --device <simulator> describe` or a screenshot, then use `ox host discover` or `ox --host ws://127.0.0.1:<debug-port> host describe` to check that the Host is available. If UI automation cannot start `idb_companion`, distinguish that from an app startup failure using the screenshot and logs. Keep diagnostics outside the repository.
+- Confirm the normal UI with `sim --device <simulator> describe` or a screenshot, then use `ox host list` or `ox --host ws://127.0.0.1:<debug-port> host describe` to check that the Host is available. If UI automation cannot start `idb_companion`, distinguish that from an app startup failure using the screenshot and logs. Keep diagnostics outside the repository.
 - Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
 
 ## App Store authentication and commit readiness

@@ -75,7 +75,7 @@ cd apps/cli
 bun run build
 bun link
 ox --help
-ox host discover --help
+ox host list --help
 ```
 
 Run `bun link` inside `apps/cli`, not `bun link @openox/cli` at the workspace
@@ -224,17 +224,17 @@ local address ranges are not remote peer credentials. Authentication and access
 grants remain Tailscale's responsibility.
 
 ```sh
-ox host discover
+ox host list
 ox host describe
 ox host logs --level warning
 ox host logs --follow
 ox host providers
 ```
 
-`host discover` finds simulator-daemon candidates and online iOS Tailscale peers,
+`host list` finds simulator-daemon candidates and online iOS Tailscale peers,
 then probes `host.describe`. Only reachable Hosts are shown by default; `--all`
 also shows unavailable candidates. Physical-device discovery uses port 9876;
-pass `--host` explicitly for another port.
+pass `--host` explicitly for another port. `host discover` remains a compatibility alias.
 
 One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
 `host logs --follow --json` emit one JSON object per line. Watch commands use
@@ -419,7 +419,7 @@ ox --repository <path-or-url> repository actions <domain> [--json]
 ox --repository <path-or-url> repository skills [name] [--json]
 ox [--host <ws-url>] --repository <path-or-url> repository test [<domain>[:<action>[:<case>]]] --proxy-port <port> [--timeout 30000] [--allow-partial]
 
-ox host discover [--all] [--json] [--timeout 3000]
+ox host list [--all] [--json] [--timeout 3000]
 ox [--host <ws-url>] host describe [--json] [--timeout 30000]
 ox [--host <ws-url>] host logs [--level debug|info|warning|error] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]
 ox [--host <ws-url>] host providers [--json] [--timeout 30000]

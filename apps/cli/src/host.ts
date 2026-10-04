@@ -7,7 +7,8 @@ import { hostService, serviceStatus } from "./services.ts";
 
 export const HOST_COMMANDS: Record<string, SubCommand> = {
   describe: { desc: "Show Host identity, supported protocol versions and methods (--json)", fn: describe },
-  discover: { desc: "Discover reachable Ox Hosts", fn: discover },
+  list: { desc: "List reachable Ox Hosts (--all includes unavailable candidates)", fn: discover },
+  discover: { desc: "Alias for host list", fn: discover },
   logs: { desc: "Read or follow structured Host logs", fn: logs },
   providers: { desc: "List the Host's model providers and their models", fn: providers },
   services: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
