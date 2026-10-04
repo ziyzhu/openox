@@ -1,16 +1,31 @@
 {
   "name": "@openox/protocol",
   "version": "0.1.0",
-  "description": "Shared OpenOx Host JSON-RPC contract, schemas, and validation",
+  "description": "Shared OpenOx Client-Host and Host-Repository contracts, schemas, and validation",
   "license": "Apache-2.0",
   "type": "module",
-  "files": ["src", "schema.json", "methods.json", "fixtures.json", "README.md"],
+  "files": ["src", "schema.json", "methods.json", "fixtures.json", "repository.schema.json", "LICENSE", "README.md"],
   "exports": {
     ".": "./src/index.ts",
     "./schema.json": "./schema.json",
     "./methods.json": "./methods.json",
-    "./fixtures.json": "./fixtures.json"
+    "./fixtures.json": "./fixtures.json",
+    "./repository.schema.json": "./repository.schema.json",
+    "./repository": "./src/repository.ts",
+    "./manifest": "./src/manifest.ts",
+    "./catalog": "./src/catalog.ts",
+    "./installer": "./src/installer.ts",
+    "./action": "./src/action.ts",
+    "./model-actions": "./src/model-actions.ts",
+    "./skills": "./src/skills.ts"
   },
+  "scripts": { "package:check": "bun package-check.ts" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyzhu/openox.git",
+    "directory": "packages/protocol"
+  },
+  "publishConfig": { "access": "public" },
   "dependencies": {
     "@sinclair/typebox": "^0.34.49"
   }

@@ -1,13 +1,14 @@
 import { runCheck, run } from "./lib.ts";
 import { check as hostContract } from "./ios-host-contract-check.ts";
 import { check as hostSchema } from "./host-rpc-contract.ts";
+import { check as repositoryContract } from "./repository-contract.ts";
 import { check as localizations } from "./localization-check.ts";
 import { check as providerModels } from "./provider-models.ts";
 import { check as providerSchema } from "./provider-definitions.ts";
 import { check as publicBoundary } from "./public-boundary-check.ts";
 import { check as systemSkills } from "./system-skills-check.ts";
 
-for (const check of [publicBoundary, hostContract, hostSchema, systemSkills, localizations, providerModels, providerSchema]) {
+for (const check of [publicBoundary, hostContract, hostSchema, repositoryContract, systemSkills, localizations, providerModels, providerSchema]) {
   await runCheck(check);
 }
 

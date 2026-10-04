@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, runCheck } from "./lib.ts";
-import { SYSTEM_SKILL_NAMES } from "../packages/service-sdk/src/skills.ts";
+import { SYSTEM_SKILL_NAMES } from "../packages/protocol/src/skills.ts";
 
 const systemSkillsRoot = join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle");
 const localName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

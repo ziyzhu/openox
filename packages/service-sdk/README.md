@@ -1,6 +1,9 @@
 # OpenOx Service SDK
 
-`@openox/service-sdk` provides the schemas, validators, action contracts, and replay tooling used by Ox services.
+`@openox/service-sdk` provides authoring helpers, filesystem readers, and replay
+tooling used by Ox services. Shared schemas, validators, and action contracts are
+owned by [`@openox/protocol`](../protocol/README.md). Existing SDK exports remain
+compatible re-exports; consumers do not need to change their imports.
 
 The SDK requires Bun 1.3 or newer.
 
@@ -26,6 +29,9 @@ The app injects the versioned dispatcher before evaluating each service. New web
 
 ## Release
 
+Publish the required `@openox/protocol` version first using its matching
+`protocol-v<version>` tag. SDK package checks install the local protocol and SDK
+tarballs together, so they do not require a published protocol to verify compatibility.
 Update the version in `package.json`, verify with `bun run package:check`, and push a matching `service-sdk-v<version>` tag from `main`. The first release requires an interactive npm publish with two-factor authentication:
 
 ```sh

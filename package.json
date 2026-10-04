@@ -18,6 +18,8 @@
     "check:public-boundary": "bun tooling/public-boundary-check.ts",
     "build:host-schema": "bun tooling/host-rpc-contract.ts --write",
     "check:host-schema": "bun tooling/host-rpc-contract.ts",
+    "build:repository-schema": "bun tooling/repository-contract.ts --write",
+    "check:repository-schema": "bun tooling/repository-contract.ts",
     "typecheck": "bun tooling/typecheck.ts"
   },
   "dependencies": {

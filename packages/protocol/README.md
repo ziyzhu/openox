@@ -1,7 +1,8 @@
-# Host RPC contract
+# OpenOx protocols
 
-Platform-neutral contract for OpenOx's JSON-RPC 2.0 Client–Host interface.
-It is independent of iOS, the service manifest, and any LLM provider.
+Platform-neutral contracts for OpenOx's Client–Host JSON-RPC interface and
+Host–Repository content interface. They are independent of iOS and any LLM provider.
+The RPC and repository contracts have separate versions.
 
 ## Files and ownership
 
@@ -101,3 +102,52 @@ The live suite validates advertised read operations and sends only structurally
 invalid mutation requests, which must fail decoding before their handlers run.
 For iOS, enable Host connections, connect Tailscale, and keep Ox foregrounded.
 This suite does not establish tailnet authorization or lifecycle correctness.
+
+## Host–Repository contract
+
+The existing version 3 content contract now lives here without changing its
+schemas, validators, installer behavior, or file layouts:
+
+| Export | Responsibility |
+|---|---|
+| `@openox/protocol/repository` | Repository index, supported versions, service identities and paths |
+| `@openox/protocol/manifest` | Web/API manifests, action input/output schema profile, semantic validation |
+| `@openox/protocol/catalog` | Native iOS and MCP catalog manifests |
+| `@openox/protocol/installer` | Installer registration contract and inspection |
+| `@openox/protocol/action` | Action installer TypeScript interfaces, including retained compatibility types |
+| `@openox/protocol/model-actions` | Standard model Action schemas and validation |
+| `@openox/protocol/skills` | Reserved names, package limits, frontmatter and resource-path rules |
+
+`@openox/service-sdk` preserves its existing exports by re-exporting these
+contracts. Filesystem readers, action convenience helpers, and replay tooling
+remain in the SDK. Protocol modules do not depend on the SDK or Node filesystem
+APIs.
+
+`repository.schema.json` is the generated portable Draft 7 document. Its root
+validates `repository.json`; the `definitions` also expose service, auth, native
+catalog, and MCP catalog shapes. Existing semantic validators remain necessary:
+JSON Schema alone does not check duplicate identities, reserved names, URL
+relationships, standard Actions, or installer registration. The manifest schema
+and existing schema IDs are unchanged.
+
+```sh
+bun run build:repository-schema
+bun run check:repository-schema
+bun run --cwd packages/protocol package:check
+bun run --cwd packages/service-sdk package:check
+```
+
+The generated `Host/HostRepositoryContract.swift` keeps the iOS supported-version
+list synchronized with `REPOSITORY_VERSIONS`. Native repository and service
+validation still use their existing platform codecs; this extraction does not
+claim to generate all Swift validators or change persisted storage. Migration
+and legacy-format handling remain exclusively behind StorageMigrator.
+
+## Distribution
+
+The protocol package contains source, portable schemas, fixtures, and its license.
+The SDK now has a runtime dependency on `@openox/protocol`. Publish the matching
+protocol version before releasing an SDK version that requires it. The release
+workflow accepts `protocol-v<version>` tags. Package checks install local tarballs
+in temporary directories, so SDK compatibility can be verified before publication.
+No package is published by the checks themselves.

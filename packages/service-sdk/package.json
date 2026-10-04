@@ -47,6 +47,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@openox/protocol": "0.1.0",
     "@sinclair/typebox": "^0.34.49",
     "typescript": "^5"
   }

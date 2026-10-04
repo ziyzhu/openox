@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "apps/cli/**"
+      - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/service-repository/**"
       - "package.json"
@@ -17,6 +18,7 @@ on:
     branches: [main]
     paths:
       - "apps/cli/**"
+      - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/service-repository/**"
       - "package.json"

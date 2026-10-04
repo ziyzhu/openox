@@ -4,6 +4,7 @@ import { ROOT, run } from "./lib.ts";
 
 const packages: Record<string, { name: string; directory: string }> = {
   cli: { name: "@openox/cli", directory: "apps/cli" },
+  protocol: { name: "@openox/protocol", directory: "packages/protocol" },
   "service-sdk": { name: "@openox/service-sdk", directory: "packages/service-sdk" },
   services: { name: "@openox/services", directory: "packages/services" },
 };
@@ -21,7 +22,7 @@ const { values } = parseArgs({
 const directory = values.directory;
 const selected = directory && Object.hasOwn(packages, directory) ? packages[directory] : undefined;
 const tarball = values.tarball ? resolve(values.tarball) : null;
-if (!selected) throw new Error("Pass --directory <cli|service-sdk|services>");
+if (!selected) throw new Error("Pass --directory <cli|protocol|service-sdk|services>");
 if (!tarball || !await Bun.file(tarball).exists()) throw new Error("Pass --tarball <package.tgz>");
 
 const expectedName = selected.name;

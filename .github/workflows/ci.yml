@@ -6,7 +6,9 @@ on:
     paths:
       - "apps/cli/**"
       - "apps/ios/Ox/Host/OxHost*.swift"
-      - "apps/ios/Ox/Debug/**"
+      - "apps/ios/Ox/Host/Host*.swift"
+      - "apps/ios/Ox/Host/RPC/**"
+      - "packages/protocol/**"
       - "tooling/**"
       - "packages/service-sdk/**"
       - "packages/services/**"
@@ -27,7 +29,9 @@ on:
     paths:
       - "apps/cli/**"
       - "apps/ios/Ox/Host/OxHost*.swift"
-      - "apps/ios/Ox/Debug/**"
+      - "apps/ios/Ox/Host/Host*.swift"
+      - "apps/ios/Ox/Host/RPC/**"
+      - "packages/protocol/**"
       - "tooling/**"
       - "packages/service-sdk/**"
       - "packages/services/**"
@@ -68,11 +72,15 @@ jobs:
       - name: Typecheck
         run: bun install --frozen-lockfile && bun run typecheck
 
+      - name: Verify repository CLI E2E
+        run: bun test tooling/tests/repository-contract.test.ts
+
       - name: Verify generated service bundle
         run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
 
       - name: Verify npm packages
         run: |
+          bun run --cwd packages/protocol package:check
           bun run --cwd packages/service-sdk package:check
           bun run --cwd packages/services package:check
           bun run --cwd apps/cli package:check

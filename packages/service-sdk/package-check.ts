@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import packageMetadata from "./package.json";
+import { packProtocol } from "../protocol/package-check.ts";
 
 type PackReport = {
   name: string;
@@ -52,7 +53,8 @@ try {
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) throw new Error(`unexpected package files: ${files.join(", ")}`);
 
   const tarball = join(packageDirectory, report.filename);
-  await run(["npm", "install", "--prefix", installDirectory, tarball], import.meta.dir);
+  const protocolTarball = await packProtocol(join(temporaryRoot, "protocol"));
+  await run(["npm", "install", "--prefix", installDirectory, protocolTarball, tarball], import.meta.dir);
   const checkPath = join(installDirectory, "check.ts");
   await Bun.write(checkPath, [
     'await import("@openox/service-sdk/action");',

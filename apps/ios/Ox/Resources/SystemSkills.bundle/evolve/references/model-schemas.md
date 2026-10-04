@@ -1,6 +1,6 @@
 # Standard model Action schemas
 
-Generated from packages/service-sdk/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action. continueModelGeneration is optional; the other four Actions are required for model services.
+Generated from packages/protocol/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action. continueModelGeneration is optional; the other four Actions are required for model services.
 
 ```json
 {
