@@ -2545,10 +2545,22 @@ final class Chat: Identifiable {
         let fileMountPaths = attached.contains(where: { $0.domain == "ios:files" })
             ? DeviceFolderStore.shared.grants.map { "files/\($0.id)" }
             : []
+        var turnSkills: [Skill] = []
+        var skillConflicts: [String] = []
+        do {
+            turnSkills = try await skillsMount.entries().map(\.skill)
+        } catch {
+            Log.session.warning("Chat.runOne skills unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
+        }
+        do {
+            skillConflicts = try await skillsMount.catalog().conflicts.filter { $0.selectedSourceID == nil }.map(\.name)
+        } catch {
+            Log.session.warning("Chat.runOne skill-conflicts unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
+        }
         let transientContext = Self.turnContext(
             TurnContext(
-                skills: (try? await skillsMount.entries().map(\.skill)) ?? [],
-                skillConflicts: (try? await skillsMount.catalog().conflicts.filter { $0.selectedSourceID == nil }.map(\.name)) ?? [],
+                skills: turnSkills,
+                skillConflicts: skillConflicts,
                 attachedServices: attached,
                 definitions: definitions,
                 fileMountPaths: fileMountPaths,

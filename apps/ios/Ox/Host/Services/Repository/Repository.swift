@@ -787,14 +787,29 @@ actor Repository {
             if existing != nil { try FileManager.default.removeItem(at: backup) }
             Log.service.info("Repository.import id=\(service.id.rawValue) files=\(payload.files.count) replaced=\(existing != nil)")
         } catch {
+            Log.service.error("Repository.import failed id=\(service.id.rawValue) destination=\(destination.path) backup=\(backup.path) error=\(Self.errorMessage(error))")
             configuration = originalConfiguration
-            try? saveConfiguration()
-            if existing == nil { try? Self.writePackage(originalPackage, at: localRoot) }
+            attemptRollback(serviceID: service.id.rawValue, step: "import.configuration", path: configurationURL) {
+                try saveConfiguration()
+            }
+            if existing == nil {
+                attemptRollback(serviceID: service.id.rawValue, step: "import.package", path: localRoot) {
+                    try Self.writePackage(originalPackage, at: localRoot)
+                }
+            }
             if FileManager.default.fileExists(atPath: backup.path) {
-                try? FileManager.default.removeItem(at: destination)
-                try? FileManager.default.moveItem(at: backup, to: destination)
-            } else if existing == nil {
-                try? FileManager.default.removeItem(at: destination)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    attemptRollback(serviceID: service.id.rawValue, step: "import.remove-replacement", path: destination) {
+                        try FileManager.default.removeItem(at: destination)
+                    }
+                }
+                attemptRollback(serviceID: service.id.rawValue, step: "import.restore-source", path: backup) {
+                    try FileManager.default.moveItem(at: backup, to: destination)
+                }
+            } else if existing == nil, FileManager.default.fileExists(atPath: destination.path) {
+                attemptRollback(serviceID: service.id.rawValue, step: "import.remove-source", path: destination) {
+                    try FileManager.default.removeItem(at: destination)
+                }
             }
             throw error
         }
@@ -825,16 +840,31 @@ actor Repository {
             }
             try FileManager.default.removeItem(at: staging)
         } catch {
+            Log.service.error("Repository.local delete failed id=\(service.id.rawValue) source=\(serviceRoot.path) staging=\(staging.path) error=\(Self.errorMessage(error))")
             configuration = originalConfiguration
-            try? saveConfiguration()
-            try? Self.writePackage(originalPackage, at: localRoot)
+            attemptRollback(serviceID: service.id.rawValue, step: "delete.configuration", path: configurationURL) {
+                try saveConfiguration()
+            }
+            attemptRollback(serviceID: service.id.rawValue, step: "delete.package", path: localRoot) {
+                try Self.writePackage(originalPackage, at: localRoot)
+            }
             if FileManager.default.fileExists(atPath: staging.path) {
-                try? FileManager.default.moveItem(at: staging, to: serviceRoot)
+                attemptRollback(serviceID: service.id.rawValue, step: "delete.restore-source", path: staging) {
+                    try FileManager.default.moveItem(at: staging, to: serviceRoot)
+                }
             }
             throw error
         }
         Log.service.info("Repository.local delete id=\(id) kind=\(service.id.kind.rawValue)")
         return service.id.kind
+    }
+
+    private func attemptRollback(serviceID: String, step: String, path: URL, _ rollback: () throws -> Void) {
+        do {
+            try rollback()
+        } catch {
+            Log.service.error("Repository.rollback failed id=\(serviceID) step=\(step) path=\(path.path) error=\(Self.errorMessage(error))")
+        }
     }
 
     func listSource(kind: ServiceKind, id: String, path: [String]) throws -> [Entry] {
