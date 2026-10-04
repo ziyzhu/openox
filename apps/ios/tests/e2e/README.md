@@ -17,7 +17,7 @@ Agent loop and fixture-backed tools. Run it with `bun run evals`. LLM-related pr
 behavior under test is the app experience, such as provider setup,
 authentication, model switching, or persistence across relaunch.
 
-Executable live Host RPC checks remain in `tooling/tests/`. Reserve a numbered
+Executable live Host RPC checks remain in `tools/tests/`. Reserve a numbered
 QA simulator and set `OX_RPC_TEST_ENDPOINT` to its running Host endpoint, then run
 `bun run test:e2e`. Without an endpoint these checks skip; they do not use mock
 Hosts. The VPN-ingress check additionally needs `OX_RPC_DENIED_ENDPOINTS`, and the

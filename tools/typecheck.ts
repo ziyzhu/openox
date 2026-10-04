@@ -17,7 +17,7 @@ const projects = [
   "packages/protocol/tsconfig.json",
   "packages/service-sdk/tsconfig.json",
   "packages/services/tsconfig.json",
-  "tooling/tsconfig.json",
+  "tools/tsconfig.json",
   "evals/tsconfig.json",
 ];
 

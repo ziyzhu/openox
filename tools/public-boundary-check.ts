@@ -26,7 +26,7 @@ export async function check(): Promise<string> {
   const failures = files.filter((file) => forbiddenPaths.some((pattern) => pattern.test(file)));
 
   for (const file of files) {
-    if (file === "tooling/public-boundary-check.ts") continue;
+    if (file === "tools/public-boundary-check.ts") continue;
     const text = await readFile(join(ROOT, file)).catch(() => null);
     if (!text) continue;
     const value = text.toString("utf8");

@@ -6,7 +6,7 @@ import { mcpArtifactFixture, mcpManagementFixture } from "./fixtures/mcp-managem
 import { ROOT } from "./lib.ts";
 import { qaCommand } from "./qa-config.ts";
 
-const config = qaCommand({ usage: "Usage: bun tooling/canvas-integration-fixture.ts --device ox-N" });
+const config = qaCommand({ usage: "Usage: bun tools/canvas-integration-fixture.ts --device ox-N" });
 const directory = await mkdtemp(join(tmpdir(), "ox-canvas-integration-"));
 const repository = Bun.spawn(["ox", "--repository", join(ROOT, "repositories/builtin"), "repository", "serve", "--port", "0"], {
   stdout: "pipe", stderr: "inherit",
@@ -45,7 +45,7 @@ try {
   });
   const endpoint = `http://127.0.0.1:${server.port}/mcp`;
   const domain = "mcp." + createHash("sha256").update(endpoint).digest("hex").slice(0, 16);
-  const html = (await Bun.file(join(ROOT, "tooling/fixtures/canvas-handoffs.html")).text()).replace("__MCP_DOMAIN__", domain);
+  const html = (await Bun.file(join(ROOT, "tools/fixtures/canvas-handoffs.html")).text()).replace("__MCP_DOMAIN__", domain);
   const artifactPath = join(directory, "Canvas Integration.html");
   await Bun.write(artifactPath, html);
   const profile = join(directory, "bootstrap.json");

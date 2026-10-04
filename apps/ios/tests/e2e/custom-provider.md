@@ -6,7 +6,7 @@ response and persistence across app relaunch. Do not modify repository source or
 use a paid external provider.
 
 Use the `sim-cli` and `ox-cli` skills. Work on the user-selected numbered QA
-simulator, or `ox-1` when none was selected. Use the matching debug port from `tooling/qa-config.ts`. Keep screenshots, request journals,
+simulator, or `ox-1` when none was selected. Use the matching debug port from `tools/qa-config.ts`. Keep screenshots, request journals,
 temporary server code, and diagnostics in a new temporary directory outside the
 repository.
 

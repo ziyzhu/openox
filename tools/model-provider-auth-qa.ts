@@ -7,7 +7,7 @@ import { qaCommand } from "./qa-config.ts";
 // Opt-in live E2E. Claim a free simulator first; Doubao must already be signed out.
 // Never clears website data, changes credentials, or signs out an existing account.
 const { device, debugEndpoint } = qaCommand({
-  usage: "bun tooling/model-provider-auth-qa.ts --device ox-N\nRequires a running Debug Host on the matching port and signed-out Doubao.",
+  usage: "bun tools/model-provider-auth-qa.ts --device ox-N\nRequires a running Debug Host on the matching port and signed-out Doubao.",
 });
 const output = mkdtempSync(join(tmpdir(), "openox-model-auth-"));
 const host = new HostRPCClient(debugEndpoint);

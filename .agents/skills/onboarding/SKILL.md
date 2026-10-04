@@ -48,7 +48,7 @@ sim devices
 
 Use the `sim-cli` skill for iOS interaction; see the coding-agent setup section below to install it. If unavailable, consult `sim --help`, command-specific help, and `sim agent-context`. Never guess flags or build directly with `xcodebuild`.
 
-- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [tooling/qa-config.ts](../../../tooling/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
+- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [tools/qa-config.ts](../../../tools/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
 - Before touching a device, coordinate ownership with other agents and inspect recent activity in `~/.sim-cli/logs/invocations.jsonl`. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `sim devices`.
 - When no suitable simulator exists, create it in Xcode's **Devices and Simulators** window using the assigned runtime. After reserving a suitable iOS 26 baseline, for example:

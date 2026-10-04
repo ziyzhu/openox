@@ -4,7 +4,7 @@ Use a numbered QA simulator with the Mock model and standing approvals disabled
 for service creation, update, and deletion. This scenario uses only loopback
 fixtures; it needs no account or provider credentials.
 
-Start `bun tooling/canvas-integration-fixture.ts --device ox-5` from the selected
+Start `bun tools/canvas-integration-fixture.ts --device ox-5` from the selected
 OpenOx checkout. Verify `http://127.0.0.1:8105/health`, then build and launch:
 
 ```sh

@@ -7,7 +7,7 @@ numbered QA simulator with its matching ports; the commands below use `ox-2`.
 Start the repository and fixture MCP endpoint:
 
 ```sh
-bun run tooling/canvas-integration-fixture.ts --device ox-2
+bun run tools/canvas-integration-fixture.ts --device ox-2
 curl --fail http://127.0.0.1:8102/health
 ```
 
@@ -23,7 +23,7 @@ Start the network fixtures using mitmproxy 12.2.3:
 mitmdump --listen-host 127.0.0.1 --listen-port 7102 \
   --set confdir=/tmp/ox-canvas-integration-ca \
   --set connection_strategy=lazy --set upstream_cert=false --set flow_detail=0 \
-  -s tooling/fixtures/canvas-network.py
+  -s tools/fixtures/canvas-network.py
 sim --device ox-2 keychain add-root-cert /tmp/ox-canvas-integration-ca/mitmproxy-ca-cert.pem
 ```
 

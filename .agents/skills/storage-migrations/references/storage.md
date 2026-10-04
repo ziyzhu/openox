@@ -98,7 +98,7 @@ Primary owners:
 - App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
-- Developer bootstrap credentials — owner: tooling/sim-bootstrap.ts
+- Developer bootstrap credentials — owner: tools/sim-bootstrap.ts
 
 ## Compatibility gate
 

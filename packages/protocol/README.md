@@ -19,7 +19,7 @@ After changing the source:
 bun run build:host-schema
 bun run check:host-schema
 bun run typecheck
-bun test tooling/tests/host-rpc-contract.test.ts tooling/tests/host-rpc.test.ts
+bun test tools/tests/host-rpc-contract.test.ts tools/tests/host-rpc.test.ts
 ```
 
 CI checks that generated JSON and Swift artifacts match the source. Do not edit generated files.
@@ -95,7 +95,7 @@ The retained E2E suite validates the shared contract against a live Host.
 Run the live, read-only/invalid-parameter suite against any available Host:
 
 ```sh
-OX_RPC_TEST_ENDPOINT=ws://<host>:9876 bun test tooling/tests/host-rpc-contract.test.ts
+OX_RPC_TEST_ENDPOINT=ws://<host>:9876 bun test tools/tests/host-rpc-contract.test.ts
 ```
 
 The live suite validates advertised read operations and sends only structurally
