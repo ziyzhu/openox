@@ -1,6 +1,27 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Categories" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分类" } } }
+    },
+    "Chats" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "聊天" } } }
+    },
+    "Models & secrets" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模型与密钥" } } }
+    },
+    "Web & browser" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页与浏览器" } } }
+    },
+    "Artifacts & images" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "资料与图片" } } }
+    },
+    "Skills & schedules" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "技能与定时任务" } } }
+    },
+    "App settings" : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "应用设置" } } }
+    },
     "Host" : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主机" } } }
     },

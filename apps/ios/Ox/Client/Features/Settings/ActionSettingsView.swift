@@ -151,12 +151,56 @@ struct ActionSettingsView: View {
     }
 }
 
+private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
+    case chats, models, web, artifacts, memory, skills, services, repositories, settings
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .chats: "Chats"
+        case .models: "Models & secrets"
+        case .web: "Web & browser"
+        case .artifacts: "Artifacts & images"
+        case .memory: "Memory"
+        case .skills: "Skills & schedules"
+        case .services: "Services"
+        case .repositories: "Repositories"
+        case .settings: "App settings"
+        }
+    }
+
+    var actions: [String] {
+        Actions.builtIn.filter {
+            !OxFileSystem.actions.contains($0) && Self.group(for: $0) == self
+        }
+    }
+
+    private static func group(for action: String) -> Self {
+        switch action {
+        case Actions.appRenameChat: return .chats
+        case Actions.appModel, Actions.appDefaultModel: return .models
+        case Actions.appRepositories: return .repositories
+        case Actions.outputRead: return .artifacts
+        default: break
+        }
+        // Group by user-facing feature, not by permission policy or storage source.
+        return switch action.split(separator: ".").dropFirst().first {
+        case "chat", "user": .chats
+        case "provider", "secret": .models
+        case "web": .web
+        case "artifact", "vision", "widget": .artifacts
+        case "memory": .memory
+        case "skill", "schedule": .skills
+        case "service": .services
+        case "repository": .repositories
+        default: .settings
+        }
+    }
+}
+
 struct BuiltInActionSettingsView: View {
     @Environment(ServiceManager.self) private var serviceManager
-
-    private var actions: [String] {
-        Actions.builtIn.filter { !OxFileSystem.actions.contains($0) }
-    }
 
     var body: some View {
         ScrollView {
@@ -171,11 +215,17 @@ struct BuiltInActionSettingsView: View {
                     )
                 }
 
-                SettingsSection("Actions", layout: .group) {
+                SettingsSection("Categories", layout: .group) {
                     VStack(spacing: 0) {
-                        ForEach(Array(actions.enumerated()), id: \.element) { index, action in
+                        ForEach(Array(BuiltInActionGroup.allCases.enumerated()), id: \.element) { index, group in
                             if index > 0 { Divider().settingsContentInset() }
-                            actionRow(action)
+                            NavigationLink {
+                                BuiltInActionGroupSettingsView(group: group)
+                            } label: {
+                                SettingsDisclosureRow(title: group.title, value: Text(""))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.actions.group.\(group.rawValue)")
                         }
                     }
                 }
@@ -185,6 +235,29 @@ struct BuiltInActionSettingsView: View {
         .scrollIndicators(.hidden)
         .background(Theme.Colors.background)
         .navigationTitle("Built into Ox")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct BuiltInActionGroupSettingsView: View {
+    let group: BuiltInActionGroup
+    @Environment(ServiceManager.self) private var serviceManager
+
+    var body: some View {
+        ScrollView {
+            SettingsSection("Actions", layout: .group) {
+                VStack(spacing: 0) {
+                    ForEach(Array(group.actions.enumerated()), id: \.element) { index, action in
+                        if index > 0 { Divider().settingsContentInset() }
+                        actionRow(action)
+                    }
+                }
+            }
+            .settingsPagePadding()
+        }
+        .scrollIndicators(.hidden)
+        .background(Theme.Colors.background)
+        .navigationTitle(group.title)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -204,6 +277,7 @@ struct BuiltInActionSettingsView: View {
             )
         }
         .settingsRowPadding()
+        .accessibilityIdentifier("settings.actions.action.\(action)")
     }
 }
 
