@@ -522,6 +522,10 @@ final class Chat: Identifiable {
     var serviceOperations: ServiceOperations {
         ServiceOperations(
             serviceManager: serviceManager,
+            conversationOwner: .chat(id),
+            resolveConversationAttachments: { [unowned self] refs in
+                try await websiteConversationAttachments(refs)
+            },
             resolveService: { [unowned self] domain in
                 guard let service = attachedService(domain: domain) else {
                     throw RuntimeError.bridge("Service '\(domain)' isn't attached to this chat.")

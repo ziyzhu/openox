@@ -123,6 +123,7 @@ final class OxCanvas {
         activeAuth?.cancel()
         activeHandoff?.cancel()
         serviceManager.browserActionSessions.closeSession(for: id)
+        serviceManager.closeWebConversations(owner: .canvas(id))
         for service in services.values where service.isWebService { service.discardPages() }
     }
 
@@ -166,6 +167,7 @@ final class OxCanvas {
     private var operations: ServiceOperations {
         ServiceOperations(
             serviceManager: serviceManager,
+            conversationOwner: .canvas(id),
             resolveService: { [unowned self] in try await resolveService($0) },
             resolveAction: { [unowned self] in try await resolveAction($0) },
             approve: { [unowned self] action, defaultPolicy, args, purpose, prompt in

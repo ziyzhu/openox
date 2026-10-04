@@ -5,6 +5,8 @@ final class ServiceOperations {
     private static let maximumFindResults = 10
 
     let serviceManager: ServiceManager
+    let conversationOwner: WebConversation.Owner
+    let resolveConversationAttachments: ([JSONValue]) async throws -> [WebsiteAttachment]
     let resolveService: (String) async throws -> Service
     let resolveAction: (String) async throws -> (Service, String)
     let attachedDomains: () -> Set<String>
@@ -20,6 +22,11 @@ final class ServiceOperations {
 
     init(
         serviceManager: ServiceManager,
+        conversationOwner: WebConversation.Owner,
+        resolveConversationAttachments: @escaping ([JSONValue]) async throws -> [WebsiteAttachment] = { refs in
+            guard refs.isEmpty else { throw WebsiteProviderError("This caller cannot stage website attachments", kind: .unsupportedInput) }
+            return []
+        },
         resolveService: @escaping (String) async throws -> Service,
         resolveAction: @escaping (String) async throws -> (Service, String),
         attachedDomains: @escaping () -> Set<String> = { [] },
@@ -34,6 +41,8 @@ final class ServiceOperations {
         native: NativeServiceOperations
     ) {
         self.serviceManager = serviceManager
+        self.conversationOwner = conversationOwner
+        self.resolveConversationAttachments = resolveConversationAttachments
         self.resolveService = resolveService
         self.resolveAction = resolveAction
         self.attachedDomains = attachedDomains
@@ -107,12 +116,18 @@ final class ServiceOperations {
             throw Service.InvokeError.invalidInput(qualifiedName, inputViolations)
         }
         return try await recorded("ox.service.invoke(\(service.definition.qualifiedActionName(actionID)))", input, purpose: purpose) {
-            try await self.requireApproval(
-                action: qualifiedName,
-                defaultPolicy: action.requireApproval ? .ask : .allow,
-                args: input.toAny(),
-                purpose: purpose
-            )
+            if actionID != WebConversationContract.actionID || WebConversationContract.requiresApproval(input) {
+                try await self.requireApproval(
+                    action: qualifiedName,
+                    defaultPolicy: action.requireApproval ? .ask : .allow,
+                    args: input.toAny(),
+                    purpose: purpose
+                )
+            }
+            if service.definition.supportsConversation, actionID == WebConversationContract.actionID {
+                let attachments = try await resolveConversationAttachments(input.objectValue?["attachments"]?.arrayValue ?? [])
+                return try await serviceManager.invokeConversation(service: service, args: input, owner: conversationOwner, attachments: attachments)
+            }
             let approve: @MainActor (String, Any?) async -> Bool = { _, _ in true }
             let result: Result<JSONValue, Error>
             if let implementation = service.apiService {

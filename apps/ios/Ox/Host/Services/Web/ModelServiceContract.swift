@@ -10,7 +10,7 @@ nonisolated enum ModelServiceContract {
     static let generationIDs: Set<String> = [start, resume, read, cancel]
     static let actionIDs = generationIDs.union([list])
 
-    private static let schemas: [String: JSONValue] = {
+    static let schemas: [String: JSONValue] = {
         guard let url = Bundle.main.url(forResource: "ModelServiceActions", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let value = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
@@ -42,7 +42,7 @@ nonisolated enum ModelServiceContract {
         }
     }
 
-    private static func normalized(_ value: JSONValue, definitions: [String: JSONValue] = [:], depth: Int = 0) throws -> JSONValue {
+    static func normalized(_ value: JSONValue, definitions: [String: JSONValue] = [:], depth: Int = 0) throws -> JSONValue {
         guard depth <= 32 else { throw ServiceDefinition.ValidationError.invalid("recursive model schema") }
         if let array = value.arrayValue {
             return .array(try array.map { try normalized($0, definitions: definitions, depth: depth + 1) })

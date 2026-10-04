@@ -237,6 +237,7 @@ final class Service: NSObject, Identifiable {
         case debug(UUID)
         case browser(UUID)
         case model(UUID)
+        case conversation(UUID)
 
         var logLabel: String {
             switch self {
@@ -245,6 +246,7 @@ final class Service: NSObject, Identifiable {
             case .debug: "debug"
             case .browser: "browser"
             case .model: "model"
+            case .conversation: "conversation"
             }
         }
     }
@@ -830,6 +832,7 @@ final class Service: NSObject, Identifiable {
     }
 
     func discardPages() {
+        manager.closeWebConversations(service: self)
         manager.sessionCoordinator.cancel(for: self)
         debugSession?.close()
         debugSession = nil

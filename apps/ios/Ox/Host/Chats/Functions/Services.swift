@@ -1,6 +1,30 @@
 import Foundation
 
 extension Chat: OxFunctionBridge {
+    func websiteConversationAttachments(_ refs: [JSONValue]) async throws -> [WebsiteAttachment] {
+        var attachments: [WebsiteAttachment] = []
+        var total = 0
+        for (index, ref) in refs.enumerated() {
+            guard let fields = ref.objectValue, fields["id"]?.intValue == index,
+                  let name = fields["name"]?.stringValue, let mimeType = fields["mimeType"]?.stringValue else {
+                throw WebsiteProviderError("Invalid website attachment reference", kind: .unsupportedInput)
+            }
+            let stored = try await repository.artifact(named: name, in: scope)
+            let artifact = try await repository.materializeArtifact(stored, in: scope)
+            guard artifact.exists, artifact.mimeType == mimeType,
+                  let size = artifact.size, size <= ArtifactLimits.fileBytes else {
+                throw WebsiteProviderError("Website attachment is unavailable, too large, or has a different MIME type", kind: .unsupportedInput)
+            }
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: artifact.fileURL) }.value
+            total += data.count
+            guard !data.isEmpty, total <= ArtifactLimits.fileBytes else {
+                throw WebsiteProviderError("Website attachments exceed the upload limit", kind: .unsupportedInput)
+            }
+            attachments.append(WebsiteAttachment(name: name, mimeType: mimeType, data: data))
+        }
+        return attachments
+    }
+
     public func validateService(domain: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.validateService(domain: domain, purpose: purpose)
     }

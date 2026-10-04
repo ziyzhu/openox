@@ -542,6 +542,21 @@ Interactive sign-in and throwaway browsing use separate
 pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.
 
+Website conversations use owned pages separate from the ordinary Action pool.
+`WebConversation` routes the shared `conversation` Action for provider,
+chat-tool, Canvas, and direct Client owners; legacy provider Actions also use its
+page lifecycle through `WebModelContext`. Owners share the persistent website
+account store, but not pages, DOM, history, session storage, or conversation IDs.
+The native conversation/submission registry is process-local and is never
+checkpointed. Opaque handles appearing in archived tool results cannot restore
+work after page/process loss. Source replacement, scope cleanup, interruption,
+and memory pressure release pages; idle nonbusy sessions expire when pruned
+(after ten minutes; active submissions have an absolute one-hour lifetime,
+without claiming remote cancellation). Retention is bounded to 12 open/opening pages and, for the
+shared contract, 32 submissions per page. Existing installed/Local manifests,
+JavaScript, saved selections, and approvals are not rewritten by this additive
+contract. No new persisted format or migration is introduced.
+
 Simulator bootstrap can make an explicit one-way copy of cookies and local
 storage between two running numbered simulators. It serializes the source's
 global website data store with WebKit, holds the opaque credential-bearing blob

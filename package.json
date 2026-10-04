@@ -13,6 +13,7 @@
     "build:services": "bun tools/build/ios-services-build.ts",
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
     "test:storage-migration": "bun tools/qa/storage-migration-replay.ts",
+    "test:conversation": "bun tools/qa/web-conversation.ts",
     "sim:bootstrap": "bun tools/qa/sim-bootstrap.ts",
     "update:llms": "bun tools/build/provider-models.ts",
     "build:provider-schema": "bun tools/build/provider-definitions.ts",

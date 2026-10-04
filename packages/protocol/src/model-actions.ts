@@ -59,6 +59,69 @@ export const MODEL_ACTION_SCHEMAS: Record<string, { inputSchema: Schema; outputS
   },
 };
 
+export const CONVERSATION_ACTION_ID = "conversation";
+const reference = { ...string, minLength: 1, maxLength: 200 };
+const submission = { submissionId: reference };
+const conversationURL = nullable({ ...string, maxLength: 8192, pattern: "^https?://" });
+const result = object({
+  url: conversationURL,
+  files: array(object({
+    id: string, name: string, kind: string, mimeType: nullable(string), sizeBytes: nullable(integer),
+    url: nullable(string), thumbnailUrl: nullable(string),
+    width: nullable(integer), height: nullable(integer), pageCount: nullable(integer), tokenCount: nullable(integer),
+    source: choice("attachment", "generated"), downloadable: boolean,
+  })),
+});
+
+/** One website interaction contract for provider and ordinary service callers. */
+export const CONVERSATION_ACTION_SCHEMA = {
+  inputSchema: { oneOf: [
+    object({
+      operation: choice("submit"), conversationRef: nullable(reference), accountId: nullable(reference), modelId: reference,
+      messages: messages(["system", "user", "assistant", "tool"]),
+      attachments, options: object({ temperature: nullable({ type: "number" }), maxTokens: nullable(integer) }),
+    }),
+    object({ operation: choice("read"), ...submission, after: integer, waitMilliseconds: { ...integer, maximum: 1000 } }),
+    object({ operation: choice("cancel"), ...submission }),
+  ] },
+  outputSchema: { oneOf: [
+    object({ operation: choice("submit"), ...submission, conversationRef: reference,
+      submission: choice("uncertain", "confirmed"), continuation: boolean, url: conversationURL }),
+    object({ operation: choice("read"), conversationRef: reference, url: conversationURL, nextCursor: integer,
+      events: array({ oneOf: [
+        object({ type: choice("text"), text: { ...string, maxLength: 2_000_000 } }),
+        object({ type: choice("completed"), result }),
+        object({ type: choice("failed"), message: string,
+          kind: choice("contextOverflow", "rateLimited", "network", "authentication", "unsupportedInput", "provider") }),
+      ] }) }),
+    object({ operation: choice("cancel"), status: choice("cancelled", "requested", "completed", "unsupported") }),
+  ] },
+};
+
+export const STANDARD_WEB_ACTION_SCHEMAS = { ...MODEL_ACTION_SCHEMAS, [CONVERSATION_ACTION_ID]: CONVERSATION_ACTION_SCHEMA };
+
+export function validateConversationAction(
+  actions: { id: string; inputSchema: Schema; outputSchema: Schema; blocking?: boolean; baseUrl?: string }[],
+  definitions: Record<string, Schema> = {},
+): string[] {
+  const action = actions.find(action => action.id === CONVERSATION_ACTION_ID);
+  if (!action) return [];
+  const errors: string[] = [];
+  if (action.blocking) errors.push("actions.conversation: cannot block cancellation");
+  if (/[{}]/.test(action.baseUrl ?? "")) errors.push("actions.conversation: baseUrl must be literal");
+  for (const candidate of actions.filter(action => [CONVERSATION_ACTION_ID, "listModels"].includes(action.id))) {
+    const expected = candidate.id === CONVERSATION_ACTION_ID ? CONVERSATION_ACTION_SCHEMA : MODEL_ACTION_SCHEMAS.listModels!;
+    for (const field of ["inputSchema", "outputSchema"] as const) {
+      try {
+        if (JSON.stringify(normalizedModelSchema(candidate[field], definitions)) !== JSON.stringify(normalizedModelSchema(expected[field]))) {
+          errors.push(`actions.${candidate.id}.${field}: incompatible standard website Action schema`);
+        }
+      } catch (error) { errors.push(`actions.${candidate.id}.${field}: ${(error as Error).message}`); }
+    }
+  }
+  return errors;
+}
+
 export const MODEL_ACTION_IDS = Object.keys(MODEL_ACTION_SCHEMAS);
 export const REQUIRED_MODEL_ACTION_IDS = MODEL_ACTION_IDS.filter(id => id !== "continueModelGeneration");
 export const MODEL_GENERATION_ACTION_IDS = MODEL_ACTION_IDS.filter(id => id !== "listModels");

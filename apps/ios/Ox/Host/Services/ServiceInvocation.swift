@@ -67,7 +67,7 @@ extension Service {
             role: role,
             scripts: scripts
         )
-        if let approve {
+        if let approve, actionId != WebConversationContract.actionID || WebConversationContract.requiresApproval(args) {
             let allow = await approve(name, args.toAny())
             Log.service.info("Service.invoke approval name=\(name) allow=\(allow)")
             if !allow { return .failure(InvokeError.denied(name)) }
@@ -97,6 +97,10 @@ extension Service {
                 Log.service.info("Service.invoke requiresAuth name=\(name) auth=\(auth.logLabel)")
                 return .failure(InvokeError.requiresAuth(name))
             }
+        }
+        if actionId == WebConversationContract.actionID, ownedPage == nil {
+            do { return .success(try await manager.invokeConversation(service: self, args: args, owner: .client)) }
+            catch { return .failure(error) }
         }
         let argsJSON = (try? JSONEncoder().encode(args))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

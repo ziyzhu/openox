@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum ModelConversationHistory {
+nonisolated enum WebModelHistory {
     static func newTurns(after history: [JSONValue], in messages: [JSONValue]) -> [JSONValue]? {
         guard !history.isEmpty, messages.count > history.count, messages.starts(with: history) else { return nil }
         let turns = Array(messages.dropFirst(history.count))

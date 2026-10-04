@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { buildArtifacts } from "../../packages/services/src/build.ts";
 import { ROOT, run } from "../lib.ts";
-import { MODEL_ACTION_SCHEMAS } from "../../packages/protocol/src/model-actions.ts";
+import { STANDARD_WEB_ACTION_SCHEMAS } from "../../packages/protocol/src/model-actions.ts";
 
 const destination = join(ROOT, "apps", "ios", "Ox", "Resources", "OxServices.bundle");
 const temporary = await mkdtemp(join(dirname(destination), ".ox-services-bundle-"));
@@ -61,9 +61,9 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
 }
 
 try {
-  await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelServiceActions.json"), `${JSON.stringify(MODEL_ACTION_SCHEMAS, null, 2)}\n`);
+  await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelServiceActions.json"), `${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n`);
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle/evolve/references/model-schemas.md"),
-    `# Standard model Action schemas\n\nGenerated from packages/protocol/src/model-actions.ts by bun run build:services. These are the exact inputSchema and outputSchema values for each standard Action. continueModelGeneration is optional; the other four Actions are required for model services.\n\n\`\`\`json\n${JSON.stringify(MODEL_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
+    `# Standard website Action schemas\n\nGenerated from packages/protocol/src/model-actions.ts by bun run build:services. conversation is the shared submit/read/cancel Action; add listModels for model-provider discovery. The existing four model Actions and optional continueModelGeneration remain supported during transition. Copy exact schemas; do not mix protocols on one conversation page.\n\n\`\`\`json\n${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
   const repository = await buildArtifacts(staging, { name: "Built-in" });
   await addLocalRepositorySeed(staging);
   await rm(backup, { recursive: true, force: true });

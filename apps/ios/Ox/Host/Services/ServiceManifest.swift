@@ -122,6 +122,7 @@ nonisolated struct ServiceDefinition: Sendable {
         }
         guard object["skills"] == nil else { throw ValidationError.invalid("skills belong in the repository") }
         try ModelServiceContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
+        try WebConversationContract.validate(actions, definitions: object["$defs"]?.objectValue ?? [:], isWeb: !api)
         self.manifest = manifest
         self.source = .repository(id: repositoryID, provenance: provenance)
         self.repositoryID = repositoryID
@@ -316,8 +317,13 @@ nonisolated struct ServiceDefinition: Sendable {
         return includingStandard || !isStandardAction(id) ? action : nil
     }
 
+    var supportsConversation: Bool {
+        !isAPI && !isIOS && !isMCP && actionIndex[WebConversationContract.actionID] != nil
+    }
+
     var supportsModelGeneration: Bool {
-        !isAPI && !isIOS && !isMCP && ModelServiceContract.requiredActionIDs.isSubset(of: Set(actionIndex.keys))
+        !isAPI && !isIOS && !isMCP && (ModelServiceContract.requiredActionIDs.isSubset(of: Set(actionIndex.keys))
+            || (supportsConversation && actionIndex[ModelServiceContract.list] != nil))
     }
 
     func isStandardAction(_ id: String) -> Bool {

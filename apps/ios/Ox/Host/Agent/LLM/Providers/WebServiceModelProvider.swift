@@ -82,10 +82,10 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
             let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: displayName)
             let prepared = input.messages.arrayValue ?? []
             let chatID = options.sessionID.flatMap(UUID.init(uuidString:))
-            let (conversation, turn) = try await ModelConversation.checkout(service: service(), chatID: chatID, modelID: model.wireID, options: options, messages: prepared)
-            var generation: ModelConversation.Generation?
+            let (context, turn) = try await WebModelContext.checkout(service: service(), chatID: chatID, modelID: model.wireID, options: options, messages: prepared)
+            var generation: WebModelContext.Generation?
             do {
-                let started = try await conversation.start(turn: turn, attachments: input.attachments)
+                let started = try await context.start(turn: turn, attachments: input.attachments)
                 generation = started
                 var assembler = StreamAssembler(model: model, continuation: continuation)
                 assembler.start()
@@ -95,7 +95,7 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
                 while !state.completed {
                     guard Date() < deadline else { throw WebsiteProviderError("Model generation timed out", kind: .network) }
                     let cursor = state.cursor
-                    try state.accept(try await conversation.read(started, after: cursor))
+                    try state.accept(try await context.read(started, after: cursor))
                     if state.cursor == cursor { try await Task.sleep(for: .milliseconds(100)) }
                     if !WebsiteToolContract.isPossibleCallPrefix(state.text) {
                         assembler.textDelta(String(state.text.dropFirst(emittedText.count)))
@@ -114,9 +114,9 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
                     reply = state.text
                     assembler.finish(reason: .stop, label: id, lines: state.cursor)
                 }
-                await conversation.finish(started, history: prepared + [ModelConversationHistory.assistantTurn(reply)], chatID: chatID)
+                await context.finish(started, history: prepared + [WebModelHistory.assistantTurn(reply)], chatID: chatID)
             } catch {
-                await conversation.cancelAndClose(generation)
+                await context.cancelAndClose(generation)
                 if let invocationError = error as? Service.InvokeError {
                     switch invocationError {
                     case .requiresAuth: throw signInRequiredError

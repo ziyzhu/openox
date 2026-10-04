@@ -118,7 +118,9 @@ final class ServiceManager {
     }
 
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
-    @ObservationIgnored var modelConversations: [UUID: ModelConversation] = [:]
+    @ObservationIgnored var webModelContexts: [UUID: WebModelContext] = [:]
+    @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
+    @ObservationIgnored var openingWebConversations: [UUID: WebConversation.Opening] = [:]
 
     nonisolated static let savedKey = "savedServices"
     nonisolated static let actionPoliciesKey = "actionApprovalPolicies"
@@ -189,7 +191,8 @@ final class ServiceManager {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.actionScheduler.releaseIdle(reason: .memoryWarning)
-                self.closeModelConversations(reason: "memoryWarning")
+                self.closeWebModelContexts(reason: "memoryWarning")
+                self.closeWebConversations()
             }
         }
     }
@@ -432,23 +435,29 @@ final class ServiceManager {
 
     func setAttachedServices(_ attached: [Service], for chatID: UUID) {
         let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
-        attachedServiceDomainsByChat[chatID] = Set(attached.map(\.domain))
+        let retained = Set(attached.map(\.domain))
+        attachedServiceDomainsByChat[chatID] = retained
+        let detached = webConversations.values.filter { $0.owner == .chat(chatID) && !retained.contains($0.service.domain) }
+        detached.forEach { $0.close() }
+        let pendingDetached = openingWebConversations.values.filter { $0.owner == .chat(chatID) && !retained.contains($0.service.domain) }
+        pendingDetached.forEach { closeWebConversations(owner: .chat(chatID), service: $0.service) }
         updateMCPActivation(from: previous)
     }
 
     func removeAttachedServices(for chatID: UUID) {
         let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         attachedServiceDomainsByChat.removeValue(forKey: chatID)
-        modelConversations.removeValue(forKey: chatID)?.close()
+        webModelContexts.removeValue(forKey: chatID)?.close()
+        closeWebConversations(owner: .chat(chatID))
         updateMCPActivation(from: previous)
     }
 
-    private func closeModelConversations(reason: String) {
-        guard !modelConversations.isEmpty else { return }
-        Log.service.info("ModelService.release reason=\(reason) count=\(modelConversations.count)")
-        let conversations = modelConversations.values
-        modelConversations.removeAll()
-        conversations.forEach { $0.close() }
+    private func closeWebModelContexts(reason: String) {
+        guard !webModelContexts.isEmpty else { return }
+        Log.service.info("ModelService.release reason=\(reason) count=\(webModelContexts.count)")
+        let contexts = webModelContexts.values
+        webModelContexts.removeAll()
+        contexts.forEach { $0.close() }
     }
 
     private func updateMCPActivation(from previous: Set<String>) {
