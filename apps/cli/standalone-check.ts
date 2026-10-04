@@ -17,7 +17,10 @@ const server = Bun.serve({
     if (server.upgrade(request)) return;
     const artifact = downloads.get(new URL(request.url).pathname);
     if (artifact) return new Response(Bun.file(artifact));
-    return Response.json({ devices: [] });
+    return Response.json({ devices: [{
+      name: "Standalone fixture", udid: "standalone-fixture", state: "Booted",
+      listeners: [{ port: server.port }],
+    }] });
   },
   websocket: {
     message(socket, message) {
@@ -80,10 +83,15 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
     throw new Error("Standalone executable could not inspect the example repository");
   }
   await run([executable, "--repository", repositoryDirectory, "repository", "validate"]);
-  const discovery = JSON.parse(await run([executable, "host", "discover", "--json"], {
-    ...environment, OX_SIM_DAEMON_PORT: String(server.port),
-  }));
-  if (discovery.hosts[0]?.endpoint !== "ws://127.0.0.1:9876") throw new Error("Standalone loaded the working directory's .env");
+  const discoveryEnvironment = { ...environment, OX_SIM_DAEMON_PORT: String(server.port) };
+  const candidates = JSON.parse(await run([executable, "host", "list", "--all", "--json"], discoveryEnvironment));
+  const configured = candidates.hosts.find((host: { source: string }) => host.source === "configuration");
+  if (configured?.endpoint !== "ws://127.0.0.1:9876") throw new Error("Standalone loaded the working directory's .env");
+  const discovery = JSON.parse(await run([executable, "host", "list", "--json"], discoveryEnvironment));
+  if (!discovery.hosts.some((host: { endpoint: string; reachable: boolean }) =>
+    host.endpoint === `ws://127.0.0.1:${server.port}` && host.reachable)) {
+    throw new Error("Standalone Host discovery missed the reachable fixture");
+  }
   const chats = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "chat", "list", "--json"]));
   if (chats[0]?.id !== "standalone-smoke") throw new Error("Standalone Host request failed");
   console.log(`PASS standalone ${nativePlatform}: download, install, version, help, repository validation, discovery, Host request; no Bun or Node on PATH`);
