@@ -1,6 +1,6 @@
 ---
 name: ox-demo
-description: Prepare and record the Ox iOS services demo with three chats and three short prompts. Use when recording, recreating, or preparing this specific demo.
+description: "Prepare and record the three-part Ox iOS demo: Connect anything, Local first, and Yours. Use when recording, recreating, or preparing this specific demo."
 ---
 
 # Ox Demo
