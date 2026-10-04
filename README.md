@@ -4,7 +4,7 @@
 
 <h1>OpenOx</h1>
 
-Ox is a local agent that uses the internet for you.
+A self-evolving mobile app.
 
 <h3>
 
@@ -21,9 +21,9 @@ Ox is a local agent that uses the internet for you.
 
 ## Features
 
-1. **Intelligent proxy** — Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable.
-2. **Free to use** — Ox is completely free and open source. You can use any model provider while keeping all your data on device.
-3. **Peace of mind** — Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time.
+1. **Connect anything** — Ox works across AI assistants, apps, and websites to get things done for you.
+2. **Local first** — Ox runs on your device, keeping your conversations, credentials, and memory stored locally.
+3. **Yours** — Open source and malleable, Ox evolves with you and uses the models you choose.
 
 ## Ox Clients and Hosts
 

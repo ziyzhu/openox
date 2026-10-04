@@ -4582,13 +4582,13 @@
         }
       }
     },
-    "Free to use" : {
+    "Local first" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "免费使用"
+            "value" : "本地优先"
           }
         }
       }
@@ -5065,13 +5065,13 @@
         }
       }
     },
-    "Intelligent proxy" : {
+    "Connect anything" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "智能代理"
+            "value" : "连接一切"
           }
         }
       }
@@ -6989,13 +6989,13 @@
         }
       }
     },
-    "Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time." : {
+    "Open source and malleable, Ox evolves with you and uses the models you choose." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 会在执行任何敏感操作前征求你的同意，隔离存放你的凭据，并让你随时停止它。"
+            "value" : "Ox 开源且可塑，随你一同进化，并使用你选择的模型。"
           }
         }
       }
@@ -7102,13 +7102,13 @@
         }
       }
     },
-    "Ox is completely free and open source. You can use any model provider while keeping all your data on device." : {
+    "Ox runs on your device, keeping your conversations, credentials, and memory stored locally." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 完全免费且开源。你可以使用任何模型提供商，同时将所有数据保留在设备上。"
+            "value" : "Ox 在你的设备上运行，将对话、凭据和记忆保存在本地。"
           }
         }
       }
@@ -7226,13 +7226,13 @@
         }
       }
     },
-    "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable." : {
+    "Ox works across AI assistants, apps, and websites to get things done for you." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ox 可以代你使用网站和应用，让你摆脱争夺注意力的界面和缓慢的旧式服务。Ox 还会把学到的内容转化为可复用的能力，让之后的交互更快、更可靠。"
+            "value" : "Ox 跨 AI 助手、应用和网站为你办事。"
           }
         }
       }
@@ -7397,13 +7397,13 @@
         }
       }
     },
-    "Peace of mind" : {
+    "Yours" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安心使用"
+            "value" : "属于你"
           }
         }
       }

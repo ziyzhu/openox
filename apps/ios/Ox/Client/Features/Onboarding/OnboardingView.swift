@@ -24,18 +24,18 @@ struct OnboardingView: View {
                     VStack(spacing: Theme.Spacing.xxl) {
                         OnboardingDisclosureRow(
                             symbol: "hammer",
-                            title: "Intelligent proxy",
-                            description: "Ox uses websites and apps on your behalf, freeing you from attention-hungry interfaces and slow legacy services. It turns what it learns into reusable capabilities, making future interactions faster and more reliable."
+                            title: "Connect anything",
+                            description: "Ox works across AI assistants, apps, and websites to get things done for you."
                         )
                         OnboardingDisclosureRow(
                             symbol: "chevron.left.forwardslash.chevron.right",
-                            title: "Free to use",
-                            description: "Ox is completely free and open source. You can use any model provider while keeping all your data on device."
+                            title: "Local first",
+                            description: "Ox runs on your device, keeping your conversations, credentials, and memory stored locally."
                         )
                         OnboardingDisclosureRow(
                             symbol: "hand.raised",
-                            title: "Peace of mind",
-                            description: "Ox asks before taking any sensitive actions, keeps your credentials isolated and lets you pull the plug any time."
+                            title: "Yours",
+                            description: "Open source and malleable, Ox evolves with you and uses the models you choose."
                         )
                     }
                     .padding(.top, Theme.Spacing.xxl)
