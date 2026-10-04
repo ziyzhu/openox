@@ -87,6 +87,25 @@ The CLI validates known method parameters before submission and validates
 successful results. An invalid result after submission does not authorize a
 retry: the operation may have executed, and no request is automatically resent.
 
+## Log pagination
+
+`logs.list` accepts optional `limit` (1–2,000, default 2,000), `cursor`, minimum
+`level`, exact `category`, case-insensitive `query` (message or category), and
+ISO 8601 `since` (inclusive). Filters run on the Host before the page limit.
+
+The first page contains the newest matches. Each page is chronological;
+`nextCursor` retrieves the next older page, with `hasMore` indicating whether one
+exists. Keep the same filters when continuing; the limit may change. Cursors are
+opaque and survive appends and app restarts. iOS binds them to the log file's
+identity, byte boundary, record digest, and filters. Compaction, replacement,
+truncation, or a changed boundary expires the cursor rather than returning a
+misaligned page. Start a fresh read after an expiration error.
+
+Pagination adds optional fields within RPC version 1. Existing clients may still
+request `{}` and ignore the metadata. Results without `hasMore` identify an older
+Host that does not support pagination. Log `seq` values describe positions in a
+snapshot, not durable global event IDs. Log follow remains bounded polling.
+
 ## Conformance
 
 The retained E2E suite validates the shared contract against a live Host.

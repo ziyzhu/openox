@@ -84,6 +84,15 @@ extension OxHostProtocol {
         let wait: Bool?
     }
 
+    struct GetLogsRequest: Decodable {
+        let limit: Int?
+        let cursor: String?
+        let level: String?
+        let category: String?
+        let query: String?
+        let since: String?
+    }
+
     struct RepositoryGateRequest: Decodable {
         let domain: String
         let action: String

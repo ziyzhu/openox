@@ -5,6 +5,7 @@
   "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services"],
   "scripts": {
     "test:e2e": "bun test tools/tests",
+    "test:logs": "bun apps/cli/logs-e2e.ts",
     "evals": "bun evals/runner.ts",
     "test:services": "bun tools/service-replay.ts",
     "build:services": "bun tools/ios-services-build.ts",

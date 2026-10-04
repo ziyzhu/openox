@@ -258,19 +258,38 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleGetLogs(_ command: EmptyRequest, reply: OxHostRPC.Reply) {
-        let logs = LogStore.shared.snapshot().map {
-            DebugLogRow(
-                seq: $0.id,
-                time: iso($0.date),
-                level: $0.level.name,
-                category: $0.category,
-                thread: $0.thread,
-                location: $0.location,
-                message: $0.message
-            )
+    static func handleGetLogs(_ command: GetLogsRequest, reply: OxHostRPC.Reply) {
+        Task {
+            do {
+                let limit = command.limit ?? 2_000
+                guard (1...2_000).contains(limit),
+                      command.cursor.map({ !$0.isEmpty && $0.count <= 2_048 }) ?? true else {
+                    reply.failure("logs.list: limit must be 1...2000 and cursor must be a nonempty token.", code: -32602)
+                    return
+                }
+                let fields: [String: String?] = ["level": command.level, "category": command.category,
+                                                "query": command.query, "since": command.since]
+                let query = try AppLogQuery(options: .object(fields.compactMapValues { $0.map(JSONValue.string) }))
+                let page = try await LogFile.shared.page(limit: limit, cursor: command.cursor, level: query.level,
+                                                         category: query.category, query: query.query, since: query.since)
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let logs = page.entries.map {
+                    DebugLogRow(
+                        seq: $0.id,
+                        time: formatter.string(from: $0.date),
+                        level: $0.level.name,
+                        category: $0.category,
+                        thread: $0.thread,
+                        location: $0.location,
+                        message: $0.message
+                    )
+                }
+                reply.success(GetLogsResult(logs: logs, nextCursor: page.nextCursor, hasMore: page.nextCursor != nil))
+            } catch {
+                reply.failure(error.localizedDescription)
+            }
         }
-        reply.success(GetLogsResult(logs: logs))
     }
 
     @MainActor

@@ -46,7 +46,7 @@ enum OxHostProtocol {
         case .sendChat: handleSendChat(try decode(SendChatRequest.self), chatManager: chats, reply: reply)
         case .stopChat: handleStopChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)
         case .listProviders: handleListProviders(try decode(EmptyRequest.self), reply: reply)
-        case .getLogs: handleGetLogs(try decode(EmptyRequest.self), reply: reply)
+        case .getLogs: handleGetLogs(try decode(GetLogsRequest.self), reply: reply)
         case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), chatManager: chats, reply: reply)
         case .replayStorageMigration: handleReplayStorageMigration(try decode(ReplayStorageMigrationRequest.self), reply: reply)

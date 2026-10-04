@@ -1,6 +1,13 @@
 {
   "params": [
     { "method": "host.describe", "params": {}, "valid": true },
+    { "method": "logs.list", "params": {}, "valid": true },
+    { "method": "logs.list", "params": { "limit": 100, "cursor": "opaque", "level": "warning", "category": "Session", "query": "failed", "since": "2026-10-01T00:00:00Z" }, "valid": true },
+    { "method": "logs.list", "params": { "limit": 0 }, "valid": false },
+    { "method": "logs.list", "params": { "limit": 2001 }, "valid": false },
+    { "method": "logs.list", "params": { "limit": 1.5 }, "valid": false },
+    { "method": "logs.list", "params": { "cursor": "" }, "valid": false },
+    { "method": "logs.list", "params": { "level": "trace" }, "valid": false },
     { "method": "host.describe", "params": [], "valid": true },
     { "method": "host.describe", "params": { "extra": true }, "valid": false },
     { "method": "host.describe", "params": null, "valid": false },
@@ -32,6 +39,10 @@
     { "method": "agents.evaluate", "params": { "sessionId": "chat", "providerId": "example", "modelId": "example", "prompts": [], "fixtures": [], "maxTurns": 1.5, "timeoutMs": 1000 }, "valid": false }
   ],
   "results": [
+    { "method": "logs.list", "result": { "logs": [] }, "valid": true },
+    { "method": "logs.list", "result": { "logs": [], "hasMore": false }, "valid": true },
+    { "method": "logs.list", "result": { "logs": [], "hasMore": true, "nextCursor": "opaque" }, "valid": true },
+    { "method": "logs.list", "result": { "logs": [], "nextCursor": 123 }, "valid": false },
     { "method": "host.describe", "result": { "implementation": { "name": "Example", "version": "1", "build": "1" }, "protocols": { "rpc": [1] }, "methods": [] }, "valid": true },
     { "method": "host.describe", "result": { "methods": [] }, "valid": false },
     { "method": "chats.list", "result": { "chats": [] }, "valid": true },

@@ -177,7 +177,9 @@ extension Chat {
         let query = try AppLogQuery(options: options)
         return try await tracked(Actions.appLogs, options ?? .object([:]), purpose: purpose) {
             try Task.checkCancellation()
-            let result = query.read(LogStore.shared.snapshot())
+            let snapshot = try await LogFile.shared.snapshot()
+            try Task.checkCancellation()
+            let result = query.read(snapshot)
             Log.session.info("bridge.app.logs entries=\(result.objectValue?["entries"]?.arrayValue?.count ?? 0) truncated=\(result.objectValue?["truncated"]?.boolValue ?? false)")
             return result
         }

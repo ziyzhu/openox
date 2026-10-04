@@ -48,6 +48,9 @@ Target the default DEBUG iOS Simulator Host with `ox vm`. Pass
 ox chat list
 ox chat inspect
 ox host logs --level warning
+ox host logs --all --level warning --grep timeout
+ox host logs --page --limit 100 --json
+ox host logs --cursor '<nextCursor>' --limit 100 --json
 ox vm inspect
 ox vm functions
 ox vm help ox.fs.read

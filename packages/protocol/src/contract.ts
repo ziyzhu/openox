@@ -20,6 +20,12 @@ const opaque = (name: string, description: string) => object(name, {}, { descrip
 export const Schemas = {
   EmptyRequest: object("EmptyRequest", {}, { additionalProperties: false }),
   SessionRequest: object("SessionRequest", { sessionId: nullable(S()) }),
+  GetLogsRequest: object("GetLogsRequest", {
+    limit: nullable(I({ minimum: 1, maximum: 2000 })), cursor: nullable(S({ minLength: 1, maxLength: 2048 })),
+    level: nullable(S({ enum: ["debug", "info", "warning", "error"] })),
+    category: nullable(S({ minLength: 1, maxLength: 80 })), query: nullable(S({ minLength: 1, maxLength: 200 })),
+    since: nullable(S({ minLength: 1, maxLength: 40 })),
+  }),
   ActionRequest: object("ActionRequest", { domain: S(), action: S(), args: nullable(json()), approve: nullable(B()) }),
   EvaluateRequest: object("EvaluateRequest", { domain: S(), script: S() }),
   ServiceRequest: object("ServiceRequest", { domain: S() }),
@@ -97,7 +103,7 @@ export const Schemas = {
   }),
   ListProvidersResult: object("ListProvidersResult", { region: S(), providers: A(R("ProviderRow")) }),
   LogRow: object("LogRow", { seq: I(), time: S(), level: S(), category: S(), thread: S(), location: S(), message: S() }),
-  GetLogsResult: object("GetLogsResult", { logs: A(R("LogRow")) }),
+  GetLogsResult: object("GetLogsResult", { logs: A(R("LogRow")), nextCursor: optional(S()), hasMore: optional(B()) }),
   ComposerFormattingResult: object("ComposerFormattingResult", {
     text: S(), hasForegroundColor: B(), visibleHasOrangeForeground: B(), visibleHasPrimaryForeground: B(), visibleHasMarkedText: B(),
   }),
@@ -138,7 +144,7 @@ export const Methods = {
   "chats.send": method("sendChat", "SendChatRequest", "SendChatResult"),
   "chats.stop": method("stopChat", "SessionRequest", "StopChatResult"),
   "providers.list": method("listProviders", "EmptyRequest", "ListProvidersResult"),
-  "logs.list": method("getLogs", "EmptyRequest", "GetLogsResult"),
+  "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
   "debug.repositories.saveGate": method("repositoryGate", "RepositoryGateRequest", "RepositorySaveGateResult"),
   "debug.storage.replayMigration": method("replayStorageMigration", "ReplayStorageMigrationRequest", "StorageMigrationReplayResult"),

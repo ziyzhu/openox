@@ -236,6 +236,32 @@ then probes `host.describe`. Only reachable Hosts are shown by default; `--all`
 also shows unavailable candidates. Physical-device discovery uses port 9876;
 pass `--host` explicitly for another port. `host discover` remains a compatibility alias.
 
+On iOS, `host logs` reads the retained on-device `logs.jsonl`, including previous
+app runs. By default it returns the latest 2,000 matches; filters run on the Host
+before this limit. `--all` walks all older pages, and `--tail` can exceed 2,000.
+The file compacts from over 10 MiB to roughly 5 MiB; retention is size-based, not
+age-based. There is no in-app Logs viewer.
+
+```sh
+ox host logs --all --level warning --grep timeout --json
+ox host logs --tail 5000 --category Session
+ox host logs --page --limit 100 --since 2026-10-01T00:00:00Z --json
+ox host logs --cursor '<nextCursor>' --limit 100 --since 2026-10-01T00:00:00Z --json
+```
+
+`--page --json` (also implied by `--cursor --json`) returns
+`{ logs, nextCursor, hasMore }`; ordinary `--json` reads remain arrays. Each page
+is chronological, and cursors walk backward. Keep filters unchanged when using
+a cursor; the page size may change. Cursors survive new writes and app restarts
+but expire after compaction or file replacement; start a new read if that happens.
+`--page`/`--cursor`, `--all`, and `--follow` are mutually exclusive; `--tail` cannot
+be combined with explicit page mode or `--all`. Follow mode still polls a bounded
+recent window. Older Hosts allow ordinary reads but reject pagination requests
+with an update message.
+
+Run CLI process E2E checks with `bun run test:logs`; add `--host <ws-url>` to
+exercise pagination on a live Host as well.
+
 One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
 `host logs --follow --json` emit one JSON object per line. Watch commands use
 request-based snapshots, tolerate Host restarts, and retry until interrupted.
@@ -421,7 +447,7 @@ ox [--host <ws-url>] --repository <path-or-url> repository test [<domain>[:<acti
 
 ox host list [--all] [--json] [--timeout 3000]
 ox [--host <ws-url>] host describe [--json] [--timeout 30000]
-ox [--host <ws-url>] host logs [--level debug|info|warning|error] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]
+ox [--host <ws-url>] host logs [--level debug|info|warning|error] [--grep <substring>] [--category <name>] [--since <ISO-8601>] [--tail <count>] [--limit 1..2000] [--page | --cursor <token> | --all | --follow] [--json] [--timeout 30000] [--interval 1000]
 ox [--host <ws-url>] host providers [--json] [--timeout 30000]
 ox [--host <ws-url>] host services [--json] [--timeout 30000]
 ox [--host <ws-url>] host service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--approve] [--json] [--timeout 30000]

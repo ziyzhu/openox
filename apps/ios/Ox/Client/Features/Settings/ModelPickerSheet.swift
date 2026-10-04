@@ -76,11 +76,6 @@ struct SettingsSheet: View {
         Binding(get: { theme.theme }, set: { theme.theme = $0 })
     }
 
-    private var logsSummary: Text {
-        let count = LogStore.shared.count
-        return count == 0 ? Text("Empty") : Text(verbatim: "\(count)")
-    }
-
     private var defaultModelValue: Text {
         guard let selection = registry.defaultModel else { return Text("Not configured") }
         let client = registry.client(for: selection)
@@ -256,21 +251,6 @@ struct SettingsSheet: View {
                         }
                     }
 
-                    SettingsSection(
-                        "Developer",
-                        footer: "Recent on-device activity for troubleshooting. Logs are held in memory and never leave your device.",
-                        layout: .group
-                    ) {
-                        VStack(spacing: 0) {
-                            NavigationLink {
-                                LogsView()
-                            } label: {
-                                SettingsDisclosureRow(title: "Logs", value: logsSummary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(A11yID.Settings.logs)
-                        }
-                    }
                 }
                 .settingsPagePadding()
             }

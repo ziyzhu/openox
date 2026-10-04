@@ -618,12 +618,22 @@ contents rather than device storage.
 `Library/Application Support/logs.jsonl` is the durable structured log. Each
 line contains timestamp, level, category, source location, and message. Writes
 flush periodically, on a pending threshold, and during lifecycle transitions.
-The file is capped at 10 MB by retaining the newest portion.
+When the file exceeds 10 MiB, compaction retains roughly the newest 5 MiB of
+complete lines. There is no age-based expiry.
 
-Logs stay outside Profiles, Files, iCloud, and backup. Export shares the file.
-Clearing the in-memory log view does not erase its durable history. Logs may
-contain user data needed for diagnosis but never credentials or reusable
-secrets.
+This file is the sole app diagnostic store. The CLI and other Clients read a
+filtered, cursor-paginated history through `logs.list` (up to 2,000 records per
+page); the approval-gated `ox.app.logs` function
+filters the retained file, including previous app runs. Reads flush pending writes
+and run on the log file's serial utility queue. No Logs row or viewer appears in
+Settings, and no separate in-memory history is retained. The existing JSONL path
+and record format are unchanged, so previously written logs remain readable
+without a migration. RPC cursors carry only transient read positions and filter
+bindings; no pagination index or cursor state is persisted. They survive appends
+and restarts, but fail explicitly after compaction or file replacement.
+
+Logs stay outside Profiles, Files, iCloud, and backup. Logs may contain user data
+needed for diagnosis but never credentials or reusable secrets.
 
 ## Retention summary
 

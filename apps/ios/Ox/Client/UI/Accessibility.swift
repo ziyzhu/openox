@@ -120,7 +120,6 @@ nonisolated enum A11yID {
         static func profileDuplicate(_ id: String) -> String { "settings.profileDuplicate.\(id)" }
         static func profileDelete(_ id: String) -> String { "settings.profileDelete.\(id)" }
         static let server = "settings.server"
-        static let logs = "settings.logs"
         static let discord = "settings.discord"
         static let github = "settings.github"
         static let howItWorks = "settings.howItWorks"
@@ -289,13 +288,6 @@ nonisolated enum A11yID {
         static let choiceCustomSubmit = "chat.choice.customSubmit"
         static func confirm(_ option: String) -> String { "chat.confirm.\(option)" }
         static func confirmReceipt(_ option: String) -> String { "chat.confirm.receipt.\(option)" }
-    }
-
-    enum Logs {
-        static let reload = "logs.reload"
-        static let copy = "logs.copy"
-        static let export = "logs.export"
-        static let clear = "logs.clear"
     }
 
     enum ServiceHandoff {

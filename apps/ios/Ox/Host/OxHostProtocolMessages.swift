@@ -91,6 +91,8 @@ extension OxHostProtocol {
 
     struct GetLogsResult: Encodable {
         let logs: [DebugLogRow]
+        let nextCursor: String?
+        let hasMore: Bool
     }
 
     struct RepositorySaveGateResult: Encodable {

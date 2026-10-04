@@ -206,7 +206,6 @@ nonisolated final class Logger: @unchecked Sendable {
         case .warning: oslog.warning("\(loc, privacy: .public) \(msg, privacy: .public)")
         case .error:   oslog.error("\(loc, privacy: .public) \(msg, privacy: .public)")
         }
-        LogStore.shared.append(date: date, level: level, category: category, thread: thread, location: loc, message: msg)
         LogFile.shared.append(date: date, level: level, category: category, thread: thread, location: loc, message: msg)
     }
 
@@ -237,7 +236,7 @@ nonisolated enum Log {
     static let perf     = Logger(category: "Perf")
 }
 
-nonisolated struct LogEntry: Identifiable, Sendable {
+nonisolated struct LogEntry: Sendable {
     let id: Int
     let date: Date
     let level: Logger.Level
@@ -245,47 +244,4 @@ nonisolated struct LogEntry: Identifiable, Sendable {
     let thread: String
     let location: String
     let message: String
-
-    var line: String {
-        "\(LogStore.timeFormatter.string(from: date)) \(level.name.uppercased()) [\(category)] (\(thread)) \(location) \(message)"
-    }
-}
-
-nonisolated final class LogStore: @unchecked Sendable {
-    static let shared = LogStore()
-
-    static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
-
-    private let maxEntries = 2000
-    private struct State {
-        var entries: [LogEntry] = []
-        var sequence = 0
-    }
-    private let state = Mutex(State())
-
-    var count: Int {
-        state.withLock { $0.entries.count }
-    }
-
-    func append(date: Date, level: Logger.Level, category: String, thread: String, location: String, message: String) {
-        state.withLock { state in
-            state.sequence += 1
-            state.entries.append(LogEntry(id: state.sequence, date: date, level: level, category: category, thread: thread, location: location, message: message))
-            if state.entries.count > maxEntries + 256 {
-                state.entries.removeFirst(state.entries.count - maxEntries)
-            }
-        }
-    }
-
-    func snapshot() -> [LogEntry] {
-        state.withLock { $0.entries }
-    }
-
-    func clear() {
-        state.withLock { $0.entries.removeAll(keepingCapacity: true) }
-    }
 }
