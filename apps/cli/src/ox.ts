@@ -7,8 +7,10 @@ import { HOST_COMMANDS } from "./host.ts";
 import { SUBS as chatCommands } from "./chat.ts";
 import { SUBS as vmCommands } from "./vm.ts";
 import packageMetadata from "../package.json";
+import { serve } from "./serve.ts";
 
 const groups: Record<string, CommandGroup> = {
+  serve: { desc: "Serve managed Pi sessions as MCP over Tailscale.", fn: (args) => serve(args) },
   profile: group("profile", "Read a Profile directly from disk (--profile <path>).", PROFILE_COMMANDS),
   repository: group("repository", "Inspect, validate, serve, and test a repository (--repository <path-or-url>).", {
     ...REPOSITORY_COMMANDS,

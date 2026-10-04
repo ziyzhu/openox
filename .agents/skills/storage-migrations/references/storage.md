@@ -665,3 +665,26 @@ API base URL, repository ID, and service domain; a mismatch requires setup.
 Sign out unbinds static credentials or removes the managed OAuth envelope.
 Replacing a static credential writes a dedicated Secret entry for that service.
 Auth status is observed at runtime rather than persisted.
+
+## CLI-managed Pi sessions
+
+`ox serve` owns a separate, on-device CLI store at `~/.openox/serve` (or the
+explicit `--data-dir`). It is not an iOS Profile and does not sync through Ox.
+Each `sessions/<uuid>/session.json` is a version-1 metadata document containing
+its UUID, working directory, optional name, and optional model selection.
+`session.json` is atomically published before launch; a failed launch retains a
+resumable catalog entry. `sessions/<uuid>/pi/` contains Pi-owned durable JSONL
+sessions; Ox does not rewrite or migrate their format. Metadata has no predecessor
+representation, and incompatible documents fail validation without rewriting
+bytes. No additional migrator or legacy-format fallback is introduced.
+
+`serve.lock/owner.json` records the running server PID and ingress address. The
+lock prevents concurrent writers and is removed on clean shutdown; crash recovery
+requires the operator to confirm no server or orphaned agent remains before
+removing it. Runtime identities, deduplication results, and conversation
+projections are memory-only. Saved sessions remain until the user removes them
+from disk. Host backup behavior is user-controlled; no automatic backup or cloud
+synchronization is configured. Tailscale Serve owns TLS certificates; Ox stores
+no certificate material. Publication is foreground-only and Ox does not replace
+existing Serve configuration. CLI diagnostics are structured stderr output, with
+retention controlled by the caller's redirection.
