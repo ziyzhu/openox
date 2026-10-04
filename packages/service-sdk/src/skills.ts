@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 import {
   SYSTEM_SKILL_NAMES, SKILL_NAME_RE, MAXIMUM_SKILL_BYTES, MAXIMUM_SKILL_FILES,
-  parseSkill, isSkillResourcePath, type SkillPackage, type SkillResult,
+  parseSkill, isSkillResourcePath, type Skill, type SkillResult,
 } from "@openox/protocol/skills";
 
 export * from "@openox/protocol/skills";
 
-export function readSkill(directory: string, name: string): SkillPackage {
+export function readSkill(directory: string, name: string): Skill {
   const files: Record<string, string> = {};
   let total = 0;
   function collect(root: string, relative = ""): void {

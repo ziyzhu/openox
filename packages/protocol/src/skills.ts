@@ -9,16 +9,16 @@ export interface SkillMeta {
   services: string[];
 }
 
-export interface SkillPackage extends SkillMeta {
+export interface Skill extends SkillMeta {
   instructions: string;
   resources: Record<string, string>;
 }
 
 export type SkillResult =
-  | { ok: true; skills: SkillPackage[] }
+  | { ok: true; skills: Skill[] }
   | { ok: false; error: string };
 
-export function parseSkill(text: string, name: string): SkillPackage {
+export function parseSkill(text: string, name: string): Skill {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(text);
   if (!match || (!SKILL_NAME_RE.test(name) || name.length > 100)) throw new Error(`${name}: invalid skill frontmatter`);
   const fields: Record<string, string> = {};
