@@ -51,7 +51,7 @@ nonisolated enum SkillFiles {
     static let fileName = "SKILL.md"
     static let maximumBytes = 524_288
     static let maximumFiles = 64
-    static let reservedNames: Set<String> = ["evolve", "import-memory", "manage-skills", "visualize"]
+    static let reservedNames: Set<String> = ["evolve", "import-memory", "manage-providers", "manage-skills", "visualize"]
 
     static func displayName(_ name: String) -> String {
         name

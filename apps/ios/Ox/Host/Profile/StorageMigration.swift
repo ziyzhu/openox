@@ -26,6 +26,7 @@ nonisolated enum ProfileSchema {
         "2026-09-24-repository-skills",
         "2026-09-25-import-memory",
         "2026-09-27-outcome-skills",
+        "2026-09-28-provider-skill",
     ]
     static var current: String { versions.last! }
 
@@ -49,6 +50,7 @@ nonisolated enum ProfileSchema {
         { try StorageMigrator.migrateProfileSkillCatalog(at: $0) },
         { try StorageMigrator.migrateReservedImportMemorySkill(at: $0) },
         { try StorageMigrator.migrateReservedOutcomeSkills(at: $0) },
+        { try StorageMigrator.migrateReservedSkill("manage-providers", at: $0) },
     ]
 }
 
@@ -1287,7 +1289,7 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    private static func migrateReservedSkill(_ name: String, at root: URL) throws {
+    fileprivate static func migrateReservedSkill(_ name: String, at root: URL) throws {
         let manager = FileManager.default
         let source = root.appendingPathComponent("skills/\(name)", isDirectory: true)
         let destination = root.appendingPathComponent("skills/user-\(name)", isDirectory: true)
@@ -2490,7 +2492,7 @@ nonisolated enum StorageMigrator {
         scheduleDecoder.dateDecodingStrategy = .iso8601
         let upgraded = try scheduleDecoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: scheduleFile)).validated()
         checks["legacyScheduledPackageMigrated"] = upgraded.schedules.first?.skill.name == "user-manage-skills" && upgraded.schedules.first?.skill.instructions == "Read skills/manage-services/SKILL.md." && upgraded.schedules.first?.skill.resources == original.resources
-        for name in ["import-memory", "evolve", "visualize"] {
+        for name in ["import-memory", "evolve", "visualize", "manage-providers"] {
             let collisionRoot = root.appendingPathComponent("\(name)-collision")
             let source = collisionRoot.appendingPathComponent("skills/\(name)")
             let destination = collisionRoot.appendingPathComponent("skills/user-\(name)")

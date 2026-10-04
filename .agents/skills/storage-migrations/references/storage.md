@@ -419,6 +419,14 @@ packages using a newly reserved name fail catalog validation with their files
 untouched; their author must rename them. Saved invocations and schedules keep
 their frozen packages, and transcript bytes remain unchanged.
 
+The `2026-09-28-provider-skill` Profile milestone reserves `manage-providers` for
+on-device provider/model catalog management. An existing Profile package moves
+to `user-manage-providers`, preserving its resources and explicit user source
+selection. Unequal destination collisions stop migration with both packages
+intact. Repository packages using the reserved name must be renamed by their
+author; frozen invocations, schedules, and transcripts remain unchanged. Provider
+catalog storage and credential ownership are unchanged.
+
 `Application Support/scheduled-skills.json` is a version 2 device-owned document
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
 and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly

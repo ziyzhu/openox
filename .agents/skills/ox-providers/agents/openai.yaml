@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ox Providers"
+  short_description: "Drive Ox provider management and ship reviewed defaults"
+  default_prompt: "Use $ox-providers to drive Ox's manage-providers workflow, promote verified bundled updates, or maintain native integration support."

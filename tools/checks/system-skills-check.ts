@@ -10,6 +10,7 @@ const expectedReferences = new Map([
   ["import-memory", []],
   ["visualize", ["canvas.md"]],
   ["evolve", ["api-service.md", "helpers.js", "model-schemas.md", "model-service.md", "web-service.md"]],
+  ["manage-providers", []],
   ["manage-skills", ["repository-skill.md", "user-skill.md"]],
 ]);
 

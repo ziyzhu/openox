@@ -1586,7 +1586,7 @@ extension Scenario {
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = ["evolve", "import-memory", "manage-skills", "visualize"].allSatisfy {
+        let hasStableSystemSkills = SkillFiles.reservedNames.allSatisfy {
             ctx.transientContext.contains("skills/\($0)/SKILL.md") && !ctx.systemPrompt.contains("- `skills/\($0)/SKILL.md` —")
         }
         let hasTimestamp = ctx.serializedUserText
@@ -1657,12 +1657,16 @@ extension Scenario {
             const references = await ox.fs.list({ path: "skills/manage-skills/references", purpose: "List skill references" });
             const user = await ox.fs.read({ path: "skills/manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
             const matched = await ox.fs.glob({ path: "skills/manage-skills", pattern: "references/*.md", purpose: "Find skill references" });
-            console.log(JSON.stringify({ manager: manager.text.includes("# Manage Skills"), references: references.items.map(item => item.path), user: user.text.includes("# User Skill"), matched: matched.paths }));
+            const providers = await ox.fs.read({ path: "skills/manage-providers/SKILL.md", purpose: "Activate provider management" });
+            const defaults = await ox.provider.default({ purpose: "Inspect read-only bundled providers" });
+            const validation = await ox.provider.validate({ provider: defaults[0], purpose: "Validate without changing the catalog" });
+            console.log(JSON.stringify({ manager: manager.text.includes("# Manage Skills"), references: references.items.map(item => item.path), user: user.text.includes("# User Skill"), matched: matched.paths, providers: providers.text.includes("# Manage Providers") && validation.valid === true }));
             """)]
         }
         guard let result = JSONValue.parse(jsonString: output)?.objectValue,
               result["manager"]?.boolValue == true,
               result["user"]?.boolValue == true,
+              result["providers"]?.boolValue == true,
               result["references"]?.arrayValue?.compactMap(\.stringValue) == [
                 "skills/manage-skills/references/repository-skill.md",
                 "skills/manage-skills/references/user-skill.md",
