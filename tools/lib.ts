@@ -48,14 +48,15 @@ export async function runCheck(check: Check): Promise<void> {
 export type Generated = Record<string, string>;
 
 export async function writeGenerated(files: Generated): Promise<void> {
-  for (const [path, contents] of Object.entries(files)) await Bun.write(path, contents);
+  for (const [path, contents] of Object.entries(files)) await Bun.write(resolve(ROOT, path), contents);
 }
 
 export async function checkGenerated(files: Generated, command: string): Promise<void> {
   const stale: string[] = [];
   for (const [path, contents] of Object.entries(files)) {
-    const file = Bun.file(path);
-    if (!await file.exists() || await file.text() !== contents) stale.push(relative(ROOT, path));
+    const absolute = resolve(ROOT, path);
+    const file = Bun.file(absolute);
+    if (!await file.exists() || await file.text() !== contents) stale.push(relative(ROOT, absolute));
   }
   if (stale.length > 0) throw new Error(`Generated files are stale. Run bun run ${command}:\n${stale.join("\n")}`);
 }

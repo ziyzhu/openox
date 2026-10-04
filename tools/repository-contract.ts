@@ -1,9 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { RepositoryPackageSchema, REPOSITORY_VERSIONS } from "../packages/protocol/src/repository.ts";
 import { ServiceManifestSchema, APIAuthSchema } from "../packages/protocol/src/manifest.ts";
 import { IOSCatalogManifestSchema, MCPCatalogManifestSchema } from "../packages/protocol/src/catalog.ts";
-import { ROOT, runCheck } from "./lib.ts";
+import { checkGenerated, writeGenerated, runCheck } from "./lib.ts";
 
 export function artifacts(): Record<string, string> {
   const schema = {
@@ -27,15 +25,11 @@ export function artifacts(): Record<string, string> {
 }
 
 export async function check(): Promise<string> {
-  for (const [path, expected] of Object.entries(artifacts())) {
-    const actual = await readFile(join(ROOT, path), "utf8").catch(() => "");
-    if (actual !== expected) throw new Error(`${path} is stale; run bun tools/repository-contract.ts --write`);
-  }
+  await checkGenerated(artifacts(), "build:repository-schema");
   return `Host-Repository contract: versions ${REPOSITORY_VERSIONS.join(", ")}, portable schemas and iOS version synchronized`;
 }
 
 if (import.meta.main) {
-  if (process.argv.includes("--write")) {
-    for (const [path, content] of Object.entries(artifacts())) await writeFile(join(ROOT, path), content);
-  } else await runCheck(check);
+  if (process.argv.includes("--write")) await writeGenerated(artifacts());
+  else await runCheck(check);
 }

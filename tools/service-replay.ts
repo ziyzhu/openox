@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { callHost } from "../apps/cli/src/host-rpc.ts";
 import { ROOT, killChildren, run } from "./lib.ts";
-import { qaCommand, targetedQaDevice } from "./qa-config.ts";
+import { qaCommand } from "./qa-config.ts";
 
 const BUNDLE_ID = Bun.env.OX_BUNDLE_ID ?? "ai.openox.local";
 const PROJECT = join(ROOT, "apps/ios/Ox.xcodeproj");
 const SCHEME = "ios";
 
 type SimInventory = {
-  devices?: Record<string, Array<{ name?: unknown }>>;
+  devices?: Record<string, Array<{ name?: string; state?: string; isAvailable?: boolean }>>;
 };
 
 let interrupted: NodeJS.Signals | undefined;
@@ -25,15 +25,16 @@ function interrupt(signal: NodeJS.Signals): void {
 process.once("SIGINT", () => interrupt("SIGINT"));
 process.once("SIGTERM", () => interrupt("SIGTERM"));
 
-async function ensureDevice(device: string): Promise<void> {
+async function requireDevice(device: string): Promise<boolean> {
   const inventory = JSON.parse((await run(["sim", "devices"], { capture: true })).stdout) as SimInventory;
-  const simulators = Object.values(inventory.devices ?? {}).flat();
-  if (simulators.some((candidate) => candidate.name === device)) return;
-  const source = device === targetedQaDevice ? undefined : targetedQaDevice;
-  if (!source || !simulators.some((candidate) => candidate.name === source)) {
-    throw new Error(`Cannot create ${device}: no QA simulator template is available`);
-  }
-  await run(["sim", "devices", "clone", source, device]);
+  const simulators = Object.entries(inventory.devices ?? {}).flatMap(([runtime, devices]) =>
+    devices.map((candidate) => ({ ...candidate, runtime })));
+  const target = simulators.find((candidate) => candidate.name === device && candidate.isAvailable !== false);
+  if (!target) throw new Error(`Simulator ${device} is unavailable; provision the QA pool before replay`);
+  const version = Number(device.slice(-1)) <= 3 ? 26 : 27;
+  if (!target.runtime.includes(`.iOS-${version}-`)) throw new Error(`${device} must run iOS ${version}`);
+  if (target.state !== "Booted" && target.state !== "Shutdown") throw new Error(`${device} is ${target.state}; wait before replay`);
+  return target.state === "Booted";
 }
 
 async function requireFreePort(port: number): Promise<void> {
@@ -115,11 +116,11 @@ function staleClaim(path: string): boolean {
 }
 
 const config = qaCommand({
-  usage: "Usage: bun run test:services [domain[:action[:case]]] [--repository <repository>] [--device ox-N]",
-  options: { repository: { type: "string" } },
+  usage: "Usage: bun run test:services [domain[:action[:case]]] --device ox-N [--repository <repository>] [--reset]\nReserve the device first. --reset uninstalls the app and deletes its local data before replay.",
+  options: { repository: { type: "string" }, reset: { type: "boolean" } },
   positionals: 1,
-  defaultDevice: targetedQaDevice,
 });
+if (!config.values.device) throw new Error("Pass --device ox-N explicitly after reserving the simulator");
 const selector = config.positionals[0];
 const repositoryRoot = config.values.repository ?? Bun.env.OX_SERVER_ROOT;
 const repository = repositoryRoot ? resolve(repositoryRoot) : undefined;
@@ -127,6 +128,8 @@ const release = claimDevice(config.device);
 let registry: ReturnType<typeof Bun.spawn> | undefined;
 let failed = false;
 let serverTemporary: string | undefined;
+let bootedByReplay = false;
+let launchAttempted = false;
 
 try {
   await Promise.all([
@@ -134,7 +137,7 @@ try {
     ...(repository ? [requireFreePort(config.registryPort)] : []),
     requireFreePort(config.debugPort),
   ]);
-  await ensureDevice(config.device);
+  const wasBooted = await requireDevice(config.device);
   console.log(`Service replay ${config.device}: proxy ${config.serviceProxyPort}, services ${repository ? `repository ${config.registryPort}` : "bundled"}, debug ${config.debugPort}`);
   if (repository) {
     serverTemporary = mkdtempSync(join(tmpdir(), "openox-service-replay-"));
@@ -156,13 +159,17 @@ try {
       registry.exited.then((code) => { throw new Error(`repository server exited ${code}`); }),
     ]);
   }
-  await run(["sim", "devices", "boot", config.device]);
-  await run(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
+  if (!wasBooted) {
+    await run(["sim", "devices", "boot", config.device]);
+    bootedByReplay = true;
+  }
+  if (config.values.reset) await run(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
   await run([
     "sim", "--device", config.device,
     "defaults", "write", BUNDLE_ID,
     "app.hasCompletedOnboarding", "true", "--type", "bool",
   ]);
+  launchAttempted = true;
   await run([
     "sim", "--device", config.device,
     "run", BUNDLE_ID,
@@ -193,13 +200,15 @@ try {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = interrupted === "SIGINT" ? 130 : interrupted === "SIGTERM" ? 143 : 1;
 } finally {
-  if (failed) await run(["sim", "--device", config.device, "logs"], { allowFailure: true });
-  if (registry) {
-    registry.kill("SIGTERM");
-    await registry.exited;
+  try {
+    if (failed && launchAttempted) await run(["sim", "--device", config.device, "logs"], { allowFailure: true });
+    if (registry) {
+      registry.kill("SIGTERM");
+      await registry.exited;
+    }
+    if (bootedByReplay) await run(["sim", "devices", "shutdown", config.device], { allowFailure: true });
+    if (serverTemporary) rmSync(serverTemporary, { recursive: true, force: true });
+  } finally {
+    release();
   }
-  await run(["sim", "--device", config.device, "uninstall", BUNDLE_ID], { allowFailure: true });
-  await run(["sim", "devices", "shutdown", config.device], { allowFailure: true });
-  if (serverTemporary) rmSync(serverTemporary, { recursive: true, force: true });
-  release();
 }

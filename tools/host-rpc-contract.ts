@@ -1,10 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { type TSchema } from "@sinclair/typebox";
 import {
   Methods, Schemas, RPC_VERSION, RequestSchema, ResponseSchema, ErrorSchema, RequestBatchSchema, ResponseBatchSchema,
 } from "../packages/protocol/src/contract.ts";
-import { ROOT, runCheck } from "./lib.ts";
+import { checkGenerated, writeGenerated, runCheck } from "./lib.ts";
 
 function portable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(portable);
@@ -63,15 +61,11 @@ export function artifacts(): Record<string, string> {
 }
 
 export async function check(): Promise<string> {
-  for (const [path, expected] of Object.entries(artifacts())) {
-    const actual = await readFile(join(ROOT, path), "utf8").catch(() => "");
-    if (actual !== expected) throw new Error(`${path} is stale; run bun tools/host-rpc-contract.ts --write`);
-  }
+  await checkGenerated(artifacts(), "build:host-schema");
   return `Host RPC schema v${RPC_VERSION}: ${Object.keys(Methods).length} methods, JSON Schema and Swift requests synchronized`;
 }
 
 if (import.meta.main) {
-  if (process.argv.includes("--write")) {
-    for (const [path, content] of Object.entries(artifacts())) await writeFile(join(ROOT, path), content);
-  } else await runCheck(check);
+  if (process.argv.includes("--write")) await writeGenerated(artifacts());
+  else await runCheck(check);
 }

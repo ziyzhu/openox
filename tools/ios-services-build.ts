@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { buildArtifacts } from "../packages/services/src/build.ts";
-import { ROOT } from "./lib.ts";
+import { ROOT, run } from "./lib.ts";
 import { MODEL_ACTION_SCHEMAS } from "../packages/protocol/src/model-actions.ts";
 
 const destination = join(ROOT, "apps", "ios", "Ox", "Resources", "OxServices.bundle");
@@ -22,15 +22,7 @@ const localPackage = `{
 `;
 
 async function git(root: string, args: string[], environment: Record<string, string> = {}): Promise<void> {
-  const process = Bun.spawn(["git", "-C", root, ...args], {
-    env: { ...Bun.env, ...environment },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const code = await process.exited;
-  if (code === 0) return;
-  const detail = (await new Response(process.stderr).text()).trim();
-  throw new Error(`git ${args.join(" ")} failed${detail ? `: ${detail}` : ""}`);
+  await run(["git", "-C", root, ...args], { capture: true, env: environment });
 }
 
 async function initializeRepository(root: string, message: string): Promise<void> {
