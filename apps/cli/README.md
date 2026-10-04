@@ -88,16 +88,9 @@ for agent and simulator setup.
 
 ## Connect to Pi through MCP
 
-The Pi session server lives in the independent public
-[pi-mcp repository](https://github.com/ziyzhu/pi-mcp), not the Ox CLI. Run its
-standalone launcher with optional Tailscale publication and add the printed
-Streamable HTTP `/mcp` URL through Ox's existing remote MCP connection settings.
-Ox remains an ordinary MCP client; it does not own Pi processes or publication.
-
-Existing `~/.openox/serve` stores remain untouched. Stop the old server, then use
-pi-mcp's `--data-dir ~/.openox/serve` and the original `--directory` root to resume
-saved sessions in place. See pi-mcp's README for security, storage compatibility,
-launcher options, and verification. Do not run both servers against one store.
+Run [pi-mcp](https://github.com/ziyzhu/pi-mcp) separately and add its printed
+Streamable HTTP URL through Ox's remote MCP connection settings. Setup and
+existing-store instructions live in that repository.
 
 ## Targeting model
 

@@ -678,21 +678,9 @@ Auth status is observed at runtime rather than persisted.
 
 ## External Pi session server
 
-The former `ox serve` implementation now lives in the independent
-[pi-mcp repository](https://github.com/ziyzhu/pi-mcp). Ox is only an MCP client;
-pi-mcp owns session processes, storage, and optional Tailscale publication.
-This is not an iOS Profile and does not sync through Ox.
-
-Existing `~/.openox/serve` stores are retained unchanged. With the old server
-stopped, pi-mcp can open one in place using `--data-dir ~/.openox/serve` and the
-original allowed working-directory root. Version-1 `sessions/<uuid>/session.json`
-metadata, Pi-owned `sessions/<uuid>/pi/` JSONL files, and `serve.lock/owner.json`
-retain their formats and layout. There is no automatic copying, relocation,
-legacy fallback, or new app migration. pi-mcp defaults new stores to `~/.pi-mcp`.
-Its E2E verifies a sanitized predecessor-produced store across two startups.
-
-The lock still prevents concurrent writers; after a crash, confirm no server or
-orphaned Pi process remains before removing it. Retention and backup remain
-operator-controlled. Runtime identities and deduplication are memory-only.
-Tailscale owns certificates; diagnostics remain structured stderr output.
-See pi-mcp's documentation for the current external storage and server contract.
+[pi-mcp](https://github.com/ziyzhu/pi-mcp) owns the former `ox serve` storage;
+it is not an iOS Profile. Existing `~/.openox/serve` stores remain unchanged and
+can be opened with `--data-dir ~/.openox/serve` after stopping the old server.
+Version-1 metadata, Pi JSONL files, and lock layout are unchanged; no app migration
+or automatic relocation occurs. New stores default to `~/.pi-mcp`. See pi-mcp's
+README for storage, locking, and retention details.
