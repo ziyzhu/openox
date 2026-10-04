@@ -44,7 +44,7 @@ Related:
 
 1. Use the fixed five-simulator pool: `ox-1`, `ox-2`, and `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Verify with `sim devices` before testing. Keep replaced devices as backups until their replacements are verified.
 1. Before using a simulator, check other agents' sessions and recent `sim` activity. Coordinate ownership and choose another device if it is in use. Never interrupt or change another agent's simulator.
-1. Each concurrent agent uses its own simulator and matching ports from `tools/qa-config.ts`. Always pass `--device` explicitly.
+1. Each concurrent agent uses its own simulator and matching ports from `tools/qa/qa-config.ts`. Always pass `--device` explicitly.
 1. Start tests with the same website and provider state on all five simulators, using `ox-1` as the baseline. Copy only when both source and target are free; verify website logins, provider credentials, configuration, and default model afterward.
 1. Use `bun run sim:bootstrap --help` for state-copy options. It copies cookies/local storage and installs provider API keys; other website data and provider settings require separate setup. See [website state](.agents/skills/storage-migrations/references/storage.md#website-state).
 1. Build and exercise iOS flows with `sim`, never `xcodebuild`. Rebuild and install after switching worktrees; keep screenshots and recordings outside the repository.

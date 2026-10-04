@@ -3,50 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - "apps/cli/**"
-      - "apps/ios/Ox/Host/OxHost*.swift"
-      - "apps/ios/Ox/Host/Host*.swift"
-      - "apps/ios/Ox/Host/RPC/**"
-      - "packages/protocol/**"
-      - "tools/**"
-      - "packages/service-sdk/**"
-      - "packages/services/**"
-      - "repositories/**"
-      - "examples/repository/**"
-      - "apps/ios/Ox/Resources/OxServices.bundle/**"
-      - "apps/ios/tests/**"
-      - "apps/ios/fixtures/chatlogs/**"
-      - "apps/ios/**/*.xcstrings"
-      - ".agents/skills/ox-evolve/**"
-      - "package.json"
-      - "bun.lock"
-      - "tsconfig.base.json"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/publish-npm.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "apps/cli/**"
-      - "apps/ios/Ox/Host/OxHost*.swift"
-      - "apps/ios/Ox/Host/Host*.swift"
-      - "apps/ios/Ox/Host/RPC/**"
-      - "packages/protocol/**"
-      - "tools/**"
-      - "packages/service-sdk/**"
-      - "packages/services/**"
-      - "repositories/**"
-      - "examples/repository/**"
-      - "apps/ios/Ox/Resources/OxServices.bundle/**"
-      - "apps/ios/tests/**"
-      - "apps/ios/fixtures/chatlogs/**"
-      - "apps/ios/**/*.xcstrings"
-      - ".agents/skills/ox-evolve/**"
-      - "package.json"
-      - "bun.lock"
-      - "tsconfig.base.json"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/publish-npm.yml"
   workflow_dispatch:
 
 permissions: {}
@@ -56,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  typecheck:
+  checks:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,23 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.13
-
-      - name: Typecheck
-        run: bun install --frozen-lockfile && bun run typecheck
-
-      - name: Verify repository CLI E2E
-        run: bun test tools/tests/repository-contract.test.ts
-
-      - name: Verify generated service bundle
-        run: bun run build:services && git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
-
-      - name: Verify npm packages
-        run: |
-          bun run --cwd packages/protocol package:check
-          bun run --cwd packages/service-sdk package:check
-          bun run --cwd packages/services package:check
-          bun run --cwd apps/cli package:check
+      - run: ./scripts/ci.sh

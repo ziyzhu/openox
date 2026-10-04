@@ -71,14 +71,8 @@ jobs:
           echo "package_directory=$package_directory" >> "$GITHUB_OUTPUT"
           echo "package_key=$package_key" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
       - name: Verify repository
-        run: |
-          bun run typecheck
-          bun run build:services
-          git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle
+        run: ./scripts/ci.sh
 
       - name: Build and verify package
         run: bun "${{ steps.release.outputs.package_directory }}/package-check.ts" --output "$RUNNER_TEMP/npm-package"
@@ -92,7 +86,7 @@ jobs:
 
       - name: Publish package
         run: |
-          bun tools/npm-publish.ts \
+          bun tools/release/npm-publish.ts \
             --directory "${{ steps.release.outputs.package_key }}" \
             --tarball "${{ steps.artifact.outputs.tarball }}"
 

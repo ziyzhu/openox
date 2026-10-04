@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import packageMetadata from "./package.json";
 import { buildStandalone, nativePlatform } from "./standalone.ts";
+import { hostFixtureReply } from "../../tests/contracts/client-host/fixture.ts";
 
 const { values } = parseArgs({ options: { out: { type: "string" } } });
 const temporaryRoot = await mkdtemp(join(tmpdir(), "ox-cli-standalone-check-"));
@@ -24,21 +25,7 @@ const server = Bun.serve({
   },
   websocket: {
     message(socket, message) {
-      const request = JSON.parse(String(message));
-      const result = request.method === "host.describe" ? {
-        implementation: { name: "Ox fixture", version: "1", build: "1" },
-        protocols: { repository: [3] },
-        methods: ["host.describe", "chats.list"],
-      } : {
-        chats: [{ id: "standalone-smoke", title: "Standalone smoke test", model: null, createdAt: "2026-09-22T00:00:00Z", lastActivity: null, active: false }],
-      };
-      socket.send(JSON.stringify({
-        jsonrpc: "2.0",
-        id: request.id,
-        ...(request.jsonrpc === "2.0" && ["host.describe", "chats.list"].includes(request.method)
-          ? { result }
-          : { error: { code: -32601, message: "Method not found" } }),
-      }));
+      socket.send(JSON.stringify(hostFixtureReply(JSON.parse(String(message)))));
     },
   },
 });
@@ -94,7 +81,13 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
   }
   const chats = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "chat", "list", "--json"]));
   if (chats[0]?.id !== "standalone-smoke") throw new Error("Standalone Host request failed");
-  console.log(`PASS standalone ${nativePlatform}: download, install, version, help, repository validation, discovery, Host request; no Bun or Node on PATH`);
+  const hostArgs = [executable, "--host", `ws://127.0.0.1:${server.port}`];
+  const created = JSON.parse(await run([...hostArgs, "chat", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"]));
+  const outcome = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "chat", "send", "hello", "--json"]));
+  if (outcome.outcome !== "completed" || outcome.text !== "Hello from the fixture.") throw new Error("Standalone chat send failed");
+  const snapshot = JSON.parse(await run([...hostArgs, "--chat", created.chatId, "chat", "inspect", "--json"]));
+  if (snapshot.id !== created.chatId || snapshot.isBusy || !snapshot.messages.length) throw new Error("Standalone chat inspection failed");
+  console.log(`PASS standalone ${nativePlatform}: download, install, version, help, repository validation, discovery, chat create/send/inspect; no Bun or Node on PATH`);
 } finally {
   server.stop(true);
   await rm(temporaryRoot, { recursive: true, force: true });
