@@ -73,6 +73,22 @@
         "$ref": "./schema.json#/definitions/GetChatResult"
       }
     },
+    "chats.open": {
+      "params": {
+        "$ref": "./schema.json#/definitions/SessionRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/GetChatResult"
+      }
+    },
+    "chats.respond": {
+      "params": {
+        "$ref": "./schema.json#/definitions/RespondChatRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/RespondChatResult"
+      }
+    },
     "chats.new": {
       "params": {
         "$ref": "./schema.json#/definitions/NewChatRequest"

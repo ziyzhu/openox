@@ -10,6 +10,24 @@ struct ChatSnapshot: Encodable {
     let tools: [ToolDecl]
     let messages: [Message]
     let blocks: [Block]
+    let isBusy: Bool
+    let pendingPrompt: PendingPrompt?
+
+    struct PendingPrompt: Encodable {
+        let id: String
+        let prompt: String
+        let options: [String]
+        let allowsCustomAnswer: Bool
+        let requiresApp: Bool
+
+        init(_ prompt: Chat.PendingPrompt) {
+            id = prompt.id.uuidString
+            self.prompt = prompt.prompt
+            options = prompt.options
+            allowsCustomAnswer = prompt.allowsCustomAnswer
+            requiresApp = prompt.secretEntry != nil
+        }
+    }
 
     struct ToolDecl: Encodable {
         let name: String
@@ -46,5 +64,11 @@ struct ChatSnapshot: Encodable {
         tools = (agent?.tools ?? []).map(ToolDecl.init)
         messages = agent?.messages ?? []
         blocks = chat.transcript
+        isBusy = chat.isBusy
+        if case .prompt(let prompt) = chat.interaction {
+            pendingPrompt = PendingPrompt(prompt)
+        } else {
+            pendingPrompt = nil
+        }
     }
 }

@@ -24,6 +24,7 @@ export interface HostServiceRuntime {
   invoke(request: InvokeRequest): Promise<Record<string, unknown>>;
   evaluate(request: EvaluateRequest): Promise<Record<string, unknown>>;
   reload(request: ReloadRequest): Promise<Record<string, unknown>>;
+  refreshAuth(request: ReloadRequest): Promise<Record<string, unknown>>;
   sync(timeoutMs: number): Promise<Record<string, unknown>>;
 }
 
@@ -43,6 +44,8 @@ class WebSocketHostServiceRuntime implements HostServiceRuntime {
   }
 
   reload(request: ReloadRequest) { return callHost("services.reload", { domain: request.domain }, request.timeoutMs, this.endpoint); }
+
+  refreshAuth(request: ReloadRequest) { return callHost("services.refreshAuth", { domain: request.domain }, request.timeoutMs, this.endpoint); }
 
   sync(timeoutMs: number) { return callHost("services.sync", {}, timeoutMs, this.endpoint); }
 }

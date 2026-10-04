@@ -34,6 +34,53 @@ extension OxHostProtocol {
     }
 
     @MainActor
+    static func handleOpenChat(
+        _ command: SessionRequest,
+        chatManager: ChatManager,
+        reply: OxHostRPC.Reply
+    ) {
+        guard let rawID = command.sessionId.flatMap(UUID.init(uuidString:)) else {
+            return reply.failure("provide a full chat UUID")
+        }
+        Task { @MainActor in
+            do {
+                let chat = try await chatManager.openForClient(rawID)
+                Log.agent.info("OxHostRPC.chats.open id=\(reply.id) chat=\(chat.id)")
+                reply.success(GetChatResult(data: ChatSnapshot(chat)))
+            } catch { reply.failure(error.localizedDescription) }
+        }
+    }
+
+    @MainActor
+    static func handleRespondChat(
+        _ command: RespondChatRequest,
+        chatManager: ChatManager,
+        reply: OxHostRPC.Reply
+    ) {
+        guard case .found(let chat?) = resolveSession(chatManager, command.sessionId),
+              case .prompt(let prompt) = chat.interaction,
+              UUID(uuidString: command.promptId) == prompt.id else {
+            return reply.failure("pending prompt not found; inspect the chat before responding")
+        }
+        guard prompt.secretEntry == nil else {
+            return reply.failure("enter credentials in Ox, not through chat responses")
+        }
+        guard !command.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              command.answer.count <= 2_000,
+              prompt.allowsCustomAnswer || prompt.options.contains(command.answer) else {
+            return reply.failure("provide one of the prompt options or an allowed custom answer")
+        }
+        chat.resolvePrompt(blockId: prompt.id, answer: command.answer)
+        Log.agent.info("OxHostRPC.chats.respond id=\(reply.id) chat=\(chat.id) prompt=\(prompt.id)")
+        reply.success(RespondChatResult(chatId: chat.id.uuidString, promptId: prompt.id.uuidString))
+    }
+
+    struct RespondChatResult: Encodable {
+        let chatId: String
+        let promptId: String
+    }
+
+    @MainActor
     static func handleNewChat(
         _ command: NewChatRequest,
         chatManager: ChatManager,

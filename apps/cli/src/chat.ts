@@ -21,6 +21,8 @@ type ChatOptions = {
 export const SUBS: Record<string, SubCommand> = {
   list: { desc: "List chats exposed by the selected Host (--json)", fn: listChats },
   new: { desc: "Start a chat and make it active, optionally temporary or on a chosen model", fn: newChat },
+  open: { desc: "Load a saved chat and make it active (--chat <id>)", fn: openChat },
+  respond: { desc: "Answer a pending choice or approval using its prompt id", fn: respondChat },
   send: { desc: "Send a message through the real chat turn and wait for its outcome", fn: sendChat },
   stop: { desc: "Stop the selected chat's running turn", fn: stopChat },
   inspect: { desc: "Inspect the selected chat's prompt, tools, messages, and blocks", fn: inspectChat },
@@ -39,6 +41,9 @@ async function listChats(args: string[], context: CliContext): Promise<void> {
   } finally {
     host.close();
   }
+  rows = rows.filter(row => (!options.active || row.active)
+    && (!options.search || `${row.title} ${row.id}`.toLowerCase().includes(options.search.toLowerCase())));
+  rows = rows.slice(0, options.limit);
   if (options.json) {
     console.log(JSON.stringify(rows, null, 2));
     return;
@@ -47,6 +52,41 @@ async function listChats(args: string[], context: CliContext): Promise<void> {
 }
 
 type SendResult = { chatId: string; outcome: string; text?: string; error?: string };
+
+async function openChat(args: string[], context: CliContext): Promise<void> {
+  const options = parseListOptions(args, "open");
+  if (!context.chat) fail("chat open requires --chat <full-chat-uuid>");
+  const result = await requireHost("chats.open", context, options.timeoutMs);
+  const snapshot = (result.data as ChatSnapshot | undefined) ?? fail("Host did not return the opened chat");
+  if (options.json) console.log(JSON.stringify(snapshot, null, 2));
+  else console.log(`opened ${snapshot.id}`);
+}
+
+async function respondChat(args: string[], context: CliContext): Promise<void> {
+  let promptId = "";
+  let timeoutMs = 30000;
+  let json = false;
+  const words: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index]!;
+    if (argument === "--prompt") promptId = requiredValue(args[++index], "--prompt");
+    else if (argument.startsWith("--prompt=")) promptId = requiredValue(argument.slice(9), "--prompt");
+    else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
+    else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
+    else if (argument === "--json") json = true;
+    else if (argument === "--help" || argument === "-h") {
+      console.log("Usage: ox [--host <url>] [--chat <id>] chat respond <answer | -> --prompt <prompt-id> [--json] [--timeout 30000]");
+      console.log("       Get the current prompt with chat inspect --pending; stale responses are rejected.");
+      return;
+    } else if (argument.startsWith("--")) fail(`unknown option: ${argument}`);
+    else words.push(argument);
+  }
+  const answer = words.join(" ") === "-" ? (await Bun.stdin.text()).trim() : words.join(" ");
+  if (!promptId || !answer.trim()) fail("chat respond requires an answer and --prompt <prompt-id>");
+  const result = await requireHost("chats.respond", context, timeoutMs, { promptId, answer });
+  if (json) console.log(JSON.stringify(result, null, 2));
+  else console.log(`responded ${result.promptId} (chat ${result.chatId}); use chat watch to follow the run`);
+}
 
 async function newChat(args: string[], context: CliContext): Promise<void> {
   const options = parseNewOptions(args);
@@ -70,7 +110,7 @@ async function sendChat(args: string[], context: CliContext): Promise<void> {
   else if (result.outcome === "queued") console.log(result.chatId);
   if (result.outcome === "completed" || result.outcome === "queued") return;
   const detail = result.outcome === "needsAttention"
-    ? "chat is waiting for a user response in Ox; answer it in the app or run ox chat stop"
+    ? "chat needs attention; inspect with ox chat inspect --pending, then use ox chat respond (or answer in Ox)"
     : result.error ?? result.outcome;
   process.stderr.write(`chat send ${result.outcome}: ${detail} (chat ${result.chatId})\n`);
   process.exitCode = 1;
@@ -130,21 +170,31 @@ async function fetchSnapshot(context: CliContext, timeoutMs: number): Promise<Ch
   return (result.data ?? null) as ChatSnapshot | null;
 }
 
-function parseListOptions(args: string[], command: "list" | "stop" = "list"): { timeoutMs: number; json: boolean } {
+function parseListOptions(args: string[], command: "list" | "stop" | "open" = "list") {
   let timeoutMs = 30000;
   let json = false;
+  let active = false;
+  let search = "";
+  let limit = Number.POSITIVE_INFINITY;
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--json") json = true;
+    else if (argument === "--active" && command === "list") active = true;
+    else if (argument === "--search" && command === "list") search = requiredValue(args[++index], "--search");
+    else if ((argument === "--limit" || argument.startsWith("--limit=")) && command === "list") {
+      limit = Number(argument === "--limit" ? requiredValue(args[++index], "--limit") : requiredValue(argument.slice(8), "--limit"));
+      if (!Number.isInteger(limit) || limit < 0) fail("--limit requires a nonnegative integer");
+    }
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      const chat = command === "stop" ? " [--chat <id>]" : "";
-      console.log(`Usage: ox [--host <url>]${chat} chat ${command} [--json] [--timeout 30000]`);
+      const chat = command !== "list" ? " [--chat <id>]" : "";
+      const filters = command === "list" ? " [--active] [--search <text>] [--limit <count>]" : "";
+      console.log(`Usage: ox [--host <url>]${chat} chat ${command}${filters} [--json] [--timeout 30000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
-  return { timeoutMs, json };
+  return { timeoutMs, json, active, search, limit };
 }
 
 function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; temporary: boolean; provider: string; model: string; attach: string[] } {
@@ -211,7 +261,7 @@ function parseChatOptions(args: string[], watching: boolean): ChatOptions {
     const argument = args[index]!;
     if (argument === "--json") json = true;
     else if (argument === "--full") full = true;
-    else if (["--system", "--tools", "--messages", "--blocks"].includes(argument)) sections.add(argument.slice(2));
+    else if (["--system", "--tools", "--messages", "--blocks", "--pending"].includes(argument)) sections.add(argument.slice(2));
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "--interval" && watching) intervalMs = positiveNumber(args[++index], "--interval");
@@ -219,7 +269,7 @@ function parseChatOptions(args: string[], watching: boolean): ChatOptions {
     else if (argument === "-h" || argument === "--help") {
       const command = watching ? "watch" : "inspect";
       const interval = watching ? " [--interval 1000]" : "";
-      console.log(`Usage: ox [--host <url>] [--chat <id>] chat ${command} [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000]${interval}`);
+      console.log(`Usage: ox [--host <url>] [--chat <id>] chat ${command} [--system|--tools|--messages|--blocks|--pending] [--full] [--json] [--timeout 30000]${interval}`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
@@ -258,6 +308,7 @@ function projectSnapshot(snapshot: ChatSnapshot | null, sections: Set<string>): 
     ...(sections.has("tools") ? { tools: snapshot.tools } : {}),
     ...(sections.has("messages") ? { messages: snapshot.messages } : {}),
     ...(sections.has("blocks") ? { blocks: snapshot.blocks } : {}),
+    ...(sections.has("pending") ? { isBusy: snapshot.isBusy, pendingPrompt: snapshot.pendingPrompt ?? null } : {}),
   };
 }
 
@@ -293,6 +344,15 @@ function printSnapshot(snapshot: ChatSnapshot, options: ChatOptions): void {
   console.log(`${terminalText("Chat", [C.sky])}       ${snapshot.id}`);
   console.log(`${terminalText("Model", [C.sky])}      ${snapshot.model.id}`);
   console.log(`${terminalText("Context", [C.sky])}    system ${formatTokenCount(usage.system)} · tools ${formatTokenCount(usage.tools)} · messages ${formatTokenCount(usage.messages)} · ${formatTokenCount(usage.input)}/${formatTokenCount(usage.maximumContext)} (${percentage}%) · ${cache}`);
+  if (show("pending")) {
+    const prompt = snapshot.pendingPrompt;
+    console.log(`\n${terminalText("PENDING PROMPT", [C.sky])}`);
+    if (prompt) {
+      console.log(`  ${prompt.id}  ${prompt.prompt}`);
+      console.log(`  Options: ${prompt.options.join(" | ")}`);
+      console.log(prompt.requiresApp ? "  Complete credential entry in Ox." : `  Custom answer: ${prompt.allowsCustomAnswer ? "allowed" : "not allowed"}`);
+    } else console.log("  (none)");
+  }
   if (show("system")) {
     console.log(`\n${terminalText("SYSTEM PROMPT", [C.sky])}`);
     console.log(snapshot.systemPrompt || "(empty)");

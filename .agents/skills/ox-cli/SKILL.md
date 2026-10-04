@@ -23,9 +23,9 @@ or tab session IDs; a live service is addressed by its domain.
 
 ## Choose the correct surface
 
-- Use `ox host discover` to find iOS Simulator Hosts exposed by a running sim daemon.
+- Use `ox host discover` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
 - Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
-- Use `ox chat` to create, drive, stop, inspect, and watch chats; `ox chat send`
+- Use `ox chat` to create, open, drive, respond to, stop, inspect, and watch chats; `ox chat send`
   runs the real chat turn, including tools, services, and compaction.
 - Use `ox vm` for VM functions, VM-visible skills, and execution through the
   agent's actual capability boundary.
@@ -63,7 +63,7 @@ ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read --args '<json>'
 ```
 
-After reinstalling or relaunching the app, a saved chat may appear in `ox chat list` while `ox chat send --chat <id>` reports `unknown chat`. Open that chat through the app sidebar with `sim`, allow hydration to finish, and confirm `ox --chat <id> chat inspect` succeeds before sending. For an authorized approval in a long chat, scroll to the bottom and verify the button is `chat.confirm.Approve`; `chat.confirm.receipt.Approve` records an approval already completed.
+A saved chat may be listed before it is hydrated. Run `ox --chat <full-id> chat open` before inspecting or sending to an unloaded chat. This selects it and discards an outgoing temporary chat. For a pending choice or authorized approval, inspect with `ox --chat <id> chat inspect --pending --json`, then use `ox --chat <id> chat respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `chats.open` or `chats.respond` require the app sidebar and prompt UI; with `sim`, `chat.confirm.Approve` is active while `chat.confirm.receipt.Approve` records an approval already completed.
 
 First-time `ox.service.attach` from an idle chat can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
 
@@ -129,6 +129,7 @@ ox [--host <ws-url>] host services [--json] [--timeout 30000]
 ox [--host <ws-url>] host service invoke <domain>:<action> --args '<json>' [--approve] [--timeout 30000]
 ox [--host <ws-url>] host service eval <domain> --script '<javascript>' [--timeout 30000]
 ox [--host <ws-url>] host service reload <domain> [--timeout 30000]
+ox [--host <ws-url>] host service refresh-auth <domain> [--timeout 30000]
 ox [--host <ws-url>] host service sync [--timeout 60000]
 ```
 

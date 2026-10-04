@@ -1,4 +1,7 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { hostEndpoint } from "./host-connection.ts";
+import { HostRPCClient } from "./host-rpc.ts";
 import { fail, type CliContext } from "./lib.ts";
 
 type Listener = { port: number; pid?: number; process?: string };
@@ -7,14 +10,16 @@ type HostCandidate = { endpoint: string; label: string; kind: string; source: st
 
 export async function discover(args: string[], context: CliContext): Promise<void> {
   let json = false;
+  let all = false;
   let timeoutMs = 3000;
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--json") json = true;
+    else if (argument === "--all") all = true;
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox host discover [--json] [--timeout 3000]");
+      console.log("Usage: ox host discover [--all] [--json] [--timeout 3000]");
       return;
     } else fail(`unknown option: ${argument}`);
   }
@@ -40,13 +45,41 @@ export async function discover(args: string[], context: CliContext): Promise<voi
   } catch (error) {
     warning = `simulator discovery unavailable: ${(error as Error).message}`;
   }
-  const hosts = [...candidates.values()];
+  const tailscale = Bun.which("tailscale");
+  if (tailscale) {
+    try {
+      const { stdout } = await promisify(execFile)(tailscale, ["status", "--json"], { timeout: timeoutMs, maxBuffer: 1024 * 1024 });
+      const status = JSON.parse(stdout) as { Peer?: Record<string, { OS?: string; DNSName?: string; TailscaleIPs?: string[]; Online?: boolean }> };
+      for (const peer of Object.values(status.Peer ?? {})) {
+        if (peer.OS !== "iOS" || (!all && !peer.Online)) continue;
+        const address = peer.TailscaleIPs?.find(ip => !ip.includes(":"));
+        if (!address) continue;
+        const endpoint = `ws://${address}:9876`;
+        if (!candidates.has(endpoint)) candidates.set(endpoint, {
+          endpoint, label: peer.DNSName?.replace(/\.$/, "") ?? address, kind: "ios-device", source: "tailscale",
+        });
+      }
+    } catch {
+      warning = [warning, "Tailscale discovery unavailable; connect Tailscale or pass --host explicitly"].filter(Boolean).join("; ");
+    }
+  }
+  const probed = await Promise.all([...candidates.values()].map(async candidate => {
+    const client = new HostRPCClient(candidate.endpoint);
+    try {
+      const description = await client.describe(timeoutMs);
+      return { ...candidate, reachable: true, implementation: description.implementation };
+    } catch {
+      return { ...candidate, reachable: false };
+    } finally { client.close(); }
+  }));
+  const hosts = probed.filter(host => all || host.reachable);
   if (json) {
     console.log(JSON.stringify({ hosts, ...(warning ? { warning } : {}) }, null, 2));
     return;
   }
-  hosts.forEach(host => console.log(`${host.endpoint}  ${host.label} · ${host.kind}`));
-  if (warning) process.stderr.write(`${warning}; run sim daemon to discover iOS Simulator Hosts\n`);
+  hosts.forEach(host => console.log(`${host.endpoint}  ${host.label} · ${host.kind} · ${host.reachable ? "reachable" : "unavailable"}`));
+  if (!hosts.length) console.log("(no reachable Hosts; connect Tailscale and keep Ox open with Host connections enabled)");
+  if (warning) process.stderr.write(`${warning}\n`);
 }
 
 async function discoverSimulators(port: number, timeoutMs: number): Promise<{ devices?: Device[] }> {

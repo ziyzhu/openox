@@ -14,6 +14,8 @@ extension OxHostProtocol {
         case syncServices = "services.sync"
         case listChats = "chats.list"
         case getChat = "chats.get"
+        case openChat = "chats.open"
+        case respondChat = "chats.respond"
         case newChat = "chats.new"
         case sendChat = "chats.send"
         case stopChat = "chats.stop"
@@ -62,6 +64,12 @@ extension OxHostProtocol {
 
     struct SessionRequest: Decodable {
         let sessionId: String?
+    }
+
+    struct RespondChatRequest: Decodable {
+        let sessionId: String?
+        let promptId: String
+        let answer: String
     }
 
     struct NewChatRequest: Decodable {

@@ -10,6 +10,8 @@ export type ChatSnapshot = {
   tools: ToolDeclaration[];
   messages: unknown[];
   blocks: unknown[];
+  isBusy?: boolean;
+  pendingPrompt?: { id: string; prompt: string; options: string[]; allowsCustomAnswer: boolean; requiresApp: boolean };
 };
 
 export type ModelEntry = { id: string; displayName: string; maxTokens: number; maxContext: number };

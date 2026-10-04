@@ -87,6 +87,7 @@ final class ChatManager {
     private var selection: Selection = .empty
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
+    @ObservationIgnored private var hydrationTasks: [ChatID: (generation: HydrationGeneration, task: Task<Chat?, Never>)] = [:]
     @ObservationIgnored private let repository: ProfileRepository
     @ObservationIgnored private let storage: StorageRoot
     @ObservationIgnored private let providerRegistry: ProviderRegistry
@@ -346,47 +347,72 @@ final class ChatManager {
             setCurrent(chat)
             return
         }
-        guard var record = records[id] else {
+        guard records[id] != nil else {
             selection = .deferred(id, previous: current)
             Log.session.info("ChatManager.open deferred id=\(id)")
             return
         }
         hydrationGeneration &+= 1
         let generation = HydrationGeneration(rawValue: hydrationGeneration)
+        selection = .opening(id, generation, previous: current)
+        Task { [weak self] in
+            guard let self else { return }
+            let chat = await self.hydrate(id)
+            guard case .opening(let openingID, let openingGeneration, _) = self.selection,
+                  openingID == id, openingGeneration == generation else { return }
+            if let chat { self.setCurrent(chat) }
+            else { self.selection = self.current.map(Selection.active) ?? .empty }
+        }
+    }
+
+    func openForClient(_ rawID: UUID) async throws -> Chat {
+        ensureRepositoryScope()
+        let scope = repositoryScope
+        let storageScope = storage.scope
+        let id = ChatID(rawID)
+        guard contains(rawID), let chat = await hydrate(id),
+              scope == repositoryScope, storageScope == storage.scope, contains(rawID) else {
+            throw RuntimeError.bridge("chat unavailable: \(rawID)")
+        }
+        setCurrent(chat)
+        return chat
+    }
+
+    private func hydrate(_ id: ChatID) async -> Chat? {
+        if let chat = records[id]?.hydration.chat { return chat }
+        if let pending = hydrationTasks[id] { return await pending.task.value }
+        guard var record = records[id], contains(id.rawValue) else { return nil }
+        hydrationGeneration &+= 1
+        let generation = HydrationGeneration(rawValue: hydrationGeneration)
+        let scope = repositoryScope
         record.hydration = .loading(record.hydration.meta, generation)
         records[id] = record
-        selection = .opening(id, generation, previous: current)
-        let scopedRepository = repository
-        let storageScope = repositoryScope
-        Log.session.info("ChatManager.open hydrating id=\(id) generation=\(generation.rawValue)")
-        Task { [weak self] in
-            let loaded = await scopedRepository.loadChat(id, in: storageScope)
-            guard let self,
-                  self.repositoryScope == storageScope,
-                  var currentRecord = self.records[id],
-                  case .loading(_, let currentGeneration) = currentRecord.hydration,
-                  currentGeneration == generation,
-                  case .opening(let openingID, let openingGeneration, _) = self.selection,
-                  openingID == id,
-                  openingGeneration == generation else { return }
+        Log.session.info("ChatManager.hydrate id=\(id) generation=\(generation.rawValue)")
+        let task = Task { [weak self, repository] () -> Chat? in
+            let loaded = await repository.loadChat(id, in: scope)
+            guard let self, self.repositoryScope == scope,
+                  var record = self.records[id], self.contains(id.rawValue),
+                  case .loading(_, let activeGeneration) = record.hydration,
+                  activeGeneration == generation else { return nil }
             guard let loaded else {
-                Log.session.error("ChatManager.open not found id=\(id)")
-                currentRecord.hydration = .unloaded(currentRecord.hydration.meta)
-                self.records[id] = currentRecord
-                self.selection = self.current.map(Selection.active) ?? .empty
-                return
+                record.hydration = .unloaded(record.hydration.meta)
+                self.records[id] = record
+                Log.session.error("ChatManager.hydrate unavailable id=\(id)")
+                return nil
             }
-            let restored = currentRecord.persistence.isDirty
-                ? loaded.replacingMeta(currentRecord.hydration.meta)
-                : loaded
-            let chat = self.restoredChat(from: restored, in: storageScope)
+            let restored = record.persistence.isDirty ? loaded.replacingMeta(record.hydration.meta) : loaded
+            let chat = self.restoredChat(from: restored, in: scope)
             self.hydrationOrdinal &+= 1
-            currentRecord.hydration = .loaded(chat)
-            currentRecord.accessOrdinal = self.hydrationOrdinal
-            self.records[id] = currentRecord
+            record.hydration = .loaded(chat)
+            record.accessOrdinal = self.hydrationOrdinal
+            self.records[id] = record
             if loaded.needsPersistence || chat.state != loaded.state { self.persist(chat) }
-            self.setCurrent(chat)
+            return chat
         }
+        hydrationTasks[id] = (generation, task)
+        let chat = await task.value
+        if hydrationTasks[id]?.generation == generation { hydrationTasks[id] = nil }
+        return chat
     }
 
     @discardableResult
@@ -585,6 +611,8 @@ final class ChatManager {
             }
             record.hydration.chat?.release()
         }
+        hydrationTasks.values.forEach { $0.task.cancel() }
+        hydrationTasks.removeAll()
         records.removeAll()
         selection = .empty
         ensureRepositoryScope(force: true)

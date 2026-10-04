@@ -25,6 +25,7 @@ export const Schemas = {
   ServiceRequest: object("ServiceRequest", { domain: S() }),
   NewChatRequest: object("NewChatRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),
   SendChatRequest: object("SendChatRequest", { sessionId: nullable(S()), text: S(), wait: nullable(B()) }),
+  RespondChatRequest: object("RespondChatRequest", { sessionId: nullable(S()), promptId: S(), answer: S() }),
   SetKeyRequest: object("SetKeyRequest", {
     providerId: S(), key: nullable(S()), region: nullable(swift(Type.Union([Type.Literal("global"), Type.Literal("china")]), "LLMRegion")),
   }),
@@ -65,7 +66,12 @@ export const Schemas = {
   ChatSnapshot: object("ChatSnapshot", {
     id: S(), model: R("ProviderModel"), systemPrompt: S(), renderedSystemPrompt: S(), soul: S(), memory: S(),
     tools: A(R("ChatTool")), messages: A(R("Message")), blocks: A(R("Block")),
+    isBusy: optional(B()), pendingPrompt: optional(R("PendingChatPrompt")),
   }),
+  PendingChatPrompt: object("PendingChatPrompt", {
+    id: S(), prompt: S(), options: A(S()), allowsCustomAnswer: B(), requiresApp: B(),
+  }),
+  RespondChatResult: object("RespondChatResult", { chatId: S(), promptId: S() }),
   GetChatResult: object("GetChatResult", { data: optional(R("ChatSnapshot")) }),
   NewChatResult: object("NewChatResult", { chatId: S(), temporary: B(), model: S() }),
   SendChatResult: object("SendChatResult", { chatId: S(), outcome: S(), text: optional(S()), error: optional(S()) }),
@@ -126,6 +132,8 @@ export const Methods = {
   "services.sync": method("syncServices", "EmptyRequest", "SyncServicesResult"),
   "chats.list": method("listChats", "EmptyRequest", "ListChatsResult"),
   "chats.get": method("getChat", "SessionRequest", "GetChatResult"),
+  "chats.open": method("openChat", "SessionRequest", "GetChatResult"),
+  "chats.respond": method("respondChat", "RespondChatRequest", "RespondChatResult"),
   "chats.new": method("newChat", "NewChatRequest", "NewChatResult"),
   "chats.send": method("sendChat", "SendChatRequest", "SendChatResult"),
   "chats.stop": method("stopChat", "SessionRequest", "StopChatResult"),

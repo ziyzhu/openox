@@ -18,7 +18,7 @@ test.skipIf(!endpoint)("live Host conforms to shared read-only result and invali
     if (description.methods.includes(method)) expect(validateResult(method, await client.call(method, 15000))).toBe(true);
   }
   // Only structurally invalid mutation requests are submitted; they cannot reach handlers.
-  for (const fixture of fixtures.params.filter(fixture => !fixture.valid)) {
+  for (const fixture of fixtures.params.filter(fixture => !fixture.valid && description.methods.includes(fixture.method))) {
     const error = await connection.request(fixture.method, fixture.params as Record<string, unknown>, 5000).catch(error => error);
     expect(error).toBeInstanceOf(HostRPCError);
     if (!(error instanceof HostRPCError)) throw new Error("Expected a contract rejection");

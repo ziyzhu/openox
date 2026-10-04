@@ -6,7 +6,7 @@ The RPC and repository contracts have separate versions.
 
 ## Files and ownership
 
-- `src/contract.ts` — authoritative TypeBox/JSON Schema definitions, 35 method mappings, and RPC contract version.
+- `src/contract.ts` — authoritative TypeBox/JSON Schema definitions, 37 method mappings, and RPC contract version.
 - `schema.json` — generated, portable JSON Schema Draft 7 document. All references are local under `definitions`.
 - `methods.json` — generated method catalog mapping names to parameter/result schema references. This is a small catalog, not an OpenRPC document.
 - `fixtures.json` — language-neutral valid/invalid conformance examples.

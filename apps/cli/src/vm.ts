@@ -20,6 +20,7 @@ export const SUBS: Record<string, SubCommand> = {
 
 
 async function inspect(args: string[], context: CliContext): Promise<void> {
+  if (printHelp(args, "inspect [--json] [--timeout 30000]")) return;
   const options = parseOutputOptions(args, 30000);
   const result = await request("vm.inspect", context, options.timeoutMs);
   if (options.json) {
@@ -39,6 +40,7 @@ async function inspect(args: string[], context: CliContext): Promise<void> {
 }
 
 async function functions(args: string[], context: CliContext): Promise<void> {
+  if (printHelp(args, "functions [--json] [--timeout 30000]")) return;
   const options = parseOutputOptions(args, 30000);
   const result = await request("vm.functions", context, options.timeoutMs);
   const catalog = object(valueObject(result).functions);
@@ -54,6 +56,7 @@ async function functions(args: string[], context: CliContext): Promise<void> {
 }
 
 async function help(args: string[], context: CliContext): Promise<void> {
+  if (printHelp(args, "help <ox.function> [--json] [--timeout 30000]")) return;
   const options = parsePositionals(args, 30000);
   const name = options.positionals[0];
   if (!name || options.positionals.length !== 1) fail("Usage: ox vm help <ox.function> [--json] [--timeout 30000]");
@@ -194,6 +197,12 @@ function printVMJSON(result: VMResult): void {
   }, null, 2));
 }
 
+function printHelp(args: string[], usage: string): boolean {
+  if (!args.includes("--help") && !args.includes("-h")) return false;
+  console.log(`Usage: ox [--host <url>] [--chat <id>] vm ${usage}`);
+  return true;
+}
+
 function parseOutputOptions(args: string[], defaultTimeout: number): { json: boolean; timeoutMs: number } {
   const parsed = parsePositionals(args, defaultTimeout);
   if (parsed.positionals.length) fail(`unexpected argument: ${parsed.positionals[0]}`);
@@ -218,7 +227,8 @@ function parsePositionals(args: string[], defaultTimeout: number): { json: boole
 
 function timeoutValue(value: string, fallback: number): number {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  if (!Number.isFinite(parsed) || parsed <= 0) fail("--timeout requires a positive number");
+  return parsed;
 }
 
 function requiredValue(args: string[], index: number, flag: string): string {

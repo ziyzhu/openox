@@ -40,6 +40,8 @@ enum OxHostProtocol {
         case .syncServices: handleSyncServices(try decode(EmptyRequest.self), serviceManager: services, reply: reply)
         case .listChats: handleListChats(try decode(EmptyRequest.self), host: host, reply: reply)
         case .getChat: handleGetChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)
+        case .openChat: handleOpenChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)
+        case .respondChat: handleRespondChat(try decode(RespondChatRequest.self), chatManager: chats, reply: reply)
         case .newChat: handleNewChat(try decode(NewChatRequest.self), chatManager: chats, reply: reply)
         case .sendChat: handleSendChat(try decode(SendChatRequest.self), chatManager: chats, reply: reply)
         case .stopChat: handleStopChat(try decode(SessionRequest.self), chatManager: chats, reply: reply)

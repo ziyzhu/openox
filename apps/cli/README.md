@@ -149,6 +149,11 @@ ox host logs --follow
 ox host providers
 ```
 
+`host discover` finds simulator-daemon candidates and online iOS Tailscale peers,
+then probes `host.describe`. Only reachable Hosts are shown by default; `--all`
+also shows unavailable candidates. Physical-device discovery uses port 9876;
+pass `--host` explicitly for another port.
+
 One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
 `host logs --follow --json` emit one JSON object per line. Watch commands use
 request-based snapshots, tolerate Host restarts, and retry until interrupted.
@@ -176,15 +181,33 @@ ox chat send "Summarize my unread messages"
 echo "Long prompt" | ox chat send -
 ox --chat <chat-id> chat send --no-wait "Keep going"
 ox --chat <chat-id> chat stop
-ox chat list
+ox chat list --search "trip" --limit 10
+ox chat list --active
+ox --chat <chat-id> chat open
 ox --chat <chat-id> chat inspect --messages --blocks
 ox --chat <chat-id> chat watch --json
 ```
 
 `chat send` waits for the turn and prints the response. It exits 1 when the
 turn fails, is cancelled, or pauses for a user response such as an approval;
-answer the prompt in the app or stop the turn. Use `sim` instead when the UI
-itself is under test.
+inspect the pending prompt, then answer it using its exact ID:
+
+```sh
+ox --chat <chat-id> chat inspect --pending --json
+ox --chat <chat-id> chat respond "Approve" --prompt <prompt-id>
+ox --chat <chat-id> chat watch --blocks --pending
+```
+
+Use the labels returned in `pendingPrompt.options`; custom answers are accepted
+only when `allowsCustomAnswer` is true. Stale or already-answered prompt IDs are
+rejected. Credential entry and other app-only interactions still require Ox.
+`chat respond` acknowledges the answer without waiting for the resumed turn;
+use `chat watch` to follow its outcome. These commands require an updated Host
+advertising `chats.open` and `chats.respond`.
+
+`chat open` hydrates a saved chat and selects it, including after an app restart.
+Opening another chat discards an outgoing temporary chat, just as in the app.
+Use `sim` instead when the UI itself is under test.
 
 ## Use a chat's VM
 
@@ -222,8 +245,11 @@ service; there is no tab ID, service session ID, or client-selected runtime.
 ox host services
 ox host services --json
 ox host service invoke <domain>:<action> --args '<json>'
+ox host service invoke <domain>:<action> --args-file - < action-args.json
 ox host service eval <domain> --script 'return document.title;'
+ox host service eval <domain> --script-file script.js
 ox host service reload <domain>
+ox host service refresh-auth <domain>
 ox host service sync
 ox --host ws://127.0.0.1:9101 host services
 ```
@@ -311,22 +337,25 @@ ox --repository <path-or-url> repository actions <domain> [--json]
 ox --repository <path-or-url> repository skills [name] [--json]
 ox [--host <ws-url>] --repository <path-or-url> repository test [<domain>[:<action>[:<case>]]] --proxy-port <port> [--timeout 30000] [--allow-partial]
 
-ox host discover [--json] [--timeout 3000]
+ox host discover [--all] [--json] [--timeout 3000]
 ox [--host <ws-url>] host describe [--json] [--timeout 30000]
 ox [--host <ws-url>] host logs [--level debug|info|warning|error] [--grep <substring>] [--tail <count>] [--follow] [--json] [--timeout 30000] [--interval 1000]
 ox [--host <ws-url>] host providers [--json] [--timeout 30000]
 ox [--host <ws-url>] host services [--json] [--timeout 30000]
-ox [--host <ws-url>] host service invoke <domain>:<action> [--args '{}'] [--approve] [--timeout 30000]
-ox [--host <ws-url>] host service eval <domain> --script '<javascript>' [--timeout 30000]
-ox [--host <ws-url>] host service reload <domain> [--timeout 30000]
-ox [--host <ws-url>] host service sync [--timeout 60000]
+ox [--host <ws-url>] host service invoke <domain>:<action> [--args '{}'] [--args-file <path|->] [--approve] [--json] [--timeout 30000]
+ox [--host <ws-url>] host service eval <domain> (--script '<javascript>' | --script-file <path|->) [--json] [--timeout 30000]
+ox [--host <ws-url>] host service reload <domain> [--json] [--timeout 30000]
+ox [--host <ws-url>] host service refresh-auth <domain> [--json] [--timeout 30000]
+ox [--host <ws-url>] host service sync [--json] [--timeout 60000]
 
-ox [--host <ws-url>] chat list [--json] [--timeout 30000]
+ox [--host <ws-url>] chat list [--active] [--search <text>] [--limit <count>] [--json] [--timeout 30000]
+ox [--host <ws-url>] --chat <chat-id> chat open [--json] [--timeout 30000]
+ox [--host <ws-url>] [--chat <chat-id>] chat respond <answer | -> --prompt <prompt-id> [--json] [--timeout 30000]
 ox [--host <ws-url>] chat new [--temporary] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]
 ox [--host <ws-url>] [--chat <chat-id>] chat send <text | -> [--no-wait] [--json] [--timeout 600000]
 ox [--host <ws-url>] [--chat <chat-id>] chat stop [--json] [--timeout 30000]
-ox [--host <ws-url>] [--chat <chat-id>] chat inspect [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000]
-ox [--host <ws-url>] [--chat <chat-id>] chat watch [--system|--tools|--messages|--blocks] [--full] [--json] [--timeout 30000] [--interval 1000]
+ox [--host <ws-url>] [--chat <chat-id>] chat inspect [--system|--tools|--messages|--blocks|--pending] [--full] [--json] [--timeout 30000]
+ox [--host <ws-url>] [--chat <chat-id>] chat watch [--system|--tools|--messages|--blocks|--pending] [--full] [--json] [--timeout 30000] [--interval 1000]
 
 ox [--host <ws-url>] [--chat <chat-id>] vm inspect [--json] [--timeout 30000]
 ox [--host <ws-url>] vm functions [--json] [--timeout 30000]

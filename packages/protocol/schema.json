@@ -168,6 +168,32 @@
         }
       }
     },
+    "RespondChatRequest": {
+      "additionalProperties": true,
+      "type": "object",
+      "required": [
+        "promptId",
+        "answer"
+      ],
+      "properties": {
+        "sessionId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "promptId": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        }
+      }
+    },
     "SetKeyRequest": {
       "additionalProperties": true,
       "type": "object",
@@ -771,6 +797,59 @@
           "items": {
             "$ref": "#/definitions/Block"
           }
+        },
+        "isBusy": {
+          "type": "boolean"
+        },
+        "pendingPrompt": {
+          "$ref": "#/definitions/PendingChatPrompt"
+        }
+      }
+    },
+    "PendingChatPrompt": {
+      "additionalProperties": true,
+      "type": "object",
+      "required": [
+        "id",
+        "prompt",
+        "options",
+        "allowsCustomAnswer",
+        "requiresApp"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowsCustomAnswer": {
+          "type": "boolean"
+        },
+        "requiresApp": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RespondChatResult": {
+      "additionalProperties": true,
+      "type": "object",
+      "required": [
+        "chatId",
+        "promptId"
+      ],
+      "properties": {
+        "chatId": {
+          "type": "string"
+        },
+        "promptId": {
+          "type": "string"
         }
       }
     },
