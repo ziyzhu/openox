@@ -1,8 +1,9 @@
 # Ox CLI
 
-Ox CLI is an Ox Client for the terminal on macOS and Linux. It connects to an
-Ox Host for live operations and can inspect Profiles and repositories offline.
-The Host owns service runtimes, permissions, approvals, and credentials.
+Ox CLI is an Ox Client for the terminal on macOS, Linux, and Windows. It
+connects to an Ox Host for live operations and can inspect Profiles and
+repositories offline. The Host owns service runtimes, permissions, approvals,
+and credentials.
 
 ## Install
 
@@ -16,14 +17,31 @@ ox --help
 
 The installer requires a published `ox-cli-v<version>` GitHub Release. It verifies
 the SHA-256 checksum and executable version, then installs into `~/.local/bin`.
-Supported platforms are Apple Silicon and Intel macOS, and ARM64 and x64 Linux
-with glibc. Run the same command to update; remove the executable to uninstall.
+Supported platforms are Apple Silicon and Intel macOS, ARM64 and x64 Linux
+with glibc, and ARM64 and x64 Windows. Run the same command to update; remove
+the executable to uninstall.
 
 Select a version or directory with `OX_CLI_VERSION` and `OX_INSTALL_DIR`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.sh \
   | OX_CLI_VERSION=0.1.0 OX_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+On Windows, run in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.ps1 | iex
+ox --version
+```
+
+The Windows installer verifies the same checksums, installs `ox.exe` into
+`%LOCALAPPDATA%\Programs\Ox\bin`, and adds that directory to your user PATH.
+Set `OX_CLI_VERSION` or `OX_INSTALL_DIR` the same way, or `OX_NO_MODIFY_PATH=1`
+to leave PATH unchanged:
+
+```powershell
+$env:OX_CLI_VERSION = "0.1.0"; irm https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.ps1 | iex
 ```
 
 If another `ox` is on PATH, uninstall it through its original package manager

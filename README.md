@@ -30,7 +30,7 @@ A self-evolving mobile app.
 | Implementation | Client | Host |
 | --- | --- | --- |
 | [iOS app](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) ([source](apps/ios)) | On-device app | Embedded on the device |
-| [CLI](apps/cli/README.md) | Terminal app for macOS and Linux | Connects to a running Ox Host |
+| [CLI](apps/cli/README.md) | Terminal app for macOS, Linux, and Windows | Connects to a running Ox Host |
 
 Install the standalone terminal Client on macOS or Linux:
 
@@ -39,9 +39,16 @@ curl -fsSL https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install
 ox --help
 ```
 
+On Windows, run in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/ziyzhu/openox/main/apps/cli/install.ps1 | iex
+ox --help
+```
+
 Standalone downloads require a published `ox-cli-v<version>` GitHub Release.
-The installer verifies the download and installs into `~/.local/bin` without
-requiring Bun or Node.js. Run the same command to update.
+The installers verify the download and install without requiring Bun or
+Node.js. Run the same command to update.
 
 Live commands connect to a foreground iOS Host through Tailscale. Enable
 Settings → Host → Allow connections, then pass its tailnet endpoint to the CLI.

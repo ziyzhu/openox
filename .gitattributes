@@ -1,0 +1,2 @@
+# Windows checkouts must keep shell scripts runnable by bash.
+*.sh text eol=lf
