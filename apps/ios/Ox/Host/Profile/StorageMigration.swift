@@ -3,6 +3,7 @@ import CryptoKit
 import Security
 import SwiftGitX
 import UniformTypeIdentifiers
+import Darwin
 
 nonisolated enum ProfileSchema {
     static let versions = [
@@ -89,6 +90,248 @@ nonisolated enum StorageMigrationError: LocalizedError {
 
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
+    static let durableProfileVersion = "2026-10-05-pi-durable"
+
+    static func stageDurableProfile(_ profile: Profile, at destination: URL) async throws -> JSONValue {
+        let sourcePath = profile.url.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
+        let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
+        guard profile.location == .local, profile.version == ProfileSchema.current,
+              sourcePath != destinationPath, !destinationPath.hasPrefix(sourcePath + "/"), !sourcePath.hasPrefix(destinationPath + "/") else {
+            throw StorageMigrationError.profileMigrationFailed(profile.name)
+        }
+        let prepared = try await Task.detached(priority: .userInitiated) {
+            guard !FileManager.default.fileExists(atPath: destination.path) else {
+                throw StorageMigrationError.collision(destination.lastPathComponent)
+            }
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+            return try durableProfileDraft(profile, destination: destination)
+        }.value
+        let runtime = DurableRuntime(databaseURL: destination.appendingPathComponent("state.sqlite"), artifactRoot: destination)
+        do {
+            let result = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": prepared.draft]).jsonString())
+            await runtime.dispose()
+            try await Task.detached(priority: .userInitiated) {
+                let current = try durableSourceInventory(at: profile.url)
+                guard current == prepared.inventory else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
+                var manifest = prepared.manifest
+                manifest["version"] = durableProfileVersion
+                try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
+                    .write(to: destination.appendingPathComponent(ProfileIO.configName), options: .atomic)
+                let directory = open(destination.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+                guard directory >= 0 else { throw StorageMigrationError.invalidApplicationStorage("staged Profile") }
+                defer { Darwin.close(directory) }
+                let file = openat(directory, ProfileIO.configName, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+                guard file >= 0 else { throw StorageMigrationError.missingConfig }
+                defer { Darwin.close(file) }
+                guard fsync(file) == 0, fsync(directory) == 0 else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
+            }.value
+            Log.app.info("StorageMigrator.pi staged id=\(profile.id) target=\(durableProfileVersion) activated=false")
+            return .object(["installation": try JSONDecoder().decode(JSONValue.self, from: Data(result.utf8)),
+                "sourceInventory": .from(prepared.inventory), "profileID": .string(profile.id.uuidString)])
+        } catch {
+            await runtime.dispose()
+            Log.app.error("StorageMigrator.pi stage failed id=\(profile.id) sourcePreserved=true error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private struct DurableProfileDraft: @unchecked Sendable {
+        let draft: JSONValue
+        let manifest: [String: Any]
+        let inventory: [String: String]
+    }
+
+    private static func durableProfileDraft(_ profile: Profile, destination: URL) throws -> DurableProfileDraft {
+        let manager = FileManager.default
+        let inventory = try durableSourceInventory(at: profile.url)
+        let manifest = try JSONSerialization.jsonObject(with: durableSourceFile(ProfileIO.configName, at: profile.url)) as? [String: Any]
+        guard let manifest, (manifest["id"] as? String).flatMap(UUID.init(uuidString:)) == profile.id,
+              manifest["version"] as? String == ProfileSchema.current else { throw StorageMigrationError.missingConfig }
+        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: .local)
+        let decoder = JSONDecoder()
+        decoder.userInfo[.profileScope] = scope
+        decoder.userInfo[.artifactDirectoryListing] = ArtifactDirectoryListing()
+        var documents: [[String: Any]] = []
+        var artifacts: [[String: Any]] = []
+        var conversations: [[String: Any]] = []
+        let savedPath = "artifacts/.saved.json"
+        let saved = inventory[savedPath] == nil ? [] : try decoder.decode([String].self, from: durableSourceFile(savedPath, at: profile.url))
+        let artifactDirectory = destination.appendingPathComponent("artifacts", isDirectory: true)
+        try manager.createDirectory(at: artifactDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        for path in inventory.keys.sorted() {
+            if ["MEMORY.md", "SOUL.md", "skill-selections.json"].contains(path) || path.hasPrefix("skills/") {
+                let data = try durableSourceFile(path, at: profile.url)
+                if path == "skill-selections.json", try decoder.decode(SkillSelections.self, from: data).version != 1 { throw SkillError.invalidPackage }
+                guard let text = String(data: data, encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(path) }
+                documents.append(["path": path, "text": text])
+            } else if path.hasPrefix("artifacts/"), path != savedPath {
+                let name = String(path.dropFirst("artifacts/".count))
+                guard !name.contains("/"), try ArtifactStore.validatedFilename(name) == name else { throw StorageMigrationError.invalidArtifact(path) }
+                let data = try durableSourceFile(path, at: profile.url, limit: 32 * 1024 * 1024)
+                let binary = data.count > 200 * 1024 || String(data: data, encoding: .utf8) == nil
+                try data.write(to: artifactDirectory.appendingPathComponent(name), options: .withoutOverwriting)
+                artifacts.append(["path": path, "size": data.count, "sha256": durableDigest(data), "binary": binary,
+                    "saved": saved.contains { $0.caseInsensitiveCompare(name) == .orderedSame }])
+            }
+        }
+        let names = Set(artifacts.compactMap { $0["path"] as? String }.map { String($0.dropFirst("artifacts/".count)).lowercased() })
+        guard saved.allSatisfy({ names.contains($0.lowercased()) }) else { throw StorageMigrationError.invalidArtifact(savedPath) }
+        let chatFiles = inventory.keys.filter { $0.hasPrefix("chats/") }
+        guard chatFiles.allSatisfy({ path in
+            let parts = path.split(separator: "/")
+            return parts.count == 3 && UUID(uuidString: String(parts[1])) != nil && inventory["\(parts[0])/\(parts[1])/chat.json"] != nil
+        }) else { throw StorageMigrationError.invalidApplicationStorage("chats") }
+        let chatPaths = chatFiles.filter { $0.hasSuffix("/chat.json") }.sorted()
+        for path in chatPaths {
+            let prefix = String(path.dropLast("chat.json".count))
+            let data = try durableSourceFile(path, at: profile.url)
+            let metadata = try decoder.decode(ChatMeta.self, from: data)
+            guard metadata.schemaVersion == ChatFormat.currentSchemaVersion,
+                  UUID(uuidString: String(prefix.split(separator: "/")[1])) == metadata.id else {
+                throw StorageMigrationError.invalidApplicationStorage(path)
+            }
+            let transcriptPath = prefix + "turns.jsonl"
+            let lines: [Data] = inventory[transcriptPath] == nil ? [] : try [UInt8](durableSourceFile(transcriptPath, at: profile.url))
+                .split(separator: 0x0A).map { Data($0) }
+            let turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
+            var document = ChatDocument(turns: turns)
+            guard document.turns.map(\.id) == turns.map(\.id) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
+            document.apply(.sealAllTurns)
+            let sealed = document.turns
+            let contextPath = prefix + "context.json"
+            let checkpoint = inventory[contextPath] == nil ? nil : try decoder.decode(AgentContextCheckpoint.self,
+                from: durableSourceFile(contextPath, at: profile.url))
+            let boundary = checkpoint?.boundary(in: turns)
+            guard checkpoint == nil || boundary != nil, !turns.requiresContextCheckpoint || checkpoint != nil else {
+                throw StorageMigrationError.invalidApplicationStorage(contextPath)
+            }
+            let alias = "ox-native:\(metadata.id.uuidString)"
+            func messages(_ source: [Turn]) -> [JSONValue] {
+                ChatProjection.makeWireMessages(from: source).map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id) }
+            }
+            guard let metadataJSON = String(data: data, encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(path) }
+            var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["sourceJSON": metadataJSON]]]
+            var expected: [Any] = []
+            for (index, turn) in sealed.enumerated() {
+                guard let original = String(data: lines[index], encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
+                let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
+                let model = messages([turn]).map { $0.toAny() }
+                expected.append(contentsOf: model)
+                entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "sourceJSON": original]])
+                if index == boundary, let checkpoint {
+                    expected = checkpoint.messages.map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id).toAny() }
+                    guard let original = String(data: try durableSourceFile(contextPath, at: profile.url), encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(contextPath) }
+                    entries.append(["kind": "pi.reset", "head": "self", "data": ["sourceJSON": original], "model": expected])
+                }
+            }
+            var applicationMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            for key in ["id", "model", "title", "isFavorite", "hasUnreadResponse"] { applicationMetadata.removeValue(forKey: key) }
+            var agent: [String: Any] = [:]
+            if let model = metadata.model {
+                agent["model"] = ["provider": model.providerID, "modelId": model.modelID]
+                if let effort = model.reasoningEffort {
+                    if ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains(effort) { agent["thinkingLevel"] = effort }
+                    else { applicationMetadata["nativeReasoningEffort"] = effort }
+                }
+            }
+            conversations.append(["key": metadata.id.uuidString, "title": metadata.title ?? "", "favorite": metadata.isFavorite,
+                "unread": metadata.hasUnreadResponse, "agent": agent, "metadata": applicationMetadata, "entries": entries, "expectedContext": try durableExpectedContext(expected)])
+        }
+        return DurableProfileDraft(draft: .from(["format": 1, "profileID": profile.id.uuidString, "documents": documents,
+            "artifacts": artifacts, "conversations": conversations]), manifest: manifest, inventory: inventory)
+    }
+
+    private static func durableExpectedContext(_ source: [Any]) throws -> [[String: Any]] {
+        let messages = try source.map { value -> [String: Any] in
+            guard let message = value as? [String: Any] else { throw StorageMigrationError.invalidApplicationStorage("model context") }
+            return message
+        }.filter { $0["role"] as? String != "assistant" || !["aborted", "error", "deferred"].contains($0["stopReason"] as? String ?? "") }
+        var ordered: [[String: Any]] = []
+        for (index, message) in messages.enumerated() {
+            if message["role"] as? String == "toolResult" { continue }
+            ordered.append(message)
+            guard message["role"] as? String == "assistant", let content = message["content"] as? [[String: Any]] else { continue }
+            var results: [String: [String: Any]] = [:]
+            for candidate in messages.dropFirst(index + 1) {
+                if candidate["role"] as? String == "assistant" { break }
+                if candidate["role"] as? String == "toolResult", let id = candidate["toolCallId"] as? String, results[id] == nil { results[id] = candidate }
+            }
+            for call in content where call["type"] as? String == "toolCall" {
+                guard let id = call["id"] as? String, let name = call["name"] as? String, let timestamp = message["timestamp"] else {
+                    throw StorageMigrationError.invalidApplicationStorage("tool context")
+                }
+                ordered.append(results[id] ?? ["role": "toolResult", "toolCallId": id, "toolName": name,
+                    "content": [["type": "text", "text": "Tool result unavailable: history ends before this call completed."]],
+                    "isError": true, "details": ["reason": "missing_result"], "timestamp": timestamp])
+            }
+        }
+        return ordered
+    }
+
+    private static func durableSourceInventory(at root: URL) throws -> [String: String] {
+        var files: [String: String] = [:]
+        var directories = [root]
+        while let directory = directories.popLast() {
+            for url in try FileManager.default.contentsOfDirectory(at: directory,
+                includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey]) {
+                let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey])
+                guard values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(url.lastPathComponent) }
+                let path = String(url.path.dropFirst(root.path.count + 1))
+                if values.isDirectory == true {
+                    guard ["chats", "skills", "artifacts"].contains(path) || path.hasPrefix("chats/") || path.hasPrefix("skills/") else {
+                        throw StorageMigrationError.invalidApplicationStorage(path)
+                    }
+                    directories.append(url); continue
+                }
+                guard values.isRegularFile == true,
+                    [ProfileIO.configName, "MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts/.saved.json"].contains(path)
+                    || path.hasPrefix("skills/") || path.hasPrefix("artifacts/")
+                    || (path.hasPrefix("chats/") && ["chat.json", "turns.jsonl", "context.json"].contains(url.lastPathComponent)) else {
+                    throw StorageMigrationError.invalidApplicationStorage(path)
+                }
+                files[path] = durableDigest(try durableSourceFile(path, at: root))
+            }
+        }
+        return files
+    }
+
+    private static func durableSourceFile(_ path: String, at root: URL, limit: Int = 64 * 1024 * 1024) throws -> Data {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else {
+            throw StorageMigrationError.invalidApplicationStorage(path)
+        }
+        var descriptor = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard descriptor >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+        defer { Darwin.close(descriptor) }
+        for (index, part) in parts.enumerated() {
+            let next = openat(descriptor, part, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | (index < parts.count - 1 ? O_DIRECTORY : 0))
+            guard next >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+            Darwin.close(descriptor); descriptor = next
+        }
+        var before = stat()
+        guard fstat(descriptor, &before) == 0, before.st_mode & S_IFMT == S_IFREG, before.st_nlink == 1,
+              before.st_size >= 0, before.st_size <= limit else { throw StorageMigrationError.invalidApplicationStorage(path) }
+        var output = Data()
+        var buffer = [UInt8](repeating: 0, count: 128 * 1024)
+        while true {
+            let count = Darwin.read(descriptor, &buffer, buffer.count)
+            if count < 0 && errno == EINTR { continue }
+            guard count >= 0, output.count + count <= limit else { throw StorageMigrationError.invalidApplicationStorage(path) }
+            if count == 0 { break }
+            output.append(contentsOf: buffer.prefix(count))
+        }
+        var after = stat()
+        guard fstat(descriptor, &after) == 0, after.st_size == before.st_size, output.count == before.st_size,
+              after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec, after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec else {
+            throw StorageMigrationError.invalidApplicationStorage(path)
+        }
+        return output
+    }
+
+    private static func durableDigest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
 
     private enum LegacyLocalRepositoryState {
         case main(String)

@@ -300,11 +300,9 @@ final class ChatManager {
     func toggleTemporaryChat() {
         guard let chat = current, chat.toggleRetention() else { return }
         attachPersistence(chat)
-        #if DEBUG && targetEnvironment(simulator)
-        if chat.isTemporary, let caseID = SimEnv.durableTemporarySessionID {
+        if chat.isTemporary, let caseID = OxHostProtocol.durableTemporarySessionID {
             chat.durablePreparation = Task { try await OxHostProtocol.prepareDurableTemporaryChat(chat, caseID: caseID) }
         }
-        #endif
         Log.session.info("ChatManager.retention chat=\(chat.id) temporary=\(chat.isTemporary)")
     }
 

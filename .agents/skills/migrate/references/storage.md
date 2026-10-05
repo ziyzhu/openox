@@ -120,8 +120,9 @@ against readers/writers. This is not one combined document/blob transaction.
 Submitted messages, contextual snapshots, model replies and native diagnostics
 can be present: these are private user-owned scratch data, not anonymous fixtures.
 The controller refuses persisted chats; normal activation never opens these caches.
-A DEBUG Simulator launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` also allows
-an idle chat switched to temporary in the actual UI to attach to `NativeFiles`.
+An explicit launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` allows an idle chat
+switched to temporary in the actual UI to attach to `NativeFiles`, including
+Release builds on physical devices. Diagnostic RPCs remain DEBUG Simulator-only.
 Admission waits for attachment and rejects preparation failure without selecting
 the legacy loop. Preparing/attached chats cannot become persisted. The test
 skill's actual UI replay verifies reasoning, Markdown, native tools, Stop and
@@ -174,9 +175,26 @@ fork-aware scrollback separately from active model context. Read-only virtual
 `chats/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
-Production conversion and Profile export/import are not implemented. Post-rebase
+Production activation and Profile export/import are not implemented. Post-rebase
 native RPC verification requires usable simulator VPN ingress; no loopback
 exception is authorized.
+
+`StorageMigrator.stageDurableProfile` now builds a separate caller-owned local
+staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
+only the current native representation, pins source-file reads without following
+links, retains source files, fingerprints the source before/after installation,
+and refuses unknown files, missing references or invalid compaction boundaries.
+The shared normalized installer has no legacy decoder or model/tool execution.
+Pi entries retain the full ledger and application payloads; self-head checkpoints
+retain compacted active context separately. `ox.conversation.metadata` v1 stores
+non-identity application settings, with latest history, current forks and bounded
+checkpoints. Source-key mappings are returned to the migrator, not stored in a
+runtime registry. Physical artifacts are digest-checked and flushed before Pi
+metadata commits. The installer closes SQLite and its artifact owner before the
+staged manifest receives `2026-10-05-pi-durable`. That version is deliberately
+absent from normal activation milestones until readers/lifecycle are cut over.
+Staging is not publication, backup, export, automatic migration or activation;
+failed partial stages are retained for diagnosis and never reused implicitly.
 
 The existing production Profile representations and compatibility milestones are unchanged.
 Upstream SQLite/document/task compatibility has not yet been adopted by the
@@ -772,7 +790,7 @@ needed for diagnosis but never credentials or reusable secrets.
 | Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |
 | Local repository and service snapshots | Application Support | Excluded from backup | Remove repository or replace snapshot |
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
-| Pi Durable temporary-chat caches | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
+| Pi Durable temporary-chat caches | Caches (explicit launch opt-in) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
 | Pi Durable upstream storage diagnostics | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | Removed after each request; crash remnants by system eviction or QA cleanup |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
 | App logs | Application Support | Excluded from backup | Retention compaction |

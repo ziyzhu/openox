@@ -7,7 +7,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { ProfileFiles, ProfileFile, canonical } from "../src/core/profile-files";
 import { profileEnv } from "../src/core/profile-env";
 import { backend } from "./sqlite-backend";
-import { openOxAgentSession, type ArtifactFiles } from "../src/index";
+import { openOxAgentSession, installOxProfile, type NormalizedProfileDraft, type ArtifactFiles } from "../src/index";
 import { artifactPath } from "../src/core/artifacts";
 import { mkdtemp, mkdir, open, rm, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -157,6 +157,48 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     const ledger = await conversation.entries({}, 100, undefined, BACKGROUND_CONTEXT);
     expect(JSON.stringify(ledger.items)).not.toContain(png);
     expect(JSON.stringify(ledger.items)).toContain("oxProfileID");
+    const installed = `${directory}/installed`;
+    await mkdir(`${installed}/artifacts`, { recursive: true });
+    const imageBytes = Buffer.from(png, "base64");
+    await writeFile(`${installed}/artifacts/chart.png`, imageBytes);
+    const old = { role: "user" as const, content: "Full retained ledger", timestamp: 1 };
+    const summary = { role: "user" as const, content: "Compacted context", timestamp: 2 };
+    const tail = { role: "user" as const, content: [Object.assign({ type: "text" as const, text: "[Attachment: artifacts/chart.png]" },
+      { oxAttachment: "chart.png", oxProfileID: "installed-profile" })], timestamp: 3 };
+    const draft: NormalizedProfileDraft = { format: 1, profileID: "installed-profile",
+      documents: [{ path: "MEMORY.md", text: "Installed memory" }],
+      artifacts: [{ path: "artifacts/chart.png", size: imageBytes.length, sha256: hash(imageBytes), binary: true, saved: true }],
+      conversations: [{ key: "source-key", title: "Preserved title", favorite: true, unread: false,
+        agent: { model: { provider: "native-source", modelId: "model" }, thinkingLevel: "high" }, metadata: { createdAt: 42, scheduledSkillID: "schedule" },
+        entries: [{ kind: "pi.user", model: [old], data: { retained: "application data" } },
+          { kind: "pi.reset", head: "self", model: [summary] }, { kind: "pi.user", model: [tail] }], expectedContext: [summary, tail] }] };
+    const installation = await installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) });
+    expect(installation.conversations).toHaveLength(1);
+    expect(installation.conversations[0]!.key).toBe("source-key");
+    const installedSession = await openOxAgentSession({ database: backend(`${installed}/state.sqlite`).db,
+      profileID: draft.profileID, models: createModels(), artifacts: host(installed), authorizeFile: async () => {} });
+    try {
+      const reference = installation.conversations[0]!.reference;
+      expect((await installedSession.conversations.history(reference)).items).toHaveLength(3);
+      expect((await installedSession.inspect(reference)).messages).toEqual([summary, tail]);
+      expect(await installedSession.files.readReference("artifacts/chart.png")).toEqual(imageBytes);
+      expect((await installedSession.conversations.metadata(reference)).favorite).toBe(true);
+      expect((await installedSession.inspect()).inspection.tasks).toHaveLength(0);
+    } finally { await installedSession.close(); }
+    const installedProbe = backend(`${installed}/state.sqlite`);
+    expect(await installedProbe.db.all("SELECT name FROM sqlite_master WHERE name IN ('ox_chats','ox_blobs','ox_blob_chunks')")).toHaveLength(0);
+    expect(await installedProbe.db.all("SELECT id FROM submissions")).toHaveLength(0);
+    expect(await installedProbe.db.all("SELECT id FROM tasks")).toHaveLength(0);
+    expect(await installedProbe.db.all("SELECT id FROM documents WHERE kind='\"ox.chat\"'")).toHaveLength(0);
+    await installedProbe.db.close();
+    await expect(installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) })).rejects.toThrow("fresh staged database");
+    const untouched = backend(`${installed}/state.sqlite`);
+    expect(await untouched.db.all("SELECT id FROM entries")).toHaveLength(3);
+    await untouched.db.close();
+    const foreign = `${directory}/foreign`;
+    await mkdir(foreign);
+    await expect(installOxProfile({ ...draft, profileID: "another-profile" },
+      { database: backend(`${foreign}/state.sqlite`).db, artifacts: host(foreign) })).rejects.toThrow("owning Profile");
     await writeFile(`${directory}/artifacts/chart.bin`, new Uint8Array([1, 1, 1]));
     await expect(session.files.read("artifacts/chart.bin")).rejects.toThrow("digest");
     await session.close();

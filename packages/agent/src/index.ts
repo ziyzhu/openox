@@ -6,3 +6,4 @@ export { OxConversations, ConversationPresentation, ConversationFavorite, Conver
   type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor, type PresentationChange } from "./core/conversations";
 export type { ArtifactFiles, ArtifactRecord } from "./core/artifacts";
 export type { AuthorizeFile } from "./core/file-tools";
+export { installOxProfile, ConversationApplicationMetadata, type NormalizedProfileDraft, type ProfileInstallHost } from "./core/profile-install";

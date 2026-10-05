@@ -1,7 +1,9 @@
-#if DEBUG && targetEnvironment(simulator)
 import Foundation
 
 extension OxHostProtocol {
+    static let durableTemporarySessionID = ProcessInfo.processInfo.environment["OX_DURABLE_TEMPORARY_SESSION"].flatMap(UUID.init(uuidString:))
+
+    #if DEBUG && targetEnvironment(simulator)
     struct DurableChatRequest: Codable {
         let caseID: UUID
         let action: String
@@ -16,11 +18,14 @@ extension OxHostProtocol {
         let presentation: JSONValue?
         let lastReadEntryID: Int?
     }
+    #endif
+
     @MainActor
     static func prepareDurableTemporaryChat(_ chat: Chat, caseID: UUID) async throws {
         _ = try await DurableChatController.attach(chat, caseID: caseID, artifactFiles: true)
     }
 
+    #if DEBUG && targetEnvironment(simulator)
     @MainActor
     static func handleDurableChat(_ request: DurableChatRequest, chats: ChatManager, reply: OxHostRPC.Reply) {
         Task { @MainActor in
@@ -28,6 +33,7 @@ extension OxHostProtocol {
             catch { reply.failure(error.localizedDescription) }
         }
     }
+    #endif
 }
 
 /// Deliberate rollout gate: real native providers/capabilities and chat presentation, synthetic cache storage only.
@@ -79,6 +85,7 @@ private enum DurableChatController {
         return .object(["attached": .bool(true), "chatID": .string(chat.id.uuidString)])
     }
 
+    #if DEBUG && targetEnvironment(simulator)
     static func command(_ request: OxHostProtocol.DurableChatRequest, chats: ChatManager) async throws -> JSONValue {
         if request.action == "attach" {
             guard case .found(let chat?) = OxHostProtocol.resolveSession(chats, request.sessionId), chat.isTemporary, !chat.isBusy else {
@@ -113,5 +120,5 @@ private enum DurableChatController {
             throw error
         }
     }
+    #endif
 }
-#endif

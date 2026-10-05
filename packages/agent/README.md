@@ -64,7 +64,11 @@ bun run typecheck
 The existing portable integration/conformance and bundle-boundary tests remain.
 Application acceptance uses actual-chat E2E, not a parallel mock proof harness.
 The custom proof, conversion/package experiments and agent-overhead benchmark
-have been removed. Profile conversion/export/import remain future production work.
+have been removed. `installOxProfile` installs normalized drafts into fresh,
+dormant physical-backend stores and returns qualified conversation mappings.
+Native decoding and staging stay in `StorageMigrator`. This is the start of the
+production cutover, not activation: normal readers/writers, publication, lifecycle
+and export/import still require replacement before the legacy path can be removed.
 
 Audited IIFEs are generated into ignored `apps/ios/Ox/Resources/PiDurable.bundle/`:
 
@@ -87,7 +91,8 @@ Use a freshly built DEBUG app and an idle chat with native Mock selected. The
 runner verifies reasoning, Markdown, native snippet tools, Stop, committed Pi
 history and reopening the cache Session across process restart. It uses the
 explicit `OX_DURABLE_TEMPORARY_SESSION=<UUID>` UI opt-in, not Host RPC, and clears
-the opt-in afterward. Diagnostic stopped-process SQLite copies are not exports,
+the opt-in afterward. This launch flag also supports Release builds on physical
+devices; diagnostic RPCs remain DEBUG Simulator-only. Diagnostic stopped-process SQLite copies are not exports,
 graceful-close or physical-device power-loss evidence. This does not convert
 persisted chats or implement production Profile adoption.
 

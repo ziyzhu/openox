@@ -73,8 +73,9 @@ temporary-chat Pi path with native Mock already selected. It checks reasoning,
 Markdown, native snippet tools, Stop, committed SQLite history and process reopen.
 It requires an idle chat, claims the selected simulator, uses no Host transport,
 and restores ordinary launch afterward. `OX_DURABLE_TEMPORARY_SESSION=<UUID>`
-enables only DEBUG Simulator temporary-chat attachment; it does not enable Host
-access or adopt persisted Profiles. Stopped-process SQLite copies include WAL/SHM
+enables temporary-chat UI attachment in Debug and Release builds on simulators
+and physical devices; it does not enable Host access or adopt persisted Profiles.
+Diagnostic RPCs remain restricted to DEBUG Simulator builds. Stopped-process SQLite copies include WAL/SHM
 and are diagnostic evidence, not Profile exports or power-loss verification.
 
 `test:demo` checks native preview

@@ -3,7 +3,7 @@ import { createModels, createProvider } from "@earendil-works/pi-ai/models";
 import type { Message, Model, Tool, Api } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, section, type UserInput, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { openOxAgentSession, type OxAgentSession, type ConversationReference, type ConversationHistoryCursor,
-  type ConversationListCursor, type PresentationChange } from "../../index";
+  type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft } from "../../index";
 import type { EntryId } from "@earendil-works/pi-durable";
 import { ChatBindings, ConversationIdentity } from "../../chat-bindings";
 import { nativeDatabase } from "../../sqlite";
@@ -14,7 +14,7 @@ import { nativeArtifacts } from "./artifacts";
 const context = BACKGROUND_CONTEXT;
 interface Config { chatID: string; title?: string; systemPrompt: string; model: string; contextWindow: number; maxTokens: number;
   reasoning: boolean; tools: Tool[]; messages: Message[] }
-interface Command { action: string; config?: Config; chatID?: string | null; content?: UserInput;
+interface Command { action: string; draft?: NormalizedProfileDraft; config?: Config; chatID?: string | null; content?: UserInput;
   requestID?: string; profileID?: string; path?: string; text?: string; artifactFiles?: boolean;
   reference?: ConversationReference | null; limit?: number; historyCursor?: ConversationHistoryCursor | null; listCursor?: ConversationListCursor | null;
   presentation?: PresentationChange | null; lastReadEntryID?: EntryId | null }
@@ -26,6 +26,10 @@ export class IOSAgentAdapter {
   private models = createModels();
 
   async command(args: Command): Promise<unknown> {
+    if (args.action === "installProfile") {
+      if (this.session || !args.draft) throw new Error("Profile installation requires an unopened staged runtime and normalized draft");
+      return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })), artifacts: nativeArtifacts() });
+    }
     if (args.action === "open") {
       if (this.session) throw new Error("Session already open");
       this.models = createModels();
