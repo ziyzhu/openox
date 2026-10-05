@@ -60,7 +60,7 @@ Local repository loading can be tested separately.
 
 An Ox separates the interface, runtime, model, persistent state, and capabilities into seven components.
 
-![OpenOx components](docs/openox-components.svg)
+![OpenOx components](assets/openox-components.svg)
 
 *The Client and model remain replaceable around a Host that owns the Agent, Profile, VM, and service lifecycle.*
 
