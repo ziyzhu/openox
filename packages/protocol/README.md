@@ -18,7 +18,7 @@ After changing the source:
 ```sh
 bun run build:host-schema
 bun run typecheck
-bun test tests/contracts/client-host
+bun test ./.agents/skills/test/contracts/client-host
 ```
 
 CI checks that generated JSON and Swift artifacts match the source. Do not edit generated files.
@@ -111,7 +111,7 @@ The portable E2E suite exercises CLI processes against a controlled WebSocket
 fixture using the shared contract:
 
 ```sh
-bun test tests/contracts/client-host/protocol.test.ts
+bun test ./.agents/skills/test/contracts/client-host/protocol.test.ts
 ```
 
 `fixtures.json` is also available to Host implementations in other languages.

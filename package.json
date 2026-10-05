@@ -4,20 +4,20 @@
   "license": "Apache-2.0",
   "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services"],
   "scripts": {
-    "ci": "./tests/ci.sh",
-    "ci:ios": "bun tests/apps/ios/smoke.ts",
-    "test:e2e": "bun test tests",
-    "test:logs": "bun tests/apps/cli/logs.ts",
-    "evals": "bun tests/evals/runner.ts",
-    "build:services": "bun tools/build/ios-services-build.ts",
+    "ci": "./.agents/skills/test/scripts/ci.sh",
+    "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",
+    "test:e2e": "bun test ./.agents/skills/test",
+    "test:logs": "bun .agents/skills/test/apps/cli/logs.ts",
+    "evals": "bun .agents/skills/evals/scripts/runner.ts",
+    "build:services": "bun .agents/skills/build/scripts/ios-services-build.ts",
     "test:demo": "bun .agents/skills/test/apps/ios/demo-preview.ts",
     "build:diagram": "dot -Tsvg assets/openox-components.dot -o assets/openox-components.svg",
-    "sim:bootstrap": "bun tools/sim/bootstrap.ts",
-    "update:llms": "bun tools/build/provider-models.ts",
-    "build:provider-schema": "bun tools/build/provider-definitions.ts",
-    "build:host-schema": "bun tools/build/host-rpc-contract.ts --write",
-    "build:repository-schema": "bun tools/build/repository-contract.ts --write",
-    "typecheck": "bun tools/checks/typecheck.ts"
+    "sim:bootstrap": "bun .agents/skills/onboarding/scripts/bootstrap.ts",
+    "update:llms": "bun .agents/skills/build/scripts/provider-models.ts",
+    "build:provider-schema": "bun .agents/skills/build/scripts/provider-definitions.ts",
+    "build:host-schema": "bun .agents/skills/build/scripts/host-rpc-contract.ts --write",
+    "build:repository-schema": "bun .agents/skills/build/scripts/repository-contract.ts --write",
+    "typecheck": "bun .agents/skills/build/scripts/typecheck.ts"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.49"

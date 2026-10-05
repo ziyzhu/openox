@@ -17,7 +17,7 @@ System names are reserved. System and installed repository skills are read-only.
 
 ## Create and customize
 
-New skills belong to the active Profile by default. Read `references/user-skill.md` for the authoring workflow. Use `ox.skill.create` for the initial instructions, `ox.fs.write` or `ox.fs.edit` for revisions, and `ox.skill.copy` to create an independent Profile copy of any resolved skill. Copying retains references, helpers, and service dependencies.
+New skills belong to the active Profile by default. Read `skills/manage-skills/references/user-skill.md` for the authoring workflow. Use `ox.skill.create` for the initial instructions, `ox.fs.write` or `ox.fs.edit` for revisions, and `ox.skill.copy` to create an independent Profile copy of any resolved skill. Copying retains references, helpers, and service dependencies.
 
 Each skill directory contains:
 
@@ -29,6 +29,6 @@ Use `ox.fs` to read and edit resources. Helpers are async function bodies receiv
 
 ## Share
 
-Read `references/repository-skill.md` when publishing a skill or editing Local repository content. `ox.skill.share` copies the complete resolved skill into Local and refuses to replace an existing Local name. Review personal information before sharing. Repository publication is an explicit user choice, separate from creating or customizing a Profile skill.
+Read `skills/manage-skills/references/repository-skill.md` when publishing a skill or editing Local repository content. `ox.skill.share` copies the complete resolved skill into Local and refuses to replace an existing Local name. Review personal information before sharing. Repository publication is an explicit user choice, separate from creating or customizing a Profile skill.
 
 Deleting a skill uses `ox.skill.delete`. Saved invocations and schedules retain their own snapshots. Explain that deletion does not delete those snapshots or their schedules.

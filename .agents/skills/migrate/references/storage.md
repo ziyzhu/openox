@@ -98,7 +98,7 @@ Primary owners:
 - App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
-- Developer bootstrap credentials — owner: tools/sim/bootstrap.ts
+- Developer bootstrap credentials — owner: .agents/skills/onboarding/scripts/bootstrap.ts
 
 ## Compatibility gate
 
@@ -537,7 +537,8 @@ WebKit's same-origin policy separates origin storage, while cookies follow
 normal browser domain rules. Signing out enumerates WebKit records and cookies,
 then removes only entries mapped to that website's Public Suffix List-aware
 registrable domain. The list is shipped in `PublicSuffixList.bundle` and looked
-up by `WebsitePublicSuffixList`; see [bundled PSL maintenance](../../../../docs/public-suffix-list.md).
+up by [WebsitePublicSuffixList](../../../../apps/ios/Ox/Host/Services/Web/WebsitePublicSuffixList.swift)
+using [the bundled rules](../../../../apps/ios/Ox/Resources/PublicSuffixList.bundle/public_suffix_list.dat).
 Interactive sign-in and throwaway browsing use separate
 pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.

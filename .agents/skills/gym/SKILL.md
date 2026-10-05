@@ -13,7 +13,7 @@ Exercise Ox as a user would, preserve observable evidence, and return prioritize
 - Read [references/session-protocol.md](references/session-protocol.md) before driving simulators or delegating sessions.
 - Read [references/findings.md](references/findings.md) before judging sessions or writing the report.
 
-Also use the `sim-cli` and `cli` skills. Consult their current help instead of guessing commands or flags.
+Also use the `sim-cli` and `ox-cli` skills. Consult their current help instead of guessing commands or flags.
 
 ## Relationship to deterministic tests
 
@@ -39,10 +39,10 @@ Default to `explore`. Use a recorded seed for every campaign and derived seed fo
 1. Resolve mode, session count, providers, comparison targets, authorized effects, and available numbered QA simulators. Default to six sessions when the request gives no count. Do not make paid real-provider calls unless the current request authorizes them and their count is bounded.
 2. Discover configured models and eligible dimension values, then generate the session plan and its owned `/tmp/ox-gym.*` directory with `scripts/plan-run.ts`. Pass supported additional axes with `--dimension`, provider and model identifiers only, and never credentials. Pass `--authorize-real` only when the current request authorizes real-provider calls. Use `--previous` only when the user explicitly supplies prior ephemeral manifests for cumulative coverage.
 3. Materialize every selected dimension into concrete setup, prompts, fixtures, and actions before delegation. Verify the provider and language, then set `materializationStatus`, `providerVerification`, and `executionAuthorized` to ready values. Never delegate a planner-only session. Remove or mark a value unavailable when it cannot actually be exercised. Keep manifests, logs, screenshots, short screen recordings, traces, and reports inside the planner-created directory. Do not write campaign artifacts into the repository or a Profile.
-4. Follow the Simulator Setup reservation, runtime, and common-state rules in `AGENTS.md`. Claim only fixed `ox-1` through `ox-5` simulators. Give every concurrent process its own numbered simulator and matching service and debug ports from `tools/sim/qa-config.ts`; use its repository port only for explicit repository installation or sync verification.
+4. Follow the Simulator Setup reservation, runtime, and common-state rules in `AGENTS.md`. Claim only fixed `ox-1` through `ox-5` simulators. Give every concurrent process its own numbered simulator and matching service and debug ports from `.agents/skills/onboarding/scripts/qa-config.ts`; use its repository port only for explicit repository installation or sync verification.
 5. Before interaction timing begins, build and install through `sim`, launch Ox with bundled services, discover its Host, and establish the session's initial theme, language, model, and state. Reuse a verified prebuilt app where appropriate, but rebuild and reinstall after switching worktrees.
 6. Run functional and exploratory sessions concurrently when resources allow. Keep one coordinator slot available. Have each driver follow the session protocol and return structured evidence.
-7. Aggregate candidate issues. Reproduce performance regressions and ambiguous high-severity findings sequentially on one simulator with other QA simulators shut down. Parallel simulator or provider contention invalidates clean performance comparisons.
+7. Aggregate candidate issues. Reproduce performance regressions and ambiguous high-severity findings sequentially on one owned simulator without competing QA activity. Shut down only simulators owned by this campaign; coordinate with other agents or defer clean performance measurements when their devices remain active. Never interrupt another agent's simulator. Parallel simulator or provider contention invalidates clean performance comparisons.
 8. Write `findings.md` and update `campaign.json` inside the owned temporary directory. Report the session outcomes, strongest findings, coverage gaps, limitations, and exact report path.
 
 ## Non-negotiable boundaries

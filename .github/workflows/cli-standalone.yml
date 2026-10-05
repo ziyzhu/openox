@@ -5,14 +5,14 @@ on:
   push:
     branches: [main]
     paths:
-      - "tests/contracts/client-host/**"
-      - "tests/apps/cli/**"
+      - ".agents/skills/test/contracts/client-host/**"
+      - ".agents/skills/test/apps/cli/**"
       - "tsconfig.base.json"
       - "apps/cli/**"
       - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/repository/**"
-      - "tests/ci.sh"
+      - ".agents/skills/test/scripts/ci.sh"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/cli-standalone.yml"
@@ -20,14 +20,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "tests/contracts/client-host/**"
-      - "tests/apps/cli/**"
+      - ".agents/skills/test/contracts/client-host/**"
+      - ".agents/skills/test/apps/cli/**"
       - "tsconfig.base.json"
       - "apps/cli/**"
       - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/repository/**"
-      - "tests/ci.sh"
+      - ".agents/skills/test/scripts/ci.sh"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/cli-standalone.yml"

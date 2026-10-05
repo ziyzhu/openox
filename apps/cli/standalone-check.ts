@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import packageMetadata from "./package.json";
 import { buildStandalone, nativePlatform } from "./standalone.ts";
-import { hostFixtureReply } from "../../tests/contracts/client-host/fixture.ts";
+import { hostFixtureReply } from "../../.agents/skills/test/contracts/client-host/fixture.ts";
 
 const { values } = parseArgs({ options: { out: { type: "string" } } });
 const temporaryRoot = await mkdtemp(join(tmpdir(), "ox-cli-standalone-check-"));

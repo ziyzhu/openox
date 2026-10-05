@@ -9,7 +9,7 @@ Ox owns provider and model management through the built-in `manage-providers` sk
 
 ## Drive Ox
 
-Read the `sim-cli` and `cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
+Read the `sim-cli` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
 
 1. Establish whether the request is for an on-device change, bundled defaults, or native runtime support. On-device management does not authorize publication.
 2. Drive a real Ox chat through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.

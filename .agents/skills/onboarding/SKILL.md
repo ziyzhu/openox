@@ -48,7 +48,7 @@ sim devices
 
 Use the `sim-cli` skill for iOS interaction; see the coding-agent setup section below to install it. If unavailable, consult `sim --help`, command-specific help, and `sim agent-context`. Never guess flags or build directly with `xcodebuild`.
 
-- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [tools/sim/qa-config.ts](../../../tools/sim/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
+- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [scripts/qa-config.ts](scripts/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
 - Before touching a device, coordinate ownership with other agents and inspect recent activity in `~/.sim-cli/logs/invocations.jsonl`. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `sim devices`.
 - When no suitable simulator exists, create it in Xcode's **Devices and Simulators** window using the assigned runtime. After reserving a suitable iOS 26 baseline, for example:
@@ -60,6 +60,8 @@ sim devices clone ox-1 ox-3
 ```
 
 Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../migrate/references/storage.md#website-state). Other website state and provider settings need separate setup.
+
+`scripts/simulator.ts` shares device/runtime checks and PID claims with the test runners. Claims coordinate repository runners only; they do not replace agent ownership checks. `scripts/bootstrap.ts` owns the explicit credential/artifact/website-state setup behind `bun run sim:bootstrap`.
 
 ## iOS signing and local configuration
 
@@ -115,7 +117,7 @@ ln -s "$PWD/skills/sim-cli" "$HOME/.agents/skills/sim-cli"
 
 Inspect an existing destination before changing it; do not replace another installation blindly. Pi discovers `~/.agents/skills/` without extra settings. Run `/reload` after installing or editing skills. Use `sim` help as the fallback when the external skill is unavailable.
 
-The optional user-level `agent-sessions` skill helps inspect tmux agents. Without it, `tmux list-panes -a` and `tmux capture-pane` provide read-only inspection; never send keystrokes to another agent or interrupt its device. Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
+Use `tmux list-panes -a` and `tmux capture-pane` for read-only inspection of other agents' sessions; never send keystrokes to another agent or interrupt its device. Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
 
 ## Completion
 

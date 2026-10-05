@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run } from "../../../../../tools/lib.ts";
-import { qaCommand } from "../../../../../tools/sim/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../../../tools/sim/simulator.ts";
+import { run } from "../../../../lib.ts";
+import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 
 const config = qaCommand({ usage: "Usage: bun run test:demo --device ox-N\nExercises native demo scenes without player controls or live model/service calls." });
 const bundle = "ai.oxcraft.bot";

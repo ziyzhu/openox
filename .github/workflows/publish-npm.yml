@@ -86,7 +86,7 @@ jobs:
 
       - name: Publish package
         run: |
-          bun tools/release/npm-publish.ts \
+          bun .agents/skills/release/scripts/npm-publish.ts \
             --directory "${{ steps.release.outputs.package_key }}" \
             --tarball "${{ steps.artifact.outputs.tarball }}"
 

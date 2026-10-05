@@ -14,7 +14,7 @@ Both paths use the same Ox authoring workflow. Built-in services usually evolve 
 
 ## Drive the development loop
 
-Read the `sim-cli` and `cli` skills for simulator operation and chat control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
+Read the `sim-cli` and `ox-cli` skills for simulator operation and chat control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
 
 1. Establish the requested service outcome and whether delivery is Local or built-in. A request to add or update a built-in service authorizes preparing its promotion after live verification; a Local-only request does not authorize publication.
 2. Build, install, and launch the app as needed. Drive a real Ox chat through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.

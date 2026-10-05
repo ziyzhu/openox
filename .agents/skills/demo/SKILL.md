@@ -5,7 +5,7 @@ description: "Prepare and record the three-part Ox iOS demo: Connect anything, L
 
 # Ox Demo
 
-Use the `sim-cli` skill for visible iOS interaction and the `cli` skill to verify selected chats, models, service state, and completed replies. Use the `evolve` skill for the live Reddit service-creation scene. Follow the repository's simulator rules. Keep recordings, response drafts, and the run manifest outside the repository.
+Use the `sim-cli` skill for visible iOS interaction and the `ox-cli` skill to verify selected chats, models, service state, and completed replies. Use the `evolve` skill for the live Reddit service-creation scene. Follow the repository's simulator rules. Keep recordings, response drafts, and the run manifest outside the repository.
 
 ## Story and opening
 

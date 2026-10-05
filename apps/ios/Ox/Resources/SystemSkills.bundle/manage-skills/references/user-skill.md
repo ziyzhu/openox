@@ -58,7 +58,7 @@ Omit `services` when the set is empty. Store accepted service domains only in fr
 
 Write the body as an execution prompt. Use imperative steps, decision rules, the required output shape, checkpoints, and stopping conditions. Keep one-time task details and attachment mechanics outside the skill.
 
-The skill may use available `ox.*` functions. Its runtime has no shell, filesystem outside Ox's virtual layout, bundled resources, scripts, package installation, browser globals, or ambient network access.
+The skill may use available `ox.*` functions and packaged resources under `skills/<name>/references/` and `skills/<name>/scripts/`. Read references with `ox.fs.read`; run JavaScript helpers with `ox.skill.run` under normal Action policies. Its runtime has no shell, filesystem outside Ox's virtual layout, package installation, browser globals, or ambient network access.
 
 Read an existing file before replacing it and prefer `ox.fs.edit` for focused revisions. Read the final skill back and verify its name, description, services, instructions, and trigger boundaries against the accepted proposal. Use `ox.skill.delete` when the user asks to remove a Profile-owned skill.
 

@@ -14,7 +14,7 @@ Require all of the following before changing built-in service source:
 
 If any precondition is missing, return to Ox on the requested simulator. Do not substitute terminal Chrome, mitmproxy exploration, direct source editing, or inferred endpoint behavior.
 
-When returning work to Ox for authoring or repair, follow the `cli` skill's service-authoring guidance: use observed friction and failures to improve the harness, fix underlying issues, and verify the affected flow through Ox so future authoring is faster and more reliable.
+When returning work to Ox for authoring or repair, follow the `ox-cli` skill's service-authoring guidance: use observed friction and failures to improve the harness, fix underlying issues, and verify the affected flow through Ox so future authoring is faster and more reliable.
 
 ## Export the Local source
 
