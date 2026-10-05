@@ -17,6 +17,11 @@ extension OxHostProtocol {
         let lastReadEntryID: Int?
     }
     @MainActor
+    static func prepareDurableTemporaryChat(_ chat: Chat, caseID: UUID) async throws {
+        _ = try await DurableChatController.attach(chat, caseID: caseID, artifactFiles: true)
+    }
+
+    @MainActor
     static func handleDurableChat(_ request: DurableChatRequest, chats: ChatManager, reply: OxHostRPC.Reply) {
         Task { @MainActor in
             do { reply.success(try await DurableChatController.command(request, chats: chats)) }
@@ -42,44 +47,44 @@ private enum DurableChatController {
     static var sessions: [UUID: Session] = [:]
     static var attaching: Set<UUID> = []
 
+    static func attach(_ chat: Chat, caseID: UUID, artifactFiles requestedBackend: Bool?) async throws -> JSONValue {
+        guard chat.isTemporary, !chat.isBusy else { throw RuntimeError.bridge("Durable rollout requires an idle temporary chat") }
+        guard !attaching.contains(chat.id), !sessions.contains(where: { $0.key != caseID && $0.value.chats[chat.id] != nil }) else {
+            throw RuntimeError.bridge("Chat already belongs to another durable Session or attachment")
+        }
+        attaching.insert(chat.id)
+        defer { attaching.remove(chat.id) }
+        if sessions[caseID] == nil {
+            guard sessions.count < 2 else { throw RuntimeError.bridge("Close another durable Session first") }
+            let host = DurableAgentHost()
+            let physical = requestedBackend == true
+            let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appending(path: "PiDurableProof/\(physical ? "NativeFiles" : "Native")/\(caseID.uuidString)")
+            let runtime = DurableRuntime(databaseURL: directory.appending(path: physical ? "state.sqlite" : "session.sqlite"),
+                artifactRoot: physical ? directory : nil) { method, params, stream in try await host.handle(method, params, stream: stream) }
+            let artifactScope = physical ? ProfileScope(profileID: caseID, root: directory, location: .local) : nil
+            sessions[caseID] = Session(runtime: runtime, host: host, scope: chat.scope, artifactFiles: physical, artifactScope: artifactScope)
+            do {
+                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(caseID.uuidString), "artifactFiles": .bool(physical)]).jsonString())
+                sessions[caseID]?.opening = false
+            } catch { await runtime.dispose(); sessions.removeValue(forKey: caseID); throw error }
+        }
+        guard var session = sessions[caseID], !session.opening, !session.closing, session.scope == chat.scope,
+              requestedBackend == nil || requestedBackend == session.artifactFiles else { throw RuntimeError.bridge("Session unavailable or bound to another Profile scope") }
+        guard session.chats.count < 8 || session.chats[chat.id] != nil else { throw RuntimeError.bridge("Durable Session chat limit reached") }
+        try await chat.installDurableDriver(DurableAgentDriver(runtime: session.runtime, host: session.host, chatID: chat.id,
+            scope: chat.scope, runtimeProfileID: caseID, artifactScope: session.artifactScope))
+        session.chats[chat.id] = chat; sessions[caseID] = session
+        Log.agent.info("PiDurable rollout attached chat=\(chat.id) case=\(caseID) profile=\(chat.scope.profileID?.uuidString ?? "nil")")
+        return .object(["attached": .bool(true), "chatID": .string(chat.id.uuidString)])
+    }
+
     static func command(_ request: OxHostProtocol.DurableChatRequest, chats: ChatManager) async throws -> JSONValue {
         if request.action == "attach" {
             guard case .found(let chat?) = OxHostProtocol.resolveSession(chats, request.sessionId), chat.isTemporary, !chat.isBusy else {
                 throw RuntimeError.bridge("Durable rollout requires an idle temporary chat; persisted chats remain behind the storage migration gate")
             }
-            guard !attaching.contains(chat.id), !sessions.contains(where: { $0.key != request.caseID && $0.value.chats[chat.id] != nil }) else {
-                throw RuntimeError.bridge("Chat already belongs to another durable Session or attachment")
-            }
-            attaching.insert(chat.id)
-            defer { attaching.remove(chat.id) }
-            if sessions[request.caseID] == nil {
-                guard sessions.count < 2 else { throw RuntimeError.bridge("Close another durable Session first") }
-                let host = DurableAgentHost()
-                let artifactFiles = request.artifactFiles == true
-                let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                    .appending(path: "PiDurableProof/\(artifactFiles ? "NativeFiles" : "Native")/\(request.caseID.uuidString)")
-                let runtime = DurableRuntime(databaseURL: directory.appending(path: artifactFiles ? "state.sqlite" : "session.sqlite"),
-                                             artifactRoot: artifactFiles ? directory : nil) { method, params, stream in
-                    try await host.handle(method, params, stream: stream)
-                }
-                let artifactScope = artifactFiles ? ProfileScope(profileID: request.caseID, root: directory, location: .local) : nil
-                sessions[request.caseID] = Session(runtime: runtime, host: host, scope: chat.scope, artifactFiles: artifactFiles, artifactScope: artifactScope)
-                do {
-                    _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(request.caseID.uuidString), "artifactFiles": .bool(artifactFiles)]).jsonString(), entry: "agentCommand")
-                    sessions[request.caseID]?.opening = false
-                } catch {
-                    await runtime.dispose(); sessions.removeValue(forKey: request.caseID); throw error
-                }
-            }
-            guard var session = sessions[request.caseID], !session.opening, !session.closing, session.scope == chat.scope,
-                  request.artifactFiles == nil || request.artifactFiles == session.artifactFiles else {
-                throw RuntimeError.bridge("Session unavailable or bound to another Profile scope")
-            }
-            guard session.chats.count < 8 || session.chats[chat.id] != nil else { throw RuntimeError.bridge("Durable Session chat limit reached") }
-            try await chat.agent.installDurableDriver(DurableAgentDriver(runtime: session.runtime, host: session.host, chatID: chat.id, scope: chat.scope, runtimeProfileID: request.caseID, artifactScope: session.artifactScope))
-            session.chats[chat.id] = chat; sessions[request.caseID] = session
-            Log.agent.info("PiDurable rollout attached chat=\(chat.id) case=\(request.caseID) profile=\(chat.scope.profileID?.uuidString ?? "nil")")
-            return .object(["attached": .bool(true), "chatID": .string(chat.id.uuidString)])
+            return try await attach(chat, caseID: request.caseID, artifactFiles: request.artifactFiles)
         }
         guard var session = sessions[request.caseID], !session.opening, !session.closing else { throw RuntimeError.bridge("Attach an isolated durable Session first") }
         guard ["inspect", "fileWrite", "fileRead", "fileReference", "fileRemove", "conversationList", "conversationMetadata",
@@ -97,7 +102,7 @@ private enum DurableChatController {
             let result = try await session.runtime.command(value.jsonString(), entry: "agentCommand")
             if request.action == "close" {
                 for chat in session.chats.values {
-                    try await chat.agent.installDurableDriver(nil)
+                    try await chat.installDurableDriver(nil)
                     await session.host.unbind(chatID: chat.id.uuidString)
                 }
                 await session.runtime.dispose(); sessions.removeValue(forKey: request.caseID)

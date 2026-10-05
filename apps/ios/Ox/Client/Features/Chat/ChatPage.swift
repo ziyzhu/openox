@@ -2009,50 +2009,45 @@ struct ChatPage: View {
         }
     }
 
+    private func importAttachment(named name: String, source: String, operation: @escaping @MainActor () async throws -> Artifact) {
+        composer.importAttachment(named: name, operation: operation) { error in
+            Log.ui.error("ChatPage.attach \(source) error=\(error.localizedDescription)")
+            showAttachmentError(error)
+        }
+    }
+
     private func ingestPhotoItems(_ items: [PhotosPickerItem]) {
         for item in items {
             let suggested = item.itemIdentifier.map { "Photo-\($0.prefix(6)).jpg" } ?? "Photo.jpg"
-            composer.importAttachment(named: suggested) {
+            importAttachment(named: suggested, source: "photo") {
                 guard let data = try await item.loadTransferable(type: Data.self) else {
                     throw ArtifactError.imageDecodeFailed
                 }
                 return try await ArtifactImporter.importImageDataAsync(data, suggestedName: suggested)
-            } onFailure: { error in
-                Log.ui.error("ChatPage.attach photo error=\(error.localizedDescription)")
-                showAttachmentError(error)
             }
         }
     }
 
     private func ingestCameraImage(_ image: UIImage) {
-        composer.importAttachment(named: "Camera.jpg") {
+        importAttachment(named: "Camera.jpg", source: "camera") {
             try await ArtifactImporter.importImageAsync(image, suggestedName: "Camera.jpg")
-        } onFailure: { error in
-            Log.ui.error("ChatPage.attach camera error=\(error.localizedDescription)")
-            showAttachmentError(error)
         }
     }
 
     private func ingestPastedImages(_ images: [PastedComposerImage]) {
         for image in images {
-            composer.importAttachment(named: image.suggestedName) {
+            importAttachment(named: image.suggestedName, source: "pastedImage") {
                 try await ArtifactImporter.importImageDataAsync(image.data, suggestedName: image.suggestedName)
-            } onFailure: { error in
-                Log.ui.error("ChatPage.attach pastedImage error=\(error.localizedDescription)")
-                showAttachmentError(error)
             }
         }
     }
 
     private func ingestFileURLs(_ urls: [URL]) {
         for url in urls {
-            composer.importAttachment(named: url.lastPathComponent) {
+            importAttachment(named: url.lastPathComponent, source: "file") {
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 return try await ArtifactImporter.importFileAsync(at: url)
-            } onFailure: { error in
-                Log.ui.error("ChatPage.attach file error=\(error.localizedDescription)")
-                showAttachmentError(error)
             }
         }
     }

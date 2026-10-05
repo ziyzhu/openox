@@ -5,13 +5,10 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
     let displayName: String
     let models: [ProviderModel]
     let endpoint: URL
-    let regions: Set<LLMRegion>
-    let iconURL: URL?
-    let website: URL?
+    let presentation: ProviderPresentation
     let usesAPIKey: Bool
     let acceptsAPIKey: Bool
     let subscriptionAccount: (any SubscriptionAccount)?
-    let credentialKind: LLMCredentialKind
     let credentialID: String
     let adaptiveThinkingModelIDs: Set<String>
     let requestAuthentication: ProviderRequestAuthentication?
@@ -46,13 +43,10 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         self.displayName = displayName
         self.models = models
         self.endpoint = endpoint
-        self.regions = regions
-        self.iconURL = iconURL
-        self.website = website
+        self.presentation = ProviderPresentation(regions: regions, website: website, iconURL: iconURL, credentialKind: credentialKind)
         self.usesAPIKey = usesAPIKey
         self.acceptsAPIKey = acceptsAPIKey ?? usesAPIKey
         self.subscriptionAccount = subscriptionAccount
-        self.credentialKind = credentialKind
         self.credentialID = credentialID ?? id
         self.adaptiveThinkingModelIDs = adaptiveThinkingModelIDs
         self.requestAuthentication = requestAuthentication

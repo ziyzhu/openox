@@ -22,7 +22,7 @@ Read `service.json`, `actions.js`, Local Git status, and the exact saved Local r
 
 Compare the exported source with any existing built-in service and report behavioral differences before replacing it. Preserve unrelated built-in changes.
 
-The official source uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. Use the verified Local `faviconUrl` as an artwork source, store an audited `favicon.png`, and omit the third-party URL override from the built-in manifest so the build assigns the OpenOx CloudFront asset URL. Deploy the reviewed icon through the existing service-assets workflow with an explicit OpenOx checkout and verify its anonymous hosted response before delivery. Favicons load through URLs only; do not include PNG assets in the generated runtime bundle or add an on-device fallback. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
+The official source in `apps/ios/Ox/Resources/OxServices.bundle/` uses the same plain-JavaScript installer format as Local. Copy the exact saved `actions.js` without translation and preserve every behavioral manifest field. Use the verified Local `faviconUrl` as an artwork source, store an audited `assets/services/<domain>/favicon.png`, and set the built-in manifest's `faviconUrl` to `https://openox.ai/assets/services/<domain>/favicon.png`. Deploy the reviewed icon through the existing service-assets workflow with an explicit OpenOx checkout and verify its anonymous hosted response before delivery. Favicons load through URLs only; do not include PNG assets in the runtime bundle or add an on-device fallback. The build must reject syntax errors, installers that pass a version, multiple installations, and manifest-registration mismatches. Do not hand-rewrite Ox-authored JavaScript as a second implementation.
 
 An installed app's validator can lag behind the repository compiler. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and a new saved revision before re-exporting.
 
@@ -54,6 +54,6 @@ bun run build:services
 bun run typecheck
 ```
 
-Verify the generated `apps/ios/Ox/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, live verification, authentication boundaries, icon evidence, checks run, and any remaining limitation.
+Verify the canonical `apps/ios/Ox/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, live verification, authentication boundaries, icon evidence, checks run, and any remaining limitation.
 
 Do not commit repository changes unless the user separately requests it.

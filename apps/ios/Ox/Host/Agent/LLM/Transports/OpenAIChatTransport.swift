@@ -4,11 +4,10 @@ public struct OpenAIChatTransport: ProviderClient {
     public let id: String
     public let displayName: String
     public let models: [ProviderModel]
-    public let regions: Set<LLMRegion>
+    public let presentation: ProviderPresentation
     public let auth: any OpenAIChatTransportAuth
     public let usesAPIKey: Bool
     public let acceptsAPIKey: Bool
-    public let credentialKind: LLMCredentialKind
     public let credentialID: String
     public let subscriptionAccount: (any SubscriptionAccount)?
     public let extraBody: [String: JSONValue]
@@ -17,11 +16,6 @@ public struct OpenAIChatTransport: ProviderClient {
     public let maxTokensField: MaxTokensField
     public let reasoningReplayModelIDs: Set<String>
     public let reasoningControl: ReasoningControl
-    public let iconURL: URL?
-    public let website: URL?
-    public let authNotice: String?
-    public let gettingStartedOffer: ProviderGettingStartedOffer?
-    public let inferenceLocation: LLMInferenceLocation
     public let diagnosticsEndpoint: URL?
     public func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { .openAIChatCompletions }
     public var protocolDiagnostics: LLMProtocolDiagnostics {
@@ -115,11 +109,9 @@ public struct OpenAIChatTransport: ProviderClient {
         self.id = id
         self.displayName = displayName
         self.models = models
-        self.regions = regions
         self.auth = auth
         self.usesAPIKey = usesAPIKey
         self.acceptsAPIKey = acceptsAPIKey ?? usesAPIKey
-        self.credentialKind = credentialKind
         self.credentialID = credentialID ?? id
         self.subscriptionAccount = subscriptionAccount
         self.extraBody = extraBody
@@ -128,11 +120,11 @@ public struct OpenAIChatTransport: ProviderClient {
         self.maxTokensField = maxTokensField
         self.reasoningReplayModelIDs = reasoningReplayModelIDs
         self.reasoningControl = reasoningControl
-        self.iconURL = iconURL
-        self.website = website
-        self.authNotice = authNotice
-        self.gettingStartedOffer = gettingStartedOffer
-        self.inferenceLocation = inferenceLocation
+        self.presentation = ProviderPresentation(
+            regions: regions, website: website, iconURL: iconURL,
+            authNotice: authNotice, offer: gettingStartedOffer,
+            credentialKind: credentialKind, inferenceLocation: inferenceLocation
+        )
         self.diagnosticsEndpoint = diagnosticsEndpoint
     }
 

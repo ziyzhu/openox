@@ -11,5 +11,5 @@ Ox presents Claude Website in Global. It uses the consumer website session insid
 
 ## Runtime sources
 
-- Website provider: [claude.ai/actions.js](../../../../repositories/builtin/web/claude.ai/actions.js)
+- Website provider: [claude.ai/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/claude.ai/actions.js)
 - Provider identity and region: [WebServiceModelProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/WebServiceModelProvider.swift)

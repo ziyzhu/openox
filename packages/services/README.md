@@ -2,8 +2,10 @@
 
 `@openox/services` contains the sanitized official services built into Ox. It contains manifests, plain-JavaScript action installers, skills, and icons without TypeScript service sources or raw HAR captures.
 
-The authored source lives in `repositories/builtin/`. Its `repository.json`
-inventories services whose individual metadata is stored in `service.json`.
+The single authored source lives in `apps/ios/Ox/Resources/OxServices.bundle/`
+and ships directly with iOS. Its `repository.json` inventories services whose
+individual metadata is stored in `service.json`. Package builds validate and copy
+this source; hosted icon artwork lives separately in `assets/services/`.
 
 ```sh
 bun add @openox/services

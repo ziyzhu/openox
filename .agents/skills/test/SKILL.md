@@ -68,7 +68,16 @@ temporary chat: use a dedicated QA target, not personal working state.
 
 Screenshots, build results, chat snapshots, and failure logs go in a new directory
 outside the repository; `--output` selects its parent. PID claims coordinate these
-runners only, not manual sim use or other agents. `test:demo` checks native preview
+runners only, not manual sim use or other agents. `test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` exercises the actual
+temporary-chat Pi path with native Mock already selected. It checks reasoning,
+Markdown, native snippet tools, Stop, committed SQLite history and process reopen.
+It requires an idle chat, claims the selected simulator, uses no Host transport,
+and restores ordinary launch afterward. `OX_DURABLE_TEMPORARY_SESSION=<UUID>`
+enables only DEBUG Simulator temporary-chat attachment; it does not enable Host
+access or adopt persisted Profiles. Stopped-process SQLite copies include WAL/SHM
+and are diagnostic evidence, not Profile exports or power-loss verification.
+
+`test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use
 the `demo` skill for its workflow.
 

@@ -12,7 +12,7 @@ When OpenOx functionality uses OAuth, use apps registered as OpenOx.
 
 ## Model-capable web services
 
-Website authentication, submission, upload, completion, and model discovery belong in `repositories/builtin/web/<domain>/actions.js`. Follow the built-in `evolve` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file.
+Website authentication, submission, upload, completion, and model discovery belong in `apps/ios/Ox/Resources/OxServices.bundle/web/<domain>/actions.js`. Follow the built-in `evolve` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file.
 
 Verify both fetch and XHR on a fresh owned generation page. A warm inspection page can use a different transport, and hidden-page animation state may lag completed server responses. Require a native completion marker correlated with the submitted conversation.
 
@@ -24,6 +24,6 @@ Check bundled/discovered capabilities, provider validation, user messages, Actio
 
 ## Artwork
 
-Built-in model web services use reviewed 128×128 `favicon.png` sources and the service build's OpenOx CloudFront URL; remove third-party `faviconUrl` overrides. Audit the opaque central 96×96 area and light/dark rendering at 20 px, upload through the existing service-assets deployment workflow, and verify the anonymous hosted response matches the source. Use the resolved service and shared `ServiceAvatar` in the picker. Local user-authored services retain verified public icon URLs.
+Built-in model web services use reviewed 128×128 `assets/services/<domain>/favicon.png` sources and explicit OpenOx CloudFront `faviconUrl` values in their manifests; replace third-party URLs. Audit the opaque central 96×96 area and light/dark rendering at 20 px, upload through the existing service-assets deployment workflow, and verify the anonymous hosted response matches the source. Use the resolved service and shared `ServiceAvatar` in the picker. Local user-authored services retain verified public icon URLs.
 
 Native API/subscription artwork is hosted on OpenOx CloudFront; do not track its source files in this repository. Keep working artwork and official provenance outside the repository. Published URLs belong in provider Swift composition and `ProviderPresentation.iconURL`. Cover regional/protocol-suffixed IDs, including both Bedrock transports and BytePlus/Volcengine. Audit normalized 128×128 PNGs with existing favicon checks; preserve official artwork, never upscale raster sources, and document opaque white backing used for transparency.

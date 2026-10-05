@@ -14,7 +14,7 @@ async function ox(repository: string, ...args: string[]) {
   return { code, stdout, stderr };
 }
 
-for (const repository of ["repositories/builtin", "examples/repository"]) {
+for (const repository of ["apps/ios/Ox/Resources/OxServices.bundle", "examples/repository"]) {
   test(`CLI validates existing ${repository} through shared repository contracts`, async () => {
     const result = await ox(join(ROOT, repository), "validate");
     expect(result.code).toBe(0);

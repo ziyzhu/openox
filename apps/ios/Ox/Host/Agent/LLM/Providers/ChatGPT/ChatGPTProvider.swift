@@ -27,11 +27,9 @@ nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesTransportAuth {
     }
 }
 
-struct ChatGPTProvider: ProviderClient {
-    private let client: OpenAIResponsesTransport
-
-    init(models: [ProviderModel]) {
-        client = OpenAIResponsesTransport(
+nonisolated enum ChatGPTProvider {
+    static func client(models: [ProviderModel]) -> OpenAIResponsesTransport {
+        OpenAIResponsesTransport(
             id: "chatgpt",
             displayName: "ChatGPT",
             models: models,
@@ -47,31 +45,5 @@ struct ChatGPTProvider: ProviderClient {
             },
             streamingTransport: .webSocketWithServerSentEventsFallback(accountHeader: "ChatGPT-Account-Id")
         )
-    }
-
-    var id: String { client.id }
-    var displayName: String { client.displayName }
-    var models: [ProviderModel] { client.models }
-    var regions: Set<LLMRegion> { client.regions }
-    var iconURL: URL? { client.iconURL }
-    var website: URL? { client.website }
-    var usesAPIKey: Bool { client.usesAPIKey }
-    var acceptsAPIKey: Bool { client.acceptsAPIKey }
-    var credentialKind: LLMCredentialKind { client.credentialKind }
-    var supportsTools: Bool { client.supportsTools }
-    var subscriptionAccount: (any SubscriptionAccount)? { client.subscriptionAccount }
-    var inferenceLocation: LLMInferenceLocation { client.inferenceLocation }
-    var reasoningPolicy: LLMReasoningPolicy { client.reasoningPolicy }
-    var protocolDiagnostics: LLMProtocolDiagnostics { client.protocolDiagnostics }
-    func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { client.wireProtocol(for: model) }
-
-    func stream(
-        model: ProviderModel,
-        systemPrompt: String?,
-        messages: [Message],
-        tools: [any AgentTool],
-        options: StreamOptions
-    ) -> AsyncThrowingStream<AssistantEvent, Error> {
-        client.stream(model: model, systemPrompt: systemPrompt, messages: messages, tools: tools, options: options)
     }
 }

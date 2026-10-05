@@ -13,6 +13,7 @@
     "test:demo": "bun .agents/skills/test/apps/ios/demo-preview.ts",
     "build:agent": "bun packages/agent/build.ts",
     "test:agent": "bun test packages/agent/test",
+    "test:agent-ui-ios": "bun .agents/skills/test/apps/ios/durable-chat.ts",
     "build:diagram": "dot -Tsvg assets/openox-components.dot -o assets/openox-components.svg",
     "sim:bootstrap": "bun .agents/skills/onboarding/scripts/bootstrap.ts",
     "update:llms": "bun .agents/skills/build/scripts/provider-models.ts",

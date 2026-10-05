@@ -76,8 +76,22 @@ package versions, sizes and SHA-256; upstream licensing is included. Builds reje
 Node adapters, external runtime imports, shell tools and provider SDKs. Normal
 startup does not initialize a Pi context or open these cache databases.
 
-The standalone iOS replay and benchmark runners have been removed in line with
-repository verification cleanup. Use `sim` and `ox` for application verification;
+The old standalone fixture replay and benchmark runners have been removed.
+Actual UI acceptance lives in the test skill:
+
+```sh
+bun run test:agent-ui-ios --device ox-1 --app /absolute/Ox.app
+```
+
+Use a freshly built DEBUG app and an idle chat with native Mock selected. The
+runner verifies reasoning, Markdown, native snippet tools, Stop, committed Pi
+history and reopening the cache Session across process restart. It uses the
+explicit `OX_DURABLE_TEMPORARY_SESSION=<UUID>` UI opt-in, not Host RPC, and clears
+the opt-in afterward. Diagnostic stopped-process SQLite copies are not exports,
+graceful-close or physical-device power-loss evidence. This does not convert
+persisted chats or implement production Profile adoption.
+
+Use `sim` and `ox` for application verification;
 check simulator ownership, pass `--device` explicitly and keep evidence outside
 the repository. Host access requires native **Allow connections** opt-in and
 approved Tailscale ingress. Temporary-chat diagnostics use private cache storage,

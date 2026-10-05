@@ -11,7 +11,7 @@ nonisolated struct BundledProviderDefinition: Sendable {
 nonisolated extension BuiltInProviders {
     static func definitions(modelLookup: (String, LLMRegion) -> [ProviderModel]) -> [BundledProviderDefinition] {
         var entries: [BundledProviderDefinition] = []
-        let chatgpt = ChatGPTProvider(models: modelLookup("chatgpt", .global))
+        let chatgpt = ChatGPTProvider.client(models: modelLookup("chatgpt", .global))
         entries.append(custom(chatgpt, url: ChatGPTOAuth.responsesURL.deletingLastPathComponent(), api: .openAIResponses,
                               options: .init(sessionHeader: "session-id", streaming: "websocket-with-sse-fallback", accountHeader: "ChatGPT-Account-Id"),
                               models: chatgpt.models.map { .init($0, options: $0.variant == .fast ? .init(serviceTier: "priority") : nil) }))

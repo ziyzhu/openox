@@ -1,14 +1,16 @@
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { buildArtifacts } from "../../../../packages/services/src/build.ts";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { refreshBuiltinRepository } from "../../../../packages/services/src/build.ts";
+import { BUILTIN_REPOSITORY_ROOT } from "../../../../packages/services/src/service.ts";
 import { ROOT, run } from "../../../lib.ts";
 import { STANDARD_WEB_ACTION_SCHEMAS } from "../../../../packages/protocol/src/model-actions.ts";
 
-const destination = join(ROOT, "apps", "ios", "Ox", "Resources", "OxServices.bundle");
-const temporary = await mkdtemp(join(dirname(destination), ".ox-services-bundle-"));
-const staging = join(temporary, "repository");
-const backup = join(dirname(destination), ".ox-services-bundle-previous");
+const destination = join(BUILTIN_REPOSITORY_ROOT, "Repositories.bundle");
+const temporary = await mkdtemp(join(tmpdir(), "ox-local-repository-seed-"));
+const staging = join(temporary, "Repositories.bundle");
+const backup = join(temporary, "previous");
 const localPackage = `{
   "name" : "Local",
   "services" : [
@@ -61,11 +63,11 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
 }
 
 try {
+  const repository = await refreshBuiltinRepository();
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelServiceActions.json"), `${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n`);
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/SystemSkills.bundle/evolve/references/model-schemas.md"),
     `# Standard website Action schemas\n\nGenerated from packages/protocol/src/model-actions.ts by bun run build:services. conversation is the shared submit/read/cancel Action; add listModels for model-provider discovery. The existing four model Actions and optional continueModelGeneration remain supported during transition. Copy exact schemas; do not mix protocols on one conversation page.\n\n\`\`\`json\n${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
-  const repository = await buildArtifacts(staging, { name: "Built-in" });
-  await addLocalRepositorySeed(staging);
+  await addLocalRepositorySeed(temporary);
   await rm(backup, { recursive: true, force: true });
   const hadPrevious = existsSync(destination);
   if (hadPrevious) await rename(destination, backup);
@@ -77,7 +79,7 @@ try {
     if (hadPrevious) await rename(backup, destination);
     throw error;
   }
-  console.log(`Built ${destination} services=${repository.services.length} hash=${repository.contentHash?.slice(0, 12)}`);
+  console.log(`Validated ${BUILTIN_REPOSITORY_ROOT} services=${repository.services.length} hash=${repository.contentHash?.slice(0, 12)} and built Local repository seed`);
 } catch (error) {
   await rm(temporary, { recursive: true, force: true });
   throw error;

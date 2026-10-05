@@ -89,7 +89,7 @@ nonisolated struct RepositoryProposalTarget: Sendable {
         self.owner = owner
         self.name = name
         self.requestedBaseRef = base
-        self.rootPath = owner.lowercased() == "ziyzhu" && name.lowercased() == "openox" ? "repositories/builtin" : ""
+        self.rootPath = owner.lowercased() == "ziyzhu" && name.lowercased() == "openox" ? "apps/ios/Ox/Resources/OxServices.bundle" : ""
     }
 
     func path(_ relativePath: String) -> String {

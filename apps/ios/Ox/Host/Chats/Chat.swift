@@ -206,6 +206,14 @@ final class Chat: Identifiable {
     let javaScriptOutputs = JavaScriptOutputStore()
     @ObservationIgnored private(set) var agentSnapshot: AgentSnapshot?
     @ObservationIgnored private var agentControlTask: Task<Void, Never>?
+    @ObservationIgnored var durablePreparation: Task<Void, Error>?
+    private(set) var usesDurableAgent = false
+
+    func installDurableDriver(_ driver: DurableAgentDriver?) async throws {
+        guard driver == nil || isTemporary else { throw RuntimeError.bridge("Persisted chats require the storage migration gate") }
+        try await agent.installDurableDriver(driver)
+        usesDurableAgent = driver != nil
+    }
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationIntent = false
     @ObservationIgnored private var contextCheckpoint: AgentContextCheckpoint?
@@ -232,7 +240,7 @@ final class Chat: Identifiable {
     private(set) var retention: ChatRetention
 
     var isTemporary: Bool { retention == .temporary }
-    var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy }
+    var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy && !usesDurableAgent && durablePreparation == nil }
 
     func toggleRetention() -> Bool {
         guard canChangeRetention else {
@@ -306,7 +314,7 @@ final class Chat: Identifiable {
     @ObservationIgnored private var interactionQueue: [InteractionWaiter] = []
 
     var interaction: Interaction? {
-        guard case .running(let run) = runState,
+        guard let run = activeRun,
               case .awaiting(let interaction) = run.phase else { return nil }
         return interaction
     }
@@ -387,7 +395,7 @@ final class Chat: Identifiable {
         modelPreparationTask = nil
         deselect()
         serviceManager.browserActionSessions.closeSession(for: id)
-        if cancelling { cancelAll() }
+        if cancelling { durablePreparation?.cancel(); cancelAll() }
     }
 
     var customTitle: String?
@@ -472,11 +480,11 @@ final class Chat: Identifiable {
     private(set) var notice = Notice.none
 
     var activity: Activity {
-        switch runState {
-        case .idle:
+        switch activeRun {
+        case nil:
             if showsStoppedTurn { return .idle(.stopped) }
             return .idle(hasUnreadResponse ? .unread : .read)
-        case .running(let run):
+        case .some(let run):
             switch run.phase {
             case .thinking:
                 return .running(.thinking)
@@ -890,94 +898,9 @@ final class Chat: Identifiable {
         case cancelled
     }
 
-    private enum RunState {
-        case idle
-        case running(Run)
-
-        var isRunning: Bool {
-            if case .idle = self { false } else { true }
-        }
-
-        var task: Task<Void, Never>? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.task
-            }
-        }
-
-        var id: RunID? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.id
-            }
-        }
-
-        var phase: RunPhase? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.phase
-            }
-        }
-
-        var backgroundExecution: ChatBackgroundExecution? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.backgroundExecution
-            }
-        }
-
-        var completionNotification: CompletionNotification? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.completionNotification
-            }
-        }
-
-        var activeSubmission: Submission? {
-            switch self {
-            case .idle: nil
-            case .running(let run): run.activeSubmission
-            }
-        }
-
-        var backgroundExecutionExpired: Bool {
-            switch self {
-            case .idle: false
-            case .running(let run): run.backgroundExecutionExpired
-            }
-        }
-
-        mutating func setBackgroundExecution(_ execution: ChatBackgroundExecution?) {
-            switch self {
-            case .idle:
-                break
-            case .running(var run):
-                run.backgroundExecution = execution
-                self = .running(run)
-            }
-        }
-
-        mutating func setCompletionNotification(_ notification: CompletionNotification) {
-            guard case .running(var run) = self else { return }
-            run.completionNotification = notification
-            self = .running(run)
-        }
-
-        mutating func setActiveSubmission(_ submission: Submission?, runID: RunID) {
-            guard case .running(var run) = self, run.id == runID else { return }
-            run.activeSubmission = submission
-            self = .running(run)
-        }
-
-        mutating func expireBackgroundExecution() {
-            guard case .running(var run) = self else { return }
-            run.backgroundExecutionExpired = true
-            self = .running(run)
-        }
-    }
-    private var runState: RunState = .idle
+    private var activeRun: Run?
     private var submissions: [Submission] = []
-    var isBusy: Bool { runState.isRunning }
+    var isBusy: Bool { activeRun != nil }
     var showsStoppedTurn: Bool {
         guard !isBusy,
               submissions.isEmpty,
@@ -985,11 +908,7 @@ final class Chat: Identifiable {
               case .cancelled = turn.outcome else { return false }
         return true
     }
-    var hasPendingInteraction: Bool {
-        guard case .running(let run) = runState else { return false }
-        if case .awaiting = run.phase { return true }
-        return false
-    }
+    var hasPendingInteraction: Bool { interaction != nil }
     @ObservationIgnored private var eventConsumer: Task<Void, Never>?
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
@@ -1081,9 +1000,9 @@ final class Chat: Identifiable {
                     await self.waitForStreamingDelivery()
                     self.document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
                     self.requestPersistence(.generationFinished)
-                    self.runState.backgroundExecution?.advance()
+                    self.activeRun?.backgroundExecution?.advance()
                 case .runFinished(let result):
-                    self.runState.backgroundExecution?.updatePhase(.finishing)
+                    self.activeRun?.backgroundExecution?.updatePhase(.finishing)
                     let snapshot = await self.agent.snapshot()
                     self.agentSnapshot = snapshot
                     self.finishAgentTurnFromEvents(error: result.errorMessage)
@@ -1099,11 +1018,11 @@ final class Chat: Identifiable {
                     }
                     Log.session.info("Chat compacted id=\(self.id) msgs \(before)->\(after) summaryChars=\(chars) tokensBefore=\(tokensBefore)")
                 case .toolExecutionStart:
-                    self.runState.backgroundExecution?.updatePhase(.working)
+                    self.activeRun?.backgroundExecution?.updatePhase(.working)
                 case .toolExecutionEnd(let toolCall, let result):
                     self.document.apply(.recordToolExchange(toolCall, result))
-                    self.runState.backgroundExecution?.advance()
-                    self.runState.backgroundExecution?.updatePhase(.thinking)
+                    self.activeRun?.backgroundExecution?.advance()
+                    self.activeRun?.backgroundExecution?.updatePhase(.thinking)
                 case .messageStart(_),
                      .messageEnd(_):
                     break
@@ -1231,8 +1150,8 @@ final class Chat: Identifiable {
 
     private func beginAgentTurn() {
         setRunPhase(.thinking)
-        runState.backgroundExecution?.updatePhase(.thinking)
-        switch runState.activeSubmission?.kind {
+        activeRun?.backgroundExecution?.updatePhase(.thinking)
+        switch activeRun?.activeSubmission?.kind {
         case let .system(.some(target)):
             document.apply(.resumeAgentTurn(id: target))
         case .user, .system, nil:
@@ -1242,9 +1161,9 @@ final class Chat: Identifiable {
 
     private func growAgentText(_ delta: String) {
         setRunPhase(.streaming)
-        runState.backgroundExecution?.updatePhase(.responding)
+        activeRun?.backgroundExecution?.updatePhase(.responding)
         document.apply(.appendText(delta))
-        runState.backgroundExecution?.advance()
+        activeRun?.backgroundExecution?.advance()
     }
 
     func beginExecution(source: String) {
@@ -1254,7 +1173,7 @@ final class Chat: Identifiable {
         currentExecutionActivatedSkills = [:]
         currentExecutionFetchCount = 0
         currentExecutionFetchBytes = 0
-        runState.backgroundExecution?.updatePhase(.working)
+        activeRun?.backgroundExecution?.updatePhase(.working)
         document.apply(.beginExecution(source: source))
     }
 
@@ -1305,8 +1224,8 @@ final class Chat: Identifiable {
         currentExecutionTransientAttachments = []
         currentExecutionActivatedSkills = [:]
         currentExecutionFetchBytes = 0
-        runState.backgroundExecution?.advance()
-        runState.backgroundExecution?.updatePhase(.thinking)
+        activeRun?.backgroundExecution?.advance()
+        activeRun?.backgroundExecution?.updatePhase(.thinking)
     }
 
     @discardableResult
@@ -1365,8 +1284,8 @@ final class Chat: Identifiable {
     private func activateInteraction(_ waiter: InteractionWaiter) {
         interactionWaiter = waiter
         replaceRunPhase(.awaiting(waiter.interaction))
-        runState.backgroundExecution?.finish(success: true)
-        runState.setBackgroundExecution(nil)
+        activeRun?.backgroundExecution?.finish(success: true)
+        activeRun?.backgroundExecution = nil
         Log.session.info("Chat.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
         observeActionPolicy()
     }
@@ -1550,7 +1469,7 @@ final class Chat: Identifiable {
             throw RuntimeError.bridge("ox.user.reportProgress: no JavaScript execution is active")
         }
         document.apply(.appendProgress(message))
-        runState.backgroundExecution?.advance()
+        activeRun?.backgroundExecution?.advance()
     }
 
     @discardableResult
@@ -1640,7 +1559,7 @@ final class Chat: Identifiable {
         ensureExecutionContext()
         let invocation = Invocation(name: name, purpose: purpose, args: args)
         document.apply(.appendInvocation(invocation))
-        runState.backgroundExecution?.updateStep(purpose)
+        activeRun?.backgroundExecution?.updateStep(purpose)
         Log.session.info("Chat.invocation appended id=\(invocation.id) name=\(name) purpose=\(purpose)")
         return invocation.id
     }
@@ -1648,12 +1567,12 @@ final class Chat: Identifiable {
     func appendReasoning(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        runState.backgroundExecution?.updatePhase(.thinking)
+        activeRun?.backgroundExecution?.updatePhase(.thinking)
         document.apply(.appendReasoning(trimmed))
         if let paragraph = Reasoning.paragraphs(trimmed).last {
-            runState.backgroundExecution?.updateStep(paragraph)
+            activeRun?.backgroundExecution?.updateStep(paragraph)
         }
-        runState.backgroundExecution?.advance()
+        activeRun?.backgroundExecution?.advance()
     }
 
     private func resetStreamedText() {
@@ -1666,8 +1585,8 @@ final class Chat: Identifiable {
         case .textDelta(let index, let delta, _):
             guard !delta.isEmpty else { return }
             registerAgentDelta()
-            runState.backgroundExecution?.advance()
-            runState.backgroundExecution?.updatePhase(.responding)
+            activeRun?.backgroundExecution?.advance()
+            activeRun?.backgroundExecution?.updatePhase(.responding)
             let chunk = streamedTextBlockIndex == nil || streamedTextBlockIndex == index ? delta : "\n" + delta
             streamedTextBlockIndex = index
             streamedText += chunk
@@ -1675,20 +1594,19 @@ final class Chat: Identifiable {
         case .thinkingDelta(_, let delta, _):
             guard !delta.isEmpty else { return }
             registerAgentDelta()
-            runState.backgroundExecution?.advance()
+            activeRun?.backgroundExecution?.advance()
         case .toolCallDelta:
             registerAgentDelta()
-            runState.backgroundExecution?.advance()
+            activeRun?.backgroundExecution?.advance()
             flushBufferedAgentText()
             setRunPhase(.thinking)
         case .start(let partial):
-            // Durable watchers deliver complete committed partials, including replacement frames.
             if !partial.content.isEmpty {
                 registerAgentDelta()
-                runState.backgroundExecution?.advance()
+                activeRun?.backgroundExecution?.advance()
             }
             if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
-                runState.backgroundExecution?.updatePhase(.responding)
+                activeRun?.backgroundExecution?.updatePhase(.responding)
             }
             applyAssistantFinal(partial)
         case .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
@@ -1840,7 +1758,7 @@ final class Chat: Identifiable {
     }
 
     func confirmScheduledSkillChange(action: String, prompt: String) async throws {
-        runState.backgroundExecution?.updatePhase(.permissionNeeded)
+        activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
         let cancel = L10n.string("Cancel")
         let permission = PermissionPresentation(title: "Ox - \(action)", purpose: prompt)
         let answer = await awaitPrompt(
@@ -1870,7 +1788,7 @@ final class Chat: Identifiable {
             purpose: purpose,
             prompt: prompt
         ) { request in
-            runState.backgroundExecution?.updatePhase(.permissionNeeded)
+            activeRun?.backgroundExecution?.updatePhase(.permissionNeeded)
             let answer = await awaitPrompt(
                 prompt: request.prompt,
                 options: request.options,
@@ -1941,7 +1859,7 @@ final class Chat: Identifiable {
     }
 
     func latestContinuation() -> ChatContinuation? {
-        if let activeSubmission = runState.activeSubmission, case .user = activeSubmission.kind {
+        if let activeSubmission = activeRun?.activeSubmission, case .user = activeSubmission.kind {
             if let index = document.turns.lastIndex(where: { turn in
                 guard case let .user(user, _) = turn else { return false }
                 return user.submissionID == activeSubmission.id
@@ -2239,11 +2157,11 @@ final class Chat: Identifiable {
         agentEventCycle.cancel()
         enqueueAgentMutation { await $0.abort() }
         cancelInteractions()
-        let task = runState.task
-        let runID = runState.id
-        runState.backgroundExecution?.finish(success: true)
+        let task = activeRun?.task
+        let runID = activeRun?.id
+        activeRun?.backgroundExecution?.finish(success: true)
         finishFinishingDiagnostics(next: "idle")
-        runState = .idle
+        activeRun = nil
         task?.cancel()
         Log.session.info("Chat.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
         resetOutputDelivery()
@@ -2271,7 +2189,7 @@ final class Chat: Identifiable {
             if case .text(let t) = $0 { return t.text }; return nil
         }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
         let body = preview.isEmpty ? L10n.string("Your chat finished while you were away.", comment: "Notification body shown when a chat turn completes while the app is backgrounded and there is no preview text.") : String(preview.prefix(140))
-        runState.setCompletionNotification(CompletionNotification(title: title, body: body))
+        activeRun?.completionNotification = CompletionNotification(title: title, body: body)
     }
 
     private func deliverCompletionNotification(_ notification: CompletionNotification) {
@@ -2326,7 +2244,7 @@ final class Chat: Identifiable {
         botControlSource.release()
         let at = Date()
         let outcome: TurnOutcome
-        if agentEventCycle.isCancelled || runState.task?.isCancelled == true || error == "aborted" {
+        if agentEventCycle.isCancelled || activeRun?.task.isCancelled == true || error == "aborted" {
             outcome = .cancelled(at: at)
         } else if let error {
             outcome = .failed(at: at, message: error)
@@ -2408,10 +2326,10 @@ final class Chat: Identifiable {
                 activeLatency = submission.latency
                 await runOne(submission, runID: runID)
                 activeLatency = nil
-                runState.backgroundExecution?.advance()
+                activeRun?.backgroundExecution?.advance()
             }
         }
-        runState = .running(Run(
+        activeRun = Run(
             id: runID,
             task: task,
             phase: .thinking,
@@ -2419,7 +2337,7 @@ final class Chat: Identifiable {
             backgroundExecutionExpired: false,
             backgroundExecution: nil,
             completionNotification: nil
-        ))
+        )
         startBackgroundExecution()
         Log.session.info("Chat.worker start id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) queueDepth=\(queueDepth)")
     }
@@ -2433,17 +2351,17 @@ final class Chat: Identifiable {
     }
 
     private func finishWorker(_ runID: RunID) {
-        guard runState.id == runID else { return }
-        let backgroundExecutionExpired = runState.backgroundExecutionExpired
+        guard let run = activeRun, run.id == runID else { return }
+        let backgroundExecutionExpired = run.backgroundExecutionExpired
         let chatFailed = notice.errorMessage != nil
         let chatSucceeded = !agentEventCycle.isCancelled && notice.errorMessage == nil
         let hasUnreadResult = chatSucceeded || chatFailed
         let leaseSucceeded = !backgroundExecutionExpired
-        if chatFailed { runState.backgroundExecution?.updatePhase(.failed) }
-        let completionNotification = chatSucceeded ? runState.completionNotification : nil
-        runState.backgroundExecution?.finish(success: leaseSucceeded)
+        if chatFailed { run.backgroundExecution?.updatePhase(.failed) }
+        let completionNotification = chatSucceeded ? run.completionNotification : nil
+        run.backgroundExecution?.finish(success: leaseSucceeded)
         finishFinishingDiagnostics(next: "idle")
-        runState = .idle
+        activeRun = nil
         if hasUnreadResult, !isTranscriptVisible {
             hasUnreadResponse = true
             Log.session.info("Chat.unread id=\(id)")
@@ -2467,19 +2385,14 @@ final class Chat: Identifiable {
     }
 
     private func replaceRunPhase(_ phase: RunPhase) {
-        guard runState.phase != phase else { return }
-        Log.session.debug("Chat.phase id=\(id) from=\(runState.phase?.logLabel ?? "idle") to=\(phase.logLabel)")
-        if runState.phase == .finishing {
+        guard activeRun?.phase != phase else { return }
+        Log.session.debug("Chat.phase id=\(id) from=\(activeRun?.phase.logLabel ?? "idle") to=\(phase.logLabel)")
+        if activeRun?.phase == .finishing {
             finishFinishingDiagnostics(next: phase.logLabel)
         }
-        switch runState {
-        case .idle:
-            break
-        case .running(var run):
-            run.phase = phase
-            runState = .running(run)
-            if phase == .finishing { beginFinishingDiagnostics() }
-        }
+        guard activeRun != nil else { return }
+        activeRun?.phase = phase
+        if phase == .finishing { beginFinishingDiagnostics() }
     }
 
     private func beginFinishingDiagnostics() {
@@ -2494,7 +2407,7 @@ final class Chat: Identifiable {
                 return
             }
             guard let self,
-                  self.runState.phase == .finishing,
+                  self.activeRun?.phase == .finishing,
                   self.finishingStartedAt == startedAt else { return }
             let durationMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
             Log.session.warning("Chat.finishing slow id=\(self.id) durationMs=\(durationMs)")
@@ -2512,18 +2425,18 @@ final class Chat: Identifiable {
 
     private func startBackgroundExecution() {
         guard executionLease == .userInitiated,
-              let runID = runState.id,
-              runState.backgroundExecution == nil else { return }
+              let runID = activeRun?.id,
+              activeRun?.backgroundExecution == nil else { return }
         let execution = ChatBackgroundExecution(chatID: id, runID: runID) { [weak self] in
             self?.expireBackgroundExecution(runID: runID)
         }
-        runState.setBackgroundExecution(execution)
+        activeRun?.backgroundExecution = execution
         execution.submit()
     }
 
     private func expireBackgroundExecution(runID: RunID) {
-        guard runState.id == runID else { return }
-        runState.expireBackgroundExecution()
+        guard activeRun?.id == runID else { return }
+        activeRun?.backgroundExecutionExpired = true
         Log.session.warning("Chat.backgroundLeaseExpired id=\(id) run=\(runID.rawValue)")
     }
 
@@ -2537,8 +2450,10 @@ final class Chat: Identifiable {
         submission.latency.mark(.runStarted)
         Log.session.info("Chat.runOne start id=\(id) client=\(client.id) model=\(model.id)")
         agentHapticPhase = .waitingForDelta
-        runState.setActiveSubmission(submission, runID: runID)
-        defer { runState.setActiveSubmission(nil, runID: runID) }
+        if activeRun?.id == runID { activeRun?.activeSubmission = submission }
+        defer {
+            if activeRun?.id == runID { activeRun?.activeSubmission = nil }
+        }
         await Soul.shared.waitUntilCurrent()
         await freezeMemorySnapshot()
         await Skills.shared.waitUntilCurrent()
@@ -2598,6 +2513,8 @@ final class Chat: Identifiable {
         submission.latency.mark(.agentSubmitted)
         let result: AgentRunResult
         do {
+            try await durablePreparation?.value
+            try Task.checkCancellation()
             result = try await LogContext.$latency.withValue(submission.latency) {
                 try await agent.run(AgentRunRequest(
                     text: submission.text,

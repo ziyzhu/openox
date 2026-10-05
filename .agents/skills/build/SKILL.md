@@ -32,8 +32,11 @@ focused output diff. Do not change contract schemas merely to make checks pass;
 service manifest changes require maintainer approval. Provider selection changes
 follow the `providers` skill rather than a second catalog-management workflow.
 
-`build:services` updates app resources from the built-in repository and creates a
-deterministic Local Git seed. It is a build operation, not live service verification.
+`apps/ios/Ox/Resources/OxServices.bundle/` is the single built-in repository source.
+`build:services` validates it, refreshes its content hash without rewriting service
+files, and creates a deterministic Local Git seed and model-action resources.
+Package builds copy this source; hosted icon artwork lives in `assets/services/`.
+It is a build operation, not live service verification.
 Do not overwrite unrelated repository or generated changes.
 
 Run `bun run ci` through the `test` skill after maintenance. Simulator provisioning

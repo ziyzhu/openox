@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { BUILTIN_REPOSITORY_ROOT } from "./service.ts";
 import {
   validateIOSManifest,
   validateMCPManifest,
@@ -10,11 +11,9 @@ import {
 
 export type { CatalogKind } from "@openox/protocol/catalog";
 
-const CATALOG_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
-
 export function catalogDir(kind: CatalogKind, id: string): string {
   const directory = kind === "ios" && id.startsWith("ios:") ? id.slice("ios:".length) : id;
-  return join(CATALOG_ROOT, kind, directory);
+  return join(BUILTIN_REPOSITORY_ROOT, kind, directory);
 }
 
 async function readManifest(kind: CatalogKind, id: string): Promise<unknown | { error: string }> {

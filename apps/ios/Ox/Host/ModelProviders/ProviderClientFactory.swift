@@ -1,15 +1,5 @@
 import Foundation
 
-nonisolated struct ProviderPresentation: Sendable {
-    var regions: Set<LLMRegion> = [.global, .china]
-    var website: URL?
-    var iconURL: URL?
-    var authNotice: String?
-    var offer: ProviderGettingStartedOffer?
-    var credentialKind: LLMCredentialKind = .apiKey
-    var inferenceLocation: LLMInferenceLocation = .remote
-}
-
 nonisolated enum ProviderClientFactory {
     static func make(_ definition: ProviderDefinition, presentation: ProviderPresentation = .init()) throws -> any ProviderClient {
         let models = definition.models.map(\.runtimeModel)
@@ -156,18 +146,12 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
               let available = GitHubCopilotSubscriptionAccount.shared.cachedAvailableModelIDs else { return models }
         return models.filter { available.contains($0.wireID) }
     }
-    var regions: Set<LLMRegion> { presentation.regions }
-    var website: URL? { presentation.website }
-    var iconURL: URL? { presentation.iconURL }
-    var authNotice: String? { presentation.authNotice }
-    var gettingStartedOffer: ProviderGettingStartedOffer? { presentation.offer }
     var usesAPIKey: Bool { definition.auth.kind == .bearer || definition.auth.kind == .apiKey ? definition.auth.optional != true : false }
     var acceptsAPIKey: Bool { native.acceptsAPIKey }
     var credentialKind: LLMCredentialKind { definition.auth.kind == .bearer && presentation.inferenceLocation == .userHosted ? .bearerToken : presentation.credentialKind }
     var credentialID: String { definition.credentialID }
     var subscriptionAccount: (any SubscriptionAccount)? { account }
     var supportsTools: Bool { native.supportsTools }
-    var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     var reasoningPolicy: LLMReasoningPolicy { native.reasoningPolicy }
     var protocolDiagnostics: LLMProtocolDiagnostics { native.protocolDiagnostics }
     var canLoadModels: Bool { native.canLoadModels }

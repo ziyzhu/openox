@@ -14,6 +14,13 @@ this cleanup. Native RPC verification requires approved Tailscale ingress; do no
 weaken transport checks or treat loopback discovery as verification. See
 [`packages/agent/README.md`](../packages/agent/README.md) for current commands and gates.
 
+Actual UI acceptance is available through `bun run test:agent-ui-ios --device ox-1
+--app /absolute/Ox.app`. An explicit DEBUG Simulator launch UUID attaches only idle
+temporary chats to the physical-backend cache; preparation failure never falls back
+to the Swift loop. The replay uses native Mock, reasoning/Markdown, native snippet
+tools, Stop and process reopen with full retained Pi history. It does not use Host
+RPC, change credentials, convert Profiles, or establish power-loss durability.
+
 Use Pi Durable as Ox's sole agent harness through a host-neutral `@openox/agent` integration package. Swift remains the native iOS host adapter; other hosts reuse the shared Ox agent behavior with their own adapters. The agreed production storage unit is a local Profile folder:
 
 ```text

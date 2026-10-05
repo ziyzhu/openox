@@ -146,7 +146,18 @@ nonisolated public struct ProviderGettingStartedOffer: Sendable {
     }
 }
 
+nonisolated public struct ProviderPresentation: Sendable {
+    var regions: Set<LLMRegion> = [.global, .china]
+    var website: URL?
+    var iconURL: URL?
+    var authNotice: String?
+    var offer: ProviderGettingStartedOffer?
+    var credentialKind: LLMCredentialKind = .apiKey
+    var inferenceLocation: LLMInferenceLocation = .remote
+}
+
 nonisolated public protocol ProviderClient: Sendable {
+    var presentation: ProviderPresentation { get }
     var id: String { get }
     var displayName: String { get }
     var models: [ProviderModel] { get }
@@ -186,17 +197,20 @@ nonisolated public protocol ProviderClient: Sendable {
 }
 
 nonisolated extension ProviderClient {
-    public var regions: Set<LLMRegion> { [.global, .china] }
-    public var website: URL? { nil }
-    public var iconURL: URL? { nil }
-    public var authNotice: String? { nil }
-    public var gettingStartedOffer: ProviderGettingStartedOffer? { nil }
+    public var presentation: ProviderPresentation {
+        ProviderPresentation(credentialKind: usesAPIKey ? .apiKey : .bearerToken)
+    }
+    public var regions: Set<LLMRegion> { presentation.regions }
+    public var website: URL? { presentation.website }
+    public var iconURL: URL? { presentation.iconURL }
+    public var authNotice: String? { presentation.authNotice }
+    public var gettingStartedOffer: ProviderGettingStartedOffer? { presentation.offer }
     public var usesAPIKey: Bool { true }
     public var acceptsAPIKey: Bool { usesAPIKey }
-    public var credentialKind: LLMCredentialKind { usesAPIKey ? .apiKey : .bearerToken }
+    public var credentialKind: LLMCredentialKind { presentation.credentialKind }
     public var credentialID: String { id }
     public var supportsTools: Bool { true }
-    public var inferenceLocation: LLMInferenceLocation { .remote }
+    public var inferenceLocation: LLMInferenceLocation { presentation.inferenceLocation }
     public var reasoningPolicy: LLMReasoningPolicy { .unavailable }
     public var protocolDiagnostics: LLMProtocolDiagnostics { LLMProtocolDiagnostics() }
     public var canLoadModels: Bool { false }

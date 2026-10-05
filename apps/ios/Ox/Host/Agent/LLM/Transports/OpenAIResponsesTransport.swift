@@ -4,13 +4,9 @@ public struct OpenAIResponsesTransport: ProviderClient {
     public let id: String
     public let displayName: String
     public let models: [ProviderModel]
-    public let regions: Set<LLMRegion>
-    public let iconURL: URL?
-    public let website: URL?
-    public let authNotice: String?
+    public let presentation: ProviderPresentation
     public let usesAPIKey: Bool
     public let acceptsAPIKey: Bool
-    public let credentialKind: LLMCredentialKind
     public let subscriptionAccount: (any SubscriptionAccount)?
     public let auth: any OpenAIResponsesTransportAuth
     public let sessionHeaderName: String
@@ -42,13 +38,12 @@ public struct OpenAIResponsesTransport: ProviderClient {
         self.id = id
         self.displayName = displayName
         self.models = models
-        self.regions = regions
-        self.iconURL = iconURL
-        self.website = website
-        self.authNotice = authNotice
+        self.presentation = ProviderPresentation(
+            regions: regions, website: website, iconURL: iconURL,
+            authNotice: authNotice, credentialKind: credentialKind
+        )
         self.usesAPIKey = usesAPIKey
         self.acceptsAPIKey = acceptsAPIKey ?? usesAPIKey
-        self.credentialKind = credentialKind
         self.subscriptionAccount = subscriptionAccount
         self.auth = auth
         self.sessionHeaderName = sessionHeaderName

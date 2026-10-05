@@ -18,6 +18,6 @@ The Gemini web service can also supply the website's default text model through 
 
 ## Runtime sources
 
-- Website model and ordinary Actions: [Gemini service](../../../../repositories/builtin/web/gemini.google.com/actions.js)
+- Website model and ordinary Actions: [Gemini service](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/gemini.google.com/actions.js)
 - Provider and Gemini GenerateContent implementation: [GeminiProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/GeminiProvider.swift)
 - Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)

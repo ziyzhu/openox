@@ -1,5 +1,6 @@
-import { mkdir, writeFile, cp, readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, writeFile, cp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { readSkills } from "./skills.ts";
 import {
   buildService,
@@ -47,6 +48,7 @@ type ArtifactOptions = {
 };
 
 export async function buildArtifacts(outDir: string, options: ArtifactOptions = {}): Promise<RepositoryPackage> {
+  if (resolve(outDir) === BUILTIN_REPOSITORY_ROOT) throw new Error("Cannot export over the built-in repository source");
   const sourcePackage = validateRepositoryPackage(
     JSON.parse(await readFile(join(BUILTIN_REPOSITORY_ROOT, "repository.json"), "utf8")),
   );
@@ -94,7 +96,7 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     const identity = domain.replace(/^api:/, "");
     const out = join(outDir, kind, identity);
     await mkdir(out, { recursive: true });
-    await writeFile(join(out, "service.json"), JSON.stringify(service.manifest, null, 2));
+    await cp(join(BUILTIN_REPOSITORY_ROOT, kind, identity, "service.json"), join(out, "service.json"));
     await writeFile(join(out, "actions.js"), service.actions);
     entries.push(qualifiedRepositoryServiceID(kind, identity));
   }
@@ -103,13 +105,13 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
     const serviceID = qualifiedRepositoryServiceID(kind, id);
     const out = join(outDir, repositoryServicePath(serviceID));
     await mkdir(out, { recursive: true });
-    await writeFile(join(out, "service.json"), JSON.stringify(manifest, null, 2));
+    await cp(join(BUILTIN_REPOSITORY_ROOT, repositoryServicePath(serviceID), "service.json"), join(out, "service.json"));
     entries.push(serviceID);
   }
   const services = entries.sort((a, b) => a.localeCompare(b));
   if (options.domains === undefined && options.catalogKinds === undefined
     && JSON.stringify(services) !== JSON.stringify([...sourcePackage.services].sort((a, b) => a.localeCompare(b)))) {
-    throw new Error("repositories/builtin/repository.json does not match built-in service directories");
+    throw new Error("Built-in repository.json does not match built-in service directories");
   }
   const skillResult = readSkills(BUILTIN_REPOSITORY_ROOT, sourcePackage.skills);
   if (!skillResult.ok) throw new Error(skillResult.error);
@@ -127,4 +129,17 @@ export async function buildArtifacts(outDir: string, options: ArtifactOptions = 
   if ("error" in validated) throw new Error(validated.error);
   await writeFile(join(outDir, "repository.json"), `${JSON.stringify(validated, null, 2)}\n`);
   return validated;
+}
+
+export async function refreshBuiltinRepository(): Promise<RepositoryPackage> {
+  const temporary = await mkdtemp(join(tmpdir(), "ox-builtin-repository-"));
+  try {
+    const repository = await buildArtifacts(temporary);
+    const manifest = join(BUILTIN_REPOSITORY_ROOT, "repository.json");
+    const contents = await readFile(join(temporary, "repository.json"), "utf8");
+    if (contents !== await readFile(manifest, "utf8")) await writeFile(manifest, contents);
+    return repository;
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 }

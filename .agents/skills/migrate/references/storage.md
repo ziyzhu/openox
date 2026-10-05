@@ -120,6 +120,13 @@ against readers/writers. This is not one combined document/blob transaction.
 Submitted messages, contextual snapshots, model replies and native diagnostics
 can be present: these are private user-owned scratch data, not anonymous fixtures.
 The controller refuses persisted chats; normal activation never opens these caches.
+A DEBUG Simulator launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` also allows
+an idle chat switched to temporary in the actual UI to attach to `NativeFiles`.
+Admission waits for attachment and rejects preparation failure without selecting
+the legacy loop. Preparing/attached chats cannot become persisted. The test
+skill's actual UI replay verifies reasoning, Markdown, native tools, Stop and
+history retained across process reopen. Its stopped-process cache copies include
+WAL/SHM and are private diagnostics, never Profile export/import or activation.
 
 `DurableStorageController` owns fresh
 `PiDurableDiagnostics/<storageConformance|storageBenchmark>/<uuid>/` fixtures for

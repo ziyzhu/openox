@@ -6,12 +6,7 @@ import {
 } from "@openox/protocol/manifest";
 import { inspectInstaller } from "@openox/protocol/installer";
 
-export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
-export const SERVICE_ASSET_BASE_URL = "https://openox.ai/assets/services";
-
-export function serviceAssetURL(id: string): string {
-  return `${SERVICE_ASSET_BASE_URL}/${id}/favicon.png`;
-}
+export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../apps/ios/Ox/Resources/OxServices.bundle");
 
 export function sourceDirFor(domain: string, root = BUILTIN_REPOSITORY_ROOT): string {
   return domain.startsWith("api:")
@@ -71,14 +66,5 @@ export async function buildService(domain: string, root = BUILTIN_REPOSITORY_ROO
   const installerErrors = inspectInstaller(loaded, svc);
   if (installerErrors.length) return { error: `service ${domain}: ${installerErrors.join("; ")}` };
 
-  const dir = sourceDirFor(domain, root);
-  const faviconUrl = svc.faviconUrl ?? (existsSync(join(dir, "favicon.png"))
-    ? serviceAssetURL(domain)
-    : undefined);
-
-  const manifest: Manifest = {
-    ...svc,
-    ...(faviconUrl ? { faviconUrl } : {}),
-  };
-  return { manifest, actions: loaded };
+  return { manifest: svc, actions: loaded };
 }

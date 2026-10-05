@@ -8,6 +8,9 @@ nonisolated enum SimEnv {
     static let iCloudDisabled = argument("--disable-icloud")
     static let mockLLMDisabled = argument("--disable-mock-llm")
     static let cloudOnlyArtifacts = values("OX_CLOUD_ONLY_ARTIFACTS")
+    #if DEBUG
+    static let durableTemporarySessionID = ProcessInfo.processInfo.environment["OX_DURABLE_TEMPORARY_SESSION"].flatMap(UUID.init(uuidString:))
+    #endif
     static let startupDelayMilliseconds = min(30_000, max(0,
         Int(ProcessInfo.processInfo.environment["OX_STARTUP_DELAY_MS"] ?? "") ?? 0
     ))

@@ -4,7 +4,7 @@ nonisolated enum BuiltInProviders {
         modelLookup: (String, LLMRegion) -> [ProviderModel]
     ) -> [any ProviderClient] {
         let leading: [any ProviderClient] = [
-            ChatGPTProvider(models: modelLookup("chatgpt", .global)),
+            ChatGPTProvider.client(models: modelLookup("chatgpt", .global)),
             GeminiProvider(models: modelLookup("gemini", .global)),
             GitHubCopilotProvider(models: modelLookup("github-copilot", .global)),
         ]

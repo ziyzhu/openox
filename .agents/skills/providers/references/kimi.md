@@ -19,7 +19,7 @@ The Kimi Website provider is a separate China chat option with text, image, and 
 - Provider composition and regional account mapping: [KimiProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/KimiProvider.swift)
 - Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
 - Kimi For Coding models: [CuratedProviderModels.swift](../../../../apps/ios/Ox/Host/ModelProviders/CuratedProviderModels.swift)
-- Website provider: [www.kimi.com/actions.js](../../../../repositories/builtin/web/www.kimi.com/actions.js)
+- Website provider: [www.kimi.com/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/www.kimi.com/actions.js)
 
 ## Implementation comparison
 
