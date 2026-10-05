@@ -77,7 +77,7 @@ struct OnboardingView: View {
     }
 }
 
-private struct OnboardingDisclosureRow: View {
+struct OnboardingDisclosureRow: View {
     let symbol: String
     let title: LocalizedStringKey
     let description: LocalizedStringKey

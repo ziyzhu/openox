@@ -1,0 +1,58 @@
+{
+  "chatgpt.com": {
+    "source": "https://chatgpt.com/unauth-mweb/apple-touch-icon.png",
+    "finalURL": "https://chatgpt.com/unauth-mweb/apple-touch-icon.png"
+  },
+  "claude.ai": {
+    "source": "https://openox.ai/assets/services/claude.ai/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/claude.ai/favicon.png"
+  },
+  "muse.ai": {
+    "source": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://muse.ai&size=128",
+    "finalURL": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://muse.ai&size=128"
+  },
+  "manus.im": {
+    "source": "https://manus.im/apple-icon.png?apple-icon.153es_5lvwth1.png",
+    "finalURL": "https://manus.im/apple-icon.png?apple-icon.153es_5lvwth1.png"
+  },
+  "doubao.com": {
+    "source": "https://openox.ai/assets/services/doubao.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/doubao.com/favicon.png"
+  },
+  "grok.com": {
+    "source": "https://openox.ai/assets/services/grok.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/grok.com/favicon.png"
+  },
+  "outlook.live.com": {
+    "source": "https://www.google.com/s2/favicons?domain_url=https://outlook.live.com&sz=128&alt=404",
+    "finalURL": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://outlook.live.com&size=128"
+  },
+  "linkedin.com": {
+    "source": "https://www.google.com/s2/favicons?domain_url=https://linkedin.com&sz=128&alt=404",
+    "finalURL": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://linkedin.com&size=128"
+  },
+  "www.1point3acres.com": {
+    "source": "https://www.google.com/s2/favicons?domain_url=https://www.1point3acres.com&sz=128&alt=404",
+    "finalURL": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.1point3acres.com&size=128"
+  },
+  "reddit.com": {
+    "source": "https://www.google.com/s2/favicons?domain_url=https://reddit.com&sz=128&alt=404",
+    "finalURL": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=128"
+  },
+  "github.com": {
+    "source": "https://openox.ai/assets/services/github.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/github.com/favicon.png"
+  },
+  "www.kimi.com": {
+    "source": "https://openox.ai/assets/services/www.kimi.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/www.kimi.com/favicon.png"
+  },
+  "gemini.google.com": {
+    "source": "https://openox.ai/assets/services/gemini.google.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/gemini.google.com/favicon.png"
+  },
+  "qwen.ai": {
+    "source": "https://openox.ai/assets/services/qwen.ai/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/qwen.ai/favicon.png"
+  }
+}

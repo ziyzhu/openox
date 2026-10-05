@@ -5,40 +5,99 @@ description: "Prepare and record the three-part Ox iOS demo: Connect anything, L
 
 # Ox Demo
 
-Use the `sim-cli` skill for visible iOS interaction and the `cli` skill to verify the selected chat, model, and completed replies. Follow the repository's simulator rules. Keep recordings and response drafts outside the repository.
+Use the `sim-cli` skill for visible iOS interaction and the `cli` skill to verify selected chats, models, service state, and completed replies. Use the `evolve` skill for the live Reddit service-creation scene. Follow the repository's simulator rules. Keep recordings, response drafts, and the run manifest outside the repository.
+
+## Story and opening
+
+Use the existing feature copy verbatim for the opening and chapter introductions, in this order. Do not add a separate tagline or rewrite the descriptions; they remain identical to the README, onboarding, and website:
+
+**Connect anything**
+Ox works across AI assistants, apps, and websites to get things done for you.
+
+**Local first**
+Ox runs on your device, keeping your conversations, credentials, and memory stored locally.
+
+**Yours**
+Open source and malleable, Ox evolves with you and uses the models you choose.
+
+Introduce each chapter with its exact heading and description before its footage, through narration or an existing product screen, not a composited card over the app. Do not change public feature copy or add app UI solely for the recording without a separate request. Avoid claims that all models run locally, all services work offline, or every assistant exposes all of its memory.
+
+## Native SwiftUI preview mode
+
+Use this mode when the user explicitly requests a controlled SwiftUI preview rather than live execution. Open `apps/ios/Ox/Development/OxDemoSceneView.swift` and use its `#Preview` scenes. Reuse production onboarding rows, chat header, composer, message bubbles, Markdown, service chips, and provider picker rows. **Do not add player controls, demo labels, custom cards, overlays, simulated system controls, or other special recording UI.** Scene selection and timing belong outside the rendered app, in Xcode previews or launch configuration.
+
+For a simulator snapshot:
+
+```bash
+sim --device <owned-device> run ai.oxcraft.bot \
+  --project apps/ios/Ox.xcodeproj --scheme ios \
+  --env OX_DEMO=1 --env OX_DEMO_SCENE=memory --env OX_DEMO_COMPLETE=1
+```
+
+`OX_DEMO_SCENE` accepts `connect`, `memory`, `research`, `jobs`, `local`, `offline`, `yours`, `providers`, `reddit`, or `reuse`. Use `OX_DEMO_AUTOPLAY=1` without `OX_DEMO_COMPLETE=1` for the timeline. Relaunch without demo environment variables to return to normal Ox. This entry point and its fixtures are DEBUG-only; demo artwork is excluded from Release builds.
+
+The preview uses in-memory, illustrative data and local artwork. It bypasses normal Host preparation and performs no model requests, account imports, service execution, or persisted service creation. Disclose this distinction in the accompanying description or delivery notes, not through extra in-app UI. The `offline` preview presents existing messages only; it does not demonstrate offline inference or change radio settings. A real airplane-mode action still requires separate system footage, following the live requirements below. Do not present preview screenshots as evidence that signed-out services succeeded.
+
+Run `bun run test:demo --device <owned-device>` to check native rendering, exact prompts and service assignments, absence of special UI, and unchanged profile/Local repository contents. This checks presentation fixtures, not live integrations. Keep its private diagnostics outside the repository.
 
 ## Prepare
 
-1. Use the requested simulator, normally `ox-1`, and confirm the existing Ox app is ready with bundled services.
-2. Reuse prepared empty chats when their service attachments match; create missing chats as needed. Attach Amazon, Facebook, and Reddit to the desk chat; Airbnb, Google, and Xiaohongshu to the Seattle chat; Outlook, LinkedIn, and 1Point3Acres to the catch-up chat. Each chat has three services, with nine distinct services across the demo.
-3. Start `bun run .agents/skills/demo/scripts/replay-server.ts --responses <sanitized-response-directory> --port 8082` and verify `http://127.0.0.1:8082/health`. The directory must contain `01-desks.md`, `02-seattle.md`, and `03-catch-up.md`, each prepared from a saved GPT-5.6 Luna · Fast response with private details removed. The replay server exposes `Bonsai 2 27B` as a local OpenAI-compatible model. In Ox, configure its custom provider URL as `http://127.0.0.1:8082/v1`, select that model, and tap **Save**. Verify the chat header shows Bonsai. Disclose outside the recording that the replayed answers were prepared with Luna.
-4. Check service sign-in states before recording. If an attached service cannot be used, report the limit and avoid presenting its reply as a successful service result.
+1. Use the requested simulator, normally `ox-1`, and confirm Ox is ready with bundled services. Check ownership before using it. If the simulator cannot demonstrate a real airplane-mode transition and offline inference, coordinate a paired physical device with the user; do not replace that action with a mock toggle.
+2. Reuse prepared empty chats only when their service attachments match; create missing chats as needed. Prepare these three **Connect anything** chats:
+
+   | Scene | Attached services | Exact prompt | Saved response file |
+   | --- | --- | --- | --- |
+   | Memory | ChatGPT, Claude, Muse | Import all of my memory into Ox. | `01-memory.md` |
+   | Research | Manus, Doubao, Grok | Do deep research on stock trading tips across my assistants. | `02-research.md` |
+   | Jobs | Outlook, LinkedIn, 1Point3Acres | What are the best job opportunities for me? | `03-jobs.md` |
+
+3. **Sign-in is a hard preflight gate.** Verify all nine services above, plus Reddit for **Yours**, are signed in on the recording device. Open each service in Ox and perform a harmless authenticated read using the same session the demo will use. A service chip, stored cookie, or public landing page is not proof of authentication. Record the service, check time, and result in the private run manifest; never copy credentials or identifying account details into shared artifacts. Resolve expired sessions, challenges, and missing permissions before recording. Ask the user to complete any interactive sign-in or MFA. Do not claim the full demo is ready while any required service is blocked.
+4. **Use a real ChatGPT model by default, not replay.** Find a free simulator with an existing ChatGPT provider sign-in, select an available model in Ox, and verify a harmless live reply before recording. Provider authentication is separate from the ChatGPT website service's sign-in; verify both. Keep the default model unchanged unless needed, and record any settings changed for the demo. Run the three Connect anything prompts against the real signed-in services, checking which memory each assistant exposes, that research draws on all three assistants, and that jobs use accessible personal context. Save actual outputs privately. Review live replies before sharing footage; re-record with non-identifying demo data or omit private content rather than substituting sanitized replay without approval. Do not fabricate success; imported memory must really be persisted before showing an import as complete.
+5. **Replay is optional and requires an explicit request.** For repeatable **Connect anything** footage only, start `bun run .agents/skills/demo/scripts/replay-server.ts --responses <sanitized-response-directory> --port 8082` and verify `http://127.0.0.1:8082/health`. The directory must contain `01-memory.md`, `02-research.md`, and `03-jobs.md`, prepared from saved GPT-5.6 Luna · Fast runs with private details removed. The server exposes `Bonsai 2 27B` as a local OpenAI-compatible replay model. Configure its custom provider URL in Ox as `http://127.0.0.1:8082/v1`, select that model, and tap **Save**. Verify the chat header shows Bonsai. Disclose outside the recording that these answers are replayed from Luna runs; the replay does not execute service calls or memory imports.
+6. Prepare **Local first** separately: verify a genuinely on-device inference path works without network access. The host-side replay server, cloud providers, cached replies, and Mock do not establish offline inference. If no supported local inference path is available, mark this scene blocked and ask the user to choose between implementing one and showing only offline access to existing local conversations. Do not silently substitute the latter for a new offline conversation.
+7. Prepare **Yours** with the model-provider list and a live Reddit service-creation flow. Verify the authoring model and required tools work. Use a separate disposable profile for chats and memory, sign into Reddit, and verify the device has no installed Reddit service so the recording can show real creation. Profiles do not isolate the shared Local service worktree: inspect its pending changes before authoring, and never include unrelated work in Save. If scoped Save is unavailable, preserve the verified draft and report that limit. Do not delete an existing Reddit service just to recreate it or modify the prepared Connect anything profile. Record the initial state and resulting service identifier in the manifest.
 
 ## Iterate efficiently
 
-- Reuse sanitized response files, the configured provider, and a healthy model replay server when they match the requested demo. Check existing state before repeating setup.
-- Keep a small run manifest outside the repository with the simulator, chat IDs, response directory, raw scene paths, source trim timestamps, and final export command. Preserve each scene separately so later edits can reuse verified footage.
-- Before a full take, capture and review a short sample covering typing, cursor blinking, Send, and keyboard dismissal. Check that the text and composer move together and that export timing matches the source. If the sample can serve as the finished scene, reuse it.
-- For a revision, record only scenes whose visible content changed. For a timing or trimming correction, re-export from the existing raw capture. Verify changed scenes and the final joins without repeating completed setup or unrelated checks.
-- Trim using source timestamps, reset each trimmed clip to start at zero, and only then convert to a constant frame rate. Preserve pauses and cursor cadence on the first export.
-- For a commit-only follow-up, review the current diff, complete repository-required commit checks, and commit. Reuse completed demo validation unless the files changed in a way that invalidates it.
+- Reuse configured providers and authenticated sessions when they match this storyboard. Recheck authentication before a take rather than repeating sign-in unnecessarily. Reuse sanitized response files and a healthy replay server only for explicitly requested replay footage.
+- Keep a private run manifest with the device, profile and chat IDs, sign-in checks, actual pre-run results and limitations, inference mode per scene, response directory, raw scene paths, source trim timestamps, original radio settings, and final export command.
+- Preserve each scene separately. Before a full take, review a short sample covering typing, cursor blinking, Send, and keyboard dismissal. Confirm text and composer move together and export timing matches the source. Reuse a successful sample as finished footage when possible.
+- For a revision, record only scenes whose visible content changed. For timing or trimming changes, re-export existing raw captures. Verify changed scenes and final joins without repeating unrelated setup.
+- Trim using source timestamps, reset each trimmed clip to zero, then convert to a constant frame rate. Preserve pauses and cursor cadence on the first export.
+- For a commit-only follow-up, review the diff, complete repository-required commit checks, and reuse completed validation unless changes invalidate it.
 
 ## Record
 
-1. Begin with the desk chat showing its three service chips. Move to a fresh chat for each later prompt, with only its assigned three chips. The earlier eight-chip swipe sequence does not apply to this three-chat version.
-2. Type and send these prompts in order:
-   - “Find a desk people love and add the best deal to my cart.”
-   - “Plan a Seattle weekend for me.”
-   - “What should I catch up on?”
-3. Attaching services through the composer's service picker can leave a leading space, so confirm the composer is empty before recording. Focus the composer with a brief tap, without pressing and holding or selecting text. Type each complete prompt in one input action. Send only after the field exactly matches the prompt; a mismatched send creates a chat the replay server rejects. Verify the completed field and hold it on screen for about one second before tapping Send or ending a typing-only scene. Cut around paste menus, autocorrect flashes, and any unsynchronized keyboard dismissal and composer movement. In the final cut, show the first prompt's reply, cutting from the completed prompt directly to the anchored message so the send animation is skipped. Match the reference pace: about 0.9 seconds of empty composer before typing, about 1.1 seconds on the completed desk prompt, the reply stream plus about 0.6 seconds, and about 1.5 to 1.7 seconds on each later completed prompt. End the Seattle and catch-up scenes on their completed typed prompts, before either agent reply appears.
-4. Record the simulator with `sim --device <device> record-video start --out <path.mov>` and `sim --device <device> record-video stop`. Send one prompt in each chat and let its saved response finish in Ox before continuing. On `ox-qa`, a still screen may not extend the recording after the last streamed frame. Open and dismiss **More** after completion to create a later frame, then trim the clip before the menu. Trim variable-frame-rate captures by source timestamps before converting to a constant frame rate, then trim again to the intended duration because the last kept frame otherwise holds until the next source frame; assigning sequential frames new 30 fps timestamps speeds up the cursor blink. Verify the exported first reply is complete and the second and third clips contain only typing. Join the simulator clips without overlays. The replay server rejects other prompts rather than inventing answers.
+Record simulator footage with `sim --device <device> record-video start --out <path.mov>` and `sim --device <device> record-video stop`; use the documented device recording flow for a paired physical target. Capture actual app and system interaction, without composited cards or overlays.
+
+### 1. Connect anything
+
+1. Show three distinct chats in the table's order, each with only its assigned three service chips. The previous desk/Seattle/catch-up scenes and eight-chip swipe do not apply.
+2. Confirm the composer is empty: attaching services through the picker can leave a leading space. Focus with a brief tap, not a press-and-hold, and verify the focused composer has settled before typing. Type each complete exact prompt in one input action. Simulator HID input can finish after `sim type` returns or drop text during composer/keyboard movement: inspect the field until its complete value is stable and exactly matches the prompt. Then hold it on screen for about one second before Send or ending a typing-only scene. Apply this check to every chapter's prompts; never send a mismatched field. If entry fails, correct it off-camera and record a clean take.
+3. Show the memory prompt and its verified live reply, reviewed for privacy. Cut from the completed prompt to the anchored message to skip the send animation. End the research and jobs scenes on their completed typed prompts, before their replies appear. Still send and verify their real responses off-camera so all three chats are validated. Use saved replay replies only when explicitly requested.
+4. Start with about 0.9 seconds of empty composer; hold the completed memory prompt about 1.1 seconds, its reply stream plus about 0.6 seconds, and each later completed prompt about 1.5–1.7 seconds. Adjust for readability of the new prompts rather than forcing the previous runtime. Cut around paste menus, autocorrect flashes, and unsynchronized keyboard dismissal.
+
+### 2. Local first
+
+1. Start this chapter with the visible action of turning **Airplane Mode on** in the system UI. **Keep that action in the final recording.** Confirm Wi-Fi and cellular data are off; airplane mode may preserve Wi-Fi. Do not cut from an online conversation to an offline icon and imply the reply was generated offline.
+2. Return to Ox, show the verified on-device model, and start a fresh simple conversation. Suggested prompt: “Help me plan a focused morning.” Keep the send and completed live reply in the recording. Use no connected-service attachments or network-dependent tools.
+3. Verify the reply was generated after disconnection, not preloaded, replayed, or cached. Keep diagnostic evidence outside the repository. If the device cannot complete this flow, stop and report the blocker rather than presenting a simulated success.
+4. Restore the device's original radio settings before the next chapter and after failures. Verify connectivity before the live Reddit scene.
+
+### 3. Yours
+
+1. Show the **model-provider list view**, with readable provider names and no exposed keys or account identifiers. Present model choice neutrally; do not imply every listed provider is configured or available offline.
+2. Switch to the prepared disposable profile and show Ox using Reddit through the live website workflow. Suggested prompt: “Use Reddit to find discussions about focused morning routines, and create a reusable Reddit service as you go.” The wording is provisional until the real authoring flow is verified.
+3. Capture actual service creation while Ox works with the site. Show the resulting Reddit service in the services list or picker, then reuse it for a harmless read. Verify that it was absent before, created during this run, and usable afterward. Opening a preinstalled Reddit service is not this scene.
+4. Keep the website use, creation, and reusable result understandable in the cut. Trim waiting time if needed, but do not replace service creation with a replayed assistant claim. Report any authentication or authoring limit rather than implying success.
 
 ## Review and deliver
 
-- Save each pre-run reply outside the repository. Remove personal names, account addresses, and other identifying details from shared response copies.
-- Review the simulator recording for identifying details in the live UI. Redact the saved response text before loading the replay server; the chat transcript receives the redacted text.
-- Verify that the video shows three distinct chats with their assigned service chips, the requested model, each exact prompt, and public inline links in the first reply. The second and third chats should show only typing. Disclose the prerecorded Luna source when sharing the recording.
-- Deliver the simulator recording without composited cards or overlays. Report the output path and any service limits visible in the recording.
+- Review all footage for identifying details in chats, memory, jobs, account menus, provider settings, and Reddit. Redact response copies before loading the replay server; keep real source transcripts private. Avoid opening account identifiers during a take.
+- Verify all three headings, all three exact Connect anything prompts, their assigned chips, the first reply, and typing-only research/jobs scenes. Verify the visible airplane-mode action, radios off, a new offline reply, the model-provider list, and actual Reddit service creation and reuse.
+- For variable-frame-rate captures, trim by source timestamps before constant-frame-rate conversion, then trim to intended duration again: the last retained frame can otherwise hold until the next source frame. Do not assign sequential frames new 30 fps timestamps, which speeds up cursor blinking. If a still screen stops producing frames, create a later frame by opening and dismissing **More**, then trim before that menu.
+- Review each changed scene and final joins. Confirm replies are complete and chapter transitions are clear. Do not mark an unverified or blocked chapter as finished.
+- Deliver the recording without composited cards or overlays. Report the output path, actual model used, and any service limits. For explicitly requested replay, disclose the saved response source and distinguish it from live footage. Share screenshots or representative frames for human review.
 
 ## Publish on openox.ai
 

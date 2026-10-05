@@ -14,62 +14,23 @@ struct ChatPageTopBar: View {
     let onDeleteChat: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            SidebarMenuButton(action: onShowSidebar)
-            if showsModelPicker, blockCount == 0, (chat.canChangeRetention || !chat.isTemporary) {
-                modelPill(chat: chat)
-            }
-            Spacer()
+        ChatHeader(
+            modelTitle: showsModelPicker && blockCount == 0 && (chat.canChangeRetention || !chat.isTemporary)
+                ? chat.model.displayName : nil,
+            iconButtonSize: iconButtonSize,
+            onShowSidebar: onShowSidebar,
+            onPickModel: onPickModel
+        ) {
             if chat.canChangeRetention {
-                temporaryModeButton
+                TemporaryChatButton(isActive: chat.isTemporary, size: iconButtonSize, action: onToggleTemporary)
             } else {
                 overflowMenu(chat: chat)
             }
         }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.bottom, Theme.Spacing.xs)
-    }
-
-    private var temporaryModeButton: some View {
-        Button(action: onToggleTemporary) {
-            TemporaryChatIcon(isActive: chat.isTemporary)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: 29, height: 29)
-                .frame(width: iconButtonSize, height: iconButtonSize)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .accessibilityLabel(chat.isTemporary ? "Turn off temporary chat" : "Start temporary chat")
-        .accessibilityValue(chat.isTemporary ? "On" : "Off")
-        .accessibilityAddTraits(chat.isTemporary ? .isSelected : [])
-        .accessibilityIdentifier(A11yID.Chat.temporaryToggle)
-    }
-
-    private func modelPill(chat: Chat) -> some View {
-        Button(action: onPickModel) {
-            HStack(spacing: 4) {
-                Text(chat.model.displayName)
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Image(systemName: "chevron.down")
-                    .font(Theme.Icons.xs)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            }
-            .padding(.horizontal, 14)
-            .frame(height: iconButtonSize)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Capsule())
-        .accessibilityLabel("Model: \(chat.model.displayName)")
-        .accessibilityIdentifier(A11yID.Chat.modelPicker)
     }
 
     private func overflowMenu(chat: Chat) -> some View {
-        Menu {
+        ChatOverflowMenu(size: iconButtonSize) {
             Button(action: onPickModel) {
                 Label("Models", systemImage: "slider.horizontal.3")
             }
@@ -104,15 +65,6 @@ struct ChatPageTopBar: View {
                 }
                 .accessibilityIdentifier(A11yID.Chat.delete)
             }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(.title3, weight: .semibold))
-                .foregroundStyle(Theme.Colors.onSurface)
-                .frame(width: iconButtonSize, height: iconButtonSize)
-                .contentShape(Rectangle())
         }
-        .accessibilityLabel(A11yLabel.more)
-        .accessibilityIdentifier(A11yID.Chat.more)
-        .glassEffect(.regular.interactive(), in: Circle())
     }
 }

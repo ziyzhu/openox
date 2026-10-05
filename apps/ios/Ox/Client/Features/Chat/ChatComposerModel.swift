@@ -118,6 +118,11 @@ final class ChatComposerModel {
         return String(token)
     }
 
+    func replaceDraft(_ text: String) {
+        draft = text
+        caretEndRequest += 1
+    }
+
     func startMention() {
         attachmentMenuPresented = false
         if activeMention == nil {

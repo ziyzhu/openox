@@ -10,6 +10,7 @@
     "test:logs": "bun tests/apps/cli/logs.ts",
     "evals": "bun tests/evals/runner.ts",
     "build:services": "bun tools/build/ios-services-build.ts",
+    "test:demo": "bun .agents/skills/test/apps/ios/demo-preview.ts",
     "build:diagram": "dot -Tsvg assets/openox-components.dot -o assets/openox-components.svg",
     "sim:bootstrap": "bun tools/sim/bootstrap.ts",
     "update:llms": "bun tools/build/provider-models.ts",

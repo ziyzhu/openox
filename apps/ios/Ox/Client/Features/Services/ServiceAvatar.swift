@@ -17,6 +17,7 @@ struct ServiceAvatar: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @Environment(\.localDomainArtwork) private var localArtwork
     @State private var faviconState = FaviconState.loading
 
     var body: some View {
@@ -34,7 +35,7 @@ struct ServiceAvatar: View {
         }
         .frame(width: size, height: size)
         .task(id: "\(service.domain):\(colorScheme):\(serviceManager.faviconRevision)") {
-            guard loadsFavicon else {
+            guard localArtwork[service.domain] == nil, loadsFavicon else {
                 faviconState = .unavailable
                 return
             }
@@ -54,12 +55,13 @@ struct ServiceAvatar: View {
     }
 
     private var favicon: UIImage? {
+        if let data = localArtwork[service.domain], let image = UIImage(data: data) { return image }
         guard loadsFavicon, case .loaded(let image) = faviconState else { return nil }
         return image
     }
 
     private var isLoadingFavicon: Bool {
-        guard loadsFavicon else { return false }
+        guard localArtwork[service.domain] == nil, loadsFavicon else { return false }
         if case .loading = faviconState { return true }
         return false
     }

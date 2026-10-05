@@ -1265,7 +1265,7 @@ private struct ProviderPickerView: View {
     }
 }
 
-private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
+struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     let id: String
     let value: Value
     let title: String
@@ -1278,7 +1278,7 @@ private struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     var children: [SettingsSelectionOption<Value>] = []
 }
 
-private struct SettingsSelectionPickerView<Value: Hashable>: View {
+struct SettingsSelectionPickerView<Value: Hashable>: View {
     let title: LocalizedStringKey
     let options: [SettingsSelectionOption<Value>]
     @Binding var selection: Value

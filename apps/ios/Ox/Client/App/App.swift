@@ -2,6 +2,33 @@ import SwiftUI
 
 @main
 struct OxApp: App {
+    init() {
+        #if DEBUG
+        guard !OxDemoLaunch.enabled else { return }
+        #endif
+        ScheduledSkillScheduler.shared.register()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            #if DEBUG
+            if OxDemoLaunch.enabled {
+                OxDemoSceneView(
+                    scene: OxDemoLaunch.scene,
+                    completed: OxDemoLaunch.completed,
+                    autoplay: OxDemoLaunch.autoplay
+                )
+            } else {
+                OxApplicationView()
+            }
+            #else
+            OxApplicationView()
+            #endif
+        }
+    }
+}
+
+private struct OxApplicationView: View {
     @AppStorage("app.hasCompletedOnboarding") private var onboarded = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
@@ -13,7 +40,6 @@ struct OxApp: App {
     private let webSocketTransport: WebSocketOxHostTransport
 
     init() {
-        ScheduledSkillScheduler.shared.register()
         let host = IOSHost.shared
         let access = HostAccess()
         _hostAccess = State(initialValue: access)
@@ -24,8 +50,7 @@ struct OxApp: App {
         PerfMonitor.shared.start()
     }
 
-    var body: some Scene {
-        WindowGroup {
+    var body: some View {
             Group {
                 #if DEBUG && targetEnvironment(simulator)
                 if let mode = ProcessInfo.processInfo.environment["OX_PERMISSION_PROTOTYPE"] {
@@ -94,7 +119,6 @@ struct OxApp: App {
                     ScheduledSkillScheduler.shared.refresh()
                 }
             }
-        }
     }
 
     @ViewBuilder

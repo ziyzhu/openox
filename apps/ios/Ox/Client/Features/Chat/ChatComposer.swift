@@ -239,6 +239,7 @@ struct ChatComposer: View, Equatable {
     let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
+    var showsServiceAuthStatus = true
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -878,7 +879,7 @@ struct ChatComposer: View, Equatable {
             service: picked,
             title: picked.title,
             onOpen: { onOpenService(picked) },
-            showsAuthStatus: true,
+            showsAuthStatus: showsServiceAuthStatus,
             onRemove: {
                 Log.ui.info("ChatComposer.detachService domain=\(picked.domain)")
                 onRemoveService(picked)
