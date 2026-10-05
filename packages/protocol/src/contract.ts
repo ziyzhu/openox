@@ -19,6 +19,9 @@ const opaque = (name: string, description: string) => object(name, {}, { descrip
 // Domain payloads remain owned by their existing codecs, not a new persisted format.
 export const Schemas = {
   EmptyRequest: object("EmptyRequest", {}, { additionalProperties: false }),
+  // Experimental DEBUG Simulator commands. Native controllers own bounded domain validation.
+  DurableCommandParameters: object("DurableCommandParameters", { caseID: S(), action: S() }),
+  DurableCommandResult: opaque("DurableCommandResult", "Experimental cache-only Pi Durable command result."),
   SessionRequest: object("SessionRequest", { sessionId: nullable(S()) }),
   GetLogsRequest: object("GetLogsRequest", {
     limit: nullable(I({ minimum: 1, maximum: 2000 })), cursor: nullable(S({ minLength: 1, maxLength: 2048 })),
@@ -117,6 +120,8 @@ type SchemaName = keyof typeof Schemas;
 const method = (swiftCase: string, params: SchemaName, result: SchemaName) => ({ swiftCase, params, result });
 export const Methods = {
   "host.describe": method("describe", "EmptyRequest", "HostDescription"),
+  "debug.durable.storage": method("durableStorage", "DurableCommandParameters", "DurableCommandResult"),
+  "debug.durable.chat": method("durableChat", "DurableCommandParameters", "DurableCommandResult"),
   "services.invoke": method("invokeAction", "ActionRequest", "ValueResult"),
   "services.evaluate": method("evaluate", "EvaluateRequest", "ValueResult"),
   "services.reload": method("reloadService", "ServiceRequest", "ValueResult"),

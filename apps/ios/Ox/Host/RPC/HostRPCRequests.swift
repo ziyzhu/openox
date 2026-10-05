@@ -5,6 +5,8 @@ extension OxHostProtocol {
 
     enum Method: String, CaseIterable {
         case describe = "host.describe"
+        case durableStorage = "debug.durable.storage"
+        case durableChat = "debug.durable.chat"
         case invokeAction = "services.invoke"
         case evaluate = "services.evaluate"
         case reloadService = "services.reload"
@@ -43,6 +45,11 @@ extension OxHostProtocol {
     }
 
     struct EmptyRequest: Decodable {}
+
+    struct DurableCommandParameters: Decodable {
+        let caseID: String
+        let action: String
+    }
 
     struct ActionRequest: Decodable {
         let domain: String

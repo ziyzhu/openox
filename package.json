@@ -2,7 +2,7 @@
   "private": true,
   "author": "Ziyuan Zhu",
   "license": "Apache-2.0",
-  "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services"],
+  "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services", "packages/agent"],
   "scripts": {
     "ci": "./.agents/skills/test/scripts/ci.sh",
     "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",
@@ -11,6 +11,8 @@
     "evals": "bun .agents/skills/evals/scripts/runner.ts",
     "build:services": "bun .agents/skills/build/scripts/ios-services-build.ts",
     "test:demo": "bun .agents/skills/test/apps/ios/demo-preview.ts",
+    "build:agent": "bun packages/agent/build.ts",
+    "test:agent": "bun test packages/agent/test",
     "build:diagram": "dot -Tsvg assets/openox-components.dot -o assets/openox-components.svg",
     "sim:bootstrap": "bun .agents/skills/onboarding/scripts/bootstrap.ts",
     "update:llms": "bun .agents/skills/build/scripts/provider-models.ts",

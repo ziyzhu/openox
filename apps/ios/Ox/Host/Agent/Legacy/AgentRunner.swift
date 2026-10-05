@@ -67,9 +67,6 @@ nonisolated enum AgentRunner {
                     Log.agent.info("Agent.run terminating: next-turn preparation cancelled")
                     break loop
                 }
-                if pendingMessages.isEmpty {
-                    pendingMessages = await config.getSteeringMessages()
-                }
             }
             snapshot.context.messages = messages
             Log.agent.info("Agent.run iter=\(iter) msgs=\(messages.count) streaming…")
@@ -201,23 +198,9 @@ nonisolated enum AgentRunner {
                 break loop
             }
 
-            let steeringMessages = await config.getSteeringMessages()
             if toolCalls.isEmpty || shouldTerminate {
-                if !steeringMessages.isEmpty {
-                    pendingMessages = steeringMessages
-                    continue loop
-                }
-                let followUpMessages = await config.getFollowUpMessages()
-                if !followUpMessages.isEmpty {
-                    pendingMessages = followUpMessages
-                    continue loop
-                }
                 Log.agent.info(shouldTerminate ? "Agent.run terminating: tool requested terminate" : "Agent.run terminating: no tool calls")
                 break loop
-            }
-
-            if !steeringMessages.isEmpty {
-                pendingMessages = steeringMessages
             }
         }
 

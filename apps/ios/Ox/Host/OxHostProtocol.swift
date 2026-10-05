@@ -29,6 +29,8 @@ enum OxHostProtocol {
         let chats = host.chats
         let services = host.services
         switch method {
+        case .durableStorage, .durableChat:
+            try handleDurableExperiment(method, params: params, chats: chats, reply: reply)
         case .describe:
             _ = try decode(EmptyRequest.self)
             reply.success(OxHostRPC.description)

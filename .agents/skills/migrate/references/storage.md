@@ -34,6 +34,9 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
+│   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-chat cache Session; WAL sidecars
+│   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + artifacts/  Temporary-chat physical backend
+│   │   ├── PiDurableDiagnostics/<action>/<uuid>/session.sqlite  Upstream storage conformance/benchmarks; removed after each request
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               local Profile catalog
@@ -99,6 +102,92 @@ Primary owners:
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/onboarding/scripts/bootstrap.ts
+
+## Pi Durable rollout and upstream diagnostics
+
+`DurableChatController` owns opt-in temporary-chat Sessions under
+`Library/Caches/PiDurableProof/Native/<uuid>/`. Several temporary chats share each
+Session. These private caches are purgeable, outside backup/sync/export, and never
+opened by normal startup or Profile activation. They have no credentials or
+website state. Native Sessions add `ox.profile`/`ox.file` documents and
+`ox.chat` v1 conversation metadata plus `ox_blobs`/`ox_blob_chunks` for bounded
+binary content. Pi conversation records are authoritative. `ox.chat` contains only
+the external Ox UUID; a disposable UUID-to-Pi-ID lookup is rebuilt from Pi records
+on open. No separate `ox.chats` registry is created or consulted; unconsumed cache
+documents are left untouched, without converting user Profile data.
+Blob commits precede document-reference commits; orphan reclamation is serialized
+against readers/writers. This is not one combined document/blob transaction.
+Submitted messages, contextual snapshots, model replies and native diagnostics
+can be present: these are private user-owned scratch data, not anonymous fixtures.
+The controller refuses persisted chats; normal activation never opens these caches.
+
+`DurableStorageController` owns fresh
+`PiDurableDiagnostics/<storageConformance|storageBenchmark>/<uuid>/` fixtures for
+published Pi storage conformance and benchmarks only. They use the native SQLite
+facade without an Ox Session, Harness, scheduler, Profile content or provider
+requests. One read dataset serves its warmup/retained sweeps; each write sample
+and conformance case uses a separate database. The controller serializes requests
+and refuses stale fixture reuse. SQLite closes before runtime disposal and
+fixture/WAL removal on success/error. Abrupt termination or failed cleanup may
+leave purgeable synthetic caches, never adopted or reopened by the runner.
+Reports and whole-app process gauges stay outside the repository under `/tmp`.
+
+Custom mock proofs, effect receipts, fault-injection hooks, artifact/security
+fixtures, conversion/package experiments and the agent-overhead benchmark have
+been removed. Existing retired cache directories remain untouched and ignored;
+no production Profile format or compatibility milestone is changed.
+
+### Physical files and conversation projections
+
+`NativeFiles` uses `state.sqlite` and flat ordinary files in
+`artifacts/`, including UTF-8 text artifacts. The native `DurableArtifactStore`
+acquires the descriptor-relative `.owner` lock **before** SQLite opens and retains
+it until database close. Files/directories reject links; published files are
+single-link regular files. Private transfer staging, `.owner`, WAL and SHM are
+implementation details, not independent authorities. Transfers use 128 KiB chunks;
+reads still assemble a whole bounded file. Limits are 200 KiB text, 32 MiB binary,
+10,000 indexed files, four native transfer handles and 240 UTF-8 bytes per basename.
+Publication is write-once, digest-checked and flushed; metadata commits follow
+physical publication. Failure between them can retain unreferenced physical bytes.
+Logical removal hides the index entry but retains historical metadata/bytes.
+Overwrite, edit, filename reuse and physical-backend orphan collection are refused.
+`F_FULLFSYNC` has an explicit supported-platform fallback; simulator passes do not
+establish physical-device power-loss durability.
+
+Pi's nine tables own history, documents and execution. `ox.profile` v1 provides
+an index/integrity binding, not a competing manifest. `ox.file` v1 holds UTF-8
+memory/soul/skill documents. `ox.filesystem` v1 binds the backend as
+`artifact-files-v1` or explicit `fixture-blobs-v1`; implicit transitions are refused.
+`ox.artifact` v1 holds `{path,size,sha256,binary,saved}` without artifact bytes.
+The Profile document kinds checkpoint every 32 ordinary changes.
+`ox.conversation.presentation`, `.favorite` and `.read` v1 are conversation-scoped
+latest projections. Title/visibility fork current; favorite/read fork initial.
+Qualified `(profileID,conversationID)` references and bound cursors route full
+fork-aware scrollback separately from active model context. Read-only virtual
+`chats/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts.
+Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
+Temporary native routing still retains explicit `ox.chat` UUID compatibility.
+Production conversion and Profile export/import are not implemented. Post-rebase
+native RPC verification requires usable simulator VPN ingress; no loopback
+exception is authorized.
+
+The existing production Profile representations and compatibility milestones are unchanged.
+Upstream SQLite/document/task compatibility has not yet been adopted by the
+application: a future real-Profile integration must enter through `StorageMigrator`
+before consumers open its database. See [the integration package](../../../../packages/agent/README.md).
+
+The agreed production target, not yet activated or integrated into normal Profile lifecycle, is a local Profile folder containing
+`profile.json`, `state.sqlite` and ordinary files at `artifacts/<filename>`.
+The top-level manifest remains authoritative for Profile identity, creation date
+and format/migration milestone; Pi owns execution, history and application
+documents without a second mutable copy of manifest fields. Artifacts are
+referenced by Profile-relative paths, not duplicated in binary SQL tables.
+Application identity becomes
+Profile-qualified Pi conversation IDs after migration, with presentation metadata
+in conversation-scoped documents rather than a separate chat registry. This does
+not change the implemented map above or authorize live folder synchronization,
+external in-place editing, or adoption of the debug caches. See
+[the remaining implementation plan](../../../../assets/PI_DURABLE.md#remaining-implementation-sequence).
 
 ## Compatibility gate
 
@@ -677,6 +766,8 @@ needed for diagnosis but never credentials or reusable secrets.
 | Service repository configuration | Application Support | Device backup policy | Remove repository or reset choices |
 | Local repository and service snapshots | Application Support | Excluded from backup | Remove repository or replace snapshot |
 | Service-search vectors | Caches | Purgeable local cache | System eviction or MonoRepository rebuild |
+| Pi Durable temporary-chat caches | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | System eviction, app deletion, or explicit QA cleanup after close |
+| Pi Durable upstream storage diagnostics | Caches (DEBUG Simulator only) | Purgeable; no backup/sync/export | Removed after each request; crash remnants by system eviction or QA cleanup |
 | Folder grants | Application Support | Excluded from backup | Remove or replace grant |
 | App logs | Application Support | Excluded from backup | Retention compaction |
 

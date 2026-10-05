@@ -1681,7 +1681,17 @@ final class Chat: Identifiable {
             runState.backgroundExecution?.advance()
             flushBufferedAgentText()
             setRunPhase(.thinking)
-        case .start, .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
+        case .start(let partial):
+            // Durable watchers deliver complete committed partials, including replacement frames.
+            if !partial.content.isEmpty {
+                registerAgentDelta()
+                runState.backgroundExecution?.advance()
+            }
+            if partial.content.contains(where: { if case .text(let text) = $0 { return !text.text.isEmpty }; return false }) {
+                runState.backgroundExecution?.updatePhase(.responding)
+            }
+            applyAssistantFinal(partial)
+        case .textEnd, .thinkingEnd, .toolCallEnd, .done, .failed:
             break
         }
     }

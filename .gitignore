@@ -6,6 +6,7 @@ node_modules
 .claude/scheduled_tasks.lock
 apps/ios/build
 apps/ios/DerivedData
+apps/ios/Ox/Resources/PiDurable.bundle/
 apps/ios/Local.xcconfig
 **/.build/
 **/.swiftpm/

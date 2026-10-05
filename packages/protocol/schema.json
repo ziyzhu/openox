@@ -22,6 +22,28 @@
       "type": "object",
       "properties": {}
     },
+    "DurableCommandParameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "required": [
+        "caseID",
+        "action"
+      ],
+      "properties": {
+        "caseID": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        }
+      }
+    },
+    "DurableCommandResult": {
+      "additionalProperties": true,
+      "description": "Experimental cache-only Pi Durable command result.",
+      "type": "object",
+      "properties": {}
+    },
     "SessionRequest": {
       "additionalProperties": true,
       "type": "object",

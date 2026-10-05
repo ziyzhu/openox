@@ -31,22 +31,16 @@ public actor Agent {
     nonisolated public let events: AsyncStream<AgentEvent>
     nonisolated private let eventsContinuation: AsyncStream<AgentEvent>.Continuation
 
+    private var durableDriver: DurableAgentDriver?
+
+    func installDurableDriver(_ driver: DurableAgentDriver?) throws {
+        guard activeRun == nil else { throw AgentRunError.busy }
+        durableDriver = driver
+    }
+
     private var lastTurnTokens = 0
     private var activeRun: (id: UUID, task: Task<AgentRunResult, Never>)?
-    private var steeringQueue = PendingMessageQueue()
-    private var followUpQueue = PendingMessageQueue()
-
     public var isStreaming: Bool { runState != .idle }
-
-    public var steeringMode: AgentQueueMode {
-        get { steeringQueue.mode }
-        set { steeringQueue.mode = newValue }
-    }
-
-    public var followUpMode: AgentQueueMode {
-        get { followUpQueue.mode }
-        set { followUpQueue.mode = newValue }
-    }
 
     public init(configuration: AgentConfiguration) {
         self.configuration = configuration
@@ -92,8 +86,6 @@ public actor Agent {
         errorMessage = nil
         failureKind = nil
         lastTurnTokens = 0
-        steeringQueue.clear()
-        followUpQueue.clear()
     }
 
     public func restore(messages: [Message]) {
@@ -106,8 +98,6 @@ public actor Agent {
     }
 
     public func abort() {
-        steeringQueue.clear()
-        followUpQueue.clear()
         activeRun?.task.cancel()
     }
 
@@ -129,59 +119,13 @@ public actor Agent {
         pendingToolCalls = []
         let runID = UUID()
         let initialConfiguration = configuration
-        let initialSnapshot = makeTurnSnapshot(messages: messages)
-        let task = Task { await execute(request, configuration: initialConfiguration, snapshot: initialSnapshot) }
+        let task = Task { await execute(request, configuration: initialConfiguration) }
         activeRun = (runID, task)
         return await withTaskCancellationHandler {
             await task.value
         } onCancel: {
             Task { await self.abort(runID: runID) }
         }
-    }
-
-    public func steer(_ text: String, attachments: [Artifact] = []) {
-        steer([.user(UserMessage(text: text, attachments: attachments))])
-    }
-
-    public func steer(_ messages: [Message]) {
-        steeringQueue.enqueue(messages)
-    }
-
-    public func followUp(_ text: String, attachments: [Artifact] = []) {
-        followUp([.user(UserMessage(text: text, attachments: attachments))])
-    }
-
-    public func followUp(_ messages: [Message]) {
-        followUpQueue.enqueue(messages)
-    }
-
-    public func clearSteeringQueue() {
-        steeringQueue.clear()
-    }
-
-    public func clearFollowUpQueue() {
-        followUpQueue.clear()
-    }
-
-    public func clearAllQueues() {
-        steeringQueue.clear()
-        followUpQueue.clear()
-    }
-
-    public func continueFromContext() async throws -> AgentRunResult {
-        try Task.checkCancellation()
-        guard activeRun == nil else { throw AgentRunError.busy }
-        guard let last = messages.last else {
-            throw AgentRunError.nothingToContinue
-        }
-        if case .assistant = last {
-            let queued = steeringQueue.drain() + followUpQueue.drain()
-            guard !queued.isEmpty else {
-                throw AgentRunError.nothingToContinue
-            }
-            return try await run(AgentRunRequest(messages: queued))
-        }
-        return try await run(AgentRunRequest(messages: []))
     }
 
     public func waitForIdle() async {
@@ -191,33 +135,20 @@ public actor Agent {
 
     private func execute(
         _ request: AgentRunRequest,
-        configuration: AgentConfiguration,
-        snapshot: AgentTurnSnapshot
+        configuration: AgentConfiguration
     ) async -> AgentRunResult {
-        let config = AgentRunConfig(
-            turnID: request.turnID,
-            snapshot: snapshot,
-            getSteeringMessages: { [weak self] in
-                await self?.drainSteeringMessages() ?? []
-            },
-            getFollowUpMessages: { [weak self] in
-                await self?.drainFollowUpMessages() ?? []
-            },
-            transformContext: configuration.transformContext,
-            beforeToolCall: configuration.beforeToolCall,
-            afterToolCall: configuration.afterToolCall,
-            shouldStopAfterTurn: configuration.shouldStopAfterTurn,
-            toolExecutionMode: configuration.toolExecutionMode,
-            priorTurnTokens: lastTurnTokens,
-            refreshSnapshot: { [weak self] messages in
-                await self?.makeTurnSnapshot(messages: messages)
+        let result: AgentRunResult
+        if let durableDriver {
+            do {
+                result = try await durableDriver.run(request, configuration: configuration, seed: messages) { [weak self] event in
+                    await self?.emit(event)
+                }
+            } catch {
+                result = AgentRunResult(outcome: Task.isCancelled ? .aborted : .failed(message: error.localizedDescription, kind: llmFailureKind(error: error)),
+                                        messages: messages, lastTurnTokens: lastTurnTokens)
             }
-        )
-
-        let result = await LogContext.$turnID.withValue(request.turnID) {
-            await AgentRunner.run(newMessages: request.messages, config: config) { [weak self] event in
-                await self?.emit(event)
-            }
+        } else {
+            result = await runLegacy(request, configuration: configuration)
         }
         messages = result.messages
         errorMessage = result.errorMessage
@@ -231,16 +162,30 @@ public actor Agent {
         return result
     }
 
-    private func drainSteeringMessages() -> [Message] {
-        steeringQueue.drain()
+    // Compatibility boundary until persisted chats enter through the StorageMigrator gate.
+    // No legacy snapshots, queues or compaction configuration are built on the Pi path.
+    private func runLegacy(_ request: AgentRunRequest, configuration: AgentConfiguration) async -> AgentRunResult {
+        let config = AgentRunConfig(
+            turnID: request.turnID,
+            snapshot: makeTurnSnapshot(messages: messages, configuration: configuration),
+            transformContext: configuration.transformContext,
+            beforeToolCall: configuration.beforeToolCall,
+            afterToolCall: configuration.afterToolCall,
+            shouldStopAfterTurn: configuration.shouldStopAfterTurn,
+            toolExecutionMode: configuration.toolExecutionMode,
+            priorTurnTokens: lastTurnTokens,
+            refreshSnapshot: { [weak self] messages in await self?.makeTurnSnapshot(messages: messages) }
+        )
+        return await LogContext.$turnID.withValue(request.turnID) {
+            await AgentRunner.run(newMessages: request.messages, config: config) { [weak self] event in
+                await self?.emit(event)
+            }
+        }
     }
 
-    private func drainFollowUpMessages() -> [Message] {
-        followUpQueue.drain()
-    }
-
-    private func makeTurnSnapshot(messages: [Message]) -> AgentTurnSnapshot {
-        AgentTurnSnapshot(
+    private func makeTurnSnapshot(messages: [Message], configuration: AgentConfiguration? = nil) -> AgentTurnSnapshot {
+        let configuration = configuration ?? self.configuration
+        return AgentTurnSnapshot(
             context: AgentContext(systemPrompt: configuration.systemPrompt, messages: messages, tools: configuration.tools),
             client: configuration.client,
             model: configuration.model,

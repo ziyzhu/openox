@@ -1,0 +1,50 @@
+import { build } from "esbuild";
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+const root = fileURLToPath(new URL("../../", import.meta.url));
+const destination = `${root}apps/ios/Ox/Resources/PiDurable.bundle`;
+for (const name of ["pi-durable", "pi-ai", "chord"]) {
+  const metadata = await Bun.file(new URL("../package.json", import.meta.resolve(`@earendil-works/${name}`))).json();
+  if (metadata.version !== "1.0.0") throw new Error(`Unverified ${name} version ${metadata.version}; audit the host adapters before upgrading`);
+}
+const result = await build({
+  absWorkingDir: root,
+  entryPoints: { harness: "packages/agent/src/adapters/ios/index.ts", "harness-storage": "packages/agent/src/adapters/ios/storage-diagnostics.ts" },
+  bundle: true, platform: "browser", format: "iife", globalName: "OxDurable",
+  target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true,
+  outdir: destination,
+  plugins: [{ name: "native-auth-context", setup(builder) {
+    builder.onLoad({ filter: /\/pi-ai\/dist\/auth\/context\.js$/ }, async () => ({
+      contents: await Bun.file(`${root}packages/agent/src/adapters/ios/auth-context.ts`).text(),
+      loader: "ts", resolveDir: `${root}packages/agent`,
+    }));
+    // The published tools entry eagerly constructs CodingTools (including bash). Export only iOS-supported tools.
+    builder.onLoad({ filter: /\/pi-durable\/dist\/tools\/index\.js$/ }, args => ({
+      contents: 'export { createReadTool } from "./read.js"; export { createWriteTool } from "./write.js"; export { createEditTool } from "./edit.js";',
+      loader: "js", resolveDir: fileURLToPath(new URL(".", `file://${args.path}`)),
+    }));
+  } }],
+});
+await mkdir(destination, { recursive: true });
+await rm(`${destination}/harness-proof.js`, { force: true });
+const bundles: Record<string, { bytes: number; sha256: string }> = {};
+for (const file of result.outputFiles) {
+  const name = file.path.split("/").at(-1)!;
+  const output = Object.entries(result.metafile.outputs).find(([path]) => path.endsWith(`/${name}`))![1];
+  const inputs = Object.entries(output.inputs).filter(([, contribution]) => contribution.bytesInOutput > 0).map(([path]) => path);
+  const forbidden = inputs.filter(path => /\/(env\/node|storage\/.*\/node|api\/(?!lazy\.js$).*|providers\/|node\/).*\.js$|\/tools\/bash\.js$/.test(path)
+    || (name === "harness.js" && /\/(storage-diagnostics\.ts$|storage-check\.ts$|storage-benchmark\.ts$)/.test(path))
+    || (name === "harness-storage.js" && /\/src\/(core\/|chat-bindings\.ts$|adapters\/ios\/(agent|native-model)\.ts$)/.test(path)));
+  const external = output.imports.filter(item => item.external);
+  if (forbidden.length || external.length || /\brequire\s*\(|\bimport\s*\(|\bprocess\s*\./.test(file.text)) {
+    throw new Error(`Non-portable ${name}: ${JSON.stringify({ forbidden, external })}`);
+  }
+  await writeFile(file.path, file.text);
+  bundles[name] = { bytes: file.contents.length, sha256: new Bun.CryptoHasher("sha256").update(file.text).digest("hex") };
+  console.log(`PASS ${name} audit: ${inputs.length} inputs, ${file.contents.length} bytes, no external imports or Node runtime`);
+}
+await copyFile(`${root}packages/agent/UPSTREAM_LICENSE.txt`, `${destination}/UPSTREAM_LICENSE.txt`);
+await writeFile(`${destination}/manifest.json`, JSON.stringify({
+  format: 1, purpose: "isolated-native-rollout", packages: { durable: "1.0.0", ai: "1.0.0", chord: "1.0.0" }, bundles,
+}, null, 2) + "\n");

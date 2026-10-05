@@ -9,6 +9,22 @@
         "$ref": "./schema.json#/definitions/HostDescription"
       }
     },
+    "debug.durable.storage": {
+      "params": {
+        "$ref": "./schema.json#/definitions/DurableCommandParameters"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/DurableCommandResult"
+      }
+    },
+    "debug.durable.chat": {
+      "params": {
+        "$ref": "./schema.json#/definitions/DurableCommandParameters"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/DurableCommandResult"
+      }
+    },
     "services.invoke": {
       "params": {
         "$ref": "./schema.json#/definitions/ActionRequest"

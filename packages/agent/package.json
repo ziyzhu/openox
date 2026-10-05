@@ -1,0 +1,31 @@
+{
+  "name": "@openox/agent",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ios": "./src/adapters/ios/index.ts",
+    "./storage-diagnostics": "./src/adapters/ios/storage-diagnostics.ts",
+    "./chat-bindings": "./src/chat-bindings.ts"
+  },
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun test test"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-durable": "1.0.0",
+    "@ungap/structured-clone": "1.3.2",
+    "abort-controller": "3.0.0",
+    "text-encoding": "0.7.0",
+    "typebox": "1.3.27",
+    "whatwg-url": "11.0.0"
+  },
+  "devDependencies": {
+    "@types/text-encoding": "0.0.40",
+    "@types/ungap__structured-clone": "1.2.0",
+    "@types/whatwg-url": "11.0.5",
+    "esbuild": "0.28.2"
+  }
+}

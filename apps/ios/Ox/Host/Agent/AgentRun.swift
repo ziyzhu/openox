@@ -24,12 +24,10 @@ nonisolated public struct AgentRunRequest: Sendable {
 
 nonisolated public enum AgentRunError: Error, LocalizedError, Sendable {
     case busy
-    case nothingToContinue
 
     public var errorDescription: String? {
         switch self {
         case .busy: "Agent already has an active run."
-        case .nothingToContinue: "Agent has no unfinished context or queued messages to continue."
         }
     }
 }
