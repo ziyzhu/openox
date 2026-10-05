@@ -4,12 +4,26 @@ Four groups: contracts, apps, packages, and evals. GitHub runs portable checks;
 iOS smoke and real models are explicit local runs. A green portable run is not
 evidence that iOS, authentication, or live services were exercised.
 
+```text
+tests/
+├── apps/       CLI checks, iOS runner safety, and explicit simulator flows
+├── contracts/ Client-Host and Host-Service boundary checks
+├── evals/      Agent/model cases, scoring, runner, and comparison
+├── ci.sh       Portable verification orchestration
+└── tsconfig.json
+```
+
+Simulator setup and shared device helpers live in [`tools/sim/`](../tools/sim/).
+Only `*.test.ts` files are discovered by `bun test tests`; simulator and eval
+runners are explicit commands, not automatically executed tests.
+
 ## Supported entry points
 
 ```sh
 bun run ci
 bun run ci --standalone-only --out /tmp/ox-cli-artifacts
 bun run ci:ios --device ox-1
+bun run evals --validate --suite all
 ```
 
 Run from the repository root, or pass `bun run --cwd <checkout>`. Portable CI requires Bun, Git,
@@ -19,7 +33,7 @@ such as curl and tar. Both install dependencies with the frozen lockfile. Use
 
 ### Portable CI
 
-`ci.sh` runs:
+[`ci.sh`](ci.sh) runs:
 
 1. Typecheck and repository checks: boundaries, schema consistency, model catalog,
    translations, system skills, and public/private-content checks.
@@ -78,7 +92,7 @@ copy cookie/local-storage state between two reserved running devices.
 Each package's `package-check.ts` owns its release artifact, clean installation,
 public exports, and consumer smoke checks. Do not publish packages as a test.
 
-Real-model evals remain in [`evals/`](../evals/README.md), outside the ordinary CI
+Real-model evals live in [`evals/`](evals/README.md), outside the ordinary CI
 gate. Validate cases in portable CI; select a prepared Host and provider/model
 explicitly for real runs. Reports belong outside the repository and may contain
 sensitive Profile context. Live Host contract suites, agent-driven iOS scenario

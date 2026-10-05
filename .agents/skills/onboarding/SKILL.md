@@ -48,7 +48,7 @@ sim devices
 
 Use the `sim-cli` skill for iOS interaction; see the coding-agent setup section below to install it. If unavailable, consult `sim --help`, command-specific help, and `sim agent-context`. Never guess flags or build directly with `xcodebuild`.
 
-- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [tools/test/qa-config.ts](../../../../tools/test/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
+- Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [tools/sim/qa-config.ts](../../../tools/sim/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
 - Before touching a device, coordinate ownership with other agents and inspect recent activity in `~/.sim-cli/logs/invocations.jsonl`. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `sim devices`.
 - When no suitable simulator exists, create it in Xcode's **Devices and Simulators** window using the assigned runtime. After reserving a suitable iOS 26 baseline, for example:
@@ -59,7 +59,7 @@ sim devices clone ox-1 ox-2
 sim devices clone ox-1 ox-3
 ```
 
-Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../storage-migrations/references/storage.md#website-state). Other website state and provider settings need separate setup.
+Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../migrate/references/storage.md#website-state). Other website state and provider settings need separate setup.
 
 ## iOS signing and local configuration
 

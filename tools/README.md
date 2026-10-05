@@ -1,16 +1,15 @@
 # Repository helpers
 
-Use `bun run ci` ([`ci.sh`](ci.sh)) for portable local/GitHub verification and
-`bun run ci:ios` ([`test/ios-ci.ts`](test/ios-ci.ts)) for explicit local iOS checks. The
-verification contract and CI/local division live in [`tests/README.md`](../tests/README.md).
+Build, generate, check, set up simulators, and publish with the helpers here.
+Verification suites and orchestration live in [`tests/`](../tests/README.md);
+use `bun run ci` for portable checks and `bun run ci:ios` for explicit iOS smoke.
 
 ```text
 tools/
-├── ci.sh       Portable CI orchestration
-├── checks/     Repository/static checks and typecheck orchestration
 ├── build/      Schema generators, provider catalog maintenance, service bundle
-├── test/       Local simulator setup, iOS smoke, conversation and demo helpers
+├── checks/     Repository/static checks and typecheck orchestration
 ├── release/    npm publication (release-only, not verification)
+├── sim/        Simulator setup, device validation, ports, and claims
 ├── lib.ts      Subprocess and generated-file helpers
 └── tsconfig.json
 ```
@@ -21,7 +20,7 @@ Run from the repository root after `bun install`:
 
 | Command | Purpose |
 | --- | --- |
-| `bun run typecheck` | Static checks and typecheck seven projects, including tests. |
+| `bun run typecheck` | Static checks and typecheck six projects, including tests and evals. |
 | `bun run build:host-schema` | Regenerate Host RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate model-provider schema. |
@@ -30,10 +29,10 @@ Run from the repository root after `bun install`:
 | `bun run sim:bootstrap --help` | Explicit local credential/artifact/website-state setup. |
 
 Individual validation aliases were removed; the checks run through `typecheck`
-and `ci.sh`. Invoke an individual implementation directly only when debugging.
+and `tests/ci.sh`. Invoke an individual implementation directly only when debugging.
 Generated-file helpers resolve paths against the repository root.
 
-`test/simulator.ts` shares device/runtime validation and PID claims between local
+`sim/simulator.ts` shares device/runtime validation and PID claims between local
 runners. Claims do not replace coordination with other agents. Follow simulator
 ownership and baseline rules in [`AGENTS.md`](../AGENTS.md).
 
