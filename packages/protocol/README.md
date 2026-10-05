@@ -1,166 +1,112 @@
 # OpenOx protocols
 
-Platform-neutral contracts for OpenOx's Client–Host JSON-RPC interface and
-Host–Repository content interface. They are independent of iOS and any LLM provider.
-The RPC and repository contracts have separate versions.
-
-## Files and ownership
-
-- `src/contract.ts` — authoritative TypeBox/JSON Schema definitions, 37 method mappings, and RPC contract version.
-- `schema.json` — generated, portable JSON Schema Draft 7 document. All references are local under `definitions`.
-- `methods.json` — generated method catalog mapping names to parameter/result schema references. This is a small catalog, not an OpenRPC document.
-- `fixtures.json` — language-neutral valid/invalid conformance examples.
-- `src/index.ts` — reusable TypeScript validation. Clients and TypeScript Hosts consume the same schemas.
-- `apps/ios/Ox/Host/RPC/HostRPCRequests.swift` — generated iOS method enum and request models. Swift continues to use [Decodable](https://developer.apple.com/documentation/swift/decodable) and JSONDecoder, not a second handwritten schema validator.
-
-After changing the source:
+`@openox/protocol` owns platform-neutral contracts for the Client–Host JSON-RPC
+interface and Host–Repository content interface. It is independent of iOS and
+LLM providers. RPC and repository contracts have separate versions.
 
 ```sh
-bun run build:host-schema
-bun run typecheck
-bun test ./.agents/skills/test/contracts/client-host
+bun add @openox/protocol
 ```
 
-CI checks that generated JSON and Swift artifacts match the source. Do not edit generated files.
+## Client–Host contract
 
-## Host integration
+- `src/contract.ts` defines RPC schemas, method mappings, and the contract version.
+- `schema.json` is portable JSON Schema Draft 7, with local `definitions` references.
+- `methods.json` maps methods to parameter/result schema references.
+- `fixtures.json` supplies language-neutral conformance examples.
+- `src/index.ts` exports TypeScript validation helpers.
 
-A Host may advertise the methods it implements in `host.describe.methods` and
-advertise supported contract versions in `host.describe.protocols.rpc`, currently
-`[1]`. This is independent of the app marketing version and repository protocol.
-Older Hosts without the new version field remain usable by the CLI.
-
-For a TypeScript Host:
+Hosts advertise supported methods in `host.describe.methods` and RPC versions
+in `host.describe.protocols.rpc`. Clients can use older Hosts without that
+version field. Contract versions are independent of app marketing versions.
 
 ```ts
 import { isMethod, validateParams, validateResult } from "@openox/protocol";
 
-// After validating the JSON-RPC envelope:
-if (!isMethod(request.method)) {
-  // Return -32601, or dispatch a separately defined extension method.
-} else if (!validateParams(request.method, request.params)) {
-  // Return -32602. Do not invoke the handler.
-} else {
-  // Check authorization, Profile/chat scope, and runtime policies, then invoke.
-  // validateResult(method, result) can check output in tests/development.
-}
+const supported = isMethod(request.method);
+const valid = supported && validateParams(request.method, request.params);
 ```
 
-A Host in another language can load `schema.json` into a Draft 7 validator and
-use the `params`/`result` references in `methods.json`. Resolve references against
-the schema document, not by fetching the schema's identifying URN. Normalize
-omitted parameters and compatibility `[]` to `{}` before method validation.
-Explicit `null` parameters are not normalized.
+Hosts must validate the JSON-RPC envelope, select supported methods, check
+parameters, and enforce authorization and runtime policies before dispatch.
+Use `validateResult` to check handler outputs. Unknown method names pass through
+the generic validators so extensions remain possible; validation alone does not
+establish that a method is supported.
 
-The generic request schema accepts method names beyond this catalog. The
-TypeScript method validators deliberately pass through unknown method names;
-Hosts must separately select supported methods, and Clients can call extensions.
+Other languages can load `schema.json` into a Draft 7 validator and resolve the
+references from `methods.json` locally. Normalize omitted parameters and
+compatibility `[]` to `{}`; explicit `null` is not normalized.
 
-## Compatibility and validation boundaries
+## Validation boundaries
 
-Version 1 records the existing wire shapes; it does not tighten business rules:
-
-- Most parameter objects accept unknown fields, as Swift Codable already does.
-  No-parameter methods require an empty object (or omitted parameters/`[]`).
+- Most parameter objects allow unknown fields. No-parameter methods require an
+  empty object after normalization.
 - Optional request fields accept omission and explicit null. Optional typed
-  result fields are omitted by Swift Encodable when absent; they do not imply
-  nullable values. Explicit JSONValue nulls remain valid where declared.
-- Strings are not UUID/date-validated merely because existing implementations
-  commonly put UUIDs or dates in them.
-- Base64 `contentEncoding` is an annotation. Hosts must still decode binary
-  data and enforce byte limits using their existing codecs.
-- ProviderModel, Message, Block, and migration Turn payloads are deliberately
-  opaque objects in this first contract. Their nested domain formats remain
-  owned by their existing codecs; the shared schema does not claim to validate
-  their complete contents or redefine persisted storage.
-- Chat existence, active UI availability, action approval, eval bounds, VM
-  function lookup, authorization, resource limits, and ingress restrictions
-  remain runtime checks. For example, `vm.call.arguments` accepts JSON at the
-  decode boundary; the handler separately requires an object.
+  result fields may be absent without accepting null; declared JSON values can
+  contain null.
+- Strings are not implicitly UUID/date-validated. Base64 `contentEncoding` is an
+  annotation; Hosts must enforce decoding and byte limits.
+- ProviderModel, Message, Block, and migration Turn payloads are opaque objects.
+  Their codecs own nested formats; these schemas do not redefine storage.
+- Chat existence, active UI availability, approvals, VM argument shape, resource
+  limits, and ingress restrictions remain Host runtime checks.
 
-Notifications omit `id` and receive no response. IDs correlate requests; they
-are not durable operation identifiers or deduplication keys. Batches contain
-1–64 requests. Streams such as chat watch and log follow still poll snapshots.
-
-The CLI validates known method parameters before submission and validates
-successful results. An invalid result after submission does not authorize a
-retry: the operation may have executed, and no request is automatically resent.
+Notifications omit `id` and receive no response. Batches contain 1–64 requests.
+Request IDs correlate responses; they are not deduplication keys. Clients must
+not retry a mutation merely because its result is invalid or the connection
+failed after submission. The operation may already have executed.
 
 ## Log pagination
 
-`logs.list` accepts optional `limit` (1–2,000, default 2,000), `cursor`, minimum
-`level`, exact `category`, case-insensitive `query` (message or category), and
-ISO 8601 `since` (inclusive). Filters run on the Host before the page limit.
+`logs.list` supports a bounded page size, cursor, and filters. Filters run before
+the page limit. The first page contains the newest matches; each page is
+chronological, and `nextCursor` retrieves older matches when `hasMore` is true.
 
-The first page contains the newest matches. Each page is chronological;
-`nextCursor` retrieves the next older page, with `hasMore` indicating whether one
-exists. Keep the same filters when continuing; the limit may change. Cursors are
-opaque and survive appends and app restarts. iOS binds them to the log file's
-identity, byte boundary, record digest, and filters. Compaction, replacement,
-truncation, or a changed boundary expires the cursor rather than returning a
-misaligned page. Start a fresh read after an expiration error.
-
-Pagination adds optional fields within RPC version 1. Existing clients may still
-request `{}` and ignore the metadata. Results without `hasMore` identify an older
-Host that does not support pagination. Log `seq` values describe positions in a
-snapshot, not durable global event IDs. Log follow remains bounded polling.
-
-## Conformance
-
-The portable E2E suite exercises CLI processes against a controlled WebSocket
-fixture using the shared contract:
-
-```sh
-bun test ./.agents/skills/test/contracts/client-host/protocol.test.ts
-```
-
-`fixtures.json` is also available to Host implementations in other languages.
-These fixture-backed checks do not establish live iOS Host conformance, tailnet
-authorization, or lifecycle correctness.
+Keep filters unchanged across pages. Cursors survive appends and app restarts,
+but compaction or file changes can expire them; start a fresh read on expiration.
+Results without `hasMore` indicate an older Host without pagination support.
+Log sequence values are snapshot positions, not durable event IDs. Log follow
+and chat watch use bounded snapshot polling.
 
 ## Host–Repository contract
 
-The existing version 3 content contract now lives here without changing its
-schemas, validators, installer behavior, or file layouts:
-
 | Export | Responsibility |
-|---|---|
+| --- | --- |
 | `@openox/protocol/repository` | Repository index, supported versions, service identities and paths |
-| `@openox/protocol/manifest` | Web/API manifests, action input/output schema profile, semantic validation |
+| `@openox/protocol/manifest` | Web/API manifests, action schemas, semantic validation |
 | `@openox/protocol/catalog` | Native iOS and MCP catalog manifests |
 | `@openox/protocol/installer` | Installer registration contract and inspection |
-| `@openox/protocol/action` | Action installer TypeScript interfaces, including retained compatibility types |
+| `@openox/protocol/action` | Action installer TypeScript interfaces |
 | `@openox/protocol/model-actions` | Standard model Action schemas and validation |
 | `@openox/protocol/skills` | Reserved names, package limits, frontmatter and resource-path rules |
 
-`@openox/service-sdk` preserves its existing exports by re-exporting these
-contracts. Filesystem readers and action convenience helpers remain in the SDK. Protocol modules do not depend on the SDK or Node filesystem
-APIs.
-
-`repository.schema.json` is the generated portable Draft 7 document. Its root
-validates `repository.json`; the `definitions` also expose service, auth, native
-catalog, and MCP catalog shapes. Existing semantic validators remain necessary:
+`repository.schema.json` validates `repository.json` and exposes service, auth,
+and catalog shapes under `definitions`. Semantic validators are also required:
 JSON Schema alone does not check duplicate identities, reserved names, URL
-relationships, standard Actions, or installer registration. The manifest schema
-and existing schema IDs are unchanged.
+relationships, standard Actions, or installer registration.
+
+The [Service SDK](../service-sdk/README.md) re-exports these contracts and adds
+filesystem readers and authoring helpers. Protocol modules do not depend on the
+SDK or Node filesystem APIs.
+
+## Development
+
+After changing the authoritative source, regenerate artifacts and verify them:
 
 ```sh
+bun run build:host-schema
 bun run build:repository-schema
-bun run --cwd packages/protocol package:check
-bun run --cwd packages/service-sdk package:check
+bun run typecheck
+bun test ./.agents/skills/test/contracts/client-host
 ```
 
-The generated `Host/HostRepositoryContract.swift` keeps the iOS supported-version
-list synchronized with `REPOSITORY_VERSIONS`. Native repository and service
-validation still use their existing platform codecs; this extraction does not
-claim to generate all Swift validators or change persisted storage. Migration
-and legacy-format handling remain exclusively behind StorageMigrator.
+CI checks generated JSON and Swift artifacts against the source. Do not edit
+generated files. iOS uses generated RPC request models and supported repository
+versions, with platform codecs for runtime validation. Storage migration and
+legacy handling remain exclusively behind `StorageMigrator`.
 
-## Distribution
-
-The protocol package contains source, portable schemas, fixtures, and its license.
-The SDK now has a runtime dependency on `@openox/protocol`. Publish the matching
-protocol version before releasing an SDK version that requires it. The release
-workflow accepts `protocol-v<version>` tags. Package checks install local tarballs
-in temporary directories, so SDK compatibility can be verified before publication.
-No package is published by the checks themselves.
+Portable CLI process E2E checks use a controlled WebSocket fixture. They do not
+establish live iOS Host conformance, Tailscale authorization, or lifecycle
+correctness. See the [test skill](../../.agents/skills/test/SKILL.md) for
+verification and the [release skill](../../.agents/skills/release/SKILL.md) for
+publication.

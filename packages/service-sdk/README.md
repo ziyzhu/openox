@@ -3,8 +3,7 @@
 `@openox/service-sdk` provides authoring helpers and filesystem readers
 used by Ox services. Shared schemas, validators, and action contracts are
 owned by [`@openox/protocol`](../protocol/README.md). Existing SDK exports remain
-compatible re-exports. The former `testing/replay/*` exports are no longer
-provided.
+compatible re-exports.
 
 The SDK requires Bun 1.3 or newer.
 
@@ -28,20 +27,6 @@ window.ox.install(({ action }) => {
 
 The app injects the versioned dispatcher before evaluating each service. New web installers receive only `action`; convenience functions belong in each service's `actions.js`. The `action-lib` SDK export is not importable from a service WebView; copy the helpers a service needs into its `actions.js`. The official service collection is published separately as `@openox/services`.
 
-## Release
-
-Publish the required `@openox/protocol` version first using its matching
-`protocol-v<version>` tag. SDK package checks install the local protocol and SDK
-tarballs together, so they do not require a published protocol to verify compatibility.
-Update the version in `package.json`, verify with `bun run package:check`, and push a matching `service-sdk-v<version>` tag from `main`. The first release requires an interactive npm publish with two-factor authentication:
-
-```sh
-bun package-check.ts --output /tmp/openox-service-sdk-release
-npm publish /tmp/openox-service-sdk-release/openox-service-sdk-0.1.0.tgz --access public
-```
-
-Subsequent releases use npm Trusted Publishing through `.github/workflows/publish-npm.yml` and the `npm-publish` environment.
-
 ## API services
 
 API repositories use `api/<id>/service.json` and `actions.js`, listed as `api:<id>`
@@ -58,4 +43,8 @@ within the configured API base URL and returns parsed JSON. The Host injects
 credentials only when the action declares `requireAuth: true`. Writes require
 `requireApproval: true`; redirects and automatic retries are disabled. There is
 no DOM, ambient fetch, agent bridge, or token access. Source authoring and live
-verification happen inside Ox through evolve.
+verification happen inside Ox through the
+[evolve skill](../../.agents/skills/evolve/SKILL.md).
+
+For package verification and publication, use the
+[release skill](../../.agents/skills/release/SKILL.md).
