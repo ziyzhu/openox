@@ -23,7 +23,7 @@
       },
       "devDependencies": {
         "@openox/protocol": "0.1.0",
-        "@openox/service-sdk": "0.1.0",
+        "@openox/services": "0.1.0",
       },
     },
     "packages/agent": {
@@ -52,19 +52,11 @@
         "@sinclair/typebox": "^0.34.49",
       },
     },
-    "packages/service-sdk": {
-      "name": "@openox/service-sdk",
-      "version": "0.1.0",
-      "dependencies": {
-        "@openox/protocol": "0.1.0",
-        "@sinclair/typebox": "^0.34.49",
-      },
-    },
     "packages/services": {
       "name": "@openox/services",
       "version": "0.1.0",
-      "devDependencies": {
-        "@openox/service-sdk": "0.1.0",
+      "dependencies": {
+        "@openox/protocol": "0.1.0",
       },
     },
   },
@@ -173,13 +165,11 @@
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
-    "@openox/cli": ["@openox/cli@workspace:apps/cli"],
-
     "@openox/agent": ["@openox/agent@workspace:packages/agent"],
 
-    "@openox/protocol": ["@openox/protocol@workspace:packages/protocol"],
+    "@openox/cli": ["@openox/cli@workspace:apps/cli"],
 
-    "@openox/service-sdk": ["@openox/service-sdk@workspace:packages/service-sdk"],
+    "@openox/protocol": ["@openox/protocol@workspace:packages/protocol"],
 
     "@openox/services": ["@openox/services@workspace:packages/services"],
 

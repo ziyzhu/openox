@@ -85,9 +85,9 @@ and catalog shapes under `definitions`. Semantic validators are also required:
 JSON Schema alone does not check duplicate identities, reserved names, URL
 relationships, standard Actions, or installer registration.
 
-The [Service SDK](../service-sdk/README.md) re-exports these contracts and adds
-filesystem readers and authoring helpers. Protocol modules do not depend on the
-SDK or Node filesystem APIs.
+The [services package](../services/README.md) supplies filesystem skill readers
+through `@openox/services/skills`. Protocol modules do not depend on services or
+Node filesystem APIs.
 
 ## Development
 

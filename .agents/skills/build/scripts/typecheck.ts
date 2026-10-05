@@ -15,7 +15,6 @@ for (const check of [publicBoundary, hostContract, hostSchema, repositoryContrac
 const projects = [
   "apps/cli/tsconfig.json",
   "packages/protocol/tsconfig.json",
-  "packages/service-sdk/tsconfig.json",
   "packages/agent/tsconfig.json",
   "packages/services/tsconfig.json",
   ".agents/tsconfig.json",

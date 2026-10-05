@@ -3,8 +3,8 @@ import { join, resolve } from "node:path";
 import {
   validateServiceManifest,
   type Manifest,
-} from "@openox/service-sdk/manifest";
-import { inspectInstaller } from "@openox/service-sdk/installer";
+} from "@openox/protocol/manifest";
+import { inspectInstaller } from "@openox/protocol/installer";
 
 export const BUILTIN_REPOSITORY_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
 export const SERVICE_ASSET_BASE_URL = "https://openox.ai/assets/services";

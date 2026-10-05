@@ -48,6 +48,6 @@
   },
   "devDependencies": {
     "@openox/protocol": "0.1.0",
-    "@openox/service-sdk": "0.1.0"
+    "@openox/services": "0.1.0"
   }
 }

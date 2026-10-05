@@ -2,7 +2,7 @@
   "private": true,
   "author": "Ziyuan Zhu",
   "license": "Apache-2.0",
-  "workspaces": ["apps/cli", "packages/protocol", "packages/service-sdk", "packages/services", "packages/agent"],
+  "workspaces": ["apps/cli", "packages/protocol", "packages/services", "packages/agent"],
   "scripts": {
     "ci": "./.agents/skills/test/scripts/ci.sh",
     "ci:ios": "bun .agents/skills/test/apps/ios/smoke.ts",

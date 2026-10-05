@@ -8,11 +8,13 @@
   "files": [
     "dist",
     "repository.js",
+    "src/skills.ts",
     "LICENSE",
     "README.md"
   ],
   "exports": {
     ".": "./repository.js",
+    "./skills": "./src/skills.ts",
     "./repository.json": "./dist/repository/repository.json",
     "./web/*": "./dist/repository/web/*",
     "./ios/*": "./dist/repository/ios/*",
@@ -41,7 +43,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "devDependencies": {
-    "@openox/service-sdk": "0.1.0"
+  "dependencies": {
+    "@openox/protocol": "0.1.0"
   }
 }

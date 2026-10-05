@@ -6,8 +6,6 @@ import {
   parseSkill, isSkillResourcePath, type Skill, type SkillResult,
 } from "@openox/protocol/skills";
 
-export * from "@openox/protocol/skills";
-
 export function readSkill(directory: string, name: string): Skill {
   const files: Record<string, string> = {};
   let total = 0;

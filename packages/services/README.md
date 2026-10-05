@@ -17,7 +17,14 @@ import { repositoryRoot } from "@openox/services";
 
 Use `repositoryRoot` anywhere Ox accepts a local repository path.
 
-Service authoring APIs are published separately as `@openox/service-sdk`.
+`@openox/services/skills` exports `readSkill(directory, name)` and
+`readSkills(repositoryDir, declared?)` for loading skill packages from any local
+repository or Profile. This filesystem module requires Bun 1.3 or newer and does
+not load the built-in repository.
+
+Shared service contracts and validators live in
+[`@openox/protocol`](../protocol/README.md). Ox authors plain-JavaScript installers;
+the Host supplies `window.ox.install` at runtime.
 
 For package verification and publication, use the
 [release skill](../../.agents/skills/release/SKILL.md).

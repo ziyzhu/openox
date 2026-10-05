@@ -1,6 +1,6 @@
 import { mkdir, writeFile, cp, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { readSkills } from "@openox/service-sdk/skills";
+import { readSkills } from "./skills.ts";
 import {
   buildService,
   BUILTIN_REPOSITORY_ROOT,
@@ -18,7 +18,7 @@ import {
   repositoryServicePath,
   type RepositoryPackage,
   type RepositoryService,
-} from "@openox/service-sdk/repository";
+} from "@openox/protocol/repository";
 
 async function contentHash(root: string): Promise<string> {
   const files: string[] = [];

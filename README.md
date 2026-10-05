@@ -67,8 +67,9 @@ An Ox separates the interface, runtime, model, persistent state, and capabilitie
 The network Client–Host protocol is JSON-RPC 2.0 over WebSocket inside Tailscale.
 The [shared protocol package](packages/protocol/README.md) owns Client–Host RPC
 schemas and Host–Repository content contracts. It supplies portable JSON Schema,
-generated iOS RPC request models, and the supported repository version; the
-Service SDK preserves its authoring APIs while reusing those contracts.
+generated iOS RPC request models, and the supported repository version.
+The [services package](packages/services/README.md) supplies the official repository
+and filesystem skill readers.
 iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
 and production logging under `Diagnostics`. Simulator launch helpers and demo
 previews live under `Development`; these do not define a separate Host privilege tier.

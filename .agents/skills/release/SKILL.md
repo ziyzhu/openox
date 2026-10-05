@@ -18,13 +18,12 @@ unrelated changes. Update the selected package's `package.json` version on `main
 | --- | --- | --- |
 | `@openox/cli` | `apps/cli` | `ox-cli-v<version>` |
 | `@openox/protocol` | `packages/protocol` | `protocol-v<version>` |
-| `@openox/service-sdk` | `packages/service-sdk` | `service-sdk-v<version>` |
 | `@openox/services` | `packages/services` | `services-v<version>` |
 
-Publish the protocol version required by the SDK before publishing that SDK.
-SDK checks install local protocol and SDK tarballs together, so verification
-requires no prior publication. For services, run `bun run build:services` from
-the repository root before checking the package.
+Publish the protocol version required by services before publishing services.
+Services checks install local protocol and services tarballs together, so
+verification requires no prior publication. Run `bun run build:services` from
+the repository root before checking the services package.
 
 Run `bun run ci`; CLI releases also require the four-platform standalone checks
 in `.github/workflows/cli-standalone.yml`. Each package's `package-check.ts` creates

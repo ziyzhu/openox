@@ -48,7 +48,7 @@ bun --no-env-file run build:services
 git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle \
   apps/ios/Ox/Resources/ModelServiceActions.json \
   apps/ios/Ox/Resources/SystemSkills.bundle/evolve/references/model-schemas.md
-for package in protocol service-sdk services; do
+for package in protocol services; do
   bun --no-env-file run --cwd "packages/$package" package:check
 done
 bun --no-env-file run --cwd apps/cli package:check

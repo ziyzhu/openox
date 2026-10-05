@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 import { verifyRepository } from "./repository-verify.ts";
-import { inspectInstaller } from "@openox/service-sdk/installer";
-import { validateServiceManifest } from "@openox/service-sdk/manifest";
+import { inspectInstaller } from "@openox/protocol/installer";
+import { validateServiceManifest } from "@openox/protocol/manifest";
 
-import { validateRepositoryPackage, type RepositoryPackage } from "@openox/service-sdk/repository";
-import { readSkills } from "@openox/service-sdk/skills";
+import { validateRepositoryPackage, type RepositoryPackage } from "@openox/protocol/repository";
+import { readSkills } from "@openox/services/skills";
 
 type RepositoryCheckout = {
   root: string;

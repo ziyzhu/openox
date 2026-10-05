@@ -6,9 +6,9 @@ import {
   type CatalogKind,
   type IOSCatalogManifest,
   type MCPCatalogManifest,
-} from "@openox/service-sdk/catalog";
+} from "@openox/protocol/catalog";
 
-export type { CatalogKind } from "@openox/service-sdk/catalog";
+export type { CatalogKind } from "@openox/protocol/catalog";
 
 const CATALOG_ROOT = resolve(import.meta.dir, "../../../repositories/builtin");
 
