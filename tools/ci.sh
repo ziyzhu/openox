@@ -11,7 +11,7 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] && [ -n "$2" ] || { echo '--out requires a directory' >&2; exit 1; }
       output="$2"; shift 2 ;;
     -h|--help)
-      echo 'Usage: ./scripts/ci.sh [--standalone-only [--out <directory>]]'
+      echo 'Usage: bun run ci [--standalone-only [--out <directory>]]'
       echo 'Default: portable checks, offline contracts/app regressions, packages, generated artifacts, eval definitions.'
       echo 'No iOS, live Hosts, model calls, credentials, or publication. Standalone mode tests only the current platform.'
       exit 0 ;;

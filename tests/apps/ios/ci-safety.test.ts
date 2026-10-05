@@ -35,7 +35,7 @@ console.log(JSON.stringify(result));
     await chmod(join(directory, "bun"), 0o755);
     const inventory = { devices: { "com.apple.CoreSimulator.SimRuntime.iOS-27-0":
       state === "missing" ? [] : [{ name: "ox-5", state, isAvailable: true }] } };
-    const child = Bun.spawn(["bash", join(ROOT, "scripts/ios-ci.sh"), ...args], {
+    const child = Bun.spawn([join(directory, "bun"), "run", "--cwd", ROOT, "ci:ios", ...args], {
       cwd: directory, env: { ...Bun.env, PATH: `${directory}:${Bun.env.PATH}`, TMPDIR: directory,
         OX_QA_DEVICE: "", OX_BUNDLE_ID: "ai.openox.local", IOS_TRACE: trace,
         IOS_INVENTORY: JSON.stringify(inventory), IOS_LAUNCH_FAIL: String(launchFails) },

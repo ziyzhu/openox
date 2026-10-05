@@ -1,14 +1,15 @@
 # Repository helpers
 
-Use [`scripts/ci.sh`](../scripts/ci.sh) for portable local/GitHub verification and
-[`scripts/ios-ci.sh`](../scripts/ios-ci.sh) for explicit local iOS checks. The
+Use `bun run ci` ([`ci.sh`](ci.sh)) for portable local/GitHub verification and
+`bun run ci:ios` ([`test/ios-ci.ts`](test/ios-ci.ts)) for explicit local iOS checks. The
 verification contract and CI/local division live in [`tests/README.md`](../tests/README.md).
 
 ```text
 tools/
+├── ci.sh       Portable CI orchestration
 ├── checks/     Repository/static checks and typecheck orchestration
 ├── build/      Schema generators, provider catalog maintenance, service bundle
-├── qa/         Local simulator setup, iOS smoke, conversation and demo helpers
+├── test/       Local simulator setup, iOS smoke, conversation and demo helpers
 ├── release/    npm publication (release-only, not verification)
 ├── lib.ts      Subprocess and generated-file helpers
 └── tsconfig.json
@@ -32,7 +33,7 @@ Individual validation aliases were removed; the checks run through `typecheck`
 and `ci.sh`. Invoke an individual implementation directly only when debugging.
 Generated-file helpers resolve paths against the repository root.
 
-`qa/simulator.ts` shares device/runtime validation and PID claims between local
+`test/simulator.ts` shares device/runtime validation and PID claims between local
 runners. Claims do not replace coordination with other agents. Follow simulator
 ownership and baseline rules in [`AGENTS.md`](../AGENTS.md).
 

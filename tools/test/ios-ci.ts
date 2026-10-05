@@ -6,7 +6,7 @@ import { qaCommand } from "./qa-config.ts";
 import { claimSimulator, requireSimulator } from "./simulator.ts";
 
 const config = qaCommand({
-  usage: `Usage: ./scripts/ios-ci.sh --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>]
+  usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>]
 Reserve the device and prepare the common QA state first. Host connections must already be enabled.
 Builds/launches the app and runs a temporary Mock chat. Never resets app data or changes credentials/settings.
 Evidence stays outside the repository.`,

@@ -7,12 +7,12 @@ evidence that iOS, authentication, or live services were exercised.
 ## Supported entry points
 
 ```sh
-./scripts/ci.sh
-./scripts/ci.sh --standalone-only --out /tmp/ox-cli-artifacts
-./scripts/ios-ci.sh --device ox-1
+bun run ci
+bun run ci --standalone-only --out /tmp/ox-cli-artifacts
+bun run ci:ios --device ox-1
 ```
 
-Scripts resolve the checkout root themselves. Portable CI requires Bun, Git,
+Run from the repository root, or pass `bun run --cwd <checkout>`. Portable CI requires Bun, Git,
 and npm; standalone mode additionally uses normal platform installation tools
 such as curl and tar. Both install dependencies with the frozen lockfile. Use
 `--help` for options. GitHub pins Bun 1.3.13.
@@ -44,7 +44,7 @@ script for macOS ARM64/Intel and Linux ARM64/x64.
 
 ### Local iOS
 
-`ios-ci.sh` requires `sim`, Xcode, and an explicitly reserved fixed-pool simulator.
+`bun run ci:ios` requires `sim`, Xcode, and an explicitly reserved fixed-pool simulator.
 Read recent sim activity and coordinate other agents before running; follow
 [`AGENTS.md`](../AGENTS.md) for runtime and baseline-state requirements. It never
 provisions, clones, uninstalls, erases, changes credentials, or enables Host access.
@@ -54,7 +54,7 @@ Enable Host connections in the reserved app first. The default endpoint uses the
 selected device's assigned port. For VPN ingress, pass its reachable address:
 
 ```sh
-./scripts/ios-ci.sh --device ox-1 --host ws://<simulator-vpn-address>:9101
+bun run ci:ios --device ox-1 --host ws://<simulator-vpn-address>:9101
 ```
 
 The runner follows Apple's [Simulator build/launch workflow](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices)

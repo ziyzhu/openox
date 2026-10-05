@@ -399,7 +399,7 @@ bun run typecheck
 cd apps/cli
 bun run build
 bun run package:check
-../../scripts/ci.sh --standalone-only
+bun run --cwd ../.. ci --standalone-only
 bun run build:standalone --platform linux-x64 --out /tmp/ox-cli-artifacts
 ```
 

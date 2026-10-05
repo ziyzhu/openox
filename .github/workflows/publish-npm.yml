@@ -72,7 +72,7 @@ jobs:
           echo "package_key=$package_key" >> "$GITHUB_OUTPUT"
 
       - name: Verify repository
-        run: ./scripts/ci.sh
+        run: bun run ci
 
       - name: Build and verify package
         run: bun "${{ steps.release.outputs.package_directory }}/package-check.ts" --output "$RUNNER_TEMP/npm-package"

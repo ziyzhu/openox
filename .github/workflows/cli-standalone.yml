@@ -12,7 +12,7 @@ on:
       - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/repository/**"
-      - "scripts/ci.sh"
+      - "tools/ci.sh"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/cli-standalone.yml"
@@ -27,7 +27,7 @@ on:
       - "packages/protocol/**"
       - "packages/service-sdk/**"
       - "examples/repository/**"
-      - "scripts/ci.sh"
+      - "tools/ci.sh"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/cli-standalone.yml"
@@ -62,7 +62,7 @@ jobs:
       - name: Verify standalone CLI
         run: |
           test "$(bun -p 'process.platform + "-" + process.arch')" = "${{ matrix.platform }}"
-          ./scripts/ci.sh --standalone-only --out "$RUNNER_TEMP/ox-cli-artifacts"
+          bun run ci --standalone-only --out "$RUNNER_TEMP/ox-cli-artifacts"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ox-cli-${{ matrix.platform }}
