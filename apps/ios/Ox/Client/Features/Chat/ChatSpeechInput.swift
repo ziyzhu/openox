@@ -48,7 +48,7 @@ final class ChatSpeechInput {
     func begin(accessible: Bool = false, completion: @escaping (String, ReleaseAction) -> Void) {
         guard state == .idle else { return }
         let id = UUID()
-        let recording = makeRecording()
+        let recording = OnDeviceSpeechRecording()
         sessionID = id
         session = recording
         self.completion = completion
@@ -202,14 +202,5 @@ final class ChatSpeechInput {
             cancel(reason: "timeout")
             notice = message
         }
-    }
-
-    private func makeRecording() -> any SpeechRecording {
-        #if DEBUG && targetEnvironment(simulator)
-        if let fixture = ProcessInfo.processInfo.environment["OX_SPEECH_FIXTURE"] {
-            return FixtureSpeechRecording(fixture: fixture)
-        }
-        #endif
-        return OnDeviceSpeechRecording()
     }
 }

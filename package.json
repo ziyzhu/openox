@@ -11,7 +11,6 @@
     "evals": "bun evals/runner.ts",
     "build:services": "bun tools/build/ios-services-build.ts",
     "build:diagram": "dot -Tsvg docs/openox-components.dot -o docs/openox-components.svg",
-    "test:conversation": "bun tools/test/web-conversation.ts",
     "sim:bootstrap": "bun tools/test/sim-bootstrap.ts",
     "update:llms": "bun tools/build/provider-models.ts",
     "build:provider-schema": "bun tools/build/provider-definitions.ts",

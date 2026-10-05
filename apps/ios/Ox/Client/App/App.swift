@@ -87,9 +87,6 @@ struct OxApp: App {
                         try await client.prepare()
                         guard UIApplication.shared.applicationState == .active else { return }
                         webSocketTransport.activate()
-                        #if DEBUG && targetEnvironment(simulator)
-                        await WebConversationFixture.runIfRequested()
-                        #endif
                     } catch {
                         Log.app.warning("OxHost transport unavailable: preparation failed")
                     }

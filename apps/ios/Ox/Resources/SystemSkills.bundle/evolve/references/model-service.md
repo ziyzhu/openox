@@ -43,4 +43,4 @@ Fresh pages may use XHR where warm inspection pages use fetch; observe both. Con
 
 Hidden pages may not run requestAnimationFrame. If site initialization depends on it, a service-local document-start timer fallback can keep callbacks running while hidden; preserve cancellation and execute each callback once. This must not submit again or bypass sign-in/human verification.
 
-The repository's `bun run test:conversation --device ox-N` fixture checks shared native routing and the Action bridge against a synthetic loopback website. It does not replace live verification or authorize promoting an unverified website conversion. After page loss, report interruption; do not add background repair, durable checkpoints, fallback selection, or automatic resubmission.
+After page loss, report interruption; do not add background repair, durable checkpoints, fallback selection, or automatic resubmission.
