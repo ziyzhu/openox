@@ -53,7 +53,7 @@ types remain authoritative in their `Codable` implementations.
 │       ├── SOUL.md
 │       └── MEMORY.md
 ├── Keychain                                 provider and service credentials
-└── WKWebsiteDataStore(forIdentifier:)       per-site website state
+└── WKWebsiteDataStore(forIdentifier:)       shared app-wide website state
 
 <configured iCloud container>/
 └── Documents/<ProfileName>/              same Profile layout
@@ -560,8 +560,8 @@ reproducible app infrastructure outside Profiles, Files, and iCloud, and are
 excluded from device backup. Removing a repository deletes its snapshot and
 saved conflict choices without touching website data.
 
-The editable Local repository always exists at `service-repositories/local/` and
-cannot be disabled or removed. It receives preinitialized metadata for an empty
+The editable Local repository always exists at `service-repositories/local/`.
+It can be disabled in the active catalog but cannot be removed. It receives preinitialized metadata for an empty
 repository only when `.git` is absent; existing metadata, commits, index state, and
 working-tree changes are never replaced when valid. Legacy metadata with an unborn
 `master` reference is repaired by restoring `HEAD` to an existing `main` tip or,

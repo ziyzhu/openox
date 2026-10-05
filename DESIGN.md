@@ -186,7 +186,7 @@ The type system uses **SF Pro Rounded for display and label roles**, SF Pro for 
 | `label-md` | `.subheadline` | Rounded, semibold |
 | `mono-sm` | `.caption` | Monospaced |
 
-The frontmatter gives nominal artifact sizes; native text scales with the user's text-size setting. Prefer a small number of type roles per visible region. See Apple's [SwiftUI Font documentation](https://developer.apple.com/documentation/swiftui/font) for the native font model.
+The frontmatter gives nominal artifact sizes; native text scales with the user's text-size setting. The `mono-sm` artifact default maps to a monospaced system caption; native views configure monospacing directly. Prefer a small number of type roles per visible region. See Apple's [SwiftUI Font documentation](https://developer.apple.com/documentation/swiftui/font) for the native font model.
 
 ## Layout
 

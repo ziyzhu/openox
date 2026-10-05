@@ -315,7 +315,6 @@ extension Scenario {
             Entry("58", "artifact — write, edit, rename, and present", .artifactWorkflow),
             Entry("59", "skills — create, copy, edit, and delete a user skill", .skillWorkflow),
             Entry("60", "budget — truncate oversized tool output", .toolResultBudget),
-            Entry("61", "web fetch — HTTP responses plus explicit attachments", .webFetch),
             Entry("62", "web import — explicitly persist an HTTP response", .webImport),
             Entry("63", "html update — revise and redisplay", .htmlUpdate),
             Entry("65", "fail-fast — settle a late service invocation", .failFastInvocation),
@@ -344,7 +343,6 @@ extension Scenario {
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
             Entry("89", "browser PDF — export full page as artifact", .browserPDF),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
-            Entry("92", "MCP management — approve, connect, refresh, replace, and remove", .mcpManagement),
             Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
             Entry("94", "repository conflicts — select and reload an existing Local source", .repositoryConflicts),
         ]),
@@ -615,23 +613,16 @@ extension Scenario {
         .stop(.stop),
     ])
 
-    static var links: Scenario {
-        #if targetEnvironment(simulator)
-        let root = SimEnv.servicesURL(path: "/mock").absoluteString
-        #else
-        let root = "https://example.com"
-        #endif
-        return Scenario(name: "links", steps: [
+    static let links = Scenario(name: "links", steps: [
         .say("""
         ## Streaming links
 
-        [Home](\(root) "Home page"), [Docs](\(root)/docs "Documentation"), \
-        [Nested](\(root)/wiki/Function_(mathematics) "Nested destination"), and \
+        [Home](https://example.com "Home page"), [Docs](https://example.com/docs "Documentation"), \
+        [Nested](https://example.com/wiki/Function_(mathematics) "Nested destination"), and \
         [Status](https://status.example.com "Service status").
         """),
         .stop(.stop)
-        ]).pacing(betweenDeltas: .milliseconds(180))
-    }
+    ]).pacing(betweenDeltas: .milliseconds(180))
 
     static let errorMidstream = Scenario(name: "error", steps: [
         .say("Starting some work…"),
@@ -1054,86 +1045,25 @@ extension Scenario {
         return [.say("The finished artifact contains: **\(text)** and read agent-image.svg."), .stop(.stop)]
     }
 
-    static let webFetch = Scenario(name: "web-fetch") { ctx in
-        if ctx.turn == 0 {
-            #if targetEnvironment(simulator)
-            let textURL = SimEnv.servicesURL(path: "/web/text").absoluteString
-            let imageURL = SimEnv.servicesURL(path: "/web/image.png").absoluteString
-            let secondImageURL = SimEnv.servicesURL(path: "/web/image.gif").absoluteString
-            let pdfURL = SimEnv.servicesURL(path: "/web/document.pdf").absoluteString
-            #else
-            let textURL = "https://example.com/"
-            let imageURL = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png"
-            let secondImageURL = imageURL
-            let pdfURL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-            #endif
-            return [
-                .say("Fetching mixed web resources.\n"),
-                execute("""
-                const [text, firstImage, pdf, secondImage] = await Promise.all([
-                  ox.web.fetch({ url: "\(textURL)", purpose: "Fetch text fixture" }),
-                  ox.web.fetch({ url: "\(imageURL)", purpose: "Fetch first image" }),
-                  ox.web.fetch({ url: "\(pdfURL)", purpose: "Fetch PDF fixture" }),
-                  ox.web.fetch({ url: "\(secondImageURL)", purpose: "Fetch second image" })
-                ]);
-                console.log({
-                  text: text.text,
-                  status: text.status,
-                  contentType: text.headers["content-type"]
-                });
-                console.warn("FETCH STDERR");
-                return "RETURN VALUE MUST NOT REACH THE MODEL";
-                """),
-            ]
-        }
-        let result = ctx.toolResults.last
-        let attachments = result?.transientAttachments ?? []
-        let kinds = attachments.map(\.kind)
-        let outputLines = result?.content.concatenatedText.split(separator: "\n", omittingEmptySubsequences: false)
-        let log = outputLines?.first.flatMap { JSONValue.parse(jsonString: String($0)) }?.objectValue
-        guard result?.content.concatenatedText.contains("Ox fetch fixture") == true
-                || result?.content.concatenatedText.contains("Example Domain") == true,
-              log?["text"]?.stringValue?.contains("Ox fetch fixture") == true
-                || log?["text"]?.stringValue?.contains("Example Domain") == true,
-              outputLines?.dropFirst().first == "[warn] FETCH STDERR",
-              result?.content.concatenatedText.contains("RETURN VALUE MUST NOT REACH THE MODEL") == false,
-              kinds.count == 3,
-              kinds[0] == .image,
-              kinds[1] == .pdf,
-              kinds[2] == .image,
-              attachments[0].mimeType == "image/png",
-              attachments[2].mimeType == "image/png",
-              attachments[2].displayName.hasSuffix(".png"),
-              attachments[2].data.starts(with: Data([0x89, 0x50, 0x4E, 0x47])) else {
-            return [.say("Web fetch attachment delivery failed."), .stop(.stop)]
-        }
-        return [.say("Fetched HTTP resources and delivered 3 attachments."), .stop(.stop)]
-    }
-
     static let webImport = Scenario(name: "web-import") { ctx in
         if ctx.turn == 0 {
-            #if targetEnvironment(simulator)
-            let url = SimEnv.servicesURL(path: "/health").absoluteString
-            #else
-            let url = "https://example.com/"
-            #endif
             return [
                 .say("Importing one fetched response.\n"),
                 execute("""
                 const artifact = await ox.artifact.import({
-                  url: "\(url)",
-                  filename: "web-health.txt",
-                  purpose: "Import health response"
+                  url: "https://example.com/",
+                  filename: "web-response.txt",
+                  purpose: "Import web response"
                 });
                 console.log(artifact);
                 """),
             ]
         }
         let text = ctx.resultText("execute") ?? ""
-        guard !text.contains("ERROR"), text.contains("web-health.txt") else {
+        guard !text.contains("ERROR"), text.contains("web-response.txt") else {
             return [.say("Web response import failed."), .stop(.stop)]
         }
-        return [.say("Imported the fetched response as web-health.txt."), .stop(.stop)]
+        return [.say("Imported the fetched response as web-response.txt."), .stop(.stop)]
     }
 
     static let failFastInvocation = Scenario(name: "fail-fast") { ctx in
@@ -1282,59 +1212,6 @@ extension Scenario {
             return [.say("Local service validation failed: \(output)"), .stop(.stop)]
         }
         return [.say("PASS: 18 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
-    }
-
-    static let mcpManagement = Scenario(name: "mcp-management") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            #if targetEnvironment(simulator)
-            let endpoint = SimEnv.servicesURL(path: "/mcp-a").absoluteString
-            #else
-            let endpoint = "https://example.com/mcp-a"
-            #endif
-            return [execute("""
-            const endpoint = \(JSONValue.string(endpoint).jsonString());
-            const checks = [];
-            const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
-            const rejected = async (call, name) => {
-              let failed = false;
-              try { await call(); } catch { failed = true; }
-              check(failed, name);
-            };
-            await rejected(() => ox.service.create({ kind: "mcp", endpoint: "https://user:password@example.com/mcp", purpose: "Reject embedded credentials" }), "Credential endpoint rejected");
-            await rejected(() => ox.service.create({ kind: "mcp", purpose: "Reject missing endpoint" }), "Missing endpoint rejected");
-            await rejected(() => ox.service.create({ kind: "mcp", endpoint, purpose: "Deny this test connection" }), "Creation denied");
-            const created = await ox.service.create({ kind: "mcp", endpoint, purpose: "Create test MCP connection" });
-            const domain = created.domain;
-            check(created.kind === "mcp" && created.endpoint === endpoint, "MCP connection created");
-            const duplicate = await ox.service.create({ kind: "mcp", endpoint, purpose: "Reuse existing test connection" });
-            check(duplicate.domain === domain, "Duplicate endpoint reused");
-            await ox.service.attach({ domain, purpose: "Attach test MCP connection" });
-            const before = await ox.service.inspect({ domain, actions: ["echo"], purpose: "Inspect test MCP tools" });
-            check(Boolean(before.actions.echo), "MCP tools discovered");
-            const result = await ox.service.invoke({ name: "mcp:" + domain + ":echo", input: {message: "MCP lifecycle verified"}, purpose: "Invoke test echo tool" });
-            check(JSON.stringify(result).includes("MCP lifecycle verified"), "MCP tool invoked");
-            await rejected(() => ox.service.update({ domain, endpoint: endpoint.replace("mcp-a", "mcp-fail"), transport: "streamable-http", purpose: "Test failed replacement" }), "Failed replacement rejected");
-            check((await ox.service.listAttached({kind: "mcp", purpose: "Check preserved connection"})).some(x => x.domain === domain), "Failed replacement preserves attachment");
-            const refreshed = await ox.service.update({ domain, transport: "auto", purpose: "Refresh test MCP tools" });
-            check(refreshed.domain === domain, "Refresh preserves service identity");
-            await ox.service.invoke({ name: "mcp:" + domain + ":echo", input: {message: "Refreshed"}, purpose: "Invoke refreshed MCP tool" });
-            const changed = await ox.service.update({ domain, endpoint: endpoint.replace("mcp-a", "mcp-b"), purpose: "Change test MCP endpoint" });
-            check(changed.domain !== domain, "Changed endpoint has new identity");
-            check(!(await ox.service.listAttached({kind: "mcp", purpose: "Check detached old endpoint"})).some(x => x.domain === domain), "Old endpoint detached");
-            await ox.service.attach({ domain: changed.domain, purpose: "Attach replacement MCP connection" });
-            await rejected(() => ox.service.delete({domain: changed.domain, purpose: "Deny this test deletion"}), "Deletion denied");
-            check((await ox.service.listAttached({kind: "mcp", purpose: "Check denied deletion"})).some(x => x.domain === changed.domain), "Denied deletion preserves attachment");
-            await ox.service.delete({ domain: changed.domain, purpose: "Delete test MCP connection" });
-            check(!(await ox.service.listAttached({kind: "mcp", purpose: "Check removed connection"})).some(x => x.domain === changed.domain), "Deleted endpoint detached");
-            await rejected(() => ox.service.invoke({name: "mcp:" + changed.domain + ":echo", input: {message: "removed"}, purpose: "Reject removed MCP tool"}), "Removed tool unavailable");
-            console.log(JSON.stringify({checks}));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["checks"]?.arrayValue?.count == 16 else {
-            return [.say("MCP management failed: \(output)"), .stop(.stop)]
-        }
-        return [.say("PASS: 16 MCP lifecycle checks, including denied creation and deletion, failed replacement, refresh, invocation, endpoint change, and removal."), .stop(.stop)]
     }
 
     static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in

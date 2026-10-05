@@ -70,9 +70,8 @@ schemas and Host–Repository content contracts. It supplies portable JSON Schem
 generated iOS RPC request models, and the supported repository version; the
 Service SDK preserves its authoring APIs while reusing those contracts.
 iOS RPC handlers live under `Host/RPC`, UI automation under `Client/Automation`,
-and production logging under `Diagnostics`. Only simulator launch helpers,
-fixtures, and prototypes live under `Development`; these do not define a
-separate Host privilege tier.
+and production logging under `Diagnostics`. Simulator launch helpers and demo
+previews live under `Development`; these do not define a separate Host privilege tier.
 
 - **Ox Client** — An interface that connects to an Ox Host. A Client may be a mobile app, desktop app, web app, or command-line tool. The Host binds VM execution to the selected conversation, its permissions, attached services, and virtual filesystem view.
 - **Ox Host** — A process or device that opens an Ox Profile, runs the Ox VM, and supplies platform and service adapters. A Client can use an embedded Host or target a compatible Host elsewhere.

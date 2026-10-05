@@ -51,17 +51,7 @@ private struct OxApplicationView: View {
     }
 
     var body: some View {
-            Group {
-                #if DEBUG && targetEnvironment(simulator)
-                if let mode = ProcessInfo.processInfo.environment["OX_PERMISSION_PROTOTYPE"] {
-                    PermissionPrototypeScreen(mode: mode)
-                } else {
-                    appContent
-                }
-                #else
-                appContent
-                #endif
-            }
+        appContent
             .themed()
             .appPresentations(presentations)
             .environment(client.services)

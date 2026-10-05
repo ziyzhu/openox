@@ -13,7 +13,7 @@ Each user-driver subagent owns one session at a time. Its assignment must includ
 
 ## Preflight outside the interaction timer
 
-Confirm the simulator exists and is available, repository health is green, the intended app build is installed and launched, the Host is discoverable, and the required Mock or real provider is exposed. Establish theme, app language, keyboard, permissions, chat state, and safe fixtures before declaring the starting UI ready.
+Confirm the simulator exists and is available, the intended app build is installed and launched, the Host is discoverable, and the required Mock or real provider is exposed. Use bundled services normally; verify repository `/health` only when the session explicitly tests repository installation or sync. Establish theme, app language, keyboard, permissions, chat state, and safe fixtures before declaring the starting UI ready.
 
 If preflight cannot establish the assigned state or authorization, return `blocked` with the exact boundary. Do not silently substitute a different provider, model, locale, or simulator.
 

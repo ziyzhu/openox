@@ -27,11 +27,6 @@ enum Theme {
         static let xxl: CGFloat = 32
     }
 
-    enum Z {
-        static let content:    Double = 0
-        static let navigation: Double = 500
-    }
-
     enum Radius {
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
@@ -55,7 +50,6 @@ enum Theme {
         static let captionMd = Font.caption.weight(.semibold)
         static let captionSm = Font.caption2.weight(.semibold)
         static let labelMd   = Font.system(.subheadline, design: .rounded).weight(.semibold)
-        static let monoSm    = Font.system(.caption,     design: .monospaced)
     }
 
     enum Icons {
@@ -75,7 +69,6 @@ enum Theme {
         static let quick = SwiftUI.Animation.smooth(duration: 0.15)
         static let standard = SwiftUI.Animation.smooth(duration: 0.2)
         static let handoff = SwiftUI.Animation.smooth(duration: 0.24)
-        static let entrance = SwiftUI.Animation.smooth(duration: 0.3)
         static let drop = SwiftUI.Animation.smooth(duration: 0.35)
         static let ride = SwiftUI.Animation.smooth(duration: 0.45)
         static let streamFade: Double = 0.2

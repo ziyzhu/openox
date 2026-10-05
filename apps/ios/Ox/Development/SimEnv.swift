@@ -12,15 +12,6 @@ nonisolated enum SimEnv {
         Int(ProcessInfo.processInfo.environment["OX_STARTUP_DELAY_MS"] ?? "") ?? 0
     ))
 
-    static func servicesURL(path: String) -> URL {
-        let base = servicesEndpoint ?? URL(string: "http://127.0.0.1:8100/repository.git")!
-        var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
-        components.path = path
-        components.query = nil
-        components.fragment = nil
-        return components.url!
-    }
-
     private static func argument(_ value: String) -> Bool {
         let enabled = ProcessInfo.processInfo.arguments.contains(value)
         if enabled { Log.app.info("SimEnv \(value)") }
@@ -35,12 +26,6 @@ nonisolated enum SimEnv {
         }
         Log.app.info("SimEnv \(key) configured")
         return value
-    }
-
-    private static func flag(_ key: String) -> Bool {
-        let enabled = ProcessInfo.processInfo.environment[key] == "1"
-        if enabled { Log.app.info("SimEnv \(key)") }
-        return enabled
     }
 
     private static func values(_ key: String) -> Set<String> {
