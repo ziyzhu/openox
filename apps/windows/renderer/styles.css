@@ -1,0 +1,26 @@
+/* Tokens from DESIGN.md; Windows substitutes Segoe UI Variable for SF Pro. */
+:root {
+  --primary: #FFA500; --surface: #FFFDF7; --surface-sunken: #FBE9C7; --background: #FFF6E6;
+  --on-surface: #3A2410; --on-surface-muted: #7A5A3A; --on-primary: #FFFDF7;
+  --gutter: 16px; --rounded-md: 12px; --rounded-lg: 18px; --rounded-xl: 24px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: var(--on-surface); background: var(--background);
+}
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; background: var(--background); font-size: 15px; }
+.sidebar { width: 260px; padding: var(--gutter); background: var(--surface-sunken); display: flex; flex-direction: column; gap: 12px; }
+.sidebar h1 { margin: 0; font-size: 22px; font-weight: 600; }
+main { flex: 1; display: flex; flex-direction: column; padding: var(--gutter); gap: var(--gutter); min-width: 0; }
+.content { flex: 1; overflow: auto; max-width: 720px; }
+h2 { margin: 8px 0 16px; font-size: 28px; font-weight: 700; }
+h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
+.features { padding-left: 20px; line-height: 1.5; }
+.features li { margin-bottom: 8px; }
+.card { background: var(--surface); border-radius: var(--rounded-lg); padding: var(--gutter); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dt { color: var(--on-surface-muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+.muted { color: var(--on-surface-muted); margin: 0; }
+.button-primary { background: var(--primary); color: var(--on-primary); border: 0; border-radius: 9999px; height: 32px; padding: 0 12px; font: inherit; font-weight: 600; }
+.button-primary:disabled { opacity: 0.5; }
+.composer input { width: 100%; padding: 12px 16px; border-radius: var(--rounded-xl); border: 1px solid var(--surface-sunken); background: var(--surface); font: inherit; color: inherit; }

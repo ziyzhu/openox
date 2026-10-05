@@ -31,6 +31,7 @@ A self-evolving mobile app.
 | --- | --- | --- |
 | [iOS app](https://apps.apple.com/us/app/ox-self-evolving-agent/id6802224502) ([source](apps/ios)) | On-device app | Embedded on the device |
 | [CLI](apps/cli/README.md) | Terminal app for macOS, Linux, and Windows | Connects to a running Ox Host |
+| [Windows app](apps/windows/README.md) (preview) | Desktop app | Embedded on the device |
 
 Install the standalone terminal Client on macOS or Linux:
 

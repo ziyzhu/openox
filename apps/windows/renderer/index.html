@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+  <title>Ox</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="../dist/renderer.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <h1>Ox</h1>
+    <button class="button-primary" disabled>New chat</button>
+    <p class="muted">No chats yet.</p>
+  </aside>
+  <main>
+    <section class="content">
+      <h2>Welcome to Ox for Windows</h2>
+      <ol class="features">
+        <li><strong>Connect anything</strong> — Ox works across AI assistants, apps, and websites to get things done for you.</li>
+        <li><strong>Local first</strong> — Ox runs on your device, keeping your conversations, credentials, and memory stored locally.</li>
+        <li><strong>Yours</strong> — Open source and malleable, Ox evolves with you and uses the models you choose.</li>
+      </ol>
+      <div class="card">
+        <h3>Host</h3>
+        <dl>
+          <dt>Implementation</dt><dd id="implementation">Connecting…</dd>
+          <dt>Protocols</dt><dd id="protocols">—</dd>
+          <dt>Remote Clients</dt><dd id="transport">—</dd>
+        </dl>
+      </div>
+    </section>
+    <form class="composer">
+      <input placeholder="Chats are not available in this preview" disabled>
+    </form>
+  </main>
+</body>
+</html>

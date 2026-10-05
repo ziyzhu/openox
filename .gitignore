@@ -22,4 +22,5 @@ hars/*
 .playwright-cli
 docs/LOC.html
 apps/cli/dist/
+apps/windows/dist/
 packages/services/dist/
