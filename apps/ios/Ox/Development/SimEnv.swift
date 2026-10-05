@@ -4,7 +4,6 @@ import Foundation
 nonisolated enum SimEnv {
     static let servicesEndpoint = endpoint("OX_SERVICES_ENDPOINT")
     static let debugEndpoint = endpoint("OX_DEBUG_ENDPOINT")
-    static let serviceProxyEndpoint = endpoint("OX_SERVICE_PROXY")
     static let webSearchEndpoint = endpoint("OX_WEB_SEARCH_ENDPOINT")
     static let iCloudDisabled = argument("--disable-icloud")
     static let mockLLMDisabled = argument("--disable-mock-llm")

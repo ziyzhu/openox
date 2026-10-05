@@ -6,13 +6,12 @@ import { qaCommand } from "./qa-config.ts";
 import { claimSimulator, requireSimulator } from "./simulator.ts";
 
 const config = qaCommand({
-  usage: `Usage: ./scripts/ios-ci.sh --device ox-N [--host <ws-url>] [--bundle <id>] [--migration] [--contracts] [--output <directory>]
+  usage: `Usage: ./scripts/ios-ci.sh --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>]
 Reserve the device and prepare the common QA state first. Host connections must already be enabled.
 Builds/launches the app and runs a temporary Mock chat. Never resets app data or changes credentials/settings.
---migration runs storage fixtures; --contracts runs live Client-Host checks. Evidence stays outside the repository.`,
+Evidence stays outside the repository.`,
   options: {
-    host: { type: "string" }, bundle: { type: "string" }, migration: { type: "boolean" },
-    contracts: { type: "boolean" }, output: { type: "string" },
+    host: { type: "string" }, bundle: { type: "string" }, output: { type: "string" },
   },
 });
 if (!config.values.device) throw new Error("Pass --device ox-N explicitly after reserving the simulator");
@@ -99,14 +98,6 @@ try {
   await writeFile(join(evidence, "chat.json"), JSON.stringify({ outcome, snapshot }, null, 2), { mode: 0o600 });
   await run(["sim", "--device", config.device, "wait", "--id", "chat.message.agent", "--timeout", "10000"]);
   await run(["sim", "--device", config.device, "screenshot", "--out", join(evidence, "chat.png")]);
-  if (config.values.migration) {
-    await run(["bun", "tools/qa/storage-migration-replay.ts"], { env: { OX_HOST_ENDPOINT: endpoint } });
-  }
-  if (config.values.contracts) {
-    await run(["bun", "test", "tests/contracts/client-host"], { env: {
-      OX_RPC_TEST_ENDPOINT: endpoint, OX_RPC_LIFECYCLE_DEVICE: undefined,
-    } });
-  }
   completed = true;
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

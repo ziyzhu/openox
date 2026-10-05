@@ -53,4 +53,4 @@ Install synchronously exactly once and register every declared action exactly on
 5. Verify successful reads, empty results, continuation, missing resources, and auth errors. Exercise mutations only with authorization. Report inaccessible or unverified capabilities explicitly.
 6. Inspect Local status and diff, then **Save** the verified service without a separate confirmation. Preserve unrelated changes, resolve ambiguous Save scope, and use the existing Local Git workflow internally. Honor any runtime Action policy gate.
 
-Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and replay fixtures must contain only public configuration and synthetic or sanitized examples.
+Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and shared verification evidence must contain only public configuration and synthetic or sanitized examples.

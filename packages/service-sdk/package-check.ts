@@ -25,9 +25,6 @@ const expectedFiles = [
   "src/model-actions.ts",
   "src/repository.ts",
   "src/skills.ts",
-  "src/testing/replay/fixtures.ts",
-  "src/testing/replay/proxy.ts",
-  "src/testing/replay/types.ts",
 ].sort();
 const outputArgument = process.argv.indexOf("--output");
 if (outputArgument >= 0 && !process.argv[outputArgument + 1]) throw new Error("--output requires a directory");
@@ -62,9 +59,6 @@ try {
     'await import("@openox/service-sdk/catalog");',
     'await import("@openox/service-sdk/installer");',
     'await import("@openox/service-sdk/skills");',
-    'await import("@openox/service-sdk/testing/replay/fixtures");',
-    'await import("@openox/service-sdk/testing/replay/proxy");',
-    'await import("@openox/service-sdk/testing/replay/types");',
     'import { matchesServiceDomain } from "@openox/service-sdk/manifest";',
     'import { repositoryServicePath } from "@openox/service-sdk/repository";',
     'if (!matchesServiceDomain("mail.google.com", "google.com")) throw new Error("manifest API failed");',

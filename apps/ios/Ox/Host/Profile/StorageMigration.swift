@@ -87,49 +87,6 @@ nonisolated enum StorageMigrationError: LocalizedError {
     }
 }
 
-nonisolated struct StorageMigrationReplay: Sendable {
-    let currentVersion: String
-    let versionUpdated: Bool
-    let ordinaryContextRemoved: Bool
-    let unreadableContextRetained: Bool
-    let compactedContextRetained: Bool
-    let compactedContextValid: Bool
-    let noContextPreserved: Bool
-    let transcriptsUnchanged: Bool
-    let secondRunNoOp: Bool
-    let ordinaryExportOmitsContext: Bool
-    let compactedExportRetainsContext: Bool
-    let defaultModelMigrated: Bool
-    let chatModelMigrated: Bool
-    let unsupportedVersionRejected: Bool
-    let providerCatalogMigrated: Bool
-    let actionPoliciesMigrated: Bool
-    let savedServicesMigrated: Bool
-    let futureActionPoliciesPreserved: Bool
-    let actionPolicyResolutionValid: Bool
-    let skillChecks: [String: Bool]
-    let secretsIndexRenamed: Bool
-    let retiredGemmaRemoved: Bool
-    let fixtureResults: [StorageMigrationFixtureReplay]
-}
-
-nonisolated struct StorageMigrationFixtureEntry: Codable, Sendable {
-    let path: String
-    let base64: String?
-}
-
-nonisolated struct StorageMigrationFixture: Codable, Sendable {
-    let name: String
-    let before: [StorageMigrationFixtureEntry]
-    let after: [StorageMigrationFixtureEntry]
-}
-
-nonisolated struct StorageMigrationFixtureReplay: Codable, Sendable {
-    let name: String
-    let migratedAsExpected: Bool
-    let secondRunNoOp: Bool
-}
-
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
 
@@ -148,24 +105,24 @@ nonisolated enum StorageMigrator {
     @MainActor
     static func migrateApplicationStorage() {
         Log.app.info("StorageMigrator.application start")
-        _ = migrateExternalProfiles(
+        migrateExternalProfiles(
             in: AppStoragePaths.applicationSupport,
             destination: AppStoragePaths.externalProfiles
         )
-        _ = migrateDeviceFolderGrants(
+        migrateDeviceFolderGrants(
             in: AppStoragePaths.applicationSupport,
             destination: AppStoragePaths.deviceFolderGrants
         )
-        _ = migrateRemoteMCPServers(
+        migrateRemoteMCPServers(
             defaults: .standard,
             currentKey: ServiceManager.remoteMCPKey
         )
-        _ = migrateCustomLLMProviders(
+        migrateCustomLLMProviders(
             defaults: .standard,
             key: ProviderRegistry.customProvidersKey
         )
-        _ = migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
-        do { _ = try removeRetiredGemma() }
+        migrateDefaultModel(defaults: .standard, fallbackRegion: AppRegion.shared.region)
+        do { try removeRetiredGemma() }
         catch { Log.app.error("StorageMigrator.retiredGemma failed error=\(error.localizedDescription)") }
         do { try migrateProviderCatalog(defaults: .standard) }
         catch { Log.app.error("StorageMigrator.providerCatalog failed error=\(error.localizedDescription)") }
@@ -203,7 +160,7 @@ nonisolated enum StorageMigrator {
     private static func removeRetiredGemma(
         defaults: UserDefaults = .standard,
         support: URL = AppStoragePaths.applicationSupport
-    ) throws -> (files: Int, defaultModel: Bool) {
+    ) throws {
         let providerID = "on-device-gemma"
         let names = ["gemma-4-e2b-it.litertlm", "gemma-4-e2b-it.json"]
         let manager = FileManager.default
@@ -224,7 +181,6 @@ nonisolated enum StorageMigrator {
         if removedFiles > 0 || clearedDefault {
             Log.app.info("StorageMigrator.retiredGemma removedFiles=\(removedFiles) clearedDefault=\(clearedDefault)")
         }
-        return (removedFiles, clearedDefault)
     }
 
     private static func migrateLegacySecrets() throws {
@@ -290,25 +246,6 @@ nonisolated enum StorageMigrator {
             return binding
         }
         return try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
-    }
-
-    private static func replaySecretsIndexRename() throws -> Bool {
-        let entry = SecretEntry(key: "example.login", displayName: "Example Login",
-                                origin: .named, usePolicy: .reusable)
-        let binding = SecretBinding(consumerKind: .provider, consumerID: "example",
-                                    secretKey: entry.key, destination: "https://example.com",
-                                    configurationFingerprint: "example", requiredFields: ["apiKey"])
-        let expected = SecretIndex(entries: [entry], bindings: [binding])
-        let encoded = try JSONEncoder().encode(expected)
-        var legacy = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
-        var bindings = legacy["bindings"] as! [[String: Any]]
-        bindings[0]["vaultKey"] = bindings[0].removeValue(forKey: "secretKey")
-        legacy["bindings"] = bindings
-        let migrated = try convertLegacySecretsIndex(JSONSerialization.data(withJSONObject: legacy))
-        let result = try JSONDecoder().decode(SecretIndex.self, from: migrated)
-        try result.validate()
-        return result.entries.count == 1 && result.entries[0].key == entry.key
-            && result.bindings.count == 1 && result.bindings[0].secretKey == entry.key
     }
 
     @MainActor
@@ -734,25 +671,25 @@ nonisolated enum StorageMigrator {
         }
     }
 
-    static func migrateExternalProfiles(
+    private static func migrateExternalProfiles(
         in support: URL,
         destination: URL? = nil
-    ) -> (URL, [ProfileStore.ExternalRecord]) {
+    ) {
         let destination = destination ?? AppStoragePaths.externalProfiles(in: support)
         let legacyDirectory = support.appendingPathComponent("profiles", isDirectory: true)
         let legacyURL = legacyDirectory.appendingPathComponent("profiles.json", isDirectory: false)
         if let data = try? Data(contentsOf: destination),
-           let stored = try? JSONDecoder().decode([ProfileStore.ExternalRecord].self, from: data) {
+           (try? JSONDecoder().decode([ProfileStore.ExternalRecord].self, from: data)) != nil {
             do {
                 try removeLegacyFile(legacyURL, directory: legacyDirectory)
             } catch {
                 Log.app.error("StorageMigrator.externalProfiles cleanup failed: \(error.localizedDescription)")
             }
-            return (destination, stored)
+            return
         }
         guard let data = try? Data(contentsOf: legacyURL),
               let legacy = try? JSONDecoder().decode([LegacyProfileRecord].self, from: data) else {
-            return (destination, [])
+            return
         }
         let records: [ProfileStore.ExternalRecord] = legacy.compactMap { record in
             guard record.location == .external, let bookmark = record.bookmark else { return nil }
@@ -771,10 +708,9 @@ nonisolated enum StorageMigrator {
         } catch {
             Log.app.error("StorageMigrator.externalProfiles failed: \(error.localizedDescription)")
         }
-        return (destination, records)
     }
 
-    static func migrateDeviceFolderGrants(in support: URL, destination: URL? = nil) -> URL {
+    private static func migrateDeviceFolderGrants(in support: URL, destination: URL? = nil) {
         let destination = destination ?? AppStoragePaths.deviceFolderGrants(in: support)
         let legacyDirectory = support.appendingPathComponent("device-folders", isDirectory: true)
         let legacyURL = legacyDirectory.appendingPathComponent("grants.json", isDirectory: false)
@@ -786,11 +722,11 @@ nonisolated enum StorageMigrator {
             } catch {
                 Log.app.error("StorageMigrator.deviceFolderGrants cleanup failed: \(error.localizedDescription)")
             }
-            return destination
+            return
         }
         guard let data = try? Data(contentsOf: legacyURL),
               let grants = try? decoder.decode([DeviceFolderStore.Grant].self, from: data) else {
-            return destination
+            return
         }
         do {
             try data.write(to: destination, options: .atomic)
@@ -800,23 +736,22 @@ nonisolated enum StorageMigrator {
         } catch {
             Log.app.error("StorageMigrator.deviceFolderGrants failed: \(error.localizedDescription)")
         }
-        return destination
     }
 
-    static func migrateRemoteMCPServers(
+    private static func migrateRemoteMCPServers(
         defaults: UserDefaults,
         currentKey: String
-    ) -> [ServiceManager.PersistedRemoteMCP] {
+    ) {
         let legacyKey = "remoteMCPEndpoints"
         if let data = defaults.data(forKey: currentKey),
-           let stored = try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data) {
+           (try? JSONDecoder().decode([ServiceManager.PersistedRemoteMCP].self, from: data)) != nil {
             defaults.removeObject(forKey: legacyKey)
-            return stored
+            return
         }
         let migrated = (defaults.stringArray(forKey: legacyKey) ?? []).map {
             ServiceManager.PersistedRemoteMCP(endpoint: $0, transport: nil)
         }
-        guard !migrated.isEmpty else { return [] }
+        guard !migrated.isEmpty else { return }
         do {
             defaults.set(try JSONEncoder().encode(migrated), forKey: currentKey)
             defaults.removeObject(forKey: legacyKey)
@@ -824,14 +759,13 @@ nonisolated enum StorageMigrator {
         } catch {
             Log.app.error("StorageMigrator.remoteMCPServers failed: \(error.localizedDescription)")
         }
-        return migrated
     }
 
-    static func migrateCustomLLMProviders(
+    private static func migrateCustomLLMProviders(
         defaults: UserDefaults,
         key: String
-    ) -> [CustomLLMProvider] {
-        guard let data = defaults.data(forKey: key) else { return [] }
+    ) {
+        guard let data = defaults.data(forKey: key) else { return }
         do {
             let providers = try JSONDecoder().decode([CustomLLMProvider].self, from: data)
             let legacyModelsStored = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
@@ -839,17 +773,15 @@ nonisolated enum StorageMigrator {
                 defaults.set(try JSONEncoder().encode(providers), forKey: key)
                 Log.app.info("StorageMigrator.customLLMProviders removed legacy models providers=\(providers.count)")
             }
-            return providers
         } catch {
             Log.app.error("StorageMigrator.customLLMProviders failed error=\(error.localizedDescription)")
-            return []
         }
     }
 
-    static func migrateDefaultModel(
+    private static func migrateDefaultModel(
         defaults: UserDefaults,
         fallbackRegion: LLMRegion
-    ) -> ModelSelection? {
+    ) {
         let selectedModelsKey = "llm.selectedModels"
         let selectedReasoningEffortsKey = "llm.selectedReasoningEfforts"
         let defaultProviderKey = "llm.defaultClient"
@@ -871,11 +803,11 @@ nonisolated enum StorageMigrator {
                 }
             }
             legacyKeys.forEach { defaults.removeObject(forKey: $0) }
-            return defaults.data(forKey: ProviderRegistry.defaultModelKey).flatMap { try? JSONDecoder().decode(ModelSelection.self, from: $0) }
+            return
         }
-        guard defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil else { return nil }
+        guard defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil else { return }
         let hasLegacyValue = legacyKeys.contains { defaults.object(forKey: $0) != nil }
-        guard hasLegacyValue else { return nil }
+        guard hasLegacyValue else { return }
         let region = defaults.string(forKey: defaultRegionKey).flatMap(LLMRegion.init(rawValue:)) ?? fallbackRegion
         let providerID = defaults.string(forKey: defaultProviderKey)
         let selectedModels = defaults.dictionary(forKey: selectedModelsKey) as? [String: String] ?? [:]
@@ -900,15 +832,13 @@ nonisolated enum StorageMigrator {
                 guard let data = defaults.data(forKey: ProviderRegistry.defaultModelKey),
                       (try? JSONDecoder().decode(ModelSelection.self, from: data)) == selection else {
                     Log.app.error("StorageMigrator.defaultModel verification failed")
-                    return nil
+                    return
                 }
             }
             legacyKeys.forEach { defaults.removeObject(forKey: $0) }
             Log.app.info("StorageMigrator.defaultModel migrated complete=\(selection != nil)")
-            return selection
         } catch {
             Log.app.error("StorageMigrator.defaultModel failed error=\(error.localizedDescription)")
-            return nil
         }
     }
 
@@ -1143,7 +1073,7 @@ nonisolated enum StorageMigrator {
         return value
     }
 
-    static func migrateRepositorySkills(at root: URL) throws {
+    private static func migrateRepositorySkills(at root: URL) throws {
         let manager = FileManager.default
         let current = root.appendingPathComponent("repository.json")
         let packageURL = manager.fileExists(atPath: current.path) ? current : root.appendingPathComponent("ox.json")
@@ -1843,7 +1773,7 @@ nonisolated enum StorageMigrator {
         Log.app.info("StorageMigrator.redundantAgentContexts root=\(root.lastPathComponent) scanned=\(scanned) removed=\(removed) retained=\(retained) unreadable=\(unreadable)")
     }
 
-    static func providerIdentity(_ id: String, region: LLMRegion, modelID: String) -> String {
+    private static func providerIdentity(_ id: String, region: LLMRegion, modelID: String) -> String {
         if id == "amazon-bedrock" {
             return "amazon-bedrock:\(modelID.hasPrefix("claude") || modelID.hasPrefix("anthropic.") ? "messages" : "responses")"
         }
@@ -1855,16 +1785,14 @@ nonisolated enum StorageMigrator {
         return id
     }
 
-    static func migrateProviderCatalog(
-        defaults: UserDefaults,
-        copyCredential: (String, String) throws -> Void = { source, destination in
+    private static func migrateProviderCatalog(defaults: UserDefaults) throws {
+        func copyCredential(_ source: String, _ destination: String) throws {
             guard source != destination, let value = Credentials.legacyKey(for: source) else { return }
             if let existing = Credentials.legacyKey(for: destination), existing != value {
                 throw StorageMigrationError.collision("provider credential")
             }
             try Credentials.setSecretChecked(value, for: "api:\(destination)")
         }
-    ) throws {
         let existing = defaults.data(forKey: ProviderRegistry.catalogKey)
         if let existing {
             let catalog = try JSONDecoder().decode(ProviderCatalog.self, from: existing)
@@ -2062,622 +1990,6 @@ nonisolated enum StorageMigrator {
             return region
         }
         return Locale.current.region?.identifier == "CN" ? .china : .global
-    }
-
-    private enum StorageMigrationFixtureSnapshot: Equatable {
-        case directory
-        case file(Data)
-    }
-
-    static func replayStorageMigration(
-        turns: [Turn],
-        fixtures: [StorageMigrationFixture]
-    ) async throws -> StorageMigrationReplay {
-        guard !turns.isEmpty,
-              let lastAgent = turns.lastIndex(where: { if case .agent = $0 { return true }; return false }),
-              case .agent(var compactedAgent, let compactedAgentID) = turns[lastAgent],
-              let generation = compactedAgent.generations.last else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        let defaultsName = "ai.openox.storage-migration-replay"
-        guard let defaults = UserDefaults(suiteName: defaultsName) else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        defaults.removePersistentDomain(forName: defaultsName)
-        defer { defaults.removePersistentDomain(forName: defaultsName) }
-        defaults.set("mock", forKey: "llm.defaultClient")
-        defaults.set(LLMRegion.china.rawValue, forKey: "llm.defaultRegion")
-        defaults.set(["china\u{1F}mock": "mock-model"], forKey: "llm.selectedModels")
-        defaults.set(["mock\u{1F}mock-model": "high"], forKey: "llm.selectedReasoningEfforts")
-        defaults.set(
-            [
-                "ox.app.inspect", "ox.app.logs", "example.com:read", "ios:files:ox.fs.write",
-                "ios:browser:screenshot", "ios:browser:executeScript", "ox.service.attach:ios:browser",
-            ],
-            forKey: ServiceManager.legacyAutoApproveActionsKey
-        )
-        defaults.set(true, forKey: ServiceManager.legacyAutoApproveAllKey)
-        migrateActionApprovalPolicies(defaults: defaults)
-        let firstActionPolicies = defaults.data(forKey: ServiceManager.actionPoliciesKey)
-        migrateActionApprovalPolicies(defaults: defaults)
-        let migratedActionPolicies = firstActionPolicies.flatMap {
-            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
-        }
-        let legacyActionPoliciesMigrated = migratedActionPolicies?.defaultPolicy == .allow
-            && migratedActionPolicies?.actions == ["ox.app.logs": .allow, "web:example.com:read": .allow]
-            && defaults.data(forKey: ServiceManager.actionPoliciesKey) == firstActionPolicies
-            && defaults.object(forKey: ServiceManager.legacyAutoApproveActionsKey) == nil
-            && defaults.object(forKey: ServiceManager.legacyAutoApproveAllKey) == nil
-        let legacyConfiguration = ActionPolicyConfiguration(
-            format: ActionPolicyConfiguration.legacyFormat,
-            defaultPolicy: .ask,
-            sources: ["example.com": .block],
-            actions: [
-                "ox.app.inspect": .allow,
-                "ox.app.info": .block,
-                "ox.service.repository.connect": .block,
-                "ox.service.git.commit": .ask,
-                "ox.app.serviceRepositories": .allow,
-                "ios:browser:executeScript": .allow,
-                "ox.service.attach:ios:browser": .allow,
-            ]
-        )
-        let currentActionPolicies = try JSONEncoder().encode(legacyConfiguration)
-        defaults.set(currentActionPolicies, forKey: ServiceManager.actionPoliciesKey)
-        migrateActionApprovalPolicies(defaults: defaults)
-        let migratedCurrentActionPolicies = defaults.data(forKey: ServiceManager.actionPoliciesKey).flatMap {
-            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
-        }
-        let actionPoliciesMigrated = legacyActionPoliciesMigrated
-            && migratedCurrentActionPolicies?.format == ActionPolicyConfiguration.currentFormat
-            && migratedCurrentActionPolicies?.defaultPolicy == nil
-            && migratedCurrentActionPolicies?.sources == legacyConfiguration.sources
-            && migratedCurrentActionPolicies?.actions == ["ox.app.info": .block, "ox.repository.connect": .block, "ox.repository.git.commit": .ask, "ox.app.repositories": .allow]
-        defaults.set(["ios:browser", "web:example.com"], forKey: ServiceManager.savedKey)
-        migrateSavedServices(defaults: defaults)
-        let savedServicesFirst = defaults.stringArray(forKey: ServiceManager.savedKey)
-        migrateSavedServices(defaults: defaults)
-        let savedServicesMigrated = savedServicesFirst == ["web:example.com"]
-            && defaults.stringArray(forKey: ServiceManager.savedKey) == savedServicesFirst
-        let legacyBlockConfiguration = ActionPolicyConfiguration(
-            format: ActionPolicyConfiguration.legacyFormat,
-            defaultPolicy: .block
-        )
-        defaults.set(try JSONEncoder().encode(legacyBlockConfiguration), forKey: ServiceManager.actionPoliciesKey)
-        migrateActionApprovalPolicies(defaults: defaults)
-        let migratedBlockPolicy = defaults.data(forKey: ServiceManager.actionPoliciesKey).flatMap {
-            try? JSONDecoder().decode(ActionPolicyConfiguration.self, from: $0)
-        }
-        let globalBlockPreserved = migratedBlockPolicy?.format == ActionPolicyConfiguration.currentFormat
-            && migratedBlockPolicy?.defaultPolicy == .block
-        let futureActionPolicies = try JSONEncoder().encode(ActionPolicyConfiguration(
-            format: ActionPolicyConfiguration.currentFormat + 1,
-            defaultPolicy: .block
-        ))
-        defaults.set(futureActionPolicies, forKey: ServiceManager.actionPoliciesKey)
-        migrateActionApprovalPolicies(defaults: defaults)
-        let futureActionPoliciesPreserved = defaults.data(forKey: ServiceManager.actionPoliciesKey) == futureActionPolicies
-        let policyFixture = ActionPolicyConfiguration(
-            defaultPolicy: .block,
-            sources: ["example.com": .allow],
-            actions: ["web:example.com:read": .ask]
-        )
-        let automaticPolicyFixture = ActionPolicyConfiguration()
-        let builtInActionDefaultsValid = Actions.builtIn.allSatisfy { action in
-            Actions.defaultPolicy(for: action) == (action.hasSuffix(".delete") ? .ask : .allow)
-        }
-        let actionPolicyResolutionValid = globalBlockPreserved
-            && policyFixture.policy(for: "web:example.com:read", default: .allow) == .ask
-            && policyFixture.policy(for: "api:example.com:write", default: .ask) == .allow
-            && policyFixture.policy(for: "ox.app.info", default: .allow) == .block
-            && automaticPolicyFixture.policy(for: "ox.app.info", default: .allow) == .allow
-            && automaticPolicyFixture.policy(for: "ox.app.logs", default: .ask) == .ask
-            && Actions.defaultPolicy(for: Actions.appInfo) == .allow
-            && Actions.defaultPolicy(for: Actions.fsRead) == .allow
-            && Actions.defaultPolicy(for: Actions.appLogs) == .allow
-            && Actions.defaultPolicy(for: Actions.fsWrite) == .allow
-            && Actions.defaultPolicy(for: Actions.providerDelete) == .ask
-            && Actions.defaultPolicy(for: "ox.web.browser.getPageInfo") == .allow
-            && Actions.defaultPolicy(for: "ox.web.browser.executeScript") == .allow
-            && Actions.defaultPolicy(for: "ox.unknown.action") == .ask
-            && builtInActionDefaultsValid
-            && ActionPolicyConfiguration.sourceID(for: "ox.service.attach:example.com") == "example.com"
-            && ActionPolicyConfiguration.sourceID(for: "ox.fs.read") == "ios:files"
-        let migratedDefault = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
-        let migratedDefaultAgain = migrateDefaultModel(defaults: defaults, fallbackRegion: .global)
-        let defaultModelMigrated = migratedDefault == ModelSelection(
-            region: .china,
-            providerID: "mock",
-            modelID: "mock-model",
-            reasoningEffort: "high"
-        ) && migratedDefaultAgain == migratedDefault
-            && defaults.object(forKey: "llm.defaultClient") == nil
-            && defaults.object(forKey: "llm.defaultRegion") == nil
-            && defaults.object(forKey: "llm.selectedModels") == nil
-            && defaults.object(forKey: "llm.selectedReasoningEfforts") == nil
-        let providerCatalogMigrated = try replayProviderCatalogMigration(defaults: defaults)
-        var compactedTurns = turns
-        compactedAgent.steps.append(Step(
-            generation: generation.id,
-            kind: .contextCompaction(ContextCompaction(at: Date(timeIntervalSinceReferenceDate: 700_100_003), tokensBefore: 1_024))
-        ))
-        compactedTurns[lastAgent] = .agent(compactedAgent, id: compactedAgentID)
-
-        let root = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "context-migration-replay")
-        defer { FileStaging.cleanup(root, operation: "context-migration-replay") }
-        let config = ProfileConfig(id: UUID(), createdAt: Date(timeIntervalSinceReferenceDate: 700_100_000), version: "2026-08-17-runtime")
-        try ProfileIO.writeConfig(config, to: root)
-        let chats = root.appendingPathComponent("chats", isDirectory: true)
-        try FileManager.default.createDirectory(at: chats, withIntermediateDirectories: true)
-        let ordinaryDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let unreadableDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let compactedDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let noContextDirectory = chats.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        for directory in [ordinaryDirectory, unreadableDirectory, compactedDirectory, noContextDirectory] {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        }
-
-        let encoder = JSONEncoder()
-        let ordinaryTranscript = try blob(turns, encoder: encoder)
-        let compactedTranscript = try blob(compactedTurns, encoder: encoder)
-        let ordinaryTranscriptURL = ordinaryDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
-        let unreadableTranscriptURL = unreadableDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
-        let compactedTranscriptURL = compactedDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
-        let noContextTranscriptURL = noContextDirectory.appendingPathComponent("turns.jsonl", isDirectory: false)
-        try ordinaryTranscript.write(to: ordinaryTranscriptURL, options: .atomic)
-        var unreadableTranscript = ordinaryTranscript
-        unreadableTranscript.append(Data("{\"type\":\"unsupported-legacy-turn\"}\n".utf8))
-        try unreadableTranscript.write(to: unreadableTranscriptURL, options: .atomic)
-        try compactedTranscript.write(to: compactedTranscriptURL, options: .atomic)
-        try ordinaryTranscript.write(to: noContextTranscriptURL, options: .atomic)
-
-        let ordinaryContext = AgentContextCheckpoint(
-            messages: ChatProjection.makeWireMessages(from: turns),
-            tokensBefore: 0,
-            turns: turns,
-            through: lastAgent
-        )
-        let compactedContext = AgentContextCheckpoint(
-            messages: ChatProjection.makeWireMessages(from: compactedTurns),
-            tokensBefore: 1_024,
-            turns: compactedTurns,
-            through: lastAgent
-        )
-        let ordinaryContextURL = ordinaryDirectory.appendingPathComponent("context.json", isDirectory: false)
-        let unreadableContextURL = unreadableDirectory.appendingPathComponent("context.json", isDirectory: false)
-        let compactedContextURL = compactedDirectory.appendingPathComponent("context.json", isDirectory: false)
-        let compactedContextData = try encoder.encode(compactedContext)
-        let ordinaryContextData = try encoder.encode(ordinaryContext)
-        try ordinaryContextData.write(to: ordinaryContextURL, options: .atomic)
-        try ordinaryContextData.write(to: unreadableContextURL, options: .atomic)
-        try compactedContextData.write(to: compactedContextURL, options: .atomic)
-
-        let selection = ModelSelection(
-            region: .china,
-            providerID: "mock",
-            modelID: "mock-model",
-            reasoningEffort: "high"
-        )
-        let meta = ChatMeta(
-            id: UUID(),
-            createdAt: config.createdAt,
-            lastActivity: config.createdAt,
-            title: "Context migration replay",
-            isFavorite: false,
-            model: selection,
-            monoRepositoryHash: nil,
-            attachedServiceDomains: [],
-            preview: nil
-        )
-        var legacyMetadata = try JSONSerialization.jsonObject(with: encoder.encode(meta)) as! [String: Any]
-        legacyMetadata.removeValue(forKey: "model")
-        legacyMetadata["clientID"] = selection.providerID
-        legacyMetadata["modelID"] = selection.modelID
-        legacyMetadata["region"] = LLMRegion.china.rawValue
-        legacyMetadata["reasoningEffort"] = selection.reasoningEffort
-        try JSONSerialization.data(withJSONObject: legacyMetadata).write(
-            to: ordinaryDirectory.appendingPathComponent("chat.json", isDirectory: false),
-            options: .atomic
-        )
-        let ordinaryPackage = try ChatPackageCodec.decode(
-            ChatPackageCodec.encode(ChatState(meta: meta, turns: turns, context: ordinaryContext)),
-            sourceName: "ordinary.chat"
-        )
-        let compactedPackage = try ChatPackageCodec.decode(
-            ChatPackageCodec.encode(ChatState(meta: meta, turns: compactedTurns, context: compactedContext)),
-            sourceName: "compacted.chat"
-        )
-
-        let profile = Profile(
-            id: config.id,
-            name: root.lastPathComponent,
-            location: .local,
-            url: root,
-            createdAt: config.createdAt,
-            version: config.version
-        )
-        let migrated = try await migrate(profile)
-        let firstConfigData = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false))
-        let firstOrdinaryTranscript = try Data(contentsOf: ordinaryTranscriptURL)
-        let firstUnreadableTranscript = try Data(contentsOf: unreadableTranscriptURL)
-        let firstCompactedTranscript = try Data(contentsOf: compactedTranscriptURL)
-        let firstNoContextTranscript = try Data(contentsOf: noContextTranscriptURL)
-        let firstCompactedContext = try Data(contentsOf: compactedContextURL)
-        let migratedMetadataURL = ordinaryDirectory.appendingPathComponent("chat.json", isDirectory: false)
-        let firstMigratedMetadata = try Data(contentsOf: migratedMetadataURL)
-        let decoder = JSONDecoder()
-        let retainedContext = try decoder.decode(AgentContextCheckpoint.self, from: firstCompactedContext)
-        let decodedMeta = try decoder.decode(ChatMeta.self, from: firstMigratedMetadata)
-        _ = try await migrate(migrated)
-        let unsupportedProfile = Profile(
-            id: migrated.id,
-            name: migrated.name,
-            location: migrated.location,
-            url: migrated.url,
-            createdAt: migrated.createdAt,
-            version: "2099-01-01-future"
-        )
-        let unsupportedVersionRejected: Bool
-        do {
-            _ = try await migrate(unsupportedProfile)
-            unsupportedVersionRejected = false
-        } catch let error as StorageMigrationError {
-            if case .unsupportedProfileVersion = error {
-                unsupportedVersionRejected = true
-            } else {
-                unsupportedVersionRejected = false
-            }
-        }
-        var fixtureResults: [StorageMigrationFixtureReplay] = []
-        for fixture in fixtures {
-            fixtureResults.append(try await replay(fixture))
-        }
-
-        let versionUpdated = ProfileIO.readConfig(at: root)?.version == ProfileSchema.current
-        let ordinaryContextRemoved = !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
-        let unreadableContextRetained = try Data(contentsOf: unreadableContextURL) == ordinaryContextData
-        let compactedContextRetained = firstCompactedContext == compactedContextData
-        let compactedContextValid = retainedContext.boundary(in: compactedTurns) != nil
-        let noContextPreserved = !FileManager.default.fileExists(
-            atPath: noContextDirectory.appendingPathComponent("context.json", isDirectory: false).path
-        )
-        let transcriptsUnchanged = firstOrdinaryTranscript == ordinaryTranscript
-            && firstUnreadableTranscript == unreadableTranscript
-            && firstCompactedTranscript == compactedTranscript
-            && firstNoContextTranscript == ordinaryTranscript
-        let secondRunNoOp = try Data(contentsOf: root.appendingPathComponent(ProfileIO.configName, isDirectory: false)) == firstConfigData
-            && Data(contentsOf: ordinaryTranscriptURL) == firstOrdinaryTranscript
-            && Data(contentsOf: unreadableTranscriptURL) == firstUnreadableTranscript
-            && Data(contentsOf: compactedTranscriptURL) == firstCompactedTranscript
-            && Data(contentsOf: noContextTranscriptURL) == firstNoContextTranscript
-            && Data(contentsOf: compactedContextURL) == firstCompactedContext
-            && Data(contentsOf: migratedMetadataURL) == firstMigratedMetadata
-            && !FileManager.default.fileExists(atPath: ordinaryContextURL.path)
-            && Data(contentsOf: unreadableContextURL) == ordinaryContextData
-        return StorageMigrationReplay(
-            currentVersion: ProfileSchema.current,
-            versionUpdated: versionUpdated,
-            ordinaryContextRemoved: ordinaryContextRemoved,
-            unreadableContextRetained: unreadableContextRetained,
-            compactedContextRetained: compactedContextRetained,
-            compactedContextValid: compactedContextValid,
-            noContextPreserved: noContextPreserved,
-            transcriptsUnchanged: transcriptsUnchanged,
-            secondRunNoOp: secondRunNoOp,
-            ordinaryExportOmitsContext: !ordinaryPackage.header.hasContext && ordinaryPackage.payload.context == nil,
-            compactedExportRetainsContext: compactedPackage.header.hasContext && compactedPackage.payload.context != nil,
-            defaultModelMigrated: defaultModelMigrated,
-            chatModelMigrated: decodedMeta.model == selection,
-            unsupportedVersionRejected: unsupportedVersionRejected,
-            providerCatalogMigrated: providerCatalogMigrated,
-            actionPoliciesMigrated: actionPoliciesMigrated,
-            savedServicesMigrated: savedServicesMigrated,
-            futureActionPoliciesPreserved: futureActionPoliciesPreserved,
-            actionPolicyResolutionValid: actionPolicyResolutionValid,
-            skillChecks: try replayRepositorySkills(),
-            secretsIndexRenamed: try replaySecretsIndexRename(),
-            retiredGemmaRemoved: try replayRetiredGemmaRemoval(),
-            fixtureResults: fixtureResults
-        )
-    }
-
-    private static func replayRetiredGemmaRemoval() throws -> Bool {
-        let manager = FileManager.default
-        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "retired-gemma-replay")
-        defer { FileStaging.cleanup(root, operation: "retired-gemma-replay") }
-        let defaultsName = "ai.openox.retired-gemma-replay"
-        guard let defaults = UserDefaults(suiteName: defaultsName) else { throw CocoaError(.fileWriteUnknown) }
-        defaults.removePersistentDomain(forName: defaultsName)
-        defer { defaults.removePersistentDomain(forName: defaultsName) }
-        let models = root.appendingPathComponent("models", isDirectory: true)
-        let legacyModels = root.appendingPathComponent("on-device-models", isDirectory: true)
-        try manager.createDirectory(at: models, withIntermediateDirectories: true)
-        try manager.createDirectory(at: legacyModels, withIntermediateDirectories: true)
-        let unrelatedBytes = Data("unrelated".utf8)
-        try unrelatedBytes.write(to: models.appendingPathComponent("unrelated.bin"))
-        try Data("model".utf8).write(to: models.appendingPathComponent("gemma-4-e2b-it.litertlm"))
-        try Data("receipt".utf8).write(to: legacyModels.appendingPathComponent("gemma-4-e2b-it.json"))
-        let retiredSelection = ModelSelection(providerID: "on-device-gemma", modelID: "gemma-4-e2b-it", reasoningEffort: nil)
-        defaults.set(try JSONEncoder().encode(retiredSelection), forKey: ProviderRegistry.defaultModelKey)
-        let cleanup = try removeRetiredGemma(defaults: defaults, support: root)
-        let unrelatedModelPreserved = try Data(contentsOf: models.appendingPathComponent("unrelated.bin")) == unrelatedBytes
-        let retiredRemoved = cleanup.files == 2 && cleanup.defaultModel
-            && !manager.fileExists(atPath: models.appendingPathComponent("gemma-4-e2b-it.litertlm").path)
-            && !manager.fileExists(atPath: legacyModels.appendingPathComponent("gemma-4-e2b-it.json").path)
-            && defaults.object(forKey: ProviderRegistry.defaultModelKey) == nil
-            && unrelatedModelPreserved
-        let cleanupAgain = try removeRetiredGemma(defaults: defaults, support: root)
-        return retiredRemoved && cleanupAgain.files == 0 && !cleanupAgain.defaultModel
-    }
-
-    private static func replayRepositorySkills() throws -> [String: Bool] {
-        let manager = FileManager.default
-        let root = try FileStaging.createDirectory(in: manager.temporaryDirectory, prefix: "repository-skills-replay")
-        defer { FileStaging.cleanup(root, operation: "repository-skills-replay") }
-        var checks: [String: Bool] = [:]
-        let original = Skill(name: "research", description: "Research a topic", instructions: "Read skills/system:manage-skills/SKILL.md.", resources: ["references/nested/guide.md": "Preserve this reference", "scripts/run.js": "return args;"])
-        func fixture(_ name: String) throws -> (URL, SwiftGitX.Repository, Commit) {
-            let directory = root.appendingPathComponent(name)
-            try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-            let git = try SwiftGitX.Repository(at: directory)
-            let config = directory.appendingPathComponent(".git/config")
-            let existing = try String(contentsOf: config, encoding: .utf8)
-            try (existing + "\n[user]\nname = Ox\nemail = ox@example.test\n").write(to: config, atomically: true, encoding: .utf8)
-            try #"{"version":2,"name":"Fixture","services":["web:example.com"]}"#.write(to: directory.appendingPathComponent("repository.json"), atomically: true, encoding: .utf8)
-            let service = directory.appendingPathComponent("web/example.com")
-            try SkillFiles.write(original, directory: service.appendingPathComponent("skills/research"))
-            try #"{"domain":"example.com","skills":[{"name":"research","description":"Research a topic"}]}"#.write(to: service.appendingPathComponent("service.json"), atomically: true, encoding: .utf8)
-            try git.add(paths: ["."])
-            return (directory, git, try git.commit(message: "Predecessor repository"))
-        }
-        let (clean, cleanGit, prior) = try fixture("clean")
-        _ = try prepareRepository(at: clean, local: true)
-        let migrated = try SkillFiles.load(directory: clean.appendingPathComponent("skills/example-com-research"))
-        checks["repositoryPackagePreserved"] = migrated.resources == original.resources && migrated.services == ["example.com"] && migrated.instructions == "Read skills/manage-skills/SKILL.md."
-        let current = try cleanGit.HEAD.target as? Commit
-        checks["cleanRepositoryCommitted"] = try current?.id != prior.id && cleanGit.status().isEmpty
-        let first = try Data(contentsOf: clean.appendingPathComponent("repository.json"))
-        _ = try prepareRepository(at: clean, local: true)
-        checks["repositorySecondRunNoOp"] = try Data(contentsOf: clean.appendingPathComponent("repository.json")) == first && (cleanGit.HEAD.target as? Commit)?.id == current?.id
-        try cleanGit.switch(to: prior)
-        let view = try prepareRepository(at: clean, local: true)
-        checks["historicalRepositoryPreserved"] = try view != clean && cleanGit.isHEADDetached && cleanGit.status().isEmpty && SkillFiles.load(directory: view.appendingPathComponent("skills/example-com-research")).resources == original.resources
-        let (dirty, dirtyGit, dirtyHead) = try fixture("dirty")
-        let draft = dirty.appendingPathComponent("draft.txt")
-        try "staged draft".write(to: draft, atomically: true, encoding: .utf8)
-        try dirtyGit.add(paths: ["draft.txt"])
-        try "working draft".write(to: draft, atomically: true, encoding: .utf8)
-        let index = try Data(contentsOf: dirty.appendingPathComponent(".git/index"))
-        _ = try prepareRepository(at: dirty, local: true)
-        checks["dirtyRepositoryPreserved"] = try Data(contentsOf: dirty.appendingPathComponent(".git/index")) == index && String(contentsOf: draft, encoding: .utf8) == "working draft" && (dirtyGit.HEAD.target as? Commit)?.id == dirtyHead.id
-        let (collision, _, _) = try fixture("collision")
-        var other = original
-        other.name = "example-com-research"
-        other.instructions = "Independent draft"
-        try SkillFiles.write(other, directory: collision.appendingPathComponent("skills/example-com-research"))
-        do {
-            _ = try prepareRepository(at: collision, local: true)
-            checks["repositoryCollisionRejected"] = false
-        } catch StorageMigrationError.collision {
-            checks["repositoryCollisionRejected"] = try SkillFiles.load(directory: collision.appendingPathComponent("skills/example-com-research")) == other && SkillFiles.load(directory: collision.appendingPathComponent("web/example.com/skills/research")) == original
-        }
-        try manager.removeItem(at: collision.appendingPathComponent("skills/example-com-research"))
-        _ = try prepareRepository(at: collision, local: true)
-        checks["repositoryRetryAfterCollision"] = try SkillFiles.load(directory: collision.appendingPathComponent("skills/example-com-research")).resources == original.resources
-        var user = migrated
-        user.source = .user
-        var shared = migrated
-        shared.source = .repository(id: "remote", name: "Remote", writable: false)
-        let conflict = SkillCatalog(candidates: [user, shared], selections: [:])
-        checks["skillConflictRequiresSelection"] = conflict.skills.isEmpty && conflict.conflicts.count == 1
-        checks["skillSelectionResolves"] = SkillCatalog(candidates: [user, shared], selections: [user.name: "user"]).skills == [user]
-        checks["missingSelectedSourceStaysUnresolved"] = SkillCatalog(candidates: [user], selections: [user.name: "repository:remote"]).skills.isEmpty
-        let data = try SkillPackageCodec.encode(shared)
-        let imported = try SkillPackageCodec.decode(data, sourceName: "fixture.skill").skill
-        checks["completeSkillArchiveRoundTrip"] = imported.resources == shared.resources && imported.instructions == shared.instructions && imported.owner == .user
-        var snapshot = ScheduledSkill(id: UUID(), profileID: UUID(), skill: shared, argument: "topic", recurrence: .daily(hour: 9, minute: 0, timeZone: "UTC"), nextFireAt: nil, isEnabled: true, createdAt: Date())
-        shared.resources?["scripts/run.js"] = "return null;"
-        snapshot.isEnabled = false
-        checks["scheduleRetainsPackage"] = try ScheduledSkillsDocument(schedules: [snapshot]).validated().schedules.first?.skill.resources == original.resources
-        snapshot.skill.name = "manage-skills"
-        snapshot.skill.instructions = "Read skills/system:manage-services/SKILL.md."
-        var legacySchedule = ScheduledSkillsDocument(schedules: [snapshot])
-        legacySchedule.version = 1
-        let scheduleEncoder = JSONEncoder()
-        scheduleEncoder.dateEncodingStrategy = .iso8601
-        let scheduleFile = root.appendingPathComponent("scheduled-skills.json")
-        try scheduleEncoder.encode(legacySchedule).write(to: scheduleFile)
-        try migrateScheduledSkillPackages(at: scheduleFile)
-        let scheduleDecoder = JSONDecoder()
-        scheduleDecoder.dateDecodingStrategy = .iso8601
-        let upgraded = try scheduleDecoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: scheduleFile)).validated()
-        checks["legacyScheduledPackageMigrated"] = upgraded.schedules.first?.skill.name == "user-manage-skills" && upgraded.schedules.first?.skill.instructions == "Read skills/manage-services/SKILL.md." && upgraded.schedules.first?.skill.resources == original.resources
-        for name in ["import-memory", "evolve", "visualize", "manage-providers"] {
-            let collisionRoot = root.appendingPathComponent("\(name)-collision")
-            let source = collisionRoot.appendingPathComponent("skills/\(name)")
-            let destination = collisionRoot.appendingPathComponent("skills/user-\(name)")
-            let existing = Skill(name: name, description: "Existing user skill", instructions: "Keep this workflow", resources: original.resources)
-            var conflicting = existing
-            conflicting.name = "user-\(name)"
-            conflicting.instructions = "Independent workflow"
-            try SkillFiles.write(existing, directory: source)
-            try SkillFiles.write(conflicting, directory: destination)
-            do {
-                try migrateReservedSkill(name, at: collisionRoot)
-                checks["reserved-\(name)-collisionPreserved"] = false
-            } catch StorageMigrationError.collision {
-                checks["reserved-\(name)-collisionPreserved"] = try SkillFiles.load(directory: source) == existing && SkillFiles.load(directory: destination) == conflicting
-            }
-            conflicting.instructions = existing.instructions
-            try SkillFiles.write(conflicting, directory: destination)
-            try migrateReservedSkill(name, at: collisionRoot)
-            checks["reserved-\(name)-interruptionResumed"] = try !manager.fileExists(atPath: source.path) && SkillFiles.load(directory: destination) == conflicting
-        }
-        return checks
-    }
-
-    private static func replayProviderCatalogMigration(defaults: UserDefaults) throws -> Bool {
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let key = ProviderRegistry.catalogKey
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        let seeded = try decoder.decode(ProviderCatalog.self, from: defaults.data(forKey: key)!)
-        let bundled = ProviderRegistry.bundledDefinitions().map(\.definition)
-        guard seeded.providers.isEmpty else { return false }
-        let empty = try encoder.encode(ProviderCatalog())
-        defaults.set(empty, forKey: key)
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        guard defaults.data(forKey: key) == empty else { return false }
-        var changed = bundled[0]
-        changed.name = "Fixture provider"
-        let overlay: JSONValue = .object([
-            "format": .int(1), "providers": .array([try changed.json]), "deleted": .array([.string(bundled[1].id)]),
-        ])
-        defaults.set(try encoder.encode(overlay), forKey: key)
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        let convertedBytes = defaults.data(forKey: key)!
-        let converted = try decoder.decode(ProviderCatalog.self, from: convertedBytes)
-        guard converted.format == 2, converted.providers.first == changed,
-              converted.providers.last?.id == bundled[1].id,
-              converted.providers.last?.models.isEmpty == true,
-              converted.providers.count == 2 else { return false }
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        guard defaults.data(forKey: key) == convertedBytes else { return false }
-        let website = ProviderDefinition(
-            id: "qwen-web", name: "Qwen Website", url: URL(string: "https://chat.qwen.ai/")!, api: .web,
-            auth: .init(kind: .custom, adapter: "qwen-web"), options: nil,
-            models: [.init(WebServiceModelProvider.model(id: "website-default", name: "Default"))]
-        )
-        let legacyWebsite: JSONValue = .object(["format": .int(2), "providers": .array([try changed.json, try website.json])])
-        defaults.set(try encoder.encode(legacyWebsite), forKey: key)
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        let withoutWebsiteBytes = defaults.data(forKey: key)!
-        guard try decoder.decode(ProviderCatalog.self, from: withoutWebsiteBytes).providers == [changed] else { return false }
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        guard defaults.data(forKey: key) == withoutWebsiteBytes else { return false }
-        let unknown = try encoder.encode(ProviderCatalog(format: 999))
-        defaults.set(unknown, forKey: key)
-        do {
-            try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-            return false
-        } catch {
-            guard defaults.data(forKey: key) == unknown else { return false }
-        }
-        defaults.removeObject(forKey: key)
-        let custom = CustomLLMProvider(name: "Fixture custom", baseURL: URL(string: "https://fixture.invalid/v1")!, models: [])
-        defaults.set(try encoder.encode([custom]), forKey: ProviderRegistry.customProvidersKey)
-        try migrateProviderCatalog(defaults: defaults, copyCredential: { _, _ in })
-        let migrated = try decoder.decode(ProviderCatalog.self, from: defaults.data(forKey: key)!)
-        return migrated.providers == [custom.definition]
-            && defaults.object(forKey: ProviderRegistry.customProvidersKey) == nil
-    }
-
-    private static func replay(_ fixture: StorageMigrationFixture) async throws -> StorageMigrationFixtureReplay {
-        let root = try FileStaging.createDirectory(
-            in: FileManager.default.temporaryDirectory,
-            prefix: "storage-migration-fixture"
-        )
-        defer { FileStaging.cleanup(root, operation: "storage-migration-fixture") }
-        try write(fixture.before, to: root)
-        guard let profile = ProfileIO.profile(at: root, location: .local) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        let migrated = try await migrate(profile)
-        let firstSnapshot = try snapshot(at: root)
-        let expectedSnapshot = try decodedEntries(fixture.after)
-        if firstSnapshot != expectedSnapshot {
-            for path in Set(firstSnapshot.keys).union(expectedSnapshot.keys).sorted() where firstSnapshot[path] != expectedSnapshot[path] {
-                if case .file(let actual) = firstSnapshot[path], case .file(let expected) = expectedSnapshot[path] {
-                    let difference = zip(actual, expected).enumerated().first { $0.element.0 != $0.element.1 }?.offset ?? min(actual.count, expected.count)
-                    Log.app.error("StorageMigrator.fixture mismatch name=\(fixture.name) path=\(path) actualBytes=\(actual.count) expectedBytes=\(expected.count) offset=\(difference)")
-                } else { Log.app.error("StorageMigrator.fixture mismatch name=\(fixture.name) path=\(path) kind=different-entry") }
-            }
-        }
-        _ = try await migrate(migrated)
-        return StorageMigrationFixtureReplay(
-            name: fixture.name,
-            migratedAsExpected: firstSnapshot == expectedSnapshot,
-            secondRunNoOp: try snapshot(at: root) == firstSnapshot
-        )
-    }
-
-    private static func write(_ entries: [StorageMigrationFixtureEntry], to root: URL) throws {
-        for (path, entry) in try decodedEntries(entries).sorted(by: { $0.key < $1.key }) {
-            let destination = try fixtureURL(path, in: root)
-            switch entry {
-            case .directory:
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-            case .file(let data):
-                try FileManager.default.createDirectory(
-                    at: destination.deletingLastPathComponent(),
-                    withIntermediateDirectories: true
-                )
-                try data.write(to: destination, options: .atomic)
-            }
-        }
-    }
-
-    private static func decodedEntries(
-        _ entries: [StorageMigrationFixtureEntry]
-    ) throws -> [String: StorageMigrationFixtureSnapshot] {
-        var decoded: [String: StorageMigrationFixtureSnapshot] = [:]
-        for entry in entries {
-            guard decoded[entry.path] == nil else { throw CocoaError(.fileReadCorruptFile) }
-            let snapshot: StorageMigrationFixtureSnapshot
-            if let base64 = entry.base64 {
-                guard let data = Data(base64Encoded: base64) else { throw CocoaError(.fileReadCorruptFile) }
-                snapshot = .file(data)
-            } else {
-                snapshot = .directory
-            }
-            _ = try fixtureURL(entry.path, in: FileManager.default.temporaryDirectory)
-            decoded[entry.path] = snapshot
-        }
-        return decoded
-    }
-
-    private static func fixtureURL(_ path: String, in root: URL) throws -> URL {
-        let components = path.split(separator: "/", omittingEmptySubsequences: false)
-        guard !path.hasPrefix("/"),
-              !components.isEmpty,
-              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
-            throw CocoaError(.fileReadInvalidFileName)
-        }
-        return components.reduce(root) { url, component in
-            url.appendingPathComponent(String(component), isDirectory: false)
-        }
-    }
-
-    private static func snapshot(at root: URL) throws -> [String: StorageMigrationFixtureSnapshot] {
-        try snapshot(directory: root, relativePath: "")
-    }
-
-    private static func snapshot(
-        directory: URL,
-        relativePath: String
-    ) throws -> [String: StorageMigrationFixtureSnapshot] {
-        var result: [String: StorageMigrationFixtureSnapshot] = [:]
-        let items = try FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
-        ).sorted { $0.lastPathComponent < $1.lastPathComponent }
-        for item in items {
-            let values = try item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
-            guard values.isSymbolicLink != true else { throw CocoaError(.fileReadInvalidFileName) }
-            let path = relativePath.isEmpty ? item.lastPathComponent : "\(relativePath)/\(item.lastPathComponent)"
-            if values.isDirectory == true {
-                result[path] = .directory
-                for (childPath, entry) in try snapshot(directory: item, relativePath: path) {
-                    guard result[childPath] == nil else { throw CocoaError(.fileReadCorruptFile) }
-                    result[childPath] = entry
-                }
-            } else if values.isRegularFile == true {
-                result[path] = .file(try Data(contentsOf: item))
-            } else {
-                throw CocoaError(.fileReadUnknown)
-            }
-        }
-        return result
     }
 
     static func migrateLegacySkills(at root: URL) throws {

@@ -11,7 +11,7 @@ export async function check(): Promise<string> {
     /^\.github\/workflows\/deploy\.yml$/,
     /^docs\/demo-60s\.md$/,
     /^docs\/LOC\.html$/,
-    /^(?!(?:repositories|services)\/builtin\/web\/[^/]+\/actions\.har$).*\.har$/,
+    /\.har$/,
     /\.mitm$/,
     /\.mobileprovision$/,
     /\.p12$/,
@@ -23,12 +23,13 @@ export async function check(): Promise<string> {
     "iCloud.ai.oxcraft.bot",
     "github.com/ziyzhu/openox-dev",
   ];
-  const failures = files.filter((file) => forbiddenPaths.some((pattern) => pattern.test(file)));
+  const failures: string[] = [];
 
   for (const file of files) {
     if (file === "tools/checks/public-boundary-check.ts") continue;
     const text = await readFile(join(ROOT, file)).catch(() => null);
     if (!text) continue;
+    if (forbiddenPaths.some((pattern) => pattern.test(file))) failures.push(file);
     const value = text.toString("utf8");
     for (const forbidden of forbiddenText) {
       if (value.includes(forbidden)) failures.push(`${file}: contains ${forbidden}`);

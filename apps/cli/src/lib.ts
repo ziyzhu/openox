@@ -169,7 +169,7 @@ const MOVED_COMMANDS: Record<string, string> = {
   discover: "ox host list",
   logs: "ox host logs",
   providers: "ox host providers",
-  service: "ox repository services|actions|test or ox host services|service",
+  service: "ox repository services|actions or ox host services|service",
 };
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
@@ -179,8 +179,8 @@ function validateContext(command: string, subcommand: string | undefined, contex
   }
   if (context.profile && command !== "profile") throw new Error("--profile applies only to ox profile");
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
-  const usesHost = command === "host" || command === "chat" || command === "vm" || (command === "repository" && subcommand === "test");
-  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox chat, ox vm, and ox repository test");
+  const usesHost = command === "host" || command === "chat" || command === "vm";
+  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox chat, and ox vm");
 }
 
 export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {

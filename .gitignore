@@ -14,7 +14,6 @@ apps/ios/Local.xcconfig
 *.trace
 *.mitm
 *.har
-!repositories/builtin/web/**/actions.har
 *.mov
 secrets/API_KEYS.json
 docs/SIMULATOR_BOOTSTRAP.local.json

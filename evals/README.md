@@ -57,8 +57,8 @@ error to test recovery; `terminate` stops at a tool decision, as in the migrated
 protocol smoke case. These are responses at the `execute` boundary, not simulations
 of every JavaScript operation. Source substring matching is a routing constraint,
 not proof that code is correct. AST checks verify direct calls and syntax but do
-not execute code, follow aliases, or prove argument semantics. Use service replays
-and simulator QA to verify real execution.
+not execute code, follow aliases, or prove argument semantics. Use live service
+invocation and simulator QA to verify real execution.
 
 Automatic checks cover exact output constraints, required/forbidden answer facts,
 and direct function-call counts. Exact wording is appropriate only when the user
@@ -72,4 +72,4 @@ The former `test:llm` entry point is replaced by `evals`. Its single execute cal
 JavaScript syntax, web search, result printing, and no-`ox.help` checks are covered
 by `web-tool-decision`. Select a configured provider/model explicitly and run the
 same cases on additional providers when coverage across wire protocols matters.
-Service replay, storage migration, and other software tests remain separate.
+Portable software checks and the iOS build/chat smoke remain separate.

@@ -145,14 +145,6 @@
         "$ref": "./schema.json#/definitions/RepositorySaveGateResult"
       }
     },
-    "debug.storage.replayMigration": {
-      "params": {
-        "$ref": "./schema.json#/definitions/ReplayStorageMigrationRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/StorageMigrationReplayResult"
-      }
-    },
     "agents.evaluate": {
       "params": {
         "$ref": "./schema.json#/definitions/EvaluateAgentRequest"

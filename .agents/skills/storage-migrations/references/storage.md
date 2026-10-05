@@ -490,7 +490,7 @@ invalid drafts; incomplete services do not make the entire Local repository
 unavailable. Read-only repositories still require valid service file structure.
 Portable repository, manifest, installer, and skill-package contracts are owned
 by `packages/protocol`; `packages/service-sdk` retains compatibility exports and
-filesystem/replay tooling. The iOS supported-version list is generated from the
+filesystem tooling. The iOS supported-version list is generated from the
 shared repository contract. Native codecs, persisted paths, and representations
 are unchanged by this ownership extraction; legacy handling stays behind
 `StorageMigrator`.

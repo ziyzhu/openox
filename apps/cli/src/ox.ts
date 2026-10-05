@@ -10,7 +10,7 @@ import packageMetadata from "../package.json";
 
 const groups: Record<string, CommandGroup> = {
   profile: group("profile", "Read a Profile directly from disk (--profile <path>).", PROFILE_COMMANDS),
-  repository: group("repository", "Inspect, validate, serve, and test a repository (--repository <path-or-url>).", {
+  repository: group("repository", "Inspect, validate, and serve a repository (--repository <path-or-url>).", {
     ...REPOSITORY_COMMANDS,
     ...REPOSITORY_SERVICE_COMMANDS,
   }),

@@ -1,6 +1,6 @@
 ---
 name: ox-cli
-description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, drive, inspect, or watch chats; list model providers; read structured logs; inspect or call a VM; administer Profiles; inspect or verify service repositories; invoke live services; and replay service fixtures.
+description: Use the terminal as an Ox Client. Connect to an Ox Host; discover, drive, inspect, or watch chats; list model providers; read structured logs; inspect or call a VM; administer Profiles; inspect or verify service repositories; and invoke live services.
 ---
 
 # Ox CLI
@@ -31,7 +31,7 @@ or tab session IDs; a live service is addressed by its domain.
   agent's actual capability boundary.
 - Use `ox profile` for direct Profile file reads.
 - Use `ox repository` for offline repository, service manifest, action, and
-  skill inspection, and `ox repository test` for fixture replay.
+  skill inspection.
 - Use `ox host services` and `ox host service` for live service operations.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
@@ -150,26 +150,6 @@ action even when it appears in the catalog.
 Sign-in, human verification, page creation, and page lifecycle happen through
 the Host's interface. Do not attempt to choose a page engine, tab, or another
 implementation from the Client.
-
-## Replay service fixtures
-
-Prefer the lifecycle-owning repository harness for replay:
-
-```sh
-bun run test:services [<domain>:<action>:<case>] --device <numbered-qa-device>
-bun run test:services [<domain>:<action>:<case>] --repository <origin> --device <numbered-qa-device>
-```
-
-The direct command is intended for the lifecycle-owning harness:
-
-```sh
-OX_QA_DEVICE=<device> ox [--host <ws-url>] --repository <service-source> repository test [<domain>:<action>:<case>] --proxy-port <port> [--allow-partial]
-```
-
-The first command tests bundled services; `--repository` separately tests loading
-a local repository over loopback. Replay is fail-closed and must not permit unmatched traffic to reach the
-network. Create or revise fixtures through the Host's service-management
-workflow, then run the repository harness for verification.
 
 ## Diagnose live connection failures
 

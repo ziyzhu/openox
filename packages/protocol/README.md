@@ -107,19 +107,16 @@ snapshot, not durable global event IDs. Log follow remains bounded polling.
 
 ## Conformance
 
-The retained E2E suite validates the shared contract against a live Host.
-`fixtures.json` is also available to Host implementations in other languages.
-
-Run the live, read-only/invalid-parameter suite against any available Host:
+The portable E2E suite exercises CLI processes against a controlled WebSocket
+fixture using the shared contract:
 
 ```sh
-OX_RPC_TEST_ENDPOINT=ws://<host>:9876 bun test tests/contracts/client-host/live-rpc-contract.test.ts
+bun test tests/contracts/client-host/protocol.test.ts
 ```
 
-The live suite validates advertised read operations and sends only structurally
-invalid mutation requests, which must fail decoding before their handlers run.
-For iOS, enable Host connections, connect Tailscale, and keep Ox foregrounded.
-This suite does not establish tailnet authorization or lifecycle correctness.
+`fixtures.json` is also available to Host implementations in other languages.
+These fixture-backed checks do not establish live iOS Host conformance, tailnet
+authorization, or lifecycle correctness.
 
 ## Host–Repository contract
 
@@ -137,8 +134,7 @@ schemas, validators, installer behavior, or file layouts:
 | `@openox/protocol/skills` | Reserved names, package limits, frontmatter and resource-path rules |
 
 `@openox/service-sdk` preserves its existing exports by re-exporting these
-contracts. Filesystem readers, action convenience helpers, and replay tooling
-remain in the SDK. Protocol modules do not depend on the SDK or Node filesystem
+contracts. Filesystem readers and action convenience helpers remain in the SDK. Protocol modules do not depend on the SDK or Node filesystem
 APIs.
 
 `repository.schema.json` is the generated portable Draft 7 document. Its root

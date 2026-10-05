@@ -48,7 +48,7 @@ Exercise an upgrade fixture produced by the oldest supported shipped representat
 - an older build is never installed over data stamped by a newer build during upgrade testing unless the downgrade path is explicitly under test;
 - fresh install still works, but is not the only tested path.
 
-Add the smallest sanitized fixture and automated upgrade regression that would have failed before the migration. For Local services, include dirty and clean Git states when relevant. Run the relevant repository checks and exercise the installed iOS build through the startup flow before calling the migration verified.
+Keep sanitized predecessor snapshots and upgrade evidence outside the repository. For Local services, include dirty and clean Git states when relevant. Run the relevant repository checks and exercise the installed iOS build through the startup flow before calling the migration verified.
 
 ### Required repository gate
 
@@ -56,16 +56,15 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 
 1. Select a numbered QA simulator and use its assigned debug port.
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
-3. Run `bun run test:storage-migration` against the running app.
-4. Run `bun run typecheck` and the smallest domain-specific tests.
+3. Manually exercise an upgrade from a sanitized predecessor snapshot on the reserved simulator, then relaunch to verify second-run stability. Store snapshots and evidence outside the repository.
+4. Run `bun run typecheck` and the retained portable checks.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
 For `ox-1`, the standard commands are:
 
 ```sh
 sim --device ox-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
-OX_HOST_ENDPOINT=ws://127.0.0.1:9101 bun run test:storage-migration
 bun run typecheck
 ```
 
-Every newly added ordered Profile milestone needs its own directory under `apps/ios/fixtures/storage-migrations/<milestone>/` with complete `before/` and `after/` trees. Derive `before/` from bytes written by the actual predecessor build, sanitize them without changing their encoded shape, and keep the fixture minimal. The replay requires a fixture matching `ProfileSchema.current`, exact post-migration bytes, and exact second-run stability. Never update expected `after/` bytes merely to make a failure green; review the representation change first.
+For every newly added ordered Profile milestone, compare complete before/after trees from an actual predecessor build and verify second-run stability. Sanitize snapshots without changing their encoded shape and retain them outside the repository. The former storage-replay RPC and committed fixture suite are no longer available; do not claim automated migration coverage from the iOS chat smoke.

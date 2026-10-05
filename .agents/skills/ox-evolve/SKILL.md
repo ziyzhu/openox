@@ -36,6 +36,6 @@ Use the current session as the notification destination unless the user specifie
 
 For Local delivery, finish the built-in `evolve` verification and Save workflow, then report the capability delivered, checks performed, limitations, and authoring-loop findings or fixes.
 
-For requested built-in web-service delivery, read [references/promotion.md](references/promotion.md) after Ox has produced a verified, saved Local revision. Follow its export, sanitized replay, icon, bundle, and release checks. The exact saved Local implementation is the behavioral source of truth; promotion packages it without creating a second implementation.
+For requested built-in web-service delivery, read [references/promotion.md](references/promotion.md) after Ox has produced a verified, saved Local revision. Follow its export, live verification, icon, bundle, and release checks. The exact saved Local implementation is the behavioral source of truth; promotion packages it without creating a second implementation.
 
 Do not commit repository changes unless the user requests it. Report service delivery and developer findings separately so a working service does not hide remaining loop issues.

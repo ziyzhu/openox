@@ -305,46 +305,4 @@ extension OxHostProtocol {
         reply.success(RepositorySaveGateResult(entered: entered))
     }
 
-    @MainActor
-    static func handleReplayStorageMigration(
-        _ command: ReplayStorageMigrationRequest,
-        reply: OxHostRPC.Reply
-    ) {
-        Task {
-            do {
-                let replay = try await StorageRoot.replayStorageMigration(
-                    turns: command.turns,
-                    fixtures: command.fixtures
-                )
-                reply.success(StorageMigrationReplayResult(
-                    currentVersion: replay.currentVersion,
-                    versionUpdated: replay.versionUpdated,
-                    ordinaryContextRemoved: replay.ordinaryContextRemoved,
-                    unreadableContextRetained: replay.unreadableContextRetained,
-                    compactedContextRetained: replay.compactedContextRetained,
-                    compactedContextValid: replay.compactedContextValid,
-                    noContextPreserved: replay.noContextPreserved,
-                    transcriptsUnchanged: replay.transcriptsUnchanged,
-                    secondRunNoOp: replay.secondRunNoOp,
-                    ordinaryExportOmitsContext: replay.ordinaryExportOmitsContext,
-                    compactedExportRetainsContext: replay.compactedExportRetainsContext,
-                    defaultModelMigrated: replay.defaultModelMigrated,
-                    chatModelMigrated: replay.chatModelMigrated,
-                    unsupportedVersionRejected: replay.unsupportedVersionRejected,
-                    providerCatalogMigrated: replay.providerCatalogMigrated,
-                    actionPoliciesMigrated: replay.actionPoliciesMigrated,
-                    savedServicesMigrated: replay.savedServicesMigrated,
-                    futureActionPoliciesPreserved: replay.futureActionPoliciesPreserved,
-                    actionPolicyResolutionValid: replay.actionPolicyResolutionValid,
-                    skillChecks: replay.skillChecks,
-                    secretsIndexRenamed: replay.secretsIndexRenamed,
-                    retiredGemmaRemoved: replay.retiredGemmaRemoved,
-                    fixtureResults: replay.fixtureResults
-                ))
-            } catch {
-                reply.failure(error.localizedDescription)
-            }
-        }
-    }
-
 }

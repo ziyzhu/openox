@@ -99,30 +99,4 @@ extension OxHostProtocol {
         let entered: Bool?
     }
 
-    struct StorageMigrationReplayResult: Encodable {
-        let currentVersion: String?
-        let versionUpdated: Bool?
-        let ordinaryContextRemoved: Bool?
-        let unreadableContextRetained: Bool?
-        let compactedContextRetained: Bool?
-        let compactedContextValid: Bool?
-        let noContextPreserved: Bool?
-        let transcriptsUnchanged: Bool?
-        let secondRunNoOp: Bool?
-        let ordinaryExportOmitsContext: Bool?
-        let compactedExportRetainsContext: Bool?
-        let defaultModelMigrated: Bool?
-        let chatModelMigrated: Bool?
-        let unsupportedVersionRejected: Bool?
-        let providerCatalogMigrated: Bool?
-        let actionPoliciesMigrated: Bool?
-        let savedServicesMigrated: Bool?
-        let futureActionPoliciesPreserved: Bool?
-        let actionPolicyResolutionValid: Bool?
-        let skillChecks: [String: Bool]?
-        let secretsIndexRenamed: Bool?
-        let retiredGemmaRemoved: Bool?
-        let fixtureResults: [StorageMigrationFixtureReplay]?
-    }
-
 }

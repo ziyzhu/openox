@@ -7,7 +7,6 @@ export const REPOSITORY_SERVICE_COMMANDS: Record<string, SubCommand> = {
   services: { desc: "List the repository's web and API services, or print one manifest as JSON", fn: services },
   actions: { desc: "List the actions a repository service declares (--json)", fn: actions },
   skills: { desc: "List the repository's skills, or print one", fn: skills },
-  test: { desc: "Replay the repository's committed service cases through the selected Host", fn: test },
 };
 
 function parseArgs(args: string[], usage: string): { json: boolean; domain?: string } {
@@ -89,9 +88,4 @@ async function actions(args: string[], context: CliContext): Promise<void> {
 async function skills(args: string[], context: CliContext): Promise<void> {
   await printSkills(args, "ox --repository <path-or-url> repository skills [name] [--json]", (print) =>
     withRepository(requireRepository(context), async (root, repository) => print(root, repository.skills)));
-}
-
-async function test(args: string[], context: CliContext): Promise<void> {
-  const command = await import("./service-test.ts");
-  await command.testService(args, context);
 }

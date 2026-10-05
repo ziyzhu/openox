@@ -1,6 +1,6 @@
 ---
 name: ox-evals
-description: Run, compare, diagnose, and extend Ox's real-model behavioral evals, including system-prompt and tool-decision regressions. Use for repeatable agent-quality measurement; use Ox Gym for exploratory user simulation and service replay for live service correctness.
+description: Run, compare, diagnose, and extend Ox's real-model behavioral evals, including system-prompt and tool-decision regressions. Use for repeatable agent-quality measurement; use Ox Gym for exploratory user simulation and live service invocation for service correctness.
 ---
 
 # Ox evals

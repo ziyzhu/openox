@@ -1,9 +1,10 @@
 # OpenOx Service SDK
 
-`@openox/service-sdk` provides authoring helpers, filesystem readers, and replay
-tooling used by Ox services. Shared schemas, validators, and action contracts are
+`@openox/service-sdk` provides authoring helpers and filesystem readers
+used by Ox services. Shared schemas, validators, and action contracts are
 owned by [`@openox/protocol`](../protocol/README.md). Existing SDK exports remain
-compatible re-exports; consumers do not need to change their imports.
+compatible re-exports. The former `testing/replay/*` exports are no longer
+provided.
 
 The SDK requires Bun 1.3 or newer.
 

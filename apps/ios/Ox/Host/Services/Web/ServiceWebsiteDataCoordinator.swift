@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Network
 import WebKit
 
 @MainActor
@@ -164,20 +163,6 @@ final class ServiceWebsiteDataCoordinator {
         if let sharedDataStore { return sharedDataStore }
         let identifier = Self.dataStoreID
         let store = WKWebsiteDataStore(forIdentifier: identifier)
-        #if targetEnvironment(simulator)
-        if let url = SimEnv.serviceProxyEndpoint,
-           url.scheme == "http",
-           let host = url.host,
-           let endpointPort = NWEndpoint.Port(rawValue: UInt16(url.port ?? 8080)) {
-            var proxy = ProxyConfiguration(
-                httpCONNECTProxy: .hostPort(host: NWEndpoint.Host(host), port: endpointPort),
-                tlsOptions: nil
-            )
-            proxy.allowFailover = false
-            store.proxyConfigurations = [proxy]
-            Log.service.info("ServiceManager.dataStore proxy configured scope=global endpoint=\(host):\(endpointPort.rawValue)")
-        }
-        #endif
         sharedDataStore = store
         Log.service.info("ServiceManager.dataStore created scope=global id=\(identifier)")
         return store

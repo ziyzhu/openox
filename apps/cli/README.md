@@ -107,7 +107,7 @@ ox
 
 - `--host` defaults to `OX_HOST_ENDPOINT`, then the compatibility
   `OX_DEBUG_ENDPOINT`, then `ws://127.0.0.1:9876`. It applies to `ox host`,
-  `ox chat`, `ox vm`, and `ox repository test`.
+  `ox chat`, and `ox vm`.
 - `--chat` selects a chat for `ox chat` and `ox vm`; without it, the Host's
   active chat is used. Obtain IDs with `ox chat list`.
 - `--profile` applies only to `ox profile` and bypasses any Host.
@@ -183,8 +183,7 @@ be combined with explicit page mode or `--all`. Follow mode still polls a bounde
 recent window. Older Hosts allow ordinary reads but reject pagination requests
 with an update message.
 
-Run CLI process E2E checks with `bun run test:logs`; add `--host <ws-url>` to
-exercise pagination on a live Host as well.
+Run fixture-backed CLI process E2E checks with `bun run test:logs`.
 
 One-shot JSON commands emit ordinary JSON. Streaming `chat watch --json` and
 `host logs --follow --json` emit one JSON object per line. Watch commands use
@@ -310,7 +309,7 @@ listings report cloud-only iCloud placeholders without downloading them.
 
 ## Inspect repositories
 
-Repository commands are offline except `test`, which replays through a Host:
+Repository commands inspect, validate, and serve repository contents without a Host:
 
 ```sh
 ox --repository /path/to/repository repository inspect
@@ -333,23 +332,6 @@ Repository origins may be local paths, loopback Git URLs, or HTTPS Git URLs.
 Private HTTPS repositories are cloned with the developer's Git credentials
 before being served; credentials are never embedded in the URL.
 
-## Test services
-
-The repository harness owns the complete iOS replay lifecycle:
-
-```sh
-bun run test:services --device ox-1
-bun run test:services <domain>:<action>:<case> --device ox-1
-bun run test:services <domain>:<action>:<case> \
-  --repository /path/to/repository --device ox-1
-```
-
-Replay uses bundled services by default. Pass `--repository` to exercise loading
-a local repository through a simulator-specific loopback server. Production action
-code runs through the iOS Host while mitmproxy serves committed responses. Requests absent from the HAR are terminated locally. The
-CLI only replays reviewed fixtures; fixture creation happens through the Ox
-Host's service-management workflow.
-
 ## Command reference
 
 ```text
@@ -367,7 +349,6 @@ ox --repository <path-or-url> repository serve [--port 8100]
 ox --repository <path-or-url> repository services [domain] [--json]
 ox --repository <path-or-url> repository actions <domain> [--json]
 ox --repository <path-or-url> repository skills [name] [--json]
-ox [--host <ws-url>] --repository <path-or-url> repository test [<domain>[:<action>[:<case>]]] --proxy-port <port> [--timeout 30000] [--allow-partial]
 
 ox host list [--all] [--json] [--timeout 3000]
 ox [--host <ws-url>] host describe [--json] [--timeout 30000]

@@ -1,9 +1,7 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { parseArgs } from "node:util";
 import { validateParams, validateResult } from "../../../packages/protocol/src/index.ts";
 
-const { values } = parseArgs({ options: { host: { type: "string" } } });
 const rows = Array.from({ length: 2_807 }, (_, seq) => ({
   seq, time: "2026-10-04T00:00:00.000Z", level: seq % 7 === 0 ? "error" : "info",
   category: seq % 3 === 0 ? "Session" : "Perf", thread: "main", location: "[fixture:1]",
@@ -96,18 +94,4 @@ try {
   assert.match((await cli(host, "--all", "--limit", "1")).stderr, /invalid log pagination cursor/);
   console.log("PASS CLI process E2E: older pages, appends, all/tail, sparse server filters, cursor errors, validation, old Hosts");
 
-  const liveHost = values.host ?? Bun.env.OX_RPC_TEST_ENDPOINT;
-  if (liveHost) {
-    const page = await json(liveHost, "--page", "--limit", "2");
-    assert.ok(page.logs.length <= 2);
-    assert.equal(typeof page.hasMore, "boolean");
-    if (page.hasMore) {
-      const older = await json(liveHost, "--cursor", page.nextCursor, "--limit", "3");
-      assert.ok(older.logs.length > 0 && older.logs.length <= 3);
-      assert.ok(older.logs.at(-1).seq < page.logs[0].seq);
-      assert.equal((await cli(liveHost, "--cursor", page.nextCursor, "--level", "error")).code, 1);
-    }
-    assert.equal((await cli(liveHost, "--cursor", "invalid")).code, 1);
-    console.log("PASS live Host log pagination");
-  } else console.log("SKIP live Host: pass --host or OX_RPC_TEST_ENDPOINT (iOS requires Tailscale)");
 } finally { server.stop(true); }

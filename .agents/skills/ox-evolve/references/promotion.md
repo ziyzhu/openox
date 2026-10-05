@@ -26,24 +26,18 @@ The official source uses the same plain-JavaScript installer format as Local. Co
 
 An installed app's validator can lag behind the repository compiler. If the exported manifest fails current compilation, return the diagnostic to Ox for repair, verification, and a new saved revision before re-exporting.
 
-## Replay evidence
+## Live verification evidence
 
-Replay verification may exercise already declared actions, but must not become endpoint exploration or service redesign.
+Verify the promoted service through Ox on a reserved simulator. Verification may exercise already declared actions, but must not become endpoint exploration or service redesign.
 
-- Capture only the requests needed by the committed action contracts.
 - Ask the user to perform sign-in, challenges, and account selection.
 - Require explicit approval before any live mutation.
-- Keep raw authenticated captures in a private temporary directory outside the repository.
-- Sanitize cookies, authorization values, CSRF values, signed URLs, identities, account identifiers, and user-authored content before import.
-- Retain success, empty, terminal pagination, safe error, and authentication cases that apply to the committed contracts.
-- Include the authentication probe's request and response in each authenticated Action case; the Host checks sign-in before invoking the Action.
-- Inspect every retained request and response after automated redaction.
+- Exercise success, empty, terminal pagination, safe error, and authentication behavior where available without inventing data or success.
+- Keep screenshots, logs, and authenticated diagnostics in a private temporary directory outside the repository.
+- Sanitize identities, account identifiers, user-authored content, cookies, authorization values, CSRF values, and signed URLs before sharing evidence.
+- Preserve the authoring app's Local source, credentials, and other data.
 
-Import each sanitized case through the current replay tooling and run it fail-closed through the authoritative iOS harness.
-
-The repository replay harness uninstalls its target app before and after testing. Preserve the authoring app's Local source and other data: use a disposable app identity on the selected simulator, or verify a complete backup and restoration path before running it. Keep the build's bundle identifier and `OX_BUNDLE_ID` aligned.
-
-For page-owned DOM actions, do not retain a raw authenticated SPA capture when making it replayable would require private user payloads, reusable session state, or an unbounded application shell. Use a minimal same-origin structural replay derived only from selectors, routes, and states already verified live by Ox. Replace identities and user-authored content with explicit fixture values, exercise the exact committed action code, and describe this as structural regression coverage rather than endpoint evidence. Do not use a synthetic page to invent or redesign behavior that Ox did not verify live.
+The former repository replay command, harness, and committed response fixtures are no longer available. Report live verification boundaries and any behavior that could not safely be exercised.
 
 ## Icon
 
@@ -53,13 +47,13 @@ Require an official square source that is at least 128×128, remains recognizabl
 
 ## Verify and report
 
-Run the smallest relevant replay cases, then:
+Verify the affected actions live through Ox, then:
 
 ```bash
 bun run build:services
 bun run typecheck
 ```
 
-Set `OX_BUNDLE_ID` to the configured iOS bundle identifier when it differs from the replay harness default. Verify the generated `apps/ios/Ox/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, replay cases, authentication boundaries, icon evidence, checks run, and any remaining limitation.
+Verify the generated `apps/ios/Ox/Resources/OxServices.bundle` diff contains only the promoted service and expected index changes. Report the saved Ox Local revision only when technical detail is useful or requested; otherwise report the promoted files, live verification, authentication boundaries, icon evidence, checks run, and any remaining limitation.
 
 Do not commit repository changes unless the user separately requests it.

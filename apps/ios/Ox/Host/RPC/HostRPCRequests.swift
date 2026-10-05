@@ -23,7 +23,6 @@ extension OxHostProtocol {
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
         case repositoryGate = "debug.repositories.saveGate"
-        case replayStorageMigration = "debug.storage.replayMigration"
         case evaluateAgent = "agents.evaluate"
         case vmInspect = "vm.inspect"
         case vmFunctions = "vm.functions"
@@ -96,11 +95,6 @@ extension OxHostProtocol {
     struct RepositoryGateRequest: Decodable {
         let domain: String
         let action: String
-    }
-
-    struct ReplayStorageMigrationRequest: Decodable {
-        let turns: [Turn]
-        let fixtures: [StorageMigrationFixture]
     }
 
     struct EvaluateAgentRequest: Decodable {

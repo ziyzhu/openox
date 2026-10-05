@@ -24,8 +24,7 @@ fi
 for tool in bun git; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
-# Do not accidentally opt into live checks from the developer's environment.
-unset OX_CLI_TEST_DEVICE OX_RPC_TEST_ENDPOINT OX_RPC_DENIED_ENDPOINTS OX_RPC_LIFECYCLE_DEVICE
+# Keep fixture-backed checks independent of the developer's live Host selection.
 unset OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
 bun --no-env-file install --frozen-lockfile
 
@@ -54,4 +53,4 @@ for package in protocol service-sdk services; do
   bun --no-env-file run --cwd "packages/$package" package:check
 done
 bun --no-env-file run --cwd apps/cli package:check
-echo 'PASS portable CI (iOS, live integrations, and real-model evals are local-only)'
+echo 'PASS portable CI (iOS smoke and real-model evals are local-only)'

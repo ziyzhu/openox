@@ -1,7 +1,7 @@
 {
   "name": "@openox/service-sdk",
   "version": "0.1.0",
-  "description": "Author, validate, and test Ox services",
+  "description": "Author and validate Ox services",
   "author": "Ziyuan Zhu",
   "license": "Apache-2.0",
   "type": "module",
@@ -17,10 +17,7 @@
     "./installer": "./src/installer.ts",
     "./manifest": "./src/manifest.ts",
     "./repository": "./src/repository.ts",
-    "./skills": "./src/skills.ts",
-    "./testing/replay/fixtures": "./src/testing/replay/fixtures.ts",
-    "./testing/replay/proxy": "./src/testing/replay/proxy.ts",
-    "./testing/replay/types": "./src/testing/replay/types.ts"
+    "./skills": "./src/skills.ts"
   },
   "scripts": {
     "package:check": "bun package-check.ts"
@@ -48,7 +45,6 @@
   },
   "dependencies": {
     "@openox/protocol": "0.1.0",
-    "@sinclair/typebox": "^0.34.49",
-    "typescript": "^5"
+    "@sinclair/typebox": "^0.34.49"
   }
 }

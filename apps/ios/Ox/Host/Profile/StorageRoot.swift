@@ -286,12 +286,3 @@ final class StorageRoot {
         }
     }
 }
-
-nonisolated extension StorageRoot {
-    static func replayStorageMigration(
-        turns: [Turn],
-        fixtures: [StorageMigrationFixture]
-    ) async throws -> StorageMigrationReplay {
-        try await StorageMigrator.replayStorageMigration(turns: turns, fixtures: fixtures)
-    }
-}

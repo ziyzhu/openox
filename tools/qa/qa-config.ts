@@ -7,7 +7,6 @@ export function qaConfig(device: string) {
   if (!index) throw new Error(`QA device must be ox-N for N from 1 to 5, got ${device}`);
   return {
     device,
-    serviceProxyPort: 7100 + index,
     registryPort: 8100 + index,
     debugPort: 9100 + index,
     debugEndpoint: `ws://127.0.0.1:${9100 + index}`,

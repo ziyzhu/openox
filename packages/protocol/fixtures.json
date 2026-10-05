@@ -34,7 +34,6 @@
     { "method": "debug.providers.setKey", "params": { "providerId": "example", "region": "other" }, "valid": false },
     { "method": "debug.artifacts.write", "params": { "name": "example.txt", "data": "aGVsbG8=" }, "valid": true },
     { "method": "debug.artifacts.write", "params": { "name": "example.txt", "data": 42 }, "valid": false },
-    { "method": "debug.storage.replayMigration", "params": { "turns": [], "fixtures": [] }, "valid": true },
     { "method": "agents.evaluate", "params": { "sessionId": "chat", "providerId": "example", "modelId": "example", "prompts": [], "fixtures": [], "maxTurns": 1, "timeoutMs": 1000 }, "valid": true },
     { "method": "agents.evaluate", "params": { "sessionId": "chat", "providerId": "example", "modelId": "example", "prompts": [], "fixtures": [], "maxTurns": 1.5, "timeoutMs": 1000 }, "valid": false }
   ],

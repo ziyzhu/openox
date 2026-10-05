@@ -526,28 +526,6 @@
         }
       }
     },
-    "ReplayStorageMigrationRequest": {
-      "additionalProperties": true,
-      "type": "object",
-      "required": [
-        "turns",
-        "fixtures"
-      ],
-      "properties": {
-        "turns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Turn"
-          }
-        },
-        "fixtures": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/StorageMigrationFixture"
-          }
-        }
-      }
-    },
     "EvaluateAgentRequest": {
       "additionalProperties": true,
       "type": "object",
@@ -620,60 +598,6 @@
           "type": "boolean"
         }
       }
-    },
-    "StorageMigrationFixtureEntry": {
-      "additionalProperties": true,
-      "type": "object",
-      "required": [
-        "path"
-      ],
-      "properties": {
-        "path": {
-          "type": "string"
-        },
-        "base64": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "StorageMigrationFixture": {
-      "additionalProperties": true,
-      "type": "object",
-      "required": [
-        "name",
-        "before",
-        "after"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "before": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/StorageMigrationFixtureEntry"
-          }
-        },
-        "after": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/StorageMigrationFixtureEntry"
-          }
-        }
-      }
-    },
-    "Turn": {
-      "additionalProperties": true,
-      "description": "Existing Turn Codable payload; nested domain validation remains with StorageMigrator.",
-      "type": "object",
-      "properties": {}
     },
     "ProviderModel": {
       "additionalProperties": true,
@@ -1408,109 +1332,6 @@
       "properties": {
         "entered": {
           "type": "boolean"
-        }
-      }
-    },
-    "StorageMigrationFixtureReplay": {
-      "additionalProperties": true,
-      "type": "object",
-      "required": [
-        "name",
-        "migratedAsExpected",
-        "secondRunNoOp"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "migratedAsExpected": {
-          "type": "boolean"
-        },
-        "secondRunNoOp": {
-          "type": "boolean"
-        }
-      }
-    },
-    "StorageMigrationReplayResult": {
-      "additionalProperties": true,
-      "type": "object",
-      "properties": {
-        "currentVersion": {
-          "type": "string"
-        },
-        "versionUpdated": {
-          "type": "boolean"
-        },
-        "ordinaryContextRemoved": {
-          "type": "boolean"
-        },
-        "unreadableContextRetained": {
-          "type": "boolean"
-        },
-        "compactedContextRetained": {
-          "type": "boolean"
-        },
-        "compactedContextValid": {
-          "type": "boolean"
-        },
-        "noContextPreserved": {
-          "type": "boolean"
-        },
-        "transcriptsUnchanged": {
-          "type": "boolean"
-        },
-        "secondRunNoOp": {
-          "type": "boolean"
-        },
-        "ordinaryExportOmitsContext": {
-          "type": "boolean"
-        },
-        "compactedExportRetainsContext": {
-          "type": "boolean"
-        },
-        "defaultModelMigrated": {
-          "type": "boolean"
-        },
-        "chatModelMigrated": {
-          "type": "boolean"
-        },
-        "unsupportedVersionRejected": {
-          "type": "boolean"
-        },
-        "providerCatalogMigrated": {
-          "type": "boolean"
-        },
-        "actionPoliciesMigrated": {
-          "type": "boolean"
-        },
-        "savedServicesMigrated": {
-          "type": "boolean"
-        },
-        "futureActionPoliciesPreserved": {
-          "type": "boolean"
-        },
-        "actionPolicyResolutionValid": {
-          "type": "boolean"
-        },
-        "skillChecks": {
-          "type": "object",
-          "patternProperties": {
-            "^(.*)$": {
-              "type": "boolean"
-            }
-          }
-        },
-        "secretsIndexRenamed": {
-          "type": "boolean"
-        },
-        "retiredGemmaRemoved": {
-          "type": "boolean"
-        },
-        "fixtureResults": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/StorageMigrationFixtureReplay"
-          }
         }
       }
     },
