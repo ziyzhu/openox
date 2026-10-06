@@ -418,10 +418,16 @@ chats/
     └── turns.jsonl                              read-only, current or stored transcript
 ```
 
-The mount resolves permissions from the selected source, never frontmatter. System,
-enabled repository, and active Profile packages share one catalog before service
+Read-only built-in documentation lives in the signed `ModelGuidance.bundle` and
+is mounted at `guidance/<workflow>/guide.md` with supporting `references/` files.
+It is available before attachment and in temporary conversations, but is not
+Profile content, a skill package, or part of the skill catalog. Reads, listing,
+glob, and grep use the existing bounded filesystem APIs; mutations are refused.
+
+The mount resolves permissions from the selected source, never frontmatter.
+Enabled repository and active Profile packages share one catalog before service
 attachment. Duplicate names require a Profile source selection; no source silently
-overrides another. System names are reserved. Local packages are writable only at
+overrides another. Retired system names remain reserved. Local packages are writable only at
 its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same
@@ -432,8 +438,15 @@ files for unloaded chats. `ProfileRepository` encodes both with the same metadat
 and transcript format; reads do not write snapshots or change storage checkpoints.
 Temporary chats remain excluded. `ox.chat.start` creates a normal persisted chat
 without selecting it, and its ID is immediately readable through this mount.
-System-skill JavaScript references are readable as source by the agent, but are not installed,
-importable, or resolvable from a service action runtime.
+Built-in JavaScript guidance is readable as source, but is not installed,
+importable, or resolvable from a service action runtime. `StorageMigrator` owns
+read-only compatibility snapshots for old `skills/<system-name>/` paths, using
+the current guidance and its resources. Existing run snapshots take precedence;
+frozen invocations, schedules, historical migrations, user copies, and transcript
+bytes are unchanged. No persisted format or milestone changes for this move.
+Retired workflows are excluded from catalog/root skill listings. Named Pi system
+sections replace the old `ox` section through Pi's normal transcript patching;
+memory remains frozen per conversation and turn-state facts remain per-message.
 Unscoped root grep excludes chat files, while an explicit `chats` path searches
 JSONL records with a separate bounded byte budget and match-centered excerpts.
 Reads and searches are bounded; writes are atomic; writes and edits to the same

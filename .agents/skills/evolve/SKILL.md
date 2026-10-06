@@ -8,16 +8,16 @@ description: Build or update Ox services through an Ox chat on a simulator, impr
 Ox evolves services in two ways:
 
 - Development focused: a coding agent on the user's desktop drives Ox on a simulator to build or update services, observes the authoring loop, and improves it.
-- User focused: users talk directly to their Ox to build or update services through the built-in `evolve` system skill.
+- User focused: users talk directly to their Ox to build or update services through the built-in `guidance/evolve/guide.md` workflow.
 
-Both paths use the same Ox authoring workflow. Built-in services usually evolve through the development path, which also dogfoods and improves the experience available to users. Put reusable improvements in the shared runtime, tools, system skills, diagnostics, and verification so both paths benefit. Users evolving Local services do not need a desktop, simulator, or built-in promotion.
+Both paths use the same Ox authoring workflow. Built-in services usually evolve through the development path, which also dogfoods and improves the experience available to users. Put reusable improvements in the shared runtime, tools, built-in guidance, diagnostics, and verification so both paths benefit. Users evolving Local services do not need a desktop, simulator, or built-in promotion.
 
 ## Drive the development loop
 
 Read the `sim-cli` and `ox-cli` skills for simulator operation and chat control. Use the user-selected simulator and its assigned Host endpoint; follow the repository's simulator setup and data-preservation rules.
 
 1. Establish the requested service outcome and whether delivery is Local or built-in. A request to add or update a built-in service authorizes preparing its promotion after live verification; a Local-only request does not authorize publication.
-2. Build, install, and launch the app as needed. Drive a real Ox chat through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.
+2. Build, install, and launch the app as needed. Drive a real Ox chat through `guidance/evolve/guide.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, mutation, and Save boundaries.
 3. Observe the user-visible flow with `sim` and inspect chat history and structured logs with `ox`. Look for unclear prompts, repeated failures, missing capabilities, unnecessary confirmations, poor recovery, and gaps in diagnostics or verification.
 4. Notify developers of actionable findings as they emerge. Fix supported harness issues within the task's scope, rebuild as needed, and exercise the affected flow through Ox again. Return service defects and compiler diagnostics to Ox for repair and a newly verified saved revision.
 5. Verify the requested outcome through actual service actions, including applicable authentication and handoff boundaries. Browser success alone does not verify a handler. Preserve evidence outside the repository and disclose unexecuted or partially verified actions.

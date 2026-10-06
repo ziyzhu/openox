@@ -575,11 +575,9 @@ struct ConversationComposer: View, Equatable {
                 Log.ui.info("ConversationComposer.followIntent send conversation=\(sessionID) chars=\(message.count)")
                 submit()
             case .importMemory:
-                guard let skill = BuiltInSkills.skills.first(where: { $0.name == "import-memory" }) else {
-                    Log.ui.error("ConversationComposer.importMemoryIntent missingSkill conversation=\(sessionID)")
-                    return
-                }
-                onSubmitSkill(skill, "")
+                composer.draft = String(localized: "Import memory to Ox")
+                Log.ui.info("ConversationComposer.importMemoryIntent send conversation=\(sessionID)")
+                submit()
             }
         } label: {
             followIntentTitle(intent)

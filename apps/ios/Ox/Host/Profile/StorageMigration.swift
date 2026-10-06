@@ -106,6 +106,19 @@ nonisolated enum StorageMigrator {
     static let durableProfileVersion = "2026-10-05-pi-durable"
     static let nativeProfileVersion = "2026-09-28-provider-skill"
 
+    static func builtInSkillSnapshot(named name: String) throws -> Skill? {
+        guard SkillFiles.reservedNames.contains(name) else { return nil }
+        let prefix = name + "/"
+        let instructions = try BuiltInGuidance.text(prefix + "guide.md")
+        var resources: [String: String] = [:]
+        for path in try BuiltInGuidance.paths(under: name) where path != prefix + "guide.md" {
+            resources[String(path.dropFirst(prefix.count))] = try BuiltInGuidance.text(path)
+        }
+        Log.app.info("StorageMigrator.builtInSkillSnapshot name=\(name) resources=\(resources.count)")
+        return Skill(name: name, description: "Built-in Ox workflow retained for compatibility.", instructions: instructions,
+            resources: resources.isEmpty ? nil : resources, source: .system)
+    }
+
     static func createFreshProfile(name: String, base: URL, unique: Bool = false) async throws -> Profile {
         let manager = FileManager.default
         let stem = ProfileRepository.cleanName(name)

@@ -31,7 +31,7 @@ extension OxHostProtocol {
                 "temporary": .bool($0.isTemporary),
             ])
         } ?? .null
-        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "conversations"]
+        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "guidance", "skills", "services", "conversations"]
         if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
             roots.append("files")
         }

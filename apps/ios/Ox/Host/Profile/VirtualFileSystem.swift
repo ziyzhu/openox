@@ -13,6 +13,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case soul
         case artifacts
         case artifact(String)
+        case guidance(String)
         case skills
         case skill(String)
         case skillFile(String)
@@ -37,6 +38,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .soul: "SOUL.md"
             case .artifacts: "artifacts"
             case .artifact(let name): "artifacts/\(name)"
+            case .guidance(let path): path.isEmpty ? "guidance" : "guidance/\(path)"
             case .skills: "skills"
             case .skill(let name): "skills/\(name)"
             case .skillFile(let name): "skills/\(name)/SKILL.md"
@@ -60,7 +62,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         var isDirectory: Bool {
             switch self {
             case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder: true
-            case .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
+            case .guidance, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
             }
         }
 
@@ -69,6 +71,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .memory: .memory
             case .soul: .soul
             case .artifacts, .artifact: .artifacts
+            case .guidance: .guidance
             case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
             case .services, .serviceKind, .service, .serviceItem: .services
             case .chats, .chat, .chatMetadata, .chatTurns: .chats
@@ -85,6 +88,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case memory
         case soul
         case artifacts
+        case guidance
         case skills
         case services
         case chats
@@ -133,6 +137,11 @@ nonisolated public struct VirtualFileSystem: Sendable {
             let name = parts[1]
             _ = try ArtifactStore.validatedFilename(name)
             return .artifact(name)
+        case ["guidance"]: return .guidance("")
+        case let parts where parts.count >= 2 && parts[0] == "guidance":
+            let relative = parts.dropFirst().joined(separator: "/")
+            guard BuiltInGuidance.validPath(relative) else { throw Error.invalidPath(rawPath) }
+            return .guidance(relative)
         case ["skills"]: return .skills
         case let parts where parts.count == 2 && parts[0] == "skills":
             let name = parts[1]

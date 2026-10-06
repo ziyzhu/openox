@@ -1,13 +1,8 @@
----
-name: manage-providers
-description: Inspect, add, connect, customize, refresh, or restore model providers and their model lists in this Ox installation.
----
-
 # Manage Providers
 
 Manage provider and model data through the Ox VM's `ox.provider.*` APIs. Do not assume a terminal, Node.js, a host filesystem, or access to the app's source code. Read the current function contracts before unfamiliar operations; every call includes a meaningful `purpose`.
 
-Changes affect this installation's active provider catalog across Profiles, not the read-only app bundle or other users. The built-in catalog is a starting point, not a live upstream directory. This skill cannot ship new defaults, implement transports, or add native authentication mechanisms. Explain unsupported runtime requirements instead of fabricating configuration.
+Changes affect this installation's active provider catalog across Profiles, not the read-only app bundle or other users. The built-in catalog is a starting point, not a live upstream directory. This workflow cannot ship new defaults, implement transports, or add native authentication mechanisms. Explain unsupported runtime requirements instead of fabricating configuration.
 
 ## Inspect and plan
 
@@ -45,7 +40,7 @@ Use `ox.provider.authenticate` for native user-entered setup, or `ox.provider.co
 
 For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Exercise the actual configured model through a supported Ox chat/model selection path, not an invented provider-test API. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing chats, and the user's working provider.
 
-Website providers come from model-capable services. Do not save website definitions or freeze their discovered models into the native catalog. Use the service's model Actions for discovery and verification; use the built-in `evolve` skill when website behavior needs repair. Test expired/signed-out behavior only with isolated sessions or synthetic fixtures; removing authentication from a live website request can clear the user's session.
+Website providers come from model-capable services. Do not save website definitions or freeze their discovered models into the native catalog. Use the service's model Actions for discovery and verification; read `guidance/evolve/guide.md` when website behavior needs repair. Test expired/signed-out behavior only with isolated sessions or synthetic fixtures; removing authentication from a live website request can clear the user's session.
 
 ## Restore, disable, or remove
 

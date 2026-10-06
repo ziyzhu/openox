@@ -15,7 +15,7 @@ Establish through concrete examples:
 
 Ask one decisive question at a time when its answer changes the reusable workflow. Use `ox.user.choose` with 2–4 likely answers; its custom-answer path covers anything else. Stop once the workflow can be explained without inventing consequential details.
 
-Inspect existing user skills with `ox.fs.glob` and `ox.fs.read` to avoid duplicate names or overlapping instructions. When adapting an existing Profile, system, or repository skill, use `ox.skill.copy` to create the Profile-owned starting point.
+Inspect existing user skills with `ox.fs.glob` and `ox.fs.read` to avoid duplicate names or overlapping instructions. When adapting an existing Profile or repository skill, use `ox.skill.copy` to create the Profile-owned starting point.
 
 ## Validate the design
 
@@ -42,7 +42,7 @@ Then call `ox.user.choose` with `Create skill`, `Revise proposal`, and `Cancel`.
 
 ## Write the skill
 
-Use a short lowercase kebab-case name. System skill names are reserved. Other duplicate names require a source selection. Create the accepted skill with `ox.skill.create`, passing its name, description, instructions, and service domains. This writes one canonical `skills/<name>/SKILL.md` file:
+Use a short lowercase kebab-case name. Retired system names remain reserved for compatibility. Other duplicate names require a source selection. Create the accepted skill with `ox.skill.create`, passing its name, description, instructions, and service domains. This writes one canonical `skills/<name>/SKILL.md` file:
 
 ```markdown
 ---

@@ -1,8 +1,3 @@
----
-name: evolve
-description: Create, extend, repair, and verify Local web and API services, including improvements noticed during ordinary use, model-generation actions, and website tasks with no suitable service. Use existing functions directly for connections, repositories, and ordinary service use.
----
-
 # Evolve
 
 Build useful service capabilities from observed behavior. Keep discovery, exploration, implementation, live verification, and Save in one workflow. Use existing services normally when their definitions already meet the request.
@@ -11,13 +6,13 @@ Evolve a service when a requested capability is missing, an existing action is c
 
 Fulfill the original request first, then run at most one bounded improvement pass. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for verification. If improvement requires expanded scope or user input, explain the opportunity instead of proceeding. Save verified improvements only when the Local repository was clean before this work began; otherwise leave them unsaved and report the limitation.
 
-Read `skills/evolve/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
+Read `guidance/evolve/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
-For web-service authoring, read `skills/evolve/references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
+For web-service authoring, read `guidance/evolve/references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
 
-Read `skills/evolve/references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
+Read `guidance/evolve/references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
-Read `skills/evolve/references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
+Read `guidance/evolve/references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
 
 ## Ownership and safeguards
 
@@ -36,4 +31,4 @@ Share only a saved, verified Local version. Run `ox.service.validate` for every 
 
 The proposal action asks for approval, may ask the user for their GitHub personal access token, uploads only the selected service and skill files plus the repository manifest through the GitHub API, and returns the pull-request URL. It does not publish uncommitted work, clone the target repository, or create a fork. The user's GitHub account must be allowed to push the proposal ref directly to the target repository. Never put credentials, session data, raw captures, or machine-specific files in a proposal.
 
-Repositories can also share independent skills under root `skills/<name>/`. Read `skills/manage-skills/SKILL.md` when creating or publishing a reusable workflow. Services do not contain nested skills.
+Repositories can also share independent skills under root `skills/<name>/`. Read `guidance/manage-skills/guide.md` when creating or publishing a reusable workflow. Services do not contain nested skills.

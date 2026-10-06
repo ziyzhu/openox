@@ -6,7 +6,7 @@ Treat the committed Local service produced by Ox as the behavioral source of tru
 
 Require all of the following before changing built-in service source:
 
-- Ox created or copied the service into Local through `skills/evolve/SKILL.md`.
+- Ox created or copied the service into Local through `guidance/evolve/guide.md`.
 - Ox explored the live site through `ox.web.browser.*` and followed the current `evolve` planning and approval rules, including its scoped missing-service bootstrap path.
 - Ox verified every promoted action and applicable authentication or handoff boundary in iOS.
 - The Local service has a verified, saved revision with no unrelated pending Local changes.

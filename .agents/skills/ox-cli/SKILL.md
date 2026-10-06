@@ -86,7 +86,7 @@ ox vm help <ox.function>
 
 Use the `evolve` skill for the service evolution and developer-feedback loop.
 Drive an Ox chat on the user-selected simulator through the built-in
-`evolve` workflow for service exploration, authoring, repair, and live
+`guidance/evolve/guide.md` workflow for service exploration, authoring, repair, and live
 verification. While observing the run, use chat history and structured logs to
 identify friction, repeated failures, and missing capabilities. Fix the underlying
 harness issues and improve tools, instructions, diagnostics, or verification

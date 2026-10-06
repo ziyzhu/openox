@@ -317,6 +317,7 @@ extension Scenario {
 
     public static var defaultLibrary: [String: Scenario] {
         var library = Dictionary(uniqueKeysWithValues: catalog.flatMap(\.entries).map { ($0.number, $0.scenario) })
+        library["72 guidance"] = skillCatalog
         library[String(repeating: "slow ", count: 200).trimmingCharacters(in: .whitespaces)] = slowFirstToken
         return library
     }
@@ -738,8 +739,8 @@ extension Scenario {
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableSystemSkills = SkillFiles.reservedNames.allSatisfy {
-            ctx.transientContext.contains("skills/\($0)/SKILL.md") && !ctx.systemPrompt.contains("- `skills/\($0)/SKILL.md` —")
+        let hasStableGuidance = BuiltInGuidance.names.allSatisfy {
+            ctx.systemPrompt.contains("guidance/\($0)/guide.md") && !ctx.transientContext.contains("skills/\($0)/SKILL.md")
         }
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
@@ -775,13 +776,29 @@ extension Scenario {
               !ctx.transientContext.contains("User slash commands:"),
               !ctx.transientContext.contains("System skills:"),
               !ctx.transientContext.contains("127.0.0.1:delayedEcho"),
-              hasStableSystemSkills,
+              hasStableGuidance,
               hasTimestamp,
               hasTurnStateAfterTimestamp,
               !verifiesStablePrefix || retainedServiceState,
               hasArtifactState,
               hasServiceSkill == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
+        }
+        if ctx.latestUserSaid("guidance") {
+            guard let result = ctx.toolResults.last else {
+                return [execute("""
+                const files = await ox.fs.glob({ path: "guidance", pattern: "**/guide.md", purpose: "Find built-in guidance" });
+                const guide = await ox.fs.read({ path: "guidance/manage-skills/guide.md", purpose: "Read built-in guidance" });
+                const references = await ox.fs.list({ path: "guidance/manage-skills/references", purpose: "List guidance references" });
+                console.log({ count: files.paths.length, guide: guide.text.includes("# Manage Skills"), references: references.items.length });
+                """), .stop(.toolUse)]
+            }
+            guard !result.isError, result.activatedSkills.isEmpty,
+                  let text = ctx.resultText("execute"), let values = JSONValue.parse(jsonString: text)?.objectValue,
+                  values["count"]?.intValue == 5, values["guide"]?.boolValue == true, values["references"]?.intValue == 2 else {
+                return [.say("Built-in guidance context was incorrect."), .stop(.stop)]
+            }
+            return [.say("Built-in guidance loaded without activating a skill."), .stop(.stop)]
         }
         if activatesUserSkill {
             guard let result = ctx.toolResults.last else {

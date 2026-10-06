@@ -22,7 +22,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,
-protocol schema consistency, bundled system skills, translations, provider models,
+protocol schema consistency, built-in guidance resources and links, translations, provider models,
 and provider definitions before checking TypeScript. `.agents/tsconfig.json`
 includes test, eval, Gym, demo, setup, build, and release code.
 

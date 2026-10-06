@@ -85,6 +85,8 @@ and are diagnostic evidence, not Profile exports or power-loss verification.
 
 Keep Mock focused on model streaming, tool loops, handoffs, and model-visible context. Feature-specific regression setup, assertions, and cleanup belong in E2E runners, not new numbered Mock scenarios. The Mock menu is the source of truth for supported inputs; retired numbers fall back to that menu. Removing a Mock regression does not establish replacement coverage.
 
+Built-in guidance boundaries use `bun .agents/skills/test/apps/ios/guidance.ts --device ox-N --host ws://<VPN-address>:<assigned-port> --chat <QA-chat-id>` after installing a fresh build. It verifies read-only documentation, discovery/search, and old-path compatibility without model inference or Profile writes. Mock `72 guidance` covers model-visible loading without skill activation; it is not full workflow verification.
+
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use
 the `demo` skill for its workflow.

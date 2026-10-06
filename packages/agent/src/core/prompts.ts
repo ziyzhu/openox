@@ -3,7 +3,7 @@ import { hostContextText, activeHost, sameScope, type HostContext, type HostScop
 export const defaultSoul = "## Voice\nBe warm, quietly competent, and a little dry. Sound like a capable teammate in a live conversation. Lead with the result, default to concise natural replies, and be direct about risks or disagreement. Match the user's tone and use judgment; style never overrides accuracy, safety, or the user's request.";
 export interface ResponseLanguage { identifier: string; name: string }
 export interface SystemPromptInput { soul: string; memory: string; hostContext?: HostContext }
-export interface PromptScaffold { identity: string; operatingRules: string; skills: string }
+export interface PromptScaffold { identity: string; operatingRules: string; skills: string; guidance?: string }
 export interface TurnState {
   skills: { name: string; description: string }[];
   skillConflicts: string[];
@@ -30,9 +30,12 @@ const ordered = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 export function composeSystemPrompt(input: SystemPromptInput, scaffold: PromptScaffold) {
   if (typeof input?.soul !== "string" || typeof input?.memory !== "string") throw new Error("Prompt state requires soul and memory text");
-  const { identity, operatingRules, skills } = scaffold;
-  return { scaffold: join([identity, operatingRules, skills]), soul: input.soul, memory: input.memory,
-    rendered: join([identity, input.soul, operatingRules, skills, `## Memory\n${input.memory}`]) };
+  const { identity, operatingRules, skills, guidance = "" } = scaffold;
+  const sections = Object.fromEntries(Object.entries({ ox_identity: identity, ox_soul: input.soul,
+    ox_rules: operatingRules, ox_guidance: guidance, ox_skills: skills, ox_memory: `## Memory\n${input.memory}` })
+    .filter(([, text]) => text.length > 0));
+  return { scaffold: join([identity, operatingRules, guidance, skills]), soul: input.soul, memory: input.memory,
+    sections, rendered: join(Object.values(sections)) };
 }
 
 export function responseDirective(language: ResponseLanguage | null) {

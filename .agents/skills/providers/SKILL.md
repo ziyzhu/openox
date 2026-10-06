@@ -1,19 +1,19 @@
 ---
 name: providers
-description: Drive Ox's manage-providers workflow, review and promote verified provider/model updates into bundled defaults, or maintain native provider transports and authentication. Use for development changes to Ox's provider catalog or runtime; routine on-device management belongs to Ox's built-in manage-providers skill, not this desktop workflow.
+description: Drive Ox's manage-providers workflow, review and promote verified provider/model updates into bundled defaults, or maintain native provider transports and authentication. Use for development changes to Ox's provider catalog or runtime; routine on-device management belongs to Ox's built-in provider guidance, not this desktop workflow.
 ---
 
 # Ox Providers
 
-Ox owns provider and model management through the built-in `manage-providers` skill. This desktop workflow exercises that same path, ships reviewed defaults, and maintains runtime support that cannot be expressed as provider data. Do not maintain a second catalog-management playbook here.
+Ox owns provider and model management through `guidance/manage-providers/guide.md`. This desktop workflow exercises that same path, ships reviewed defaults, and maintains runtime support that cannot be expressed as provider data. Do not maintain a second catalog-management playbook here.
 
 ## Drive Ox
 
 Read the `sim-cli` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
 
 1. Establish whether the request is for an on-device change, bundled defaults, or native runtime support. On-device management does not authorize publication.
-2. Drive a real Ox chat through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
-3. Observe chat history, provider state, and structured logs. Report missing capabilities or unclear boundaries; improve the shared skill or runtime and exercise the workflow again.
+2. Drive a real Ox chat through `guidance/manage-providers/guide.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
+3. Observe chat history, provider state, and structured logs. Report missing capabilities or unclear boundaries; improve the shared guidance or runtime and exercise the workflow again.
 4. Preserve sanitized verification evidence outside the repository. State separately which definitions were validated, which models were exercised, and which checks remain unperformed.
 
 ## Promote bundled defaults
@@ -28,7 +28,7 @@ Only promote when the user requests a bundled update. Read the matching provider
 
 ## Maintain native support
 
-Read [native integrations](references/native-integrations.md) and the matching provider reference before changing native composition, transport, authentication, website adapters, or artwork. These changes belong in code, not an on-device skill. New model-capable website behavior belongs to the built-in `evolve` workflow and shared `WebServiceModelProvider`, not a site-specific Swift provider.
+Read [native integrations](references/native-integrations.md) and the matching provider reference before changing native composition, transport, authentication, website adapters, or artwork. These changes belong in code, not on-device guidance. New model-capable website behavior belongs to the built-in `evolve` workflow and shared `WebServiceModelProvider`, not a site-specific Swift provider.
 
 Run `bun run typecheck` after provider or catalog changes. Build and exercise runtime Swift changes with `sim`. Do not commit unless requested.
 

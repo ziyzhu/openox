@@ -22,6 +22,7 @@ extension Conversation {
                     fileSystemItem(path: "MEMORY.md", type: "file", size: UserMemory.shared.text.utf8.count),
                     fileSystemItem(path: "SOUL.md", type: "file", size: Soul.shared.text.utf8.count),
                     fileSystemItem(path: "artifacts", type: "directory", size: nil),
+                    fileSystemItem(path: "guidance", type: "directory", size: nil),
                     fileSystemItem(path: "skills", type: "directory", size: nil),
                     fileSystemItem(path: "services", type: "directory", size: nil),
                     fileSystemItem(path: "conversations", type: "directory", size: nil),
@@ -33,6 +34,10 @@ extension Conversation {
             case .artifacts:
                 items = try await repository.artifacts(in: scope).map {
                     fileSystemItem(path: "artifacts/\($0.fileName)", type: "file", size: $0.size)
+                }
+            case .guidance(let path):
+                items = try BuiltInGuidance.entries(under: path).map {
+                    fileSystemItem(path: $0.path, type: $0.isDirectory ? "directory" : "file", size: $0.size)
                 }
             case .skills:
                 items = try await skillsMount.entries().map {
@@ -410,7 +415,7 @@ extension Conversation {
             break
         case .deviceFolder(let id):
             guard DeviceFolderStore.shared.grant(id) != nil else { throw DeviceFolderStore.StoreError.missingGrant(id) }
-        case .root, .memory, .soul, .artifacts, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
             return
         }
         try requireIOSService("ios:files")
@@ -421,7 +426,7 @@ extension Conversation {
         switch location {
         case .skill(let name), .skillFile(let name), .skillResource(let name, _):
             try await skillsMount.requireWritable(name: name, path: location.path)
-        case .skillDirectory:
+        case .guidance, .skillDirectory:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .serviceItem:
             return
@@ -433,13 +438,15 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return
-        case .root, .memory, .soul, .artifacts, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
             try requireProfileMutation(action)
         }
     }
 
     private func fileSystemIsDirectory(_ location: VirtualFileSystem.Location) async throws -> Bool {
         switch location {
+        case .guidance(let path):
+            return try BuiltInGuidance.isDirectory(path)
         case .skillResource(let name, let path):
             return try await skillsMount.entry(named: name).resources.contains { $0.name.hasPrefix(path + "/") }
         case .serviceItem(let kind, let domain, let path):
@@ -459,7 +466,7 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return "files:\(path)"
-        case .root, .memory, .soul, .artifacts, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
             return "profile:\(scope.root.standardizedFileURL.path.lowercased()):\(path)"
         }
     }
@@ -532,6 +539,8 @@ extension Conversation {
                 try ArtifactLibrary.read(artifact, options: readOptions)
             }.value
             return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
+        case .guidance(let path):
+            return try fileSystemTextRead(BuiltInGuidance.text(path), maxBytes: maxBytes)
         case .skillFile(let name):
             let skill = try await skillsMount.activate(named: name)
             let result = try fileSystemTextRead(skill.content, maxBytes: maxBytes)
@@ -596,6 +605,8 @@ extension Conversation {
             }
             guard let text = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
             return text
+        case .guidance(let path):
+            return try BuiltInGuidance.text(path)
         case .skillFile(let name):
             return try await skillsMount.entry(named: name).content
         case .skillResource(let name, let referenceName):
@@ -629,6 +640,8 @@ extension Conversation {
             throw ArtifactError.textTooLarge(bytes: data.count, limit: ArtifactLimits.textBytes)
         }
         switch location {
+        case .guidance:
+            throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .memory:
             UserMemory.shared.text = content
             return fileSystemItem(path: location.path, type: "file", size: data.count)
@@ -678,6 +691,8 @@ extension Conversation {
 
     private func fileSystemPaths(for base: VirtualFileSystem.Location) async throws -> [String] {
         switch base {
+        case .guidance(let path):
+            return try BuiltInGuidance.paths(under: path).map { "guidance/" + $0 }
         case .services:
             var paths: [String] = []
             for service in servicesMount.entries() {
@@ -732,7 +747,7 @@ extension Conversation {
             return try await deviceFilePaths(base)
         case .chats:
             return await chatFileSystemPaths()
-        case .root, .memory, .soul, .artifacts, .skills, .services:
+        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services:
             break
         }
         let artifacts = try await repository.artifacts(in: scope).map { "artifacts/\($0.fileName)" }
@@ -745,9 +760,10 @@ extension Conversation {
             if services.count >= VirtualFileSystem.maximumSearchFiles { break }
         }
         let chats = await chatFileSystemPaths()
-        return (["MEMORY.md", "SOUL.md"] + artifacts + skills + services + chats).sorted {
-            $0.localizedStandardCompare($1) == .orderedAscending
-        }
+        let guidance = try BuiltInGuidance.paths().map { "guidance/" + $0 }
+        var paths = ["MEMORY.md", "SOUL.md"]
+        for group in [guidance, artifacts, skills, services, chats] { paths.append(contentsOf: group) }
+        return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     private func chatFileSystemPaths() async -> [String] {
@@ -782,6 +798,8 @@ extension Conversation {
     private func fileSystemSearchText(_ path: String) async throws -> String? {
         let location = try virtualMachine.fileSystem.location(path)
         switch location {
+        case .guidance(let path):
+            return try BuiltInGuidance.isDirectory(path) ? nil : BuiltInGuidance.text(path)
         case .memory:
             return UserMemory.shared.text
         case .soul:

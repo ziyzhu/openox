@@ -415,7 +415,7 @@ export class IOSAgentAdapter {
 
   private async attach(config: Config, requestedReference?: ConversationReference) {
     if (!config?.chatID) throw new Error("A native route identity is required");
-    const systemPrompt = composeIOSPrompt(config.promptState, config.isolatedWorkspace).rendered;
+    const prompt = composeIOSPrompt(config.promptState, config.isolatedWorkspace);
     if (config.toolExecutionMode !== undefined && !["parallel", "sequential"].includes(config.toolExecutionMode)) throw new Error("Invalid tool execution mode");
     if (config.providerID !== undefined && (typeof config.providerID !== "string" || !config.providerID)) throw new Error("Invalid native credential provider ID");
     if (config.thinkingLevel != null && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(config.thinkingLevel)) throw new Error("Invalid Pi thinking level");
@@ -445,7 +445,7 @@ export class IOSAgentAdapter {
       models: [{ id: config.model, provider: alias, api: "ox-native", name: config.model, baseUrl: "", reasoning: config.reasoning,
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
-    const extension = defineExtension({ name: extensionName ?? `ox-chat:${alias.slice(10)}`, sections: [section("ox", () => systemPrompt, { tag: false })],
+    const extension = defineExtension({ name: extensionName ?? `ox-chat:${alias.slice(10)}`, sections: Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: false })),
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });
     session.registry.install(extension);
