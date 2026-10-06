@@ -214,7 +214,8 @@ final class ScheduledSkills {
     nonisolated static let maximumOutcomeCharacters = 500
 
     private(set) var all: [ScheduledSkill] = []
-    private(set) var isLoaded = false
+    private(set) var preparation: StoragePreparation?
+    var isLoaded: Bool { preparation == .ready }
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let url: URL
 
@@ -222,15 +223,18 @@ final class ScheduledSkills {
         self.url = url
     }
 
-    func load() throws {
+    func load(retry: Bool = false) throws {
         guard !isLoaded else { return }
-        if FileManager.default.fileExists(atPath: url.path) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            all = try decoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: url)).validated().schedules
+        if !retry, let message = preparation?.failureMessage { throw StorageMigrationError.recoveryRequired(message) }
+        do {
+            all = try StorageMigrator.prepareScheduledSkills(at: url)
+            preparation = .ready
+            Log.app.info("ScheduledSkills.load count=\(all.count)")
+        } catch {
+            preparation = .needsRecovery(error.localizedDescription)
+            Log.app.error("ScheduledSkills.load needsRecovery=true sourcePreserved=true error=\(error.localizedDescription)")
+            throw error
         }
-        isLoaded = true
-        Log.app.info("ScheduledSkills.load count=\(all.count)")
     }
 
     @discardableResult
@@ -318,13 +322,15 @@ final class ScheduledSkills {
     }
 
     func due(at date: Date) -> [ScheduledSkill] {
-        all.filter { schedule in
+        guard isLoaded else { return [] }
+        return all.filter { schedule in
             schedule.isEnabled && schedule.nextFireAt.map { $0 <= date } == true
         }.sorted { ($0.nextFireAt ?? .distantPast) < ($1.nextFireAt ?? .distantPast) }
     }
 
     func nextEnabledDate() -> Date? {
-        all.compactMap { $0.isEnabled ? $0.nextFireAt : nil }.min()
+        guard isLoaded else { return nil }
+        return all.compactMap { $0.isEnabled ? $0.nextFireAt : nil }.min()
     }
 
     func record(

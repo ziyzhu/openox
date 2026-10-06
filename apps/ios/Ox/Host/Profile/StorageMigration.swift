@@ -68,6 +68,7 @@ nonisolated enum StorageMigrationError: LocalizedError {
     case missingConfig
     case localRepositoryRollbackFailed(String)
     case profileMigrationFailed(String)
+    case recoveryRequired(String)
     case unsupportedProfileVersion(String, String)
 
     var errorDescription: String? {
@@ -83,9 +84,20 @@ nonisolated enum StorageMigrationError: LocalizedError {
         case .missingConfig: "The Profile configuration could not be read."
         case .localRepositoryRollbackFailed(let detail): "The Local repository repair and rollback failed: \(detail)"
         case .profileMigrationFailed(let name): "The Profile “\(name)” could not be updated safely."
+        case .recoveryRequired(let message): message
         case .unsupportedProfileVersion(let name, let version):
             "The Profile “\(name)” uses data format “\(version)”, which this version of Ox does not support. Install the Ox version that last opened it or a newer one."
         }
+    }
+}
+
+nonisolated enum StoragePreparation: Equatable, Sendable {
+    case ready
+    case needsRecovery(String)
+
+    var failureMessage: String? {
+        if case .needsRecovery(let message) = self { return message }
+        return nil
     }
 }
 
@@ -175,7 +187,7 @@ nonisolated enum StorageMigrator {
         if FileManager.default.fileExists(atPath: root.path) {
             guard !FileManager.default.fileExists(atPath: backup.path),
                   let result = journal["result"] as? [String: Any], let inventory = result["sourceInventory"] as? [String: String],
-                  try durableSourceInventory(at: root) == inventory else { throw StorageMigrationError.profileMigrationFailed(root.lastPathComponent) }
+                  try migrationSourceInventory(at: root) == inventory else { throw StorageMigrationError.profileMigrationFailed(root.lastPathComponent) }
             try FileManager.default.moveItem(at: root, to: backup)
             try syncDurableDirectory(root.deletingLastPathComponent())
             try syncDurableDirectory(backup.deletingLastPathComponent())
@@ -414,28 +426,65 @@ nonisolated enum StorageMigrator {
                     || (path.hasPrefix("chats/") && ["chat.json", "turns.jsonl", "context.json"].contains(url.lastPathComponent)) else {
                     throw StorageMigrationError.invalidApplicationStorage(path)
                 }
-                files[path] = durableDigest(try durableSourceFile(path, at: root))
+                files[path] = try durableSourceFingerprint(path, at: root)
             }
         }
         return files
     }
 
-    private static func durableSourceFile(_ path: String, at root: URL, limit: Int = 64 * 1024 * 1024) throws -> Data {
+    private static func durableSourceDescriptor(_ path: String, at root: URL) throws -> Int32 {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else {
             throw StorageMigrationError.invalidApplicationStorage(path)
         }
         var descriptor = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+        do {
+            for (index, part) in parts.enumerated() {
+                let next = openat(descriptor, part, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | (index < parts.count - 1 ? O_DIRECTORY : 0))
+                guard next >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+                Darwin.close(descriptor); descriptor = next
+            }
+            var info = stat()
+            guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1, info.st_size >= 0 else {
+                throw StorageMigrationError.invalidApplicationStorage(path)
+            }
+            return descriptor
+        } catch { Darwin.close(descriptor); throw error }
+    }
+
+    private static func durableSourceFingerprint(_ path: String, at root: URL) throws -> String {
+        let descriptor = try durableSourceDescriptor(path, at: root)
         defer { Darwin.close(descriptor) }
-        for (index, part) in parts.enumerated() {
-            let next = openat(descriptor, part, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | (index < parts.count - 1 ? O_DIRECTORY : 0))
-            guard next >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
-            Darwin.close(descriptor); descriptor = next
-        }
         var before = stat()
-        guard fstat(descriptor, &before) == 0, before.st_mode & S_IFMT == S_IFREG, before.st_nlink == 1,
-              before.st_size >= 0, before.st_size <= limit else { throw StorageMigrationError.invalidApplicationStorage(path) }
+        guard fstat(descriptor, &before) == 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+        var hash = SHA256()
+        var size = 0
+        var buffer = [UInt8](repeating: 0, count: 128 * 1024)
+        while true {
+            let count = Darwin.read(descriptor, &buffer, buffer.count)
+            if count < 0 && errno == EINTR { continue }
+            guard count >= 0 else { throw StorageMigrationError.invalidApplicationStorage(path) }
+            if count == 0 { break }
+            hash.update(data: Data(buffer.prefix(count)))
+            size += count
+        }
+        var after = stat()
+        guard fstat(descriptor, &after) == 0, after.st_size == before.st_size, size == before.st_size,
+              after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec, after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec else {
+            throw StorageMigrationError.invalidApplicationStorage(path)
+        }
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func durableSourceFile(_ path: String, at root: URL, limit: Int = 64 * 1024 * 1024) throws -> Data {
+        let descriptor = try durableSourceDescriptor(path, at: root)
+        defer { Darwin.close(descriptor) }
+        var before = stat()
+        guard fstat(descriptor, &before) == 0, before.st_size <= limit else {
+            Log.app.error("StorageMigrator.pi source too large path=\(path) bytes=\(before.st_size) limit=\(limit)")
+            throw StorageMigrationError.invalidApplicationStorage(path)
+        }
         var output = Data()
         var buffer = [UInt8](repeating: 0, count: 128 * 1024)
         while true {
@@ -518,7 +567,7 @@ nonisolated enum StorageMigrator {
         try await storage.resolve()
         try migrateSecretProviderKeys()
         try removeVerifiedLegacyProviderKeys()
-        try await services.prepareStorage()
+        await services.prepareStorage()
         let manifests = try await services.storageManifestFiles()
         try migrateAPIServiceOAuthAccounts(manifests: manifests)
         try migrateSecretAPIServiceCredentials(manifests: manifests)
@@ -829,16 +878,29 @@ nonisolated enum StorageMigrator {
             return migrated
         }
         guard profile.location == .local else { throw StorageMigrationError.invalidApplicationStorage("Pi Profiles require an offline local import; live cloud/external database synchronization is unsupported") }
-        guard await migrateProfile(migrated) else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
-        migrated.version = nativeProfileVersion
+        let working = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-source-work-" + UUID().uuidString)
+        let inventory = try await Task.detached(priority: .userInitiated) {
+            try copyMigrationSource(from: profile.url, to: working)
+        }.value
+        var draft = migrated
+        draft.url = working
+        try await migrateProfile(draft)
+        draft.version = nativeProfileVersion
         let destination = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-stage-" + UUID().uuidString)
-        let result = try await stageDurableProfile(migrated, at: destination)
+        let staged = try await stageDurableProfile(draft, at: destination)
+        guard var fields = staged.objectValue, try migrationSourceInventory(at: profile.url) == inventory else {
+            throw StorageMigrationError.profileMigrationFailed(profile.name)
+        }
+        fields["sourceInventory"] = .from(inventory)
+        let result = JSONValue.object(fields)
         let journalRoot = try durableJournalDirectory(profile.id)
         let backup = journalRoot.appendingPathComponent("source-" + UUID().uuidString)
         let journal: [String: Any] = ["format": 1, "phase": "prepared", "profileID": profile.id.uuidString,
             "root": profile.url.path, "stage": destination.path, "backup": backup.path, "result": result.toAny()]
         try writeDurableJournal(journal, profileID: profile.id)
         try publishDurableJournal(journal)
+        do { try FileManager.default.removeItem(at: working) }
+        catch { Log.app.warning("StorageMigrator.pi workingCopy cleanup deferred error=\(error.localizedDescription)") }
         migrated.version = durableProfileVersion
         Log.app.info("StorageMigrator.pi activated id=\(profile.id) sourcePreserved=true")
         return migrated
@@ -996,22 +1058,6 @@ nonisolated enum StorageMigrator {
             as: [DeviceFolderStore.Grant].self,
             component: "folder grants"
         )
-        if FileManager.default.fileExists(atPath: AppStoragePaths.scheduledSkills.path) {
-            do {
-                try migrateScheduledSkillPackages(at: AppStoragePaths.scheduledSkills)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let document = try decoder.decode(
-                    ScheduledSkillsDocument.self,
-                    from: Data(contentsOf: AppStoragePaths.scheduledSkills)
-                )
-                _ = try document.validated()
-            } catch {
-                Log.app.error("StorageMigrator.validate component=scheduled skills failed=\(error.localizedDescription)")
-                throw StorageMigrationError.invalidApplicationStorage("scheduled skills")
-            }
-        }
-
         let defaults = UserDefaults.standard
         do {
             guard let data = defaults.data(forKey: ProviderRegistry.catalogKey) else {
@@ -1552,6 +1598,83 @@ nonisolated enum StorageMigrator {
         }
     }
 
+    static func prepareScheduledSkills(at file: URL) throws -> [ScheduledSkill] {
+        guard FileManager.default.fileExists(atPath: file.path) else { return [] }
+        try migrateScheduledSkillPackages(at: file)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let document = try decoder.decode(ScheduledSkillsDocument.self, from: Data(contentsOf: file))
+        let schedules = try document.validated().schedules
+        Log.app.info("StorageMigrator.schedules prepared version=\(document.version) count=\(schedules.count)")
+        return schedules
+    }
+
+    static func exportRecoverySource(at source: URL) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Ox Recovery-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        let destination = directory.appendingPathComponent(source.lastPathComponent)
+        _ = try copyMigrationSource(from: source, to: destination)
+        return destination
+    }
+
+    @MainActor
+    static func recoverOptionalStorage(services: ServiceManager) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        if services.localRecoveryMessage != nil {
+            do {
+                try await services.retryLocalStorage()
+                Log.app.info("StorageMigrator.recovery done resource=local")
+            } catch {
+                Log.app.warning("StorageMigrator.recovery deferred resource=local error=\(error.localizedDescription)")
+            }
+        }
+        guard !Task.isCancelled else { return false }
+        if ScheduledSkills.shared.preparation?.failureMessage != nil {
+            do {
+                try ScheduledSkills.shared.load(retry: true)
+                try ScheduledSkillScheduler.shared.activate()
+                Log.app.info("StorageMigrator.recovery done resource=schedules")
+            } catch {
+                Log.app.warning("StorageMigrator.recovery deferred resource=schedules error=\(error.localizedDescription)")
+            }
+        }
+        return services.localRecoveryMessage == nil && ScheduledSkills.shared.preparation == .ready
+    }
+
+    private static func copyMigrationSource(from source: URL, to destination: URL) throws -> [String: String] {
+        let inventory = try migrationSourceInventory(at: source)
+        try FileManager.default.copyItem(at: source, to: destination)
+        guard try migrationSourceInventory(at: source) == inventory,
+              try migrationSourceInventory(at: destination) == inventory else {
+            throw StorageMigrationError.collision(source.lastPathComponent)
+        }
+        return inventory
+    }
+
+    private static func migrationSourceInventory(at root: URL) throws -> [String: String] {
+        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey]
+        let values = try root.resourceValues(forKeys: keys)
+        guard values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(root.lastPathComponent) }
+        if values.isRegularFile == true {
+            return ["": try durableSourceFingerprint(root.lastPathComponent, at: root.deletingLastPathComponent())]
+        }
+        guard values.isDirectory == true else { throw StorageMigrationError.invalidApplicationStorage(root.lastPathComponent) }
+        var files: [String: String] = [:]
+        var directories = [root]
+        while let directory = directories.popLast() {
+            for url in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)) {
+                let values = try url.resourceValues(forKeys: keys)
+                guard values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(url.lastPathComponent) }
+                if values.isDirectory == true { directories.append(url) }
+                else {
+                    let path = String(url.path.dropFirst(root.path.count + 1))
+                    files[path] = try durableSourceFingerprint(path, at: root)
+                }
+            }
+        }
+        return files
+    }
+
     private static func migrateScheduledSkillPackages(at file: URL) throws {
         guard var document = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any],
               document["version"] as? Int == 1, var schedules = document["schedules"] as? [[String: Any]] else { return }
@@ -1642,19 +1765,21 @@ nonisolated enum StorageMigrator {
         Log.app.info("StorageMigrator.reservedSkill name=\(name) renamed=\(sourceExists)")
     }
 
-    private static func migrateProfile(_ profile: Profile) async -> Bool {
+    private static func migrateProfile(_ profile: Profile) async throws {
         guard let sourceVersion = sourceVersion(for: profile.version),
-              let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else { return false }
+              let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else {
+            throw StorageMigrationError.unsupportedProfileVersion(profile.name, profile.version)
+        }
         let target = ProfileSchema.versions.firstIndex(of: nativeProfileVersion)!
-        guard from < target else { return true }
+        guard from < target else { return }
         let url = profile.url
         let id = profile.id
         let was = profile.version
-        return await Task.detached(priority: .userInitiated) {
+        try await Task.detached(priority: .userInitiated) {
             let complete = await materialize(at: url)
             guard complete else {
                 Log.app.warning("StorageMigrator.deferred id=\(id) version=\(was) awaiting downloads")
-                return false
+                throw StorageMigrationError.profileMigrationFailed(profile.name)
             }
             Log.app.info("StorageMigrator.start id=\(id) from=\(was) to=\(ProfileSchema.current)")
             for step in from..<target {
@@ -1664,11 +1789,10 @@ nonisolated enum StorageMigrator {
                     try stamp(version, at: url)
                 } catch {
                     Log.app.error("StorageMigrator.failed id=\(id) step=\(version) error=\(error.localizedDescription)")
-                    return false
+                    throw error
                 }
             }
-            Log.app.info("StorageMigrator.done id=\(id) version=\(ProfileSchema.current)")
-            return true
+            Log.app.info("StorageMigrator.done id=\(id) version=\(nativeProfileVersion)")
         }.value
     }
 

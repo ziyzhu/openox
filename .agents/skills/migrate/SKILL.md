@@ -32,6 +32,10 @@ Before running another checkout or older build against an existing app container
 
 Prefer ordered, retry-safe milestones. Stamp a milestone only after all of its operations succeed. Preserve a recoverable source or equivalent destination across interruption. Define collision behavior explicitly; never replace ambiguous user data. Preserve Local Git history, index state, working-tree changes, and detached views unless the migration specifically and safely transforms them.
 
+Run legacy Profile transforms on an isolated verified copy, then publish the complete validated destination through the recovery journal. Preserve the original representation until publication; milestone progress on a working copy must not advance the original Profile.
+
+Optional-resource failures may isolate the feature instead of startup only when all readers, writers, and background execution are gated. Recovery must be automatic through `StorageMigrator`, with bounded retry frequency and restart/foreground handling; never require the user to repair files or discard data, and never roll back to a stale snapshot that could replay effects.
+
 Keep a legacy read fallback during the migration window when it materially reduces data-loss risk, but make the migrator responsible for converging storage to the current representation. Derived caches may be invalidated and rebuilt after authoritative migration succeeds.
 
 Log structured detection, start, completion, deferral, and failure events without credentials or reusable secrets. Include the source and target milestone and bounded item counts so TestFlight diagnostics can distinguish absent data from failed discovery or indexing.

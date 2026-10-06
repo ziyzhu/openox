@@ -314,6 +314,7 @@ actor Repository {
     private let configurationURL: URL
     private var configuration: Configuration
     private var activeSources: [String: ActiveSource] = [:]
+    private var localPreparation: StoragePreparation?
 
     init(root: URL? = nil, developmentRemote: URL? = nil) {
         bundledRoot = root ?? Bundle.main.url(forResource: "OxServices", withExtension: "bundle")
@@ -323,19 +324,23 @@ actor Repository {
         configuration = Self.loadConfiguration(from: configurationURL)
     }
 
-    func prepareStorage() throws {
-        try materializeLocalRepository()
+    func prepareStorage(retry: Bool = false) {
+        if retry { localPreparation = nil }
+        else if localPreparation?.failureMessage != nil { return }
+        do {
+            try materializeLocalRepository()
+            localPreparation = .ready
+        } catch {
+            let message = Self.errorMessage(error)
+            localPreparation = .needsRecovery(message)
+            activeSources = activeSources.filter { $0.value.provenance != .local }
+            Log.service.error("Repository.local needsRecovery=true sourcePreserved=true error=\(message)")
+        }
     }
 
     func monoRepository() async throws -> MonoRepository {
-        var localMaterializationFailure: String?
-        do {
-            try materializeLocalRepository()
-        } catch {
-            let message = Self.errorMessage(error)
-            localMaterializationFailure = message
-            Log.service.error("Repository.local unavailable error=\(message)")
-        }
+        prepareStorage()
+        let localMaterializationFailure = localPreparation?.failureMessage
         let bundled = loadBundledRepository()
         let development = loadDevelopmentRepository()
         let local = localMaterializationFailure.map(failedLocal) ?? loadLocalRepository()
@@ -604,6 +609,7 @@ actor Repository {
     }
 
     func validateLocalSkills() throws {
+        try materializeLocalRepository()
         let package = try Self.loadPackage(at: localRoot, provenance: .local)
         for name in package.skills { _ = try SkillFiles.load(directory: localRoot.appendingPathComponent("skills/\(name)")) }
     }
@@ -718,6 +724,7 @@ actor Repository {
     }
 
     func exportLocalRepository() throws -> URL {
+        if localPreparation?.failureMessage != nil { return try StorageMigrator.exportRecoverySource(at: localRoot) }
         try materializeLocalRepository()
         let manager = FileManager.default
         let exportRoot = manager.temporaryDirectory
@@ -954,6 +961,7 @@ actor Repository {
     }
 
     private func localSource(kind: ServiceKind, id: String) throws -> ActiveSource {
+        if let message = localPreparation?.failureMessage { throw Failure(message: message) }
         let package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard let service = package.services.first(where: { $0.id.kind == kind && $0.id.runtimeID == id }) else {
             throw Failure(message: "No Local service exists for \(id).")
@@ -1283,6 +1291,7 @@ actor Repository {
     }
 
     private func materializeLocalRepository() throws {
+        if let message = localPreparation?.failureMessage { throw Failure(message: message) }
         let packageURL = Self.repositoryManifestURL(at: localRoot)
         if !FileManager.default.fileExists(atPath: packageURL.path) {
             try FileManager.default.createDirectory(at: localRoot, withIntermediateDirectories: true)
@@ -1297,6 +1306,9 @@ actor Repository {
         try StorageMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
         try StorageMigrator.migrateLegacyLocalServiceActions(at: localRoot)
         try StorageMigrator.migrateLocalRepositoryVersion(at: localRoot)
+        _ = try StorageMigrator.prepareRepository(at: localRoot, local: true)
+        _ = try Self.loadPackage(at: localRoot, provenance: .local)
+        _ = try Self.gitState(at: localRoot)
     }
 
     private func loadLocalRepository() -> LoadedRepository {
@@ -1366,6 +1378,7 @@ actor Repository {
     }
 
     private func activeSource(kind: ServiceKind, id: String) throws -> ActiveSource {
+        if activeSources[id]?.provenance == .local, let message = localPreparation?.failureMessage { throw Failure(message: message) }
         guard let source = activeSources[id], source.kind == kind else { throw Failure(message: "Service not found") }
         return source
     }

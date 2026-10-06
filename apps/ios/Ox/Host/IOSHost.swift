@@ -1,3 +1,6 @@
+import Foundation
+import UIKit
+
 @MainActor
 final class IOSHost: OxHost {
     private struct PreparedStorage {}
@@ -13,6 +16,8 @@ final class IOSHost: OxHost {
     let chats: ConversationManager
 
     private var preparation: Preparation?
+    private var optionalRecovery: Task<Void, Never>?
+    private var recoveryObservers: [NSObjectProtocol] = []
 
     convenience init() {
         StorageMigrator.migrateApplicationStorage()
@@ -39,6 +44,19 @@ final class IOSHost: OxHost {
             presentations: presentations
         )
         chats.profilePreparation = { [weak self] in await self?.waitUntilProfilePrepared() }
+        recoveryObservers = [
+            NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.resumeOptionalStorageRecovery() }
+            },
+            NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.pauseOptionalStorageRecovery() }
+            },
+        ]
+    }
+
+    deinit {
+        optionalRecovery?.cancel()
+        for observer in recoveryObservers { NotificationCenter.default.removeObserver(observer) }
     }
 
     func listChats() -> [HostChatSummary] {
@@ -60,6 +78,40 @@ final class IOSHost: OxHost {
 
     func prepare() async throws {
         try await awaitPreparation(\.profile)
+    }
+
+    private func pauseOptionalStorageRecovery() {
+        optionalRecovery?.cancel()
+    }
+
+    private func resumeOptionalStorageRecovery() {
+        guard UIApplication.shared.applicationState == .active else { return }
+        if let current = optionalRecovery {
+            if current.isCancelled {
+                Task {
+                    await current.value
+                    resumeOptionalStorageRecovery()
+                }
+            }
+            return
+        }
+        guard let profile = preparation?.profile,
+              services.localRecoveryMessage != nil || ScheduledSkills.shared.preparation?.failureMessage != nil else { return }
+        optionalRecovery = Task { @MainActor in
+            defer { optionalRecovery = nil }
+            do {
+                try await profile.value
+                var delay: Double = 2
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(delay))
+                    if await StorageMigrator.recoverOptionalStorage(services: services) { return }
+                    delay = min(delay * 3, 300)
+                }
+            } catch is CancellationError {
+            } catch {
+                Log.app.error("IOSHost optionalRecovery blocked error=\(error.localizedDescription)")
+            }
+        }
     }
 
     private func waitUntilProfilePrepared() async {
@@ -96,8 +148,10 @@ final class IOSHost: OxHost {
             _ = UserMemory.shared
             try await UserMemory.shared.waitUntilCurrent()
             await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
-            try ScheduledSkillScheduler.shared.activate()
+            do { try ScheduledSkillScheduler.shared.activate() }
+            catch { Log.app.warning("IOSHost schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
             Log.app.info("IOSHost profile prepared")
+            resumeOptionalStorageRecovery()
         }
         let preparation = Preparation(storage: storage, profile: profile)
         self.preparation = preparation

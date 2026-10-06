@@ -42,6 +42,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               local Profile catalog
+│   ├── .pi-source-work-<uuid>/               isolated legacy migration working copy
 │   └── <ProfileName>/
 │       ├── profile.json
 │       ├── state.sqlite                     Pi execution, full history, application documents; WAL sidecars
@@ -188,7 +189,7 @@ non-identity application settings, with latest history, current forks and bounde
 checkpoints. Source-key mappings are returned to the migrator, not stored in a
 runtime registry. Physical artifacts are digest-checked and flushed before Pi
 metadata commits. The installer closes SQLite and its artifact owner before the
-staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now registered for local production activation. A prepared publication journal retains conversion mappings and source fingerprints; source moves to a private retained backup before stage publication. Recovery runs before Profile enumeration and completes interrupted publication before consumers open. Failed unjournaled stages are retained for diagnosis and never reused implicitly. Fresh Profiles install and validate an empty dormant Pi database before publishing their manifest.
+staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now registered for local production activation. Legacy milestones run on a fingerprint-verified `.pi-source-work-<uuid>` copy rather than the original Profile. A prepared publication journal retains conversion mappings and original source fingerprints; the untouched source moves to a private retained backup before stage publication. The working copy is removed after publication; failed working copies remain hidden and are never adopted implicitly. Recovery runs before Profile enumeration and completes interrupted publication before consumers open. Failed unjournaled stages are retained for diagnosis and never reused implicitly. Fresh Profiles install and validate an empty dormant Pi database before publishing their manifest.
 
 The current local Profile is `profile.json`, `state.sqlite`, and ordinary immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
@@ -216,6 +217,16 @@ stamp them. Unknown Profile versions and unsuccessful migrations fail closed at
 the loading screen rather than allowing consumers to interpret incompatible
 data; an unknown version specifically directs the user to the Ox build that last
 opened the Profile or a newer one.
+
+Local repository and scheduled-skill preparation failures isolate those resources
+instead of blocking a compatible Profile. Normal resource access and writes remain
+gated; Local services/skills are excluded and schedules neither execute nor accept
+edits. The Host retries through `StorageMigrator` with backoff capped at five minutes
+while foregrounded, pauses in background, and retries on later launches and foreground
+activation. Successful recovery reloads the catalog or activates scheduling without
+requiring user action. Incompatible data is retained, never reset or replaced with a
+stale snapshot to force recovery. Resource readiness is reconstructed, not persisted
+in a separate status file.
 
 Repository configuration keeps format version 1. The optional `localEnabled`
 field defaults to true when older configuration files omit it; disabling Local
@@ -538,8 +549,9 @@ catalog storage and credential ownership are unchanged.
 containing at most 100 scheduled invocations. Each record binds to one Profile UUID
 and stores a frozen complete skill-package snapshot, optional argument, one-time/daily/weekly
 recurrence, time zone, next occurrence, enabled state, and bounded last-run outcome
-with its result chat UUID. The file is validated by `StorageMigrator` before the
-scheduler reads it; unknown versions and malformed or duplicate records fail closed.
+with its result chat UUID. The file is prepared and validated by `StorageMigrator` when schedules load;
+unknown versions and malformed or duplicate records disable scheduling and edits,
+retain the file, and defer to automatic recovery without blocking ordinary chats.
 It follows Application Support's normal device-backup policy and never syncs through
 the Profile, preventing one iCloud Profile from executing on several devices.
 

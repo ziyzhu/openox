@@ -39,7 +39,11 @@ final class ScheduledSkillScheduler {
             return
         }
         register()
-        try ScheduledSkills.shared.load()
+        do { try ScheduledSkills.shared.load() }
+        catch {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            throw error
+        }
         ScheduledSkills.shared.onChange = { [weak self] in
             self?.submitNext()
         }
@@ -57,6 +61,10 @@ final class ScheduledSkillScheduler {
     }
 
     func runNow(id: UUID) {
+        guard active, ScheduledSkills.shared.isLoaded else {
+            Log.app.warning("ScheduledSkillScheduler.runNow blocked id=\(id) recoveryRequired=true")
+            return
+        }
         guard work == nil else {
             Log.app.info("ScheduledSkillScheduler.runNow queued id=\(id)")
             try? ScheduledSkills.shared.fireNow(id: id)
@@ -82,7 +90,7 @@ final class ScheduledSkillScheduler {
 
     private func submitNext() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
-        guard let next = ScheduledSkills.shared.nextEnabledDate() else {
+        guard active, let next = ScheduledSkills.shared.nextEnabledDate() else {
             Log.app.info("ScheduledSkillScheduler.submit disposition=empty")
             return
         }
@@ -114,6 +122,12 @@ final class ScheduledSkillScheduler {
             }
             do {
                 try await IOSHost.shared.prepare()
+                guard self.active, ScheduledSkills.shared.isLoaded else {
+                    task.setTaskCompleted(success: false)
+                    self.work = nil
+                    self.submitNext()
+                    return
+                }
                 await self.processDue(executionLease: .externallyManaged)
                 task.setTaskCompleted(success: !Task.isCancelled)
             } catch {

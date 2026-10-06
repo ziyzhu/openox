@@ -16,7 +16,14 @@ struct SkillSchedulesSection: View {
                 .foregroundStyle(Theme.Colors.onSurface)
                 .padding(.horizontal, Theme.Spacing.sm)
 
-            if schedules.isEmpty {
+            if let message = scheduledSkills.preparation?.failureMessage {
+                Text(verbatim: message)
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                Text("Schedules are unavailable. Ox will retry automatically.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            } else if schedules.isEmpty {
                 Text("Run this skill once or on a repeating schedule.")
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
@@ -41,6 +48,7 @@ struct SkillSchedulesSection: View {
             .foregroundStyle(Theme.Colors.onSurface)
             .minimumTouchTarget(alignment: .leading)
             .accessibilityIdentifier(A11yID.Settings.skillSchedule(skill.name))
+            .disabled(!scheduledSkills.isLoaded)
         }
         .sheet(item: $editor) { target in
             NavigationStack {

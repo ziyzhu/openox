@@ -5713,6 +5713,17 @@
         }
       }
     },
+    "Local repository is unavailable. Ox will retry automatically." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地仓库不可用。Ox 会自动重试。"
+          }
+        }
+      }
+    },
     "Location" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9033,6 +9044,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "定时任务"
+          }
+        }
+      }
+    },
+    "Schedules are unavailable. Ox will retry automatically." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定时任务不可用。Ox 会自动重试。"
           }
         }
       }
