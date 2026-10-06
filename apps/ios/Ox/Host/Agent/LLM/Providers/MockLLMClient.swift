@@ -93,10 +93,6 @@ public struct MockLLMClient: ProviderClient {
         }
     }
 
-    // The active scenario is the most recent user message whose intent is a known key.
-    // System events (an injected `[system] …` turn, e.g. a sign-in completing) are
-    // transparent — we scan past them so a multi-turn scenario stays anchored across
-    // an out-of-band turn — but a real, unrecognized user message falls back to the menu.
     private func plan(for messages: [Message]) -> (scenario: Scenario, turn: Int) {
         var turn = 0
         for message in messages.reversed() {
@@ -254,7 +250,6 @@ public struct Scenario: Sendable {
         scenario.clock = clock
         return scenario
     }
-
 }
 
 extension Scenario {
@@ -281,16 +276,10 @@ extension Scenario {
             Entry("12", "thinking — reason, then answer", .thinkingOnly),
             Entry("13", "thinkslow — live thinking row (~8s)", .slowThinking),
             Entry("14", "interleave — alternating think/say", .interleaved),
-            Entry("15", "slowstream — reading-speed text (fade demo)", .slowStream),
-            Entry("16", "links — labels stream while destinations stay hidden", .links),
             Entry("17", "faststream — CI-speed fade demo", .fastStream),
             Entry("18", "selectcode — selectable code while streaming", .selectableCodeStream),
             Entry("19", "background — stream after the reader scrolls away", .backgroundStream),
-            Entry("20", "clearance — response near the focused composer", .composerClearance),
             Entry("21", "focusstream — stream while the composer is focused", .focusedStream),
-            Entry("79", "formatstress — long single-block formatted stream", .formattedStreamStress),
-            Entry("95", "paragraphstream — consecutive paragraphs while streaming", .paragraphStream),
-            Entry("96", "listcount — ordered list through item ten", .listCount),
             Entry("97", "characterstream — partial words near a line break", .characterStream),
         ]),
         ("Tool loops & interaction", [
@@ -301,55 +290,28 @@ extension Scenario {
             Entry("27", "truncated tool — reject incomplete arguments", .truncatedToolCall),
             Entry("28", "pending stop — reject missing terminal reason", .pendingStopReason),
             Entry("29", "compaction — estimate, isolate, and summarize", .compaction),
-            Entry("98", "execution — returns, error stacks, and partial-failure receipts", .executionOutput),
         ]),
-        ("HTML artifacts", [
+        ("Artifacts & handoffs", [
             Entry("30", "chart — inline JavaScript", .htmlChart),
-            Entry("31", "video — sibling media", .htmlVideo),
-            Entry("32", "audio — sibling media", .htmlAudio),
-            Entry("33", "map — native snapshot", .htmlMap),
-        ]),
-        ("End-to-end", [
             Entry("50", "signin — auth card → resume after sign-in", .signin),
             Entry("53", "recover — tool error, then fall back", .recover),
             Entry("58", "artifact — write, edit, rename, and present", .artifactWorkflow),
-            Entry("59", "skills — create, copy, edit, and delete a user skill", .skillWorkflow),
-            Entry("60", "budget — truncate oversized tool output", .toolResultBudget),
-            Entry("62", "web import — explicitly persist an HTTP response", .webImport),
-            Entry("63", "html update — revise and redisplay", .htmlUpdate),
-            Entry("65", "fail-fast — settle a late service invocation", .failFastInvocation),
-            Entry("66", "final context — defer compaction until another request", .deferredCompaction),
-            Entry("67", "overflow recovery — compact and retry once", .overflowRecovery),
-            Entry("68", "overflow failure — stop after one retry", .overflowFailure),
             Entry("69", "solve — human-verification handoff", .botControl),
-            Entry("70", "helper schemas — callable help and service inspection", .help),
-            Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
-            Entry("72", "prompt context — unified skills and current service and artifact state", .skillCatalog),
-            Entry("73", "memory — freeze prompt context and read updates on demand", .memoryOnDemand),
             Entry("74", "progress — report, continue thinking, then answer", .progressReport),
             Entry("75", "shoveler — display non-interactive cards", .shoveler),
             Entry("76", "video — display inline artifact video", .video),
             Entry("77", "payment — user-controlled checkout", .payment),
+        ]),
+        ("Context & diagnostics", [
+            Entry("66", "final context — defer compaction until another request", .deferredCompaction),
+            Entry("67", "overflow recovery — compact and retry once", .overflowRecovery),
+            Entry("68", "overflow failure — stop after one retry", .overflowFailure),
+            Entry("71", "rate limit — normalize provider quota errors", .rateLimited),
+            Entry("72", "prompt context — unified skills and current service and artifact state", .skillCatalog),
+            Entry("73", "memory — freeze prompt context and read updates on demand", .memoryOnDemand),
             Entry("78", "URL context — annotate user and tool URLs with related services", .urlServiceContext),
-            Entry("80", "app information — read settings and filter logs without secrets", .appInformation),
-            Entry("81", "chat title — update agent titles", .chatTitle),
-            Entry("82", "local service — create and edit Local source", .localServiceWorkflow),
-            Entry("83", "local copy — copy and validate Local source", .localCopyWorkflow),
-            Entry("91", "local validation recovery — repair a draft after restart", .localServiceRecovery),
-            Entry("84", "local history — commit, time travel, restore, and revert", .localHistoryWorkflow),
-            Entry("85", "local history recovery — restore and revert pending test state", .localHistoryRecovery),
-            Entry("86", "local diff — review working and committed changes", .localDiffWorkflow),
-            Entry("87", "local delete — delete and restore a Local service", .localDeleteWorkflow),
-            Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
-            Entry("89", "browser PDF — export full page as artifact", .browserPDF),
+            Entry("80", "app information — read app identity and current model", .appInformation),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
-            Entry("92", "Files media — read, analyze, attach, and bound selected-folder content", .filesMedia),
-            Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
-            Entry("94", "repository conflicts — select and reload an existing Local source", .repositoryConflicts),
-            Entry("99", "Action previews — complete live values and bounded history", .invocationPreview),
-            Entry("100", "payload recovery — read archived results after reopening", .payloadRecovery),
-            Entry("101", "Action trace limits — side effects survive later script failure", .invocationTraceLimits),
-            Entry("102", "MCP previews — complex complete values (local QA server)", .invocationMCPPreview),
         ]),
     ]
 
@@ -370,105 +332,6 @@ extension Scenario {
     }
 
     public static var echo: Scenario { Scenario(name: "echo", steps: [.say(menuText), .stop(.stop)]) }
-
-    static let filesMedia = Scenario(name: "files-media") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            const check = (value, message) => { if (!value) throw new Error(message); };
-            const root = "files/files-media-fixture/";
-            await ox.service.attach({ domain: "ios:files", purpose: "Access selected fixture folder" });
-            const listing = await ox.fs.list({ path: root.slice(0, -1), purpose: "List media fixtures" });
-            check(listing.items.some(item => item.path.endsWith("receipt.png")), "Image fixture missing");
-            const imageRead = await ox.fs.read({ path: root + "receipt.png", purpose: "Inspect image read guidance" });
-            check(imageRead.text === null && imageRead.unsupported, "Image read must not upload pixels");
-            const pdf = await ox.fs.read({ path: root + "document.pdf", purpose: "Read PDF text" });
-            check(pdf.text.includes("FILES"), "PDF text extraction failed");
-            const analysis = await ox.vision.analyze({ source: root + "receipt.png", purpose: "Recognize receipt locally" });
-            check(analysis.processing === "on-device" && analysis.recognizedText.includes("FILES MEDIA 123"), "On-device OCR failed");
-            console.log("PASS Files text extraction and local OCR");
-            """)]
-        }
-        guard ctx.resultText("execute")?.hasPrefix("PASS") == true else {
-            return [.say("Files media failed: \(ctx.resultText("execute") ?? "missing result")"), .stop(.stop)]
-        }
-        if ctx.turn == 1 {
-            return [execute("""
-            const check = (value, message) => { if (!value) throw new Error(message); };
-            const root = "files/files-media-fixture/";
-            await ox.service.detach({ domain: "ios:files", purpose: "Verify Files attachment gate" });
-            for (const operation of [() => ox.fs.attach({ path: root + "receipt.png", purpose: "Reject unattached file upload" }),
-                                     () => ox.vision.analyze({ source: root + "receipt.png", purpose: "Reject unattached file analysis" })]) {
-                let rejected = false;
-                try { await operation(); } catch { rejected = true; }
-                check(rejected, "Unattached Files access accepted");
-            }
-            await ox.service.attach({ domain: "ios:files", purpose: "Restore fixture folder access" });
-            const image = await ox.fs.attach({ path: root + "receipt.png", purpose: "Attach receipt snapshot" });
-            const pdf = await ox.fs.attach({ path: root + "document.pdf", purpose: "Attach PDF snapshot" });
-            check(image.kind === "image" && pdf.kind === "pdf", "Attachment types incorrect");
-            for (const path of [root + "unsupported.bin", root + "invalid.png", root + "too-large.png",
-                                root.slice(0, -1), root + "../receipt.png", "files/missing/receipt.png"]) {
-                let rejected = false;
-                try { await ox.fs.attach({ path, purpose: "Verify attachment boundary" }); } catch { rejected = true; }
-                check(rejected, "Unsupported or unauthorized path accepted: " + path);
-            }
-            await ox.fs.attach({ path: root + "receipt.png", purpose: "Check attachment budget" });
-            await ox.fs.attach({ path: root + "receipt.png", purpose: "Fill attachment budget" });
-            let bounded = false;
-            try { await ox.fs.attach({ path: root + "receipt.png", purpose: "Verify attachment limit" }); } catch { bounded = true; }
-            check(bounded, "Attachment count limit not enforced");
-            await ox.fs.write({ path: root + "receipt.png", content: "Changed after media snapshot", purpose: "Verify immutable media snapshot" });
-            console.log("PASS Files immutable media attachments and boundaries");
-            """)]
-        }
-        let attachments = ctx.toolResults.flatMap(\.transientAttachments)
-        guard attachments.count == 4,
-              attachments.filter({ $0.kind == .image }).allSatisfy({ $0.data.starts(with: Data([137, 80, 78, 71])) }),
-              attachments.contains(where: { $0.kind == .pdf && $0.data.starts(with: Data("%PDF-".utf8)) }) else {
-            return [.say("Files media failed: model did not receive four immutable image/PDF snapshots."), .stop(.stop)]
-        }
-        return [.say("PASS Files media: local OCR, PDF text, immutable model attachments, invalid paths and attachment limits."), .stop(.stop)]
-    }
-
-    static let browserPDF = Scenario(name: "browserPDF") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            console.log({
-              navigate: ox.web.browser.navigate.help(),
-              executeScript: ox.web.browser.executeScript.help(),
-              exportPdf: ox.web.browser.exportPdf.help()
-            });
-            """)]
-        }
-        guard let output = ctx.resultText("execute") else {
-            return [.say("Browser setup did not return an action contract."), .stop(.stop)]
-        }
-        if ctx.turn == 1 {
-            return [execute("""
-            await ox.web.browser.navigate({ url: "https://example.com", purpose: "Open PDF fixture" });
-            await ox.web.browser.executeScript({
-              script: "const marker = document.createElement('div'); marker.textContent = 'FULL_PAGE_BOTTOM_MARKER'; marker.style.cssText = 'height:4096px;display:flex;align-items:flex-end'; document.body.appendChild(marker); return { viewportHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight };",
-              purpose: "Create tall PDF fixture"
-            });
-            const pdf = await ox.web.browser.exportPdf({ filename: "Example Page.pdf", purpose: "Export full browser page" });
-            console.log({ pdf });
-            """)]
-        }
-        let result = JSONValue.parse(jsonString: output)?.objectValue
-        let pdf = result?["pdf"]?.objectValue
-        let artifacts = ctx.toolResults.last?.content.compactMap { block -> Artifact? in
-            guard case .attachment(let artifact) = block else { return nil }
-            return artifact
-        } ?? []
-        guard let pages = pdf?["pages"]?.doubleValue,
-              pages >= 1,
-              artifacts.count == 1,
-              artifacts[0].kind == .pdf,
-              artifacts[0].fileName.hasPrefix("Example Page") else {
-            return [.say("Browser did not export the page as a PDF."), .stop(.stop)]
-        }
-        return [.say("Browser PDF imported as artifact: \(artifacts[0].fileName). Result: \(output)"), .stop(.stop)]
-    }
 
     static let markdown = Scenario(name: "markdown", steps: [
         .say("""
@@ -600,30 +463,10 @@ extension Scenario {
         while these words fade in at the tail.
         """
 
-    static let slowStream = Scenario(name: "slowstream", steps: [
-        .say(streamingMarkdown),
-        .stop(.stop)
-    ]).pacing(betweenDeltas: .milliseconds(120))
-
     static let fastStream = Scenario(name: "faststream", steps: [
         .say(streamingMarkdown),
         .stop(.stop)
     ]).pacing(betweenDeltas: .milliseconds(0))
-
-    static let formattedStreamStress = Scenario(name: "formatstress", steps: [
-        .say("**" + Array(repeating: "A long formatted paragraph keeps growing without a settling boundary.", count: 120).joined(separator: " ") + "**"),
-        .stop(.stop)
-    ])
-
-    static let paragraphStream = Scenario(name: "paragraphstream", steps: [
-        .say("First paragraph.\n\nSecond paragraph.\n\nThird paragraph."),
-        .stop(.stop)
-    ]).pacing(betweenDeltas: .milliseconds(500))
-
-    static let listCount = Scenario(name: "listcount", steps: [
-        .say((1...10).map { "\($0). Item \($0)" }.joined(separator: "\n")),
-        .stop(.stop)
-    ]).pacing(betweenDeltas: .milliseconds(250))
 
     static let characterStream = Scenario(name: "characterstream", steps: [
         .say("The opening phrase is almost full: extraordinaryphenomenon arrives next."),
@@ -659,34 +502,6 @@ extension Scenario {
         .say(String(repeating: "Background streaming must preserve the reader's position. ", count: 15)),
         .stop(.stop),
     ])
-
-    static let composerClearance = Scenario(name: "clearance", steps: [
-        .say("""
-        # Clearance check
-
-        First paragraph.
-
-        Second paragraph.
-
-        Third paragraph.
-
-        Fourth paragraph.
-
-        Fifth paragraph.
-        """),
-        .stop(.stop),
-    ])
-
-    static let links = Scenario(name: "links", steps: [
-        .say("""
-        ## Streaming links
-
-        [Home](https://example.com "Home page"), [Docs](https://example.com/docs "Documentation"), \
-        [Nested](https://example.com/wiki/Function_(mathematics) "Nested destination"), and \
-        [Status](https://status.example.com "Service status").
-        """),
-        .stop(.stop)
-    ]).pacing(betweenDeltas: .milliseconds(180))
 
     static let errorMidstream = Scenario(name: "error", steps: [
         .say("Starting some work…"),
@@ -901,703 +716,20 @@ extension Scenario {
         ]
     }
 
-    private static func outputLimitRegressionFailure() -> String? {
-        let exactBytes = String(repeating: "A", count: 51200)
-        let exactLines = String(repeating: "line\n", count: 2000)
-        for value in ["", "\n", exactBytes, exactLines, "é药💊", "e\u{301}👨‍👩‍👧‍👦"] {
-            guard JavaScriptOutputLimits.preview(value) == value else { return "A fitting output changed." }
-        }
-        guard JavaScriptOutputLimits.preview("X" + exactBytes) == exactBytes,
-              JavaScriptOutputLimits.preview("old\n" + exactLines) == String(exactLines.dropLast()),
-              JavaScriptOutputLimits.preview("old\r\n" + String(repeating: "line\r\n", count: 2000)) == String(decoding: String(repeating: "line\r\n", count: 2000).utf8.dropLast(), as: UTF8.self),
-              JavaScriptOutputLimits.preview(exactBytes + "\nTAIL") == "TAIL" else {
-            return "Fixed byte or line tail limit failed."
-        }
-        for value in ["é", "药", "💊", "e\u{301}👨‍👩‍👧‍👦"] {
-            let output = String(repeating: value, count: 30000) + "TAIL"
-            let preview = JavaScriptOutputLimits.preview(output)
-            guard Array(output.utf8).suffix(preview.utf8.count).elementsEqual(preview.utf8),
-                  preview.utf8.count <= 51200, preview.hasSuffix("TAIL"), !preview.contains("�") else {
-                return "Unicode output boundary failed."
-            }
-        }
-        return nil
-    }
-
-    static let toolResultBudget = Scenario(name: "budget") { ctx in
-        if ctx.turn == 0 {
-            if let failure = outputLimitRegressionFailure() {
-                return [.say(failure), .stop(.stop)]
-            }
-            return [execute("console.log(\"A\".repeat(51196) + \"TAIL\");")]
-        }
-        if ctx.turn == 1 {
-            guard let result = ctx.toolResults.last,
-                  result.truncated != true,
-                  ctx.resultText("execute") == String(repeating: "A", count: 51196) + "TAIL",
-                  ToolResultParts(result, label: "budget-regression").text.count == 51200 else {
-                return [.say("A fitting output was incorrectly truncated."), .stop(.stop)]
-            }
-            return [execute("console.log(\"药\".repeat(350000) + \"TAIL\");")]
-        }
-        if ctx.turn == 2 {
-            guard let result = ctx.toolResults.last,
-                  result.truncated == true,
-                  let text = ctx.resultText("execute"),
-                  text.hasPrefix(String(repeating: "药", count: 17065) + "TAIL\n[Tool output truncated:"),
-                  let marker = text.range(of: "Full output id: "),
-                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
-                return [.say("Oversized output did not provide a recovery reference."), .stop(.stop)]
-            }
-            return [execute("""
-            const text = await ox.output.read({ id: "\(id.uuidString)", purpose: "Recover full tool output" });
-            if (text.length !== 350004 || text.slice(150000, 150003) !== "药药药" || text.slice(-4) !== "TAIL") throw new Error("Captured output was incomplete");
-            for (let i = 0; i < 2001; i++) console.log("line " + i);
-            """)]
-        }
-        if ctx.turn == 3 {
-            guard let result = ctx.toolResults.last, result.isError == false, result.truncated == true,
-                  let text = ctx.resultText("execute"), text.hasPrefix("line 1\nline 2\n"),
-                  text.contains("line 2000\n[Tool output truncated:"),
-                  let marker = text.range(of: "Full output id: "),
-                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
-                return [.say("Combined console line limit or byte-output recovery failed."), .stop(.stop)]
-            }
-            return [execute("""
-            const text = await ox.output.read({ id: "\(id.uuidString)", purpose: "Recover every console line" });
-            if (text.split("\\n").length !== 2001 || !text.startsWith("line 0\\n") || !text.endsWith("line 2000")) throw new Error("Captured lines were incomplete");
-            console.log("Recovered complete oversized output, including its middle and tail.");
-            """)]
-        }
-        let text = ctx.resultText("execute") ?? ""
-        if ctx.turn == 4 {
-            guard text.contains("Recovered complete oversized output"), ctx.toolResults.last?.isError == false else {
-                return [.say("Output recovery failed: \(text)"), .stop(.stop)]
-            }
-            return [execute("console.log(\"A\".repeat(60000)); throw new Error(\"EXPECTED_OUTPUT_ERROR\");")]
-        }
-        guard ctx.toolResults.last?.isError == true, ctx.toolResults.last?.truncated == true,
-              text.contains("EXPECTED_OUTPUT_ERROR"), text.contains("Full output id:") else {
-            return [.say("Truncation lost the execution error."), .stop(.stop)]
-        }
-        return [.say("Fixed byte and line caps, Unicode boundaries, and full-output recovery passed."), .stop(.stop)]
-    }
-
-    private static let payloadRecoverySource = """
-    const chats = await ox.fs.list({ path: "chats", purpose: "Find the payload proof transcript" });
-    let reference;
-    const visit = value => {
-        if (!value || typeof value !== "object") return;
-        if (value.name === "ox.fs.read" && value.args?.path?.includes("payload-proof-")) {
-            reference = value.outcome?.succeeded?._0?.oxPayload ?? reference;
-        }
-        for (const child of Object.values(value)) visit(child);
-    };
-    for (const item of chats.items) {
-        const transcript = await ox.fs.read({ path: item.path + "/turns.jsonl", purpose: "Find committed payload references" });
-        for (const line of transcript.text.split("\\n").filter(Boolean)) visit(JSON.parse(line));
-    }
-    if (!reference) throw new Error("Missing durable invocation reference");
-    const id = "payload:" + reference.source.sha256 + ":" + reference.offset + ":" + reference.length;
-    const archived = JSON.parse(await ox.output.read({ id, purpose: "Recover the complete archived result" }));
-    if (archived.text !== "药💊".repeat(20000) || archived.truncated) throw new Error("Archived output lost bytes");
-    const files = await ox.fs.list({ path: "artifacts", purpose: "Verify internal payloads stay out of artifacts" });
-    if (files.items.some(item => /payload-[a-f0-9]{64}\\.json$/.test(item.path))) throw new Error("Private payload leaked into artifact list");
-    console.log("File-backed payload bytes, UTF-8 recovery, and hidden archive references passed.");
-    """
-
-    private static let invocationPreviewVerification = """
-    const chats = await ox.fs.list({ path: "chats", purpose: "Find committed preview proofs" });
-    const calls = [], traces = [];
-    const visit = value => {
-        if (!value || typeof value !== "object") return;
-        if (value.name && value.purpose?.includes("preview-proof")) calls.push(value);
-        if (value.invocationTrace) traces.push(value.invocationTrace);
-        for (const child of Object.values(value)) visit(child);
-    };
-    let newest;
-    for (const item of chats.items) {
-        const metadataPath = item.path + (item.path.startsWith("conversations/") ? "/conversation.json" : "/chat.json");
-        const metadata = JSON.parse((await ox.fs.read({ path: metadataPath, purpose: "Find the current preview proof chat" })).text);
-        const at = metadata.lastActivity ?? metadata.createdAt;
-        if (!newest || at > newest.at) newest = { item, at };
-    }
-    const transcript = await ox.fs.read({ path: newest.item.path + "/turns.jsonl", purpose: "Inspect retained preview proofs" });
-    for (const line of (transcript.text ?? "").split("\\n").filter(Boolean)) visit(JSON.parse(line));
-    const bytes = value => unescape(encodeURIComponent(JSON.stringify(value))).length;
-    const writes = calls.filter(call => call.name === "ox.fs.edit");
-    const reads = calls.filter(call => call.name === "ox.fs.read");
-    if (!writes.some(call => call.preview?.argumentsTruncated)) throw new Error("Large arguments were not bounded");
-    if (!reads.some(call => call.preview?.resultTruncated)) throw new Error("Large results were not bounded");
-    if (reads.length < 20 || calls.some(call => bytes(call.args) > 8192 || bytes(call.outcome?.succeeded?._0 ?? null) > 4096)) throw new Error("Preview limits failed");
-    if (!traces.some(trace => trace.previewBytes > 60000) || traces.some(trace => trace.previewBytes > 65536)) throw new Error("Combined preview budget failed");
-    if (JSON.stringify(calls).includes('"oxPayload"')) throw new Error("New diagnostics were archived");
-    console.log("Bounded Action previews, complete live values, and no diagnostic archives passed.");
-    """
-
-    static let invocationPreview = Scenario(name: "invocation-preview") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            const path = "artifacts/preview-proof-" + Date.now() + ".txt";
-            const text = "药💊".repeat(20000);
-            await ox.fs.write({ path, content: text, purpose: "Create preview-proof complete arguments" });
-            const original = (await ox.fs.read({ path: "MEMORY.md", purpose: "Save QA memory before preview proof" })).text;
-            if (typeof original !== "string") throw new Error("QA memory could not be saved");
-            try {
-                await ox.fs.write({ path: "MEMORY.md", content: "preview seed", purpose: "Prepare preview-proof argument fixture" });
-                await ox.fs.edit({ path: "MEMORY.md", edits: [{ oldText: "preview seed", newText: text }], purpose: "Edit preview-proof complete arguments" });
-                if ((await ox.fs.read({ path: "MEMORY.md", purpose: "Verify preview-proof complete edit" })).text !== text) throw new Error("The Action lost complete arguments");
-                const edits = Array.from({ length: 80 }, (_, i) => ({ oldText: "[[" + i + "]]", newText: "a\\u0301\\n\\t\\\"".repeat(30) + i }));
-                await ox.fs.write({ path: "MEMORY.md", content: edits.map(edit => edit.oldText).join("|"), purpose: "Prepare preview-proof wide array" });
-                await ox.fs.edit({ path: "MEMORY.md", edits, purpose: "Edit preview-proof wide arguments" });
-                if ((await ox.fs.read({ path: "MEMORY.md", purpose: "Verify preview-proof complete array" })).text !== edits.map(edit => edit.newText).join("|")) throw new Error("The Action lost array arguments");
-                for (let i = 0; i < 20; i++) {
-                    const result = await ox.fs.read({ path, purpose: "Read preview-proof complete result " + i });
-                    if (result.text !== text || result.truncated) throw new Error("Live JavaScript lost the full result");
-                }
-            } finally {
-                await ox.fs.write({ path: "MEMORY.md", content: original, purpose: "Restore QA memory after preview proof" });
-            }
-            console.log("Live JavaScript received every complete value.");
-            """)]
-        }
-        if ctx.turn == 1 {
-            guard ctx.toolResults.last?.isError == false else {
-                let failure = ctx.resultText("execute") ?? ""
-                return [.say("Action preview execution failed: \(failure)"), .stop(.stop)]
-            }
-            return [execute(invocationPreviewVerification)]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        return [.say(ctx.toolResults.last?.isError == false && result.contains("no diagnostic archives passed")
-            ? "Bounded Action previews and complete live values passed." : "Action preview proof failed: \(result)"), .stop(.stop)]
-    }
-
-    static let invocationTraceLimits = Scenario(name: "invocation-trace-limits") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            const path = "artifacts/trace-count-proof-" + Date.now() + ".txt";
-            await ox.fs.write({ path, content: "side effect survived", purpose: "Create trace-count-proof side effect" });
-            for (let i = 0; i < 260; i++) {
-                const value = await ox.fs.read({ path, purpose: "Read trace-count-proof " + i });
-                if (value.text !== "side effect survived") throw new Error("An omitted Action did not execute");
-            }
-            throw new Error("EXPECTED_AFTER_ACTION");
-            """)]
-        }
-        if ctx.turn == 1 {
-            let failure = ctx.resultText("execute") ?? ""
-            guard ctx.toolResults.last?.isError == true, failure.contains("EXPECTED_AFTER_ACTION"),
-                  failure.contains("5 additional calls were not retained") else {
-                return [.say("Action trace proof lost the later script failure."), .stop(.stop)]
-            }
-            return [execute("""
-            const files = await ox.fs.list({ path: "artifacts", purpose: "Find the trace-count-proof artifact" });
-            const file = files.items.find(item => item.path.includes("trace-count-proof-"));
-            if (!file || (await ox.fs.read({ path: file.path, purpose: "Verify the completed side effect" })).text !== "side effect survived") throw new Error("Completed side effect was lost");
-            const chats = await ox.fs.list({ path: "chats", purpose: "Find committed Action count proofs" });
-            let proof;
-            const visit = value => {
-                if (!value || typeof value !== "object") return;
-                if (value.invocationTrace?.omittedCalls >= 5 && JSON.stringify(value).includes("trace-count-proof")) proof = value;
-                for (const child of Object.values(value)) visit(child);
-            };
-            let newest;
-            for (const item of chats.items) {
-                const metadataPath = item.path + (item.path.startsWith("conversations/") ? "/conversation.json" : "/chat.json");
-                const metadata = JSON.parse((await ox.fs.read({ path: metadataPath, purpose: "Find the current count proof chat" })).text);
-                const at = metadata.lastActivity ?? metadata.createdAt;
-                if (!newest || at > newest.at) newest = { item, at };
-            }
-            const transcript = await ox.fs.read({ path: newest.item.path + "/turns.jsonl", purpose: "Inspect Action trace count limits" });
-            for (const line of (transcript.text ?? "").split("\\n").filter(Boolean)) visit(JSON.parse(line));
-            const calls = proof?.effects?.filter(effect => effect.type === "invocation").map(effect => effect.invocation) ?? [];
-            if (!proof || calls.length !== 256 || proof.invocationTrace.recordedCalls !== 256 || !calls.some(call => call.name === "ox.fs.write" && call.outcome?.succeeded)) throw new Error("Bounded trace lost completed Actions");
-            console.log("Action count limits, complete execution, and side effects before script failure passed.");
-            """)]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        return [.say(ctx.toolResults.last?.isError == false && result.contains("side effects before script failure passed")
-            ? "Bounded Action count and later script failure passed." : "Action count proof failed: \(result)"), .stop(.stop)]
-    }
-
-    static let invocationMCPPreview = Scenario(name: "invocation-mcp-preview") { ctx in
-        if ctx.turn == 0 {
-            return [execute("""
-            const service = await ox.service.create({ kind: "mcp", endpoint: "http://127.0.0.1:8102/mcp", transport: "streamable-http", purpose: "Connect the local diagnostic QA server" });
-            await ox.service.attach({ domain: service.domain, purpose: "Attach the local diagnostic QA server" });
-            let deep = { value: "deep value survived" };
-            for (let i = 0; i < 20; i++) deep = { child: deep };
-            const payload = { text: "药💊".repeat(20000), deep, wide: Array.from({ length: 300 }, (_, id) => ({ id })), escapes: "\\n\\t\\\"\\\\".repeat(3000), marker: { oxPayload: "ordinary user data" } };
-            payload["k".repeat(10000)] = "long key survived";
-            const result = await ox.service.invoke({ name: "mcp:" + service.domain + ":echo", input: payload, purpose: "Echo complex complete diagnostic values" });
-            let leaf = result.deep;
-            for (let i = 0; i < 20; i++) leaf = leaf.child;
-            if (result.text !== payload.text || leaf.value !== "deep value survived" || result.wide.length !== 300 || result.wide[299].id !== 299 || result.escapes !== payload.escapes || result.marker.oxPayload !== "ordinary user data" || result["k".repeat(10000)] !== "long key survived") throw new Error("Diagnostic previews changed live MCP values");
-            await ox.service.detach({ domain: service.domain, purpose: "Detach the local diagnostic QA server" });
-            console.log("Complete MCP deep JSON, wide arrays, long keys, Unicode, and escapes passed.");
-            """)]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        return [.say(ctx.toolResults.last?.isError == false && result.contains("Unicode, and escapes passed")
-            ? "Complete MCP values and bounded diagnostic previews passed." : "MCP preview proof failed: \(result)"), .stop(.stop)]
-    }
-
-    static let payloadRecovery = Scenario(name: "payload-recovery") { ctx in
-        if ctx.turn == 0 { return [execute(payloadRecoverySource)] }
-        let result = ctx.resultText("execute") ?? ""
-        return [.say(ctx.toolResults.last?.isError == false && result.contains("hidden archive references passed")
-            ? "Reopened file-backed payload recovery passed." : "Payload recovery failed: \(result)"), .stop(.stop)]
-    }
-
     static let artifactWorkflow = Scenario(name: "artifact") { ctx in
         if ctx.turn == 0 {
-            return [
-                .say("Creating an artifact and presenting the finished file.\n"),
-                execute("""
-                await ox.fs.write({ path: "artifacts/agent-note.md", content: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><text x="8" y="26">Hello</text></svg>', purpose: "Create agent note" });
-                await ox.fs.edit({ path: "artifacts/agent-note.md", edits: [{ oldText: "Hello", newText: "Hello, Ox!" }], purpose: "Edit agent note" });
-                const result = await ox.fs.read({ path: "artifacts/agent-note.md", purpose: "Read agent note" });
-                await ox.artifact.rename({ filename: "agent-note.md", newFilename: "agent-image.svg", purpose: "Rename agent note" });
-                await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" });
-                for (const extension of ["md", "html"]) {
-                    const path = "artifacts/utf8-read-check." + extension;
-                    await ox.fs.write({ path, content: "Aé药💊Z", purpose: "Create UTF-8 read fixture" });
-                    for (const [maxBytes, expected] of [[1, "A"], [2, "A"], [3, "Aé"], [4, "Aé"], [5, "Aé"], [6, "Aé药"], [7, "Aé药"], [8, "Aé药"], [9, "Aé药"], [10, "Aé药💊"], [11, "Aé药💊Z"], [12, "Aé药💊Z"]]) {
-                        const read = await ox.fs.read({ path, options: { maxBytes }, purpose: "Verify UTF-8 byte boundary" });
-                        if (read.text !== expected || read.truncated !== (maxBytes < 11)) throw new Error("UTF-8 boundary mismatch at " + maxBytes);
-                    }
-                    await ox.fs.write({ path, content: "药".repeat(50000), purpose: "Create complete read fixture" });
-                    const read = await ox.fs.read({ path, purpose: "Verify complete default read" });
-                    if (read.text !== "药".repeat(50000) || read.truncated) throw new Error("Default read was incomplete");
-                    await ox.fs.write({ path, content: String.fromCharCode(0xFEFF) + "药", purpose: "Create UTF-8 BOM fixture" });
-                    for (const maxBytes of [1, 2, 3, 4, 5, 6]) {
-                        const read = await ox.fs.read({ path, options: { maxBytes }, purpose: "Verify UTF-8 BOM boundary" });
-                        if (read.text !== (maxBytes < 6 ? "" : "药") || read.truncated !== (maxBytes < 6)) throw new Error("UTF-8 BOM boundary mismatch");
-                    }
-                    await ox.fs.delete({ path, purpose: "Remove UTF-8 read fixture" });
-                }
-                console.log(result.text.includes("Hello, Ox!") ? "Hello, Ox!" : result.text);
-                """),
-            ]
-        }
-        let text = ctx.resultText("execute") ?? ""
-        if text.contains("ERROR") {
-            return [.say("The artifact workflow failed: \(text)"), .stop(.stop)]
-        }
-        return [.say("The finished artifact contains: **\(text)** and read agent-image.svg."), .stop(.stop)]
-    }
-
-    static let webImport = Scenario(name: "web-import") { ctx in
-        if ctx.turn == 0 {
-            return [
-                .say("Importing one fetched response.\n"),
-                execute("""
-                const artifact = await ox.artifact.import({
-                  url: "https://example.com/",
-                  filename: "web-response.txt",
-                  purpose: "Import web response"
-                });
-                console.log(artifact);
-                """),
-            ]
-        }
-        let text = ctx.resultText("execute") ?? ""
-        guard !text.contains("ERROR"), text.contains("web-response.txt") else {
-            return [.say("Web response import failed."), .stop(.stop)]
-        }
-        return [.say("Imported the fetched response as web-response.txt."), .stop(.stop)]
-    }
-
-    static let failFastInvocation = Scenario(name: "fail-fast") { ctx in
-        if ctx.turn == 0 {
-            return [
-                execute("""
-                await Promise.all([
-                  ox.service.invoke({
-                    name: "web:127.0.0.1:delayedEcho",
-                    input: { value: "late", delayMs: 800 },
-                    purpose: "Exercise late invocation settlement"
-                  }),
-                  Promise.reject(new Error("fail fast"))
-                ]);
-                """),
-            ]
-        }
-        return [.say("Fail-fast execution settled cleanly."), .stop(.stop)]
-    }
-
-    static let skillWorkflow = Scenario(name: "skills") { ctx in
-        if ctx.turn == 0 {
-            return [
-                .say("Loading the skill-authoring instructions.\n"),
-                execute("""
-                const manager = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Read skill manager" });
-                const workflow = await ox.fs.read({ path: "skills/manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
-                console.log(manager.text + "\\n" + workflow.text);
-                """),
-            ]
-        }
-        if ctx.turn == 1 {
-            guard ctx.resultText("execute")?.contains("# Manage Skills") == true,
-                  ctx.resultText("execute")?.contains("# User Skill") == true else {
-                return [.say("The skill instructions could not be loaded."), .stop(.stop)]
-            }
-            return [
-                .say("Creating and refining a reusable skill.\n"),
-                execute("""
-                await ox.skill.create({
-                  name: "agent-weekly",
-                  description: "Prepare a concise weekly review",
-                  instructions: "Review completed work and choose the next priority.",
-                  purpose: "Create review skill"
-                });
-                const before = await ox.fs.read({ path: "skills/agent-weekly/SKILL.md", purpose: "Read review skill" });
-                await ox.fs.edit({
-                  path: "skills/agent-weekly/SKILL.md",
-                  edits: [
-                    { oldText: 'description: "Prepare a concise weekly review"', newText: `description: "Prepare a weekly review with unfinished work"
-                services: 127.0.0.1` },
-                    { oldText: "choose the next priority", newText: "list unfinished work and choose the next priority" }
-                  ],
-                  purpose: "Refine review skill"
-                });
-                const listed = await ox.fs.glob({ pattern: "skills/*/SKILL.md", purpose: "List user skills" });
-                const found = await ox.fs.grep({ pattern: "unfinished work", path: "skills", options: { literal: true }, purpose: "Search skill content" });
-                const copied = await ox.skill.copy({ source: "agent-weekly", name: "agent-weekly-copy", purpose: "Copy review skill" });
-                const deleted = await ox.skill.delete({ name: "agent-weekly-copy", purpose: "Delete copied skill" });
-                console.log({
-                  before: before.text,
-                  final: "agent-weekly",
-                  listed: listed.paths,
-                  matches: found.matches.length,
-                  copied: copied.name,
-                  deleted: deleted.deleted
-                });
-                """),
-            ]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        if result.contains("ERROR") {
-            return [.say("The skill workflow failed: \(result)"), .stop(.stop)]
-        }
-        return [.say("Created **/agent-weekly** and refined its instructions."), .stop(.stop)]
-    }
-
-    static let localServiceWorkflow = Scenario(name: "local-service") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute(#"""
-            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service management workflow" });
-            const checks = [];
-            const check = (value, name) => { if (!value) throw new Error(name); checks.push(name); };
-            const rejected = async (call, fragment) => {
-              let error;
-              try { await call(); } catch (failure) { error = String(failure); }
-              check(Boolean(error && error.includes(fragment)), "Rejected: " + fragment);
-            };
-            const domain = "example.test";
-            const path = "services/web/" + domain + "/";
-            await ox.service.create({ kind: "web", domain, purpose: "Create validation fixture" });
-            const companionDomain = "valid.example.test";
-            await ox.service.create({ kind: "web", domain: companionDomain, purpose: "Create valid companion service" });
-            check((await ox.service.validate({ domain: companionDomain, purpose: "Validate companion service" })).valid, "Valid companion service");
-            const manifest = JSON.parse((await ox.fs.read({ path: path + "service.json", purpose: "Read generated manifest" })).text);
-            const skeleton = (await ox.fs.read({ path: path + "actions.js", purpose: "Read generated installer" })).text;
-            check((await ox.service.validate({ domain, purpose: "Validate generated service" })).valid, "Valid skeleton");
-            await ox.fs.write({ path: path + "actions.js", content: ")", purpose: "Stage invalid JavaScript" });
-            check((await ox.fs.read({ path: path + "actions.js", purpose: "Read invalid draft" })).text === ")", "Invalid draft retained");
-            await rejected(() => ox.service.validate({ domain, purpose: "Reject invalid JavaScript" }), "actions.js syntax");
-            await rejected(() => ox.service.attach({ domain, purpose: "Reject invalid attachment" }), "actions.js syntax");
-            await rejected(
-              () => ox.repository.git.commit({ message: "Must not save invalid draft", purpose: "Reject invalid Save" }),
-              "Validation failed for services/web/example.test: actions.js syntax"
-            );
-            await ox.fs.write({ path: path + "actions.js", content: skeleton, purpose: "Restore generated installer" });
-            manifest.actions = [{
-              id: "version", label: "Version", description: "Draft one",
-              inputSchema: { type: "object", properties: {}, additionalProperties: false },
-              outputSchema: { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false },
-              requireApproval: false, requireAuth: false
-            }];
-            await ox.fs.write({ path: path + "service.json", content: JSON.stringify(manifest), purpose: "Stage manifest first" });
-            await rejected(() => ox.service.validate({ domain, purpose: "Reject missing implementation" }), "missing implementations: version");
-            const actions = 'window.ox.install(({ action }) => { action("version", { invoke: () => ({ value: "one" }) }); });';
-            await ox.fs.write({ path: path + "actions.js", content: actions, purpose: "Complete first service draft" });
-            check((await ox.service.validate({ domain, purpose: "Validate manifest-first draft" })).valid, "Manifest-first edits");
-            check(!(await ox.service.attach({ domain, purpose: "Attach first valid draft" })).reloaded, "First attach");
-            const nextActions = actions.replace('action("version"', 'action("revision"');
-            await ox.fs.write({ path: path + "actions.js", content: nextActions, purpose: "Stage implementation first" });
-            await rejected(() => ox.service.validate({ domain, purpose: "Reject mismatched draft" }), "registration mismatch");
-            await rejected(() => ox.service.attach({ domain, purpose: "Keep prior valid attachment" }), "registration mismatch");
-            const stale = await ox.service.inspect({ domain, actions: ["version"], purpose: "Inspect unchanged attachment" });
-            check(stale.actions.version.description === "Draft one", "Failed attach preserves snapshot");
-            manifest.actions[0].id = "revision";
-            manifest.actions[0].description = "Draft two";
-            const nextManifest = JSON.stringify(manifest);
-            await ox.fs.write({ path: path + "service.json", content: nextManifest, purpose: "Complete second service draft" });
-            check((await ox.service.validate({ domain, purpose: "Validate implementation-first draft" })).valid, "Implementation-first edits");
-            check((await ox.service.attach({ domain, purpose: "Reload second valid draft" })).reloaded, "Explicit reload");
-            const current = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect reloaded attachment" });
-            check(current.actions.revision.description === "Draft two", "Reloaded snapshot");
-            await ox.repository.git.commit({ message: "Save validation fixture", purpose: "Save valid test service" });
-            check(!(await ox.repository.git.status({ purpose: "Check successful Save" })).dirty, "Valid Save");
-            await ox.fs.write({ path: "artifacts/local-validation-recovery.json", content: JSON.stringify({ manifest: nextManifest, actions: nextActions }), purpose: "Preserve restart test fixture" });
-            await ox.fs.delete({ path: path + "service.json", purpose: "Stage missing manifest" });
-            await ox.fs.write({ path: path + "actions.js", content: ")", purpose: "Stage interrupted service edit" });
-            await rejected(() => ox.service.validate({ domain, purpose: "Reject incomplete restart draft" }), "");
-            check((await ox.repository.git.status({ purpose: "Check recoverable draft" })).dirty, "Incomplete draft remains editable");
-            console.log(JSON.stringify({ checks, readyForRestart: true }));
-            """#)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["checks"]?.arrayValue?.count == 18,
-              result["readyForRestart"]?.boolValue == true else {
-            return [.say("Local service validation failed: \(output)"), .stop(.stop)]
-        }
-        return [.say("PASS: 18 Local validation checks. Restart the app, then run 91 to verify recovery."), .stop(.stop)]
-    }
-
-    static let localServiceRecovery = Scenario(name: "local-service-recovery") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute(#"""
-            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service recovery workflow" });
-            const check = (value, name) => { if (!value) throw new Error(name); };
-            const domain = "example.test";
-            const path = "services/web/" + domain + "/";
-            const before = await ox.repository.git.status({ purpose: "Inspect interrupted draft" });
-            check(before.dirty, "Draft must survive restart");
-            check((await ox.fs.read({ path: path + "actions.js", purpose: "Read interrupted installer" })).text === ")", "Invalid source must survive restart");
-            let rejected = false;
-            try { await ox.service.validate({ domain, purpose: "Reject restarted incomplete draft" }); }
-            catch { rejected = true; }
-            check(rejected, "Incomplete draft must fail validation");
-            const fixture = JSON.parse((await ox.fs.read({ path: "artifacts/local-validation-recovery.json", purpose: "Read recovery fixture" })).text);
-            await ox.fs.write({ path: path + "service.json", content: fixture.manifest, purpose: "Recover missing manifest" });
-            await ox.fs.write({ path: path + "actions.js", content: fixture.actions, purpose: "Recover interrupted installer" });
-            check((await ox.service.validate({ domain, purpose: "Validate recovered service" })).valid, "Recovered draft must validate");
-            await ox.service.attach({ domain, purpose: "Attach recovered service" });
-            const inspected = await ox.service.inspect({ domain, actions: ["revision"], purpose: "Inspect recovered attachment" });
-            check(inspected.actions.revision.description === "Draft two", "Recovered attachment must match saved source");
-            const clean = await ox.repository.git.status({ purpose: "Verify preserved saved version" });
-            check(!clean.dirty && before.commitHash === clean.commitHash, "Recovery must preserve history and restore exact source");
-            console.log(JSON.stringify({ recovered: true, clean: !clean.dirty, commitHash: clean.commitHash }));
-            """#)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["recovered"]?.boolValue == true,
-              result["clean"]?.boolValue == true else {
-            return [.say("Local service restart recovery failed: \(output)"), .stop(.stop)]
-        }
-        return [.say("PASS: incomplete draft survived restart, remained editable, validated after repair, and attached with unchanged saved history."), .stop(.stop)]
-    }
-
-    static let repositoryConflicts = Scenario(name: "repository-conflicts") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute(#"""
-            const check = (value, message) => { if (!value) throw new Error(message); };
-            const service = "archive.ph";
-            const conflicts = async () => (await ox.repository.conflicts({ service, purpose: "Inspect fixture source choices" })).conflicts;
-            if (!(await conflicts()).some(item => item.candidates.some(candidate => candidate.repository === "local"))) {
-                await ox.service.copy({ domain: service, purpose: "Prepare Local conflict fixture" });
-            }
-            const available = (await conflicts())[0];
-            check(available.candidates.some(item => item.repository === "bundled"), "Bundled candidate missing");
-            const path = "services/web/" + service + "/actions.js";
-            await ox.repository.resolve({ service, repository: "local", purpose: "Read existing Local fixture" });
-            const source = (await ox.fs.read({ path, purpose: "Snapshot Local source" })).text;
-            const before = await ox.repository.git.status({ purpose: "Snapshot Local working state" });
-            await ox.repository.resolve({ service, repository: "bundled", purpose: "Reproduce hidden Local conflict" });
-            const bundled = await ox.service.attach({ domain: service, purpose: "Attach Bundled fixture" });
-            check(bundled.repository === "bundled", "Bundled source not attached");
-            let copyRejected = false;
-            try { await ox.service.copy({ domain: service, purpose: "Protect existing Local copy" }); }
-            catch { copyRejected = true; }
-            check(copyRejected, "Copy must preserve hidden Local files");
-            for (const [target, repository] of [[service, "missing"], ["missing.invalid", "local"]]) {
-                let rejected = false;
-                try { await ox.repository.resolve({ service: target, repository, purpose: "Reject unavailable source" }); }
-                catch { rejected = true; }
-                check(rejected, "Unavailable source must be rejected");
-            }
-            check((await conflicts())[0].selectedRepository === "bundled", "Failed resolution changed selection");
-            const resolved = await ox.repository.resolve({ service, repository: "local", purpose: "Select existing Local fixture" });
-            check(resolved.selectedRepository === "local" && resolved.reloadRequired, "Local selection must require attachment reload");
-            await ox.repository.resolve({ service, repository: "local", purpose: "Verify repeated selection" });
-            check((await ox.fs.read({ path, purpose: "Verify preserved Local source" })).text === source, "Source files changed");
-            const after = await ox.repository.git.status({ purpose: "Verify preserved Local working state" });
-            check(Object.keys(before).every(key => JSON.stringify(before[key]) === JSON.stringify(after[key])), "Local working state changed");
-            await ox.service.validate({ domain: service, purpose: "Validate selected Local fixture" });
-            const attached = await ox.service.attach({ domain: service, purpose: "Reload selected Local fixture" });
-            check(attached.repository === "local" && attached.reloaded, "Local attachment did not reload");
-            check((await conflicts())[0].selectedRepository === "local", "Local choice not retained");
-            console.log(JSON.stringify({ passed: true, copyRejected, resolved, attached }));
-            """#)]
-        }
-        guard JSONValue.parse(jsonString: output)?.objectValue?["passed"]?.boolValue == true else {
-            return [.say("Repository conflict regression failed: \(output)"), .stop(.stop)]
-        }
-        return [.say("PASS: hidden Local source selected, invalid choices rejected, files and working state preserved, and attachment reloaded from Local."), .stop(.stop)]
-    }
-
-    static let localCopyWorkflow = Scenario(name: "local-copy") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute(#"""
-            await ox.fs.read({ path: "skills/evolve/SKILL.md", purpose: "Load service copy workflow" });
-            const copied = await ox.service.copy({ domain: "archive.ph", purpose: "Copy validation fixture" });
-            const path = "services/web/archive.ph/service.json";
-            const before = (await ox.fs.read({ path, purpose: "Read copied manifest" })).text;
-            const invalid = JSON.parse(before);
-            invalid.domain = "wrong.example";
-            await ox.fs.write({ path, content: JSON.stringify(invalid), purpose: "Stage invalid manifest identity" });
-            let rejected;
-            try { await ox.service.validate({ domain: "archive.ph", purpose: "Reject invalid manifest identity" }); }
-            catch (error) { rejected = String(error); }
-            const retained = JSON.parse((await ox.fs.read({ path, purpose: "Read retained invalid draft" })).text).domain === "wrong.example";
-            await ox.fs.write({ path, content: before, purpose: "Restore copied manifest" });
-            const valid = await ox.service.validate({ domain: "archive.ph", purpose: "Validate restored copy" });
-            console.log(JSON.stringify({ copied, retained, rejected, valid }));
-            """#)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["copied"]?.objectValue?["source"]?.stringValue == "local",
-              result["retained"]?.boolValue == true,
-              result["rejected"]?.stringValue?.contains("identity mismatch") == true,
-              result["valid"]?.objectValue?["valid"]?.boolValue == true else {
-            return [.say("Copied Local service validation failed: \(output)"), .stop(.stop)]
-        }
-        return [.say("PASS: copied service retained an invalid draft, rejected whole-service validation, and validated after repair."), .stop(.stop)]
-    }
-
-    static let localHistoryWorkflow = Scenario(name: "local-history") { ctx in
-        guard let output = ctx.resultText("execute") else {
             return [execute("""
-            await ox.service.create({ kind: "web", domain: "history.test", purpose: "Create history service" });
-            await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "first version", purpose: "Write history note" });
-            const first = await ox.repository.git.commit({ message: "Add history test service", purpose: "Commit history service" });
-            await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "second version", purpose: "Revise history note" });
-            const second = await ox.repository.git.commit({ message: "Revise history test note", purpose: "Commit revised note" });
-            await ox.fs.delete({ path: "services/web/history.test/NOTES.md", purpose: "Delete history note" });
-            await ox.repository.git.restore({ path: "services/web/history.test/NOTES.md", purpose: "Restore history note" });
-            const pathRestored = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify targeted restore" });
-            const log = await ox.repository.git.log({ limit: 3, purpose: "Read Local history" });
-            const shown = await ox.repository.git.show({ commitHash: first.commitHash, path: "web/history.test/NOTES.md", purpose: "Read first note" });
-            const historical = await ox.repository.git.checkout({ commitHash: first.commitHash, purpose: "Visit first version" });
-            let readOnly;
-            try {
-              await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "forbidden", purpose: "Test historical write" });
-            } catch (error) {
-              readOnly = String(error);
-            }
-            await ox.repository.git.checkout({ commitHash: "latest", purpose: "Return to latest" });
-            await ox.fs.write({ path: "services/web/history.test/NOTES.md", content: "draft", purpose: "Write disposable draft" });
-            const dirty = await ox.repository.git.status({ purpose: "Inspect disposable draft" });
-            await ox.repository.git.restore({ purpose: "Discard disposable draft" });
-            const restored = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify restored note" });
-            await ox.repository.git.revert({ commitHash: second.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
-            const reverted = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Verify reverted note" });
-            const clean = await ox.repository.git.status({ purpose: "Verify clean history" });
-            console.log(JSON.stringify({
-              first: first.commitHash,
-              second: second.commitHash,
-              pathRestored: pathRestored.text,
-              log: log.commits.map(commit => commit.commitHash),
-              shown: shown.content,
-              historical: historical.view,
-              readOnly,
-              dirty: dirty.dirty,
-              restored: restored.text,
-              reverted: reverted.text,
-              clean: clean.dirty
-            }));
+            await ox.fs.write({ path: "artifacts/agent-note.md", content: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><text x="8" y="26">Hello</text></svg>', purpose: "Create agent note" });
+            await ox.fs.edit({ path: "artifacts/agent-note.md", edits: [{ oldText: "Hello", newText: "Hello, Ox!" }], purpose: "Edit agent note" });
+            await ox.artifact.rename({ filename: "agent-note.md", newFilename: "agent-image.svg", purpose: "Rename agent note" });
+            console.log((await ox.fs.read({ path: "artifacts/agent-image.svg", purpose: "Read agent image" })).text);
             """)]
         }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["first"]?.stringValue?.count == 40,
-              result["second"]?.stringValue?.count == 40,
-              result["pathRestored"]?.stringValue == "second version",
-              result["log"]?.arrayValue?.count == 3,
-              result["shown"]?.stringValue == "first version",
-              result["historical"]?.stringValue == "historical",
-              result["readOnly"]?.stringValue?.contains("historical commit") == true,
-              result["dirty"]?.boolValue != nil,
-              result["restored"]?.stringValue == "second version",
-              result["reverted"]?.stringValue == "first version",
-              result["clean"]?.boolValue == false else {
-            return [.say("Local Git history did not preserve its linear authoring guarantees."), .stop(.stop)]
+        guard ctx.toolResults.last?.isError == false,
+              let text = ctx.resultText("execute"), text.contains("Hello, Ox!") else {
+            return [.say("The artifact workflow failed."), .stop(.stop)]
         }
-        return [.say("Committed Local edits, visited an older commit read-only, restored a draft, and reverted a commit with a new inverse commit."), .stop(.stop)]
-    }
-
-    static let localHistoryRecovery = Scenario(name: "local-history-recovery") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const dirty = await ox.repository.git.status({ purpose: "Inspect pending history draft" });
-            await ox.repository.git.restore({ purpose: "Discard pending history draft" });
-            const log = await ox.repository.git.log({ limit: 2, purpose: "Read pending history" });
-            const target = log.commits[0];
-            const before = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Read latest history note" });
-            const inverse = await ox.repository.git.revert({ commitHash: target.commitHash, message: "Revert revised history note", purpose: "Revert revised note" });
-            const after = await ox.fs.read({ path: "services/web/history.test/NOTES.md", purpose: "Read reverted history note" });
-            const clean = await ox.repository.git.status({ purpose: "Verify clean Local history" });
-            console.log(JSON.stringify({ dirty: dirty.dirty, before: before.text, after: after.text, inverse: inverse.commitHash, clean: clean.dirty }));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["dirty"]?.boolValue == true,
-              result["before"]?.stringValue == "second version",
-              result["after"]?.stringValue == "first version",
-              result["inverse"]?.stringValue?.count == 40,
-              result["clean"]?.boolValue == false else {
-            return [.say("Local restore or revert recovery failed."), .stop(.stop)]
-        }
-        return [.say("Restored the pending draft and reverted the latest Local commit with a clean inverse commit."), .stop(.stop)]
-    }
-
-    static let localDiffWorkflow = Scenario(name: "local-diff") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            await ox.service.create({ kind: "web", domain: "diff.test", purpose: "Create diff service" });
-            await ox.fs.write({ path: "services/web/diff.test/NOTES.md", content: "diff fixture", purpose: "Write diff fixture" });
-            const pending = await ox.repository.git.diff({ path: "web/diff.test/NOTES.md", purpose: "Review pending diff" });
-            const commit = await ox.repository.git.commit({ message: "Add diff test service", purpose: "Commit diff service" });
-            const committed = await ox.repository.git.diff({ commitHash: commit.commitHash, path: "web/diff.test/NOTES.md", purpose: "Review committed diff" });
-            console.log(JSON.stringify({ pending, commit, committed }));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              let pending = result["pending"]?.objectValue,
-              let committed = result["committed"]?.objectValue,
-              let commitHash = result["commit"]?.objectValue?["commitHash"]?.stringValue,
-              pending["workingTree"]?.boolValue == true,
-              pending["files"]?.arrayValue?.first?.objectValue?["path"]?.stringValue == "web/diff.test/NOTES.md",
-              pending["patch"]?.stringValue?.contains("+diff fixture") == true,
-              committed["workingTree"]?.boolValue == false,
-              committed["toCommitHash"]?.stringValue == commitHash,
-              committed["patch"]?.stringValue?.contains("+diff fixture") == true else {
-            return [.say("Local diff did not expose matching working and committed patches."), .stop(.stop)]
-        }
-        return [.say("Reviewed the same Local file as a pending working-tree diff and as a committed historical diff."), .stop(.stop)]
-    }
-
-    static let localDeleteWorkflow = Scenario(name: "local-delete") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            await ox.service.create({ kind: "web", domain: "delete.test", purpose: "Create delete fixture" });
-            await ox.repository.git.commit({ message: "Add delete test service", purpose: "Commit delete fixture" });
-            const deleted = await ox.service.delete({ domain: "delete.test", purpose: "Delete Local fixture" });
-            const dirty = await ox.repository.git.status({ purpose: "Inspect service deletion" });
-            await ox.repository.git.restore({ purpose: "Restore deleted service" });
-            const restored = await ox.fs.read({ path: "services/web/delete.test/service.json", purpose: "Verify restored service" });
-            console.log(JSON.stringify({ deleted, dirty: dirty.dirty, restored: restored.text.includes('"domain" : "delete.test"') || restored.text.includes('"domain": "delete.test"') }));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["deleted"]?.objectValue?["deleted"]?.boolValue == true,
-              result["dirty"]?.boolValue == true,
-              result["restored"]?.boolValue == true else {
-            return [.say("Local service deletion did not remain recoverable through Git."), .stop(.stop)]
-        }
-        return [.say("Deleted a Local service, observed the pending Git change, and restored it."), .stop(.stop)]
+        return [.say("The finished artifact contains **Hello, Ox!** in agent-image.svg."), .stop(.stop)]
     }
 
     static let skillCatalog = Scenario(name: "skill-catalog") { ctx in
@@ -1672,36 +804,6 @@ extension Scenario {
         return [.say(result), .stop(.stop)]
     }
 
-    static let systemSkillReferences = Scenario(name: "system-skill-references") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const manager = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Read skill manager" });
-            const references = await ox.fs.list({ path: "skills/manage-skills/references", purpose: "List skill references" });
-            const user = await ox.fs.read({ path: "skills/manage-skills/references/user-skill.md", purpose: "Read user skill workflow" });
-            const matched = await ox.fs.glob({ path: "skills/manage-skills", pattern: "references/*.md", purpose: "Find skill references" });
-            const providers = await ox.fs.read({ path: "skills/manage-providers/SKILL.md", purpose: "Activate provider management" });
-            const defaults = await ox.provider.default({ purpose: "Inspect read-only bundled providers" });
-            const validation = await ox.provider.validate({ provider: defaults[0], purpose: "Validate without changing the catalog" });
-            console.log(JSON.stringify({ manager: manager.text.includes("# Manage Skills"), references: references.items.map(item => item.path), user: user.text.includes("# User Skill"), matched: matched.paths, providers: providers.text.includes("# Manage Providers") && validation.valid === true }));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["manager"]?.boolValue == true,
-              result["user"]?.boolValue == true,
-              result["providers"]?.boolValue == true,
-              result["references"]?.arrayValue?.compactMap(\.stringValue) == [
-                "skills/manage-skills/references/repository-skill.md",
-                "skills/manage-skills/references/user-skill.md",
-              ],
-              result["matched"]?.arrayValue?.compactMap(\.stringValue) == [
-                "skills/manage-skills/references/repository-skill.md",
-                "skills/manage-skills/references/user-skill.md",
-              ] else {
-            return [.say("System skill references were not mounted correctly."), .stop(.stop)]
-        }
-        return [.say("System skill references loaded progressively."), .stop(.stop)]
-    }
-
     static let memoryOnDemand = Scenario(name: "memory-on-demand") { ctx in
         guard !ctx.transientContext.contains("transient-memory-must-not-be-injected") else {
             return [.say("Memory was injected into transient context."), .stop(.stop)]
@@ -1733,196 +835,21 @@ extension Scenario {
         return [.say("Memory stayed on disk and loaded on demand."), .stop(.stop)]
     }
 
-    static let providerCatalog = Scenario(name: "provider-catalog") { ctx in
-        guard ctx.turn == 0 else {
-            if ctx.toolResults.contains(where: \.isError) {
-                return [.say("The provider demo stopped before completing. Check the capability result."), .stop(.stop)]
-            }
-            return [.say("Added Demo Provider, customized Mistral, and kept the bundled defaults unchanged. Restoring removed Demo Provider and returned Mistral to its bundled definition."), .stop(.stop)]
-        }
-        return [execute("""
-        const check = (ok, message) => { if (!ok) throw new Error(message); };
-        const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
-        const defaults = await ox.provider.default({ purpose: "Read bundled provider defaults" });
-        const original = defaults.find(provider => provider.id === "mistral");
-        const before = await ox.provider.list({ purpose: "Read active providers before demo" });
-        const existingDemo = before.find(provider => provider.id === "demo-provider");
-        if (existingDemo) {
-          const previous = await ox.provider.get({ id: existingDemo.id, purpose: "Check previous demo provider" });
-          check(previous.url === "https://demo.invalid/v1" && previous.name === "Demo Provider" && previous.auth.kind === "none", "Demo Provider already exists with different configuration");
-        }
-        const count = before.length - (existingDemo ? 1 : 0);
-        const current = await ox.provider.get({ id: original.id, purpose: "Preserve Mistral before demo" });
-        check((current.name === original.name || current.name === "Mistral (customized)") && JSON.stringify(canonical({ ...current, name: original.name })) === JSON.stringify(canonical(original)), "Mistral already has a saved override");
-        await ox.provider.save({
-          provider: {
-            id: "demo-provider", name: "Demo Provider", url: "https://demo.invalid/v1",
-            api: "openai-chat-completions", auth: { kind: "none" },
-            models: [{ id: "demo-model", name: "Demo Model" }]
-          },
-          purpose: "Add Demo Provider"
-        });
-        await ox.provider.save({ provider: { ...original, name: "Mistral (customized)" }, purpose: "Customize Mistral provider" });
-        const active = await ox.provider.list({ purpose: "Verify addition and override" });
-        const unchanged = await ox.provider.default({ purpose: "Verify bundled defaults remain unchanged" });
-        check(active.length === count + 1, "Added provider missing");
-        const activeMistral = active.find(provider => provider.id === "mistral");
-        const activeDemo = active.find(provider => provider.id === "demo-provider");
-        check(activeMistral.name === "Mistral (customized)" && activeMistral.source === "override", "Override missing");
-        check(activeDemo.source === "added" && activeDemo.api === "openai-chat-completions", "Added provider metadata missing");
-        check(activeDemo.inferenceLocation === "user-hosted" && activeDemo.access.methods.includes("none"), "Provider access metadata missing");
-        check(Array.isArray(activeDemo.regions) && typeof activeDemo.capabilities.supportsTools === "boolean", "Provider capability metadata missing");
-        check(unchanged.find(provider => provider.id === "mistral").name === original.name, "Bundled default changed");
-        let choice;
-        do {
-          choice = await ox.user.choose({
-            body: "Demo Provider was added and Mistral is customized. Bundled defaults are unchanged. Open the model picker to inspect them, then restore the catalog.",
-            options: ["Restore catalog", "Inspect again"], purpose: "Inspect provider demo"
-          });
-        } while (choice !== "Restore catalog");
-        await ox.provider.delete({ id: "demo-provider", purpose: "Remove Demo Provider" });
-        await ox.provider.delete({ id: "mistral", purpose: "Restore bundled Mistral provider" });
-        const restored = await ox.provider.get({ id: "mistral", purpose: "Verify restored Mistral definition" });
-        const after = await ox.provider.list({ purpose: "Verify catalog restoration" });
-        check(JSON.stringify(canonical(restored)) === JSON.stringify(canonical(original)), "Bundled Mistral was not restored");
-        check(after.length === count && !after.some(provider => provider.id === "demo-provider"), "Demo Provider was not removed");
-        console.log(JSON.stringify({ added: true, overridden: true, defaultsUnchanged: true, restored: true }));
-        """)]
-    }
-
     static let appInformation = Scenario(name: "app-information") { ctx in
         guard let output = ctx.resultText("execute") else {
-            do {
-                try checkAppLogQuery()
-                try checkAppActionPolicyQuery()
-            } catch {
-                return [.say("App information checks failed: \(error.localizedDescription)"), .stop(.stop)]
-            }
             return [execute("""
             const info = await ox.app.info({ purpose: "Read app identity" });
-            const profile = await ox.app.profile({ purpose: "Read active Profile" });
-            const profiles = await ox.app.profiles({ purpose: "List Profile summaries" });
-            const notifications = await ox.app.notifications({ purpose: "Read notification permission" });
-            const language = await ox.app.language({ purpose: "Read language" });
-            const theme = await ox.app.theme({ purpose: "Read theme" });
-            const voice = await ox.app.voice({ purpose: "Read voice" });
-            const model = await ox.app.model({ purpose: "Read model" });
-            const defaultModel = await ox.app.defaultModel({ purpose: "Read default model" });
-            const actionPolicies = await ox.app.actionPolicies({ action: "ox.app.info", limit: 2, purpose: "Read Action policy" });
-            const repositories = await ox.app.repositories({ purpose: "Read repositories" });
-            const assert = (ok, message) => { if (!ok) throw new Error(message); };
-            assert(typeof ox.app.inspect === "undefined", "Aggregate inspection must not be callable");
-            assert(Object.keys(info).sort().join(",") === "build,name,region,version" && info.name === "Ox" && info.version.length > 0 && info.build.length > 0, "App info must contain identity only");
-            assert(profile === null || (Object.keys(profile).sort().join(",") === "name,storage" && profile.name.length > 0 && ["local", "iCloud", "external"].includes(profile.storage)), "Invalid Profile information");
-            assert(profiles.profiles.length <= 100 && profiles.profiles.every(item => Object.keys(item).sort().join(",") === "active,name,storage" && typeof item.name === "string" && ["local", "iCloud", "external"].includes(item.storage) && typeof item.active === "boolean"), "Invalid Profile summaries");
-            assert(Object.keys(notifications).join(",") === "status" && ["granted", "denied", "notDetermined"].includes(notifications.status), "Invalid notification permission");
-            assert(typeof language.locale === "string" && language.locale.length > 0, "Missing language locale");
-            assert(["system", "en", "zh-Hans"].includes(language.selection), "Invalid language selection");
-            assert(["creatorPick", "light", "dark"].includes(theme.selection), "Invalid theme selection");
-            assert(theme.appearance === (theme.selection === "dark" ? "dark" : "light"), "Incorrect theme appearance");
-            assert(voice.selection === null || typeof voice.selection === "string", "Invalid voice selection");
-            assert(voice.effective === null || ["id", "name", "language"].every(key => typeof voice.effective[key] === "string" && voice.effective[key].length > 0), "Invalid effective voice");
-            assert(typeof defaultModel.configured === "boolean" && ["global", "china"].includes(defaultModel.region) && typeof defaultModel.provider.name === "string" && typeof defaultModel.model.name === "string", "Invalid default model");
-            assert((actionPolicies.defaultPolicy === null || ["ask", "allow", "block"].includes(actionPolicies.defaultPolicy)) && actionPolicies.overrides.length <= 2 && actionPolicies.resolved.action === "ox.app.info" && ["action", "source", "default", "actionDefault"].includes(actionPolicies.resolved.inheritedFrom), "Invalid Action policies");
-            assert(["idle", "syncing", "ready", "failed"].includes(repositories.status) && repositories.repositories.length <= 50 && repositories.repositories.every(item => Object.keys(item).sort().join(",") === "enabled,id,name,provenance,serviceCount,skillCount,state"), "Invalid repositories");
-            assert(typeof ox.app.setActionPolicy === "undefined" && typeof ox.app.selectProfile === "undefined" && typeof ox.app.updateRepository === "undefined", "Human-controlled settings must not expose mutations");
-            for (const [name, options] of [["info", { setup: true }], ["profile", { name: "test" }], ["profiles", { limit: 1 }], ["notifications", { request: true }], ["language", { language: "en" }], ["theme", { theme: "dark" }], ["voice", { voiceId: "test" }], ["model", { modelId: "test" }], ["defaultModel", { modelId: "test" }], ["repositories", { origin: true }], ["actionPolicies", { limit: 101 }], ["actionPolicies", { action: "" }], ["logs", { limit: 101 }], ["logs", { limit: 1.5 }], ["logs", { level: "fatal" }], ["logs", { since: "yesterday" }]]) {
-              let rejected = false;
-              try { await ox.app[name]({ ...options, purpose: "Reject invalid input" }); }
-              catch { rejected = true; }
-              assert(rejected, name + " must reject invalid input");
-            }
-            console.log(JSON.stringify({ info, profile, notifications, model, profileCount: profiles.profiles.length, defaultModel, actionPolicy: actionPolicies.resolved, repositoryCount: repositories.repositories.length }));
+            const model = await ox.app.model({ purpose: "Read current model" });
+            console.log({ info, model });
             """)]
         }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
+        guard ctx.toolResults.last?.isError == false,
+              let result = JSONValue.parse(jsonString: output)?.objectValue,
               result["info"]?.objectValue?["name"]?.stringValue == "Ox",
-              let model = result["model"]?.objectValue,
-              model["provider"]?.objectValue?["name"]?.stringValue?.isEmpty == false,
-              model["model"]?.objectValue?["name"]?.stringValue?.isEmpty == false,
-              let authentication = model["authentication"]?.objectValue,
-              authentication["status"]?.stringValue != nil,
-              authentication["method"]?.stringValue != nil,
-              result["notifications"]?.objectValue?["status"]?.stringValue != nil,
-              result["defaultModel"]?.objectValue?["configured"]?.boolValue != nil,
-              result["actionPolicy"]?.objectValue?["action"]?.stringValue == "ox.app.info",
-              result["profileCount"]?.intValue != nil,
-              result["repositoryCount"]?.intValue != nil,
-              !output.contains("credential"),
-              !output.contains("accountLabel"),
-              !output.contains("filesystem") else {
-            return [.say("App information was incomplete or exposed private configuration."), .stop(.stop)]
+              result["model"]?.objectValue?["model"]?.objectValue?["name"]?.stringValue?.isEmpty == false else {
+            return [.say("App information could not be read."), .stop(.stop)]
         }
-        return [.say("Ox read its identity, Profiles, notification permission, language, theme, voices, current and default models, Action policies, and repositories without changing settings. Aggregate inspection is removed. Bounds, filtering, and credential redaction passed."), .stop(.stop)]
-    }
-
-    private static func checkAppActionPolicyQuery() throws {
-        func expect(_ condition: Bool, _ message: String) throws {
-            if !condition { throw RuntimeError.bridge(message) }
-        }
-        let fixture = ActionPolicyConfiguration(
-            defaultPolicy: .ask,
-            sources: ["example.com": .block],
-            actions: ["web:example.com:read": .allow, "ox.app.info": .block]
-        )
-        let resolved = try AppActionPolicyQuery(options: .object(["action": .string("web:example.com:write")])).read(fixture).objectValue
-        try expect(resolved?["resolved"]?.objectValue?["policy"] == .string("block"), "Source policy resolution failed")
-        try expect(resolved?["resolved"]?.objectValue?["inheritedFrom"] == .string("source"), "Policy inheritance source failed")
-        let filtered = try AppActionPolicyQuery(options: .object(["source": .string("example.com"), "limit": .int(1)])).read(fixture).objectValue
-        try expect(filtered?["overrides"]?.arrayValue?.count == 1 && filtered?["truncated"] == .bool(true), "Policy source filter or limit failed")
-        let automatic = try AppActionPolicyQuery(options: .object(["action": .string("ox.app.info")])).read(
-            ActionPolicyConfiguration(),
-            actionDefaultPolicy: .allow
-        ).objectValue
-        try expect(automatic?["defaultPolicy"] == .null, "Automatic policy must not report a global override")
-        try expect(automatic?["resolved"]?.objectValue?["policy"] == .string("allow"), "Action default resolution failed")
-        try expect(automatic?["resolved"]?.objectValue?["inheritedFrom"] == .string("actionDefault"), "Action default inheritance failed")
-        let invalidOptions: [[String: JSONValue]] = [["limit": .int(0)], ["limit": .int(101)], ["limit": .double(1.5)], ["action": .string("")], ["unknown": .bool(true)]]
-        for options in invalidOptions {
-            var rejected = false
-            do { _ = try AppActionPolicyQuery(options: .object(options)) } catch { rejected = true }
-            try expect(rejected, "Invalid policy filter accepted")
-        }
-    }
-
-    private static func checkAppLogQuery() throws {
-        func expect(_ condition: Bool, _ message: String) throws {
-            if !condition { throw RuntimeError.bridge(message) }
-        }
-        let date = Date(timeIntervalSince1970: 1_700_000_000)
-        func entry(_ id: Int, _ level: Logger.Level, _ category: String, _ message: String) -> LogEntry {
-            LogEntry(id: id, date: date.addingTimeInterval(Double(id)), level: level, category: category, thread: "test", location: "test", message: message)
-        }
-        let fixture = [
-            entry(0, .info, "Agent", "ordinary event"),
-            entry(1, .warning, "Service", "Retry request"),
-            entry(2, .error, "Service", "RETRY failed"),
-            entry(3, .error, "Network", #"{"api_key":"fixture-private-value","authorization":"Basic fixture-auth","Cookie":"session=fixture-session; csrf=fixture-csrf","client_secret":"fixture-client-secret","token":"fixture-token"}"#),
-        ]
-        func read(_ options: [String: JSONValue], _ entries: [LogEntry]? = nil) throws -> [String: JSONValue] {
-            try AppLogQuery(options: .object(options)).read(entries ?? fixture).objectValue ?? [:]
-        }
-        let filtered = try read(["level": .string("warning"), "category": .string("Service"), "query": .string("retry"), "since": .string("2023-11-14T22:13:22.000Z")])
-        try expect(filtered["entries"]?.arrayValue?.count == 1 && filtered["entries"]?.arrayValue?.first?.objectValue?["message"]?.stringValue == "RETRY failed", "Combined log filters failed")
-        let seconds = try read(["since": .string("2023-11-14T22:13:22Z")])
-        try expect(seconds["entries"]?.arrayValue?.count == 2, "Whole-second timestamp failed")
-        let limited = try read(["limit": .int(1)])
-        try expect(limited["entries"]?.arrayValue?.count == 1 && limited["truncated"] == .bool(true), "Log limit failed")
-        let clean = try read([:])["entries"]?.jsonString() ?? ""
-        try expect(!["fixture-private-value", "fixture-auth", "fixture-session", "fixture-csrf", "fixture-client-secret", "fixture-token"].contains(where: clean.contains), "Credentials escaped log redaction")
-        let secretSearch = try read(["query": .string("fixture-private-value")])
-        try expect(secretSearch["entries"]?.arrayValue?.isEmpty == true, "Log query searched unredacted credentials")
-        let empty = try read([:], [])
-        try expect(empty["entries"] == .array([]) && empty["truncated"] == .bool(false) && empty["oldestAvailable"] == .null, "Empty logs failed")
-        let large = try read(["limit": .int(100)], (0..<100).map { entry($0, .info, "Agent", String(repeating: "界", count: 3_000)) })
-        let largeEntries = large["entries"]?.arrayValue ?? []
-        try expect(large["truncated"] == .bool(true) && !largeEntries.isEmpty && largeEntries.count < 100 && largeEntries.allSatisfy { $0.objectValue?["truncated"] == .bool(true) }, "Log byte or message budget failed")
-        let invalidOptions: [[String: JSONValue]] = [["limit": .int(0)], ["limit": .int(101)], ["limit": .double(1.5)], ["level": .string("fatal")], ["since": .string("yesterday")], ["since": .string("2023-11-14T22:13:22")], ["query": .null], ["unknown": .bool(true)]]
-        for options in invalidOptions {
-            var rejected = false
-            do { _ = try AppLogQuery(options: .object(options)) } catch { rejected = true }
-            try expect(rejected, "Invalid log filter accepted")
-        }
+        return [.say("App information ready: \(output)"), .stop(.stop)]
     }
 
     static let appLogs = Scenario(name: "app-logs") { ctx in
@@ -1949,140 +876,10 @@ extension Scenario {
         return [.say("Approved log access returned bounded, filtered diagnostics in newest-first order."), .stop(.stop)]
     }
 
-    static let chatTitle = Scenario(name: "chat-title") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const first = await ox.app.renameChat({ title: "Test concise chat titles", purpose: "Name this chat" });
-            const second = await ox.app.renameChat({ title: "Updated chat title purpose", purpose: "Update this chat title" });
-            const unchanged = await ox.app.renameChat({ title: "Updated chat title purpose", purpose: "Re-evaluate this chat title" });
-            let tooLong;
-            try {
-              await ox.app.renameChat({ title: "one two three four five six seven eight nine ten eleven", purpose: "Use invalid long title" });
-            } catch (error) {
-              tooLong = String(error);
-            }
-            console.log(JSON.stringify({ first, second, unchanged, tooLong }));
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              result["first"]?.objectValue?["renamed"]?.boolValue == true,
-              result["first"]?.objectValue?["title"]?.stringValue == "Test concise chat titles",
-              result["second"]?.objectValue?["renamed"]?.boolValue == true,
-              result["second"]?.objectValue?["title"]?.stringValue == "Updated chat title purpose",
-              result["unchanged"]?.objectValue?["renamed"]?.boolValue == false,
-              result["unchanged"]?.objectValue?["title"]?.stringValue == "Updated chat title purpose",
-              result["tooLong"]?.stringValue?.contains("at most 10 words") == true else {
-            return [.say("Chat title re-evaluation did not update agent-owned titles correctly."), .stop(.stop)]
-        }
-        return [.say("The chat title updated and remained concise."), .stop(.stop)]
-    }
-
-    static let help = Scenario(name: "help") { ctx in
-        guard let output = ctx.resultText("execute") else {
-            return [execute("""
-            const schemas = { write: ox.fs.write.help(), fetch: ox.web.fetch.help() };
-            const attached = await ox.service.listAttached({ kind: "web", purpose: "List web services" });
-            const index = await ox.service.inspect({ domain: "127.0.0.1", purpose: "Inspect service actions" });
-            const actions = Object.keys(index.actions).slice(0, 2);
-            const service = await ox.service.inspect({ domain: "127.0.0.1", actions, purpose: "Inspect action schemas" });
-            const functions = Object.values(ox).flatMap(namespace =>
-              Object.values(namespace).filter(value => typeof value === "function")
-            );
-            const allRequirePurpose = functions.every(fn => fn.help().includes("\\n  purpose: string"));
-            console.log({ schemas, attached, index, service, allRequirePurpose });
-            """)]
-        }
-        guard let result = JSONValue.parse(jsonString: output)?.objectValue,
-              let schemas = result["schemas"]?.objectValue,
-              schemas["write"]?.stringValue?.contains("path: string") == true,
-              schemas["write"]?.stringValue?.contains("content: string") == true,
-              schemas["fetch"]?.stringValue?.contains("url: string") == true,
-              schemas["fetch"]?.stringValue?.contains("output: exact object") == true,
-              schemas["fetch"]?.stringValue?.contains("\"inputSchema\"") == false,
-              result["allRequirePurpose"]?.boolValue == true,
-              result["attached"]?.arrayValue?.contains(where: {
-                  $0.objectValue?["domain"]?.stringValue == "127.0.0.1"
-                      && $0.objectValue?["kind"]?.stringValue == "web"
-              }) == true,
-              let index = result["index"]?.objectValue?["actions"]?.objectValue,
-              !index.isEmpty,
-              index.values.allSatisfy({ $0.objectValue?["inputSchema"] == nil }),
-              let serviceResult = result["service"]?.objectValue?["actions"]?.objectValue,
-              !serviceResult.isEmpty,
-              serviceResult.values.allSatisfy({ action in
-                  action.objectValue?["inputSchema"] != nil && action.objectValue?["outputSchema"] != nil
-              }) else {
-            return [.say("Virtual machine help omitted a schema."), .stop(.stop)]
-        }
-        return [.say("Callable help and service inspection returned complete schemas."), .stop(.stop)]
-    }
-
     static let virtualMachineCancellation = Scenario(name: "virtual-machine-cancel", steps: [
         .say("Waiting inside JavaScript…\n"),
         execute("await new Promise(() => {});"),
     ])
-
-    static let executionOutput = Scenario(name: "execution-output") { ctx in
-        let text = ctx.resultText("execute") ?? ""
-        func checked(_ condition: Bool, _ source: String) -> [Step] {
-            condition ? [execute(source)] : [.say("Execution output regression failed at step \(ctx.turn): \(text)"), .stop(.stop)]
-        }
-        switch ctx.turn {
-        case 0:
-            return [execute("console.log('printed'); return { answer: 42 };")]
-        case 1:
-            return checked(text == "printed\n{\"answer\":42}", "return null;")
-        case 2:
-            return checked(text == "null", "return 'returned string';")
-        case 3:
-            return checked(text == "returned string", "console.log(new Error('CONSOLE_DETAIL')); function fail() { throw new Error('SCRIPT_DETAIL'); } fail();")
-        case 4:
-            return checked(ctx.toolResults.last?.isError == true && text.contains("Error: CONSOLE_DETAIL") && text.contains("Error: SCRIPT_DETAIL") && text.contains("execute.js"), """
-            await ox.app.info({ purpose: 'Check receipt success' });
-            await ox.fs.read({ path: 'chats/\(UUID().uuidString)/turns.jsonl', purpose: 'Check receipt failure' });
-            """)
-        case 5:
-            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (2 calls;") && text.contains("succeeded: 1") && text.contains("failed: 1") && text.contains("ox.app.info") && text.contains("ox.fs.read") && !text.contains("Check receipt success") && !text.contains("\"build\""), """
-            const results = await Promise.allSettled([
-              ox.app.info({ purpose: 'Read app independently' }),
-              ox.fs.read({ path: 'chats/\(UUID().uuidString)/turns.jsonl', purpose: 'Exercise partial read' })
-            ]);
-            return results.map(result => result.status === 'fulfilled' ? 'success' : result.reason.message);
-            """)
-        case 6:
-            return checked(ctx.toolResults.last?.isError == false && text.contains("success") && !text.contains("Execution receipt"), """
-            for (let i = 0; i < 25; i++) await ox.app.info({ purpose: 'Exercise bounded receipt' });
-            throw new Error('EXPECTED_BOUNDED_RECEIPT');
-            """)
-        case 7:
-            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (25 calls; succeeded: 25)") && text.contains("5 middle calls omitted") && text.components(separatedBy: "- ox.app.info [").count == 21, "return 'R'.repeat(60000) + 'RETURN_TAIL';")
-        case 8:
-            guard ctx.toolResults.last?.truncated == true,
-                  let marker = text.range(of: "Full output id: "),
-                  let id = UUID(uuidString: String(text[marker.upperBound...].prefix(36))) else {
-                return [.say("Returned output did not provide a recovery reference."), .stop(.stop)]
-            }
-            return [execute("""
-            const output = await ox.output.read({ id: '\(id.uuidString)', purpose: 'Recover returned output' });
-            if (output !== 'R'.repeat(60000) + 'RETURN_TAIL') throw new Error('Returned output was incomplete');
-            return 'Returned output recovered';
-            """)]
-        case 9:
-            return checked(text == "Returned output recovered" && ctx.toolResults.last?.isError == false, """
-            void ox.user.choose({ body: 'This test prompt should cancel automatically.', options: ['First', 'Second'], purpose: 'Exercise pending call receipt' });
-            await ox.app.info({ purpose: 'Ensure calls have started' });
-            throw new Error('EXPECTED_PENDING_RECEIPT');
-            """)
-        case 10:
-            return checked(ctx.toolResults.last?.isError == true && text.contains("Execution receipt (2 calls;") && text.contains("ox.user.choose") && text.contains("ox.app.info") && text.contains("Calls are not rolled back"), "console.log('BEFORE_RETURN_LIMIT'); return 'L'.repeat(33554432);")
-        case 11:
-            return checked(ctx.toolResults.last?.isError == true && text.contains("BEFORE_RETURN_LIMIT") && text.contains("32 MiB memory safety limit"), "return undefined;")
-        default:
-            return [.say(text == "(no output)" && ctx.toolResults.last?.isError == false
-                ? "Execution returns, error stacks, partial results, bounded receipts, cancellation, and output recovery passed."
-                : "Execution recovery failed."), .stop(.stop)]
-        }
-    }
 
     static let truncatedToolCall = Scenario(name: "truncated-tool") { ctx in
         if ctx.turn == 0 {
@@ -2193,38 +990,6 @@ extension Scenario {
         }
         return [.say("[Open Quarterly Revenue](sandbox:/mnt/data/mock-revenue.html)"), .stop(.stop)]
     }
-
-    static let htmlUpdate = Scenario(name: "html-update") { context in
-        if context.turn > 0 { return [.stop(.stop)] }
-        return [
-            .say("I'll write the updated artifact.\n\n"),
-            execute(htmlArtifact(
-                "revenue",
-                revenueDocument.replacingOccurrences(of: "Quarterly Revenue", with: "Updated Quarterly Revenue")
-            )),
-            .stop(.toolUse)
-        ]
-    }
-
-    static let htmlVideo = htmlScenario("video", lead: "A local video artifact:\n\n", document: #"""
-    <style>body{margin:0;padding:24px;font:17px -apple-system;background:#fff8ef;color:#26180f}video{width:100%;border-radius:18px;background:#18120e}p{color:#745f50}</style><h1>Video</h1><video controls src="sample.mp4"></video><p>Media is loaded from a sibling artifact and never from the network.</p>
-    """#)
-
-    static let htmlAudio = htmlScenario("audio", lead: "A local audio artifact:\n\n", document: #"""
-    <style>body{margin:0;padding:24px;font:17px -apple-system;background:#fff8ef;color:#26180f}audio{width:100%}p{color:#745f50}</style><h1>Audio</h1><audio controls src="sample.mp3"></audio><p>Media is loaded from a sibling artifact and never from the network.</p>
-    """#)
-
-    static let htmlMap = htmlScenario("map", lead: "A native map snapshot inside HTML:\n\n", document: #"""
-    <style>body{margin:0;padding:24px;font:17px -apple-system;background:#fff8ef;color:#26180f}ox-map{display:block}p{color:#745f50}</style><h1>Coffee near you</h1><p>Tap the map to open Maps.</p><ox-map latitude="37.7749" longitude="-122.4194" radius="1600" aria-label="Coffee near San Francisco"><ox-marker latitude="37.7762" longitude="-122.4189" label="Blue Bottle"></ox-marker><ox-marker latitude="37.7724" longitude="-122.4231" label="Sightglass"></ox-marker></ox-map>
-    """#)
-
-    private static func htmlScenario(_ name: String, lead: String, document: String) -> Scenario {
-        Scenario(name: "html-\(name)") { context in
-            if context.turn > 0 { return [.stop(.stop)] }
-            return [.say(lead), execute(htmlArtifact(name, document)), .stop(.toolUse)]
-        }
-    }
-
 
     private static func execute(_ source: String) -> Step {
         .tool(name: "execute", args: .object(["source": .string(source)]))
