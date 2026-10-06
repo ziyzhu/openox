@@ -51,6 +51,18 @@
     "source": "https://openox.ai/assets/services/gemini.google.com/favicon.png",
     "finalURL": "https://openox.ai/assets/services/gemini.google.com/favicon.png"
   },
+  "mail.google.com": {
+    "source": "assets/services/mail.google.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/mail.google.com/favicon.png"
+  },
+  "ios:calendar": {
+    "source": "https://openox.ai/assets/services/ios:calendar/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/ios:calendar/favicon.png"
+  },
+  "ios:reminders": {
+    "source": "https://openox.ai/assets/services/ios:reminders/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/ios:reminders/favicon.png"
+  },
   "qwen.ai": {
     "source": "https://openox.ai/assets/services/qwen.ai/favicon.png",
     "finalURL": "https://openox.ai/assets/services/qwen.ai/favicon.png"

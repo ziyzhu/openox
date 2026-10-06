@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const prompts = [
-  ["Import all of my memory into Ox.", "01-memory.md"],
-  ["Do deep research on stock trading tips across my assistants.", "02-research.md"],
-  ["What are the best job opportunities for me?", "03-jobs.md"],
+  ["Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates.", "01-memory.md"],
+  ["Email Alex that the release is ready, schedule a review tomorrow at 10, and add a prep reminder at 9.", "02-planning.md"],
+  ["Open a pull request for feature/checklist in my demo repo, email Alex the link, and add a review reminder.", "03-publishing.md"],
 ] as const;
 
 const args = process.argv.slice(2);

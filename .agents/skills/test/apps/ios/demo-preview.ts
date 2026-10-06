@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../../../../lib.ts";
@@ -51,7 +51,7 @@ async function scene(name: string, completed = true, autoplay = false) {
   launched = true;
   const heading = ["connect", "local", "yours"].includes(name);
   await wait(heading ? "demo.chapter" : name === "providers" ? "demo.provider.chatgpt"
-    : completed && !["research", "jobs"].includes(name) ? "chat.message.user" : "chat.input");
+    : completed && !["planning", "publishing"].includes(name) ? "chat.message.user" : "chat.input");
   const tree = await elements();
   check(!tree.some(element => ["demo.playPause", "demo.record", "demo.disclosure", "demo.airplane"].includes(element.AXUniqueId ?? "")), `${name}: no custom player or simulated system UI`);
   await sim("screenshot", "--out", join(directory, `${name}${autoplay ? "-autoplay" : ""}.png`));
@@ -65,7 +65,7 @@ try {
   let tree = await scene("connect");
   check(tree.some(element => element.AXLabel === "Connect anything, Ox works across AI assistants, apps, and websites to get things done for you."), "verbatim copy in native onboarding row");
   tree = await scene("memory");
-  check(tree.some(element => element.AXLabel === "Import all of my memory into Ox."), "exact memory prompt in native user bubble");
+  check(tree.some(element => element.AXLabel === "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."), "exact memory prompt in native user bubble");
   check(tree.some(element => element.AXUniqueId === "demo.thinking"), "native completed task trace");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("private memory stores")), "source-specific memory reply includes access limits");
   for (const id of ["chat.message.copy", "chat.message.share"]) {
@@ -83,23 +83,30 @@ try {
   }
   await sim("screenshot", "--out", join(directory, "memory-steps.png"));
   for (const [name, prompt, domains] of [
-    ["research", "Do deep research on stock trading tips across my assistants.", ["manus.im", "doubao.com", "grok.com"]],
-    ["jobs", "What are the best job opportunities for me?", ["outlook.live.com", "linkedin.com", "www.1point3acres.com"]],
+    ["planning", "Email Alex that the release is ready, schedule a review tomorrow at 10, and add a prep reminder at 9.", ["mail.google.com", "ios:calendar", "ios:reminders"]],
+    ["publishing", "Open a pull request for feature/checklist in my demo repo, email Alex the link, and add a review reminder.", ["github.com", "mail.google.com", "ios:reminders"]],
   ] as const) {
     tree = await scene(name);
     check(await value("chat.input") === prompt, `exact ${name} prompt in native composer`);
     const send = tree.find(element => element.AXUniqueId === "chat.send")?.frame;
     check(send?.width === 44 && send.height === 44, `${name} Send matches the production 44-point tap target at standard text size`);
     check(!tree.some(element => element.AXUniqueId === "demo.reply"), `${name} remains typing-only`);
-    check(domains.every(domain => tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === "Signed in")), `${name} has assigned three services with fixture auth status`);
+    check(domains.every(domain => tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === (domain.startsWith("ios:") ? "Permission granted" : "Signed in"))), `${name} has assigned write services with snapshot access status`);
   }
   tree = await scene("offline");
-  check(tree.some(element => element.AXLabel === "Help me plan a focused morning."), "stored conversation uses native messages, no fabricated radio control");
+  check(tree.some(element => element.AXLabel === "Add a reminder for tomorrow at 9 to start a 45-minute focus block."), "stored conversation delegates an on-device write, no fabricated radio control");
+  check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("Added **Morning focus block** to Reminders")), "stored reply reports a created reminder fixture");
+  check(tree.some(element => element.AXUniqueId === "conversation.servicePill.ios:reminders" && element.AXValue === "Permission granted"), "on-device reminder chip uses snapshot permission status");
   tree = await scene("providers");
   check(tree.some(element => element.AXUniqueId === "demo.provider.chatgpt"), "native provider picker");
   tree = await scene("reddit");
   check(tree.some(element => element.AXUniqueId === "conversation.servicePill.reddit.com"), "reusable Reddit appears in native composer");
-  await scene("reuse");
+  check(tree.some(element => element.AXLabel === "Create a reusable Reddit service that can publish posts and reply to comments."), "Reddit prompt creates reusable write actions");
+  check(tree.some(element => element.AXUniqueId === "conversation.servicePill.reddit.com" && element.AXValue === "Signed in"), "Reddit write actions use snapshot sign-in status");
+  check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("require your approval")), "Reddit write fixture describes approval requirements");
+  tree = await scene("reuse");
+  check(tree.some(element => element.AXLabel === "Post my morning routine to my Reddit profile using the new service."), "reuse prompt publishes rather than retrieves advice");
+  check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("Published **My focused-morning routine**")), "reuse reply reports a published post fixture");
   await scene("memory", false, true);
   await wait("demo.thinking");
   tree = await elements();
@@ -107,9 +114,37 @@ try {
   await sim("wait", "--id", "demo.reply", "--timeout", "20000", "--stable", "300");
   await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "30000", "--stable", "300");
   tree = await elements();
-  check(tree.some(element => element.AXLabel === "Import all of my memory into Ox."), "timeline types, sends, and streams through native components");
+  check(tree.some(element => element.AXLabel === "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."), "timeline types, sends, and streams through native components");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("Source labels are kept so you can review the merge.")), "word-burst stream preserves the complete reply");
-  await scene("connect"); // Cancel playback before measuring persisted state.
+  const screenshotDirectory = join(directory, "app-store");
+  await mkdir(screenshotDirectory);
+  let screenshotSize: string | undefined;
+  for (const [index, [name, outcome]] of ([
+    ["planning", "The email includes the review time."],
+    ["publishing", "The branch has not been merged."],
+    ["memory", "Source labels are kept so you can review the merge."],
+    ["reminder", "Added **Morning focus block** to Reminders"],
+    ["service", "Both write actions require your approval"],
+    ["post", "Published **My focused-morning routine**"],
+  ] as const).entries()) {
+    await sim(...launch, "--env", `OX_APP_STORE_SCREENSHOT=${name}`);
+    await wait("demo.reply");
+    tree = await elements();
+    check(tree.some(element => element.AXUniqueId === "chat.message.user"), `App Store ${name}: native user message`);
+    check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes(outcome)), `App Store ${name}: completed action fixture`);
+    check(tree.some(element => element.AXUniqueId === "chat.message.copy"), `App Store ${name}: native completed response controls`);
+    check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "chat.stop", "chat.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
+    check(await value("chat.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);
+    const path = join(screenshotDirectory, `${String(index + 1).padStart(2, "0")}-${name}.png`);
+    await sim("screenshot", "--out", path);
+    const png = await readFile(path);
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    check(height > width && (!screenshotSize || screenshotSize === `${width}x${height}`), `App Store ${name}: consistent native portrait resolution`);
+    screenshotSize = `${width}x${height}`;
+  }
+  check((await readdir(screenshotDirectory)).length === 6, "exactly six app-only screenshot PNGs");
+  await scene("connect");
   const after = await snapshot("after");
   check(JSON.stringify(before) === JSON.stringify(after), "profile and Local repository contents unchanged");
   const defaultsAfter = await run(["sim", "--device", config.device, "defaults", "read", bundle, "chat.importMemoryIntentDisplays"], { capture: true, allowFailure: true });

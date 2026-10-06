@@ -4,7 +4,7 @@ import SwiftUI
 struct OxApp: App {
     init() {
         #if DEBUG
-        guard !OxDemoLaunch.enabled else { return }
+        guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif
         ScheduledSkillScheduler.shared.register()
     }
@@ -12,7 +12,9 @@ struct OxApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if OxDemoLaunch.enabled {
+            if OxAppStoreScreenshotLaunch.enabled {
+                OxAppStoreScreenshotView(screenshot: OxAppStoreScreenshotLaunch.screenshot)
+            } else if OxDemoLaunch.enabled {
                 OxDemoSceneView(
                     scene: OxDemoLaunch.scene,
                     completed: OxDemoLaunch.completed,

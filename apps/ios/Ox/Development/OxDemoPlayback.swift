@@ -24,12 +24,12 @@ nonisolated enum OxDemoChapter: String {
 }
 
 nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
-    case connect, memory, research, jobs, local, offline, yours, providers, reddit, reuse
+    case connect, memory, planning, publishing, local, offline, yours, providers, reddit, reuse
 
     var id: String { rawValue }
     var chapter: OxDemoChapter {
         switch self {
-        case .connect, .memory, .research, .jobs: .connect
+        case .connect, .memory, .planning, .publishing: .connect
         case .local, .offline: .local
         case .yours, .providers, .reddit, .reuse: .yours
         }
@@ -37,20 +37,21 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
     var isHeading: Bool { [.connect, .local, .yours].contains(self) }
     var prompt: String {
         switch self {
-        case .memory: "Import all of my memory into Ox."
-        case .research: "Do deep research on stock trading tips across my assistants."
-        case .jobs: "What are the best job opportunities for me?"
-        case .offline: "Help me plan a focused morning."
-        case .reddit: "Find Reddit discussions about focused mornings, and create a reusable Reddit service as you go."
-        case .reuse: "Find Reddit tips for focused mornings."
+        case .memory: "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."
+        case .planning: "Email Alex that the release is ready, schedule a review tomorrow at 10, and add a prep reminder at 9."
+        case .publishing: "Open a pull request for feature/checklist in my demo repo, email Alex the link, and add a review reminder."
+        case .offline: "Add a reminder for tomorrow at 9 to start a 45-minute focus block."
+        case .reddit: "Create a reusable Reddit service that can publish posts and reply to comments."
+        case .reuse: "Post my morning routine to my Reddit profile using the new service."
         default: ""
         }
     }
     var domains: [String] {
         switch self {
         case .memory: ["chatgpt.com", "claude.ai", "muse.ai"]
-        case .research: ["manus.im", "doubao.com", "grok.com"]
-        case .jobs: ["outlook.live.com", "linkedin.com", "www.1point3acres.com"]
+        case .planning: ["mail.google.com", "ios:calendar", "ios:reminders"]
+        case .publishing: ["github.com", "mail.google.com", "ios:reminders"]
+        case .offline: ["ios:reminders"]
         case .reuse: ["reddit.com"]
         default: []
         }
@@ -59,7 +60,7 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
         switch self {
         case .memory:
             """
-            Imported what ChatGPT, Claude, and Muse exposed; merged overlapping preferences into Ox memory.
+            Imported the available memory from ChatGPT, Claude, and Muse, merged duplicates, and saved it in Ox.
 
             - **ChatGPT:** concise answers, with trade-offs up front.
             - **Claude:** Swift and TypeScript examples; small, reviewable changes.
@@ -67,33 +68,55 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
 
             This isn't a complete export of private memory stores. Source labels are kept so you can review the merge.
             """
+        case .planning:
+            """
+            Done — the release review is set up.
+
+            - **Gmail:** sent Alex “Release ready.”
+            - **Calendar:** created “Release review,” tomorrow **10:00–10:30 AM**.
+            - **Reminders:** added “Prepare release review,” due **9:00 AM**.
+
+            The email includes the review time.
+            """
+        case .publishing:
+            """
+            Opened **Add morning checklist** from `feature/checklist` into `main` in your demo repository.
+
+            - **GitHub:** pull request created.
+            - **Gmail:** sent Alex the pull request link.
+            - **Reminders:** added “Review morning checklist,” due tomorrow.
+
+            The branch has not been merged.
+            """
         case .offline:
             """
-            Protect one hour, rather than planning the entire morning.
+            Added **Morning focus block** to Reminders, due tomorrow at **9:00 AM**.
 
-            1. **9:00–9:05:** Choose one task and define what “done” means.
-            2. **9:05–9:50:** Silence notifications and work only on that task.
-            3. **9:50–10:00:** Note the next step, then check messages.
+            The reminder includes these notes:
 
-            If you get interrupted, return to the same task instead of restarting the plan.
+            - Choose one task before starting.
+            - Silence notifications for 45 minutes.
+            - Write down the next step before checking messages.
             """
         case .reddit:
             """
-            Created **Reddit** in Local and checked its search and comment-reading actions.
+            Created **Reddit** in Local with **publish post** and **reply to comment** actions.
 
-            Start with [r/productivity](https://www.reddit.com/r/productivity/) for distractions and protecting your first work block, or [r/GetDisciplined](https://www.reddit.com/r/GetDisciplined/) for routines that are easier to repeat.
+            Both write actions require your approval and a signed-in Reddit session.
 
-            The service is attached. I'll use it for the next search. These public reads don't need a Reddit sign-in.
+            The service passed validation and is attached, ready to publish your morning routine.
             """
         case .reuse:
             """
-            A recurring theme in [r/productivity](https://www.reddit.com/r/productivity/): make starting easier instead of adding more rules.
+            Published **My focused-morning routine** to your Reddit profile using the new service.
 
-            - Pick one concrete first task the night before.
-            - Keep your phone outside the workspace until the first break.
-            - Check messages after a 45-minute block, not before.
+            The post includes:
 
-            Try the first two tomorrow. Measure whether you started on time, not whether the morning was perfect.
+            - Choose the first task the night before.
+            - Start a 45-minute focus block at 9:00 AM.
+            - Keep the phone out of reach until the first break.
+
+            The reusable service handled publishing; no manual copy-and-paste was needed.
             """
         default: ""
         }
@@ -105,13 +128,21 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
             ["Reading preferences exposed by ChatGPT, Claude, and Muse",
              "Merging overlaps and preserving source labels",
              "Saving the combined notes to Ox memory"]
+        case .planning:
+            ["Sending the release email in Gmail",
+             "Creating the review in Calendar",
+             "Adding the preparation reminder"]
+        case .publishing:
+            ["Opening the checklist pull request in GitHub",
+             "Sending Alex the pull request link",
+             "Adding a review reminder"]
         case .reddit:
-            ["Checking Reddit's pages and available reads",
-             "Building reusable search and comment-reading actions",
-             "Checking the saved service with a public search"]
+            ["Inspecting Reddit's post and comment forms",
+             "Building reusable publishing and reply actions",
+             "Validating the service and saving it in Local"]
         case .reuse:
-            ["Searching discussions about focused mornings",
-             "Reading comments and comparing practical suggestions"]
+            ["Preparing the morning-routine post",
+             "Publishing through the saved Reddit service"]
         default: []
         }
     }
@@ -133,6 +164,9 @@ nonisolated enum OxDemoLaunch {
 @MainActor
 @Observable
 final class OxDemoPlayback {
+    enum Presentation { case storyboard, appStore }
+
+    private let presentation: Presentation
     let services: ServiceManager
     let composer = ConversationComposerModel()
     let speech = ConversationSpeechInput()
@@ -150,8 +184,9 @@ final class OxDemoPlayback {
     var selectedProvider: String? = "chatgpt"
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(scene: OxDemoScene = .connect, completed: Bool = false) {
+    init(scene: OxDemoScene = .connect, completed: Bool = false, presentation: Presentation = .storyboard) {
         self.scene = scene
+        self.presentation = presentation
         let manager = ServiceManager()
         services = manager
         let names = [
@@ -159,22 +194,32 @@ final class OxDemoPlayback {
             "manus.im": "Manus", "doubao.com": "Doubao", "grok.com": "Grok",
             "outlook.live.com": "Outlook", "linkedin.com": "LinkedIn",
             "www.1point3acres.com": "1Point3Acres", "reddit.com": "Reddit",
+            "mail.google.com": "Gmail", "github.com": "GitHub",
+            "ios:calendar": "Calendar", "ios:reminders": "Reminders",
         ]
         var built: [String: Service] = [:]
         for (domain, name) in names {
-            let definition = try! ServiceDefinition(manifest: .object([
-                "domain": .string(domain), "name": .string(name),
-                "baseUrl": .string("https://\(domain)"), "actions": .array([]),
-            ]))
+            let definition: ServiceDefinition
+            if domain.hasPrefix("ios:") {
+                let url = Bundle.main.url(forResource: "OxServices", withExtension: "bundle")!
+                    .appendingPathComponent("ios/\(domain.dropFirst(4))/service.json")
+                let manifest = try! JSONDecoder().decode(IOSCatalogManifest.self, from: Data(contentsOf: url))
+                definition = try! ServiceDefinition(iOS: manifest)
+            } else {
+                definition = try! ServiceDefinition(manifest: .object([
+                    "domain": .string(domain), "name": .string(name),
+                    "baseUrl": .string("https://\(domain)"), "actions": .array([]),
+                ]))
+            }
             let service = Service(definition: definition, manager: manager)
-            service.setAuth(domain == "reddit.com" ? .notRequired : .observed(.init(
+            service.setAuth(service.isIOSService ? .authorized : .observed(.init(
                 value: .signedIn, observedAt: .distantPast, evidence: .configured
             )))
             built[domain] = service
         }
         catalog = built
         let bundle = Bundle.main.url(forResource: "OxDemoArtwork", withExtension: "bundle")
-        artwork = Dictionary(uniqueKeysWithValues: (Array(names.keys) + ["github.com", "www.kimi.com", "gemini.google.com", "qwen.ai"]).compactMap { domain in
+        artwork = Dictionary(uniqueKeysWithValues: (Array(names.keys) + ["www.kimi.com", "gemini.google.com", "qwen.ai"]).compactMap { domain in
             guard let url = bundle?.appendingPathComponent("\(domain).png"),
                   let data = try? Data(contentsOf: url) else { return nil }
             return (domain, data)
@@ -225,7 +270,7 @@ final class OxDemoPlayback {
     func showCompletedScene() {
         stop()
         composer.replaceDraft("")
-        if [.research, .jobs].contains(scene) {
+        if presentation == .storyboard && [.planning, .publishing].contains(scene) {
             composer.replaceDraft(scene.prompt)
         } else if !scene.prompt.isEmpty {
             sent = true
@@ -274,7 +319,7 @@ final class OxDemoPlayback {
             composer.replaceDraft(typed)
         }
         try await Task.sleep(for: .milliseconds(1300))
-        if [.research, .jobs].contains(scene) { return }
+        if [.planning, .publishing].contains(scene) { return }
         await animate(reduceMotion: reduceMotion) {
             self.focusComposer = false
             self.composer.replaceDraft("")

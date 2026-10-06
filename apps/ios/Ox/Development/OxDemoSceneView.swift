@@ -12,8 +12,8 @@ struct OxDemoSceneView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let autoplay: Bool
 
-    init(scene: OxDemoScene = .connect, completed: Bool = false, autoplay: Bool = false) {
-        _playback = State(initialValue: OxDemoPlayback(scene: scene, completed: completed))
+    init(scene: OxDemoScene = .connect, completed: Bool = false, autoplay: Bool = false, presentation: OxDemoPlayback.Presentation = .storyboard) {
+        _playback = State(initialValue: OxDemoPlayback(scene: scene, completed: completed, presentation: presentation))
         self.autoplay = autoplay
     }
 
@@ -225,8 +225,8 @@ struct OxDemoSceneView: View {
     OxDemoSceneView(scene: .memory, completed: true)
 }
 
-#Preview("Research · composer") {
-    OxDemoSceneView(scene: .research, completed: true)
+#Preview("Planning · write actions") {
+    OxDemoSceneView(scene: .planning, completed: true)
 }
 
 #Preview("Local first · stored messages") {
