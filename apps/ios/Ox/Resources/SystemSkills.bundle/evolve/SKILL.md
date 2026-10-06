@@ -1,13 +1,15 @@
 ---
 name: evolve
-description: Create, extend, repair, and verify Local web and API services, including model-generation actions and website tasks with no suitable service. Use existing functions directly for connections, repositories, and ordinary service use.
+description: Create, extend, repair, and verify Local web and API services, including improvements noticed during ordinary use, model-generation actions, and website tasks with no suitable service. Use existing functions directly for connections, repositories, and ordinary service use.
 ---
 
 # Evolve
 
 Build useful service capabilities from observed behavior. Keep discovery, exploration, implementation, live verification, and Save in one workflow. Use existing services normally when their definitions already meet the request.
 
-Evolve a service when a requested capability is missing, an existing action is confirmed broken, or Browser reveals a stable way to make the service more complete, reliable, or efficient. Create or improve the smallest action supported by the observed workflow, and leave an action unchanged when it already handled the request cleanly. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website failures. A general public-information question alone does not call for a service.
+Evolve a service when a requested capability is missing, an existing action is confirmed broken, or observed behavior reveals a stable way to make the service more complete, reliable, or efficient. When Ox notices a concrete improvement opportunity while fulfilling a request, implement and verify the smallest useful improvement within that request's scope, even when the user did not explicitly ask to evolve the service. Repeated workarounds, unnecessary post-processing or orchestration, unclear capability descriptions, and observed reliability or efficiency improvements are useful signals. Leave an action unchanged when there is no material improvement. Distinguish service defects from sign-in, human verification, rate limiting, missing resources, and temporary website or API failures. A general public-information question alone does not call for a service.
+
+Fulfill the original request first, then run at most one bounded improvement pass. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for verification. If improvement requires expanded scope or user input, explain the opportunity instead of proceeding. Save verified improvements only when the Local repository was clean before this work began; otherwise leave them unsaved and report the limitation.
 
 Read `skills/evolve/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
@@ -25,7 +27,7 @@ Read `skills/evolve/references/model-service.md` when adding or editing standard
 - Discover with `ox.service.find` and `ox.service.listAttached`; inspect with `ox.service.inspect` and `ox.fs.read`.
 - Set `requireApproval: false` for read-only actions by default. Require approval for external mutations. Preserve runtime authentication and attachment approval gates.
 - Do not change the manifest schema. Preserve runtime approval gates and unrelated Local changes. Inspect Local status and diff before Save, revert, restore, or deletion; keep abandoned work recoverable.
-- Save verified Local changes after reviewing status and diff without asking for a separate Save confirmation. Present the operation as **Save**, for example `Save Outlook service`. Keep Git and revision mechanics internal unless the user asks or recovery requires them. Honor any runtime Action policy gate.
+- Inspect complete Local repository status before creating, copying, or editing a service, and remember whether it was already dirty. If it had any uncommitted changes, skip automatic Save even after verification; do not commit, revert, or overwrite the pre-existing changes. Report that the improvement remains unsaved. Otherwise, Save verified Local changes after reviewing status and diff without asking for a separate Save confirmation. Present the operation as **Save**, for example `Save Outlook service`. Keep Git and revision mechanics internal unless the user asks or recovery requires them. Honor any runtime Action policy gate.
 - In user-facing plans, progress, and results, describe what Ox can do, what the user needs to do, and what remains uncertain in everyday language. Keep action IDs, service domains, base URLs, schemas, source files, captures, and repository mechanics internal unless the user asks for technical details or a specific detail is needed for a decision or recovery.
 
 ## Share a verified service

@@ -47,10 +47,10 @@ Install synchronously exactly once and register every declared action exactly on
 ## Workflow
 
 1. Discover existing coverage and read official API documentation. For Google, use Google Discovery documents and googleworkspace/cli as request and workflow references.
-2. Identify bounded operations, permissions, pagination, and mutation effects. Reuse the user's approved scope; ask only about meaningful unresolved decisions.
-3. Create or copy the service, edit through `ox.fs`, then call `ox.service.validate` and `ox.service.attach`.
+2. Identify bounded operations, permissions, pagination, and mutation effects. Reuse the user's approved scope; ask only about meaningful unresolved decisions. When ordinary API use reveals a concrete improvement, fulfill the original request first, then implement the smallest useful change within its scope without waiting for an explicit evolution request. Follow the main skill's one-pass, no-extra-prompt, and no-extra-effect boundaries; explain opportunities that need expanded scope or user input instead.
+3. Inspect complete Local status before creating, copying, or editing, and remember whether it already contains uncommitted changes. Preserve pre-existing changes and skip automatic Save if Local was already dirty. Create or copy the service, edit through `ox.fs`, then call `ox.service.validate` and `ox.service.attach`.
 4. Complete setup through `ox.service.signIn`. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.
 5. Verify successful reads, empty results, continuation, missing resources, and auth errors. Exercise mutations only with authorization. Report inaccessible or unverified capabilities explicitly.
-6. Inspect Local status and diff, then **Save** the verified service without a separate confirmation. Preserve unrelated changes, resolve ambiguous Save scope, and use the existing Local Git workflow internally. Honor any runtime Action policy gate.
+6. Inspect Local status and diff. If Local was already dirty before this work began, skip automatic Save; do not commit, revert, or overwrite pre-existing changes. Otherwise, **Save** the verified service without a separate confirmation, stopping to resolve ambiguous Save scope if new unrelated changes appeared. Use the existing Local Git workflow internally and honor any runtime Action policy gate. Report what improved, whether it was saved or remains unsaved, checks performed, and limitations.
 
 Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and shared verification evidence must contain only public configuration and synthetic or sanitized examples.
