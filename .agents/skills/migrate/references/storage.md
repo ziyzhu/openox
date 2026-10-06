@@ -701,7 +701,10 @@ bootstrap therefore leaves target IndexedDB data unchanged.
 
 New-chat provider/model defaults, provider additions and overrides, region,
 and language are stored in UserDefaults. Each chat persists its own
-provider/model selection. `llm.providerCatalog` contains a format-2 JSON envelope
+provider/model selection. Chat saves write the existing `nativeReasoningEffort`
+metadata field for non-Pi effort values; null defers to Pi thinking. They explicitly
+clear Pi thinking when the selected model has no compatible effort; a switch must not retain
+its predecessor's reasoning choice. `llm.providerCatalog` contains a format-2 JSON envelope
 with saved provider definitions and their declared models. Bundled definitions
 remain the base; a saved definition replaces the entire bundled definition with
 the same ID or adds a new provider. Deleting an override restores its bundled

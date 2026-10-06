@@ -13,8 +13,12 @@ public protocol OxFunctionBridge: AnyObject {
     func appNotifications(purpose: String) async throws -> JSONValue?
     func appLanguage(purpose: String) async throws -> JSONValue?
     func appTheme(purpose: String) async throws -> JSONValue?
+    func setAppLanguage(selection: String, purpose: String) async throws -> JSONValue?
+    func setAppTheme(selection: String, purpose: String) async throws -> JSONValue?
     func appModel(purpose: String) async throws -> JSONValue?
     func appDefaultModel(purpose: String) async throws -> JSONValue?
+    func setAppDefaultModel(options: JSONValue, purpose: String) async throws -> JSONValue?
+    func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue?
     func appActionPolicies(options: JSONValue?, purpose: String) async throws -> JSONValue?
     func appRepositories(purpose: String) async throws -> JSONValue?
     func appLogs(options: JSONValue?, purpose: String) async throws -> JSONValue?
@@ -46,6 +50,7 @@ public protocol OxFunctionBridge: AnyObject {
     func repositoryConflicts(service: String?, purpose: String) async throws -> JSONValue?
     func resolveRepositoryConflict(service: String, repository: String, purpose: String) async throws -> JSONValue?
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue?
+    func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue?
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue?
     func proposeRepository(repository: String, base: String?, commitHash: String, services: [String], skills: [String], title: String, body: String, status: String, purpose: String) async throws -> JSONValue?
     func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue?

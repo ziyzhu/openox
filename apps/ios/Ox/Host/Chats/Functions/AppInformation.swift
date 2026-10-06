@@ -100,6 +100,108 @@ extension Conversation {
         }
     }
 
+    public func setAppLanguage(selection: String, purpose: String) async throws -> JSONValue? {
+        guard let language = AppLocale.Language(rawValue: selection) else {
+            throw RuntimeError.bridge("ox.app.setLanguage: selection must be system, en, or zh-Hans")
+        }
+        return try await tracked(Actions.appSetLanguage, .object(["selection": .string(selection)]), purpose: purpose) {
+            try Task.checkCancellation()
+            let locale = AppLocale.shared
+            let changed = locale.language != language
+            locale.language = language
+            Log.app.info("bridge.app.setLanguage selection=\(selection) changed=\(changed)")
+            return .object([
+                "selection": .string(locale.language.rawValue),
+                "locale": .string(locale.locale.identifier),
+                "changed": .bool(changed),
+            ])
+        }
+    }
+
+    public func setAppTheme(selection: String, purpose: String) async throws -> JSONValue? {
+        guard let theme = AppTheme(rawValue: selection) else {
+            throw RuntimeError.bridge("ox.app.setTheme: selection must be creatorPick, light, or dark")
+        }
+        return try await tracked(Actions.appSetTheme, .object(["selection": .string(selection)]), purpose: purpose) {
+            try Task.checkCancellation()
+            let manager = ThemeManager.shared
+            let changed = manager.theme != theme
+            manager.theme = theme
+            Log.app.info("bridge.app.setTheme selection=\(selection) changed=\(changed)")
+            return .object([
+                "selection": .string(manager.theme.rawValue),
+                "appearance": .string(manager.theme == .dark ? "dark" : "light"),
+                "changed": .bool(changed),
+            ])
+        }
+    }
+
+    public func setAppDefaultModel(options: JSONValue, purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appSetDefaultModel, options, purpose: purpose) {
+            let registry = ProviderRegistry.shared
+            let previous = registry.defaultModel
+            guard let selection = options.objectValue?["selection"] else {
+                throw RuntimeError.bridge("ox.app.setDefaultModel: selection is required; use null for automatic selection")
+            }
+            let resolved = selection == .null ? nil : try await self.resolveAppModelSelection(selection, current: previous)
+            try Task.checkCancellation()
+            guard registry.defaultModel == previous else {
+                throw RuntimeError.bridge("The default model changed during verification; inspect it before retrying")
+            }
+            let changed = try registry.setDefaultModel(resolved?.selection)
+            return .object([
+                "configured": .bool(registry.defaultModel != nil),
+                "selection": registry.defaultModel?.appInformation ?? .null,
+                "changed": .bool(changed),
+            ])
+        }
+    }
+
+    public func setAppModel(options: JSONValue, purpose: String) async throws -> JSONValue? {
+        try await tracked(Actions.appSetModel, options, purpose: purpose) {
+            let previous = self.modelSelection
+            let previousChange = self.modelSelectionChange
+            guard let selection = options.objectValue?["selection"], selection != .null else {
+                throw RuntimeError.bridge("ox.app.setModel: an explicit selection is required")
+            }
+            let resolved = try await self.resolveAppModelSelection(selection, current: previous, pending: previousChange?.pendingSelection)
+            try Task.checkCancellation()
+            guard self.modelSelection == previous, self.modelSelectionChange == previousChange else {
+                throw RuntimeError.bridge("The chat model selection changed during verification; inspect it before retrying")
+            }
+            let changed = (previousChange?.pendingSelection ?? previous) != resolved.selection
+            let status = self.requestModelSelection(resolved)
+            return .object([
+                "status": .string(status),
+                "selection": resolved.selection.appInformation,
+                "changed": .bool(changed),
+            ])
+        }
+    }
+
+    private func resolveAppModelSelection(_ value: JSONValue, current: ModelSelection?, pending: ModelSelection? = nil) async throws -> ProviderRegistry.SelectedModel {
+        guard let fields = value.objectValue,
+              let provider = fields["provider"]?.stringValue, !provider.isEmpty,
+              let model = fields["model"]?.stringValue, !model.isEmpty else {
+            throw RuntimeError.bridge("Model selection requires an existing provider and exact model ID")
+        }
+        let previous: ModelSelection? = if let pending, pending.providerID == provider, pending.modelID == model { pending } else { current }
+        let effort = if fields["thinkingLevel"] != nil {
+            fields["thinkingLevel"]?.stringValue
+        } else if previous?.providerID == provider, previous?.modelID == model {
+            previous?.reasoningEffort
+        } else { nil as String? }
+        let registry = ProviderRegistry.shared
+        let selection = ModelSelection(providerID: provider, modelID: model, reasoningEffort: effort)
+        guard let client = registry.client(id: provider), client.models.contains(where: { $0.id == model }) else {
+            throw RuntimeError.bridge("Choose an existing provider from ox.provider.list and an exact available model ID from ox.provider.get")
+        }
+        if let authenticated = try await client.websiteSessionIsAuthenticated(), !authenticated {
+            throw RuntimeError.bridge("Sign in to this website provider before selecting its model")
+        }
+        return try registry.resolveSelection(selection)
+    }
+
     public func appModel(purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.appModel, .object([:]), purpose: purpose) {
             .object([
@@ -112,6 +214,8 @@ extension Conversation {
                     "name": .string(model.displayName),
                 ]),
                 "supportsTools": .bool(client.supportsTools(for: model)),
+                "thinkingLevel": model.selectedReasoningEffort.map(JSONValue.string) ?? .null,
+                "change": modelSelectionChange?.appInformation ?? .null,
                 "authentication": modelAuthentication(for: client),
             ])
         }
@@ -199,7 +303,7 @@ extension Conversation {
         } else if account != nil {
             method = "subscription"
             status = "signedOut"
-        } else if client.usesAPIKey {
+        } else if client.usesAPIKey, (try? ProviderRegistry.shared.definition(id: client.id).auth.requiresCredential) != false {
             method = client.credentialKind.appInformationValue
             status = "missingCredential"
         } else {

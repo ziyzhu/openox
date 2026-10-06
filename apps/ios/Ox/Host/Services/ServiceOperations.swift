@@ -379,6 +379,33 @@ final class ServiceOperations {
         }
     }
 
+    func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue? {
+        guard let selected = serviceManager.repositories.first(where: { $0.id == repository }) else {
+            throw RuntimeError.bridge("ox.repository.enable: select an existing repository ID from ox.app.repositories")
+        }
+        let args: JSONValue = .object([
+            "repository": .string(selected.id),
+            "name": .string(selected.name),
+            "enabled": .bool(enabled),
+        ])
+        return try await tracked(Actions.repositoryEnable, args, purpose: purpose) {
+            try Task.checkCancellation()
+            let previous = self.serviceManager.repositories.first(where: { $0.id == repository })?.isEnabled
+            let updated = try await self.serviceManager.setRepositoryEnabled(
+                repository,
+                enabled: enabled,
+                locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
+            )
+            return .object([
+                "id": .string(updated.id),
+                "enabled": .bool(updated.isEnabled),
+                "changed": .bool(previous != updated.isEnabled),
+                "serviceCount": .int(updated.serviceCount),
+                "skillCount": .int(updated.skills.count),
+            ])
+        }
+    }
+
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }) else {
             throw RuntimeError.bridge("ox.repository.sync: select an installed remote repository ID from ox.app.repositories")

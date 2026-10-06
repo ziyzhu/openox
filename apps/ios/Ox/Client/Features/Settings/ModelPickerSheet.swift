@@ -1131,18 +1131,18 @@ struct ModelPickerContent: View {
                 }
             }
         }
-        Log.ui.info("ModelPicker.select client=\(selectedClient.id) model=\(selectedModel.id) reasoning=\(selectedModel.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
-        onSelect(
-            selectedClient,
-            selectedModel,
-            ModelSelection(
-                region: selectedRegion,
+        do {
+            let selected = try registry.resolveSelection(ModelSelection(
                 providerID: selectedClient.id,
                 modelID: selectedModel.id,
                 reasoningEffort: selectedModel.selectedReasoningEffort
-            )
-        )
-        Haptics.success(.settingsSaved)
+            ))
+            Log.ui.info("ModelPicker.select client=\(selected.client.id) model=\(selected.model.id) reasoning=\(selected.model.selectedReasoningEffort ?? "unavailable") region=\(selectedRegion.rawValue)")
+            onSelect(selected.client, selected.model, selected.selection)
+            Haptics.success(.settingsSaved)
+        } catch {
+            providerCredentialError = error.localizedDescription
+        }
     }
 
     private func selectCustomProvider(onSelect: (any ProviderClient, ProviderModel, ModelSelection) -> Void) {
@@ -1164,17 +1164,18 @@ struct ModelPickerContent: View {
                 return
             }
         }
-        Log.ui.info("ModelPicker.select custom client=\(provider.clientID) model=\(model.id)")
-        onSelect(
-            provider.client,
-            model.modelInfo,
-            ModelSelection(
-                region: selectedRegion,
+        do {
+            let selected = try registry.resolveSelection(ModelSelection(
                 providerID: provider.clientID,
                 modelID: model.id,
                 reasoningEffort: model.modelInfo.selectedReasoningEffort
-            )
-        )
+            ))
+            Log.ui.info("ModelPicker.select custom client=\(selected.client.id) model=\(selected.model.id)")
+            onSelect(selected.client, selected.model, selected.selection)
+        } catch {
+            customError = error.localizedDescription
+            return
+        }
         providerSelection = .client(provider.clientID)
         selectedModelID = model.id
         loadCredentialDraft()

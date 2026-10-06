@@ -22,6 +22,8 @@ bun run test:e2e
 bun run test:logs
 bun run ci:ios --device ox-1
 bun run test:demo --device ox-1
+bun .agents/skills/test/apps/ios/settings.ts --device ox-1 --host <ws-url> --app <Ox.app>
+bun .agents/skills/test/apps/ios/durable-chat.ts --device ox-1 --app <Ox.app> --evidence /tmp/ox-model-qa --models
 ```
 
 `test:e2e` explicitly discovers this skill's `*.test.ts` files. Simulator flows,
@@ -86,6 +88,10 @@ and are diagnostic evidence, not Profile exports or power-loss verification.
 Keep Mock focused on model streaming, tool loops, handoffs, and model-visible context. Feature-specific regression setup, assertions, and cleanup belong in E2E runners, not new numbered Mock scenarios. The Mock menu is the source of truth for supported inputs; retired numbers fall back to that menu. Removing a Mock regression does not establish replacement coverage.
 
 Built-in guidance boundaries use `bun .agents/skills/test/apps/ios/guidance.ts --device ox-N --host ws://<VPN-address>:<assigned-port> --chat <QA-chat-id>` after installing a fresh build. It verifies read-only documentation, discovery/search, and old-path compatibility without model inference or Profile writes. Mock `72 guidance` covers model-visible loading without skill activation; it is not full workflow verification.
+
+`settings.ts` requires an already reachable Host on the selected simulator's assigned port and an idle saved chat. It exercises language/theme and default/current-model setters, automatic-model reset, and Local repository enablement through `ox`, checks validation and no-op results, relaunches the supplied app to verify persistence, and restores the original preferences and saved chat. It does not enable Host access, change credentials, or reset data. Host ingress failures block live verification; never add a loopback bypass to make the test pass.
+
+`durable-chat.ts --models` uses native Mock scenario `23` through the actual UI without Host ingress. It verifies deferred switches, pending no-ops, Stop/failure cancellation, and the next queued turn's model, then runs `23 defaults` to verify default selection/reset, invalid arguments, current-chat isolation, and restoration. It uses the explicit temporary SQLite fixture and restores the normal launch environment; it does not change provider credentials and restores the original new-chat default. This fixture requires automatic or Mock defaults. Default relaunch checks require the Host-based suite; persisted-chat model reload is not covered.
 
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use

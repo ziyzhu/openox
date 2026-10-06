@@ -165,12 +165,66 @@ final class ProviderRegistry {
         return selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
     }
 
+    struct SelectedModel {
+        let client: any ProviderClient
+        let model: ProviderModel
+
+        var selection: ModelSelection {
+            ModelSelection(providerID: client.id, modelID: model.id, reasoningEffort: model.selectedReasoningEffort)
+        }
+    }
+
+    func resolveSelection(_ selection: ModelSelection) throws -> SelectedModel {
+        guard catalogAvailable else { throw RuntimeError.bridge("Provider catalog is unavailable") }
+        guard let client = client(id: selection.providerID) else {
+            throw RuntimeError.bridge("Choose an existing provider ID from ox.provider.list")
+        }
+        guard var model = client.models.first(where: { $0.id == selection.modelID }) else {
+            throw RuntimeError.bridge("Choose an exact available model ID for this provider")
+        }
+        if let effort = selection.reasoningEffort, !model.reasoningEfforts.contains(effort) {
+            throw RuntimeError.bridge("This model does not support the requested thinking level")
+        }
+        let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
+        let signedIn = client.subscriptionAccount?.isSignedIn == true
+        let needsAuthentication = (try? definition(id: client.id).auth.requiresCredential) ?? (client.usesAPIKey || client.subscriptionAccount != nil)
+        guard !needsAuthentication || hasCredential || signedIn else {
+            throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
+        }
+        if let provider = client as? WebServiceModelProvider {
+            guard let service = IOSHost.shared.services.service(domain: provider.domain),
+                  service.signInState.isAuthenticated || service.signInState == .notRequired else {
+                throw RuntimeError.bridge("Verify this website provider's sign-in before selecting its model")
+            }
+        }
+        model.reasoningEffort = selection.reasoningEffort ?? model.lowestReasoningEffort
+        return SelectedModel(client: client, model: model)
+    }
+
+    @discardableResult
+    func setDefaultModel(_ selection: ModelSelection?) throws -> Bool {
+        let next = try selection.map { try resolveSelection($0).selection }
+        guard defaultModel != next else { return false }
+        if let next {
+            let data = try JSONEncoder().encode(next)
+            UserDefaults.standard.set(data, forKey: Self.defaultModelKey)
+            guard UserDefaults.standard.data(forKey: Self.defaultModelKey) == data else {
+                throw RuntimeError.bridge("Default model could not be saved")
+            }
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.defaultModelKey)
+            guard UserDefaults.standard.object(forKey: Self.defaultModelKey) == nil else {
+                throw RuntimeError.bridge("Default model could not be reset")
+            }
+        }
+        defaultModel = next
+        Log.agent.info("ProviderRegistry.defaultModel provider=\(next?.providerID ?? "automatic") model=\(next?.modelID ?? "automatic")")
+        return true
+    }
+
     func select(_ model: ProviderModel, in clientID: String, region: LLMRegion) {
-        let selection = ModelSelection(providerID: clientID, modelID: model.id, reasoningEffort: model.selectedReasoningEffort)
         do {
-            UserDefaults.standard.set(try JSONEncoder().encode(selection), forKey: Self.defaultModelKey)
-            defaultModel = selection
-            Log.agent.info("ProviderRegistry.select provider=\(clientID) model=\(model.id)")
+            try setDefaultModel(ModelSelection(providerID: clientID, modelID: model.id, reasoningEffort: model.selectedReasoningEffort))
         } catch { Log.agent.error("ProviderRegistry.select failed error=\(error.localizedDescription)") }
     }
 

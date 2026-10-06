@@ -6,8 +6,8 @@ import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 
 const qa = qaCommand({
-  usage: "bun run test:agent-ui-ios --device ox-N --app /absolute/Ox.app --evidence /tmp/directory [--bundle id]\nActual temporary-chat UI, native Mock, Pi SQLite and process reopen. Requires an idle chat and Mock already selected. No Host transport or credential changes.",
-  options: { app: { type: "string" }, evidence: { type: "string" }, bundle: { type: "string" } },
+  usage: "bun run test:agent-ui-ios --device ox-N --app /absolute/Ox.app --evidence /tmp/directory [--bundle id] [--models]\nActual temporary-chat UI, native Mock, Pi SQLite and process reopen. Requires an idle chat and Mock already selected. No Host transport or credential changes.",
+  options: { app: { type: "string" }, evidence: { type: "string" }, bundle: { type: "string" }, models: { type: "boolean" } },
 });
 if (!qa.values.device || !qa.values.app) throw new Error("Pass --device and --app from a fresh DEBUG build");
 const directory = qa.values.evidence ?? `/tmp/ox-durable-ui-${Date.now()}`;
@@ -92,6 +92,38 @@ async function stopWithQueuedInput(chatID: string) {
   await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
   check(JSON.stringify(await sim("describe")).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
 }
+async function verifyModelChanges(chatID: string) {
+  const matches = (messages: string[], text: string) => messages.filter(message => message.includes(text) && message.includes(`id=${chatID}`)).length;
+  for (const [prompt, stop, outcome] of [["23", true, "aborted"], ["23 error", false, "error"]] as const) {
+    const baseline = await logs();
+    await post(prompt);
+    await waitForLog(messages => matches(messages, "Chat.modelChange pending") > matches(baseline, "Chat.modelChange pending") ? true : undefined);
+    if (stop) await sim("tap", "--id", "chat.stop", "--wait", "5000");
+    await waitForLog(messages => matches(messages, `Chat.runOne end`) > matches(baseline, "Chat.runOne end")
+      && messages.some(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)) ? true : undefined);
+    const after = await logs();
+    check(matches(after, "Chat.modelChange cancelled") > matches(baseline, "Chat.modelChange cancelled"), "Stop or failure cancels the pending selection");
+    check(matches(after, "Chat.modelChange applied") === matches(baseline, "Chat.modelChange applied"), "Cancelled selections never apply");
+    await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "500");
+    await sim("screenshot", "--out", `${directory}/model-${outcome}.png`);
+  }
+  const baseline = await logs();
+  await post("23");
+  await waitForLog(messages => matches(messages, "Chat.modelChange pending") > matches(baseline, "Chat.modelChange pending") ? true : undefined);
+  await post("2");
+  await waitForLog(messages => matches(messages, "Chat.runOne end") >= matches(baseline, "Chat.runOne end") + 2 ? true : undefined);
+  const after = await logs();
+  const applied = after.findIndex(message => message.includes(`Chat.modelChange applied id=${chatID}`));
+  check(applied >= 0, "Successful submission applies the pending model");
+  check(after.slice(applied + 1).some(message => message.includes(`PiDurable native model start chat=${chatID}`) && message.includes("model=mock-text-only")), "Next queued turn uses the requested native model");
+  check(after.slice(0, applied).filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).every(message => message.includes("model=mock ")), "The switching submission and cancelled requests retain the original model");
+  await sim("screenshot", "--out", `${directory}/model-applied.png`);
+  await send(chatID, "23 defaults");
+  check(JSON.stringify(await sim("describe")).includes("Default model preferences were verified and restored."), "Default mutations, reset, validation, and restoration succeed through native Actions");
+  await sim("screenshot", "--out", `${directory}/model-defaults.png`);
+  Object.assign(evidence, { passed: true, firstChat: chatID, modelChanges: ["pending", "no-op", "cancelled", "failed-submission", "applied", "queued-turn", "default-selection", "automatic-reset", "validation", "restoration"] });
+  console.log(`PASS actual native model APIs, deferred selection, no-op, Stop/failure cancellation, next queued turn, defaults, reset, validation and restoration; evidence ${directory}`);
+}
 async function inspect(name: string) {
   const root = `${directory}/${name}`;
   await sim("file", "pull", bundle, `Library/Caches/PiDurableProof/NativeFiles/${caseID}`, "--dest", root);
@@ -115,38 +147,42 @@ try {
   launched = true;
   await launch(true);
   const firstChat = await attach();
-  await send(firstChat, "12");
-  check(JSON.stringify(await sim("describe")).includes("Done."), "Native reasoning reply is visible");
-  await sim("screenshot", "--out", `${directory}/reasoning.png`);
-  await send(firstChat, "10");
-  check(JSON.stringify(await sim("describe")).includes("Mock markdown"), "Native markdown reply is visible");
-  await sim("screenshot", "--out", `${directory}/two-turns.png`);
-  await send(firstChat, "22");
-  check(JSON.stringify(await sim("describe")).includes("Both reads are back"), "Native snippet tools return to the Pi model loop");
-  await sim("screenshot", "--out", `${directory}/tools.png`);
-  await send(firstChat, "13", true);
-  await sim("screenshot", "--out", `${directory}/cancelled.png`);
-  await stopWithQueuedInput(firstChat);
-  await sim("screenshot", "--out", `${directory}/queued-after-stop.png`);
-  await launch(true);
-  const before = await inspect("before-reopen");
-  check(before.references.length === 1, "One Pi conversation before reopen");
-  const firstModels = before.entries.flatMap(entry => entry.record.model ?? []);
-  check(firstModels.filter(message => message.role === "user").length === 6, "All initial and queued user turns committed exactly once");
-  check(firstModels.filter(message => message.role === "toolResult").length === 2, "Both native tool results retained in Pi history");
-  check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "thinking")), "Committed reasoning retained");
-  check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "text" && block.text.includes("# Mock markdown"))), "Full markdown retained in Pi history");
-  const secondChat = await attach();
-  check(secondChat !== firstChat, "Temporary UI chat identity must not survive process loss");
-  await send(secondChat, "12");
-  await sim("screenshot", "--out", `${directory}/reopened-session.png`);
-  await launch(false);
-  const after = await inspect("after-reopen");
-  check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
-  check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
-  check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 7, "All actual user turns, no duplicates");
-  Object.assign(evidence, { passed: true, firstChat, secondChat, before, after });
-  console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
+  if (qa.values.models) {
+    await verifyModelChanges(firstChat);
+  } else {
+    await send(firstChat, "12");
+    check(JSON.stringify(await sim("describe")).includes("Done."), "Native reasoning reply is visible");
+    await sim("screenshot", "--out", `${directory}/reasoning.png`);
+    await send(firstChat, "10");
+    check(JSON.stringify(await sim("describe")).includes("Mock markdown"), "Native markdown reply is visible");
+    await sim("screenshot", "--out", `${directory}/two-turns.png`);
+    await send(firstChat, "22");
+    check(JSON.stringify(await sim("describe")).includes("Both reads are back"), "Native snippet tools return to the Pi model loop");
+    await sim("screenshot", "--out", `${directory}/tools.png`);
+    await send(firstChat, "13", true);
+    await sim("screenshot", "--out", `${directory}/cancelled.png`);
+    await stopWithQueuedInput(firstChat);
+    await sim("screenshot", "--out", `${directory}/queued-after-stop.png`);
+    await launch(true);
+    const before = await inspect("before-reopen");
+    check(before.references.length === 1, "One Pi conversation before reopen");
+    const firstModels = before.entries.flatMap(entry => entry.record.model ?? []);
+    check(firstModels.filter(message => message.role === "user").length === 6, "All initial and queued user turns committed exactly once");
+    check(firstModels.filter(message => message.role === "toolResult").length === 2, "Both native tool results retained in Pi history");
+    check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "thinking")), "Committed reasoning retained");
+    check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "text" && block.text.includes("# Mock markdown"))), "Full markdown retained in Pi history");
+    const secondChat = await attach();
+    check(secondChat !== firstChat, "Temporary UI chat identity must not survive process loss");
+    await send(secondChat, "12");
+    await sim("screenshot", "--out", `${directory}/reopened-session.png`);
+    await launch(false);
+    const after = await inspect("after-reopen");
+    check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
+    check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
+    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 7, "All actual user turns, no duplicates");
+    Object.assign(evidence, { passed: true, firstChat, secondChat, before, after });
+    console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
+  }
 } catch (error) {
   Object.assign(evidence, { passed: false, error: String(error) });
   if (launched) await sim("screenshot", "--out", `${directory}/failure.png`).catch(() => {});

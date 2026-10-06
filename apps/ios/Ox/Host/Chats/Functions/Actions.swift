@@ -21,8 +21,12 @@ nonisolated enum Actions {
     static let appNotifications = "ox.app.notifications"
     static let appLanguage = "ox.app.language"
     static let appTheme = "ox.app.theme"
+    static let appSetLanguage = "ox.app.setLanguage"
+    static let appSetTheme = "ox.app.setTheme"
     static let appModel = "ox.app.model"
     static let appDefaultModel = "ox.app.defaultModel"
+    static let appSetDefaultModel = "ox.app.setDefaultModel"
+    static let appSetModel = "ox.app.setModel"
     static let appActionPolicies = "ox.app.actionPolicies"
     static let appRepositories = "ox.app.repositories"
     static let appLogs = "ox.app.logs"
@@ -53,6 +57,7 @@ nonisolated enum Actions {
     static let repositoryConflicts = "ox.repository.conflicts"
     static let repositoryResolve = "ox.repository.resolve"
     static let repositorySync = "ox.repository.sync"
+    static let repositoryEnable = "ox.repository.enable"
     static let repositoryDisconnect = "ox.repository.disconnect"
     static let repositoryPropose = "ox.repository.propose"
     static let repositoryGitStatus = "ox.repository.git.status"
@@ -96,15 +101,15 @@ nonisolated enum Actions {
     static let builtIn = [
         conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
-        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme,
-        appModel, appDefaultModel, appActionPolicies, appRepositories,
+        appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme, appSetLanguage, appSetTheme,
+        appModel, appDefaultModel, appSetModel, appSetDefaultModel, appActionPolicies, appRepositories,
         appLogs, appRenameChat,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
         fsList, fsRead, fsAttach, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach, visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
-        serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryDisconnect,
+        serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
         repositoryPropose, repositoryConflicts, repositoryResolve,
         repositoryGitStatus, repositoryGitLog,
         repositoryGitShow, repositoryGitDiff, repositoryGitCheckout, repositoryGitCommit, repositoryGitRevert,
@@ -144,10 +149,10 @@ nonisolated enum Actions {
         case appInfo: L10n.string("App info")
         case appProfile, appProfiles: L10n.string("Profiles")
         case appNotifications: L10n.string("Notifications")
-        case appLanguage: L10n.string("Language")
-        case appTheme: L10n.string("Theme")
-        case appModel: L10n.string("Model")
-        case appDefaultModel: L10n.string("Default model")
+        case appLanguage, appSetLanguage: L10n.string("Language")
+        case appTheme, appSetTheme: L10n.string("Theme")
+        case appModel, appSetModel: L10n.string("Model")
+        case appDefaultModel, appSetDefaultModel: L10n.string("Default model")
         case appActionPolicies: L10n.string("Actions")
         case appRepositories: L10n.string("Repositories")
         case appLogs: L10n.string("Logs")
@@ -177,6 +182,7 @@ nonisolated enum Actions {
         case repositoryConflicts: L10n.string("Conflicts")
         case repositoryResolve: L10n.string("Choose")
         case repositorySync: L10n.string("Sync")
+        case repositoryEnable: L10n.string("Repositories")
         case repositoryDisconnect: L10n.string("Remove Repository")
         case repositoryPropose: L10n.string("Share Service")
         case repositoryGitStatus, repositoryGitDiff: L10n.string("Check repository changes")

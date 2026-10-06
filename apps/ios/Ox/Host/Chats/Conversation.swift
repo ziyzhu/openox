@@ -218,6 +218,7 @@ final class Conversation: Identifiable {
     private(set) var client: any ProviderClient
     private(set) var model: ProviderModel
     private(set) var modelSelection: ModelSelection
+    private(set) var modelSelectionChange: ModelSelectionChange?
     private(set) var followIntents: [FollowIntent] = []
 
     func publishFollowIntents(_ intents: [FollowIntent]) {
@@ -247,6 +248,7 @@ final class Conversation: Identifiable {
     }
 
     func switchModel(to client: any ProviderClient, model: ProviderModel, selection: ModelSelection) {
+        cancelModelSelectionChange()
         self.client = client
         self.model = model
         publishFollowIntents([])
@@ -260,6 +262,44 @@ final class Conversation: Identifiable {
         scheduleModelPreparation()
         Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue)")
         onPersistableChange?()
+    }
+
+    func requestModelSelection(_ selected: ProviderRegistry.SelectedModel) -> String {
+        let selection = selected.selection
+        if selection == modelSelection {
+            cancelModelSelectionChange()
+            modelSelectionChange = .applied(selection)
+            return "applied"
+        }
+        if let run = activeRun {
+            modelSelectionChange = .pending(selection, run.id)
+            Log.session.info("Chat.modelChange pending id=\(id) provider=\(selection.providerID) model=\(selection.modelID)")
+            return "pending"
+        }
+        switchModel(to: selected.client, model: selected.model, selection: selection)
+        modelSelectionChange = .applied(selection)
+        return "applied"
+    }
+
+    private func cancelModelSelectionChange() {
+        guard let selection = modelSelectionChange?.pendingSelection else { return }
+        modelSelectionChange = .cancelled(selection)
+        Log.session.info("Chat.modelChange cancelled id=\(id) provider=\(selection.providerID) model=\(selection.modelID)")
+    }
+
+    private func settleModelSelectionChange(runID: RunID, succeeded: Bool) {
+        guard case let .pending(selection, owner) = modelSelectionChange, owner == runID else { return }
+        guard succeeded else { cancelModelSelectionChange(); return }
+        do {
+            let selected = try ProviderRegistry.shared.resolveSelection(selection)
+            modelSelectionChange = .applied(selected.selection)
+            switchModel(to: selected.client, model: selected.model, selection: selected.selection)
+            Log.session.info("Chat.modelChange applied id=\(id) provider=\(selection.providerID) model=\(selection.modelID)")
+        } catch {
+            modelSelectionChange = .failed(selection, error.localizedDescription)
+            notice = .error(error.localizedDescription)
+            Log.session.error("Chat.modelChange failed id=\(id) error=\(error.localizedDescription)")
+        }
     }
 
     func setModelPreparationIntent(_ active: Bool) {
@@ -2098,6 +2138,7 @@ final class Conversation: Identifiable {
     }
 
     func cancelAll() {
+        cancelModelSelectionChange()
         bluetooth.close()
         botControlSource.release()
         let cancelled = drainSubmissions()
@@ -2129,6 +2170,7 @@ final class Conversation: Identifiable {
         }
         botControlSource.release()
         Log.session.info("Chat.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
+        cancelModelSelectionChange()
         notice = .none
         submissionPresentation = .cancelled
         submissionTask?.cancel()
@@ -2360,6 +2402,7 @@ final class Conversation: Identifiable {
         let hasUnreadResult = chatSucceeded || chatFailed
         let leaseSucceeded = !backgroundExecutionExpired
         if chatFailed { run.backgroundExecution?.updatePhase(.failed) }
+        settleModelSelectionChange(runID: runID, succeeded: chatSucceeded && !run.task.isCancelled && submissionTask == nil)
         let completionNotification = chatSucceeded ? run.completionNotification : nil
         run.backgroundExecution?.finish(success: leaseSucceeded)
         finishFinishingDiagnostics(next: "idle")
@@ -2454,7 +2497,10 @@ final class Conversation: Identifiable {
         Log.session.info("Chat.runOne start id=\(id) client=\(client.id) model=\(model.id)")
         agentHapticPhase = .waitingForDelta
         if activeRun?.id == runID { activeRun?.activeSubmission = submission }
+        var submissionResult: ConversationRunResult?
         defer {
+            settleModelSelectionChange(runID: runID,
+                succeeded: submissionResult?.outcome == .completed && !Task.isCancelled)
             if activeRun?.id == runID { activeRun?.activeSubmission = nil }
         }
         do { try await freezeMemorySnapshot() }
@@ -2542,6 +2588,7 @@ final class Conversation: Identifiable {
             resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
+        submissionResult = result
         let sealedAt = Date()
         let err = result.errorMessage
         let failureKind = result.failureKind

@@ -636,9 +636,37 @@ final class ServiceManager {
         repositoryLoadWaiters.removeFirst().resume()
     }
 
-    func setRepositoryEnabled(_ repositoryID: String, enabled: Bool, locale: String?) async {
-        _ = await mutateRepositories(locale: locale) {
-            try await self.repository.setEnabled(repositoryID: repositoryID, enabled: enabled)
+    @discardableResult
+    func setRepositoryEnabled(_ repositoryID: String, enabled: Bool, locale: String?) async throws -> Repository.Descriptor {
+        guard !repositoryLoadActive, repositoryState != .syncing else {
+            throw Repository.Failure(message: "Repositories are updating; wait before changing enablement")
+        }
+        guard let selected = repositories.first(where: { $0.id == repositoryID }) else {
+            throw Repository.Failure(message: "Repository not found")
+        }
+        do {
+            try Task.checkCancellation()
+            if selected.isEnabled != enabled {
+                repositoryState = .syncing
+                try await repository.setEnabled(repositoryID: repositoryID, enabled: enabled)
+                _ = await loadRepositories(locale: locale)
+            }
+            guard let updated = repositories.first(where: { $0.id == repositoryID }),
+                  updated.isEnabled == enabled else {
+                throw Repository.Failure(message: "Repository enablement could not be verified; inspect repositories before retrying")
+            }
+            if enabled, case .failed = updated.state {
+                throw Repository.Failure(message: "Repository enablement is saved, but its content is unavailable; inspect repositories before retrying")
+            }
+            if case .failed = repositoryState {
+                throw Repository.Failure(message: "Repository enablement may be saved, but the catalog could not be loaded; inspect repositories before retrying")
+            }
+            Log.service.info("ServiceManager.repository enabled id=\(repositoryID) enabled=\(enabled) changed=\(selected.isEnabled != updated.isEnabled)")
+            return updated
+        } catch {
+            repositoryState = .failed(error.localizedDescription)
+            Log.service.error("ServiceManager.repository enable failed id=\(repositoryID) enabled=\(enabled) error=\(error.localizedDescription)")
+            throw error
         }
     }
 

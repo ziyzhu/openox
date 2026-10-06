@@ -179,7 +179,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
     private static func group(for action: String) -> Self {
         switch action {
         case Actions.appRenameChat: return .conversations
-        case Actions.appModel, Actions.appDefaultModel: return .models
+        case Actions.appModel, Actions.appDefaultModel, Actions.appSetModel, Actions.appSetDefaultModel: return .models
         case Actions.appRepositories: return .repositories
         case Actions.outputRead: return .artifacts
         default: break

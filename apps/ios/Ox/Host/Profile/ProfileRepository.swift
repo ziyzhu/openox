@@ -124,10 +124,11 @@ actor ProfileRepository {
         metadata["isFavorite"] = fields["favorite"] ?? .bool(false)
         metadata["hasUnreadResponse"] = fields["unread"] ?? .bool(false)
         let agent = fields["agent"]?.objectValue ?? [:]
+        let nativeEffort = metadata["nativeReasoningEffort"].flatMap { $0 == .null ? nil : $0 }
         if let model = agent["model"]?.objectValue, let modelID = model["modelId"]?.stringValue,
            let provider = metadata["nativeProviderID"]?.stringValue ?? model["provider"]?.stringValue {
             metadata["model"] = .object(["providerID": .string(provider), "modelID": .string(modelID),
-                "reasoningEffort": metadata["nativeReasoningEffort"] ?? agent["thinkingLevel"] ?? .null])
+                "reasoningEffort": nativeEffort ?? agent["thinkingLevel"] ?? .null])
         }
         let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = scope
         let meta = try decoder.decode(ChatMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
@@ -145,16 +146,22 @@ actor ProfileRepository {
             case .metadata(let value): meta = value; turns = nil
             case .chat(let state): meta = state.meta; turns = state.turns
             }
+            let effort = meta.model?.reasoningEffort
+            let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
             var fields = try encoded(meta).objectValue ?? [:]
             for key in ["id", "model", "title", "isFavorite", "hasUnreadResponse"] { fields.removeValue(forKey: key) }
-            if let provider = meta.model?.providerID { fields["nativeProviderID"] = .string(provider) }
+            if let model = meta.model {
+                fields["nativeProviderID"] = .string(model.providerID)
+                fields["nativeReasoningEffort"] = thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null
+            }
             var command: [String: JSONValue] = ["action": .string("applicationSave"), "reference": reference.value,
                 "metadata": .object(fields), "title": .string(meta.title ?? ""), "favorite": .bool(meta.isFavorite), "unread": .bool(meta.hasUnreadResponse)]
             if let turns { command["turns"] = .array(try turns.map(encoded)) }
             if let model = meta.model {
-                var agent: [String: JSONValue] = ["model": .object(["provider": .string(model.providerID), "modelId": .string(model.modelID)])]
-                if let effort = model.reasoningEffort, ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains(effort) { agent["thinkingLevel"] = .string(effort) }
-                command["agent"] = .object(agent)
+                command["agent"] = .object([
+                    "model": .object(["provider": .string(model.providerID), "modelId": .string(model.modelID)]),
+                    "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
+                ])
             }
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(command))
             return ChatSaveReceipt(saveID: request.saveID, succeeded: true)

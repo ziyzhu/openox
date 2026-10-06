@@ -67,6 +67,33 @@ nonisolated enum OxRepositories {
                     ])
                 ),
                 (
+                    "ox.repository.enable",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.repository.enable")),
+                        "inputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "repository": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(100)]),
+                                "enabled": .object(["type": .string("boolean")]),
+                            ]),
+                            "required": .array([.string("repository"), .string("enabled")]),
+                            "additionalProperties": .bool(false),
+                        ]),
+                        "outputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "id": .object(["type": .string("string")]),
+                                "enabled": .object(["type": .string("boolean")]),
+                                "changed": .object(["type": .string("boolean")]),
+                                "serviceCount": .object(["type": .string("integer"), "minimum": .int(0)]),
+                                "skillCount": .object(["type": .string("integer"), "minimum": .int(0)]),
+                            ]),
+                            "required": .array(["id", "enabled", "changed", "serviceCount", "skillCount"].map(JSONValue.string)),
+                            "additionalProperties": .bool(false),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.repository.disconnect",
                     .object([
                         "description": .string(ModelGuidance.text("ox.repository.disconnect")),
@@ -260,6 +287,13 @@ nonisolated enum OxRepositories {
             }
             ctx.setObject(syncRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositorySync" as NSString)
 
+            let enableRepositoryBlock: @convention(block) (String, Bool, String) -> JSValue = { repository, enabled, purpose in
+                env.call(suspendingTimeout: true) {
+                    try await $0.enableRepository(repository: repository, enabled: enabled, purpose: purpose)
+                }
+            }
+            ctx.setObject(enableRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryEnable" as NSString)
+
             let disconnectRepositoryBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call(suspendingTimeout: true) { try await $0.disconnectRepository(repository: repository, purpose: purposeValue.toString()!) }
             }
@@ -375,6 +409,7 @@ nonisolated enum OxRepositories {
             resolve: (value) => { const options = __oxOptions(value, 'ox.repository.resolve'); return __nativeRepositoryResolve(String(options.service), String(options.repository), String(options.purpose)); },
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
+            enable: (value) => { const options = __oxOptions(value, 'ox.repository.enable'); return __nativeRepositoryEnable(String(options.repository), options.enabled, String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },
             propose: (value) => { const options = __oxOptions(value, 'ox.repository.propose'); return __nativeRepositoryPropose(String(options.repository), options.base ?? null, String(options.commitHash), options.services ?? [], options.skills ?? [], String(options.title), String(options.body), String(options.status), String(options.purpose)); },
           git: {

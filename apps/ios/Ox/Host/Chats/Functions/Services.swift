@@ -66,6 +66,10 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.resolveRepositoryConflict(service: service, repository: repository, purpose: purpose)
     }
 
+    public func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.enableRepository(repository: repository, enabled: enabled, purpose: purpose)
+    }
+
     public func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
         try await serviceOperations.syncRepository(repository: repository, purpose: purpose)
     }

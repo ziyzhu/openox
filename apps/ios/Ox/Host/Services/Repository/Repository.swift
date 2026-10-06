@@ -492,6 +492,7 @@ actor Repository {
     }
 
     func setEnabled(repositoryID: String, enabled: Bool) throws {
+        let previous = configuration
         if repositoryID == Self.bundledID {
             configuration.bundledEnabled = enabled
         } else if repositoryID == Self.localID {
@@ -503,7 +504,12 @@ actor Repository {
         } else {
             throw Failure(message: "Repository not found")
         }
-        try saveConfiguration()
+        do {
+            try saveConfiguration()
+        } catch {
+            configuration = previous
+            throw error
+        }
         Log.service.info("Repository.enabled id=\(repositoryID) enabled=\(enabled)")
     }
 

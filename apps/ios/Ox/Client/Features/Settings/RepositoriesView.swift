@@ -102,7 +102,11 @@ struct RepositoriesView: View {
         HStack(spacing: 0) {
             Button {
                 Task {
-                    await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
+                    do {
+                        try await manager.setRepositoryEnabled(repository.id, enabled: !repository.isEnabled, locale: locale)
+                    } catch {
+                        Log.ui.error("Repositories.enable id=\(repository.id) failed=\(error.localizedDescription)")
+                    }
                 }
             } label: {
                 Image(systemName: repository.isEnabled ? "checkmark.square.fill" : "square")
