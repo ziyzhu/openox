@@ -255,7 +255,7 @@ private struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
 }
 
 private struct CurrentChatActivityObserver: View {
-    let chat: Chat?
+    let chat: Conversation?
     let onAwaitingUser: () -> Void
 
     var body: some View {
@@ -383,7 +383,7 @@ private struct SkillImportModifier: ViewModifier {
 
 private struct ChatImportModifier: ViewModifier {
     let coordinator: ChatImportCoordinator
-    let chats: ChatManager
+    let chats: ConversationManager
     let ready: Bool
     let onProposalPresented: () -> Void
     let onImportedChat: (UUID) -> Void
@@ -437,7 +437,7 @@ private extension View {
 
     func chatImport(
         coordinator: ChatImportCoordinator,
-        chats: ChatManager,
+        chats: ConversationManager,
         ready: Bool,
         onProposalPresented: @escaping () -> Void,
         onImportedChat: @escaping (UUID) -> Void
@@ -500,7 +500,7 @@ struct RootView: View {
     private let chatImports: ChatImportCoordinator
     private var manager: ServiceManager { client.services }
     private var storage: StorageRoot { .shared }
-    @State private var chats: ChatManager
+    @State private var chats: ConversationManager
     @State private var compactPage: CompactPage = .workspace
     @State private var showSplitSidebar = true
     @State private var splitSidebarWidth: CGFloat?
@@ -983,7 +983,7 @@ struct RootView: View {
         presentation = nil
     }
 
-    private func requestComposerFocus(for chat: Chat, reason: String) {
+    private func requestComposerFocus(for chat: Conversation, reason: String) {
         let request = ComposerFocusRequest(chatID: chat.id, reason: reason)
         composerFocusRequest = request
         Log.ui.info("ChatUX.intent chat=\(chat.id) kind=focusRequest phase=requested request=\(request.id) reason=\(reason)")

@@ -48,6 +48,10 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         }
     }
 
+    func command(_ value: JSONValue) async throws -> JSONValue {
+        try JSONDecoder().decode(JSONValue.self, from: Data(try await command(value.jsonString()).utf8))
+    }
+
     func publishArtifact(data: Data, filename: String) async throws -> JSONValue {
         _ = try ArtifactStore.validatedFilename(filename)
         let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string("artifacts/" + filename),

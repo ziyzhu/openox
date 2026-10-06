@@ -307,7 +307,7 @@ struct ServiceActionSettingsView: View {
                     VStack(spacing: 0) {
                         serviceActionRow(
                             title: String(localized: "Attach to a chat"),
-                            actionID: Chat.attachApproveKey(service.domain),
+                            actionID: Conversation.attachApproveKey(service.domain),
                             defaultPolicy: Actions.defaultPolicy(for: Actions.serviceAttach)
                         )
                         if service.detailCapabilities.supportsFolderAccess {

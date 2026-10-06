@@ -3,7 +3,7 @@ import SwiftUI
 struct ChatImportView: View {
     let proposal: ChatImportProposal
     let coordinator: ChatImportCoordinator
-    let chats: ChatManager
+    let chats: ConversationManager
 
     private var artifactBytes: Int {
         proposal.header.files.reduce(0) { total, file in

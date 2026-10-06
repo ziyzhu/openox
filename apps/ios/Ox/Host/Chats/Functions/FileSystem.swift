@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     var skillsMount: SkillsMount {
         SkillsMount(repository: repository, scope: scope, manager: serviceManager, session: skillSession)
     }

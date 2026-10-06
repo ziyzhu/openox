@@ -64,7 +64,7 @@ nonisolated struct ChatPendingPrompt: Equatable, Sendable {
 
 @MainActor
 @Observable
-final class Chat: Identifiable {
+final class Conversation: Identifiable {
     enum ExecutionLease {
         case userInitiated
         case externallyManaged
@@ -194,23 +194,21 @@ final class Chat: Identifiable {
     private(set) var id: UUID
     let createdAt: Date
     let scheduledSkillID: UUID?
-    let agent: Agent
     let javaScriptOutputs = JavaScriptOutputStore()
-    @ObservationIgnored private(set) var agentSnapshot: AgentSnapshot?
-    @ObservationIgnored private var agentControlTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
+    @ObservationIgnored var submissionTask: Task<ConversationRunResult, Never>?
+    @ObservationIgnored var preparedConfiguration: AgentConfiguration?
     @ObservationIgnored var durablePreparation: Task<Void, Error>?
     @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int)?
-    private(set) var usesDurableAgent = false
-    private(set) var conversationReference: DurableConversationReference?
+    var conversationReference: DurableConversationReference? { durableRoute?.reference }
 
-    func installDurableDriver(_ driver: DurableAgentDriver?, reference: DurableConversationReference? = nil) async throws {
-        if let reference {
+    func installDurableRoute(_ route: DurableConversationRoute?) throws {
+        guard submissionTask == nil else { throw RuntimeError.bridge("Conversation submission is still running") }
+        if let reference = route?.reference {
             guard reference.profileID == scope.profileID else { throw RuntimeError.bridge("Conversation belongs to another Profile") }
-            conversationReference = reference
             id = reference.compatibilityID.rawValue
         }
-        try await agent.installDurableDriver(driver)
-        usesDurableAgent = driver != nil
+        durableRoute = route
     }
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationIntent = false
@@ -258,10 +256,7 @@ final class Chat: Identifiable {
             modelID: model.id,
             reasoningEffort: model.selectedReasoningEffort
         )
-        let configuration = agentConfiguration(client: client, model: model)
-        enqueueAgentMutation { agent in
-            await agent.configure(configuration)
-        }
+        preparedConfiguration = nil
         scheduleModelPreparation()
         Log.session.info("Chat.switchModel id=\(id) -> client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue)")
         onPersistableChange?()
@@ -732,7 +727,7 @@ final class Chat: Identifiable {
     }
     private(set) var lastActivityAt: Date?
 
-    @ObservationIgnored weak var chatManager: ChatManager?
+    @ObservationIgnored weak var chatManager: ConversationManager?
     @ObservationIgnored var onPersistableChange: (() -> Void)?
     @ObservationIgnored var onPrivateDataTemporaryContinuation: ((ChatContinuation) -> Void)?
 
@@ -837,42 +832,12 @@ final class Chat: Identifiable {
         }
     }
 
-    private enum AgentEventCycle {
-        case completed(cancelled: Bool)
-        case running(cancelled: Bool, continuation: CheckedContinuation<Void, Never>?)
+    private enum SubmissionPresentation {
+        case completed
+        case running
+        case cancelled
 
-        var isCompleted: Bool {
-            if case .completed = self { true } else { false }
-        }
-
-        var isCancelled: Bool {
-            switch self {
-            case .completed(let cancelled), .running(let cancelled, _): cancelled
-            }
-        }
-
-        mutating func begin() {
-            self = .running(cancelled: false, continuation: nil)
-        }
-
-        mutating func cancel() {
-            guard case .running(_, let continuation) = self else { return }
-            self = .running(cancelled: true, continuation: continuation)
-        }
-
-        mutating func wait(_ continuation: CheckedContinuation<Void, Never>) {
-            guard case .running(let cancelled, nil) = self else {
-                continuation.resume()
-                return
-            }
-            self = .running(cancelled: cancelled, continuation: continuation)
-        }
-
-        mutating func finish() {
-            guard case .running(let cancelled, let continuation) = self else { return }
-            self = .completed(cancelled: cancelled)
-            continuation?.resume()
-        }
+        var isCancelled: Bool { self == .cancelled }
     }
 
     private struct Run {
@@ -906,14 +871,13 @@ final class Chat: Identifiable {
         return true
     }
     var hasPendingInteraction: Bool { interaction != nil }
-    @ObservationIgnored private var eventConsumer: Task<Void, Never>?
     @ObservationIgnored private var streamedText = ""
     @ObservationIgnored private var streamedTextBlockIndex: Int?
     @ObservationIgnored private var agentHapticPhase = AgentHapticPhase.waitingForDelta
     @ObservationIgnored private var finishingStartedAt: Date?
     @ObservationIgnored private var finishingWatchdog: Task<Void, Never>?
     @ObservationIgnored private var activeLatency: TurnLatencyTrace?
-    @ObservationIgnored private var agentEventCycle = AgentEventCycle.completed(cancelled: false)
+    @ObservationIgnored private var submissionPresentation = SubmissionPresentation.completed
     @ObservationIgnored private var submissionWaiters: [SubmissionID: CheckedContinuation<ChatSubmissionOutcome, Never>] = [:]
     @ObservationIgnored private let executionLease: ExecutionLease
 
@@ -966,70 +930,54 @@ final class Chat: Identifiable {
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
         Log.session.info("Chat created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
-        self.agent = Agent(configuration: AgentConfiguration(client: client, model: model))
-        let stream = agent.events
-        self.eventConsumer = Task { @MainActor [weak self] in
-            for await event in stream {
-                guard let self else { return }
-                switch event {
-                case .runStarted:
-                    self.pendingContextCompactions = []
-                    if !self.document.hasOpenAgentTurn { self.beginAgentTurn() }
-                case .generationStarted(let model, _):
-                    self.setRunPhase(.thinking)
-                    self.resetStreamedText()
-                    self.document.apply(.beginGeneration(model: model, at: Date()))
-                    for compaction in self.pendingContextCompactions {
-                        self.document.apply(.appendContextCompaction(compaction))
-                    }
-                    self.pendingContextCompactions = []
-                case .messageStart(.assistant(let assistant)):
-                    self.resetStreamedText()
-                    if !self.document.hasOpenAgentTurn { self.document.apply(.beginAgentTurn(at: assistant.timestamp)) }
-                    if !self.document.hasOpenGeneration { self.document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
-                case .messageUpdate(_, let event):
-                    self.applyAssistantEvent(event)
-                case .reasoning(let text):
-                    self.appendReasoning(text)
-                case .messageEnd(.assistant(let assistant)):
-                    self.document.apply(.setGenerationAssistant(assistant))
-                    self.applyAssistantFinal(assistant)
-                    self.endStreamingTurn(assistant)
-                case .generationFinished(let assistant, _):
-                    await self.waitForStreamingDelivery()
-                    self.document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
-                    self.requestPersistence(.generationFinished)
-                    self.activeRun?.backgroundExecution?.advance()
-                case .runFinished(let result):
-                    self.activeRun?.backgroundExecution?.updatePhase(.finishing)
-                    let snapshot = await self.agent.snapshot()
-                    self.agentSnapshot = snapshot
-                    self.finishAgentTurnFromEvents(error: result.errorMessage)
-                    self.requestPersistence(.agentTurnFinished)
-                    self.agentEventCycle.finish()
-                case .compacted(let before, let after, let chars, let tokensBefore):
-                    let compaction = ContextCompaction(at: Date(), tokensBefore: tokensBefore)
-                    if self.document.lastGenerationID == nil {
-                        self.pendingContextCompactions.append(compaction)
-                    } else {
-                        self.document.apply(.appendContextCompaction(compaction))
-                    }
-                    Log.session.info("Chat compacted id=\(self.id) msgs \(before)->\(after) summaryChars=\(chars) tokensBefore=\(tokensBefore)")
-                case .toolExecutionStart:
-                    self.activeRun?.backgroundExecution?.updatePhase(.working)
-                case .toolExecutionEnd(let toolCall, let result):
-                    self.document.apply(.recordToolExchange(toolCall, result))
-                    self.activeRun?.backgroundExecution?.advance()
-                    self.activeRun?.backgroundExecution?.updatePhase(.thinking)
-                case .messageStart(_),
-                     .messageEnd(_):
-                    break
-                }
-            }
-        }
-        let configuration = agentConfiguration(client: client, model: model)
-        enqueueAgentMutation { agent in
-            await agent.configure(configuration)
+    }
+
+    func receiveAgentEvent(_ event: AgentEvent) async {
+        switch event {
+        case .runStarted:
+            pendingContextCompactions = []
+            if !document.hasOpenAgentTurn { beginAgentTurn() }
+        case .generationStarted(let model, _):
+            setRunPhase(.thinking)
+            resetStreamedText()
+            document.apply(.beginGeneration(model: model, at: Date()))
+            for compaction in pendingContextCompactions { document.apply(.appendContextCompaction(compaction)) }
+            pendingContextCompactions = []
+        case .messageStart(.assistant(let assistant)):
+            resetStreamedText()
+            if !document.hasOpenAgentTurn { document.apply(.beginAgentTurn(at: assistant.timestamp)) }
+            if !document.hasOpenGeneration { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
+        case .messageUpdate(_, let event):
+            applyAssistantEvent(event)
+        case .reasoning(let text):
+            appendReasoning(text)
+        case .messageEnd(.assistant(let assistant)):
+            document.apply(.setGenerationAssistant(assistant))
+            applyAssistantFinal(assistant)
+            endStreamingTurn(assistant)
+        case .generationFinished(let assistant, _):
+            await waitForStreamingDelivery()
+            document.apply(.finishGeneration(Self.outcome(for: assistant, at: Date())))
+            requestPersistence(.generationFinished)
+            activeRun?.backgroundExecution?.advance()
+        case .runFinished(let result):
+            activeRun?.backgroundExecution?.updatePhase(.finishing)
+            finishAgentTurnFromEvents(error: result.errorMessage)
+            requestPersistence(.agentTurnFinished)
+            if !submissionPresentation.isCancelled { submissionPresentation = .completed }
+        case .compacted(let before, let after, let chars, let tokensBefore):
+            let compaction = ContextCompaction(at: Date(), tokensBefore: tokensBefore)
+            if document.lastGenerationID == nil { pendingContextCompactions.append(compaction) }
+            else { document.apply(.appendContextCompaction(compaction)) }
+            Log.session.info("Chat compacted id=\(id) msgs \(before)->\(after) summaryChars=\(chars) tokensBefore=\(tokensBefore)")
+        case .toolExecutionStart:
+            activeRun?.backgroundExecution?.updatePhase(.working)
+        case .toolExecutionEnd(let toolCall, let result):
+            document.apply(.recordToolExchange(toolCall, result))
+            activeRun?.backgroundExecution?.advance()
+            activeRun?.backgroundExecution?.updatePhase(.thinking)
+        case .messageStart(_), .messageEnd(_):
+            break
         }
     }
 
@@ -1075,7 +1023,6 @@ final class Chat: Identifiable {
         }
         hasUnreadResponse = meta.hasUnreadResponse
         resolveAttachedServices()
-        restoreAgent(messages: document.toWire())
         lastActivityAt = meta.lastActivity
         Log.session.info("Chat restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
     }
@@ -1445,8 +1392,6 @@ final class Chat: Identifiable {
             : .completed(at: Date())
         if document.hasOpenGeneration { document.apply(.finishGeneration(outcome)) }
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
-        let messages = ChatProjection.makeWireMessages(from: document.turns)
-        restoreAgent(messages: messages)
         requestPersistence(.agentTurnFinished)
     }
 
@@ -2141,8 +2086,8 @@ final class Chat: Identifiable {
         submissionWaiters.removeAll()
         for continuation in waiters { continuation.resume(returning: .cancelled) }
         notice = .none
-        agentEventCycle.cancel()
-        enqueueAgentMutation { await $0.abort() }
+        submissionPresentation = .cancelled
+        submissionTask?.cancel()
         cancelInteractions()
         let task = activeRun?.task
         let runID = activeRun?.id
@@ -2163,8 +2108,8 @@ final class Chat: Identifiable {
         botControlSource.release()
         Log.session.info("Chat.stopCurrentTurn id=\(id) queueDepth=\(submissions.count)")
         notice = .none
-        agentEventCycle.cancel()
-        enqueueAgentMutation { await $0.abort() }
+        submissionPresentation = .cancelled
+        submissionTask?.cancel()
         cancelInteractions()
         resetOutputDelivery()
         stopStreamLink()
@@ -2231,7 +2176,7 @@ final class Chat: Identifiable {
         botControlSource.release()
         let at = Date()
         let outcome: TurnOutcome
-        if agentEventCycle.isCancelled || activeRun?.task.isCancelled == true || error == "aborted" {
+        if submissionPresentation.isCancelled || activeRun?.task.isCancelled == true || error == "aborted" {
             outcome = .cancelled(at: at)
         } else if let error {
             outcome = .failed(at: at, message: error)
@@ -2240,11 +2185,6 @@ final class Chat: Identifiable {
         }
         if document.hasOpenGeneration { document.apply(.finishGeneration(outcome)) }
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
-    }
-
-    private func waitForAgentEvents() async {
-        guard !agentEventCycle.isCompleted else { return }
-        await withCheckedContinuation { agentEventCycle.wait($0) }
     }
 
     private func endStreamingTurn(_ assistant: AssistantMessage) {
@@ -2299,17 +2239,16 @@ final class Chat: Identifiable {
 
     func prepareDurableRecovery() async throws {
         try await durablePreparation?.value
-        await agentControlTask?.value
+        await waitForSubmission()
         try await freezeMemorySnapshot()
         await Skills.shared.waitUntilCurrent()
-        await agent.configure(agentConfiguration(client: client, model: model))
-        try await agent.prepareDurableConfiguration()
+        _ = try await prepareDurableConversation(configuration: agentConfiguration(client: client, model: model))
     }
 
     func resumeDurableSubmission(_ submissionID: Int, requestID: String?) {
         guard !isBusy else { return }
         let runID = RunID()
-        agentEventCycle.begin()
+        submissionPresentation = .running
         if case .agent(_, let id) = document.turns.last { document.apply(.resumeAgentTurn(id: id)) }
         else { document.apply(.beginAgentTurn(at: Date())) }
         let task = Task { @MainActor [weak self] in
@@ -2319,15 +2258,13 @@ final class Chat: Identifiable {
                 if !submissions.isEmpty { startWorker() }
             }
             do {
-                let result = try await agent.resumeDurable(submissionID: submissionID, requestID: requestID)
-                await waitForAgentEvents()
-                agentSnapshot = await agent.snapshot()
+                let result = try await resumeSubmission(submissionID, requestID: requestID)
                 if let error = result.errorMessage, error != "aborted" { notice = .error(error) }
                 document.apply(.sealAllTurns)
                 markActivity(Date())
                 onPersistableChange?()
             } catch {
-                agentEventCycle.finish()
+                submissionPresentation = .completed
                 notice = .error(error.localizedDescription)
                 Log.session.error("Chat.recovery failed chat=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
             }
@@ -2345,8 +2282,7 @@ final class Chat: Identifiable {
             guard let self else { return }
             defer { self.finishWorker(runID) }
             await waitUntilProfilePrepared(runID: runID)
-            await agentControlTask?.value
-            await agent.waitForIdle()
+            await waitForSubmission()
             while !submissions.isEmpty {
                 if Task.isCancelled { break }
                 var submission = submissions.removeFirst()
@@ -2398,7 +2334,7 @@ final class Chat: Identifiable {
         guard let run = activeRun, run.id == runID else { return }
         let backgroundExecutionExpired = run.backgroundExecutionExpired
         let chatFailed = notice.errorMessage != nil
-        let chatSucceeded = !agentEventCycle.isCancelled && notice.errorMessage == nil
+        let chatSucceeded = !submissionPresentation.isCancelled && notice.errorMessage == nil
         let hasUnreadResult = chatSucceeded || chatFailed
         let leaseSucceeded = !backgroundExecutionExpired
         if chatFailed { run.backgroundExecution?.updatePhase(.failed) }
@@ -2491,6 +2427,7 @@ final class Chat: Identifiable {
     }
 
     private func runOne(_ submission: Submission, runID: RunID) async {
+        submissionPresentation = .running
         submission.latency.mark(.runStarted)
         Log.session.info("Chat.runOne start id=\(id) client=\(client.id) model=\(model.id)")
         agentHapticPhase = .waitingForDelta
@@ -2500,7 +2437,7 @@ final class Chat: Identifiable {
         }
         do { try await freezeMemorySnapshot() }
         catch {
-            let cancelled = error is CancellationError
+            let cancelled = error is CancellationError || submissionPresentation.isCancelled
             let message = cancelled ? "aborted" : error.localizedDescription
             Log.session.error("Chat Profile documents unavailable id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
@@ -2511,11 +2448,8 @@ final class Chat: Identifiable {
         await Skills.shared.waitUntilCurrent()
         skillSession.snapshots = [:]
         if let invocation = submission.skillInvocation { skillSession.snapshots[invocation.skill.name] = invocation.skill }
-        await agentControlTask?.value
         let configuration = agentConfiguration(client: client, model: model)
-        await agent.configure(configuration)
         submission.latency.mark(.agentConfigured)
-        agentSnapshot = await agent.snapshot()
         submission.latency.mark(.manifestsStarted)
         await withTaskGroup(of: Void.self) { group in
             for svc in attachedServices { group.addTask { _ = await svc.loadManifest() } }
@@ -2560,23 +2494,27 @@ final class Chat: Identifiable {
             Log.session.info("Chat.runOne service=\(definition.domain) actions=[\(actions)]")
         }
         let turnID = transcript.last(where: { $0.isUserInitiated })?.id
-        agentEventCycle.begin()
         submission.latency.mark(.agentSubmitted)
-        let result: AgentRunResult
+        let result: ConversationRunResult
         do {
             try await durablePreparation?.value
             try Task.checkCancellation()
-            result = try await LogContext.$latency.withValue(submission.latency) {
-                try await agent.run(AgentRunRequest(
-                    text: submission.text,
-                    attachments: submission.attachments,
-                    transientContext: transientContext,
-                    turnID: turnID
-                ))
+            if submissionPresentation.isCancelled {
+                result = ConversationRunResult(outcome: .aborted)
+                await receiveAgentEvent(.runFinished(result))
+            } else {
+                result = try await LogContext.$latency.withValue(submission.latency) {
+                    try await submit(ConversationInput(
+                        text: submission.text,
+                        attachments: submission.attachments,
+                        transientContext: transientContext,
+                        turnID: turnID
+                    ), configuration: configuration)
+                }
             }
         } catch {
-            agentEventCycle.finish()
-            let cancelled = error is CancellationError
+            let cancelled = error is CancellationError || submissionPresentation.isCancelled
+            submissionPresentation = cancelled ? .cancelled : .completed
             let message = cancelled ? "aborted" : error.localizedDescription
             Log.session.error("Chat.runOne rejected id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
@@ -2584,10 +2522,7 @@ final class Chat: Identifiable {
             resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
             return
         }
-        await waitForAgentEvents()
         let sealedAt = Date()
-        let snapshot = await agent.snapshot()
-        agentSnapshot = snapshot
         let err = result.errorMessage
         let failureKind = result.failureKind
         markActivity(sealedAt)
@@ -2654,22 +2589,6 @@ final class Chat: Identifiable {
         if assistant.stopReason == .aborted { return .cancelled(at: at) }
         if let error = assistant.errorMessage { return .failed(at: at, message: error) }
         return .completed(at: at)
-    }
-
-    private func enqueueAgentMutation(_ mutation: @escaping @Sendable (Agent) async -> Void) {
-        let previous = agentControlTask
-        let agent = agent
-        agentControlTask = Task { @MainActor [weak self] in
-            await previous?.value
-            await mutation(agent)
-            self?.agentSnapshot = await agent.snapshot()
-        }
-    }
-
-    private func restoreAgent(messages: [Message]) {
-        enqueueAgentMutation { agent in
-            await agent.restore(messages: messages)
-        }
     }
 
     // MARK: - Manifest + actions
@@ -2843,7 +2762,7 @@ final class Chat: Identifiable {
         Log.session.info("Chat.memorySnapshot id=\(id) chars=\(memory.count)")
     }
 
-    private func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
+    func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
         let serviceManager = serviceManager
         let chatID = id
         return AgentConfiguration(
@@ -2853,7 +2772,7 @@ final class Chat: Identifiable {
                 memory: systemPromptMemory,
                 userSkills: Skills.shared.all
             ),
-            tools: [ChatJavaScriptTool(chat: self)],
+            tools: [ConversationTool(chat: self)],
             streamOptions: StreamOptions(sessionID: chatID.uuidString),
             transformContext: { request in
                 let messages = await ChatURLServiceContext.transform(
@@ -2873,7 +2792,7 @@ final class Chat: Identifiable {
 
 }
 
-extension Chat: PrivateDataHost {
+extension Conversation: PrivateDataHost {
     var privateDataContext: PrivateDataAccessContext {
         PrivateDataAccessContext(
             chatRetention: retention,

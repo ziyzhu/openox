@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         guard let catalogAction = BrowserFunctionCatalog.action(id: action) else {
             throw RuntimeError.bridge("ox.web.browser: unknown action '\(action)'")

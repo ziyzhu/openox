@@ -9,7 +9,7 @@ struct ChatSidebar: View {
 
     let contentState: ContentState
     let summaries: [ChatMeta]
-    let activities: [UUID: Chat.Activity]
+    let activities: [UUID: Conversation.Activity]
     let currentId: UUID?
     let showsCloseButton: Bool
     let onClose: () -> Void
@@ -225,7 +225,7 @@ struct ChatSidebar: View {
 
 private struct SidebarRow: View {
     let meta: ChatMeta
-    let activity: Chat.Activity
+    let activity: Conversation.Activity
     let isActive: Bool
     let edgeInset: CGFloat
     let onTap: () -> Void
@@ -359,7 +359,7 @@ private struct SidebarRow: View {
     }
 }
 
-private extension Chat.Activity.AwaitingAction {
+private extension Conversation.Activity.AwaitingAction {
     var badgeText: String {
         switch self {
         case .approval: L10n.string("Approve")

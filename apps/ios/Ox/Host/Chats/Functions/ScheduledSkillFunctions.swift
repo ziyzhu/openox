@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     func createScheduledSkill(
         skillName: String,
         argument: String?,

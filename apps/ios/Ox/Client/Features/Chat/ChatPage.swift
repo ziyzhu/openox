@@ -170,7 +170,7 @@ private struct ChatTranscriptProjectionSnapshot {
     let blocks: [ChatBlock]
     let latestCanvasBlockIDs: [URL: UUID]
 
-    init(key: ChatTranscriptProjectionKey, chat: Chat) {
+    init(key: ChatTranscriptProjectionKey, chat: Conversation) {
         self.key = key
         let sourceWindow = chat.blocksWithTurnID(in: key.requestedSourceRange)
         let projectedBlocks = ChatBlock.project(
@@ -203,21 +203,21 @@ private struct ChatTranscriptProjectionKey: Equatable {
     let transcriptRevision: UInt64
     let totalBlockCount: Int
     let requestedSourceRange: Range<Int>
-    let thinkingActivity: Chat.ThinkingActivity?
+    let thinkingActivity: Conversation.ThinkingActivity?
     let isBusy: Bool
-    let interaction: Chat.Interaction?
+    let interaction: Conversation.Interaction?
 }
 
 private struct DelayedActivityKey: Equatable {
     let chatID: UUID
-    let activity: Chat.Activity
+    let activity: Conversation.Activity
     let transcriptRevision: UInt64
 }
 
 private final class ChatTranscriptProjectionCache {
     private var snapshot: ChatTranscriptProjectionSnapshot?
 
-    func snapshot(for key: ChatTranscriptProjectionKey, chat: Chat) -> ChatTranscriptProjectionSnapshot {
+    func snapshot(for key: ChatTranscriptProjectionKey, chat: Conversation) -> ChatTranscriptProjectionSnapshot {
         if let snapshot, snapshot.key == key { return snapshot }
         let resolved = ChatTranscriptProjectionSnapshot(key: key, chat: chat)
         snapshot = resolved
@@ -226,9 +226,9 @@ private final class ChatTranscriptProjectionCache {
 }
 
 private struct ChatTranscriptProjection<Content: View>: View {
-    let chat: Chat
+    let chat: Conversation
     let transcriptWindow: TranscriptWindow
-    let interaction: Chat.Interaction?
+    let interaction: Conversation.Interaction?
     let content: (ChatTranscriptProjectionSnapshot) -> Content
 
     @State private var cache = ChatTranscriptProjectionCache()
@@ -259,7 +259,7 @@ struct ChatPage: View {
         case animating(submissionID: UUID, anchorID: UUID)
     }
 
-    let chat: Chat
+    let chat: Conversation
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -486,11 +486,11 @@ struct ChatPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let showsComposer = interaction == nil && isModelConfigured
-        let authProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
+        let authProbe = chat.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
         }
-        let botControlProbe = chat.pendingServiceControl.flatMap { item -> Chat.PendingServiceControl? in
+        let botControlProbe = chat.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard case .botControl = item.control else { return nil }
             return item
         }
@@ -511,8 +511,8 @@ struct ChatPage: View {
     private func projectedPage(
         _ projection: ChatTranscriptProjectionSnapshot,
         showsComposer: Bool,
-        authProbe: Chat.PendingServiceControl?,
-        botControlProbe: Chat.PendingServiceControl?
+        authProbe: Conversation.PendingServiceControl?,
+        botControlProbe: Conversation.PendingServiceControl?
     ) -> some View {
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
         let dockClearance = ChatViewportLayout.responseComposerSpacing
@@ -991,7 +991,7 @@ struct ChatPage: View {
         chat.referencedArtifacts
     }
 
-    private var submissionAnchor: Chat.SubmissionAnchor? {
+    private var submissionAnchor: Conversation.SubmissionAnchor? {
         latestSubmissionID.flatMap { chat.anchor(forSubmissionID: $0) }
     }
 
@@ -999,7 +999,7 @@ struct ChatPage: View {
         submissionAnchor?.id
     }
 
-    private var anchoredQueuedMessage: Chat.QueuedMessage? {
+    private var anchoredQueuedMessage: Conversation.QueuedMessage? {
         guard case .queued(let id) = submissionAnchor else { return nil }
         return chat.queuedMessages.first { $0.id == id }
     }
@@ -1195,7 +1195,7 @@ struct ChatPage: View {
         }
     }
 
-    private func resolveBotControl(_ pending: Chat.PendingServiceControl?) async {
+    private func resolveBotControl(_ pending: Conversation.PendingServiceControl?) async {
         guard let pending,
               case .botControl(let domain, _, let args) = pending.control else { return }
         guard prepareServiceControl(pending.control) else {
@@ -1316,7 +1316,7 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func queuedRow(_ queued: Chat.QueuedMessage, identified: Bool = true) -> some View {
+    private func queuedRow(_ queued: Conversation.QueuedMessage, identified: Bool = true) -> some View {
         let row = QueuedBubble(
             message: queued,
             onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
@@ -1778,7 +1778,7 @@ struct ChatPage: View {
         return false
     }
 
-    private var activeInteraction: Chat.Interaction? {
+    private var activeInteraction: Conversation.Interaction? {
         chat.interaction
     }
 
@@ -1796,7 +1796,7 @@ struct ChatPage: View {
         }
     }
 
-    private func resolveSignInControl(_ item: Chat.PendingServiceControl?) async {
+    private func resolveSignInControl(_ item: Conversation.PendingServiceControl?) async {
         guard let item,
               case .signIn(let domain, _) = item.control,
               let service = chat.attachedService(domain: domain) else { return }

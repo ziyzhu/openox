@@ -86,7 +86,7 @@ Primary owners:
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
 - Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
-- Profile execution/history/documents — owner: Pi Durable; native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; application facade: Host/Profile/ProfileRepository.swift
+- Profile execution/history/documents — owner: Pi Durable; native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Chats/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ChatMeta, Turn, RPC, or compatibility-ID formats.
 - All compatibility detection, orchestration, and migration steps — owner: Host/Profile/StorageMigration.swift
 - Artifact metadata — owner: Host/Profile/Artifact.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift

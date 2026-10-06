@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func startChat(prompt: String, title: String, purpose: String) async throws -> JSONValue? {
         try requireProfileMutation(Actions.chatStart)
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

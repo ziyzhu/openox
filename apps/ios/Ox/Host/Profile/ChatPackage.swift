@@ -515,7 +515,7 @@ final class ChatImportCoordinator {
         }
     }
 
-    func install(using chats: ChatManager) {
+    func install(using chats: ConversationManager) {
         guard let proposal else { return }
         isSaving = true
         operation = Task {

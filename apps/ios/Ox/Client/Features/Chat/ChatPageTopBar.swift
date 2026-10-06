@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChatPageTopBar: View {
-    let chat: Chat
+    let chat: Conversation
     let blockCount: Int
     let hasArtifacts: Bool
     let showsModelPicker: Bool
@@ -29,7 +29,7 @@ struct ChatPageTopBar: View {
         }
     }
 
-    private func overflowMenu(chat: Chat) -> some View {
+    private func overflowMenu(chat: Conversation) -> some View {
         ChatOverflowMenu(size: iconButtonSize) {
             Button(action: onPickModel) {
                 Label("Models", systemImage: "slider.horizontal.3")

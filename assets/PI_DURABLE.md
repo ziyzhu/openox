@@ -78,7 +78,7 @@ The native ownership rows below describe iOS. Other host adapters fulfill the eq
 
 Pi does not supply a built-in subagent tool. It supplies the durable primitives used to implement one. Preserve Ox's desired subagent policy explicitly rather than assuming the example policy matches it.
 
-Replace the equivalent orchestration in `apps/ios/Ox/Host/Agent/Agent.swift`, `Legacy/AgentRunner.swift`, `Legacy/AgentCompactor.swift`, and related queue/chat-run coordination as the new path becomes verified. Do not delete native capability implementations merely because their callers change.
+Native `Conversation` submits through `DurableRuntime` directly and receives committed Pi events directly. The Swift `Agent` facade, execution driver, and legacy loop are removed; native provider, tool, authorization, and presentation capabilities remain.
 
 ## Host-neutral agent package
 

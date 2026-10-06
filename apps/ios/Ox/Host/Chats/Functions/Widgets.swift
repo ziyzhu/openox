@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue? {
         guard let value else { throw RuntimeError.bridge("ox.widget.shoveler: widget is required") }
         let data = try JSONEncoder().encode(value)

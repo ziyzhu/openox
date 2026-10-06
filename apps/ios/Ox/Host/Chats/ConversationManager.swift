@@ -4,12 +4,12 @@ import UIKit
 
 @MainActor
 @Observable
-final class ChatManager {
+final class ConversationManager {
     private struct Record {
         enum HydrationState {
             case unloaded(ChatMeta)
             case loading(ChatMeta, HydrationGeneration)
-            case loaded(Chat)
+            case loaded(Conversation)
 
             var meta: ChatMeta {
                 switch self {
@@ -18,7 +18,7 @@ final class ChatManager {
                 }
             }
 
-            var chat: Chat? {
+            var chat: Conversation? {
                 if case .loaded(let chat) = self { chat } else { nil }
             }
 
@@ -68,7 +68,7 @@ final class ChatManager {
             metadataRevision = 0
         }
 
-        init(chat: Chat, accessOrdinal: UInt64) {
+        init(chat: Conversation, accessOrdinal: UInt64) {
             hydration = .loaded(chat)
             persistence = .clean
             self.accessOrdinal = accessOrdinal
@@ -78,9 +78,9 @@ final class ChatManager {
 
     private enum Selection {
         case empty
-        case deferred(ChatID, previous: Chat?)
-        case opening(ChatID, HydrationGeneration, previous: Chat?)
-        case active(Chat)
+        case deferred(ChatID, previous: Conversation?)
+        case opening(ChatID, HydrationGeneration, previous: Conversation?)
+        case active(Conversation)
     }
 
     private var records: [ChatID: Record] = [:]
@@ -88,7 +88,7 @@ final class ChatManager {
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
     @ObservationIgnored private var recoveryPreparation: (scope: ProfileScope, task: Task<Void, Error>)?
-    @ObservationIgnored private var hydrationTasks: [ChatID: (generation: HydrationGeneration, task: Task<Chat?, Never>)] = [:]
+    @ObservationIgnored private var hydrationTasks: [ChatID: (generation: HydrationGeneration, task: Task<Conversation?, Never>)] = [:]
     @ObservationIgnored private let repository: ProfileRepository
     @ObservationIgnored private let storage: StorageRoot
     @ObservationIgnored private let providerRegistry: ProviderRegistry
@@ -134,7 +134,7 @@ final class ChatManager {
         summaries.sorted { $0.activityDate > $1.activityDate }
     }
 
-    var activities: [UUID: Chat.Activity] {
+    var activities: [UUID: Conversation.Activity] {
         Dictionary(uniqueKeysWithValues: records.map { id, record in
             let activity = record.hydration.chat?.activity
                 ?? .idle(record.hydration.meta.hasUnreadResponse ? .unread : .read)
@@ -154,7 +154,7 @@ final class ChatManager {
         if case .opening(let id, _, _) = selection { id.rawValue } else { nil }
     }
 
-    var current: Chat? {
+    var current: Conversation? {
         switch selection {
         case .empty: nil
         case .deferred(_, let previous), .opening(_, _, let previous): previous
@@ -215,13 +215,13 @@ final class ChatManager {
             guard let self else { throw CancellationError() }
             let plan = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
             let pending = (plan.objectValue?["tasks"]?.arrayValue ?? []) + (plan.objectValue?["submissions"]?.arrayValue ?? [])
-            var chats: [Int: Chat] = [:]
+            var chats: [Int: Conversation] = [:]
             for item in pending {
                 guard let value = item.objectValue?["reference"] else { throw RuntimeError.bridge("Missing recovery conversation scope") }
                 let reference = try JSONDecoder().decode(DurableConversationReference.self, from: Data(value.jsonString().utf8))
                 guard reference.profileID == scope.profileID, repositoryScope == scope else { throw CancellationError() }
                 if chats[reference.conversationID] != nil { continue }
-                let chat: Chat
+                let chat: Conversation
                 if let hydrated = await hydrate(reference.compatibilityID) { chat = hydrated }
                 else {
                     guard let loaded = await repository.loadChat(reference.compatibilityID, in: scope) else {
@@ -257,7 +257,7 @@ final class ChatManager {
     }
 
     @discardableResult
-    func startNewChat() -> Chat {
+    func startNewChat() -> Conversation {
         ensureRepositoryScope()
         if let current, current.transcript.isEmpty, !current.isTemporary { return current }
         let chat = makeChat()
@@ -267,7 +267,7 @@ final class ChatManager {
         return chat
     }
 
-    func startChat(prompt: String, title: String, requestedBy caller: Chat) throws -> UUID {
+    func startChat(prompt: String, title: String, requestedBy caller: Conversation) throws -> UUID {
         guard caller.scope == repositoryScope, caller.scope == storage.scope,
               contains(caller.id) else {
             throw RuntimeError.bridge("ox.chat.start: the calling chat must belong to the active Profile.")
@@ -293,7 +293,7 @@ final class ChatManager {
         return summaries.filter { records[ChatID($0.id)]?.hydration.chat != nil }
     }
 
-    func importPackage(_ payload: ChatPackagePayload) async throws -> Chat {
+    func importPackage(_ payload: ChatPackagePayload) async throws -> Conversation {
         ensureRepositoryScope()
         let scope = repositoryScope
         let state = try await repository.importChatPackage(payload, in: scope)
@@ -311,7 +311,7 @@ final class ChatManager {
 
     func runScheduledSkill(
         _ schedule: ScheduledSkill,
-        executionLease: Chat.ExecutionLease
+        executionLease: Conversation.ExecutionLease
     ) async -> (ChatSubmissionOutcome, UUID?) {
         ensureRepositoryScope()
         guard repositoryScope.profileID == schedule.profileID else {
@@ -364,7 +364,7 @@ final class ChatManager {
         let selection = continuation.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
-        let chat = Chat(
+        let chat = Conversation(
             meta: continuation.meta,
             turns: continuation.turns,
             client: client,
@@ -422,7 +422,7 @@ final class ChatManager {
         }
     }
 
-    func openForClient(_ rawID: UUID) async throws -> Chat {
+    func openForClient(_ rawID: UUID) async throws -> Conversation {
         ensureRepositoryScope()
         let scope = repositoryScope
         let storageScope = storage.scope
@@ -435,7 +435,7 @@ final class ChatManager {
         return chat
     }
 
-    private func hydrate(_ id: ChatID) async -> Chat? {
+    private func hydrate(_ id: ChatID) async -> Conversation? {
         if let chat = records[id]?.hydration.chat { return chat }
         if let pending = hydrationTasks[id] { return await pending.task.value }
         guard var record = records[id], contains(id.rawValue) else { return nil }
@@ -445,7 +445,7 @@ final class ChatManager {
         record.hydration = .loading(record.hydration.meta, generation)
         records[id] = record
         Log.session.info("ChatManager.hydrate id=\(id) generation=\(generation.rawValue)")
-        let task = Task { [weak self, repository] () -> Chat? in
+        let task = Task { [weak self, repository] () -> Conversation? in
             let loaded = await repository.loadChat(id, in: scope)
             guard let self, self.repositoryScope == scope,
                   var record = self.records[id], self.contains(id.rawValue),
@@ -473,7 +473,7 @@ final class ChatManager {
     }
 
     @discardableResult
-    func branch(from chat: Chat, atBlock blockID: UUID, submit: Bool = true) -> Chat? {
+    func branch(from chat: Conversation, atBlock blockID: UUID, submit: Bool = true) -> Conversation? {
         guard let reference = chat.conversationReference else { Log.session.error("ChatManager.branch requires a qualified persisted conversation"); return nil }
         guard let result = chat.branchSnapshot(at: blockID) else {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
@@ -482,7 +482,7 @@ final class ChatManager {
         let selection = result.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
-        let branched = Chat(
+        let branched = Conversation(
             meta: result.meta,
             turns: result.turns,
             client: client,
@@ -626,7 +626,7 @@ final class ChatManager {
         return deletion
     }
 
-    func deletionTarget(_ id: UUID, requestedBy chat: Chat) throws -> ChatMeta {
+    func deletionTarget(_ id: UUID, requestedBy chat: Conversation) throws -> ChatMeta {
         guard chat.scope == repositoryScope, chat.scope.profileID == storage.scope.profileID,
               chat.scope.root == storage.scope.root, chat.scope.location == storage.scope.location,
               id != chat.id,
@@ -676,7 +676,7 @@ final class ChatManager {
         Log.session.info("ChatManager.reset generation=\(repositoryScope.generation)")
     }
 
-    func debugSession(matching needle: String) -> Chat? {
+    func debugSession(matching needle: String) -> Conversation? {
         let lower = needle.lowercased()
         return records.values.compactMap { $0.hydration.chat }.first {
             $0.id.uuidString.lowercased().hasPrefix(lower)
@@ -701,12 +701,12 @@ final class ChatManager {
 
     private func makeChat(
         retention: ChatRetention = .persisted,
-        executionLease: Chat.ExecutionLease = .userInitiated,
+        executionLease: Conversation.ExecutionLease = .userInitiated,
         scheduledSkillID: UUID? = nil
-    ) -> Chat {
+    ) -> Conversation {
         let client = providerRegistry.newSessionClient
         let selection = providerRegistry.sessionModel
-        let chat = Chat(
+        let chat = Conversation(
             client: client,
             model: providerRegistry.model(for: selection, client: client),
             selection: selection,
@@ -724,11 +724,11 @@ final class ChatManager {
         return chat
     }
 
-    private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Chat {
+    private func restoredChat(from loaded: ChatLoadResult, in scope: ProfileScope) -> Conversation {
         let selection = loaded.state.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
-        let chat = Chat(
+        let chat = Conversation(
             meta: loaded.state.meta,
             turns: loaded.state.turns,
             context: loaded.state.context,
@@ -758,7 +758,7 @@ final class ChatManager {
         Log.session.info("ChatManager.repository root=\(scope.root.path) generation=\(scope.generation)")
     }
 
-    private func attachPersistence(_ chat: Chat) {
+    private func attachPersistence(_ chat: Conversation) {
         chat.chatManager = self
         chat.durablePreparation = Task { @MainActor [weak self, weak chat] in
             guard let self, let chat else { throw CancellationError() }
@@ -775,9 +775,9 @@ final class ChatManager {
                 } else { reference = try await DurableProfileStore.shared.create(in: chat.scope) }
                 try Task.checkCancellation()
                 let session = try await DurableProfileStore.shared.session(in: chat.scope)
-                try await chat.installDurableDriver(DurableAgentDriver(runtime: session.runtime, host: session.host,
-                    chatID: reference.compatibilityID.rawValue, scope: chat.scope, runtimeProfileID: reference.profileID,
-                    artifactScope: chat.scope, reference: reference.value), reference: reference)
+                try chat.installDurableRoute(DurableConversationRoute(session: session,
+                    nativeID: reference.compatibilityID.rawValue, profileID: reference.profileID,
+                    artifactScope: chat.scope, reference: reference))
                 if oldID != reference.compatibilityID, var record = records.removeValue(forKey: oldID) {
                     if case .debouncing(_, let task) = record.persistence { task.cancel() }
                     record.persistence = .clean
@@ -806,7 +806,7 @@ final class ChatManager {
         }
     }
 
-    private func persist(_ chat: Chat) {
+    private func persist(_ chat: Conversation) {
         guard !chat.isTemporary, chat.conversationReference != nil, !chat.transcript.isEmpty else { return }
         enqueue(ChatSaveRequest(payload: .chat(chat.state)))
     }
@@ -887,7 +887,7 @@ final class ChatManager {
         for (id, saveID) in pending { beginSave(id, expected: saveID) }
     }
 
-    private func setCurrent(_ chat: Chat) {
+    private func setCurrent(_ chat: Conversation) {
         let id = ChatID(chat.id)
         touch(id)
         if case .active(let current) = selection, current === chat { return }

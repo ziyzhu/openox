@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     static func encodeToJSON<T: Encodable>(_ value: T) throws -> JSONValue {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]

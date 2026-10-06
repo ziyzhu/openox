@@ -5,7 +5,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleSetAttachedService(
         _ command: SetAttachedServiceRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         serviceManager: ServiceManager,
         reply: OxHostRPC.Reply
     ) {
@@ -67,7 +67,7 @@ extension OxHostProtocol {
 
     static func handleInvokeAction(
         _ command: ActionRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         serviceManager: ServiceManager,
         reply: OxHostRPC.Reply
     ) {

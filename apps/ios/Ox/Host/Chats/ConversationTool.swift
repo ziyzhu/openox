@@ -1,13 +1,13 @@
 import Foundation
 
-nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
+nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
     private struct ModelOutput {
         let text: String
         let truncated: Bool
     }
 
-    let chat: Chat
-    init(chat: Chat) { self.chat = chat }
+    weak var chat: Conversation?
+    init(chat: Conversation) { self.chat = chat }
 
     var name: String { Self.schema.name }
     var description: String { Self.schema.description }
@@ -75,7 +75,7 @@ nonisolated final class ChatJavaScriptTool: AgentTool, @unchecked Sendable {
 
     @MainActor
     private func execute(source: String) async -> ToolResult {
-        let session = chat
+        guard let session = chat else { return ToolResult(text: "Conversation is no longer available", isError: true) }
         session.beginExecution(source: source)
         let output: ModelOutput
         let diagnosticContent: JSONValue?

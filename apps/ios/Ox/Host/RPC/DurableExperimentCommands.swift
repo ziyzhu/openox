@@ -4,7 +4,7 @@ extension OxHostProtocol {
     /// The public contract is platform-independent; experimental cache execution
     /// remains unavailable outside explicitly opted-in DEBUG Simulator campaigns.
     @MainActor
-    static func handleDurableExperiment(_ method: Method, params: JSONValue, chats: ChatManager, reply: OxHostRPC.Reply) throws {
+    static func handleDurableExperiment(_ method: Method, params: JSONValue, chats: ConversationManager, reply: OxHostRPC.Reply) throws {
         #if DEBUG && targetEnvironment(simulator)
         let data = try JSONEncoder().encode(params)
         switch method {

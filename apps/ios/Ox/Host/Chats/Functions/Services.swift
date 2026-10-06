@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat: OxFunctionBridge {
+extension Conversation: OxFunctionBridge {
     func websiteConversationAttachments(_ refs: [JSONValue]) async throws -> [WebsiteAttachment] {
         var attachments: [WebsiteAttachment] = []
         var total = 0
@@ -196,7 +196,7 @@ extension Chat: OxFunctionBridge {
     }
 }
 
-extension Chat {
+extension Conversation {
     func requireIOSService(_ id: String) throws {
         guard attachedServices.contains(where: { $0.domain == id }) else {
             throw RuntimeError.bridge("\(id) isn't attached to this chat. Find and attach it before using this iOS service.")

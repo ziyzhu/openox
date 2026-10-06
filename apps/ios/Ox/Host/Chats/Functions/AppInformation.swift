@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func renameChat(title: String, purpose: String) async throws -> JSONValue? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let wordCount = trimmed.split(whereSeparator: \.isWhitespace).count

@@ -71,7 +71,7 @@ struct ChatBlock: Identifiable, Equatable {
 }
 
 extension ChatBlock {
-    private typealias ServiceControlLocation = Chat.PendingServiceControl.Source
+    private typealias ServiceControlLocation = Conversation.PendingServiceControl.Source
 
     private struct ProjectedTurn {
         let id: TurnID
@@ -84,13 +84,13 @@ extension ChatBlock {
 
     static func project(
         _ sources: [(block: Block, turnID: TurnID)],
-        thinkingActivity: Chat.ThinkingActivity?,
+        thinkingActivity: Conversation.ThinkingActivity?,
         isBusy: Bool,
-        interaction: Chat.Interaction?
+        interaction: Conversation.Interaction?
     ) -> [ChatBlock] {
         var projectedTurns: [ProjectedTurn] = []
-        let pendingPrompt: Chat.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
-        let pendingServiceControl: Chat.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
+        let pendingPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
+        let pendingServiceControl: Conversation.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
         let serviceControlLocation = pendingServiceControl.flatMap { pending in
             if let source = pending.source { return source }
             return sources.reversed().compactMap { source -> ServiceControlLocation? in

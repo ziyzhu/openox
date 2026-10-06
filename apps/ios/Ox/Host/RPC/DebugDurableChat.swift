@@ -21,19 +21,19 @@ extension OxHostProtocol {
     #endif
 
     @MainActor
-    static func prepareDurableTemporaryChat(_ chat: Chat, caseID: UUID) async throws {
+    static func prepareDurableTemporaryChat(_ chat: Conversation, caseID: UUID) async throws {
         _ = try await DurableChatController.attach(chat, caseID: caseID, artifactFiles: true)
     }
 
     @MainActor
-    static func releaseDurableTemporaryChat(_ chat: Chat) async {
-        await chat.agent.waitForIdle()
+    static func releaseDurableTemporaryChat(_ chat: Conversation) async {
+        await chat.waitForSubmission()
         await DurableChatController.release(chat)
     }
 
     #if DEBUG && targetEnvironment(simulator)
     @MainActor
-    static func handleDurableChat(_ request: DurableChatRequest, chats: ChatManager, reply: OxHostRPC.Reply) {
+    static func handleDurableChat(_ request: DurableChatRequest, chats: ConversationManager, reply: OxHostRPC.Reply) {
         Task { @MainActor in
             do { reply.success(try await DurableChatController.command(request, chats: chats)) }
             catch { reply.failure(error.localizedDescription) }
@@ -52,14 +52,14 @@ private enum DurableChatController {
         let scope: ProfileScope
         let artifactFiles: Bool
         let artifactScope: ProfileScope?
-        var chats: [UUID: Chat] = [:]
+        var chats: [UUID: Conversation] = [:]
         var opening = true
         var closing = false
     }
     static var sessions: [UUID: Session] = [:]
     static var attaching: Set<UUID> = []
 
-    static func attach(_ chat: Chat, caseID: UUID, artifactFiles requestedBackend: Bool?) async throws -> JSONValue {
+    static func attach(_ chat: Conversation, caseID: UUID, artifactFiles requestedBackend: Bool?) async throws -> JSONValue {
         guard chat.isTemporary, !chat.isBusy else { throw RuntimeError.bridge("Durable rollout requires an idle temporary chat") }
         guard !attaching.contains(chat.id), !sessions.contains(where: { $0.key != caseID && $0.value.chats[chat.id] != nil }) else {
             throw RuntimeError.bridge("Chat already belongs to another durable Session or attachment")
@@ -84,14 +84,15 @@ private enum DurableChatController {
         guard var session = sessions[caseID], !session.opening, !session.closing, session.scope == chat.scope,
               requestedBackend == nil || requestedBackend == session.artifactFiles else { throw RuntimeError.bridge("Session unavailable or bound to another Profile scope") }
         guard session.chats.count < 8 || session.chats[chat.id] != nil else { throw RuntimeError.bridge("Durable Session chat limit reached") }
-        try await chat.installDurableDriver(DurableAgentDriver(runtime: session.runtime, host: session.host, chatID: chat.id,
-            scope: chat.scope, runtimeProfileID: caseID, artifactScope: session.artifactScope))
+        try chat.installDurableRoute(DurableConversationRoute(
+            session: .init(runtime: session.runtime, host: session.host, scope: chat.scope),
+            nativeID: chat.id, profileID: caseID, artifactScope: session.artifactScope, reference: nil))
         session.chats[chat.id] = chat; sessions[caseID] = session
         Log.agent.info("PiDurable rollout attached chat=\(chat.id) case=\(caseID) profile=\(chat.scope.profileID?.uuidString ?? "nil")")
         return .object(["attached": .bool(true), "chatID": .string(chat.id.uuidString)])
     }
 
-    static func release(_ chat: Chat) async {
+    static func release(_ chat: Conversation) async {
         guard let entry = sessions.first(where: { $0.value.chats[chat.id] != nil }) else { return }
         var session = entry.value
         session.chats[chat.id] = nil
@@ -107,7 +108,7 @@ private enum DurableChatController {
     }
 
     #if DEBUG && targetEnvironment(simulator)
-    static func command(_ request: OxHostProtocol.DurableChatRequest, chats: ChatManager) async throws -> JSONValue {
+    static func command(_ request: OxHostProtocol.DurableChatRequest, chats: ConversationManager) async throws -> JSONValue {
         if request.action == "attach" {
             guard case .found(let chat?) = OxHostProtocol.resolveSession(chats, request.sessionId), chat.isTemporary, !chat.isBusy else {
                 throw RuntimeError.bridge("Durable rollout requires an idle temporary chat; persisted chats remain behind the storage migration gate")
@@ -130,7 +131,7 @@ private enum DurableChatController {
             let result = try await session.runtime.command(value.jsonString(), entry: "agentCommand")
             if request.action == "close" {
                 for chat in session.chats.values {
-                    try await chat.installDurableDriver(nil)
+                    try chat.installDurableRoute(nil)
                     await session.host.unbind(chatID: chat.id.uuidString)
                 }
                 await session.runtime.dispose(); sessions.removeValue(forKey: request.caseID)

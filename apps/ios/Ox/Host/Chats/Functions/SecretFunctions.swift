@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     func secretOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         guard let fields = arguments.objectValue else { throw RuntimeError.bridge("Invalid Secret arguments") }
         let operation = "ox.secret.\(name)"

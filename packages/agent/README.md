@@ -4,7 +4,7 @@ Host-neutral Ox Sessions backed by pinned `@earendil-works/pi-durable` 1.0.0. Pr
 
 ## Authority and hosts
 
-`openOxAgentSession(options)` owns an instance-local Harness, model registry, Profile files, and committed projections. Hosts inject storage, models, tools, authorization, artifact files, reporting, and committed events. The public entry point is native-free; `src/adapters/ios` supplies the trusted JavaScriptCore bridge. Swift owns credentials, platform capabilities, approvals, file/database I/O, and committed UI presentation, not execution or a mutable competing transcript.
+`openOxAgentSession(options)` owns an instance-local Harness, model registry, Profile files, and committed projections. Hosts inject storage, models, tools, authorization, artifact files, reporting, and committed events. The public entry point is native-free; `src/adapters/ios` supplies the trusted JavaScriptCore bridge. Swift owns credentials, platform capabilities, approvals, file/database I/O, and committed UI presentation, not execution or a mutable competing transcript. Its `Conversation` submits directly through `DurableRuntime` and receives committed events directly; there is no Swift `Agent` facade or execution driver. RPC model messages are read from Pi's active context.
 
 Production identity is `{profileID, conversationID}`. Conversation IDs are database-local; references and history cursors are Profile-qualified. Production attachment configures an existing conversation's ephemeral native route without creating `ox.chat` UUID documents. `src/chat-bindings.ts` retains explicit temporary/debug UUID compatibility only. There is no `ox.chats` registry.
 

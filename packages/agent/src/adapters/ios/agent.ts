@@ -106,7 +106,9 @@ export class IOSAgentAdapter {
     const qualifiedID = args.reference == null ? undefined : session.conversations.id(args.reference);
     if (args.action === "attach") return this.attach(args.config!, args.reference ?? undefined);
     const routeID = args.chatID ? [...this.routes].find(([, chatID]) => chatID === args.chatID)?.[0] : undefined;
-    const compatibility = args.chatID && routeID === undefined ? await this.bindings.forChat(args.chatID) : undefined;
+    const compatibility = args.chatID && routeID === undefined
+      ? args.action === "conversationContext" ? this.bindings.list().find(binding => binding.chatID === args.chatID) : await this.bindings.forChat(args.chatID)
+      : undefined;
     const chatID = routeID ?? compatibility?.id;
     if (chatID !== undefined && qualifiedID !== undefined && chatID !== qualifiedID) throw new Error("Conversation UUID/reference mismatch");
     const reference = args.reference ?? (chatID === undefined ? undefined : session.conversations.reference(chatID));
@@ -123,6 +125,12 @@ export class IOSAgentAdapter {
       case "applicationDelete": await this.application!.delete(required()); return {};
       case "conversationList": return session.conversations.list(args.limit, args.listCursor ?? undefined);
       case "conversationMetadata": return session.conversations.metadata(required());
+      case "conversationContext": {
+        if (!reference) return { messages: [] };
+        const conversation = await session.harness.conversation(session.conversations.id(reference), context);
+        if (!conversation) throw new Error("Conversation not found");
+        return { messages: (await conversation.context(context)).messages.filter(message => message.role !== "system") };
+      }
       case "conversationHistory": return session.conversations.history(required(), args.limit, args.historyCursor ?? undefined);
       case "conversationPresent": await session.conversations.present(required(), args.presentation ?? undefined); return {};
       case "conversationRead": await session.conversations.markRead(required(), args.lastReadEntryID ?? null); return {};

@@ -60,22 +60,37 @@ async function attach() {
     return matches.length > count ? matches.at(-1)?.[1] : undefined;
   });
 }
-async function send(chatID: string, text: string, stop = false) {
-  const outcome = stop ? "aborted" : "completed";
-  const ended = (messages: string[]) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
-  const count = ended(await logs());
+async function post(text: string) {
   await sim("tap", "--id", "chat.input", "--wait", "5000", "--stable", "1000");
   await sim("wait", "--id", "chat.input", "--stable", "1000");
   await sim("type", text);
   const draft = nodes(await sim("describe")).find(node => node.AXUniqueId === "chat.input");
   check(draft?.AXValue === text, "Composer did not receive exact input; never retry an uncertain send");
   await sim("tap", "--id", "chat.send", "--wait", "5000", "--stable", "200");
+}
+async function send(chatID: string, text: string, stop = false) {
+  const outcome = stop ? "aborted" : "completed";
+  const ended = (messages: string[]) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
+  const count = ended(await logs());
+  await post(text);
   if (stop) {
     await sim("wait", "--id", "chat.stop", "--timeout", "10000");
     await sim("tap", "--id", "chat.stop");
   }
   await waitForLog(messages => ended(messages) > count ? true : undefined);
   await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
+}
+async function stopWithQueuedInput(chatID: string) {
+  const count = (messages: string[], outcome: string) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
+  const before = await logs();
+  const started = before.filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).length;
+  await post("13");
+  await waitForLog(messages => messages.filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).length > started ? true : undefined);
+  await post("2");
+  await sim("tap", "--id", "chat.stop", "--wait", "5000");
+  await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
+  await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
+  check(JSON.stringify(await sim("describe")).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
 }
 async function inspect(name: string) {
   const root = `${directory}/${name}`;
@@ -111,11 +126,13 @@ try {
   await sim("screenshot", "--out", `${directory}/tools.png`);
   await send(firstChat, "13", true);
   await sim("screenshot", "--out", `${directory}/cancelled.png`);
+  await stopWithQueuedInput(firstChat);
+  await sim("screenshot", "--out", `${directory}/queued-after-stop.png`);
   await launch(true);
   const before = await inspect("before-reopen");
   check(before.references.length === 1, "One Pi conversation before reopen");
   const firstModels = before.entries.flatMap(entry => entry.record.model ?? []);
-  check(firstModels.filter(message => message.role === "user").length === 4, "All initial user turns committed exactly once");
+  check(firstModels.filter(message => message.role === "user").length === 6, "All initial and queued user turns committed exactly once");
   check(firstModels.filter(message => message.role === "toolResult").length === 2, "Both native tool results retained in Pi history");
   check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "thinking")), "Committed reasoning retained");
   check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "text" && block.text.includes("# Mock markdown"))), "Full markdown retained in Pi history");
@@ -127,9 +144,9 @@ try {
   const after = await inspect("after-reopen");
   check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
   check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
-  check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 5, "All actual user turns, no duplicates");
+  check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 7, "All actual user turns, no duplicates");
   Object.assign(evidence, { passed: true, firstChat, secondChat, before, after });
-  console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
+  console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
 } catch (error) {
   Object.assign(evidence, { passed: false, error: String(error) });
   if (launched) await sim("screenshot", "--out", `${directory}/failure.png`).catch(() => {});

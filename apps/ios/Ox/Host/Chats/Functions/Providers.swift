@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func providerOperation(name: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         guard OxProviders.operations.contains(where: { $0.0 == name }),
               let fields = arguments.objectValue else { throw RuntimeError.bridge("Unknown provider operation") }

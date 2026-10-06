@@ -10,7 +10,7 @@ final class IOSHost: OxHost {
     static let shared = IOSHost()
 
     let services: ServiceManager
-    let chats: ChatManager
+    let chats: ConversationManager
 
     private var preparation: Preparation?
 
@@ -31,7 +31,7 @@ final class IOSHost: OxHost {
         storage _: PreparedStorage
     ) {
         services = serviceManager
-        chats = ChatManager(
+        chats = ConversationManager(
             repository: .shared,
             storage: .shared,
             providerRegistry: .shared,

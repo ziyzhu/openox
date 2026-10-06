@@ -179,23 +179,24 @@ actor DurableAgentHost {
         case "filePermission":
             guard let action = fields["action"]?.stringValue, ["write", "edit"].contains(action),
                   let path = fields["path"]?.stringValue, !path.isEmpty,
-                  let tool = binding.configuration.tools.first(where: { $0 is ChatJavaScriptTool }) as? ChatJavaScriptTool else {
+                  let tool = binding.configuration.tools.first(where: { $0 is ConversationTool }) as? ConversationTool,
+                  let chat = tool.chat else {
                 throw RuntimeError.bridge("Invalid virtual-file capability or missing permission owner")
             }
             let nativeAction = action == "write" ? Actions.fsWrite : Actions.fsEdit
             if !binding.isolatedWorkspace {
-                try await tool.chat.requireProfileMutation(nativeAction)
-                let location = try await tool.chat.virtualMachine.fileSystem.location(path)
+                try await chat.requireProfileMutation(nativeAction)
+                let location = try await chat.virtualMachine.fileSystem.location(path)
                 switch location {
                 case .skill(let name), .skillFile(let name), .skillResource(let name, _):
-                    try await tool.chat.skillsMount.requireWritable(name: name, path: path)
+                    try await chat.skillsMount.requireWritable(name: name, path: path)
                 case .memory, .soul, .artifact:
                     break
                 default:
                     throw RuntimeError.bridge("Dedicated Profile tools cannot mutate this path")
                 }
             }
-            try await tool.chat.requireApproval(action: nativeAction, defaultPolicy: .allow,
+            try await chat.requireApproval(action: nativeAction, defaultPolicy: .allow,
                 purpose: binding.isolatedWorkspace ? "Update the isolated durable test workspace" : "Update \(path)")
             return .null
         default:
@@ -238,9 +239,9 @@ actor DurableAgentHost {
         binding.calls = generation.calls
         binding.providerInputs = generation.inputs
         bindings[chatID] = binding
-        if let owner = binding.configuration.tools.first(where: { $0 is ChatJavaScriptTool }) as? ChatJavaScriptTool {
-            await owner.chat.presentDurableToolAssistant(generation.committedAssistant)
-        }
+        guard let owner = binding.configuration.tools.first(where: { $0 is ConversationTool }) as? ConversationTool,
+              let chat = owner.chat else { throw RuntimeError.bridge("Recovered tool conversation is no longer available") }
+        await chat.presentDurableToolAssistant(generation.committedAssistant)
         let media = generation.inputs.footprint
         Log.agent.info("PiDurable native tool generation restored chat=\(chatID) assistantEntry=\(assistantEntryID) mediaFiles=\(media.files) mediaBytes=\(media.bytes) presentation=committed")
     }
@@ -330,117 +331,5 @@ actor DurableAgentHost {
         }
         bindings[chatID] = binding
         for event in events { await binding.emit(event) }
-    }
-}
-
-nonisolated final class DurableAgentDriver: Sendable {
-    let runtime: DurableRuntime
-    let host: DurableAgentHost
-    let chatID: String
-    let scope: ProfileScope
-    let runtimeProfileID: String?
-    let artifactScope: ProfileScope?
-    let reference: JSONValue?
-
-    init(runtime: DurableRuntime, host: DurableAgentHost, chatID: UUID, scope: ProfileScope, runtimeProfileID: UUID? = nil,
-         artifactScope: ProfileScope? = nil, reference: JSONValue? = nil) {
-        self.runtime = runtime
-        self.host = host
-        self.chatID = chatID.uuidString
-        self.scope = scope
-        self.runtimeProfileID = reference?.objectValue?["profileID"]?.stringValue ?? runtimeProfileID?.uuidString
-        self.artifactScope = artifactScope
-        self.reference = reference
-    }
-
-    func prepare(configuration: AgentConfiguration, emit: @escaping DurableAgentHost.EventSink) async throws -> JSONValue {
-        try await prepare(configuration: configuration, seed: [], emit: emit)
-    }
-
-    private func prepare(configuration: AgentConfiguration, seed: [Message], emit: @escaping DurableAgentHost.EventSink) async throws -> JSONValue {
-        try Task.checkCancellation()
-        if let reference {
-            guard reference.objectValue?["profileID"]?.stringValue == scope.profileID?.uuidString else {
-                throw RuntimeError.bridge("Conversation does not belong to the driver's Profile")
-            }
-        }
-        try await host.bind(chatID: chatID, scope: scope, configuration: configuration, runtime: runtime,
-                            runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedWorkspace: reference == nil, emit: emit)
-        if let reference { try await host.expectReference(chatID: chatID, reference: reference) }
-        let systemPrompt = reference == nil ? configuration.systemPrompt + """
-
-        <durable_test_workspace>
-        The dedicated read/write/edit tools address this Session's isolated, purgeable test workspace, NOT the user's Profile or the filesystem reached through ox.fs. Use these dedicated tools for test workspace files. Their MEMORY.md, SOUL.md, artifacts/ and skills/ paths are synthetic test content; temporary-chat restrictions on REAL Profile mutations do not prohibit editing this separate workspace. Never use ox.fs through execute to stand in for a dedicated workspace tool. Native Ox capabilities remain available through execute and retain all existing permission, temporary-chat, and private-data restrictions. Shell execution is unavailable. Do not claim a file mutation succeeded without its tool result.
-        </durable_test_workspace>
-        """ : configuration.systemPrompt
-        let effort = configuration.model.selectedReasoningEffort
-        let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
-        let config: JSONValue = .object([
-            "chatID": .string(chatID), "model": .string(configuration.model.id), "systemPrompt": .string(systemPrompt),
-            "providerID": .string(configuration.client.id),
-            "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
-            "nativeReasoningEffort": thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null,
-            "contextWindow": .int(configuration.model.maxContext), "maxTokens": .int(configuration.model.maxTokens),
-            "reasoning": .bool(configuration.model.reasoning),
-            "toolExecutionMode": .string(configuration.toolExecutionMode == .parallel ? "parallel" : "sequential"),
-            "tools": .array(configuration.tools.map { .object([
-                "name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters,
-                "executionMode": .string($0.executionMode == .parallel ? "parallel" : "sequential"),
-            ]) }),
-            "messages": .array(reference == nil ? seed.map {
-                DurableMessageCodec.message($0, provider: "ox-native:\(chatID)", profileID: scope.profileID)
-            } : []),
-        ])
-        let attachment = try await command(.object(["action": .string("attach"), "config": config, "reference": reference ?? .null]))
-        guard let attachedReference = attachment.objectValue?["reference"] else { throw RuntimeError.bridge("Missing qualified conversation reference") }
-        try await host.expectReference(chatID: chatID, reference: attachedReference)
-        return attachedReference
-    }
-
-    func run(_ request: AgentRunRequest, configuration: AgentConfiguration, seed: [Message], emit: @escaping DurableAgentHost.EventSink) async throws -> AgentRunResult {
-        let attachedReference = try await prepare(configuration: configuration, seed: seed, emit: emit)
-        let content = request.messages.flatMap { message -> [JSONValue] in
-            if case .user = message {
-                return DurableMessageCodec.message(message, provider: configuration.client.id, profileID: scope.profileID).objectValue?["content"]?.arrayValue ?? []
-            }
-            return []
-        }
-        return try await execute(.object(["action": .string("run"), "chatID": .string(chatID), "reference": attachedReference,
-                                         "content": .array(content), "requestID": .string(request.turnID?.uuidString ?? UUID().uuidString)]))
-    }
-
-    func resume(submissionID: Int? = nil, requestID: String? = nil, configuration: AgentConfiguration,
-                emit: @escaping DurableAgentHost.EventSink) async throws -> AgentRunResult {
-        guard submissionID != nil || requestID != nil else { throw RuntimeError.bridge("Existing submission ID or request ID required") }
-        let attachedReference = try await prepare(configuration: configuration, emit: emit)
-        var fields: [String: JSONValue] = ["action": .string("resumeExisting"), "chatID": .string(chatID), "reference": attachedReference]
-        if let submissionID { fields["submissionID"] = .int(submissionID) }
-        if let requestID { fields["requestID"] = .string(requestID) }
-        return try await execute(.object(fields))
-    }
-
-    private func execute(_ request: JSONValue) async throws -> AgentRunResult {
-        let result = try await withTaskCancellationHandler {
-            try await command(request)
-        } onCancel: { Task { try? await self.abort() } }
-        let messages = try (result.objectValue?["messages"]?.arrayValue ?? []).map {
-            try DurableMessageCodec.decode($0, scope: scope, artifactScope: artifactScope)
-        }
-        let status = result.objectValue?["receipt"]?.objectValue?["status"]?.stringValue
-        let failure = await host.failure(chatID: chatID)
-        let outcome: AgentRunOutcome = status == "done" ? .completed : Task.isCancelled || failure?.0 == "aborted" ? .aborted :
-            .failed(message: failure?.0 ?? "Durable submission was not answered: \(result.objectValue?["receipt"]?.jsonString() ?? "unknown")", kind: failure?.1 ?? .provider)
-        return AgentRunResult(outcome: outcome, messages: messages, lastTurnTokens: messages.reversed().compactMap {
-            if case .assistant(let message) = $0 { return message.usage.totalTokens }
-            return nil
-        }.first ?? 0)
-    }
-
-    func abort() async throws {
-        _ = try await command(.object(["action": .string("abort"), "chatID": .string(chatID), "reference": reference ?? .null]))
-    }
-
-    private func command(_ value: JSONValue) async throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self, from: Data(try await runtime.command(value.jsonString(), entry: "agentCommand").utf8))
     }
 }

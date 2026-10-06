@@ -70,7 +70,8 @@ Screenshots, build results, chat snapshots, and failure logs go in a new directo
 outside the repository; `--output` selects its parent. PID claims coordinate these
 runners only, not manual sim use or other agents. `test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` exercises the actual
 temporary-chat Pi path with native Mock already selected. It checks reasoning,
-Markdown, native snippet tools, Stop, committed SQLite history and process reopen.
+Markdown, native snippet tools, Stop followed by queued input, committed SQLite
+history and process reopen.
 It requires an idle chat, claims the selected simulator, uses no Host transport,
 and restores ordinary launch afterward. `OX_DURABLE_TEMPORARY_SESSION=<UUID>`
 enables temporary-chat UI attachment in Debug and Release builds on simulators

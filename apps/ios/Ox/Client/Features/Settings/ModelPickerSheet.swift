@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ModelPickerSheet: View {
-    let chat: Chat
+    let chat: Conversation
     @Environment(\.dismiss) private var dismiss
     private var registry: ProviderRegistry { .shared }
     private var isChoosingInitialDefault: Bool { registry.defaultModel == nil }

@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func analyzeVision(filename: String, purpose: String) async throws -> JSONValue? {
         let args: JSONValue = .object(["source": .string(filename)])
         return try await tracked(Actions.visionAnalyze, args, purpose: purpose) {

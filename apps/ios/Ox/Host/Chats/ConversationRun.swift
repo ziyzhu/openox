@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated public struct AgentRunRequest: Sendable {
+nonisolated public struct ConversationInput: Sendable {
     public let messages: [Message]
     public let turnID: UUID?
 
@@ -22,26 +22,14 @@ nonisolated public struct AgentRunRequest: Sendable {
     }
 }
 
-nonisolated public enum AgentRunError: Error, LocalizedError, Sendable {
-    case busy
-
-    public var errorDescription: String? {
-        switch self {
-        case .busy: "Agent already has an active run."
-        }
-    }
-}
-
-nonisolated public enum AgentRunOutcome: Sendable, Equatable {
+nonisolated public enum ConversationRunOutcome: Sendable, Equatable {
     case completed
     case aborted
     case failed(message: String, kind: LLMFailureKind?)
 }
 
-nonisolated public struct AgentRunResult: Sendable {
-    public let outcome: AgentRunOutcome
-    public let messages: [Message]
-    public let lastTurnTokens: Int
+nonisolated public struct ConversationRunResult: Sendable {
+    public let outcome: ConversationRunOutcome
 
     public var errorMessage: String? {
         switch outcome {

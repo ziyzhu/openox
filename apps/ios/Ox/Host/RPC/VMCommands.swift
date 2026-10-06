@@ -14,10 +14,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMInspect(
         _ command: VMRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
-        let session: Chat?
+        let session: Conversation?
         switch resolveSession(chatManager, command.sessionId) {
         case .error(let error):
             reply.failure(error)
@@ -79,7 +79,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMCall(
         _ command: VMCallRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard command.arguments.objectValue != nil else {
@@ -104,7 +104,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMEval(
         _ command: VMEvalRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard !command.script.isEmpty else {
@@ -123,14 +123,14 @@ extension OxHostProtocol {
 
     @MainActor
     static func executeVM(
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         id: String,
         sessionID: String?,
         source: String,
         logLabel: String,
         reply: OxHostRPC.Reply
     ) {
-        let session: Chat
+        let session: Conversation
         switch resolveSession(chatManager, sessionID) {
         case .error(let error):
             reply.failure(error)

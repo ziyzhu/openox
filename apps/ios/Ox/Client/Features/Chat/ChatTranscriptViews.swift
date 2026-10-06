@@ -1049,7 +1049,7 @@ private struct UserSkillBubble: View {
 }
 
 struct QueuedBubble: View {
-    let message: Chat.QueuedMessage
+    let message: Conversation.QueuedMessage
     let onOpenAttachment: (Artifact, String) -> Void
     let onOpenSkill: (Skill) -> Void
     let onCancel: () -> Void

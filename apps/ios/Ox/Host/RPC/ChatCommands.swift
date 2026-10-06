@@ -15,10 +15,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleGetChat(
         _ command: SessionRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
-        let session: Chat?
+        let session: Conversation?
         switch resolveSession(chatManager, command.sessionId) {
         case .found(let s): session = s
         case .error(let error):
@@ -30,13 +30,16 @@ extension OxHostProtocol {
             return
         }
         Log.agent.debug("OxHostRPC.chats.get id=\(reply.id) session=\(session.id)")
-        reply.success(GetChatResult(data: ChatSnapshot(session)))
+        Task { @MainActor in
+            do { reply.success(GetChatResult(data: try await ChatSnapshot(session))) }
+            catch { reply.failure(error.localizedDescription) }
+        }
     }
 
     @MainActor
     static func handleOpenChat(
         _ command: SessionRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard let rawID = command.sessionId.flatMap(UUID.init(uuidString:)) else {
@@ -46,7 +49,7 @@ extension OxHostProtocol {
             do {
                 let chat = try await chatManager.openForClient(rawID)
                 Log.agent.info("OxHostRPC.chats.open id=\(reply.id) chat=\(chat.id)")
-                reply.success(GetChatResult(data: ChatSnapshot(chat)))
+                reply.success(GetChatResult(data: try await ChatSnapshot(chat)))
             } catch { reply.failure(error.localizedDescription) }
         }
     }
@@ -54,7 +57,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleRespondChat(
         _ command: RespondChatRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard case .found(let chat?) = resolveSession(chatManager, command.sessionId),
@@ -83,7 +86,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleNewChat(
         _ command: NewChatRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         let selection: (client: any ProviderClient, model: ProviderModel)?
@@ -124,11 +127,11 @@ extension OxHostProtocol {
     @MainActor
     static func handleSendChat(
         _ command: SendChatRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard !command.text.isEmpty else { return reply.failure("missing text") }
-        let chat: Chat
+        let chat: Conversation
         switch resolveSession(chatManager, command.sessionId) {
         case .error(let error): return reply.failure(error)
         case .found(nil): return reply.failure("no active chat; create one with chats.new")
@@ -150,10 +153,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleStopChat(
         _ command: SessionRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
-        let chat: Chat
+        let chat: Conversation
         switch resolveSession(chatManager, command.sessionId) {
         case .error(let error): return reply.failure(error)
         case .found(nil): return reply.failure("no active chat")
@@ -198,12 +201,12 @@ extension OxHostProtocol {
     }
 
     enum ChatLookup {
-        case found(Chat?)
+        case found(Conversation?)
         case error(String)
     }
 
     @MainActor
-    static func resolveSession(_ manager: ChatManager, _ sessionId: String?) -> ChatLookup {
+    static func resolveSession(_ manager: ConversationManager, _ sessionId: String?) -> ChatLookup {
         guard let sessionId, !sessionId.isEmpty else { return .found(manager.current) }
         if let session = manager.debugSession(matching: sessionId) {
             return .found(session)
@@ -295,7 +298,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleRepositorySaveGate(
         _ command: RepositoryGateRequest,
-        chatManager: ChatManager,
+        chatManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard command.domain == "save", let entered = chatManager.debugControlRepositorySaveGate(command.action) else {

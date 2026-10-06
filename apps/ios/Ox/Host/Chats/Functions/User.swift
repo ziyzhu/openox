@@ -1,6 +1,6 @@
 import Foundation
 
-extension Chat {
+extension Conversation {
     public func followUser(intents: JSONValue, purpose: String) async throws -> JSONValue? {
         let parsed = try FollowIntent.parse(intents)
         try await requireApproval(

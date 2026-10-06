@@ -60,7 +60,7 @@ final class JavaScriptOutputStore {
     }
 }
 
-extension Chat {
+extension Conversation {
     public func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.outputRead, .object(["id": .string(id)]), purpose: purpose) {
             .string(try javaScriptOutputs.read(id))

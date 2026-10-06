@@ -71,7 +71,7 @@ final class ScheduledSkillScheduler {
         startProcessing(executionLease: .userInitiated)
     }
 
-    private func startProcessing(executionLease: Chat.ExecutionLease) {
+    private func startProcessing(executionLease: Conversation.ExecutionLease) {
         work = Task { @MainActor [weak self] in
             guard let self else { return }
             await self.processDue(executionLease: executionLease)
@@ -132,7 +132,7 @@ final class ScheduledSkillScheduler {
         Log.app.info("ScheduledSkillScheduler.start due=\(ScheduledSkills.shared.due(at: Date()).count)")
     }
 
-    private func processDue(executionLease: Chat.ExecutionLease) async {
+    private func processDue(executionLease: Conversation.ExecutionLease) async {
         for schedule in ScheduledSkills.shared.due(at: Date()) {
             guard !Task.isCancelled else { return }
             let outcome: ChatSubmissionOutcome

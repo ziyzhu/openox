@@ -20,7 +20,7 @@ struct ChatSnapshot: Encodable {
         let allowsCustomAnswer: Bool
         let requiresApp: Bool
 
-        init(_ prompt: Chat.PendingPrompt) {
+        init(_ prompt: Conversation.PendingPrompt) {
             id = prompt.id.uuidString
             self.prompt = prompt.prompt
             options = prompt.options
@@ -44,25 +44,22 @@ struct ChatSnapshot: Encodable {
     }
 
     @MainActor
-    init(_ chat: Chat) {
-        let agent = chat.agentSnapshot
+    init(_ chat: Conversation) async throws {
+        let configuration = chat.preparedConfiguration ?? chat.agentConfiguration(client: chat.client, model: chat.model)
+        messages = try await chat.canonicalMessages()
         id = chat.id.uuidString
-        model = agent?.model ?? chat.model
+        model = configuration.model
         let currentMemory = chat.systemPromptMemory
         let userSkills = Skills.shared.all
-        let breakdown = Chat.systemPromptBreakdown(
+        let breakdown = Conversation.systemPromptBreakdown(
             memory: currentMemory,
             userSkills: userSkills
         )
         systemPrompt = breakdown.scaffold
-        renderedSystemPrompt = agent?.systemPrompt ?? Chat.composeSystemPrompt(
-            memory: currentMemory,
-            userSkills: userSkills
-        )
+        renderedSystemPrompt = configuration.systemPrompt
         soul = breakdown.soul
         memory = breakdown.memory
-        tools = (agent?.tools ?? []).map(ToolDecl.init)
-        messages = agent?.messages ?? []
+        tools = configuration.tools.map(ToolDecl.init)
         blocks = chat.transcript
         isBusy = chat.isBusy
         if case .prompt(let prompt) = chat.interaction {
