@@ -31,6 +31,7 @@ nonisolated enum Actions {
     static let webFetch = "ox.web.fetch"
     static let fsList = "ox.fs.list"
     static let fsRead = "ox.fs.read"
+    static let fsAttach = "ox.fs.attach"
     static let outputRead = "ox.output.read"
     static let fsWrite = "ox.fs.write"
     static let fsEdit = "ox.fs.edit"
@@ -100,7 +101,7 @@ nonisolated enum Actions {
         appLogs, appRenameChat,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
-        fsList, fsRead, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
+        fsList, fsRead, fsAttach, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
         artifactAttach, visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryDisconnect,
@@ -160,6 +161,7 @@ nonisolated enum Actions {
         case fsDelete: L10n.string("Delete a file")
         case fsGlob: L10n.string("Find files")
         case fsGrep: L10n.string("Search files")
+        case fsAttach: L10n.string("Add attachment")
         case artifactAttach: L10n.string("Attach an artifact")
         case visionAnalyze: L10n.string("Analyze image")
         case serviceFind: L10n.string("Search services")

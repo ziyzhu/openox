@@ -51,6 +51,10 @@ Linux ARM64/x64 using the same command and pins Bun 1.3.13.
 ## Local iOS verification
 
 Follow the simulator ownership and baseline rules in repository `AGENTS.md`.
+Different simulators still share a checkout's DerivedData build database. Serialize
+shared builds, or use `sim --device ox-N build --project apps/ios/Ox.xcodeproj --scheme ios --derived-data /tmp/<campaign>/DerivedData --force`
+and launch the resulting `.app` with `sim run --app` on the same explicit device.
+Separate DerivedData avoids build-database locks, not concurrent source-generation races.
 `ci:ios` requires sim, Xcode, an explicitly reserved numbered simulator, and Host
 connections already enabled. It never provisions, clones, uninstalls, erases,
 changes credentials, or enables Host access.
@@ -78,6 +82,12 @@ enables temporary-chat UI attachment in Debug and Release builds on simulators
 and physical devices; it does not enable Host access or adopt persisted Profiles.
 Diagnostic RPCs remain restricted to DEBUG Simulator builds. Stopped-process SQLite copies include WAL/SHM
 and are diagnostic evidence, not Profile exports or power-loss verification.
+
+Mock scenario `92` exercises selected-folder media. Select a dedicated `Files Media Fixture`
+folder containing `receipt.png` with OCR text `FILES MEDIA 123`, `document.pdf` with
+selectable text `FILES`, `unsupported.bin`, malformed `invalid.png`, and a file over
+32 MiB named `too-large.png`. It overwrites `receipt.png` after attachment to verify
+immutable model bytes; restore the fixture afterward. Use no personal files.
 
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use

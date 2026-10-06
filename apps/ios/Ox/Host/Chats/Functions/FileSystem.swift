@@ -140,6 +140,71 @@ extension Conversation {
         }
     }
 
+    public func attachFileSystem(path: String, purpose: String) async throws -> JSONValue? {
+        let location = try virtualMachine.fileSystem.location(path)
+        let args: JSONValue = .object(["path": .string(location.path)])
+        return try await tracked(Actions.fsAttach, args, purpose: purpose) {
+            let media = try await self.fileSystemMedia(path: location.path)
+            guard media.kind == .image || media.kind == .pdf else {
+                throw RuntimeError.bridge("ox.fs.attach supports images and PDFs only; use ox.fs.read for text: \(location.path)")
+            }
+            let attachment = try await Task.detached(priority: .userInitiated) {
+                try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
+            }.value
+            try Task.checkCancellation()
+            try appendTransientAttachment(attachment)
+            Log.session.info("bridge.fs.attach path=\(location.path) bytes=\(attachment.data.count) mimeType=\(attachment.mimeType)")
+            return attachmentJSON(attachment)
+        }
+    }
+
+    struct FileSystemMedia: Sendable {
+        let filename: String
+        let mimeType: String
+        let kind: Artifact.Kind
+        let data: Data
+
+        init(artifact: Artifact, data: Data) {
+            filename = artifact.fileName
+            mimeType = artifact.mimeType
+            kind = artifact.kind
+            self.data = data
+        }
+    }
+
+    func fileSystemMedia(path: String) async throws -> FileSystemMedia {
+        let location = try virtualMachine.fileSystem.location(path)
+        try await authorizeFileAccess(location, operation: .read)
+        let media: FileSystemMedia
+        switch location {
+        case .artifact(let name):
+            let artifact = try await repository.artifact(named: name, in: scope)
+            let data = try await repository.readArtifactData(named: name, in: scope)
+            media = FileSystemMedia(artifact: artifact, data: data)
+        case .deviceItem:
+            media = try await withDeviceFile(location, mode: .read) { url in
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                guard values.isRegularFile == true else { throw VirtualFileSystem.Error.notFile(location.path) }
+                if let size = values.fileSize, size > ArtifactLimits.fileBytes {
+                    throw ArtifactError.fileTooLarge(bytes: size, limit: ArtifactLimits.fileBytes)
+                }
+                let file = try FileHandle(forReadingFrom: url)
+                defer { try? file.close() }
+                let data = try file.read(upToCount: ArtifactLimits.fileBytes + 1) ?? Data()
+                let artifact = Artifact(fileName: url.lastPathComponent, directory: url.deletingLastPathComponent())
+                return FileSystemMedia(artifact: artifact, data: data)
+            }
+        default:
+            throw RuntimeError.bridge("Media requires an artifact or a file inside an attached Files folder: \(location.path)")
+        }
+        guard media.data.count <= ArtifactLimits.fileBytes else {
+            throw ArtifactError.fileTooLarge(bytes: media.data.count, limit: ArtifactLimits.fileBytes)
+        }
+        try Task.checkCancellation()
+        guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("File media belongs to a stale Profile scope") }
+        return media
+    }
+
     public func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue? {
         let location = try virtualMachine.fileSystem.location(path)
         let args: JSONValue = .object(["path": .string(location.path), "bytes": .int(content.utf8.count)])
@@ -489,14 +554,21 @@ extension Conversation {
             let data = try await virtualChatTranscript(id)
             return try fileSystemTextRead(String(decoding: data, as: UTF8.self), maxBytes: maxBytes)
         case .deviceItem:
+            let media = try await fileSystemMedia(path: location.path)
             let readOptions = ArtifactLibrary.readOptions(from: options)
-            let result = try await withDeviceFile(location, mode: .read) { url in
-                let values = try url.resourceValues(forKeys: [.isRegularFileKey])
-                guard values.isRegularFile == true else { throw VirtualFileSystem.Error.notFile(location.path) }
-                let artifact = Artifact(fileName: url.lastPathComponent, directory: url.deletingLastPathComponent())
-                return try ArtifactLibrary.read(artifact, options: readOptions)
+            let result = try await Task.detached(priority: .userInitiated) {
+                try ArtifactLibrary.read(data: media.data, kind: media.kind, options: readOptions)
+            }.value
+            let unsupported: String?
+            switch media.kind {
+            case .image:
+                unsupported = "Use ox.vision.analyze({ source: \"\(location.path)\", purpose }) for local OCR, or ox.fs.attach({ path: \"\(location.path)\", purpose }) when original pixels are needed."
+            case .file:
+                unsupported = "This file type can't be read as text or attached. Convert it to a supported text, image, or PDF format first."
+            default:
+                unsupported = result.unsupported
             }
-            return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
+            return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: unsupported)
         case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
             throw VirtualFileSystem.Error.notFile(location.path)
         }

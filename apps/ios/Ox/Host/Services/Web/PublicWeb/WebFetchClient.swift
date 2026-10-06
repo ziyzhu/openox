@@ -336,19 +336,12 @@ nonisolated enum WebAttachmentFactory {
         return TransientAttachment(kind: kind, mimeType: mimeType, displayName: filename, data: data)
     }
 
-    static func make(artifact: Artifact) throws -> TransientAttachment {
-        guard artifact.exists else { throw ArtifactError.missing(artifact.fileName) }
-        let data = try Data(contentsOf: artifact.fileURL)
+    static func make(data: Data, filename: String, mimeType: String) throws -> TransientAttachment {
         guard data.count <= WebFetchClient.maximumBytes else { throw WebAttachmentError.tooLarge }
-        let response = WebFetchResponse(
-            requestedURL: artifact.fileURL,
-            url: artifact.fileURL,
-            status: 200,
-            statusText: "ok",
-            headers: ["content-type": artifact.mimeType],
-            data: data
-        )
-        return try make(response: response, filename: artifact.fileName)
+        let url = URL(fileURLWithPath: filename)
+        let response = WebFetchResponse(requestedURL: url, url: url, status: 200, statusText: "ok",
+                                       headers: ["content-type": mimeType], data: data)
+        return try make(response: response, filename: filename)
     }
 
     private static func inspectImage(_ data: Data) throws -> ImagePreparer.Inspection? {

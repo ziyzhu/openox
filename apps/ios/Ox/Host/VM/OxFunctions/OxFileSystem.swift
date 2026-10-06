@@ -5,6 +5,8 @@ nonisolated enum OxFileSystem {
     static let actions = [
         Actions.fsList,
         Actions.fsRead,
+        Actions.fsAttach,
+        Actions.visionAnalyze,
         Actions.fsWrite,
         Actions.fsEdit,
         Actions.fsDelete,
@@ -28,7 +30,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.read",
-                    "Read a file's complete text into JavaScript: `await ox.fs.read({ path, options?, purpose })`. There is no default text or PDF page cutoff. Filter or slice the result in JavaScript before printing; execution output has fixed line and byte limits. If console output is truncated, use its ox.output.read reference to inspect missing portions before claiming a full review. Optional `maxBytes` and `maxPages` request a shorter read and set `truncated` when content remains. A 32 MiB file safety limit applies. Chat metadata and transcripts are read-only snapshots (current for loaded chats, saved for unloaded chats) under `chats/<chat-id>/{chat.json,turns.jsonl}`; runtime `context.json` is private. Images and unsupported binary files return an explanation instead of text.",
+                    "Read a file's complete text into JavaScript: `await ox.fs.read({ path, options?, purpose })`. There is no default text or PDF page cutoff. Filter or slice the result in JavaScript before printing; execution output has fixed line and byte limits. If console output is truncated, use its ox.output.read reference to inspect missing portions before claiming a full review. Optional `maxBytes` and `maxPages` request a shorter read and set `truncated` when content remains. A 32 MiB file safety limit applies. Chat metadata and transcripts are read-only snapshots (current for loaded chats, saved for unloaded chats) under `chats/<chat-id>/{chat.json,turns.jsonl}`; runtime `context.json` is private. Images return guidance for local `ox.vision.analyze` or explicit `ox.fs.attach`; this read never uploads original pixels. Unsupported binary formats require conversion.",
                     input: object([
                         "path": path("File path to read."),
                         "options": object([
@@ -38,6 +40,17 @@ nonisolated enum OxFileSystem {
                         "purpose": purpose,
                     ], required: ["path", "purpose"]),
                     output: read
+                ),
+                entry(
+                    "ox.fs.attach",
+                    "Attach an immutable snapshot of one image or PDF to model context: `await ox.fs.attach({ path, purpose })`. Accepts `artifacts/<filename>` or `files/<folder-id>/<file>` inside a selected folder when Files is attached. This explicitly makes original content available to the selected model/provider; it does not present the file in chat or modify the source. Prefer `ox.fs.read` for text and PDF text, or `ox.vision.analyze` for local image OCR and classification. Other binary formats require conversion. Source files are limited to 10 MiB; prepared attachments share the execution limit of four transient attachments and 20 MiB total. For models without image input, adapters may substitute local OCR/classification. Unsupported PDF input fails explicitly.",
+                    input: object(["path": path("Image or PDF virtual path."), "purpose": purpose], required: ["path", "purpose"]),
+                    output: object([
+                        "filename": string("Attachment display filename."),
+                        "contentType": string("Attachment MIME type."),
+                        "bytes": integer("Prepared attachment size in bytes.", minimum: 1, maximum: 20 * 1_024 * 1_024),
+                        "kind": .object(["type": .string("string"), "enum": .array([.string("image"), .string("pdf")])]),
+                    ], required: ["filename", "contentType", "bytes", "kind"])
                 ),
                 entry(
                     "ox.fs.write",
@@ -108,6 +121,9 @@ nonisolated enum OxFileSystem {
             let read: @convention(block) (String, JSValue, JSValue) -> JSValue = { path, options, purpose in
                 env.call { try await $0.readFileSystem(path: path, options: jsValueToJSON(options), purpose: purpose.toString()!) }
             }
+            let attach: @convention(block) (String, JSValue) -> JSValue = { path, purpose in
+                env.call { try await $0.attachFileSystem(path: path, purpose: purpose.toString()!) }
+            }
             let write: @convention(block) (String, String, JSValue) -> JSValue = { path, content, purpose in
                 env.call { try await $0.writeFileSystem(path: path, content: content, purpose: purpose.toString()!) }
             }
@@ -125,6 +141,7 @@ nonisolated enum OxFileSystem {
             }
             context.setObject(list as AnyObject, forKeyedSubscript: "__nativeFSList" as NSString)
             context.setObject(read as AnyObject, forKeyedSubscript: "__nativeFSRead" as NSString)
+            context.setObject(attach as AnyObject, forKeyedSubscript: "__nativeFSAttach" as NSString)
             context.setObject(write as AnyObject, forKeyedSubscript: "__nativeFSWrite" as NSString)
             context.setObject(edit as AnyObject, forKeyedSubscript: "__nativeFSEdit" as NSString)
             context.setObject(delete as AnyObject, forKeyedSubscript: "__nativeFSDelete" as NSString)
@@ -134,6 +151,7 @@ nonisolated enum OxFileSystem {
         jsFragment: """
           list: (value) => { const options = __oxOptions(value, 'ox.fs.list'); return __nativeFSList(options.path == null ? '.' : String(options.path), options.options ?? null, String(options.purpose)); },
           read: (value) => { const options = __oxOptions(value, 'ox.fs.read'); return __nativeFSRead(String(options.path), options.options ?? null, String(options.purpose)); },
+          attach: (value) => { const options = __oxOptions(value, 'ox.fs.attach'); return __nativeFSAttach(String(options.path), String(options.purpose)); },
           write: (value) => { const options = __oxOptions(value, 'ox.fs.write'); return __nativeFSWrite(String(options.path), String(options.content), String(options.purpose)); },
           edit: (value) => { const options = __oxOptions(value, 'ox.fs.edit'); return __nativeFSEdit(String(options.path), options.edits, String(options.purpose)); },
           delete: (value) => { const options = __oxOptions(value, 'ox.fs.delete'); return __nativeFSDelete(String(options.path), String(options.purpose)); },

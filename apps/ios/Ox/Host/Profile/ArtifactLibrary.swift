@@ -115,9 +115,9 @@ nonisolated enum ArtifactLibrary {
             }
             return Read(text: text, truncated: truncated, unsupported: nil)
         case .image:
-            return Read(text: nil, truncated: false, unsupported: "Image content has no text. Use ox.artifact.attach to add it to model context.")
+            return Read(text: nil, truncated: false, unsupported: "Use ox.vision.analyze for on-device OCR and classification, or ox.fs.attach with an artifacts/<filename> path when original pixels are needed.")
         case .file:
-            return Read(text: nil, truncated: false, unsupported: "This file type can't be read as text. Use ox.artifact.attach to add it to model context.")
+            return Read(text: nil, truncated: false, unsupported: "This file type can't be read as text. Convert it to a supported text, image, or PDF format first.")
         }
     }
 

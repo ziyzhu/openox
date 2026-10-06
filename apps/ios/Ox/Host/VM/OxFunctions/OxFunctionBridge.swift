@@ -27,6 +27,7 @@ public protocol OxFunctionBridge: AnyObject {
     func analyzeVision(filename: String, purpose: String) async throws -> JSONValue?
     func listFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
+    func attachFileSystem(path: String, purpose: String) async throws -> JSONValue?
     func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue?
     func editFileSystem(path: String, edits: JSONValue?, purpose: String) async throws -> JSONValue?
     func deleteFileSystem(path: String, purpose: String) async throws -> JSONValue?

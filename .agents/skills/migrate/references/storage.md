@@ -429,8 +429,13 @@ file are serialized; edits require exact non-overlapping matches.
 User-selected Files folders appear separately as `files/<grant-id>/...` after
 the Files device service is attached. Security-scoped bookmarks live in
 `Application Support/device-folder-grants.json`, outside every Profile and outside
-backup. Each operation rejects traversal and symbolic links. Writes, edits, and
-deletes require the attached Files service and existing folder grant. Built-in
+backup. Each operation rejects traversal and symbolic links. `ox.vision.analyze` reads
+bounded image snapshots from these folders for on-device OCR and classification.
+`ox.fs.attach` explicitly attaches image/PDF byte snapshots through the existing
+immutable native media publication path; original external paths are never durable
+attachment references. Saved chats retain published bytes in their Profile;
+temporary chats use their purgeable Session. No new storage format is introduced.
+Writes, edits, and deletes require the attached Files service and existing folder grant. Built-in
 writes and edits default to Allow, while delete defaults to Ask. Artifact import
 and rename default to Allow; artifact and filesystem deletion default to Ask.
 

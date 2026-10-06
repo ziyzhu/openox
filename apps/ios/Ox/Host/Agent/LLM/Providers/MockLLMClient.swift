@@ -343,6 +343,7 @@ extension Scenario {
             Entry("88", "system skill references — list and read progressive guidance", .systemSkillReferences),
             Entry("89", "browser PDF — export full page as artifact", .browserPDF),
             Entry("90", "app logs — approve or deny diagnostic access", .appLogs),
+            Entry("92", "Files media — read, analyze, attach, and bound selected-folder content", .filesMedia),
             Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
             Entry("94", "repository conflicts — select and reload an existing Local source", .repositoryConflicts),
         ]),
@@ -365,6 +366,65 @@ extension Scenario {
     }
 
     public static var echo: Scenario { Scenario(name: "echo", steps: [.say(menuText), .stop(.stop)]) }
+
+    static let filesMedia = Scenario(name: "files-media") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            const check = (value, message) => { if (!value) throw new Error(message); };
+            const root = "files/files-media-fixture/";
+            await ox.service.attach({ domain: "ios:files", purpose: "Access selected fixture folder" });
+            const listing = await ox.fs.list({ path: root.slice(0, -1), purpose: "List media fixtures" });
+            check(listing.items.some(item => item.path.endsWith("receipt.png")), "Image fixture missing");
+            const imageRead = await ox.fs.read({ path: root + "receipt.png", purpose: "Inspect image read guidance" });
+            check(imageRead.text === null && imageRead.unsupported, "Image read must not upload pixels");
+            const pdf = await ox.fs.read({ path: root + "document.pdf", purpose: "Read PDF text" });
+            check(pdf.text.includes("FILES"), "PDF text extraction failed");
+            const analysis = await ox.vision.analyze({ source: root + "receipt.png", purpose: "Recognize receipt locally" });
+            check(analysis.processing === "on-device" && analysis.recognizedText.includes("FILES MEDIA 123"), "On-device OCR failed");
+            console.log("PASS Files text extraction and local OCR");
+            """)]
+        }
+        guard ctx.resultText("execute")?.hasPrefix("PASS") == true else {
+            return [.say("Files media failed: \(ctx.resultText("execute") ?? "missing result")"), .stop(.stop)]
+        }
+        if ctx.turn == 1 {
+            return [execute("""
+            const check = (value, message) => { if (!value) throw new Error(message); };
+            const root = "files/files-media-fixture/";
+            await ox.service.detach({ domain: "ios:files", purpose: "Verify Files attachment gate" });
+            for (const operation of [() => ox.fs.attach({ path: root + "receipt.png", purpose: "Reject unattached file upload" }),
+                                     () => ox.vision.analyze({ source: root + "receipt.png", purpose: "Reject unattached file analysis" })]) {
+                let rejected = false;
+                try { await operation(); } catch { rejected = true; }
+                check(rejected, "Unattached Files access accepted");
+            }
+            await ox.service.attach({ domain: "ios:files", purpose: "Restore fixture folder access" });
+            const image = await ox.fs.attach({ path: root + "receipt.png", purpose: "Attach receipt snapshot" });
+            const pdf = await ox.fs.attach({ path: root + "document.pdf", purpose: "Attach PDF snapshot" });
+            check(image.kind === "image" && pdf.kind === "pdf", "Attachment types incorrect");
+            for (const path of [root + "unsupported.bin", root + "invalid.png", root + "too-large.png",
+                                root.slice(0, -1), root + "../receipt.png", "files/missing/receipt.png"]) {
+                let rejected = false;
+                try { await ox.fs.attach({ path, purpose: "Verify attachment boundary" }); } catch { rejected = true; }
+                check(rejected, "Unsupported or unauthorized path accepted: " + path);
+            }
+            await ox.fs.attach({ path: root + "receipt.png", purpose: "Check attachment budget" });
+            await ox.fs.attach({ path: root + "receipt.png", purpose: "Fill attachment budget" });
+            let bounded = false;
+            try { await ox.fs.attach({ path: root + "receipt.png", purpose: "Verify attachment limit" }); } catch { bounded = true; }
+            check(bounded, "Attachment count limit not enforced");
+            await ox.fs.write({ path: root + "receipt.png", content: "Changed after media snapshot", purpose: "Verify immutable media snapshot" });
+            console.log("PASS Files immutable media attachments and boundaries");
+            """)]
+        }
+        let attachments = ctx.toolResults.flatMap(\.transientAttachments)
+        guard attachments.count == 4,
+              attachments.filter({ $0.kind == .image }).allSatisfy({ $0.data.starts(with: Data([137, 80, 78, 71])) }),
+              attachments.contains(where: { $0.kind == .pdf && $0.data.starts(with: Data("%PDF-".utf8)) }) else {
+            return [.say("Files media failed: model did not receive four immutable image/PDF snapshots."), .stop(.stop)]
+        }
+        return [.say("PASS Files media: local OCR, PDF text, immutable model attachments, invalid paths and attachment limits."), .stop(.stop)]
+    }
 
     static let browserPDF = Scenario(name: "browserPDF") { ctx in
         if ctx.turn == 0 {
