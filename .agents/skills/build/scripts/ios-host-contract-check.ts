@@ -119,6 +119,7 @@ export async function check(): Promise<string> {
     "apps/ios/Ox/Host/IOSHost.swift",
     "apps/ios/Ox/Host/Profile/StorageMigration.swift",
     "apps/ios/Ox/Host/Profile/StorageRoot.swift",
+    "apps/ios/Ox/Host/Durable/DurableProfileStore.swift",
     "apps/ios/Ox/Host/Services/Repository/Repository.swift",
   ]);
   for (const [index, source] of allSource.entries()) {

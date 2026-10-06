@@ -75,8 +75,8 @@ struct SkillsMount {
         if case .repository = selected?.owner {
             saved = try await manager.saveLocalSkill(skill)
         } else {
-            let exists = (try? await repository.skill(named: skill.name, in: scope)) != nil
-            saved = try await repository.saveSkill(name: skill.name, description: skill.description, instructions: skill.instructions, services: skill.services, replacing: exists ? skill.name : nil, resources: skill.resources, in: scope)
+            let existing = try await repository.profileFiles(prefix: "skills/\(skill.name)/", in: scope)
+            saved = try await repository.saveSkill(name: skill.name, description: skill.description, instructions: skill.instructions, services: skill.services, replacing: existing.isEmpty ? nil : skill.name, resources: skill.resources, in: scope)
         }
         session.snapshots.removeValue(forKey: skill.name)
         Skills.shared.refresh()

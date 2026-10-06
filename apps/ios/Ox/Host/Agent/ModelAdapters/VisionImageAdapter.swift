@@ -28,7 +28,7 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                     content.append(block)
                     continue
                 }
-                guard let data = try? Data(contentsOf: artifact.fileURL),
+                guard let data = try? ProviderArtifactInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze artifact=\(artifact.fileName)")
                     return nil
@@ -48,7 +48,7 @@ nonisolated struct VisionImageAdapter: ModelAdapter {
                     content.append(block)
                     continue
                 }
-                guard let data = try? Data(contentsOf: artifact.fileURL),
+                guard let data = try? ProviderArtifactInputs.read(artifact),
                       let analysis = await analysis(data: data, filename: artifact.fileName, mimeType: artifact.mimeType) else {
                     Log.agent.error("VisionImageAdapter couldn't analyze tool artifact=\(artifact.fileName)")
                     return nil

@@ -143,28 +143,46 @@ nonisolated enum SkillFiles {
 }
 
 extension ProfileRepository {
-    func skills(in scope: ProfileScope) -> [Skill] {
-        let manager = FileManager.default
-        guard let root = try? skillsDirectory(in: scope),
-              let directories = try? manager.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey]
-              ) else { return [] }
-        return directories.compactMap { directory in
-            guard SkillFiles.isUserName(directory.lastPathComponent) else { return nil }
-            do { return try SkillFiles.load(directory: directory) }
-            catch {
-                Log.ui.error("ProfileRepository.skills invalid path=\(directory.lastPathComponent) error=\(error.localizedDescription)")
-                return nil
+    func skills(in scope: ProfileScope) async throws -> [Skill] {
+        let files = try await profileFiles(prefix: "skills/", in: scope)
+        let names = Set(try files.map { file in
+            let parts = file.path.split(separator: "/", omittingEmptySubsequences: false)
+            guard parts.count >= 3, parts[0] == "skills", SkillFiles.isUserName(String(parts[1])) else {
+                throw SkillError.invalidPackage
             }
-        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return String(parts[1])
+        })
+        var skills: [Skill] = []
+        for name in names.sorted() {
+            skills.append(try await loadSkill(name: name, files: files.filter { $0.path.hasPrefix("skills/\(name)/") }, in: scope))
+        }
+        return skills.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    func skill(named rawName: String, in scope: ProfileScope) throws -> Skill {
+    func skill(named rawName: String, in scope: ProfileScope) async throws -> Skill {
         let name = try canonicalSkillName(rawName)
-        let directory = try skillsDirectory(in: scope).appendingPathComponent(name, isDirectory: true)
-        guard FileManager.default.fileExists(atPath: directory.path) else { throw SkillError.missing(name) }
-        return try SkillFiles.load(directory: directory)
+        let files = try await profileFiles(prefix: "skills/\(name)/", in: scope)
+        guard !files.isEmpty else { throw SkillError.missing(name) }
+        return try await loadSkill(name: name, files: files, in: scope)
+    }
+
+    private func loadSkill(name: String, files: [DurableProfileFile], in scope: ProfileScope) async throws -> Skill {
+        guard files.count <= SkillFiles.maximumFiles,
+              files.reduce(0, { $0 + $1.size }) <= SkillFiles.maximumBytes else { throw SkillError.invalidPackage }
+        let prefix = "skills/\(name)/"
+        var contents: [String: String] = [:]
+        for file in files {
+            let path = String(file.path.dropFirst(prefix.count))
+            guard file.path.hasPrefix(prefix), !file.binary,
+                  path == SkillFiles.fileName || SkillFiles.isResourcePath(path),
+                  let text = try await readTextFile(named: file.path, in: scope) else { throw SkillError.invalidPackage }
+            contents[path] = text
+        }
+        guard let text = contents.removeValue(forKey: SkillFiles.fileName),
+              var skill = SkillFiles.parse(text, directoryName: name) else { throw SkillError.invalidPackage }
+        skill.resources = contents.isEmpty ? nil : contents
+        try SkillFiles.validate(skill)
+        return skill
     }
 
     @discardableResult
@@ -176,28 +194,33 @@ extension ProfileRepository {
         replacing: String? = nil,
         resources: [String: String]? = nil,
         in scope: ProfileScope
-    ) throws -> Skill {
+    ) async throws -> Skill {
         let name = try canonicalSkillName(name)
         let replacing = try replacing.map(canonicalSkillName)
-        let root = try skillsDirectory(in: scope)
-        let manager = FileManager.default
-        let directory = root.appendingPathComponent(name, isDirectory: true)
-        let directoryExists = manager.fileExists(atPath: directory.path)
-        if directoryExists, replacing != name {
-            throw SkillError.exists(name)
+        let existing = try await profileFiles(prefix: "skills/\(name)/", in: scope)
+        if !existing.isEmpty, replacing != name { throw SkillError.exists(name) }
+        var skill = try validatedSkill(name: name, description: description, instructions: instructions, services: services)
+        if let resources {
+            skill.resources = resources
+        } else if let replacing {
+            skill.resources = try await self.skill(named: replacing, in: scope).resources
         }
-        var skill = try validatedSkill(
-            name: name,
-            description: description,
-            instructions: instructions,
-            services: services
-        )
-        skill.resources = try resources ?? replacing.flatMap { try self.skill(named: $0, in: scope).resources }
-        try SkillFiles.write(skill, directory: directory)
+        try SkillFiles.validate(skill)
+        let prefix = "skills/\(name)/"
+        let resources = skill.resources ?? [:]
+        let instructions = SkillFiles.serialize(skill)
+        guard instructions.utf8.count <= ArtifactLimits.textBytes,
+              resources.values.allSatisfy({ $0.utf8.count <= ArtifactLimits.textBytes }) else { throw SkillError.invalidPackage }
+        var writes = Dictionary(uniqueKeysWithValues: resources.map { (prefix + $0.key, $0.value) })
+        writes[prefix + SkillFiles.fileName] = instructions
+        var removes = existing.filter { writes[$0.path] == nil }.map(\.path)
         if let replacing, replacing != name {
-            try manager.removeItem(at: root.appendingPathComponent(replacing, isDirectory: true))
+            let source = try await profileFiles(prefix: "skills/\(replacing)/", in: scope)
+            guard !source.isEmpty else { throw SkillError.missing(replacing) }
+            removes += source.map(\.path)
         }
-        Log.ui.info("ProfileRepository.saveSkill name=\(name) replacing=\(replacing ?? "-") services=\(services.count) count=\(skills(in: scope).count)")
+        try await commitSkillFiles(writes: writes, removes: removes, in: scope)
+        Log.ui.info("ProfileRepository.saveSkill profile=\(scope.profileID?.uuidString ?? "temporary") name=\(name) replacing=\(replacing ?? "-") files=\(writes.count) removed=\(removes.count)")
         return skill
     }
 
@@ -207,8 +230,8 @@ extension ProfileRepository {
         instructions: String,
         services: [String],
         in scope: ProfileScope
-    ) throws -> Skill {
-        try saveSkill(
+    ) async throws -> Skill {
+        try await saveSkill(
             name: name,
             description: description,
             instructions: instructions,
@@ -217,9 +240,9 @@ extension ProfileRepository {
         )
     }
 
-    func updateSkill(named name: String, patch: SkillPatch, in scope: ProfileScope) throws -> Skill {
-        let current = try skill(named: name, in: scope)
-        return try saveSkill(
+    func updateSkill(named name: String, patch: SkillPatch, in scope: ProfileScope) async throws -> Skill {
+        let current = try await skill(named: name, in: scope)
+        return try await saveSkill(
             name: current.name,
             description: patch.description ?? current.description,
             instructions: patch.instructions ?? current.instructions,
@@ -229,8 +252,8 @@ extension ProfileRepository {
         )
     }
 
-    func replaceSkillText(named name: String, oldText: String, newText: String, in scope: ProfileScope) throws -> Skill {
-        let current = try skill(named: name, in: scope)
+    func replaceSkillText(named name: String, oldText: String, newText: String, in scope: ProfileScope) async throws -> Skill {
+        let current = try await skill(named: name, in: scope)
         let instructions: String
         if oldText.isEmpty {
             instructions = current.instructions.isEmpty ? newText : current.instructions + "\n" + newText
@@ -240,18 +263,18 @@ extension ProfileRepository {
             guard matches == 1 else { throw SkillError.findAmbiguous(current.name, matches: matches) }
             instructions = ExactTextReplacement.replace(oldText, with: newText, in: current.instructions)
         }
-        return try updateSkill(
+        return try await updateSkill(
             named: current.name,
             patch: SkillPatch(instructions: instructions),
             in: scope
         )
     }
 
-    func renameSkill(named name: String, to newName: String, in scope: ProfileScope) throws -> Skill {
-        let current = try skill(named: name, in: scope)
+    func renameSkill(named name: String, to newName: String, in scope: ProfileScope) async throws -> Skill {
+        let current = try await skill(named: name, in: scope)
         let destination = try canonicalSkillName(newName)
         guard destination != current.name else { return current }
-        return try saveSkill(
+        return try await saveSkill(
             name: destination,
             description: current.description,
             instructions: current.instructions,
@@ -262,12 +285,20 @@ extension ProfileRepository {
     }
 
     @discardableResult
-    func deleteSkill(named name: String, in scope: ProfileScope) throws -> Skill {
-        let skill = try skill(named: name, in: scope)
-        let root = try skillsDirectory(in: scope)
-        try FileManager.default.removeItem(at: root.appendingPathComponent(skill.name, isDirectory: true))
-        Log.ui.info("ProfileRepository.deleteSkill name=\(skill.name)")
+    func deleteSkill(named name: String, in scope: ProfileScope) async throws -> Skill {
+        let skill = try await skill(named: name, in: scope)
+        let files = try await profileFiles(prefix: "skills/\(skill.name)/", in: scope)
+        try await commitSkillFiles(writes: [:], removes: files.map(\.path), in: scope)
+        Log.ui.info("ProfileRepository.deleteSkill profile=\(scope.profileID?.uuidString ?? "temporary") name=\(skill.name) files=\(files.count)")
         return skill
+    }
+
+    private func commitSkillFiles(writes: [String: String], removes: [String], in scope: ProfileScope) async throws {
+        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+            "action": .string("fileBatch"),
+            "writes": .array(writes.sorted { $0.key < $1.key }.map { .object(["path": .string($0.key), "text": .string($0.value)]) }),
+            "removes": .array(Set(removes).sorted().map { .string($0) }),
+        ]))
     }
 
     private func canonicalSkillName(_ rawName: String) throws -> String {
@@ -328,7 +359,7 @@ final class Skills {
     }
 
     static func catalog(in scope: ProfileScope, repositorySkills: [Skill]) async throws -> SkillCatalog {
-        let users = await ProfileRepository.shared.skills(in: scope)
+        let users = try await ProfileRepository.shared.skills(in: scope)
         let selections = try await ProfileRepository.shared.skillSelections(in: scope)
         return SkillCatalog(candidates: BuiltInSkills.skills + repositorySkills + users, selections: selections.sources)
     }

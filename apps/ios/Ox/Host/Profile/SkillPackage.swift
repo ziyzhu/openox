@@ -182,7 +182,7 @@ final class SkillImportCoordinator {
                 case .replace:
                     replacing = skill.name
                 case .copy:
-                    let existing = Set(await repository.skills(in: scope).map(\.name))
+                    let existing = Set(try await repository.skills(in: scope).map(\.name))
                     let base = skill.name
                     var suffix = 2
                     while existing.contains(skill.name) {

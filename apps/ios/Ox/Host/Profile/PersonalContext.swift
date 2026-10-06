@@ -31,7 +31,9 @@ final class Soul {
 
     func reload() { file.reload() }
 
-    func waitUntilCurrent() async { await file.waitUntilCurrent() }
+    func waitUntilCurrent() async throws { try await file.waitUntilCurrent() }
+
+    var errorMessage: String? { file.errorMessage }
 
     var directive: String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -74,6 +76,8 @@ final class UserMemory {
 
     func reload() { file.reload() }
 
-    func waitUntilCurrent() async { await file.waitUntilCurrent() }
+    func waitUntilCurrent() async throws { try await file.waitUntilCurrent() }
+
+    var errorMessage: String? { file.errorMessage }
 
 }

@@ -94,7 +94,7 @@ final class IOSHost: OxHost {
             await chats.loadSummariesNow()
             _ = Soul.shared
             _ = UserMemory.shared
-            await UserMemory.shared.waitUntilCurrent()
+            try await UserMemory.shared.waitUntilCurrent()
             await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
             try ScheduledSkillScheduler.shared.activate()
             Log.app.info("IOSHost profile prepared")

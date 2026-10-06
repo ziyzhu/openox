@@ -292,9 +292,9 @@ private struct ProfileContentsView: View {
         let skills: Skills
         var artifactCount: Int
 
-        func waitUntilCurrent() async {
-            await memory.waitUntilCurrent()
-            await soul.waitUntilCurrent()
+        func waitUntilCurrent() async throws {
+            try await memory.waitUntilCurrent()
+            try await soul.waitUntilCurrent()
             await skills.waitUntilCurrent()
         }
     }
@@ -456,20 +456,24 @@ private struct ProfileContentsView: View {
             skills: Skills(scope: scope),
             artifactCount: 0
         )
-        await loaded.waitUntilCurrent()
-        let artifacts = await ProfileRepository.shared.artifacts(in: scope)
-        guard !Task.isCancelled else { return }
-        var complete = loaded
-        complete.artifactCount = artifacts.count
-        context = complete
+        do {
+            try await loaded.waitUntilCurrent()
+            let artifacts = try await ProfileRepository.shared.artifacts(in: scope)
+            guard !Task.isCancelled else { return }
+            var complete = loaded
+            complete.artifactCount = artifacts.count
+            context = complete
+        } catch { Log.ui.error("ProfileSettings.artifacts failed=\(error.localizedDescription)") }
     }
 
     private func refreshArtifactCount() async {
         guard var current = context else { return }
-        let artifacts = await ProfileRepository.shared.artifacts(in: current.scope)
-        guard !Task.isCancelled, context?.scope == current.scope else { return }
-        current.artifactCount = artifacts.count
-        context = current
+        do {
+            let artifacts = try await ProfileRepository.shared.artifacts(in: current.scope)
+            guard !Task.isCancelled, context?.scope == current.scope else { return }
+            current.artifactCount = artifacts.count
+            context = current
+        } catch { Log.ui.error("ProfileSettings.artifacts refresh failed=\(error.localizedDescription)") }
     }
 
 }

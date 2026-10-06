@@ -11,6 +11,8 @@ struct ArtifactPickerSheet: View {
     @State private var loading = true
     @State private var attaching = false
     @State private var attachErrorMessage: String?
+    @State private var loadErrorMessage: String?
+    @State private var loadedScope: ProfileScope?
 
     private var matches: [Artifact] {
         artifacts.filter { query.isEmpty || $0.userFacingName.localizedCaseInsensitiveContains(query) }
@@ -21,6 +23,8 @@ struct ArtifactPickerSheet: View {
             Group {
                 if loading {
                     ContentLoadingView(label: "Loading artifacts…")
+                } else if let loadErrorMessage {
+                    ContentUnavailableView("Artifact unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
                 } else if artifacts.isEmpty {
                     LibraryEmptyNote(
                         destination: .artifacts,
@@ -78,7 +82,7 @@ struct ArtifactPickerSheet: View {
                         ? artifact.updatingAvailability(.downloading)
                         : artifact
                     Button { toggle(artifact) } label: {
-                        ArtifactLibraryRow(artifact: displayed, accessory: .selection(selection.contains(artifact.id)))
+                        ArtifactLibraryRow(artifact: displayed, accessory: .selection(selection.contains(artifact.id)), scope: loadedScope)
                     }
                     .buttonStyle(.plain)
                     .disabled(attaching)
@@ -99,7 +103,7 @@ struct ArtifactPickerSheet: View {
 
     private func attach() {
         Task {
-            guard let scope = StorageRoot.currentScope else { return }
+            guard let scope = loadedScope, StorageRoot.currentScope == scope else { return }
             attaching = true
             defer { attaching = false }
             do {
@@ -122,13 +126,31 @@ struct ArtifactPickerSheet: View {
     private func load() async {
         guard let scope = StorageRoot.currentScope else {
             artifacts = []
+            selection.removeAll()
+            loadedScope = nil
             loading = false
             return
         }
-        artifacts = await ProfileRepository.shared.artifacts(in: scope)
-            .filter { !attachedIDs.contains($0.id) }
-            .sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
-        loading = false
-        Log.ui.info("ArtifactPickerSheet.load count=\(artifacts.count) attached=\(attachedIDs.count)")
+        do {
+            let loaded = try await ProfileRepository.shared.artifacts(in: scope)
+                .filter { !attachedIDs.contains($0.id) }
+                .sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
+            try Task.checkCancellation()
+            guard StorageRoot.currentScope == scope else { return }
+            if loadedScope != scope { selection.removeAll() }
+            loadedScope = scope
+            artifacts = loaded
+            loadErrorMessage = nil
+            loading = false
+            Log.ui.info("ArtifactPickerSheet.load count=\(artifacts.count) attached=\(attachedIDs.count)")
+        } catch is CancellationError {
+        } catch {
+            artifacts = []
+            selection.removeAll()
+            loadedScope = nil
+            loading = false
+            loadErrorMessage = error.localizedDescription
+            Log.ui.error("ArtifactPickerSheet.load profile=\(scope.profileID?.uuidString ?? "nil") error=\(error.localizedDescription)")
+        }
     }
 }

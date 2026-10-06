@@ -59,7 +59,7 @@ extension OxHostProtocol {
             var created: [Artifact] = []
             do {
                 for artifact in command.artifacts {
-                    let existing = await ProfileRepository.shared.artifacts(in: scope)
+                    let existing = try await ProfileRepository.shared.artifacts(in: scope)
                     let imported = try await ArtifactImporter.importDataAsync(
                         artifact.data,
                         suggestedName: artifact.name,

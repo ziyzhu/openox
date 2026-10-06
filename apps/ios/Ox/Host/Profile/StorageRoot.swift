@@ -61,7 +61,7 @@ final class StorageRoot {
         }
         let migrated = try await StorageMigrator.migrate(chosen)
         update(migrated.id) { $0 = migrated }
-        activate(migrated)
+        try await activate(migrated)
         Log.app.info("StorageRoot.resolve profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable) root=\(self.root.path)")
     }
 
@@ -88,7 +88,7 @@ final class StorageRoot {
         defer { isBusy = false }
         let migrated = try await StorageMigrator.migrate(profile)
         update(migrated.id) { $0 = migrated }
-        activate(migrated)
+        try await activate(migrated)
         switchEpoch += 1
     }
 
@@ -97,7 +97,8 @@ final class StorageRoot {
         isBusy = true
         defer { isBusy = false }
         do {
-            let created = try await repository.createProfile(name: name, location: location, base: base)
+            guard location == .local else { throw RuntimeError.bridge("Create a local Profile; live SQLite synchronization is unsupported") }
+            let created = try await StorageMigrator.createFreshProfile(name: name, base: base)
             profiles.append(created)
             sortProfiles()
         } catch {
@@ -118,7 +119,7 @@ final class StorageRoot {
                 profiles.append(migrated)
             }
             sortProfiles()
-            activate(migrated)
+            try await activate(migrated)
             switchEpoch += 1
             Log.app.info("StorageRoot.open id=\(migrated.id) name=\(migrated.name)")
             return migrated
@@ -136,7 +137,7 @@ final class StorageRoot {
             guard let renamed = try await repository.renameProfile(profile, to: newName, base: base) else { return }
             update(profile.id) { $0 = renamed }
             if profile.id == activeId {
-                publish(renamed)
+                try await activate(renamed)
                 switchEpoch += 1
             }
             sortProfiles()
@@ -157,9 +158,8 @@ final class StorageRoot {
             let moved = try await repository.moveProfile(profile, to: location, base: base)
             update(profile.id) { $0 = moved }
             if profile.id == activeId {
-                let scope = publish(moved)
+                try await activate(moved)
                 switchEpoch += 1
-                if location == .iCloud { await repository.startDownloads(in: scope) }
             }
             Log.app.info("StorageRoot.move id=\(profile.id) name=\(moved.name) location=\(location.rawValue)")
         } catch {
@@ -199,7 +199,7 @@ final class StorageRoot {
                 do {
                     let migrated = try await StorageMigrator.migrate(current)
                     update(migrated.id) { $0 = migrated }
-                    activate(migrated)
+                    try await activate(migrated)
                     switchEpoch += 1
                 } catch {
                     Log.app.error("StorageRoot.reconcile id=\(current.id) failed: \(error.localizedDescription)")
@@ -216,15 +216,18 @@ final class StorageRoot {
             do {
                 let migrated = try await StorageMigrator.migrate(next)
                 update(migrated.id) { $0 = migrated }
-                activate(migrated)
+                try await activate(migrated)
                 switchEpoch += 1
             } catch {
                 Log.app.error("StorageRoot.fallback id=\(next.id) failed: \(error.localizedDescription)")
             }
         } else if let seeded = await seedDefaultProfile() {
-            profiles = [seeded]
-            activate(seeded)
-            switchEpoch += 1
+            do {
+                let migrated = try await StorageMigrator.migrate(seeded)
+                profiles = [migrated]
+                try await activate(migrated)
+                switchEpoch += 1
+            } catch { Log.app.error("StorageRoot.seed activation failed=\(error.localizedDescription)") }
         }
     }
 
@@ -232,7 +235,7 @@ final class StorageRoot {
         let location = Profile.Location.local
         guard let base = baseDir(for: location) else { return nil }
         do {
-            let created = try await repository.createUniqueProfile(name: Self.defaultName, location: location, base: base)
+            let created = try await StorageMigrator.createFreshProfile(name: Self.defaultName, base: base, unique: true)
             return created
         } catch {
             Log.app.error("StorageRoot.seed name=\(Self.defaultName) location=\(location.rawValue) failed: \(error.localizedDescription)")
@@ -240,15 +243,13 @@ final class StorageRoot {
         }
     }
 
-    private func activate(_ profile: Profile) {
+    private func activate(_ profile: Profile) async throws {
+        let scope = isActive(profile) ? activeScope : ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        if activeScope.profileID != nil, activeScope.root != scope.root { try await DurableProfileStore.shared.close(in: activeScope) }
+        _ = try await DurableProfileStore.shared.session(in: scope)
         storedActiveId = profile.id
-        let scope = publish(profile)
+        activeScope = scope
         sortProfiles()
-        let repository = repository
-        Task {
-            await repository.ensureLayout(in: scope)
-            if profile.location == .iCloud { await repository.startDownloads(in: scope) }
-        }
         Log.app.info("StorageRoot.activate id=\(profile.id) name=\(profile.name) location=\(profile.location.rawValue) root=\(self.root.path)")
     }
 

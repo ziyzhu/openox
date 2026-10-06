@@ -14,14 +14,17 @@ private final class InlineCanvasSession {
     let page: WebPage
     let canvas: OxCanvas
     let presentations: AppPresentationCoordinator
+    let source: ArtifactPreviewSource
     private(set) var phase: Phase = .loading
 
-    init(artifact: Artifact, serviceManager: ServiceManager) {
+    init(source: ArtifactPreviewSource, serviceManager: ServiceManager) {
+        let artifact = source.artifact
+        self.source = source
         let presentations = AppPresentationCoordinator()
         let canvas = OxCanvas(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations)
         self.presentations = presentations
         self.canvas = canvas
-        page = HTMLArtifactPage.make(directory: artifact.fileURL.deletingLastPathComponent(), canvas: canvas)
+        page = HTMLArtifactPage.make(scope: source.scope, canvas: canvas)
     }
 
     var isReady: Bool {
@@ -29,11 +32,10 @@ private final class InlineCanvasSession {
         return false
     }
 
-    func load(_ artifact: Artifact) async {
+    func load() async {
+        let artifact = source.artifact
         do {
-            let document = try await Task.detached(priority: .userInitiated) {
-                try HTMLArtifactDocument.read(artifact)
-            }.value
+            let document = try await HTMLArtifactDocument.read(source)
             try Task.checkCancellation()
             Log.ui.info("InlineCanvas.loading filename=\(artifact.fileName) bytes=\(document.byteCount)")
             for try await event in page.load(html: document.html, baseURL: HTMLArtifactPage.baseURL) {
@@ -59,6 +61,13 @@ private final class InlineCanvasSession {
 struct InlineCanvasCard: View {
     let artifact: Artifact
     let rowID: UUID
+    private let source: ArtifactPreviewSource
+
+    init(artifact: Artifact, rowID: UUID, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.artifact = artifact
+        self.rowID = rowID
+        source = ArtifactPreviewSource(artifact: artifact, scope: scope)
+    }
 
     @Environment(ServiceManager.self) private var serviceManager
     @State private var session: InlineCanvasSession?
@@ -126,9 +135,9 @@ struct InlineCanvasCard: View {
         session?.close()
         pageMount.clear()
         loadedModifiedAt = modifiedAt
-        let loaded = InlineCanvasSession(artifact: artifact, serviceManager: serviceManager)
+        let loaded = InlineCanvasSession(source: source, serviceManager: serviceManager)
         session = loaded
-        await loaded.load(artifact)
+        await loaded.load()
         guard !Task.isCancelled, session === loaded, loaded.isReady else { return }
         pageMount.reconcile(page: loaded.page, ownerIDs: [rowID])
     }
@@ -233,7 +242,7 @@ private struct InlineCanvasExpandedView: View {
                             .accessibilityIdentifier(A11yID.ServiceInspector.close)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        ShareLink(item: artifact.fileURL) {
+                        ArtifactShareButton(artifact: artifact, scope: session.source.scope) {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .accessibilityLabel(A11yLabel.shareArtifact)

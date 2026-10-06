@@ -28,6 +28,7 @@ nonisolated enum ProfileSchema {
         "2026-09-25-import-memory",
         "2026-09-27-outcome-skills",
         "2026-09-28-provider-skill",
+        "2026-10-05-pi-durable",
     ]
     static var current: String { versions.last! }
 
@@ -91,11 +92,134 @@ nonisolated enum StorageMigrationError: LocalizedError {
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
     static let durableProfileVersion = "2026-10-05-pi-durable"
+    static let nativeProfileVersion = "2026-09-28-provider-skill"
+
+    static func createFreshProfile(name: String, base: URL, unique: Bool = false) async throws -> Profile {
+        let manager = FileManager.default
+        let stem = ProfileRepository.cleanName(name)
+        var candidate = stem
+        var suffix = 2
+        while manager.fileExists(atPath: base.appendingPathComponent(candidate).path) {
+            guard unique else { throw ProfileError.nameExists(name) }
+            candidate = "\(stem) \(suffix)"; suffix += 1
+        }
+        let destination = base.appendingPathComponent(candidate)
+        let stage = base.appendingPathComponent(".pi-fresh-" + UUID().uuidString)
+        try manager.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        let manifest = ProfileConfig.fresh()
+        let runtime = DurableRuntime(databaseURL: stage.appendingPathComponent("state.sqlite"), artifactRoot: stage) { method, _, _ in
+            throw RuntimeError.bridge("Fresh Profile installation forbids native capabilities: \(method)")
+        }
+        do {
+            let draft: JSONValue = .object(["format": .int(1), "profileID": .string(manifest.id.uuidString),
+                "documents": .array([]), "artifacts": .array([]), "conversations": .array([])])
+            _ = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": draft]).jsonString())
+            await runtime.dispose()
+            try ProfileIO.writeConfig(manifest, to: stage)
+            try syncDurableDirectory(stage)
+            try manager.moveItem(at: stage, to: destination)
+            try syncDurableDirectory(base)
+            guard let profile = ProfileIO.profile(at: destination, location: .local) else { throw StorageMigrationError.profileMigrationFailed(candidate) }
+            return profile
+        } catch {
+            await runtime.dispose()
+            Log.app.error("StorageMigrator.fresh failed stage=\(stage.lastPathComponent) error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private static func durableJournalDirectory(_ id: UUID) throws -> URL {
+        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("StorageMigration/PiProfiles/" + id.uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return root
+    }
+
+    private static func writeDurableJournal(_ journal: [String: Any], profileID: UUID) throws {
+        let directory = try durableJournalDirectory(profileID)
+        let file = directory.appendingPathComponent("journal.json")
+        try JSONSerialization.data(withJSONObject: journal, options: [.sortedKeys]).write(to: file, options: .atomic)
+        let fd = open(file.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration journal") }
+        defer { Darwin.close(fd) }
+        guard fsync(fd) == 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration journal durability") }
+        try syncDurableDirectory(directory)
+    }
+
+    private static func syncDurableDirectory(_ url: URL) throws {
+        let fd = open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration directory") }
+        defer { Darwin.close(fd) }
+        guard fsync(fd) == 0 else { throw StorageMigrationError.invalidApplicationStorage("Pi migration directory durability") }
+    }
+
+    private static func publishDurableJournal(_ journal: [String: Any]) throws {
+        guard journal["format"] as? Int == 1, let text = journal["profileID"] as? String, let id = UUID(uuidString: text),
+              let rootPath = journal["root"] as? String, let stagePath = journal["stage"] as? String, let backupPath = journal["backup"] as? String else {
+            throw StorageMigrationError.invalidApplicationStorage("Pi migration journal")
+        }
+        let root = URL(fileURLWithPath: rootPath), stage = URL(fileURLWithPath: stagePath), backup = URL(fileURLWithPath: backupPath)
+        guard stage.deletingLastPathComponent() == root.deletingLastPathComponent(), stage.lastPathComponent.hasPrefix(".pi-stage-"),
+              backup.deletingLastPathComponent() == (try durableJournalDirectory(id)), root != stage, root != backup else {
+            throw StorageMigrationError.invalidApplicationStorage("Pi migration publication paths")
+        }
+        if let manifest = ProfileIO.readConfig(at: root), manifest.id == id, manifest.version == durableProfileVersion {
+            var published = journal; published["phase"] = "published"
+            try writeDurableJournal(published, profileID: id)
+            return
+        }
+        guard let manifest = ProfileIO.readConfig(at: stage), manifest.id == id, manifest.version == durableProfileVersion,
+              FileManager.default.fileExists(atPath: stage.appendingPathComponent("state.sqlite").path) else {
+            throw StorageMigrationError.invalidApplicationStorage("validated staged Pi Profile")
+        }
+        if FileManager.default.fileExists(atPath: root.path) {
+            guard !FileManager.default.fileExists(atPath: backup.path),
+                  let result = journal["result"] as? [String: Any], let inventory = result["sourceInventory"] as? [String: String],
+                  try durableSourceInventory(at: root) == inventory else { throw StorageMigrationError.profileMigrationFailed(root.lastPathComponent) }
+            try FileManager.default.moveItem(at: root, to: backup)
+            try syncDurableDirectory(root.deletingLastPathComponent())
+            try syncDurableDirectory(backup.deletingLastPathComponent())
+        }
+        try FileManager.default.moveItem(at: stage, to: root)
+        try syncDurableDirectory(root.deletingLastPathComponent())
+        var published = journal; published["phase"] = "published"
+        try writeDurableJournal(published, profileID: id)
+        Log.app.info("StorageMigrator.pi published id=\(id) sourceBackupRetained=true")
+    }
+
+    private static func recoverDurablePublications() throws {
+        let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("StorageMigration/PiProfiles")
+        guard FileManager.default.fileExists(atPath: base.path) else { return }
+        for directory in try FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
+            let file = directory.appendingPathComponent("journal.json")
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            guard let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any], journal["format"] as? Int == 1 else {
+                throw StorageMigrationError.invalidApplicationStorage("Pi migration journal")
+            }
+            if journal["phase"] as? String == "prepared" { try publishDurableJournal(journal) }
+            else if journal["phase"] as? String != "published" { throw StorageMigrationError.invalidApplicationStorage("Pi migration phase") }
+        }
+    }
+
+    static func durableConversationReference(for legacyID: UUID, in scope: ProfileScope) throws -> DurableConversationReference? {
+        guard let id = scope.profileID else { return nil }
+        let file = try durableJournalDirectory(id).appendingPathComponent("journal.json")
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        guard let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any], journal["format"] as? Int == 1,
+              let result = journal["result"] as? [String: Any], let installation = result["installation"] as? [String: Any],
+              let conversations = installation["conversations"] as? [[String: Any]] else { throw StorageMigrationError.invalidApplicationStorage("Pi conversion results") }
+        guard let record = conversations.first(where: { ($0["key"] as? String).flatMap(UUID.init(uuidString:)) == legacyID }),
+              let reference = record["reference"] as? [String: Any] else { return nil }
+        let value = try JSONDecoder().decode(DurableConversationReference.self, from: JSONSerialization.data(withJSONObject: reference))
+        guard value.profileID == id else { throw StorageMigrationError.invalidApplicationStorage("Pi conversion identity") }
+        return value
+    }
 
     static func stageDurableProfile(_ profile: Profile, at destination: URL) async throws -> JSONValue {
         let sourcePath = profile.url.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
         let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
-        guard profile.location == .local, profile.version == ProfileSchema.current,
+        guard profile.location == .local, profile.version == nativeProfileVersion,
               sourcePath != destinationPath, !destinationPath.hasPrefix(sourcePath + "/"), !sourcePath.hasPrefix(destinationPath + "/") else {
             throw StorageMigrationError.profileMigrationFailed(profile.name)
         }
@@ -147,7 +271,7 @@ nonisolated enum StorageMigrator {
         let inventory = try durableSourceInventory(at: profile.url)
         let manifest = try JSONSerialization.jsonObject(with: durableSourceFile(ProfileIO.configName, at: profile.url)) as? [String: Any]
         guard let manifest, (manifest["id"] as? String).flatMap(UUID.init(uuidString:)) == profile.id,
-              manifest["version"] as? String == ProfileSchema.current else { throw StorageMigrationError.missingConfig }
+              manifest["version"] as? String == nativeProfileVersion else { throw StorageMigrationError.missingConfig }
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: .local)
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
@@ -386,6 +510,7 @@ nonisolated enum StorageMigrator {
     @MainActor
     static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
         Log.app.info("StorageMigrator.prepare start")
+        try recoverDurablePublications()
         try validateApplicationStorage()
         try migrateLegacySecrets()
         try migrateManagedOAuthAccounts()
@@ -690,19 +815,32 @@ nonisolated enum StorageMigrator {
     }
 
     static func migrate(_ profile: Profile) async throws -> Profile {
-        guard sourceVersion(for: profile.version) != nil else {
+        try recoverDurablePublications()
+        guard let config = ProfileIO.readConfig(at: profile.url), config.id == profile.id, sourceVersion(for: config.version) != nil else {
             Log.app.error("StorageMigrator.reject unknown version=\(profile.version) id=\(profile.id)")
             throw StorageMigrationError.unsupportedProfileVersion(profile.name, profile.version)
         }
-        guard await migrateProfile(profile) else {
-            throw StorageMigrationError.profileMigrationFailed(profile.name)
-        }
         var migrated = profile
-        migrated.version = ProfileSchema.current
-        let selections = profile.url.appendingPathComponent("skill-selections.json")
-        if FileManager.default.fileExists(atPath: selections.path) {
-            guard try JSONDecoder().decode(SkillSelections.self, from: Data(contentsOf: selections)).version == 1 else { throw SkillError.invalidPackage }
+        migrated.version = config.version
+        if config.version == durableProfileVersion {
+            guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
+                throw StorageMigrationError.invalidApplicationStorage("local Pi Profile database")
+            }
+            return migrated
         }
+        guard profile.location == .local else { throw StorageMigrationError.invalidApplicationStorage("Pi Profiles require an offline local import; live cloud/external database synchronization is unsupported") }
+        guard await migrateProfile(migrated) else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
+        migrated.version = nativeProfileVersion
+        let destination = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-stage-" + UUID().uuidString)
+        let result = try await stageDurableProfile(migrated, at: destination)
+        let journalRoot = try durableJournalDirectory(profile.id)
+        let backup = journalRoot.appendingPathComponent("source-" + UUID().uuidString)
+        let journal: [String: Any] = ["format": 1, "phase": "prepared", "profileID": profile.id.uuidString,
+            "root": profile.url.path, "stage": destination.path, "backup": backup.path, "result": result.toAny()]
+        try writeDurableJournal(journal, profileID: profile.id)
+        try publishDurableJournal(journal)
+        migrated.version = durableProfileVersion
+        Log.app.info("StorageMigrator.pi activated id=\(profile.id) sourcePreserved=true")
         return migrated
     }
 
@@ -1501,7 +1639,7 @@ nonisolated enum StorageMigrator {
     private static func migrateProfile(_ profile: Profile) async -> Bool {
         guard let sourceVersion = sourceVersion(for: profile.version),
               let from = ProfileSchema.versions.firstIndex(of: sourceVersion) else { return false }
-        let target = ProfileSchema.versions.count - 1
+        let target = ProfileSchema.versions.firstIndex(of: nativeProfileVersion)!
         guard from < target else { return true }
         let url = profile.url
         let id = profile.id

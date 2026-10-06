@@ -87,6 +87,7 @@ final class ChatManager {
     private var selection: Selection = .empty
     @ObservationIgnored private var hydrationOrdinal: UInt64 = 0
     @ObservationIgnored private var hydrationGeneration: UInt64 = 0
+    @ObservationIgnored private var recoveryPreparation: (scope: ProfileScope, task: Task<Void, Error>)?
     @ObservationIgnored private var hydrationTasks: [ChatID: (generation: HydrationGeneration, task: Task<Chat?, Never>)] = [:]
     @ObservationIgnored private let repository: ProfileRepository
     @ObservationIgnored private let storage: StorageRoot
@@ -161,8 +162,12 @@ final class ChatManager {
         }
     }
 
+    private func canonicalID(_ rawID: UUID) -> ChatID {
+        (try? DurableProfileStore.shared.reference(for: ChatID(rawID), in: repositoryScope).compatibilityID) ?? ChatID(rawID)
+    }
+
     func contains(_ rawID: UUID) -> Bool {
-        guard let record = records[ChatID(rawID)] else { return false }
+        guard let record = records[canonicalID(rawID)] else { return false }
         switch record.persistence {
         case .deleting, .deleted: return false
         case .clean, .debouncing, .saving: return true
@@ -198,8 +203,57 @@ final class ChatManager {
             }
         }
         records = loaded
+        do { try await recoverConversations(in: scope) }
+        catch { Log.session.error("ChatManager.recovery blocked error=\(error.localizedDescription)") }
         Log.session.info("ChatManager.loadSummaries count=\(summaries.count) preserved=\(preserved) generation=\(scope.generation)")
         if case .deferred(let id, _) = selection { open(id.rawValue) }
+    }
+
+    private func recoverConversations(in scope: ProfileScope) async throws {
+        if let pending = recoveryPreparation, pending.scope == scope { return try await pending.task.value }
+        let task = Task<Void, Error> { @MainActor [weak self] in
+            guard let self else { throw CancellationError() }
+            let plan = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
+            let pending = (plan.objectValue?["tasks"]?.arrayValue ?? []) + (plan.objectValue?["submissions"]?.arrayValue ?? [])
+            var chats: [Int: Chat] = [:]
+            for item in pending {
+                guard let value = item.objectValue?["reference"] else { throw RuntimeError.bridge("Missing recovery conversation scope") }
+                let reference = try JSONDecoder().decode(DurableConversationReference.self, from: Data(value.jsonString().utf8))
+                guard reference.profileID == scope.profileID, repositoryScope == scope else { throw CancellationError() }
+                if chats[reference.conversationID] != nil { continue }
+                let chat: Chat
+                if let hydrated = await hydrate(reference.compatibilityID) { chat = hydrated }
+                else {
+                    guard let loaded = await repository.loadChat(reference.compatibilityID, in: scope) else {
+                        throw RuntimeError.bridge("Recovered conversation is unavailable; Profile progress remains paused")
+                    }
+                    chat = restoredChat(from: loaded, in: scope)
+                    hydrationOrdinal &+= 1
+                    records[reference.compatibilityID] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
+                }
+                try await chat.prepareDurableRecovery()
+                chats[reference.conversationID] = chat
+            }
+            let admission = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("recoveryPlan")]))
+            guard admission.objectValue?["unconfigured"]?.arrayValue?.isEmpty == true else {
+                throw RuntimeError.bridge("Recovered native configuration is unavailable; no tasks were resumed")
+            }
+            var submissions: [Int: (id: Int, requestID: String?)] = [:]
+            for item in admission.objectValue?["submissions"]?.arrayValue ?? [] {
+                guard let fields = item.objectValue, let id = fields["submissionID"]?.intValue,
+                      let conversationID = fields["reference"]?.objectValue?["conversationID"]?.intValue else { continue }
+                if id > (submissions[conversationID]?.id ?? -1) { submissions[conversationID] = (id, fields["requestID"]?.stringValue) }
+            }
+            for (conversationID, submission) in submissions {
+                chats[conversationID]?.resumeDurableSubmission(submission.id, requestID: submission.requestID)
+            }
+            if submissions.isEmpty, let chat = chats.values.first, let reference = chat.conversationReference {
+                _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("resume"), "reference": reference.value]))
+            }
+            Log.session.info("ChatManager.recovery attached=\(chats.count) submissions=\(submissions.count)")
+        }
+        recoveryPreparation = (scope, task)
+        try await task.value
     }
 
     @discardableResult
@@ -298,11 +352,11 @@ final class ChatManager {
     }
 
     func toggleTemporaryChat() {
-        guard let chat = current, chat.toggleRetention() else { return }
-        attachPersistence(chat)
-        if chat.isTemporary, let caseID = OxHostProtocol.durableTemporarySessionID {
-            chat.durablePreparation = Task { try await OxHostProtocol.prepareDurableTemporaryChat(chat, caseID: caseID) }
-        }
+        guard let previous = current, previous.transcript.isEmpty, previous.queuedMessages.isEmpty, !previous.isBusy else { return }
+        let chat = makeChat(retention: previous.isTemporary ? .persisted : .temporary)
+        hydrationOrdinal &+= 1
+        records[ChatID(chat.id)] = Record(chat: chat, accessOrdinal: hydrationOrdinal)
+        setCurrent(chat)
         Log.session.info("ChatManager.retention chat=\(chat.id) temporary=\(chat.isTemporary)")
     }
 
@@ -344,7 +398,7 @@ final class ChatManager {
     }
 
     func open(_ rawID: UUID) {
-        let id = ChatID(rawID)
+        let id = canonicalID(rawID)
         if let chat = records[id]?.hydration.chat {
             touch(id)
             setCurrent(chat)
@@ -372,7 +426,7 @@ final class ChatManager {
         ensureRepositoryScope()
         let scope = repositoryScope
         let storageScope = storage.scope
-        let id = ChatID(rawID)
+        let id = canonicalID(rawID)
         guard contains(rawID), let chat = await hydrate(id),
               scope == repositoryScope, storageScope == storage.scope, contains(rawID) else {
             throw RuntimeError.bridge("chat unavailable: \(rawID)")
@@ -419,7 +473,8 @@ final class ChatManager {
     }
 
     @discardableResult
-    func branch(from chat: Chat, atBlock blockID: UUID) -> Chat? {
+    func branch(from chat: Chat, atBlock blockID: UUID, submit: Bool = true) -> Chat? {
+        guard let reference = chat.conversationReference else { Log.session.error("ChatManager.branch requires a qualified persisted conversation"); return nil }
         guard let result = chat.branchSnapshot(at: blockID) else {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
             return nil
@@ -439,16 +494,15 @@ final class ChatManager {
             presentations: presentations,
             serviceManager: serviceManager
         )
+        branched.durableForkSource = (reference, result.turns.filter { if case .user = $0 { return true }; return false }.count)
         attachPersistence(branched)
         hydrationOrdinal &+= 1
         records[ChatID(branched.id)] = Record(chat: branched, accessOrdinal: hydrationOrdinal)
         if branched.state.turns != result.turns { persist(branched) }
         setCurrent(branched)
-        branched.enqueue(
-            result.intent,
-            attachments: result.attachments,
-            skillInvocation: result.skillInvocation
-        )
+        if submit {
+            branched.enqueue(result.intent, attachments: result.attachments, skillInvocation: result.skillInvocation)
+        }
         return branched
     }
 
@@ -706,6 +760,33 @@ final class ChatManager {
 
     private func attachPersistence(_ chat: Chat) {
         chat.chatManager = self
+        chat.durablePreparation = Task { @MainActor [weak self, weak chat] in
+            guard let self, let chat else { throw CancellationError() }
+            if chat.isTemporary {
+                try await OxHostProtocol.prepareDurableTemporaryChat(chat, caseID: OxHostProtocol.durableTemporarySessionID ?? UUID())
+            } else {
+                let oldID = ChatID(chat.id)
+                let reference: DurableConversationReference
+                if let existing = try? DurableProfileStore.shared.reference(for: oldID, in: chat.scope) { reference = existing }
+                else if let origin = chat.durableForkSource {
+                    reference = try await DurableProfileStore.shared.fork(in: chat.scope, from: origin.reference,
+                        beforeUser: origin.users, title: chat.metadata.title)
+                    chat.durableForkSource = nil
+                } else { reference = try await DurableProfileStore.shared.create(in: chat.scope) }
+                try Task.checkCancellation()
+                let session = try await DurableProfileStore.shared.session(in: chat.scope)
+                try await chat.installDurableDriver(DurableAgentDriver(runtime: session.runtime, host: session.host,
+                    chatID: reference.compatibilityID.rawValue, scope: chat.scope, runtimeProfileID: reference.profileID,
+                    artifactScope: chat.scope, reference: reference.value), reference: reference)
+                if oldID != reference.compatibilityID, var record = records.removeValue(forKey: oldID) {
+                    if case .debouncing(_, let task) = record.persistence { task.cancel() }
+                    record.persistence = .clean
+                    records[reference.compatibilityID] = record
+                }
+                persist(chat)
+            }
+            chat.durablePreparation = nil
+        }
         if !chat.isTemporary {
             chat.onPersistableChange = { [weak self, weak chat] in
                 guard let self, let chat else { return }
@@ -726,7 +807,7 @@ final class ChatManager {
     }
 
     private func persist(_ chat: Chat) {
-        guard !chat.isTemporary, !chat.transcript.isEmpty else { return }
+        guard !chat.isTemporary, chat.conversationReference != nil, !chat.transcript.isEmpty else { return }
         enqueue(ChatSaveRequest(payload: .chat(chat.state)))
     }
 

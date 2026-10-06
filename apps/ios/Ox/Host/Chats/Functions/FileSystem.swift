@@ -31,7 +31,7 @@ extension Chat {
                 }
                 items = rootItems
             case .artifacts:
-                items = await repository.artifacts(in: scope).map {
+                items = try await repository.artifacts(in: scope).map {
                     fileSystemItem(path: "artifacts/\($0.fileName)", type: "file", size: $0.size)
                 }
             case .skills:
@@ -663,7 +663,7 @@ extension Chat {
         case .root, .memory, .soul, .artifacts, .skills, .services:
             break
         }
-        let artifacts = await repository.artifacts(in: scope).map { "artifacts/\($0.fileName)" }
+        let artifacts = try await repository.artifacts(in: scope).map { "artifacts/\($0.fileName)" }
         let skills = try await skillsMount.entries().flatMap { skill in
             [skill.filePath] + skill.resources.map(skill.resourcePath)
         }

@@ -434,14 +434,14 @@ nonisolated struct UserMessageParts {
                 textParts.append(ArtifactPromptReference.text(for: a))
                 switch a.kind {
                 case .text, .html:
-                    if let raw = try? String(contentsOf: a.fileURL, encoding: .utf8) {
+                    if let data = try? ProviderArtifactInputs.read(a), let raw = String(data: data, encoding: .utf8) {
                         let lang = Self.languageHint(for: a.fileURL.pathExtension)
                         textParts.append("```\(lang) filename=\(a.displayName)\n\(raw)\n```")
                     } else {
                         Log.network.error("\(label): failed to read text attachment \(a.fileURL.lastPathComponent)")
                     }
                 case .image, .pdf:
-                    if let data = try? Data(contentsOf: a.fileURL) {
+                    if let data = try? ProviderArtifactInputs.read(a) {
                         media.append((a, data))
                     } else {
                         Log.network.error("\(label): failed to read \(a.kind.rawValue) attachment \(a.fileURL.lastPathComponent)")
@@ -526,7 +526,7 @@ nonisolated struct ToolResultParts {
                   !media.contains(where: {
                       $0.displayName.caseInsensitiveCompare(attachment.fileName) == .orderedSame
                   }) else { return }
-            guard let data = try? Data(contentsOf: attachment.fileURL) else {
+            guard let data = try? ProviderArtifactInputs.read(attachment) else {
                 Log.network.error("\(label): failed to read \(attachment.kind.rawValue) tool result \(attachment.fileURL.lastPathComponent)")
                 return
             }

@@ -25,6 +25,12 @@ extension OxHostProtocol {
         _ = try await DurableChatController.attach(chat, caseID: caseID, artifactFiles: true)
     }
 
+    @MainActor
+    static func releaseDurableTemporaryChat(_ chat: Chat) async {
+        await chat.agent.waitForIdle()
+        await DurableChatController.release(chat)
+    }
+
     #if DEBUG && targetEnvironment(simulator)
     @MainActor
     static func handleDurableChat(_ request: DurableChatRequest, chats: ChatManager, reply: OxHostRPC.Reply) {
@@ -83,6 +89,21 @@ private enum DurableChatController {
         session.chats[chat.id] = chat; sessions[caseID] = session
         Log.agent.info("PiDurable rollout attached chat=\(chat.id) case=\(caseID) profile=\(chat.scope.profileID?.uuidString ?? "nil")")
         return .object(["attached": .bool(true), "chatID": .string(chat.id.uuidString)])
+    }
+
+    static func release(_ chat: Chat) async {
+        guard let entry = sessions.first(where: { $0.value.chats[chat.id] != nil }) else { return }
+        var session = entry.value
+        session.chats[chat.id] = nil
+        await session.host.unbind(chatID: chat.id.uuidString)
+        if !session.chats.isEmpty { sessions[entry.key] = session; return }
+        session.closing = true; sessions[entry.key] = session
+        do {
+            _ = try await session.runtime.command(JSONValue.object(["action": .string("close")]).jsonString())
+            await session.runtime.dispose()
+            sessions.removeValue(forKey: entry.key)
+            if entry.key != OxHostProtocol.durableTemporarySessionID, let root = session.artifactScope?.root { try FileManager.default.removeItem(at: root) }
+        } catch { Log.agent.error("PiDurable temporary close failed=\(error.localizedDescription)") }
     }
 
     #if DEBUG && targetEnvironment(simulator)

@@ -2,12 +2,13 @@ import type { Api, AssistantMessage, AssistantMessageEvent, Model, SimpleStreamO
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import { native } from "./bridge";
+import type { ConversationReference } from "../../core/conversations";
 
 export const emptyUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
 
 /** Swift's contract has a leading prompt/tools, not positional system messages. Use Pi's specified collapse semantics. */
-export function nativeStream(chatID: string, model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions) {
+export function nativeStream(chatID: string, model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions, reference?: ConversationReference) {
   const output = createAssistantMessageEventStream();
   let terminal = false;
   let partial: AssistantMessage = { role: "assistant", api: model.api, provider: model.provider, model: model.id,
@@ -15,8 +16,10 @@ export function nativeStream(chatID: string, model: Model<Api>, transcript: Tran
   void (async () => {
     try {
       if (options?.deferred) throw new Error("Native deferred generation is unsupported");
-      await native("nativeModel", { chatID, systemPrompt: getCurrentSystemPrompt(transcript.messages),
-        tools: getCurrentTools(transcript.messages), messages: transcript.messages.filter(message => message.role !== "system") },
+      const tools = getCurrentTools(transcript.messages);
+      const purpose = options?.cacheRetention === "none" && tools.length === 0 ? "compaction" : "generation";
+      await native("nativeModel", { chatID, reference, purpose, streamOptions: { maxTokens: options?.maxTokens, cacheRetention: options?.cacheRetention },
+        systemPrompt: getCurrentSystemPrompt(transcript.messages), tools, messages: transcript.messages.filter(message => message.role !== "system") },
       options?.signal, value => {
         const event = value as AssistantMessageEvent;
         if (terminal) {

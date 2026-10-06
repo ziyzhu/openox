@@ -38,6 +38,11 @@ public actor Agent {
         durableDriver = driver
     }
 
+    nonisolated private enum DurableOperation: Sendable {
+        case run(AgentRunRequest)
+        case resume(submissionID: Int, requestID: String?)
+    }
+
     private var lastTurnTokens = 0
     private var activeRun: (id: UUID, task: Task<AgentRunResult, Never>)?
     public var isStreaming: Bool { runState != .idle }
@@ -106,12 +111,30 @@ public actor Agent {
         abort()
     }
 
+    func prepareDurableConfiguration() async throws {
+        try Task.checkCancellation()
+        guard activeRun == nil else { throw AgentRunError.busy }
+        guard let driver = durableDriver else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
+        _ = try await driver.prepare(configuration: configuration) { [weak self] event in
+            await self?.emit(event)
+        }
+    }
+
+    func resumeDurable(submissionID: Int, requestID: String? = nil) async throws -> AgentRunResult {
+        try await start(.resume(submissionID: submissionID, requestID: requestID))
+    }
+
     public func run(_ request: AgentRunRequest) async throws -> AgentRunResult {
+        try await start(.run(request))
+    }
+
+    private func start(_ operation: DurableOperation) async throws -> AgentRunResult {
         try Task.checkCancellation()
         guard activeRun == nil else {
             Log.agent.error("Agent.run rejected: run is active")
             throw AgentRunError.busy
         }
+        guard let driver = durableDriver else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
         runState = .running
         errorMessage = nil
         failureKind = nil
@@ -119,7 +142,7 @@ public actor Agent {
         pendingToolCalls = []
         let runID = UUID()
         let initialConfiguration = configuration
-        let task = Task { await execute(request, configuration: initialConfiguration) }
+        let task = Task { await execute(operation, configuration: initialConfiguration, driver: driver) }
         activeRun = (runID, task)
         return await withTaskCancellationHandler {
             await task.value
@@ -134,21 +157,24 @@ public actor Agent {
     }
 
     private func execute(
-        _ request: AgentRunRequest,
-        configuration: AgentConfiguration
+        _ operation: DurableOperation,
+        configuration: AgentConfiguration,
+        driver: DurableAgentDriver
     ) async -> AgentRunResult {
         let result: AgentRunResult
-        if let durableDriver {
-            do {
-                result = try await durableDriver.run(request, configuration: configuration, seed: messages) { [weak self] event in
-                    await self?.emit(event)
-                }
-            } catch {
-                result = AgentRunResult(outcome: Task.isCancelled ? .aborted : .failed(message: error.localizedDescription, kind: llmFailureKind(error: error)),
-                                        messages: messages, lastTurnTokens: lastTurnTokens)
+        do {
+            let sink: DurableAgentHost.EventSink = { [weak self] event in
+                await self?.emit(event)
             }
-        } else {
-            result = await runLegacy(request, configuration: configuration)
+            switch operation {
+            case .run(let request):
+                result = try await driver.run(request, configuration: configuration, seed: [], emit: sink)
+            case .resume(let submissionID, let requestID):
+                result = try await driver.resume(submissionID: submissionID, requestID: requestID, configuration: configuration, emit: sink)
+            }
+        } catch {
+            result = AgentRunResult(outcome: Task.isCancelled ? .aborted : .failed(message: error.localizedDescription, kind: llmFailureKind(error: error)),
+                                    messages: messages, lastTurnTokens: lastTurnTokens)
         }
         messages = result.messages
         errorMessage = result.errorMessage
@@ -160,38 +186,6 @@ public actor Agent {
         activeRun = nil
         emit(.runFinished(result))
         return result
-    }
-
-    // Compatibility boundary until persisted chats enter through the StorageMigrator gate.
-    // No legacy snapshots, queues or compaction configuration are built on the Pi path.
-    private func runLegacy(_ request: AgentRunRequest, configuration: AgentConfiguration) async -> AgentRunResult {
-        let config = AgentRunConfig(
-            turnID: request.turnID,
-            snapshot: makeTurnSnapshot(messages: messages, configuration: configuration),
-            transformContext: configuration.transformContext,
-            beforeToolCall: configuration.beforeToolCall,
-            afterToolCall: configuration.afterToolCall,
-            shouldStopAfterTurn: configuration.shouldStopAfterTurn,
-            toolExecutionMode: configuration.toolExecutionMode,
-            priorTurnTokens: lastTurnTokens,
-            refreshSnapshot: { [weak self] messages in await self?.makeTurnSnapshot(messages: messages) }
-        )
-        return await LogContext.$turnID.withValue(request.turnID) {
-            await AgentRunner.run(newMessages: request.messages, config: config) { [weak self] event in
-                await self?.emit(event)
-            }
-        }
-    }
-
-    private func makeTurnSnapshot(messages: [Message], configuration: AgentConfiguration? = nil) -> AgentTurnSnapshot {
-        let configuration = configuration ?? self.configuration
-        return AgentTurnSnapshot(
-            context: AgentContext(systemPrompt: configuration.systemPrompt, messages: messages, tools: configuration.tools),
-            client: configuration.client,
-            model: configuration.model,
-            streamOptions: configuration.streamOptions,
-            compactionThreshold: configuration.compactionThreshold
-        )
     }
 
     private func emit(_ event: AgentEvent) {

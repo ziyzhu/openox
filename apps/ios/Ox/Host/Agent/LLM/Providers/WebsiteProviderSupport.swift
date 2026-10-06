@@ -123,10 +123,10 @@ nonisolated enum WebsiteProviderPrompt {
                 case .toolCall(let call):
                     return WebsiteToolContract.text(for: call)
                 case .attachment(let artifact):
-                    guard artifact.exists, let size = artifact.size, size <= ArtifactLimits.fileBytes else {
-                        throw WebsiteProviderError("Attachment is unavailable or too large: \(artifact.displayName)", kind: .unsupportedInput)
+                    let data = try ProviderArtifactInputs.read(artifact)
+                    guard data.count <= ArtifactLimits.fileBytes else {
+                        throw WebsiteProviderError("Attachment is too large: \(artifact.displayName)", kind: .unsupportedInput)
                     }
-                    let data = try Data(contentsOf: artifact.fileURL)
                     return try attachmentReference(data: data, name: artifact.displayName, mimeType: artifact.mimeType,
                                                    inlineText: artifact.kind == .text || artifact.kind == .html, attachments: &attachments)
                 }

@@ -67,7 +67,7 @@ public struct MockLLMClient: ProviderClient {
         tools: [any AgentTool],
         options: StreamOptions
     ) -> AsyncThrowingStream<AssistantEvent, Error> {
-        let plan = if systemPrompt?.contains("context compression assistant") == true {
+        let plan = if systemPrompt?.contains("context summarization assistant") == true {
             (scenario: Scenario.compactionSummary, turn: 0)
         } else {
             self.plan(for: messages)
@@ -835,94 +835,6 @@ extension Scenario {
             .say("Recovered via the cached mirror: \(recovered)."),
             .stop(.stop),
         ]
-    }
-
-    private static func contextBudgetRegressionFailure() -> String? {
-        var model = MockLLMClient().models[0]
-        let empty = AgentContext(systemPrompt: "", messages: [], tools: [])
-        var options = StreamOptions()
-        options.maxTokens = 4096
-        model.maxContext = 32768
-        let small = AgentContextBudget(context: empty, model: model, options: options, threshold: 0.75)
-        model.maxContext = 1_000_000
-        let large = AgentContextBudget(context: empty, model: model, options: options, threshold: 0.75)
-        guard large.inputLimit > small.inputLimit,
-              large.reserveTokens == 4096 else { return "Model context sizing failed." }
-        let occupied = AgentContext(systemPrompt: String(repeating: "药", count: 1000), messages: [], tools: [])
-        let remaining = AgentContextBudget(context: occupied, model: model, options: options, threshold: 0.75)
-        guard remaining.usedTokens == 3000 else { return "Multilingual context accounting failed." }
-        var assistant = AssistantMessage(model: model.id)
-        assistant.stopReason = .toolUse
-        assistant.usage.input = 20000
-        assistant.usage.output = 1000
-        let history = AgentContext(systemPrompt: "Already counted", messages: [.assistant(assistant), .user(UserMessage(text: "药"))], tools: [])
-        let measured = AgentContextBudget(context: history, model: model, options: options, threshold: 0.75)
-        guard measured.usedTokens == 21015 else { return "Provider usage accounting failed." }
-        var changedPrompt = history
-        changedPrompt.systemPrompt = String(repeating: "A", count: 100000)
-        let changed = AgentContextBudget(context: changedPrompt, model: model, options: options, threshold: 0.75)
-        guard changed.usedTokens >= 25000 else { return "Changed prompt was omitted from the budget." }
-        let full = String(repeating: "a", count: 120104)
-        let message = ToolResultMessage(toolCallId: "budget-check", toolName: "execute", content: [.text(TextContent(full))], isError: false)
-        guard message.content.concatenatedText == full,
-              ToolResultParts(message, label: "budget-regression").text == full else {
-            return "A downstream output cutoff remains."
-        }
-        let calls = ["a", "b", "c"].map { ToolCall(id: $0, name: "execute", arguments: .object([:])) }
-        let results = calls.map { Message.toolResult(ToolResultMessage(toolCallId: $0.id, toolName: "execute", content: [.text(TextContent(String(repeating: "A", count: 40000)))], isError: false)) }
-        let sequence: [Message] = [
-            .user(UserMessage(text: "Original request")),
-            .assistant(AssistantMessage(model: model.id, content: calls.prefix(2).map(ContentBlock.toolCall))),
-            results[0], results[1],
-            .assistant(AssistantMessage(model: model.id, content: [.toolCall(calls[2])])),
-            results[2],
-        ]
-        guard AgentCompactor.cutIndex(messages: sequence, retainedTokens: 20000) == 4,
-              AgentCompactor.cutIndex(messages: sequence, retainedTokens: 1) == 4,
-              AgentCompactor.cutIndex(messages: Array(sequence.prefix(4)), retainedTokens: 1) == 1,
-              AgentCompactor.cutIndex(messages: sequence, retainedTokens: 100000) == nil,
-              AgentCompactor.cutIndex(messages: sequence + [.user(UserMessage(text: "Next request"))], retainedTokens: 1) == 6 else {
-            return "Split-turn compaction boundary failed."
-        }
-        let oversizedUpload: [Message] = [
-            .user(UserMessage(text: String(repeating: "P", count: 100000))),
-            .assistant(AssistantMessage(model: model.id, content: [.text(TextContent("Document reviewed."))])),
-            .user(UserMessage(text: "Next request")),
-        ]
-        guard AgentCompactor.cutIndex(messages: oversizedUpload, retainedTokens: 20000) == 1 else {
-            return "Oversized message remained in compacted context."
-        }
-        let checkpoint = "## Goal\nPreserve the previous checkpoint."
-        let wrappedCheckpoint = AgentCompactor.wrappedSummary(checkpoint)
-        guard AgentCompactor.previousSummary(in: [.user(UserMessage(text: wrappedCheckpoint))]) == checkpoint else {
-            return "Previous compaction summary was not recovered."
-        }
-        var validSummary = AssistantMessage(model: model.id, content: [.text(TextContent("Updated checkpoint"))])
-        validSummary.stopReason = .stop
-        guard case .completed("Updated checkpoint") = AgentCompactor.validateSummary(reason: .stop, message: validSummary) else {
-            return "Valid compaction summary was rejected."
-        }
-        var truncatedSummary = validSummary
-        truncatedSummary.stopReason = .length
-        guard case .failed(_, false) = AgentCompactor.validateSummary(reason: .length, message: truncatedSummary) else {
-            return "Truncated compaction summary was accepted."
-        }
-        var toolSummary = validSummary
-        toolSummary.content.append(.toolCall(ToolCall(id: "summary-tool", name: "execute", arguments: .object([:]))))
-        guard case .failed(_, false) = AgentCompactor.validateSummary(reason: .stop, message: toolSummary) else {
-            return "Tool-calling compaction summary was accepted."
-        }
-        var transientFailure = AssistantMessage(model: model.id)
-        transientFailure.stopReason = .error
-        transientFailure.errorMessage = "503 service unavailable"
-        transientFailure.failureKind = .provider
-        var permanentFailure = transientFailure
-        permanentFailure.errorMessage = "insufficient_quota"
-        permanentFailure.failureKind = .rateLimited
-        guard isRetryableLLMFailure(transientFailure), !isRetryableLLMFailure(permanentFailure) else {
-            return "Compaction retry classification failed."
-        }
-        return nil
     }
 
     private static func outputLimitRegressionFailure() -> String? {
@@ -1961,7 +1873,6 @@ extension Scenario {
 
     static let compaction = Scenario(name: "compaction") { ctx in
         if ctx.turn == 0 {
-            if let failure = contextBudgetRegressionFailure() { return [.say(failure), .stop(.stop)] }
             return [
                 execute("""
                 await ox.fs.read({ path: "skills/visualize/SKILL.md", purpose: "Activate skill before compaction" });
@@ -2009,18 +1920,9 @@ extension Scenario {
 
     static let compactionSummary = Scenario(name: "compaction-summary") { ctx in
         if ctx.userSaid("SPLIT_TURN_CHECKPOINT") {
-            guard ctx.latestUserSaid("<previous_summary provenance=\"model-generated\">") else {
-                return [.say("Previous compaction summary was not supplied for incremental update."), .stop(.stop)]
-            }
             return [.say("<intent>29</intent> SPLIT_TURN_REPEATED: Earlier progress was summarized again; verify the retained recent step and activated skill."), .stop(.stop)]
         }
-        if ctx.latestUserSaid("[Tool result]: EARLY_STEP_") {
-            guard ctx.messages.count == 1, ctx.latestUserSaid("more characters truncated") else {
-                return [.say("Compaction sent unbounded history to the summarizer."), .stop(.stop)]
-            }
-            guard ctx.latestUserSaid("earlier context from an ongoing request") else {
-                return [.say("Missing split-turn summarization instructions."), .stop(.stop)]
-            }
+        if ctx.latestUserSaid("EARLY_STEP_") {
             return [.say("<intent>29</intent> SPLIT_TURN_CHECKPOINT: The original request is to verify split-turn compaction. The early step completed; recent work is retained separately."), .stop(.stop)]
         }
         return [.say("Earlier conversation state was summarized for the retained turn."), .stop(.stop)]

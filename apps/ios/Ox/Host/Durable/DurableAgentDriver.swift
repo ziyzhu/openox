@@ -1,34 +1,66 @@
 import Foundation
+import UniformTypeIdentifiers
 
-/// Native capability adapter. The only agent loop on this path is Pi's committed task scheduler.
 actor DurableAgentHost {
     typealias EventSink = @Sendable (AgentEvent) async -> Void
-    private struct Binding {
+    nonisolated private struct ToolGeneration: Sendable {
+        let context: AgentContext
+        let assistant: AssistantMessage
+        let committedAssistant: AssistantMessage
+        let calls: [String: ToolCall]
+        let inputs: ProviderArtifactInputs
+    }
+    nonisolated private struct ToolHydration: Sendable {
+        let id: UUID
+        let assistantEntryID: Int
+        let task: Task<ToolGeneration, Error>
+    }
+    nonisolated private struct Binding: Sendable {
         let scope: ProfileScope
         let configuration: AgentConfiguration
         let emit: EventSink
+        weak var runtime: DurableRuntime?
         let runtimeProfileID: String?
         let artifactScope: ProfileScope?
+        let isolatedWorkspace: Bool
         var conversationID: Int?
+        var context: AgentContext?
+        var providerInputs: ProviderArtifactInputs?
+        var toolHydration: ToolHydration?
+        var modelAssistant: AssistantMessage?
         var assistant: AssistantMessage?
         var calls: [String: ToolCall] = [:]
+        var results: [ToolResultMessage] = []
     }
     private var bindings: [String: Binding] = [:]
-    func bind(chatID: String, scope: ProfileScope, configuration: AgentConfiguration, runtimeProfileID: String? = nil, artifactScope: ProfileScope? = nil, emit: @escaping EventSink) {
+
+    func bind(chatID: String, scope: ProfileScope, configuration: AgentConfiguration, runtime: DurableRuntime,
+              runtimeProfileID: String? = nil, artifactScope: ProfileScope? = nil, isolatedWorkspace: Bool, emit: @escaping EventSink) throws {
+        guard configuration.shouldStopAfterTurn == nil else {
+            throw RuntimeError.bridge("Pi Durable does not support shouldStopAfterTurn; remove the hook before running")
+        }
         let previous = bindings[chatID]
-        bindings[chatID] = Binding(scope: scope, configuration: configuration, emit: emit, runtimeProfileID: runtimeProfileID, artifactScope: artifactScope,
-                                   conversationID: previous?.runtimeProfileID == runtimeProfileID ? previous?.conversationID : nil)
+        if let previous, previous.scope != scope || previous.runtimeProfileID != runtimeProfileID || previous.artifactScope != artifactScope || previous.isolatedWorkspace != isolatedWorkspace {
+            throw RuntimeError.bridge("Native conversation cannot change its immutable Profile route")
+        }
+        previous?.toolHydration?.task.cancel()
+        bindings[chatID] = Binding(scope: scope, configuration: configuration, emit: emit, runtime: runtime,
+                                   runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedWorkspace: isolatedWorkspace,
+                                   conversationID: previous?.conversationID)
     }
+
     func expectReference(chatID: String, reference: JSONValue) throws {
         guard let binding = bindings[chatID], let fields = reference.objectValue,
               let profileID = fields["profileID"]?.stringValue, let conversationID = fields["conversationID"]?.intValue,
-              conversationID >= 0, binding.runtimeProfileID == nil || binding.runtimeProfileID == profileID,
+              (0...9_007_199_254_740_991).contains(conversationID), binding.runtimeProfileID == nil || binding.runtimeProfileID == profileID,
               binding.conversationID == nil || binding.conversationID == conversationID else {
             throw RuntimeError.bridge("Native conversation reference does not match its immutable route")
         }
         bindings[chatID]?.conversationID = conversationID
     }
-    func unbind(chatID: String) { bindings.removeValue(forKey: chatID) }
+
+    func unbind(chatID: String) { bindings.removeValue(forKey: chatID)?.toolHydration?.task.cancel() }
+
     func failure(chatID: String) -> (String, LLMFailureKind?)? {
         guard let assistant = bindings[chatID]?.assistant else { return nil }
         if assistant.stopReason == .aborted { return ("aborted", nil) }
@@ -37,42 +69,63 @@ actor DurableAgentHost {
 
     func handle(_ method: String, _ params: JSONValue, stream: @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue {
         guard let fields = params.objectValue, let chatID = fields["chatID"]?.stringValue,
-              let binding = bindings[chatID] else { throw RuntimeError.bridge("Native conversation is not attached") }
+              let binding = bindings[chatID], let runtime = binding.runtime else { throw RuntimeError.bridge("Native conversation is not attached") }
         if method != "agentEvents", StorageRoot.currentScope != binding.scope {
             throw RuntimeError.bridge("Native capability belongs to a stale Profile scope; reacquire its runtime")
         }
+        if let profileID = binding.runtimeProfileID {
+            let reference = fields["reference"]?.objectValue
+            guard reference?["profileID"]?.stringValue == profileID,
+                  binding.conversationID == nil || reference?["conversationID"]?.intValue == binding.conversationID else {
+                throw RuntimeError.bridge("Native capability belongs to another Profile/conversation route")
+            }
+        }
         switch method {
         case "agentEvents":
-            if let profileID = binding.runtimeProfileID {
-                let reference = fields["reference"]?.objectValue
-                guard reference?["profileID"]?.stringValue == profileID,
-                      binding.conversationID == nil || reference?["conversationID"]?.intValue == binding.conversationID else {
-                    throw RuntimeError.bridge("Committed events belong to another Profile/conversation route")
-                }
-            }
-            let eventCount = fields["events"]?.arrayValue?.count ?? 0
-            Log.agent.debug("PiDurable committed events chat=\(chatID) count=\(eventCount)")
+            Log.agent.debug("PiDurable committed events chat=\(chatID) count=\(fields["events"]?.arrayValue?.count ?? 0)")
             for event in fields["events"]?.arrayValue ?? [] { try await receive(event, chatID: chatID) }
             return .null
         case "nativeModel":
             let config = binding.configuration
-            var messages = try (fields["messages"]?.arrayValue ?? []).map { try DurableMessageCodec.decode($0, scope: binding.scope, artifactScope: binding.artifactScope) }
-            if let transform = config.transformContext {
+            let compaction = fields["purpose"]?.stringValue == "compaction"
+            var options = config.streamOptions
+            if fields["streamOptions"]?.objectValue?["cacheRetention"]?.stringValue == "none" { options.promptCachePolicy = .disabled }
+            if let maxTokens = fields["streamOptions"]?.objectValue?["maxTokens"]?.intValue, maxTokens > 0 { options.maxTokens = maxTokens }
+            let inputs = ProviderArtifactInputs()
+            defer { withExtendedLifetime(inputs) {} }
+            var messages: [Message] = []
+            for value in fields["messages"]?.arrayValue ?? [] {
+                messages.append(try await DurableMessageCodec.decodeModel(value, scope: binding.scope,
+                    artifactScope: binding.artifactScope, runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs))
+            }
+            if !compaction, let transform = config.transformContext {
                 messages = await transform(TransformContextRequest(messages: messages, model: config.model))
             }
+            try ProviderArtifactInputs.validate(messages)
             if let error = modelInputCompatibilityError(messages: messages, model: config.model) { throw RuntimeError.bridge(error.message) }
+            let systemPrompt = fields["systemPrompt"]?.stringValue
+            if !compaction {
+                bindings[chatID]?.toolHydration?.task.cancel()
+                bindings[chatID]?.toolHydration = nil
+                bindings[chatID]?.context = AgentContext(systemPrompt: systemPrompt ?? "", messages: messages, tools: config.tools)
+                bindings[chatID]?.providerInputs = inputs
+                bindings[chatID]?.modelAssistant = nil
+            }
             let tools = (fields["tools"]?.arrayValue ?? []).map { value -> ToolSchema in
                 let tool = value.objectValue ?? [:]
                 return ToolSchema(name: tool["name"]?.stringValue ?? "", description: tool["description"]?.stringValue ?? "",
-                                  parameters: tool["parameters"] ?? .object([:]))
+                                  parameters: tool["parameters"] ?? .object([:]),
+                                  strict: config.tools.first(where: { $0.name == tool["name"]?.stringValue })?.strict ?? true)
             }
-            let response = config.client.stream(model: config.model, systemPrompt: fields["systemPrompt"]?.stringValue,
+            let response = config.client.stream(model: config.model, systemPrompt: systemPrompt,
                                                 messages: messages, tools: config.client.supportsTools(for: config.model) ? tools : [],
-                                                options: config.streamOptions)
-            Log.agent.info("PiDurable native model start chat=\(chatID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count)")
+                                                options: options)
+            let media = inputs.footprint
+            Log.agent.info("PiDurable native model start chat=\(chatID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count) mediaFiles=\(media.files) mediaBytes=\(media.bytes)")
             for try await event in response {
                 try Task.checkCancellation()
-                if case .done(_, let assistant) = event {
+                if !compaction, case .done(_, let assistant) = event {
+                    bindings[chatID]?.modelAssistant = assistant
                     for block in assistant.content {
                         if case .toolCall(let call) = block { bindings[chatID]?.calls[call.id] = call }
                     }
@@ -82,33 +135,147 @@ actor DurableAgentHost {
             Log.agent.info("PiDurable native model complete chat=\(chatID) provider=\(config.client.id)")
             return .null
         case "nativeTool":
+            let binding = binding.toolHydration != nil || binding.context == nil || binding.modelAssistant == nil
+                ? try await hydrateToolGeneration(fields, chatID: chatID, binding: binding, runtime: runtime) : binding
             guard let name = fields["name"]?.stringValue, let callID = fields["callID"]?.stringValue,
-                  let tool = binding.configuration.tools.first(where: { $0.name == name }) else {
-                throw RuntimeError.bridge("Native capability is not registered for this conversation")
+                  let context = binding.context, let assistant = binding.modelAssistant,
+                  let call = binding.calls[callID], call.name == name,
+                  let arguments = fields["arguments"], call.arguments == arguments else {
+                throw RuntimeError.bridge("Native tool call does not match its provider generation")
+            }
+            if let storedCall = fields["toolCall"],
+               try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, artifactScope: binding.artifactScope) != call {
+                throw RuntimeError.bridge("Native tool call does not match its authoritative Pi call")
             }
             try Task.checkCancellation()
-            let result = try await tool.execute(toolCallId: callID, args: fields["arguments"] ?? .object([:]))
-            guard result.transientAttachments.isEmpty else {
-                throw RuntimeError.bridge("Transient media translation is not yet enabled in this durable rollout; the native effect may have completed. Inspect before retrying.")
+            var toolContext = context
+            toolContext.messages.append(.assistant(assistant))
+            let (message, terminate) = await AgentToolExecutor.execute(call, assistantMessage: assistant, context: toolContext,
+                beforeToolCall: binding.configuration.beforeToolCall, afterToolCall: binding.configuration.afterToolCall)
+            if terminate, assistant.content.filter({ if case .toolCall = $0 { return true }; return false }).count > 1 {
+                throw RuntimeError.bridge("Pi Durable cannot terminate a multi-tool round from one native result; the effect may have completed. Inspect before retrying")
             }
-            let message = ToolResultMessage(toolCallId: callID, providerCallID: binding.calls[callID]?.providerCallID, toolName: name, content: result.content,
-                                            diagnostics: result.diagnostics, isError: result.isError, truncated: result.truncated,
-                                            activatedSkills: result.activatedSkills)
-            var value: [String: JSONValue] = ["content": .array(DurableMessageCodec.blocks(result.content)), "isError": .bool(result.isError),
-                                             "details": .string(try JSONEncoder().encode(message).base64EncodedString())]
-            if result.terminate { value["control"] = .object(["terminate": .bool(true)]) }
+            let profileID = (binding.artifactScope ?? binding.scope).profileID
+            guard message.transientAttachments.isEmpty || profileID != nil else {
+                throw RuntimeError.bridge("Transient media requires a qualified artifact owner")
+            }
+            var content = DurableMessageCodec.blocks(message.content, profileID: binding.scope.profileID)
+            do {
+                for attachment in message.transientAttachments {
+                    let suffix = UTType(mimeType: attachment.mimeType)?.preferredFilenameExtension ?? "bin"
+                    let filename = "media-\(UUID().uuidString).\(suffix)"
+                    let publication = try await runtime.publishArtifact(data: attachment.data, filename: filename)
+                    guard let receipt = publication.objectValue?["artifact"] else { throw RuntimeError.bridge("Missing immutable artifact publication") }
+                    content.append(try DurableMessageCodec.transientReference(attachment, receipt: receipt, profileID: profileID!))
+                }
+            } catch {
+                Log.agent.error("PiDurable media publication failed chat=\(chatID) call=\(callID) error=\(error.localizedDescription)")
+                throw RuntimeError.bridge("Native tool completed but its media could not be committed: \(error.localizedDescription). Inspect before retrying")
+            }
+            var value: [String: JSONValue] = ["content": .array(content), "isError": .bool(message.isError),
+                                             "details": .string(try DurableMessageCodec.toolDetails(message))]
+            if terminate { value["control"] = .object(["terminate": .bool(true)]) }
             return .object(value)
         case "filePermission":
-            // This rollout's synthetic namespace is not the user's Profile. Native authority still controls every write.
             guard let action = fields["action"]?.stringValue, ["write", "edit"].contains(action),
-                  let path = fields["path"]?.stringValue, !path.isEmpty else { throw RuntimeError.bridge("Invalid virtual-file capability") }
-            if let tool = binding.configuration.tools.first as? ChatJavaScriptTool {
-                try await tool.chat.requireApproval(action: action == "write" ? Actions.fsWrite : Actions.fsEdit,
-                                                    defaultPolicy: .allow, purpose: "Update the isolated durable test workspace")
-            } else { throw RuntimeError.bridge("No native permission owner") }
+                  let path = fields["path"]?.stringValue, !path.isEmpty,
+                  let tool = binding.configuration.tools.first(where: { $0 is ChatJavaScriptTool }) as? ChatJavaScriptTool else {
+                throw RuntimeError.bridge("Invalid virtual-file capability or missing permission owner")
+            }
+            let nativeAction = action == "write" ? Actions.fsWrite : Actions.fsEdit
+            if !binding.isolatedWorkspace {
+                try await tool.chat.requireProfileMutation(nativeAction)
+                let location = try await tool.chat.virtualMachine.fileSystem.location(path)
+                switch location {
+                case .skill(let name), .skillFile(let name), .skillResource(let name, _):
+                    try await tool.chat.skillsMount.requireWritable(name: name, path: path)
+                case .memory, .soul, .artifact:
+                    break
+                default:
+                    throw RuntimeError.bridge("Dedicated Profile tools cannot mutate this path")
+                }
+            }
+            try await tool.chat.requireApproval(action: nativeAction, defaultPolicy: .allow,
+                purpose: binding.isolatedWorkspace ? "Update the isolated durable test workspace" : "Update \(path)")
             return .null
-        default: throw RuntimeError.bridge("Native capability unavailable")
+        default:
+            throw RuntimeError.bridge("Native capability unavailable")
         }
+    }
+
+    private func hydrateToolGeneration(_ fields: [String: JSONValue], chatID: String, binding: Binding, runtime: DurableRuntime) async throws -> Binding {
+        guard let entryID = fields["assistantEntryID"]?.intValue, (0...9_007_199_254_740_991).contains(entryID),
+              let current = bindings[chatID] else { throw RuntimeError.bridge("Missing authoritative Pi tool generation") }
+        let hydration: ToolHydration
+        if let existing = current.toolHydration {
+            guard existing.assistantEntryID == entryID else { throw RuntimeError.bridge("Overlapping Pi tool generation recovery") }
+            hydration = existing
+        } else {
+            let id = UUID()
+            hydration = ToolHydration(id: id, assistantEntryID: entryID, task: Task {
+                let generation = try await self.readToolGeneration(fields, binding: binding, runtime: runtime)
+                try await self.presentToolGeneration(generation, chatID: chatID, hydrationID: id, assistantEntryID: entryID, scope: binding.scope)
+                return generation
+            })
+            bindings[chatID]?.toolHydration = hydration
+        }
+        _ = try await hydration.task.value
+        try Task.checkCancellation()
+        guard let restored = bindings[chatID], restored.toolHydration?.id == hydration.id, StorageRoot.currentScope == binding.scope else {
+            throw RuntimeError.bridge("Native tool recovery belongs to a stale conversation binding")
+        }
+        return restored
+    }
+
+    private func presentToolGeneration(_ generation: ToolGeneration, chatID: String, hydrationID: UUID, assistantEntryID: Int, scope: ProfileScope) async throws {
+        try Task.checkCancellation()
+        guard var binding = bindings[chatID], binding.toolHydration?.id == hydrationID, StorageRoot.currentScope == scope else {
+            throw RuntimeError.bridge("Recovered generation belongs to a stale conversation binding")
+        }
+        binding.context = generation.context
+        binding.modelAssistant = generation.assistant
+        binding.assistant = generation.committedAssistant
+        binding.calls = generation.calls
+        binding.providerInputs = generation.inputs
+        bindings[chatID] = binding
+        if let owner = binding.configuration.tools.first(where: { $0 is ChatJavaScriptTool }) as? ChatJavaScriptTool {
+            await owner.chat.presentDurableToolAssistant(generation.committedAssistant)
+        }
+        let media = generation.inputs.footprint
+        Log.agent.info("PiDurable native tool generation restored chat=\(chatID) assistantEntry=\(assistantEntryID) mediaFiles=\(media.files) mediaBytes=\(media.bytes) presentation=committed")
+    }
+
+    private func readToolGeneration(_ fields: [String: JSONValue], binding: Binding, runtime: DurableRuntime) async throws -> ToolGeneration {
+        guard let values = fields["contextMessages"]?.arrayValue, let value = fields["assistant"],
+              let systemPrompt = fields["systemPrompt"]?.stringValue, let tools = fields["tools"]?.arrayValue,
+              let storedCall = fields["toolCall"], let callID = fields["callID"]?.stringValue,
+              let name = fields["name"]?.stringValue, let arguments = fields["arguments"],
+              tools.contains(where: { $0.objectValue?["name"]?.stringValue == name }),
+              case .assistant(let actual) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) else {
+            throw RuntimeError.bridge("Missing authoritative Pi assistant, context, or positional tool set")
+        }
+        let calls = actual.content.compactMap { block -> ToolCall? in
+            if case .toolCall(let call) = block { return call }
+            return nil
+        }
+        let call = try DurableMessageCodec.decodeToolCall(storedCall, scope: binding.scope, artifactScope: binding.artifactScope)
+        guard Set(calls.map(\.id)).count == calls.count, calls.contains(call), call.id == callID, call.name == name, call.arguments == arguments else {
+            throw RuntimeError.bridge("Recovered native tool does not match its actual Pi assistant")
+        }
+        let inputs = ProviderArtifactInputs()
+        var messages: [Message] = []
+        for message in values {
+            try Task.checkCancellation()
+            messages.append(try await DurableMessageCodec.decodeModel(message, scope: binding.scope, artifactScope: binding.artifactScope,
+                runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs))
+        }
+        guard case .assistant(let assistant) = try await DurableMessageCodec.decodeModel(value, scope: binding.scope, artifactScope: binding.artifactScope,
+            runtime: runtime, runtimeProfileID: binding.runtimeProfileID, inputs: inputs) else {
+            throw RuntimeError.bridge("Recovered Pi message is not an assistant")
+        }
+        try ProviderArtifactInputs.validate(messages + [.assistant(assistant)])
+        return ToolGeneration(context: AgentContext(systemPrompt: systemPrompt, messages: messages, tools: binding.configuration.tools),
+                              assistant: assistant, committedAssistant: actual, calls: Dictionary(uniqueKeysWithValues: calls.map { ($0.id, $0) }), inputs: inputs)
     }
 
     private func receive(_ event: JSONValue, chatID: String) async throws {
@@ -118,13 +285,14 @@ actor DurableAgentHost {
         case "run_start": events = [.runStarted(turnID: nil)]
         case "turn_start":
             binding.assistant = nil
+            binding.results = []
             events = [.generationStarted(model: binding.configuration.model.id, turnID: nil)]
         case "message_start":
-            if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" { events = [.messageStart(try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope))] }
+            if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" {
+                events = [.messageStart(try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope))]
+            }
         case "message_update":
             if let value = fields["partial"], case .assistant(let partial) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
-                // Reconcile the complete committed partial, including whole-block and message replacement operations.
-                // Raw provider deltas are deliberately not forwarded to presentation.
                 events = [.messageUpdate(partial, event: .start(partial: partial))]
             }
         case "message_end":
@@ -142,14 +310,22 @@ actor DurableAgentHost {
         case "tool_execution_start":
             let id = fields["toolCallId"]?.stringValue ?? ""
             let call = binding.calls[id] ?? ToolCall(id: id, name: fields["toolName"]?.stringValue ?? "", arguments: fields["args"] ?? .object([:]))
-            binding.calls[id] = call; events = [.toolExecutionStart(toolCall: call)]
+            binding.calls[id] = call
+            events = [.toolExecutionStart(toolCall: call)]
         case "tool_execution_end":
             if let id = fields["toolCallId"]?.stringValue, let call = binding.calls.removeValue(forKey: id),
                let value = fields["entry"]?.objectValue?["model"]?.arrayValue?.first,
                case .toolResult(let result) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
+                binding.results.append(result)
                 events = [.toolExecutionEnd(toolCall: call, result: result)]
             }
-        case "turn_end": if let assistant = binding.assistant { events = [.generationFinished(message: assistant, toolResults: [])] }
+        case "turn_end":
+            if let assistant = binding.assistant { events = [.generationFinished(message: assistant, toolResults: binding.results)] }
+            binding.toolHydration?.task.cancel()
+            binding.toolHydration = nil
+            binding.context = nil
+            binding.providerInputs = nil
+            binding.modelAssistant = nil
         default: break
         }
         bindings[chatID] = binding
@@ -157,7 +333,6 @@ actor DurableAgentHost {
     }
 }
 
-/// Handle of one conversation in a shared Profile Session, not an independent harness or transcript store.
 nonisolated final class DurableAgentDriver: Sendable {
     let runtime: DurableRuntime
     let host: DurableAgentHost
@@ -165,47 +340,106 @@ nonisolated final class DurableAgentDriver: Sendable {
     let scope: ProfileScope
     let runtimeProfileID: String?
     let artifactScope: ProfileScope?
-    init(runtime: DurableRuntime, host: DurableAgentHost, chatID: UUID, scope: ProfileScope, runtimeProfileID: UUID? = nil, artifactScope: ProfileScope? = nil) {
-        self.runtime = runtime; self.host = host; self.chatID = chatID.uuidString; self.scope = scope
-        self.runtimeProfileID = runtimeProfileID?.uuidString
-        self.artifactScope = artifactScope
-    }
-    func run(_ request: AgentRunRequest, configuration: AgentConfiguration, seed: [Message], emit: @escaping DurableAgentHost.EventSink) async throws -> AgentRunResult {
-        await host.bind(chatID: chatID, scope: scope, configuration: configuration, runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, emit: emit)
-        let config: JSONValue = .object([
-            "chatID": .string(chatID), "model": .string(configuration.model.id),
-            "systemPrompt": .string(configuration.systemPrompt + """
+    let reference: JSONValue?
 
-            <durable_test_workspace>
-            The dedicated read/write/edit tools address this Session's isolated, purgeable test workspace, NOT the user's Profile or the filesystem reached through ox.fs. Use these dedicated tools for test workspace files. Their MEMORY.md, SOUL.md, artifacts/ and skills/ paths are synthetic test content; temporary-chat restrictions on REAL Profile mutations do not prohibit editing this separate workspace. Never use ox.fs through execute to stand in for a dedicated workspace tool. Native Ox capabilities remain available through execute and retain all existing permission, temporary-chat, and private-data restrictions. Shell execution is unavailable. Do not claim a file mutation succeeded without its tool result.
-            </durable_test_workspace>
-            """),
+    init(runtime: DurableRuntime, host: DurableAgentHost, chatID: UUID, scope: ProfileScope, runtimeProfileID: UUID? = nil,
+         artifactScope: ProfileScope? = nil, reference: JSONValue? = nil) {
+        self.runtime = runtime
+        self.host = host
+        self.chatID = chatID.uuidString
+        self.scope = scope
+        self.runtimeProfileID = reference?.objectValue?["profileID"]?.stringValue ?? runtimeProfileID?.uuidString
+        self.artifactScope = artifactScope
+        self.reference = reference
+    }
+
+    func prepare(configuration: AgentConfiguration, emit: @escaping DurableAgentHost.EventSink) async throws -> JSONValue {
+        try await prepare(configuration: configuration, seed: [], emit: emit)
+    }
+
+    private func prepare(configuration: AgentConfiguration, seed: [Message], emit: @escaping DurableAgentHost.EventSink) async throws -> JSONValue {
+        try Task.checkCancellation()
+        if let reference {
+            guard reference.objectValue?["profileID"]?.stringValue == scope.profileID?.uuidString else {
+                throw RuntimeError.bridge("Conversation does not belong to the driver's Profile")
+            }
+        }
+        try await host.bind(chatID: chatID, scope: scope, configuration: configuration, runtime: runtime,
+                            runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedWorkspace: reference == nil, emit: emit)
+        if let reference { try await host.expectReference(chatID: chatID, reference: reference) }
+        let systemPrompt = reference == nil ? configuration.systemPrompt + """
+
+        <durable_test_workspace>
+        The dedicated read/write/edit tools address this Session's isolated, purgeable test workspace, NOT the user's Profile or the filesystem reached through ox.fs. Use these dedicated tools for test workspace files. Their MEMORY.md, SOUL.md, artifacts/ and skills/ paths are synthetic test content; temporary-chat restrictions on REAL Profile mutations do not prohibit editing this separate workspace. Never use ox.fs through execute to stand in for a dedicated workspace tool. Native Ox capabilities remain available through execute and retain all existing permission, temporary-chat, and private-data restrictions. Shell execution is unavailable. Do not claim a file mutation succeeded without its tool result.
+        </durable_test_workspace>
+        """ : configuration.systemPrompt
+        let effort = configuration.model.selectedReasoningEffort
+        let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
+        let config: JSONValue = .object([
+            "chatID": .string(chatID), "model": .string(configuration.model.id), "systemPrompt": .string(systemPrompt),
+            "providerID": .string(configuration.client.id),
+            "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
+            "nativeReasoningEffort": thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null,
             "contextWindow": .int(configuration.model.maxContext), "maxTokens": .int(configuration.model.maxTokens),
             "reasoning": .bool(configuration.model.reasoning),
-            "tools": .array(configuration.tools.map { .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters]) }),
-            "messages": .array(seed.map { DurableMessageCodec.message($0, provider: "ox-native:\(chatID)") }),
+            "toolExecutionMode": .string(configuration.toolExecutionMode == .parallel ? "parallel" : "sequential"),
+            "tools": .array(configuration.tools.map { .object([
+                "name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters,
+                "executionMode": .string($0.executionMode == .parallel ? "parallel" : "sequential"),
+            ]) }),
+            "messages": .array(reference == nil ? seed.map {
+                DurableMessageCodec.message($0, provider: "ox-native:\(chatID)", profileID: scope.profileID)
+            } : []),
         ])
-        let attachment = try await command(.object(["action": .string("attach"), "config": config]))
-        guard let reference = attachment.objectValue?["reference"] else { throw RuntimeError.bridge("Missing qualified conversation reference") }
-        try await host.expectReference(chatID: chatID, reference: reference)
+        let attachment = try await command(.object(["action": .string("attach"), "config": config, "reference": reference ?? .null]))
+        guard let attachedReference = attachment.objectValue?["reference"] else { throw RuntimeError.bridge("Missing qualified conversation reference") }
+        try await host.expectReference(chatID: chatID, reference: attachedReference)
+        return attachedReference
+    }
+
+    func run(_ request: AgentRunRequest, configuration: AgentConfiguration, seed: [Message], emit: @escaping DurableAgentHost.EventSink) async throws -> AgentRunResult {
+        let attachedReference = try await prepare(configuration: configuration, seed: seed, emit: emit)
         let content = request.messages.flatMap { message -> [JSONValue] in
-            if case .user = message { return DurableMessageCodec.message(message, provider: configuration.client.id).objectValue?["content"]?.arrayValue ?? [] }
+            if case .user = message {
+                return DurableMessageCodec.message(message, provider: configuration.client.id, profileID: scope.profileID).objectValue?["content"]?.arrayValue ?? []
+            }
             return []
         }
+        return try await execute(.object(["action": .string("run"), "chatID": .string(chatID), "reference": attachedReference,
+                                         "content": .array(content), "requestID": .string(request.turnID?.uuidString ?? UUID().uuidString)]))
+    }
+
+    func resume(submissionID: Int? = nil, requestID: String? = nil, configuration: AgentConfiguration,
+                emit: @escaping DurableAgentHost.EventSink) async throws -> AgentRunResult {
+        guard submissionID != nil || requestID != nil else { throw RuntimeError.bridge("Existing submission ID or request ID required") }
+        let attachedReference = try await prepare(configuration: configuration, emit: emit)
+        var fields: [String: JSONValue] = ["action": .string("resumeExisting"), "chatID": .string(chatID), "reference": attachedReference]
+        if let submissionID { fields["submissionID"] = .int(submissionID) }
+        if let requestID { fields["requestID"] = .string(requestID) }
+        return try await execute(.object(fields))
+    }
+
+    private func execute(_ request: JSONValue) async throws -> AgentRunResult {
         let result = try await withTaskCancellationHandler {
-            try await command(.object(["action": .string("run"), "chatID": .string(chatID), "content": .array(content),
-                                       "requestID": .string(request.turnID?.uuidString ?? UUID().uuidString)]))
+            try await command(request)
         } onCancel: { Task { try? await self.abort() } }
-        let messages = try (result.objectValue?["messages"]?.arrayValue ?? []).map { try DurableMessageCodec.decode($0, scope: scope, artifactScope: artifactScope) }
+        let messages = try (result.objectValue?["messages"]?.arrayValue ?? []).map {
+            try DurableMessageCodec.decode($0, scope: scope, artifactScope: artifactScope)
+        }
         let status = result.objectValue?["receipt"]?.objectValue?["status"]?.stringValue
         let failure = await host.failure(chatID: chatID)
         let outcome: AgentRunOutcome = status == "done" ? .completed : Task.isCancelled || failure?.0 == "aborted" ? .aborted :
             .failed(message: failure?.0 ?? "Durable submission was not answered: \(result.objectValue?["receipt"]?.jsonString() ?? "unknown")", kind: failure?.1 ?? .provider)
         return AgentRunResult(outcome: outcome, messages: messages, lastTurnTokens: messages.reversed().compactMap {
-            if case .assistant(let message) = $0 { return message.usage.totalTokens }; return nil
+            if case .assistant(let message) = $0 { return message.usage.totalTokens }
+            return nil
         }.first ?? 0)
     }
-    func abort() async throws { _ = try await command(.object(["action": .string("abort"), "chatID": .string(chatID)])) }
+
+    func abort() async throws {
+        _ = try await command(.object(["action": .string("abort"), "chatID": .string(chatID), "reference": reference ?? .null]))
+    }
+
     private func command(_ value: JSONValue) async throws -> JSONValue {
         try JSONDecoder().decode(JSONValue.self, from: Data(try await runtime.command(value.jsonString(), entry: "agentCommand").utf8))
     }

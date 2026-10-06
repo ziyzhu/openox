@@ -13,13 +13,15 @@ struct ArtifactLibraryRow: View {
     var horizontalPadding = Theme.Spacing.md
     var verticalPadding = Theme.Spacing.md
     var previewSourceID: String? = nil
+    var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             ArtifactThumbnail(
                 attachment: artifact,
                 style: .library,
-                background: showsContainer ? Theme.Colors.surfaceSunken : Theme.Colors.surface
+                background: showsContainer ? Theme.Colors.surfaceSunken : Theme.Colors.surface,
+                scope: scope
             )
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(artifact.userFacingName)
@@ -78,6 +80,7 @@ struct ArtifactContextMenu: View {
     let onDelete: () -> Void
     var isSaved: Bool? = nil
     var onToggleSaved: (() -> Void)? = nil
+    var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
         if artifact.availability == .local {
@@ -88,7 +91,7 @@ struct ArtifactContextMenu: View {
                 .accessibilityIdentifier(A11yID.Artifacts.save(artifact.id))
             }
 
-            ShareLink(item: artifact.fileURL) {
+            ArtifactShareButton(artifact: artifact, scope: scope) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
             .accessibilityLabel(A11yLabel.shareArtifact)
@@ -111,11 +114,13 @@ struct ArtifactContextMenu: View {
 
 struct ArtifactPreviewPresentation: View {
     let artifact: Artifact
+    var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
         ArtifactZoomPreviewScreen(
             artifact: artifact,
-            chrome: .navigation
+            chrome: .navigation,
+            scope: scope
         )
     }
 }
@@ -128,7 +133,8 @@ struct ArtifactZoomPreviewPresentation: View {
     var body: some View {
         ArtifactZoomPreviewScreen(
             artifact: preview.artifact,
-            chrome: .immersive(onDismiss: onDismiss)
+            chrome: .immersive(onDismiss: onDismiss),
+            scope: preview.scope
         )
             .navigationTransition(.zoom(sourceID: preview.sourceID, in: namespace))
     }
@@ -198,7 +204,7 @@ private struct ArtifactMutationAlerts: ViewModifier {
                 }
                 .accessibilityIdentifier(A11yID.Artifacts.deleteConfirm)
             } message: {
-                Text("This removes the artifact from this Profile. Existing chat references will show a deleted placeholder. This can't be undone.")
+                Text("This hides the artifact from your library. Existing chat references and historical files are kept.")
             }
             .alert("Couldn't delete artifact", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }

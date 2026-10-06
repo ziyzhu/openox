@@ -1,7 +1,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models, AssistantMessage } from "@earendil-works/pi-ai";
 import { Harness, createRegistry, watchEvents, type AgentEvent, type AgentEventStream, type ConversationId,
-  type HarnessSettings, type InputSubmissionDraft, type Registry, type SubmissionId } from "@earendil-works/pi-durable";
+  type Conversation, type HarnessSettings, type InputSubmissionDraft, type Registry, type Submission, type SubmissionId } from "@earendil-works/pi-durable";
 import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { applyChanges } from "./committed-partial";
 import { ProfileFiles } from "./profile-files";
@@ -22,11 +22,13 @@ export interface SessionOptions {
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
   createBlobID?(): Promise<string>;
   authorizeFile: AuthorizeFile;
+  beforeProgress?(reference: ConversationReference): Promise<void>;
   onEvents?(conversationId: ConversationId, events: CommittedEvent[]): Promise<void>;
   onReport?(error: unknown): void;
 }
 interface Projection {
   stream: AgentEventStream;
+  pending: Set<SubmissionId>;
   partial?: AssistantMessage;
   ending?: string;
   waiter?: { id?: SubmissionId; delivered: Set<SubmissionId>; resolve(): void; reject(error: Error): void };
@@ -92,7 +94,8 @@ export class OxAgentSession {
     const conversation = await this.conversation(id);
     if (this.projections.has(id)) return;
     const stream = await watchEvents(this.harness, id, context);
-    const projection: Projection = { stream, partial: stream.snapshot.generation?.message ? structuredClone(stream.snapshot.generation.message) : undefined };
+    const projection: Projection = { stream, pending: new Set([...(stream.snapshot.run?.inputs ?? []), ...stream.snapshot.inbox.map(({ id }) => id)]),
+      partial: stream.snapshot.generation?.message ? structuredClone(stream.snapshot.generation.message) : undefined };
     this.projections.set(id, projection);
     stream.start(async events => {
       if (events.some(event => event.type === "snapshot")) {
@@ -106,10 +109,12 @@ export class OxAgentSession {
         }
         return event;
       });
+      for (const event of events) if (event.type === "submission") projection.pending.add(event.record.id);
       await this.options.onEvents?.(id, enriched);
       const waiter = projection.waiter;
       for (const event of events) {
         if (event.type === "submission" && (event.record.status === "done" || event.record.status === "unanswered")) {
+          projection.pending.delete(event.record.id);
           waiter?.delivered.add(event.record.id);
         }
       }
@@ -121,13 +126,16 @@ export class OxAgentSession {
       if (end.reason === "listener_error") {
         this.options.onReport?.(end.error);
         // A projection failure must stop unobserved effects; orderly close never uses abort.
-        void conversation.abort(context).catch(error => this.options.onReport?.(error));
+        void (async () => {
+          await this.options.beforeProgress?.(this.conversations.reference(id));
+          await conversation.abort(context);
+        })().catch(error => this.options.onReport?.(error));
       }
     });
   }
 
-  /** Execution result `messages` is active model context; scrollback comes from conversations.history(). */
-  async run(reference: ConversationId | ConversationReference, input: InputSubmissionDraft) {
+  private async observedSubmission(reference: ConversationId | ConversationReference,
+    acquire: (conversation: Conversation, id: ConversationId) => Promise<{ submission: Submission; settled: boolean }>) {
     const id = this.scopedID(reference);
     const conversation = await this.conversation(id);
     await this.observe(id);
@@ -137,19 +145,42 @@ export class OxAgentSession {
     const observed = new Promise<void>((resolve, reject) => { projection.waiter = { delivered: new Set(), resolve, reject }; });
     void observed.catch(() => {});
     try {
-      // A deduplicated completed input emits no new run_end. Keep Pi's admission authoritative.
-      const existing = input.requestId === undefined ? undefined : await this.harness.commit(
-        tx => tx.submissionByRequest(id, input.requestId!), context);
-      const submission = await conversation.submit(input, context);
+      const { submission, settled } = await acquire(conversation, id);
       projection.waiter!.id = submission.id;
       if (projection.waiter!.delivered.has(submission.id)) projection.waiter!.resolve();
       const receipt = await submission.wait(context);
-      if (!existing || (existing.status !== "done" && existing.status !== "unanswered")) await observed;
+      if (!settled || projection.pending.has(submission.id)) await observed;
       return { receipt, messages: (await conversation.context(context)).messages.filter(message => message.role !== "system") };
     } finally { projection.waiter = undefined; }
   }
 
-  async abort(reference: ConversationId | ConversationReference) { await (await this.conversation(this.scopedID(reference))).abort(context); }
+  async run(reference: ConversationId | ConversationReference, input: InputSubmissionDraft) {
+    return this.observedSubmission(reference, async (conversation, id) => {
+      const existing = input.requestId === undefined ? undefined : await this.harness.commit(
+        tx => tx.submissionByRequest(id, input.requestId!), context);
+      await this.options.beforeProgress?.(this.conversations.reference(id));
+      const submission = await conversation.submit(input, context);
+      return { submission, settled: existing?.status === "done" || existing?.status === "unanswered" };
+    });
+  }
+
+  async resumeExisting(reference: ConversationId | ConversationReference, submissionID: SubmissionId) {
+    return this.observedSubmission(reference, async (_, id) => {
+      const submission = await this.harness.submission(submissionID, context);
+      if (!submission) throw new Error("Existing submission not found");
+      const existing = await submission.status(context);
+      if (existing.conversationId !== id) throw new Error("Submission conversation scope mismatch");
+      await this.options.beforeProgress?.(this.conversations.reference(id));
+      return { submission, settled: existing.status === "done" || existing.status === "unanswered" };
+    });
+  }
+
+  async abort(reference: ConversationId | ConversationReference) {
+    const id = this.scopedID(reference);
+    const conversation = await this.conversation(id);
+    await this.options.beforeProgress?.(this.conversations.reference(id));
+    await conversation.abort(context);
+  }
   /** Diagnostic `messages` retains its active-context compatibility contract, not full scrollback. */
   async inspect(reference?: ConversationId | ConversationReference) {
     const id = reference === undefined ? undefined : this.scopedID(reference);

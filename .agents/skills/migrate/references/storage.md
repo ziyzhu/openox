@@ -32,6 +32,8 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── external-profiles.json           external profile folder bookmarks
 │   │   ├── device-folder-grants.json         security-scoped folder bookmarks
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
+│   │   ├── StorageMigration/PiProfiles/<uuid>/journal.json  publication journal + conversion mappings
+│   │   ├── StorageMigration/PiProfiles/<uuid>/source-<uuid>/ retained native source Profile
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
 │   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-chat cache Session; WAL sidecars
@@ -42,21 +44,13 @@ types remain authoritative in their `Codable` implementations.
 ├── Documents/                               local Profile catalog
 │   └── <ProfileName>/
 │       ├── profile.json
-│       ├── chats/<uuid>/
-│       │   ├── chat.json
-│       │   ├── turns.jsonl
-│       │   └── context.json                 compacted chats only
-│       ├── artifacts/
-│       │   ├── .saved.json                  saved artifact basenames
-│       │   └── <filename>
-│       ├── skills/<name>/SKILL.md
-│       ├── SOUL.md
-│       └── MEMORY.md
+│       ├── state.sqlite                     Pi execution, full history, application documents; WAL sidecars
+│       └── artifacts/<filename>             immutable physical text/binary files
 ├── Keychain                                 provider and service credentials
 └── WKWebsiteDataStore(forIdentifier:)       shared app-wide website state
 
 <configured iCloud container>/
-└── Documents/<ProfileName>/              same Profile layout
+└── Documents/<ProfileName>/              predecessor Profiles; live Pi activation refused
 
 <configured app group>/
 ├── Library/Preferences/
@@ -92,7 +86,7 @@ Primary owners:
 - App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
 - Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
-- Profile content — owner: Host/Profile/ProfileRepository.swift
+- Profile execution/history/documents — owner: Pi Durable; native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; application facade: Host/Profile/ProfileRepository.swift
 - All compatibility detection, orchestration, and migration steps — owner: Host/Profile/StorageMigration.swift
 - Artifact metadata — owner: Host/Profile/Artifact.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
@@ -103,7 +97,7 @@ Primary owners:
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/onboarding/scripts/bootstrap.ts
 
-## Pi Durable rollout and upstream diagnostics
+## Pi Durable Sessions and upstream diagnostics
 
 `DurableChatController` owns opt-in temporary-chat Sessions under
 `Library/Caches/PiDurableProof/Native/<uuid>/`. Several temporary chats share each
@@ -119,7 +113,7 @@ Blob commits precede document-reference commits; orphan reclamation is serialize
 against readers/writers. This is not one combined document/blob transaction.
 Submitted messages, contextual snapshots, model replies and native diagnostics
 can be present: these are private user-owned scratch data, not anonymous fixtures.
-The controller refuses persisted chats; normal activation never opens these caches.
+The controller handles temporary chats only; normal Profile activation never opens these caches. Ordinary temporary chats now attach automatically, while the explicit launch flag retains a chosen QA cache identity.
 An explicit launch with `OX_DURABLE_TEMPORARY_SESSION=<UUID>` allows an idle chat
 switched to temporary in the actual UI to attach to `NativeFiles`, including
 Release builds on physical devices. Diagnostic RPCs remain DEBUG Simulator-only.
@@ -175,9 +169,7 @@ fork-aware scrollback separately from active model context. Read-only virtual
 `chats/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
-Production activation and Profile export/import are not implemented. Post-rebase
-native RPC verification requires usable simulator VPN ingress; no loopback
-exception is authorized.
+Local production Profiles now activate Pi after the storage gate. No live cloud/external database synchronization or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
 
 `StorageMigrator.stageDurableProfile` now builds a separate caller-owned local
 staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
@@ -191,28 +183,15 @@ non-identity application settings, with latest history, current forks and bounde
 checkpoints. Source-key mappings are returned to the migrator, not stored in a
 runtime registry. Physical artifacts are digest-checked and flushed before Pi
 metadata commits. The installer closes SQLite and its artifact owner before the
-staged manifest receives `2026-10-05-pi-durable`. That version is deliberately
-absent from normal activation milestones until readers/lifecycle are cut over.
-Staging is not publication, backup, export, automatic migration or activation;
-failed partial stages are retained for diagnosis and never reused implicitly.
+staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now registered for local production activation. A prepared publication journal retains conversion mappings and source fingerprints; source moves to a private retained backup before stage publication. Recovery runs before Profile enumeration and completes interrupted publication before consumers open. Failed unjournaled stages are retained for diagnosis and never reused implicitly. Fresh Profiles install and validate an empty dormant Pi database before publishing their manifest.
 
-The existing production Profile representations and compatibility milestones are unchanged.
-Upstream SQLite/document/task compatibility has not yet been adopted by the
-application: a future real-Profile integration must enter through `StorageMigrator`
-before consumers open its database. See [the integration package](../../../../packages/agent/README.md).
+The current local Profile is `profile.json`, `state.sqlite`, and ordinary immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
-The agreed production target, not yet activated or integrated into normal Profile lifecycle, is a local Profile folder containing
-`profile.json`, `state.sqlite` and ordinary files at `artifacts/<filename>`.
-The top-level manifest remains authoritative for Profile identity, creation date
-and format/migration milestone; Pi owns execution, history and application
-documents without a second mutable copy of manifest fields. Artifacts are
-referenced by Profile-relative paths, not duplicated in binary SQL tables.
-Application identity becomes
-Profile-qualified Pi conversation IDs after migration, with presentation metadata
-in conversation-scoped documents rather than a separate chat registry. This does
-not change the implemented map above or authorize live folder synchronization,
-external in-place editing, or adoption of the debug caches. See
-[the remaining implementation plan](../../../../assets/PI_DURABLE.md#remaining-implementation-sequence).
+`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. Migration archives retain exact `sourceJSON`; runtime presentation never decodes it. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
+
+Pi scheduling is global to a Session. Before any progress, every recovered task/submission conversation must have its qualified native route and saved model/transport configuration installed. Recovery uses existing durable submissions and waits for both settlement and committed native-event delivery; it never resubmits user input. Cold native tools hydrate from actual Pi task/assistant/context proof without model re-stream or native hook replay. Unsafe interrupted tool intents are not rerun. Storage admission failure can poison a Pi Session even after SQLite rolls back: report failure and explicitly close/reacquire; never blindly retry effects through the failed Session.
+
+Provider media uses request-owned verified bytes, and preview/share/HTML sibling readers use pinned bytes or owned immutable snapshots. An ordinary Artifact URL is routing metadata, not snapshot proof. No live SQLite sync, external in-place edits, unsafe artifact garbage collection, or adoption of old debug caches is authorized. Native migration/normal-chat/process-recovery evidence is simulator-specific; released-predecessor and physical-power-loss acceptance remain separate gates.
 
 ## Compatibility gate
 

@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 @preconcurrency import JavaScriptCore
 
 /// Separate trusted context, never reachable through model-authored snippet execution.
@@ -46,6 +47,40 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             }
         }
     }
+
+    func publishArtifact(data: Data, filename: String) async throws -> JSONValue {
+        _ = try ArtifactStore.validatedFilename(filename)
+        let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string("artifacts/" + filename),
+                                        "base64": .string(data.base64EncodedString())])
+        return try JSONDecoder().decode(JSONValue.self, from: Data(try await command(request.jsonString()).utf8))
+    }
+
+    func readArtifact(_ artifact: JSONValue) async throws -> Data {
+        guard let fields = artifact.objectValue, let path = fields["path"]?.stringValue, let size = fields["size"]?.intValue,
+              let digest = fields["sha256"]?.stringValue, (0...32 * 1024 * 1024).contains(size) else { throw failure("Invalid artifact descriptor") }
+        return try await withCheckedThrowingContinuation { continuation in
+            nativeQueue.async { [self] in
+                do {
+                    guard let artifacts else { throw failure("No physical artifact owner") }
+                    guard let token = try artifacts.perform(["op": "open", "path": path, "size": size]) as? String else { throw failure("Cannot pin artifact") }
+                    defer { _ = try? artifacts.perform(["op": "release", "token": token]) }
+                    var data = Data()
+                    data.reserveCapacity(size)
+                    while data.count < size {
+                        let length = min(128 * 1024, size - data.count)
+                        guard let bytes = try artifacts.perform(["op": "read", "token": token, "offset": data.count, "length": length]) as? [UInt8], bytes.count == length else {
+                            throw failure("Artifact read incomplete")
+                        }
+                        data.append(contentsOf: bytes)
+                    }
+                    _ = try artifacts.perform(["op": "verify", "token": token, "sha256": digest])
+                    continuation.resume(returning: data)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func readArtifact(descriptor: JSONValue) async throws -> Data { try await readArtifact(descriptor) }
 
     /// Only after Harness.close() has joined all invocations and closed its connection.
     func dispose() async {

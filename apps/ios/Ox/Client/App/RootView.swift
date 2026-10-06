@@ -664,12 +664,14 @@ struct RootView: View {
                 monitorActiveProfile()
                 chats.reset()
                 Task {
-                    await Soul.shared.waitUntilCurrent()
-                    await UserMemory.shared.waitUntilCurrent()
-                    await Skills.shared.waitUntilCurrent()
-                    chats.startNewChat()
-                    await chats.loadSummariesNow()
-                    refreshCompactSidebar()
+                    do {
+                        try await Soul.shared.waitUntilCurrent()
+                        try await UserMemory.shared.waitUntilCurrent()
+                        await Skills.shared.waitUntilCurrent()
+                        chats.startNewChat()
+                        await chats.loadSummariesNow()
+                        refreshCompactSidebar()
+                    } catch { Log.app.error("RootView Profile documents unavailable: \(error.localizedDescription)") }
                 }
             }
             .onChange(of: AppLocale.shared.language) { _, _ in
@@ -1196,12 +1198,10 @@ struct RootView: View {
             await chats.loadSummariesNow()
             refreshCompactSidebar()
         }
-        if areas.contains(.soul) {
-            await Soul.shared.waitUntilCurrent()
-        }
-        if areas.contains(.memory) {
-            await UserMemory.shared.waitUntilCurrent()
-        }
+        do {
+            if areas.contains(.soul) { try await Soul.shared.waitUntilCurrent() }
+            if areas.contains(.memory) { try await UserMemory.shared.waitUntilCurrent() }
+        } catch { Log.app.error("RootView Profile reconciliation failed: \(error.localizedDescription)"); return }
         if areas.contains(.skills) {
             await Skills.shared.waitUntilCurrent()
         }

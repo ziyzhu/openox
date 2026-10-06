@@ -2,11 +2,16 @@ import SwiftUI
 import UIKit
 
 struct MarkdownArtifactScreen: View {
-    let artifact: Artifact
+    @State private var artifact: Artifact
     let scope: ProfileScope?
 
+    init(artifact: Artifact, scope: ProfileScope?) {
+        _artifact = State(initialValue: artifact)
+        self.scope = scope
+    }
+
     var body: some View {
-        MarkdownArtifactView(artifact: artifact, scope: scope)
+        MarkdownArtifactView(artifact: $artifact, scope: scope)
             .navigationTitle(artifact.userFacingName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
@@ -14,7 +19,7 @@ struct MarkdownArtifactScreen: View {
 }
 
 struct MarkdownArtifactView: View {
-    let artifact: Artifact
+    @Binding var artifact: Artifact
     let scope: ProfileScope?
 
     private enum Phase {
@@ -114,7 +119,7 @@ struct MarkdownArtifactView: View {
     private func load() async {
         phase = .loading
         do {
-            guard let scope else { throw CocoaError(.fileNoSuchFile) }
+            guard let scope = ArtifactPreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
             let document = try await ProfileRepository.shared.readMarkdownArtifact(
                 named: artifact.fileName,
                 in: scope
@@ -148,18 +153,20 @@ struct MarkdownArtifactView: View {
         isSaving = true
         Task {
             do {
-                guard let scope else { throw CocoaError(.fileNoSuchFile) }
-                let document = try await ProfileRepository.shared.writeMarkdownArtifact(
+                guard let scope = ArtifactPreviewSource(artifact: artifact, scope: scope).scope else { throw CocoaError(.fileReadNoPermission) }
+                let published = try await ProfileRepository.shared.writeMarkdownArtifact(
                     source,
                     named: artifact.fileName,
                     in: scope
                 )
                 guard !Task.isCancelled else { return }
+                artifact = published
                 isSaving = false
-                draft = document.source
+                draft = source
                 mode = .viewing
+                let document = MarkdownArtifactDocument(source: source, byteCount: source.utf8.count)
                 phase = .ready(document)
-                Log.ui.info("MarkdownArtifactView.save filename=\(artifact.fileName) bytes=\(document.byteCount)")
+                Log.ui.info("MarkdownArtifactView.save filename=\(published.fileName) bytes=\(document.byteCount)")
                 Haptics.success(.settingsSaved)
             } catch {
                 guard !Task.isCancelled else { return }

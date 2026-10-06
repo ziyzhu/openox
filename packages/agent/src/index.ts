@@ -7,3 +7,4 @@ export { OxConversations, ConversationPresentation, ConversationFavorite, Conver
 export type { ArtifactFiles, ArtifactRecord } from "./core/artifacts";
 export type { AuthorizeFile } from "./core/file-tools";
 export { installOxProfile, ConversationApplicationMetadata, type NormalizedProfileDraft, type ProfileInstallHost } from "./core/profile-install";
+export { ApplicationPresentation, type ApplicationPresentationChange, type ApplicationAgentChange } from "./core/application-presentation";

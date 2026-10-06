@@ -84,21 +84,21 @@ final class SkillSession {
 }
 
 extension ProfileRepository {
-    func skillSelections(in scope: ProfileScope) throws -> SkillSelections {
-        let file = try file(named: "skill-selections.json", in: scope)
-        guard FileManager.default.fileExists(atPath: file.path) else { return SkillSelections() }
-        let selections = try JSONDecoder().decode(SkillSelections.self, from: Data(contentsOf: file))
+    func skillSelections(in scope: ProfileScope) async throws -> SkillSelections {
+        guard let text = try await readTextFile(named: "skill-selections.json", in: scope) else { return SkillSelections() }
+        let selections = try JSONDecoder().decode(SkillSelections.self, from: Data(text.utf8))
         guard selections.version == 1 else { throw SkillError.invalidPackage }
         return selections
     }
 
-    func selectSkill(name: String, source: String?, in scope: ProfileScope) throws {
+    func selectSkill(name: String, source: String?, in scope: ProfileScope) async throws {
         guard SkillFiles.isUserName(name) else { throw SkillError.invalidName }
-        var selections = try skillSelections(in: scope)
+        var selections = try await skillSelections(in: scope)
         selections.sources[name] = source
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        try encoder.encode(selections).write(to: file(named: "skill-selections.json", in: scope), options: .atomic)
+        let text = String(decoding: try encoder.encode(selections), as: UTF8.self)
+        try await writeTextFile(text, named: "skill-selections.json", in: scope)
         Log.ui.info("Skills.select name=\(name) source=\(source ?? "automatic") profile=\(scope.profileID?.uuidString ?? "temporary")")
     }
 }

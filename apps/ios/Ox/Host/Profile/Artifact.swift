@@ -552,131 +552,246 @@ nonisolated enum ArtifactStore {
 }
 
 extension ProfileRepository {
-    func artifacts(in scope: ProfileScope) async -> [Artifact] {
-        guard let directory = try? artifactsDirectory(in: scope) else { return [] }
-        if scope.location == .iCloud {
-            return await ArtifactStore.listIncludingUbiquitousItems(in: directory)
+    nonisolated struct DurableProfileFile: Codable, Sendable {
+        let path: String
+        let size: Int
+        let mtime: Double
+        let binary: Bool
+        let saved: Bool
+        let sha256: String?
+    }
+
+    nonisolated private struct DurableArtifactRecord: Codable, Sendable {
+        let path: String
+        let size: Int
+        let sha256: String
+        let binary: Bool
+        let saved: Bool
+
+        func artifact(in scope: ProfileScope) -> Artifact {
+            Artifact(fileName: String(path.dropFirst("artifacts/".count)),
+                     directory: scope.root.appendingPathComponent("artifacts", isDirectory: true), size: size)
         }
-        return ArtifactStore.list(in: directory)
+    }
+
+    func profileFiles(prefix: String, in scope: ProfileScope) async throws -> [DurableProfileFile] {
+        let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+            "action": .string("fileList"), "prefix": .string(prefix),
+        ]))
+        guard let values = result.objectValue?["files"]?.arrayValue, values.count <= 10_000 else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let files = try JSONDecoder().decode([DurableProfileFile].self, from: JSONEncoder().encode(JSONValue.array(values)))
+        guard Set(files.map(\.path)).count == files.count,
+              files.allSatisfy({ $0.path.hasPrefix(prefix) && $0.size >= 0 && $0.size <= ArtifactLimits.fileBytes && $0.mtime.isFinite && $0.mtime >= 0 }) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return files
+    }
+
+    func removeProfileFile(path: String, in scope: ProfileScope) async throws {
+        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+            "action": .string("fileRemove"), "path": .string(path),
+        ]))
+    }
+
+    func artifacts(in scope: ProfileScope) async throws -> [Artifact] {
+        let files = try await profileFiles(prefix: "artifacts/", in: scope)
+        let directory = scope.root.appendingPathComponent("artifacts", isDirectory: true)
+        return try files.map { file in
+            let name = String(file.path.dropFirst("artifacts/".count))
+            guard try profileArtifactName(name) == name, file.sha256?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            return Artifact(fileName: name, directory: directory, size: file.size,
+                            modifiedAt: Date(timeIntervalSince1970: file.mtime / 1000))
+        }.sorted { $0.fileName.localizedStandardCompare($1.fileName) == .orderedAscending }
     }
 
     func materializeArtifact(_ artifact: Artifact, in scope: ProfileScope) async throws -> Artifact {
-        guard artifact.availability != .local else { return artifact }
-        let url = try artifactsDirectory(in: scope).appendingPathComponent(artifact.fileName, isDirectory: false)
-        Log.app.info("ProfileRepository.artifact download-start file=\(artifact.fileName) availability=\(artifact.availability.rawValue)")
-        try FileManager.default.startDownloadingUbiquitousItem(at: url)
-        let deadline = ContinuousClock.now + .seconds(30)
-        while ContinuousClock.now < deadline {
-            try Task.checkCancellation()
-            let values = try? url.resourceValues(forKeys: [
-                .isRegularFileKey,
-                .ubiquitousItemDownloadingStatusKey,
-                .ubiquitousItemDownloadingErrorKey,
-            ])
-            if let error = values?.ubiquitousItemDownloadingError {
-                Log.app.error("ProfileRepository.artifact download-failed file=\(artifact.fileName) error=\(error.localizedDescription)")
-                throw error
+        let expectedURL = scope.root.appendingPathComponent("artifacts", isDirectory: true).appendingPathComponent(artifact.fileName)
+        guard artifact.fileURL.standardizedFileURL == expectedURL.standardizedFileURL else {
+            throw CocoaError(.fileReadNoPermission)
+        }
+        return try await self.artifact(named: artifact.fileName, in: scope)
+    }
+
+    func artifact(named name: String, in scope: ProfileScope) async throws -> Artifact {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        _ = try await readArtifactBytes(record, in: scope)
+        return record.artifact(in: scope)
+    }
+
+    func savedArtifactNames(in scope: ProfileScope) async throws -> Set<String> {
+        Set(try await profileFiles(prefix: "artifacts/", in: scope).filter(\.saved).map { String($0.path.dropFirst("artifacts/".count)) })
+    }
+
+    func setArtifactSaved(_ saved: Bool, named name: String, in scope: ProfileScope) async throws {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+            "action": .string("fileSaved"), "path": .string(record.path), "saved": .bool(saved),
+        ]))
+        Log.app.info("ProfileRepository.artifact profile=\(scope.profileID?.uuidString ?? "temporary") saved=\(saved) file=\(name)")
+    }
+
+    func importArtifact(data: Data, suggestedName: String, in scope: ProfileScope) async throws -> Artifact {
+        let name = try await availableArtifactName(suggestedName, in: scope)
+        return try await writeArtifact(data: data, named: name, in: scope)
+    }
+
+    func writeArtifact(data: Data, named name: String, in scope: ProfileScope) async throws -> Artifact {
+        let name = try profileArtifactName(name)
+        guard data.count <= ArtifactLimits.fileBytes else {
+            throw ArtifactError.fileTooLarge(bytes: data.count, limit: ArtifactLimits.fileBytes)
+        }
+        guard try await artifactRecord(named: name, in: scope) == nil else { throw ArtifactError.filenameExists(name) }
+        let artifact = Artifact(fileName: name, directory: scope.root.appendingPathComponent("artifacts", isDirectory: true))
+        let text: String?
+        if artifact.kind == .text || artifact.kind == .html {
+            guard data.count <= ArtifactLimits.textBytes else {
+                throw ArtifactError.textTooLarge(bytes: data.count, limit: ArtifactLimits.textBytes)
             }
-            if values?.isRegularFile == true, values?.ubiquitousItemDownloadingStatus != .notDownloaded {
-                let local = try ArtifactStore.artifact(named: artifact.fileName, in: url.deletingLastPathComponent())
-                Log.app.info("ProfileRepository.artifact download-complete file=\(artifact.fileName)")
-                return local
-            }
-            try await Task.sleep(for: .milliseconds(200))
+            guard let decoded = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
+            text = decoded
+        } else {
+            text = nil
         }
-        Log.app.error("ProfileRepository.artifact download-timeout file=\(artifact.fileName)")
-        throw ArtifactError.downloadTimedOut(artifact.fileName)
-    }
-
-    func artifact(named name: String, in scope: ProfileScope) throws -> Artifact {
-        try ArtifactStore.artifact(named: name, in: artifactsDirectory(in: scope))
-    }
-
-    func savedArtifactNames(in scope: ProfileScope) -> Set<String> {
-        guard let directory = try? artifactsDirectory(in: scope) else { return [] }
-        return ArtifactStore.savedNames(in: directory)
-    }
-
-    func setArtifactSaved(_ saved: Bool, named name: String, in scope: ProfileScope) throws {
-        try ArtifactStore.setSaved(saved, name: name, directory: artifactsDirectory(in: scope))
-        Log.app.info("ProfileRepository.artifact saved=\(saved) file=\(name)")
-    }
-
-    func importArtifact(data: Data, suggestedName: String, in scope: ProfileScope) throws -> Artifact {
-        try ArtifactStore.writeImported(data: data, suggestedName: suggestedName, directory: artifactsDirectory(in: scope))
-    }
-
-    func writeArtifact(data: Data, named name: String, in scope: ProfileScope) throws -> Artifact {
-        let directory = try artifactsDirectory(in: scope)
-        let artifact = try ArtifactStore.artifact(named: name, in: directory)
-        return try coordinatedArtifactWrite(at: artifact.fileURL) { url in
-            try ArtifactStore.write(
-                data: data,
-                named: url.lastPathComponent,
-                directory: url.deletingLastPathComponent()
-            )
+        var request: [String: JSONValue] = ["path": .string("artifacts/" + name)]
+        if let text {
+            request["action"] = .string("fileWrite")
+            request["text"] = .string(text)
+        } else {
+            request["action"] = .string("fileWriteBinary")
+            request["base64"] = .string(data.base64EncodedString())
         }
+        _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(request))
+        let published = try await self.artifact(named: name, in: scope)
+        Log.app.info("ProfileRepository.artifact publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) bytes=\(data.count) binary=\(text == nil)")
+        return published
     }
 
-    func replaceArtifactText(named name: String, oldText: String, newText: String, in scope: ProfileScope) throws -> Artifact {
-        let directory = try artifactsDirectory(in: scope)
-        let artifact = try ArtifactStore.artifact(named: name, in: directory)
-        return try coordinatedArtifactWrite(at: artifact.fileURL) { url in
-            try ArtifactStore.edit(
-                name: url.lastPathComponent,
-                find: oldText,
-                replace: newText,
-                directory: url.deletingLastPathComponent()
-            )
+    func replaceArtifactText(named name: String, oldText: String, newText: String, in scope: ProfileScope) async throws -> Artifact {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        let source = try artifactText(try await readArtifactBytes(record, in: scope))
+        let updated: String
+        if oldText.isEmpty {
+            updated = source + newText
+        } else {
+            let matches = ExactTextReplacement.count(oldText, in: source)
+            guard matches > 0 else { throw ArtifactError.textNotFound }
+            guard matches == 1 else { throw ArtifactError.textAmbiguous(matches: matches) }
+            updated = ExactTextReplacement.replace(oldText, with: newText, in: source)
         }
+        return try await publishArtifactVersion(updated, of: record, in: scope)
     }
 
-    func readMarkdownArtifact(named name: String, in scope: ProfileScope) throws -> MarkdownArtifactDocument {
-        let directory = try artifactsDirectory(in: scope)
-        let artifact = try ArtifactStore.artifact(named: name, in: directory)
-        return try coordinatedArtifactRead(at: artifact.fileURL) { url in
-            try MarkdownArtifactDocument.read(Artifact(
-                fileName: url.lastPathComponent,
-                directory: url.deletingLastPathComponent()
-            ))
+    func readMarkdownArtifact(named name: String, in scope: ProfileScope) async throws -> MarkdownArtifactDocument {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        guard record.artifact(in: scope).isMarkdown else { throw ArtifactError.unsupportedType(name) }
+        let bytes = try await readArtifactBytes(record, in: scope)
+        return MarkdownArtifactDocument(source: try artifactText(bytes), byteCount: bytes.count)
+    }
+
+    func writeMarkdownArtifact(_ source: String, named name: String, in scope: ProfileScope) async throws -> Artifact {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        guard record.artifact(in: scope).isMarkdown else { throw ArtifactError.unsupportedType(name) }
+        return try await publishArtifactVersion(source, of: record, in: scope)
+    }
+
+    func renameArtifact(named name: String, to newName: String, in scope: ProfileScope) async throws -> Artifact {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        let destination = try profileArtifactName(newName)
+        let source = record.artifact(in: scope)
+        if destination == source.fileName { return try await artifact(named: name, in: scope) }
+        let bytes = try await readArtifactBytes(record, in: scope)
+        let published = try await writeArtifact(data: bytes, named: destination, in: scope)
+        if record.saved { try await setArtifactSaved(true, named: published.fileName, in: scope) }
+        Log.app.info("ProfileRepository.artifact copy profile=\(scope.profileID?.uuidString ?? "temporary") from=\(source.fileName) to=\(published.fileName) sourceRetained=true")
+        return published
+    }
+
+    func deleteArtifact(named name: String, in scope: ProfileScope) async throws -> Artifact {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        try await removeProfileFile(path: record.path, in: scope)
+        Log.app.info("ProfileRepository.artifact remove profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) historicalBytesRetained=true")
+        return record.artifact(in: scope)
+    }
+
+    private func artifactRecord(named name: String, in scope: ProfileScope) async throws -> DurableArtifactRecord? {
+        let path = "artifacts/" + (try profileArtifactName(name))
+        let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+            "action": .string("fileArtifact"), "path": .string(path),
+        ]))
+        guard let value = result.objectValue?["artifact"] else { throw CocoaError(.fileReadCorruptFile) }
+        if value == .null { return nil }
+        let record = try JSONDecoder().decode(DurableArtifactRecord.self, from: JSONEncoder().encode(value))
+        guard record.path == path, record.size >= 0, record.size <= (record.binary ? ArtifactLimits.fileBytes : ArtifactLimits.textBytes),
+              record.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else {
+            throw CocoaError(.fileReadCorruptFile)
         }
+        return record
     }
 
-    func writeMarkdownArtifact(_ source: String, named name: String, in scope: ProfileScope) throws -> MarkdownArtifactDocument {
-        let directory = try artifactsDirectory(in: scope)
-        let artifact = try ArtifactStore.artifact(named: name, in: directory)
-        return try coordinatedArtifactWrite(at: artifact.fileURL) { url in
-            try MarkdownArtifactDocument.write(source, to: Artifact(
-                fileName: url.lastPathComponent,
-                directory: url.deletingLastPathComponent()
-            ))
+    private func requiredArtifactRecord(named name: String, in scope: ProfileScope) async throws -> DurableArtifactRecord {
+        guard let record = try await artifactRecord(named: name, in: scope) else { throw ArtifactError.missing(name) }
+        return record
+    }
+
+    func readArtifactData(named name: String, in scope: ProfileScope) async throws -> Data {
+        let record = try await requiredArtifactRecord(named: name, in: scope)
+        return try await readArtifactBytes(record, in: scope)
+    }
+
+    private func readArtifactBytes(_ record: DurableArtifactRecord, in scope: ProfileScope) async throws -> Data {
+        let value = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(record))
+        let bytes = try await DurableProfileStore.shared.readArtifact(scope: scope, artifact: value)
+        guard bytes.count == record.size else { throw CocoaError(.fileReadCorruptFile) }
+        return bytes
+    }
+
+    private func artifactText(_ data: Data) throws -> String {
+        guard data.count <= ArtifactLimits.textBytes else {
+            throw ArtifactError.textTooLarge(bytes: data.count, limit: ArtifactLimits.textBytes)
         }
+        guard let text = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
+        return text
     }
 
-    func deleteArtifact(named name: String, in scope: ProfileScope) throws -> Artifact {
-        try ArtifactStore.remove(name, directory: artifactsDirectory(in: scope))
+    private func publishArtifactVersion(_ text: String, of record: DurableArtifactRecord, in scope: ProfileScope) async throws -> Artifact {
+        let data = Data(text.utf8)
+        _ = try artifactText(data)
+        let name = versionedArtifactName(record.artifact(in: scope).fileName)
+        let published = try await writeArtifact(data: data, named: name, in: scope)
+        if record.saved { try await setArtifactSaved(true, named: name, in: scope) }
+        return published
     }
 
-    private func coordinatedArtifactRead<T>(at url: URL, read: (URL) throws -> T) throws -> T {
-        var coordinationError: NSError?
-        var result: Result<T, Error>?
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            result = Result { try read(coordinatedURL) }
+    private func availableArtifactName(_ suggested: String, in scope: ProfileScope) async throws -> String {
+        let cleaned = ArtifactStore.sanitizedFilename(suggested.replacingOccurrences(of: "\\", with: " "))
+        let files = try await profileFiles(prefix: "artifacts/", in: scope)
+        let visibleCollision = files.contains { $0.path.caseInsensitiveCompare("artifacts/" + cleaned) == .orderedSame }
+        if !visibleCollision, !cleaned.hasPrefix("."), cleaned.utf8.count <= 240,
+           try await artifactRecord(named: cleaned, in: scope) == nil { return cleaned }
+        return versionedArtifactName(cleaned)
+    }
+
+    private func profileArtifactName(_ name: String) throws -> String {
+        let normalized = try ArtifactStore.validatedFilename(name)
+        guard !normalized.hasPrefix("."), !normalized.contains("\\"), normalized.utf8.count <= 240 else {
+            throw ArtifactError.invalidFilename(name)
         }
-        if let coordinationError { throw coordinationError }
-        guard let result else { throw CocoaError(.fileReadUnknown) }
-        return try result.get()
+        return normalized
     }
 
-    private func coordinatedArtifactWrite<T>(at url: URL, write: (URL) throws -> T) throws -> T {
-        var coordinationError: NSError?
-        var result: Result<T, Error>?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            result = Result { try write(coordinatedURL) }
-        }
-        if let coordinationError { throw coordinationError }
-        guard let result else { throw CocoaError(.fileWriteUnknown) }
-        return try result.get()
+    private func versionedArtifactName(_ name: String) -> String {
+        let url = URL(fileURLWithPath: name)
+        var ext = String(url.pathExtension.prefix(32))
+        while ext.utf8.count > 64 { ext.removeLast() }
+        var stem = String(url.deletingPathExtension().lastPathComponent.prefix(80))
+        while stem.utf8.count > 100 { stem.removeLast() }
+        if stem.hasPrefix(".") { stem = "Artifact" }
+        let version = "\(stem)-\(UUID().uuidString)"
+        return ext.isEmpty ? version : "\(version).\(ext)"
     }
 }
 

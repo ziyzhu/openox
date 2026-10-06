@@ -150,6 +150,7 @@ struct ArtifactContextMenuPreview: View {
     }
 
     let artifact: Artifact
+    var scope: ProfileScope? = StorageRoot.currentScope
     @State private var previewContent = PreviewContent.loading
 
     var body: some View {
@@ -176,7 +177,9 @@ struct ArtifactContextMenuPreview: View {
         .themed()
         .accessibilityElement(children: .combine)
         .task(id: artifact.fileURL) {
-            previewContent = await loadPreview()
+            let loaded = await loadPreview()
+            guard !Task.isCancelled else { return }
+            previewContent = loaded
         }
     }
 
@@ -210,22 +213,29 @@ struct ArtifactContextMenuPreview: View {
 
     private func loadPreview() async -> PreviewContent {
         let artifact = artifact
-        return await Task.detached(priority: .utility) {
-            guard artifact.exists else { return PreviewContent.unavailable }
-            switch artifact.kind {
-            case .image:
-                return UIImage(contentsOfFile: artifact.fileURL.path).map(PreviewContent.image) ?? .unavailable
-            case .pdf:
-                let size = CGSize(width: 900, height: 720)
-                guard let page = PDFDocument(url: artifact.fileURL)?.page(at: 0) else { return .unavailable }
-                return .image(page.thumbnail(of: size, for: .cropBox))
-            case .text:
-                guard let data = try? Data(contentsOf: artifact.fileURL),
-                      let text = String(data: data.prefix(4_000), encoding: .utf8) else { return .unavailable }
-                return .text(text)
-            case .html, .file:
-                return .unavailable
-            }
-        }.value
+        guard artifact.kind != .html, artifact.kind != .file else { return .unavailable }
+        do {
+            let data = try await ArtifactPreviewSource(artifact: artifact, scope: scope).read()
+            return await Task.detached(priority: .utility) {
+                switch artifact.kind {
+                case .image:
+                    return UIImage(data: data).map(PreviewContent.image) ?? .unavailable
+                case .pdf:
+                    let size = CGSize(width: 900, height: 720)
+                    guard let page = PDFDocument(data: data)?.page(at: 0) else { return .unavailable }
+                    return .image(page.thumbnail(of: size, for: .cropBox))
+                case .text:
+                    guard let text = String(data: data, encoding: .utf8) else { return .unavailable }
+                    return .text(String(text.prefix(4_000)))
+                case .html, .file:
+                    return .unavailable
+                }
+            }.value
+        } catch is CancellationError {
+            return .unavailable
+        } catch {
+            Log.ui.error("ArtifactContextMenuPreview.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+            return .unavailable
+        }
     }
 }

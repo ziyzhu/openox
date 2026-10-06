@@ -10563,13 +10563,13 @@
         }
       }
     },
-    "This removes the artifact from this Profile. Existing chat references will show a deleted placeholder. This can't be undone." : {
+    "This hides the artifact from your library. Existing chat references and historical files are kept." : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这会从此配置档案中移除该资料。现有对话中的引用会显示为已删除占位符。此操作无法撤销。"
+            "value" : "这会在你的资料库中隐藏该资料。现有对话中的引用和历史文件会保留。"
           }
         }
       }

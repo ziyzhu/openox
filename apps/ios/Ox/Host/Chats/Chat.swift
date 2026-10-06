@@ -62,14 +62,6 @@ nonisolated struct ChatPendingPrompt: Equatable, Sendable {
     let presentation: ChatPromptPresentation
 }
 
-nonisolated private struct ChatContextRestoration: Sendable {
-    let checkpoint: AgentContextCheckpoint?
-    let messages: [Message]
-    let sourceTurns: [Turn]
-    let boundary: Int?
-    let recoveryReason: String?
-}
-
 @MainActor
 @Observable
 final class Chat: Identifiable {
@@ -199,7 +191,7 @@ final class Chat: Identifiable {
         }
     }
 
-    let id: UUID
+    private(set) var id: UUID
     let createdAt: Date
     let scheduledSkillID: UUID?
     let agent: Agent
@@ -207,18 +199,22 @@ final class Chat: Identifiable {
     @ObservationIgnored private(set) var agentSnapshot: AgentSnapshot?
     @ObservationIgnored private var agentControlTask: Task<Void, Never>?
     @ObservationIgnored var durablePreparation: Task<Void, Error>?
+    @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int)?
     private(set) var usesDurableAgent = false
+    private(set) var conversationReference: DurableConversationReference?
 
-    func installDurableDriver(_ driver: DurableAgentDriver?) async throws {
-        guard driver == nil || isTemporary else { throw RuntimeError.bridge("Persisted chats require the storage migration gate") }
+    func installDurableDriver(_ driver: DurableAgentDriver?, reference: DurableConversationReference? = nil) async throws {
+        if let reference {
+            guard reference.profileID == scope.profileID else { throw RuntimeError.bridge("Conversation belongs to another Profile") }
+            conversationReference = reference
+            id = reference.compatibilityID.rawValue
+        }
         try await agent.installDurableDriver(driver)
         usesDurableAgent = driver != nil
     }
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationIntent = false
-    @ObservationIgnored private var contextCheckpoint: AgentContextCheckpoint?
     @ObservationIgnored private var memorySnapshot: String?
-    @ObservationIgnored private var pendingCompactionTokens: Int?
     @ObservationIgnored private var pendingContextCompactions: [ContextCompaction] = []
 
     private(set) var client: any ProviderClient
@@ -240,7 +236,7 @@ final class Chat: Identifiable {
     private(set) var retention: ChatRetention
 
     var isTemporary: Bool { retention == .temporary }
-    var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy && !usesDurableAgent && durablePreparation == nil }
+    var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy }
 
     func toggleRetention() -> Bool {
         guard canChangeRetention else {
@@ -396,6 +392,7 @@ final class Chat: Identifiable {
         deselect()
         serviceManager.browserActionSessions.closeSession(for: id)
         if cancelling { durablePreparation?.cancel(); cancelAll() }
+        if isTemporary { Task { await OxHostProtocol.releaseDurableTemporaryChat(self) } }
     }
 
     var customTitle: String?
@@ -977,7 +974,7 @@ final class Chat: Identifiable {
                 switch event {
                 case .runStarted:
                     self.pendingContextCompactions = []
-                    self.beginAgentTurn()
+                    if !self.document.hasOpenAgentTurn { self.beginAgentTurn() }
                 case .generationStarted(let model, _):
                     self.setRunPhase(.thinking)
                     self.resetStreamedText()
@@ -986,8 +983,10 @@ final class Chat: Identifiable {
                         self.document.apply(.appendContextCompaction(compaction))
                     }
                     self.pendingContextCompactions = []
-                case .messageStart(.assistant):
+                case .messageStart(.assistant(let assistant)):
                     self.resetStreamedText()
+                    if !self.document.hasOpenAgentTurn { self.document.apply(.beginAgentTurn(at: assistant.timestamp)) }
+                    if !self.document.hasOpenGeneration { self.document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
                 case .messageUpdate(_, let event):
                     self.applyAssistantEvent(event)
                 case .reasoning(let text):
@@ -1009,7 +1008,6 @@ final class Chat: Identifiable {
                     self.requestPersistence(.agentTurnFinished)
                     self.agentEventCycle.finish()
                 case .compacted(let before, let after, let chars, let tokensBefore):
-                    self.pendingCompactionTokens = tokensBefore
                     let compaction = ContextCompaction(at: Date(), tokensBefore: tokensBefore)
                     if self.document.lastGenerationID == nil {
                         self.pendingContextCompactions.append(compaction)
@@ -1077,12 +1075,7 @@ final class Chat: Identifiable {
         }
         hasUnreadResponse = meta.hasUnreadResponse
         resolveAttachedServices()
-        contextCheckpoint = context
-        let restoredTurns = document.turns
-        let restorationTask = Task.detached(priority: .userInitiated) {
-            Self.resolveContext(context: context, turns: restoredTurns)
-        }
-        restoreAgent(from: restorationTask)
+        restoreAgent(messages: document.toWire())
         lastActivityAt = meta.lastActivity
         Log.session.info("Chat restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
     }
@@ -1104,7 +1097,7 @@ final class Chat: Identifiable {
     }
 
     var state: ChatState {
-        ChatState(meta: metadata, turns: document.turns, context: contextCheckpoint)
+        ChatState(meta: metadata, turns: document.turns, context: nil)
     }
 
     func exportTranscript() async throws -> Data {
@@ -1415,7 +1408,6 @@ final class Chat: Identifiable {
     }
 
     func renameArtifactReferences(from oldName: String, to newName: String, directory: URL) {
-        invalidateContextCheckpoint(reason: "artifact-rename")
         document.renameArtifactReferences(from: oldName, to: newName, directory: directory)
     }
 
@@ -1432,7 +1424,6 @@ final class Chat: Identifiable {
         Log.session.info("Chat.ensureExecutionContext effect outside execution; opening a standalone turn")
         if !document.hasOpenAgentTurn {
             if case let .agent(_, id) = document.turns.last {
-                invalidateContextCheckpoint(reason: "standalone-execution")
                 document.apply(.resumeAgentTurn(id: id))
             } else {
                 document.apply(.beginAgentTurn(at: Date()))
@@ -1456,7 +1447,6 @@ final class Chat: Identifiable {
         if document.hasOpenAgentTurn { document.apply(.finishAgentTurn(outcome)) }
         let messages = ChatProjection.makeWireMessages(from: document.turns)
         restoreAgent(messages: messages)
-        installContextCheckpoint(messages: messages, tokensBefore: nil)
         requestPersistence(.agentTurnFinished)
     }
 
@@ -1837,11 +1827,8 @@ final class Chat: Identifiable {
         let text = replacingText ?? cut.text
         Log.session.info("Chat.rerun id=\(id) at=\(blockId) cutEntry=\(cut.cutEntry) edited=\(replacingText != nil)")
         cancelAll()
-        invalidateContextCheckpoint(reason: "rerun")
-        document.apply(.truncate(beforeTurn: cut.cutEntry))
-        restoreAgent(messages: document.toWire())
-        markActivity()
-        return enqueue(
+        guard let branched = chatManager?.branch(from: self, atBlock: blockId, submit: false) else { return nil }
+        return branched.enqueue(
             text,
             attachments: cut.attachments,
             skillInvocation: replacingText == nil ? cut.skillInvocation : nil
@@ -2293,6 +2280,63 @@ final class Chat: Identifiable {
 
     // MARK: - Agent loop
 
+    func presentDurableToolAssistant(_ assistant: AssistantMessage) {
+        if !document.hasOpenAgentTurn {
+            if case .agent(_, let id) = document.turns.last { document.apply(.resumeAgentTurn(id: id)) }
+            else { document.apply(.beginAgentTurn(at: assistant.timestamp)) }
+        }
+        if !document.hasOpenGeneration {
+            if case .agent(let turn, _) = document.turns.last, let generation = turn.generations.last,
+               generation.assistantMessage == assistant {
+                document.apply(.resumeGeneration(id: generation.id))
+            } else { document.apply(.beginGeneration(model: assistant.model, at: assistant.timestamp)) }
+        }
+        document.apply(.setGenerationAssistant(assistant))
+        outputDelivery.discardText()
+        streamedText = assistant.content.compactMap { if case .text(let text) = $0 { return text.text }; return nil }.joined(separator: "\n")
+        document.apply(.replaceGenerationText(streamedText))
+    }
+
+    func prepareDurableRecovery() async throws {
+        try await durablePreparation?.value
+        await agentControlTask?.value
+        try await freezeMemorySnapshot()
+        await Skills.shared.waitUntilCurrent()
+        await agent.configure(agentConfiguration(client: client, model: model))
+        try await agent.prepareDurableConfiguration()
+    }
+
+    func resumeDurableSubmission(_ submissionID: Int, requestID: String?) {
+        guard !isBusy else { return }
+        let runID = RunID()
+        agentEventCycle.begin()
+        if case .agent(_, let id) = document.turns.last { document.apply(.resumeAgentTurn(id: id)) }
+        else { document.apply(.beginAgentTurn(at: Date())) }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                finishWorker(runID)
+                if !submissions.isEmpty { startWorker() }
+            }
+            do {
+                let result = try await agent.resumeDurable(submissionID: submissionID, requestID: requestID)
+                await waitForAgentEvents()
+                agentSnapshot = await agent.snapshot()
+                if let error = result.errorMessage, error != "aborted" { notice = .error(error) }
+                document.apply(.sealAllTurns)
+                markActivity(Date())
+                onPersistableChange?()
+            } catch {
+                agentEventCycle.finish()
+                notice = .error(error.localizedDescription)
+                Log.session.error("Chat.recovery failed chat=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
+            }
+        }
+        activeRun = Run(id: runID, task: task, phase: .thinking, activeSubmission: nil, backgroundExecutionExpired: false,
+            backgroundExecution: nil, completionNotification: nil)
+        startBackgroundExecution()
+    }
+
     private func startWorker() {
         guard !isBusy else { return }
         let runID = RunID()
@@ -2454,8 +2498,16 @@ final class Chat: Identifiable {
         defer {
             if activeRun?.id == runID { activeRun?.activeSubmission = nil }
         }
-        await Soul.shared.waitUntilCurrent()
-        await freezeMemorySnapshot()
+        do { try await freezeMemorySnapshot() }
+        catch {
+            let cancelled = error is CancellationError
+            let message = cancelled ? "aborted" : error.localizedDescription
+            Log.session.error("Chat Profile documents unavailable id=\(id) error=\(message)")
+            if !cancelled { notice = .error(message) }
+            submission.latency.finish(outcome: cancelled ? "cancelled" : "rejected", client: client.id, model: model.id)
+            resolveAwaitedSubmission(submission, error: message, failureKind: nil, cancelled: cancelled)
+            return
+        }
         await Skills.shared.waitUntilCurrent()
         skillSession.snapshots = [:]
         if let invocation = submission.skillInvocation { skillSession.snapshots[invocation.skill.name] = invocation.skill }
@@ -2509,7 +2561,6 @@ final class Chat: Identifiable {
         }
         let turnID = transcript.last(where: { $0.isUserInitiated })?.id
         agentEventCycle.begin()
-        pendingCompactionTokens = nil
         submission.latency.mark(.agentSubmitted)
         let result: AgentRunResult
         do {
@@ -2537,8 +2588,6 @@ final class Chat: Identifiable {
         let sealedAt = Date()
         let snapshot = await agent.snapshot()
         agentSnapshot = snapshot
-        installContextCheckpoint(messages: result.messages, tokensBefore: pendingCompactionTokens)
-        pendingCompactionTokens = nil
         let err = result.errorMessage
         let failureKind = result.failureKind
         markActivity(sealedAt)
@@ -2621,108 +2670,6 @@ final class Chat: Identifiable {
         enqueueAgentMutation { agent in
             await agent.restore(messages: messages)
         }
-    }
-
-    private func restoreAgent(from restorationTask: Task<ChatContextRestoration, Never>) {
-        let previous = agentControlTask
-        let agent = agent
-        agentControlTask = Task { @MainActor [weak self] in
-            await previous?.value
-            let restoration = await restorationTask.value
-            guard let self else { return }
-            let transcriptMatches = document.turns == restoration.sourceTurns
-            if transcriptMatches {
-                contextCheckpoint = restoration.checkpoint
-            }
-            await agent.restore(messages: restoration.messages)
-            agentSnapshot = await agent.snapshot()
-            guard transcriptMatches else {
-                Log.session.warning("Chat.context discarded id=\(id) reason=transcript-changed-during-restore")
-                return
-            }
-            if let boundary = restoration.boundary {
-                Log.session.info("Chat.context restored id=\(id) boundary=\(boundary) checkpointMessages=\(restoration.checkpoint?.messages.count ?? 0) tailTurns=\(restoration.sourceTurns.count - boundary - 1)")
-            } else if let checkpoint = restoration.checkpoint {
-                Log.session.warning("Chat.context recovered id=\(id) reason=\(restoration.recoveryReason ?? "unknown") through=\(checkpoint.throughTurnID.rawValue) messages=\(checkpoint.messages.count)")
-            }
-            guard restoration.recoveryReason != nil, restoration.checkpoint != nil else { return }
-            onPersistableChange?()
-        }
-    }
-
-    nonisolated private static func resolveContext(
-        context: AgentContextCheckpoint?,
-        turns: [Turn]
-    ) -> ChatContextRestoration {
-        if turns.requiresContextCheckpoint,
-           let context,
-           let boundary = context.boundary(in: turns) {
-            return ChatContextRestoration(
-                checkpoint: context,
-                messages: context.messages + ChatProjection.makeWireMessages(
-                    from: Array(turns.dropFirst(boundary + 1))
-                ),
-                sourceTurns: turns,
-                boundary: boundary,
-                recoveryReason: nil
-            )
-        }
-        let messages = ChatProjection.makeWireMessages(from: turns)
-        return ChatContextRestoration(
-            checkpoint: recoveredContext(turns: turns, messages: messages),
-            messages: messages,
-            sourceTurns: turns,
-            boundary: nil,
-            recoveryReason: context == nil ? "missing" : "transcript-mismatch"
-        )
-    }
-
-    nonisolated private static func recoveredContext(turns: [Turn], messages: [Message]) -> AgentContextCheckpoint? {
-        guard let compaction = turns.latestContextCompaction,
-              let index = turns.lastIndex(where: { turn in
-            if case .agent = turn { return true }
-            return false
-        }) else { return nil }
-        let checkpointMessages: [Message]
-        if index == turns.index(before: turns.endIndex) {
-            checkpointMessages = messages
-        } else {
-            checkpointMessages = ChatProjection.makeWireMessages(from: Array(turns[...index]))
-        }
-        return AgentContextCheckpoint(
-            messages: checkpointMessages,
-            tokensBefore: compaction.tokensBefore,
-            turns: turns,
-            through: index
-        )
-    }
-
-    private func installContextCheckpoint(messages: [Message], tokensBefore: Int?) {
-        guard let compaction = document.turns.latestContextCompaction else {
-            contextCheckpoint = nil
-            return
-        }
-        guard let index = document.turns.lastIndex(where: { turn in
-            if case .agent = turn { return true }
-            return false
-        }) else {
-            Log.session.warning("Chat.context not saved id=\(id) reason=no-agent-turn")
-            return
-        }
-        let compactionTokens = tokensBefore ?? contextCheckpoint?.tokensBefore ?? compaction.tokensBefore
-        contextCheckpoint = AgentContextCheckpoint(
-            messages: messages,
-            tokensBefore: compactionTokens,
-            turns: document.turns,
-            through: index
-        )
-        Log.session.info("Chat.context checkpoint id=\(id) through=\(document.turns[index].id.rawValue) messages=\(messages.count) compacted=\(tokensBefore != nil) tokensBefore=\(compactionTokens)")
-    }
-
-    private func invalidateContextCheckpoint(reason: String) {
-        guard contextCheckpoint != nil else { return }
-        contextCheckpoint = nil
-        Log.session.info("Chat.context invalidated id=\(id) reason=\(reason)")
     }
 
     // MARK: - Manifest + actions
@@ -2883,9 +2830,14 @@ final class Chat: Identifiable {
         memorySnapshot ?? UserMemory.shared.text
     }
 
-    private func freezeMemorySnapshot() async {
+    private func freezeMemorySnapshot() async throws {
+        guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("Conversation Profile is no longer active") }
+        Soul.shared.reload()
+        UserMemory.shared.reload()
+        try await Soul.shared.waitUntilCurrent()
+        try await UserMemory.shared.waitUntilCurrent()
+        guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("Conversation Profile changed while loading documents") }
         guard memorySnapshot == nil else { return }
-        await UserMemory.shared.waitUntilCurrent()
         let memory = UserMemory.shared.text
         memorySnapshot = memory
         Log.session.info("Chat.memorySnapshot id=\(id) chars=\(memory.count)")

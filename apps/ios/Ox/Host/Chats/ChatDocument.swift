@@ -5,6 +5,7 @@ nonisolated enum ChatDocumentEvent {
     case beginAgentTurn(at: Date, id: TurnID = TurnID())
     case resumeAgentTurn(id: TurnID)
     case beginGeneration(model: String, at: Date, id: AgentGenerationID = AgentGenerationID())
+    case resumeGeneration(id: AgentGenerationID)
     case setGenerationAssistant(AssistantMessage)
     case finishGeneration(TurnOutcome)
     case appendText(String, id: StepID = StepID())
@@ -265,6 +266,12 @@ nonisolated struct ChatDocument {
             reconcileTail()
         case let .beginGeneration(model, at, id):
             beginGeneration(model: model, at: at, id: id)
+        case let .resumeGeneration(id):
+            mutateTurn { turn in
+                guard let index = turn.generations.indices.last, turn.generations[index].id == id else { return }
+                turn.generations[index].outcome = .running
+            }
+            reconcileTail()
         case let .setGenerationAssistant(assistant):
             setGenerationAssistant(assistant)
         case let .finishGeneration(outcome):

@@ -107,6 +107,7 @@ struct ArtifactsView: View {
     @State private var filesPresented = false
     @State private var cameraPresented = false
     @State private var errorMessage: String?
+    @State private var loadErrorMessage: String?
     @State private var mutation: ArtifactMutation?
     @State private var savedErrorMessage: String?
     @State private var downloadErrorMessage: String?
@@ -122,6 +123,8 @@ struct ArtifactsView: View {
                         } else {
                             Color.clear
                         }
+                    } else if let loadErrorMessage {
+                        ContentUnavailableView("Artifact unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
                     } else if records.isEmpty {
                         ScrollView {
                             VStack(spacing: Theme.Spacing.sm) {
@@ -170,7 +173,8 @@ struct ArtifactsView: View {
                                             accessory: .none,
                                             showsContainer: false,
                                             horizontalPadding: 0,
-                                            verticalPadding: Theme.Spacing.xs
+                                            verticalPadding: Theme.Spacing.xs,
+                                            scope: scope
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -185,10 +189,11 @@ struct ArtifactsView: View {
                                             onRename: { mutation = .rename(record.artifact) },
                                             onDelete: { mutation = .deleting(record.artifact) },
                                             isSaved: record.isSaved,
-                                            onToggleSaved: { toggleSaved(record) }
+                                            onToggleSaved: { toggleSaved(record) },
+                                            scope: scope
                                         )
                                     } preview: {
-                                        ArtifactContextMenuPreview(artifact: record.artifact)
+                                        ArtifactContextMenuPreview(artifact: record.artifact, scope: scope)
                                     }
                                 }
                             }
@@ -220,7 +225,7 @@ struct ArtifactsView: View {
             .searchable(text: $query, prompt: "Search artifacts")
             .navigationDestination(isPresented: dedicatedPreviewPresented) {
                 if let artifact = dedicatedPreview {
-                    ArtifactNavigationPage(artifact: artifact)
+                    ArtifactNavigationPage(artifact: artifact, scope: scope)
                         .onAppear {
                             Log.ui.info("ArtifactsView.navigation present file=\(artifact.fileName)")
                         }
@@ -230,7 +235,7 @@ struct ArtifactsView: View {
                 }
             }
             .navigationDestination(item: $preview) { selected in
-                ArtifactPreviewPresentation(artifact: selected.artifact)
+                ArtifactPreviewPresentation(artifact: selected.artifact, scope: selected.scope)
                 .toolbar(removing: .search)
                 .onAppear {
                     Log.ui.info("ArtifactsView.navigation present file=\(selected.artifact.fileName)")
@@ -318,7 +323,8 @@ struct ArtifactsView: View {
                 } else {
                     preview = ArtifactZoomPreview(
                         artifact: available,
-                        sourceID: "artifacts:\(available.id)"
+                        sourceID: "artifacts:\(available.id)",
+                        scope: scope
                     )
                 }
             } catch is CancellationError {
@@ -469,17 +475,23 @@ struct ArtifactsView: View {
 
     private func load() async {
         let repository = ProfileRepository.shared
-        let savedNames = await repository.savedArtifactNames(in: scope)
-        records = await repository.artifacts(in: scope)
-            .map { artifact in
-                ArtifactRecord(
-                    artifact: artifact,
-                    isSaved: savedNames.contains { $0.caseInsensitiveCompare(artifact.fileName) == .orderedSame }
-                )
+        do {
+            let savedNames = try await repository.savedArtifactNames(in: scope)
+            let artifacts = try await repository.artifacts(in: scope)
+            try Task.checkCancellation()
+            records = artifacts.map { artifact in
+                ArtifactRecord(artifact: artifact, isSaved: savedNames.contains { $0.caseInsensitiveCompare(artifact.fileName) == .orderedSame })
             }
-        updateDisplayedRecords()
-        loading = false
-        Log.ui.info("ArtifactsView.load count=\(records.count)")
+            loadErrorMessage = nil
+            updateDisplayedRecords()
+            loading = false
+            Log.ui.info("ArtifactsView.load count=\(records.count)")
+        } catch is CancellationError {
+        } catch {
+            loading = false
+            loadErrorMessage = error.localizedDescription
+            Log.ui.error("ArtifactsView.load profile=\(scope.profileID?.uuidString ?? "nil") error=\(error.localizedDescription)")
+        }
     }
 
     private func toggleSaved(_ record: ArtifactRecord) {

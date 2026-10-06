@@ -6,6 +6,13 @@ import UIKit
 struct ArtifactZoomPreview: Identifiable, Hashable {
     let artifact: Artifact
     let sourceID: String
+    let scope: ProfileScope?
+
+    init(artifact: Artifact, sourceID: String, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.artifact = artifact
+        self.sourceID = sourceID
+        self.scope = scope
+    }
 
     var id: String { sourceID }
 
@@ -109,7 +116,7 @@ struct ArtifactNavigationPage: View {
     var body: some View {
         Group {
             if artifact.kind == .html {
-                HTMLArtifactScreen(artifact: artifact)
+                HTMLArtifactScreen(artifact: artifact, scope: scope)
             } else if artifact.isMarkdown {
                 MarkdownArtifactScreen(artifact: artifact, scope: scope)
             }
@@ -131,9 +138,17 @@ struct ArtifactZoomPreviewScreen: View {
 
     let artifact: Artifact
     let chrome: Chrome
+    private let source: ArtifactPreviewSource
     @State private var image: UIImage?
     @State private var pdfDocument: PDFDocument?
+    @State private var snapshot: ArtifactPreviewSnapshot?
     @State private var loadState = LoadState.loading
+
+    init(artifact: Artifact, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
+        self.artifact = artifact
+        self.chrome = chrome
+        source = ArtifactPreviewSource(artifact: artifact, scope: scope)
+    }
 
     @ViewBuilder
     var body: some View {
@@ -182,9 +197,11 @@ struct ArtifactZoomPreviewScreen: View {
                 unavailable
             }
         case .text, .file:
-            if QLPreviewController.canPreview(artifact.fileURL as NSURL) {
-                QuickLookArtifactView(url: artifact.fileURL)
+            if let snapshot, loadState == .ready, QLPreviewController.canPreview(snapshot.url as NSURL) {
+                QuickLookArtifactView(snapshot: snapshot)
                     .accessibilityLabel(artifact.userFacingName)
+            } else if loadState == .loading {
+                loading
             } else {
                 unavailable
             }
@@ -209,35 +226,45 @@ struct ArtifactZoomPreviewScreen: View {
     private func loadArtifact() async {
         image = nil
         pdfDocument = nil
+        snapshot = nil
         loadState = .loading
         let started = ContinuousClock.now
-        switch artifact.kind {
-        case .image:
-            let loaded = await Task.detached(priority: .userInitiated) {
-                UIImage(contentsOfFile: artifact.fileURL.path)
-            }.value
-            guard !Task.isCancelled else { return }
-            image = loaded
-            loadState = loaded == nil ? .unavailable : .ready
-        case .pdf:
-            let loaded = await Task.detached(priority: .userInitiated) {
-                PDFDocument(url: artifact.fileURL)
-            }.value
-            guard !Task.isCancelled else { return }
-            pdfDocument = loaded
-            loadState = loaded == nil ? .unavailable : .ready
-        case .text, .html, .file:
+        do {
+            switch artifact.kind {
+            case .image:
+                let data = try await source.read()
+                let loaded = await Task.detached(priority: .userInitiated) { UIImage(data: data) }.value
+                try Task.checkCancellation()
+                image = loaded
+                loadState = loaded == nil ? .unavailable : .ready
+            case .pdf:
+                let data = try await source.read()
+                let loaded = await Task.detached(priority: .userInitiated) { PDFDocument(data: data) }.value
+                try Task.checkCancellation()
+                pdfDocument = loaded
+                loadState = loaded == nil ? .unavailable : .ready
+            case .text, .file:
+                let loaded = try await source.snapshot()
+                snapshot = loaded
+                loadState = .ready
+            case .html:
+                loadState = .unavailable
+            }
+        } catch is CancellationError {
             return
+        } catch {
+            loadState = .unavailable
+            Log.ui.error("ArtifactZoomPreviewScreen.read file=\(artifact.fileName) error=\(error.localizedDescription)")
         }
         Log.ui.info("ArtifactZoomPreviewScreen.ready filename=\(artifact.fileName) kind=\(artifact.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
     }
 }
 
 private struct QuickLookArtifactView: UIViewControllerRepresentable {
-    let url: URL
+    let snapshot: ArtifactPreviewSnapshot
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(url: url)
+        Coordinator(snapshot: snapshot)
     }
 
     func makeUIViewController(context: Context) -> QLPreviewController {
@@ -247,16 +274,16 @@ private struct QuickLookArtifactView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: QLPreviewController, context: Context) {
-        guard context.coordinator.url != url else { return }
-        context.coordinator.url = url
+        guard context.coordinator.snapshot.url != snapshot.url else { return }
+        context.coordinator.snapshot = snapshot
         controller.reloadData()
     }
 
     final class Coordinator: NSObject, QLPreviewControllerDataSource {
-        var url: URL
+        var snapshot: ArtifactPreviewSnapshot
 
-        init(url: URL) {
-            self.url = url
+        init(snapshot: ArtifactPreviewSnapshot) {
+            self.snapshot = snapshot
         }
 
         func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
@@ -264,7 +291,7 @@ private struct QuickLookArtifactView: UIViewControllerRepresentable {
         }
 
         func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem {
-            url as NSURL
+            snapshot.url as NSURL
         }
     }
 }

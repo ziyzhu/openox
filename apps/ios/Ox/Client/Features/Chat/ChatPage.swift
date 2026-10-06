@@ -779,7 +779,7 @@ struct ChatPage: View {
             case .retry(let id):
                 Alert(
                     title: Text("Regenerate this reply?"),
-                    message: Text("Erases this reply and everything after it, then runs the prompt again."),
+                    message: Text("Creates a new branch from this prompt. The original conversation is kept."),
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Regenerate")) {
                         Log.ui.info("ChatPage.retry chat=\(chat.id) atBlock=\(id)")

@@ -55,6 +55,7 @@ struct ArtifactThumbnail: View {
     let style: Style
     var background: DynamicColor? = nil
     var previewSourceID: String? = nil
+    var scope: ProfileScope? = StorageRoot.currentScope
     @State private var image: UIImage?
     @Environment(\.displayScale) private var displayScale
 
@@ -94,28 +95,27 @@ struct ArtifactThumbnail: View {
             guard kind == .image || kind == .pdf else { return }
             let size = CGSize(width: style.size * 3, height: style.size * 3)
             let targetPixelSize = max(1, Int((style.size * displayScale).rounded(.up)))
-            let loaded = await Task.detached(priority: .utility) {
-                if kind == .image {
-                    return Self.thumbnail(
-                        at: attachment.fileURL,
-                        targetPixelSize: targetPixelSize
-                    )
-                }
-                return PDFDocument(url: attachment.fileURL)?
-                    .page(at: 0)?
-                    .thumbnail(of: size, for: .cropBox)
-            }.value
-            guard !Task.isCancelled else { return }
-            image = loaded
+            do {
+                let data = try await ArtifactPreviewSource(artifact: attachment, scope: scope).read()
+                let loaded = await Task.detached(priority: .utility) {
+                    if kind == .image { return Self.thumbnail(data: data, targetPixelSize: targetPixelSize) }
+                    return PDFDocument(data: data)?.page(at: 0)?.thumbnail(of: size, for: .cropBox)
+                }.value
+                guard !Task.isCancelled else { return }
+                image = loaded
+            } catch is CancellationError {
+            } catch {
+                Log.ui.error("ArtifactThumbnail.read file=\(attachment.fileName) error=\(error.localizedDescription)")
+            }
         }
     }
 
     nonisolated private static func thumbnail(
-        at fileURL: URL,
+        data: Data,
         targetPixelSize: Int
     ) -> UIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, sourceOptions) else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

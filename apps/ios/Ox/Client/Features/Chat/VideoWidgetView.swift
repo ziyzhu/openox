@@ -6,14 +6,17 @@ import UIKit
 
 struct VideoWidgetView: View {
     let video: VideoWidget
+    var scope: ProfileScope? = StorageRoot.currentScope
 
     @Environment(ServiceManager.self) private var serviceManager
     @State private var player: AVPlayer?
     @State private var isPlaying = false
     @State private var thumbnail: UIImage?
-    @State private var asset: AVURLAsset?
+    @State private var loadedAsset: VideoWidgetAsset?
     @State private var failed = false
     @State private var statusObserver: AnyCancellable?
+
+    private var asset: AVURLAsset? { loadedAsset?.asset }
 
     var body: some View {
         playerSurface
@@ -97,33 +100,46 @@ struct VideoWidgetView: View {
 
     private func load() async {
         guard asset == nil else { return }
-        guard let loaded = await VideoWidgetAsset.asset(for: video.source, serviceManager: serviceManager) else {
+        guard let loaded = await VideoWidgetAsset.asset(for: video.source, scope: scope, serviceManager: serviceManager) else {
             failed = true
             Log.ui.error("VideoWidgetView.load failed")
             return
         }
-        asset = loaded
-        let generator = AVAssetImageGenerator(asset: loaded)
+        guard !Task.isCancelled else { return }
+        loadedAsset = loaded
+        let generator = AVAssetImageGenerator(asset: loaded.asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 600, height: 450)
         if let image = try? await generator.image(at: .zero).image {
+            guard !Task.isCancelled else { return }
             thumbnail = UIImage(cgImage: image)
         }
         Log.ui.info("VideoWidgetView.load ready")
     }
 }
 
-private enum VideoWidgetAsset {
-    static func asset(for source: VideoWidget.Source, serviceManager: ServiceManager) async -> AVURLAsset? {
+private struct VideoWidgetAsset {
+    let asset: AVURLAsset
+    let snapshot: ArtifactPreviewSnapshot?
+
+    static func asset(for source: VideoWidget.Source, scope: ProfileScope?, serviceManager: ServiceManager) async -> Self? {
         switch source {
         case let .artifact(artifact):
-            guard artifact.exists, artifact.isVideo else { return nil }
-            return AVURLAsset(url: artifact.fileURL)
+            guard artifact.isVideo else { return nil }
+            do {
+                let snapshot = try await ArtifactPreviewSource(artifact: artifact, scope: scope).snapshot()
+                return Self(asset: AVURLAsset(url: snapshot.url), snapshot: snapshot)
+            } catch is CancellationError {
+                return nil
+            } catch {
+                Log.ui.error("VideoWidgetAsset.read file=\(artifact.fileName) error=\(error.localizedDescription)")
+                return nil
+            }
         case let .remote(value):
             guard let url = URL(string: value) else { return nil }
             let cookies = await serviceManager.cookies(for: url)
             let options = cookies.isEmpty ? [:] : [AVURLAssetHTTPCookiesKey: cookies]
-            return AVURLAsset(url: url, options: options)
+            return Self(asset: AVURLAsset(url: url, options: options), snapshot: nil)
         }
     }
 }
