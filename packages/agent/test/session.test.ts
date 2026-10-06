@@ -9,7 +9,8 @@ import { ChatBindings, ConversationIdentity } from "../src/chat-bindings";
 import { openOxAgentSession, type OxAgentSession, type CommittedEvent, type SessionOptions,
   type ConversationReference, type ConversationHistoryCursor } from "../src/index";
 import { IOSAgentAdapter } from "../src/adapters/ios/agent";
-import { deliver } from "../src/adapters/ios/bridge";
+import { deliver, streamEvent } from "../src/adapters/ios/bridge";
+import { composeIOSPrompt } from "../src/adapters/ios/prompts";
 import { backend } from "./sqlite-backend";
 
 const context = BACKGROUND_CONTEXT;
@@ -252,23 +253,32 @@ test("presentation and history reopen from SQLite without creating another chat 
   } finally { for (const suffix of ["", "-wal", "-shm"]) await rm(path + suffix, { force: true }); }
 });
 
-test("bounded iOS commands route qualified references while preserving UUID bindings and provider names", async () => {
-  const storage = backend();
+test("bounded iOS commands route qualified references and execute structured prompts through the native boundary", async () => {
+  const path = `/tmp/ox-ios-prompts-${crypto.randomUUID()}.sqlite`;
+  let storage = backend(path);
+  const modelRequests: { systemPrompt: string; messages: { role: string; content: unknown }[] }[] = [];
   const host = globalThis as typeof globalThis & { __oxDurableRequest?: (id: number, json: string) => void };
   const previous = host.__oxDurableRequest;
-  const adapter = new IOSAgentAdapter();
+  let adapter = new IOSAgentAdapter();
   host.__oxDurableRequest = (id, json) => {
     const request = JSON.parse(json);
     void (async () => {
       if (request.method === "sql") return storage.request(request.params.op, request.params.sql, request.params.params);
       if (request.method === "uuid") return crypto.randomUUID();
       if (request.method === "report" || request.method === "agentEvents") return {};
+      if (request.method === "nativeModel") {
+        modelRequests.push(request.params);
+        streamEvent(id, JSON.stringify({ type: "done", reason: "stop", message: {
+          ...fauxAssistantMessage([{ type: "text", text: "native reply" }]), api: "ox-native", model: "mock", timestamp: Date.now(),
+        } }));
+        return null;
+      }
       throw new Error(`Unexpected native capability: ${request.method}`);
     })().then(result => deliver(id, JSON.stringify(result), null), error => deliver(id, "null", String(error)));
   };
   try {
     await adapter.command({ action: "open", profileID: "ios-profile" });
-    const config = { chatID: "external-uuid", title: "Native", systemPrompt: "test", model: "mock", contextWindow: 10000,
+    const config = { chatID: "external-uuid", title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory" }, model: "mock", contextWindow: 100000,
       maxTokens: 1000, reasoning: false, tools: [], messages: [{ role: "user" as const, content: "seed", timestamp: 1 }] };
     const attached = await adapter.command({ action: "attach", config }) as { conversationID: ConversationId; reference: ConversationReference };
     expect(attached.reference).toEqual({ profileID: "ios-profile", conversationID: attached.conversationID });
@@ -290,9 +300,51 @@ test("bounded iOS commands route qualified references while preserving UUID bind
     const second = await adapter.command({ action: "attach", config: { ...config, chatID: "second-uuid" } }) as typeof attached;
     await expect(adapter.command({ action: "attach", config, reference: second.reference })).rejects.toThrow("UUID/reference mismatch");
     await expect(adapter.command({ action: "conversationMetadata", chatID: config.chatID, reference: second.reference })).rejects.toThrow("UUID/reference mismatch");
+    const prompt = composeIOSPrompt(config.promptState);
+    expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
+    const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
+      attachedServices: [{ domain: "ios:files", signIn: "authorized" as const }], fileMountPaths: ["files/a"],
+      artifactPaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" } };
+    const run = await adapter.command({ action: "run", reference: attached.reference, content: "first", turnState }) as { receipt: { status: string } };
+    expect(run.receipt.status).toBe("done");
+    expect(modelRequests[0]!.systemPrompt.startsWith(prompt.rendered)).toBe(true);
+    expect(modelRequests[0]!.systemPrompt).toContain("<profile_files>");
+    expect(modelRequests[0]!.systemPrompt).not.toContain("<ox>");
+    expect(modelRequests[0]!.messages.every(message => message.role !== "system")).toBe(true);
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("<turn-state>");
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("files/a");
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("This is a temporary chat");
+    const updated = { ...config, promptState: { ...config.promptState, soul: "## Voice\nBe direct." } };
+    await adapter.command({ action: "fileWrite", path: "MEMORY.md", text: "new live memory" });
+    await adapter.command({ action: "attach", config: updated, reference: attached.reference });
+    await adapter.command({ action: "run", reference: attached.reference, content: "second",
+      turnState: { ...turnState, skills: [], attachedServices: [], fileMountPaths: [], artifactPaths: [], storageMode: "persisted", responseLanguage: null } });
+    expect(modelRequests[1]!.systemPrompt).toContain("Be direct.");
+    expect(modelRequests[1]!.systemPrompt).not.toContain("Be helpful.");
+    expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
+    expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
+    expect(JSON.stringify(modelRequests[1]!.messages.at(-1))).not.toContain("files/a");
+    const isolated = await adapter.command({ action: "attach", config: { ...config, chatID: "isolated", isolatedWorkspace: true } }) as typeof attached;
+    await adapter.command({ action: "run", reference: isolated.reference, content: "workspace" });
+    expect(modelRequests[2]!.systemPrompt).toContain("<durable_test_workspace>");
+    const retained = await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 });
+    await adapter.command({ action: "close" });
+    storage = backend(path);
+    adapter = new IOSAgentAdapter();
+    await adapter.command({ action: "open", profileID: "ios-profile" });
+    expect(await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 })).toEqual(retained);
+    for (const [config_, reference_] of [[updated, attached.reference], [{ ...config, chatID: "second-uuid" }, second.reference],
+      [{ ...config, chatID: "isolated", isolatedWorkspace: true }, isolated.reference]] as const) {
+      await adapter.command({ action: "attach", config: config_, reference: reference_ });
+    }
+    await adapter.command({ action: "run", reference: attached.reference, content: "after reopen" });
+    expect(modelRequests[3]!.systemPrompt).toBe(modelRequests[1]!.systemPrompt);
   } finally {
     try { await adapter.command({ action: "close" }); }
-    finally { if (previous) host.__oxDurableRequest = previous; else delete host.__oxDurableRequest; }
+    finally {
+      if (previous) host.__oxDurableRequest = previous; else delete host.__oxDurableRequest;
+      for (const suffix of ["", "-wal", "-shm"]) await rm(path + suffix, { force: true });
+    }
   }
 });
 

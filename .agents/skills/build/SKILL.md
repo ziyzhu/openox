@@ -18,6 +18,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services, Local Git seed, and model-action resources. |
+| `bun run build:agent` | Rebuild trusted native bundles, the standalone prompt renderer, and the default SOUL resource. |
 | `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,

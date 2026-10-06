@@ -282,15 +282,24 @@ final class Conversation: Identifiable {
             let client = self.client
             let model = self.model
             let configuration = self.agentConfiguration(client: client, model: model)
+            let prompt: RenderedChatPrompt
+            do {
+                prompt = try await self.renderPrompt(configuration: configuration)
+                try Task.checkCancellation()
+            } catch {
+                if !Task.isCancelled { Log.agent.warning("LLM.prepare prompt unavailable chat=\(self.id) error=\(error.localizedDescription)") }
+                return
+            }
+            let systemPrompt = prompt.rendered
             let fingerprint = promptCacheKey(
                 model: model,
-                systemPrompt: configuration.systemPrompt,
+                systemPrompt: systemPrompt,
                 tools: configuration.tools
             )
             let started = Date()
             let outcome = await client.prepare(
                 model: model,
-                systemPrompt: configuration.systemPrompt,
+                systemPrompt: systemPrompt,
                 tools: configuration.tools
             )
             guard !Task.isCancelled else { return }
@@ -2456,7 +2465,6 @@ final class Conversation: Identifiable {
         }
         submission.latency.mark(.manifestsReady)
         let attached = attachedServices.map { $0.snapshot(attached: true) }
-        let definitions = Dictionary(uniqueKeysWithValues: attachedServices.map { ($0.domain, $0.definition) })
         let fileMountPaths = attached.contains(where: { $0.domain == "ios:files" })
             ? DeviceFolderStore.shared.grants.map { "files/\($0.id)" }
             : []
@@ -2472,21 +2480,18 @@ final class Conversation: Identifiable {
         } catch {
             Log.session.warning("Chat.runOne skill-conflicts unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
         }
-        let transientContext = Self.turnContext(
-            TurnContext(
-                skills: turnSkills,
-                skillConflicts: skillConflicts,
-                attachedServices: attached,
-                definitions: definitions,
-                fileMountPaths: fileMountPaths,
-                artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
-                storageMode: retention == .persisted ? .persisted : .temporary,
-                languageDirective: AppLocale.shared.responseDirective
-            )
+        let turnState = ChatPromptState.turn(
+            skills: turnSkills,
+            skillConflicts: skillConflicts,
+            attachedServices: attached,
+            fileMountPaths: fileMountPaths,
+            artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
+            isTemporary: retention == .temporary,
+            responseLanguage: AppLocale.shared.responseLanguage
         )
         submission.latency.mark(.promptReady)
         let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
-        Log.session.info("Chat.runOne prompt id=\(id) attached=\(attachedLog) model=\(model.id) intentChars=\(submission.text.count) transientChars=\(transientContext?.count ?? 0) attachments=\(submission.attachments.count)")
+        Log.session.info("Chat.runOne prompt id=\(id) attached=\(attachedLog) model=\(model.id) intentChars=\(submission.text.count) turnStateChars=\(turnState.jsonString().count) attachments=\(submission.attachments.count)")
         for definition in allDefinitions() {
             let actions = definition.actions
                 .map(\.id)
@@ -2507,7 +2512,7 @@ final class Conversation: Identifiable {
                     try await submit(ConversationInput(
                         text: submission.text,
                         attachments: submission.attachments,
-                        transientContext: transientContext,
+                        turnState: turnState,
                         turnID: turnID
                     ), configuration: configuration)
                 }
@@ -2714,37 +2719,6 @@ final class Conversation: Identifiable {
 
     // MARK: - Helpers
 
-    typealias TurnContext = ChatPromptComposer.TurnContext
-    typealias SystemPromptBreakdown = ChatPromptComposer.SystemPromptBreakdown
-
-    static func composeSystemPrompt(
-        memory: String,
-        userSkills: [Skill] = []
-    ) -> String {
-        ChatPromptComposer.composeSystemPrompt(
-            memory: memory,
-            userSkills: userSkills
-        )
-    }
-
-    static func systemPromptBreakdown(
-        memory: String,
-        userSkills: [Skill] = []
-    ) -> SystemPromptBreakdown {
-        ChatPromptComposer.systemPromptBreakdown(
-            memory: memory,
-            userSkills: userSkills
-        )
-    }
-
-    static func composeTurnState(_ state: TurnContext) -> String {
-        ChatPromptComposer.composeTurnState(state)
-    }
-
-    static func turnContext(_ state: TurnContext) -> String? {
-        ChatPromptComposer.turnContext(state)
-    }
-
     var systemPromptMemory: String {
         memorySnapshot ?? UserMemory.shared.text
     }
@@ -2768,10 +2742,7 @@ final class Conversation: Identifiable {
         return AgentConfiguration(
             client: client,
             model: model,
-            systemPrompt: Self.composeSystemPrompt(
-                memory: systemPromptMemory,
-                userSkills: Skills.shared.all
-            ),
+            promptState: ChatPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory),
             tools: [ConversationTool(chat: self)],
             streamOptions: StreamOptions(sessionID: chatID.uuidString),
             transformContext: { request in

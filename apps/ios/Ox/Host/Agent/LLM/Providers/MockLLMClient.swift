@@ -1461,7 +1461,9 @@ extension Scenario {
         let hasArtifactState = artifactPaths.isEmpty
             || ctx.transientContext.contains("## Chat Artifacts")
                 && artifactPaths.allSatisfy { ctx.transientContext.contains("`\($0)`") }
-        let languageDirective = AppLocale.resolvedResponseDirective
+        guard let languageDirective = try? ModelPromptRenderer.shared.render(.responseDirective, input: AppLocale.resolvedResponseLanguage) else {
+            return [.say("Response language could not be rendered."), .stop(.stop)]
+        }
         guard ctx.transientContext.contains(userSkill) == expectsUserSkill,
               !ctx.systemPrompt.contains("## Language"),
               !ctx.systemPrompt.contains(userSkill),

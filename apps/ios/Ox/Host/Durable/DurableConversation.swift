@@ -16,6 +16,15 @@ nonisolated struct DurableConversationRoute: Sendable {
 }
 
 extension Conversation {
+    func renderPrompt(configuration: AgentConfiguration) async throws -> RenderedChatPrompt {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
+        let value = try await route.session.runtime.command(.object([
+            "action": .string("composePrompt"), "promptState": configuration.promptState,
+        ]))
+        return try JSONDecoder().decode(RenderedChatPrompt.self, from: Data(value.jsonString().utf8))
+    }
+
     func prepareDurableConversation(configuration: AgentConfiguration) async throws -> JSONValue {
         try Task.checkCancellation()
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
@@ -32,16 +41,11 @@ extension Conversation {
             await self?.receiveAgentEvent(event)
         }
         if let reference = route.reference { try await session.host.expectReference(chatID: chatID, reference: reference.value) }
-        let systemPrompt = route.reference == nil ? configuration.systemPrompt + """
-
-        <durable_test_workspace>
-        The dedicated read/write/edit tools address this Session's isolated, purgeable test workspace, NOT the user's Profile or the filesystem reached through ox.fs. Use these dedicated tools for test workspace files. Their MEMORY.md, SOUL.md, artifacts/ and skills/ paths are synthetic test content; temporary-chat restrictions on REAL Profile mutations do not prohibit editing this separate workspace. Never use ox.fs through execute to stand in for a dedicated workspace tool. Native Ox capabilities remain available through execute and retain all existing permission, temporary-chat, and private-data restrictions. Shell execution is unavailable. Do not claim a file mutation succeeded without its tool result.
-        </durable_test_workspace>
-        """ : configuration.systemPrompt
         let effort = configuration.model.selectedReasoningEffort
         let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
         let config: JSONValue = .object([
-            "chatID": .string(chatID), "model": .string(configuration.model.id), "systemPrompt": .string(systemPrompt),
+            "chatID": .string(chatID), "model": .string(configuration.model.id), "promptState": configuration.promptState,
+            "isolatedWorkspace": .bool(route.reference == nil),
             "providerID": .string(configuration.client.id),
             "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
             "nativeReasoningEffort": thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null,
@@ -68,8 +72,9 @@ extension Conversation {
             }
             return []
         }
-        return try await executeSubmission(action: "run", fields: ["content": .array(content),
-            "requestID": .string(input.turnID?.uuidString ?? UUID().uuidString)], configuration: configuration)
+        var fields: [String: JSONValue] = ["content": .array(content), "requestID": .string(input.turnID?.uuidString ?? UUID().uuidString)]
+        if let turnState = input.turnState { fields["turnState"] = turnState }
+        return try await executeSubmission(action: "run", fields: fields, configuration: configuration)
     }
 
     func resumeSubmission(_ submissionID: Int, requestID: String?) async throws -> ConversationRunResult {

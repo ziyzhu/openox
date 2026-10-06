@@ -39,10 +39,9 @@ final class Soul {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static let defaultText = """
-    ## Voice
-    Be warm, quietly competent, and a little dry. Sound like a capable teammate in a live chat. Lead with the result, default to concise natural replies, and be direct about risks or disagreement. Match the user's tone and use judgment; style never overrides accuracy, safety, or the user's request.
-    """
+    static func defaultText() throws -> String {
+        try ModelPromptRenderer.defaultSoul()
+    }
 }
 
 @MainActor
@@ -66,12 +65,12 @@ final class UserMemory {
 
     private init() {
         scope = nil
-        file = TextFile(name: "MEMORY.md", fallback: "")
+        file = TextFile(name: "MEMORY.md", fallback: { "" })
     }
 
     init(scope: ProfileScope) {
         self.scope = scope
-        file = TextFile(name: "MEMORY.md", fallback: "", scope: scope)
+        file = TextFile(name: "MEMORY.md", fallback: { "" }, scope: scope)
     }
 
     func reload() { file.reload() }

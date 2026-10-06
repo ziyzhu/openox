@@ -49,16 +49,11 @@ struct ChatSnapshot: Encodable {
         messages = try await chat.canonicalMessages()
         id = chat.id.uuidString
         model = configuration.model
-        let currentMemory = chat.systemPromptMemory
-        let userSkills = Skills.shared.all
-        let breakdown = Conversation.systemPromptBreakdown(
-            memory: currentMemory,
-            userSkills: userSkills
-        )
-        systemPrompt = breakdown.scaffold
-        renderedSystemPrompt = configuration.systemPrompt
-        soul = breakdown.soul
-        memory = breakdown.memory
+        let prompt = try await chat.renderPrompt(configuration: configuration)
+        systemPrompt = prompt.scaffold
+        renderedSystemPrompt = prompt.rendered
+        soul = prompt.soul
+        memory = prompt.memory
         tools = configuration.tools.map(ToolDecl.init)
         blocks = chat.transcript
         isBusy = chat.isBusy

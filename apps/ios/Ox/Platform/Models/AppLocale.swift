@@ -58,23 +58,18 @@ final class AppLocale {
         return code == "zh" ? "zh-Hans" : locale.identifier
     }
 
-    var responseDirective: String {
-        Self.responseDirective(for: locale)
+    var responseLanguage: JSONValue {
+        Self.responseLanguage(for: locale)
     }
 
-    nonisolated static var resolvedResponseDirective: String {
-        responseDirective(for: resolvedLocale)
+    nonisolated static var resolvedResponseLanguage: JSONValue {
+        responseLanguage(for: resolvedLocale)
     }
 
-    nonisolated private static func responseDirective(for resolved: Locale) -> String {
-        guard let code = resolved.language.languageCode?.identifier, code != "en" else {
-            return ""
-        }
+    nonisolated private static func responseLanguage(for resolved: Locale) -> JSONValue {
+        guard let code = resolved.language.languageCode?.identifier, code != "en" else { return .null }
         let name = Locale(identifier: "en").localizedString(forIdentifier: resolved.identifier) ?? resolved.identifier
-        return """
-        ## Language
-        Always reply in \(name) (\(resolved.identifier)), no matter what language the user writes in, unless they explicitly ask for another language. Write every word of every reply — prose, lists, labels — in \(name), and use local conventions for dates, numbers, and currency.
-        """
+        return .object(["identifier": .string(resolved.identifier), "name": .string(name)])
     }
 }
 

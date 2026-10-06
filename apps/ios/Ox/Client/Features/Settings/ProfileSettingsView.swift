@@ -331,7 +331,8 @@ private struct ProfileContentsView: View {
     }
 
     private var soulSummary: Text {
-        context?.soul.text == Soul.defaultText ? Text("Default") : Text("Custom")
+        guard let soul = context?.soul.text, let defaultText = try? Soul.defaultText() else { return Text("Custom") }
+        return soul == defaultText ? Text("Default") : Text("Custom")
     }
 
     private var artifactsSummary: Text {

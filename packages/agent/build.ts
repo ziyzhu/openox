@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { defaultSoul } from "./src/core/prompts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const destination = `${root}apps/ios/Ox/Resources/PiDurable.bundle`;
@@ -26,16 +27,22 @@ const result = await build({
     }));
   } }],
 });
+const promptResult = await build({
+  absWorkingDir: root, entryPoints: { prompts: "packages/agent/src/adapters/ios/prompt-renderer.ts" },
+  bundle: true, platform: "browser", format: "iife", globalName: "OxPrompts",
+  target: "es2022", minify: true, legalComments: "eof", write: false, metafile: true, outdir: destination,
+});
 await mkdir(destination, { recursive: true });
 await rm(`${destination}/harness-proof.js`, { force: true });
 const bundles: Record<string, { bytes: number; sha256: string }> = {};
-for (const file of result.outputFiles) {
+for (const generated of [result, promptResult]) for (const file of generated.outputFiles) {
   const name = file.path.split("/").at(-1)!;
-  const output = Object.entries(result.metafile.outputs).find(([path]) => path.endsWith(`/${name}`))![1];
+  const output = Object.entries(generated.metafile.outputs).find(([path]) => path.endsWith(`/${name}`))![1];
   const inputs = Object.entries(output.inputs).filter(([, contribution]) => contribution.bytesInOutput > 0).map(([path]) => path);
   const forbidden = inputs.filter(path => /\/(env\/node|storage\/.*\/node|api\/(?!lazy\.js$).*|providers\/|node\/).*\.js$|\/tools\/bash\.js$/.test(path)
     || (name === "harness.js" && /\/(storage-diagnostics\.ts$|storage-check\.ts$|storage-benchmark\.ts$)/.test(path))
-    || (name === "harness-storage.js" && /\/src\/(core\/|chat-bindings\.ts$|adapters\/ios\/(agent|native-model)\.ts$)/.test(path)));
+    || (name === "harness-storage.js" && /\/src\/(core\/|chat-bindings\.ts$|adapters\/ios\/(agent|native-model)\.ts$)/.test(path))
+    || (name === "prompts.js" && !/^packages\/agent\/src\/(adapters\/ios\/prompt-renderer|core\/(prompts|provider-prompts))\.ts$/.test(path)));
   const external = output.imports.filter(item => item.external);
   if (forbidden.length || external.length || /\brequire\s*\(|\bimport\s*\(|\bprocess\s*\./.test(file.text)) {
     throw new Error(`Non-portable ${name}: ${JSON.stringify({ forbidden, external })}`);
@@ -44,7 +51,10 @@ for (const file of result.outputFiles) {
   bundles[name] = { bytes: file.contents.length, sha256: new Bun.CryptoHasher("sha256").update(file.text).digest("hex") };
   console.log(`PASS ${name} audit: ${inputs.length} inputs, ${file.contents.length} bytes, no external imports or Node runtime`);
 }
+await writeFile(`${destination}/default-soul.md`, defaultSoul);
+const resources = { "default-soul.md": { bytes: new TextEncoder().encode(defaultSoul).length,
+  sha256: new Bun.CryptoHasher("sha256").update(defaultSoul).digest("hex") } };
 await copyFile(`${root}packages/agent/UPSTREAM_LICENSE.txt`, `${destination}/UPSTREAM_LICENSE.txt`);
 await writeFile(`${destination}/manifest.json`, JSON.stringify({
-  format: 1, purpose: "isolated-native-rollout", packages: { durable: "1.0.0", ai: "1.0.0", chord: "1.0.0" }, bundles,
+  format: 1, purpose: "isolated-native-rollout", packages: { durable: "1.0.0", ai: "1.0.0", chord: "1.0.0" }, bundles, resources,
 }, null, 2) + "\n");

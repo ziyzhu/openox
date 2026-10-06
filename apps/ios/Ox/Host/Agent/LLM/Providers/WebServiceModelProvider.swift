@@ -67,8 +67,11 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
     func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {
         streamingTask(model: model, messages: messages) { continuation in
             do {
-                let instructions = [systemPrompt, WebsiteToolContract.instructions(tools)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
-                let input = try WebsiteProviderPrompt.prepare(messages: messages, toolInstructions: instructions, providerName: displayName)
+                let instructions = try ModelPromptRenderer.shared.render(.websiteInstructions, input: .object([
+                    "systemPrompt": systemPrompt.map(JSONValue.string) ?? .null,
+                    "actionsJSON": .string(tools.isEmpty ? "" : WebsiteToolContract.canonical(WebsiteToolContract.declarations(tools))),
+                ]))
+                let input = try WebsiteProviderPrompt.prepare(messages: messages, instructions: instructions, providerName: displayName)
                 let prepared = input.messages.arrayValue ?? []
                 let chatID = options.sessionID.flatMap(UUID.init(uuidString:))
                 let (context, turn) = try await WebModelContext.checkout(service: service(), chatID: chatID, modelID: model.wireID, options: options, messages: prepared)

@@ -3,7 +3,7 @@ import Foundation
 nonisolated public struct AgentConfiguration: Sendable {
     public var client: any ProviderClient
     public var model: ProviderModel
-    public var systemPrompt: String
+    public var promptState: JSONValue
     public var tools: [any AgentTool]
     public var streamOptions: StreamOptions
     public var compactionThreshold: Double
@@ -16,7 +16,7 @@ nonisolated public struct AgentConfiguration: Sendable {
     public init(
         client: any ProviderClient,
         model: ProviderModel,
-        systemPrompt: String = "",
+        promptState: JSONValue,
         tools: [any AgentTool] = [],
         streamOptions: StreamOptions = StreamOptions(),
         compactionThreshold: Double = 0.75,
@@ -28,7 +28,7 @@ nonisolated public struct AgentConfiguration: Sendable {
     ) {
         self.client = client
         self.model = model
-        self.systemPrompt = systemPrompt
+        self.promptState = promptState
         self.tools = tools
         self.streamOptions = streamOptions
         self.compactionThreshold = compactionThreshold

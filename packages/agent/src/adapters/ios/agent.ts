@@ -15,12 +15,15 @@ import { nativeDatabase } from "../../sqlite";
 import { native } from "./bridge";
 import { nativeStream } from "./native-model";
 import { nativeArtifacts } from "./artifacts";
+import { composeIOSPrompt } from "./prompts";
+import { composeTurnContext, type SystemPromptInput, type TurnState } from "../../core/prompts";
 
 const context = BACKGROUND_CONTEXT;
-interface Config { chatID: string; title?: string; systemPrompt: string; model: string; contextWindow: number; maxTokens: number;
+interface Config { chatID: string; title?: string; promptState: SystemPromptInput; isolatedWorkspace?: boolean; model: string; contextWindow: number; maxTokens: number;
   reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; messages: Message[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
 interface Command extends ApplicationPresentationChange { action: string; draft?: NormalizedProfileDraft; config?: Config; chatID?: string | null; content?: UserInput;
+  promptState?: SystemPromptInput; turnState?: TurnState;
   requestID?: string; submissionID?: SubmissionId; profileID?: string; path?: string; prefix?: string; text?: string; base64?: string; saved?: boolean; artifactFiles?: boolean;
   artifact?: ArtifactRecord & { binary: boolean; saved: boolean }; writes?: { path: string; text: string }[]; removes?: string[]; entries?: EntryDraft[];
   reference?: ConversationReference | null; limit?: number; historyCursor?: ConversationHistoryCursor | null; listCursor?: ConversationListCursor | null;
@@ -68,6 +71,7 @@ export class IOSAgentAdapter {
   private models = createModels();
 
   async command(args: Command): Promise<unknown> {
+    if (args.action === "composePrompt") return composeIOSPrompt(args.promptState!);
     if (args.action === "installProfile") {
       if (this.session || !args.draft) throw new Error("Profile installation requires an unopened staged runtime and normalized draft");
       return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })), artifacts: nativeArtifacts() });
@@ -139,7 +143,10 @@ export class IOSAgentAdapter {
       case "run": {
         const target = attached();
         await this.guardProgress(target);
-        return session.run(target, { type: "input", content: args.content ?? "", requestId: args.requestID });
+        const content = args.content ?? "";
+        const contextualContent = args.turnState ? [...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content),
+          { type: "text" as const, text: composeTurnContext(args.turnState), oxTransientContext: true }] : content;
+        return session.run(target, { type: "input", content: contextualContent, requestId: args.requestID });
       }
       case "resumeExisting": return this.resumeExisting(attached(), args.submissionID, args.requestID);
       case "resume": {
@@ -396,6 +403,7 @@ export class IOSAgentAdapter {
 
   private async attach(config: Config, requestedReference?: ConversationReference) {
     if (!config?.chatID) throw new Error("A native route identity is required");
+    const systemPrompt = composeIOSPrompt(config.promptState, config.isolatedWorkspace).rendered;
     if (config.toolExecutionMode !== undefined && !["parallel", "sequential"].includes(config.toolExecutionMode)) throw new Error("Invalid tool execution mode");
     if (config.providerID !== undefined && (typeof config.providerID !== "string" || !config.providerID)) throw new Error("Invalid native credential provider ID");
     if (config.thinkingLevel != null && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(config.thinkingLevel)) throw new Error("Invalid Pi thinking level");
@@ -425,7 +433,7 @@ export class IOSAgentAdapter {
       models: [{ id: config.model, provider: alias, api: "ox-native", name: config.model, baseUrl: "", reasoning: config.reasoning,
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
-    const extension = defineExtension({ name: extensionName ?? `ox-chat:${alias.slice(10)}`, sections: [section("ox", () => config.systemPrompt, { tag: false })],
+    const extension = defineExtension({ name: extensionName ?? `ox-chat:${alias.slice(10)}`, sections: [section("ox", () => systemPrompt, { tag: false })],
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });
     session.registry.install(extension);

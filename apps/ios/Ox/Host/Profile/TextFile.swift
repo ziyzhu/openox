@@ -19,7 +19,7 @@ final class TextFile {
     }
 
     let name: String
-    private let fallback: String
+    private let fallback: @MainActor () throws -> String
     private let fixedScope: ProfileScope?
     private var value = ""
     private var state = State.pending(nil, failure: nil)
@@ -43,7 +43,7 @@ final class TextFile {
         }
     }
 
-    init(name: String, fallback: String, scope: ProfileScope? = nil) {
+    init(name: String, fallback: @escaping @MainActor () throws -> String, scope: ProfileScope? = nil) {
         self.name = name
         self.fallback = fallback
         self.fixedScope = scope
@@ -68,8 +68,9 @@ final class TextFile {
                 if let saved = try await repository.readTextFile(named: name, in: scope) {
                     loaded = saved
                 } else {
+                    let seed = try fallback()
                     let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
-                        "action": .string("fileSeed"), "path": .string(name), "text": .string(fallback),
+                        "action": .string("fileSeed"), "path": .string(name), "text": .string(seed),
                     ]))
                     guard let content = result.objectValue?["content"]?.stringValue else {
                         throw RuntimeError.bridge("Profile document seed did not return text: \(name)")

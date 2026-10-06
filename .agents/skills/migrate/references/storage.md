@@ -469,6 +469,10 @@ cached for presentation, and written atomically. Both reload after Profile switc
 only `SOUL.md` reloads after relevant external changes. Each chat snapshots the
 loaded memory into its system prompt so later memory changes do not invalidate the
 chat's prompt cache. An existing unreadable or cloud-evicted file is not overwritten.
+The default SOUL seed is defined in TypeScript and generated into the signed app's
+`PiDurable.bundle/default-soul.md`. Native loading requests it only after confirming
+that the Profile document is absent; missing resources fail without seeding empty
+content. Existing SOUL/MEMORY documents and their persisted representation are unchanged.
 
 Each skill package contains `SKILL.md` and optional nested UTF-8 files under
 `references/` and JavaScript helpers under `scripts/`. Names use lowercase kebab-case;
