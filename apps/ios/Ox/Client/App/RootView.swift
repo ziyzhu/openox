@@ -882,6 +882,7 @@ struct RootView: View {
                 .multilineTextAlignment(.center)
             if recovery != .updateBuild {
                 Button("Try Again") { bootstrap() }
+                    .font(Theme.Fonts.labelMd)
                     .buttonStyle(.borderedProminent)
             }
         }
