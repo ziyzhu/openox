@@ -38,7 +38,7 @@ Optional-resource failures may isolate the feature instead of startup only when 
 
 Keep a legacy read fallback during the migration window when it materially reduces data-loss risk, but make the migrator responsible for converging storage to the current representation. Derived caches may be invalidated and rebuilt after authoritative migration succeeds.
 
-Log structured detection, start, completion, deferral, and failure events without credentials or reusable secrets. Include the source and target milestone and bounded item counts so TestFlight diagnostics can distinguish absent data from failed discovery or indexing.
+Log structured detection, start, completion, deferral, and failure events without credentials or reusable secrets. Include the source and target milestone and bounded item counts so TestFlight diagnostics can distinguish absent data from failed discovery or indexing. For decoder failures, log the source-relative file, record number, coding path, and error kind without payload values; a “missing data” Cocoa error can mean an omitted field, not a missing file. A current milestone does not prove every historical transcript record uses the current encoding: retain structural compatibility probes at the conversion boundary.
 
 ## Verify upgrades
 

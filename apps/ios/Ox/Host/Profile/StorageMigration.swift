@@ -345,23 +345,34 @@ nonisolated enum StorageMigrator {
         for path in chatPaths {
             let prefix = String(path.dropLast("chat.json".count))
             let data = try durableSourceFile(path, at: profile.url)
-            let metadata = try decoder.decode(ChatMeta.self, from: data)
+            let metadata = try decodeMigrationValue(ChatMeta.self, from: data, decoder: decoder, path: path)
             guard metadata.schemaVersion == ChatFormat.currentSchemaVersion,
                   UUID(uuidString: String(prefix.split(separator: "/")[1])) == metadata.id else {
                 throw StorageMigrationError.invalidApplicationStorage(path)
             }
             let transcriptPath = prefix + "turns.jsonl"
-            var records: [(turn: Turn, source: JSONValue)] = []
+            var records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)] = []
             if inventory[transcriptPath] != nil {
                 let descriptor = try durableSourceDescriptor(transcriptPath, at: profile.url)
                 defer { Darwin.close(descriptor) }
                 let reader = DurableTranscriptReader(descriptor: descriptor, store: payloadStore)
                 while let record = try reader.next() {
-                    let turn = try decoder.decode(Turn.self, from: Data(record.value.jsonString().utf8))
-                    records.append((turn, record.source))
+                    var missingPurposes: Set<UUID> = []
+                    let value = mapMigrationInvocations(in: record.value) { invocation in
+                        var invocation = invocation
+                        if invocation["purpose"] == nil {
+                            invocation["purpose"] = .string("")
+                            if let id = invocation["id"]?.stringValue.flatMap(UUID.init(uuidString:)) { missingPurposes.insert(id) }
+                        }
+                        return invocation
+                    }
+                    let turn = try decodeMigrationValue(Turn.self, from: Data(value.jsonString().utf8), decoder: decoder,
+                        path: "\(transcriptPath):\(records.count + 1)")
+                    records.append((turn, record.source, missingPurposes))
                     payloads[record.source.objectValue!["path"]!.stringValue!] = record.source
                 }
-                Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) bytes=\(reader.position)")
+                let missingPurposes = records.reduce(0) { $0 + $1.missingPurposes.count }
+                Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) legacyPurposes=\(missingPurposes) bytes=\(reader.position)")
             }
             let turns = records.map(\.turn)
             var document = ChatDocument(turns: turns)
@@ -369,29 +380,49 @@ nonisolated enum StorageMigrator {
             document.apply(.sealAllTurns)
             let sealed = document.turns
             let contextPath = prefix + "context.json"
-            let checkpoint = inventory[contextPath] == nil ? nil : try decoder.decode(AgentContextCheckpoint.self,
-                from: durableSourceFile(contextPath, at: profile.url))
-            let boundary = try checkpoint.map { try durableCheckpointBoundary($0, turns: turns, store: payloadStore) } ?? nil
-            guard checkpoint == nil || boundary != nil else { throw StorageMigrationError.invalidApplicationStorage(contextPath) }
-            if turns.requiresContextCheckpoint, checkpoint == nil {
+            let checkpoint = inventory[contextPath] == nil ? nil : try decodeMigrationValue(AgentContextCheckpoint.self,
+                from: durableSourceFile(contextPath, at: profile.url), decoder: decoder, path: contextPath)
+            let boundary = try checkpoint.map {
+                let original = try decoder.decode(JSONValue.self, from: durableSourceFile(contextPath, at: profile.url))
+                return try durableCheckpointBoundary($0, records: records, originalMessages: original.objectValue?["messages"], store: payloadStore)
+            } ?? nil
+            if checkpoint != nil, boundary == nil {
+                Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=staleTranscriptCheckpoint source=completeTranscript turns=\(turns.count)")
+            } else if turns.requiresContextCheckpoint, checkpoint == nil {
                 Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=missingCheckpoint source=completeTranscript turns=\(turns.count)")
             }
             let alias = "ox-native:\(metadata.id.uuidString)"
-            func messages(_ source: [Turn]) -> [JSONValue] {
-                ChatProjection.makeWireMessages(from: source).map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id) }
+            var unavailableAttachments = 0
+            func messages(_ source: [Message]) -> [JSONValue] {
+                source.map { message in
+                    var fields = DurableMessageCodec.message(message, provider: alias, profileID: profile.id).objectValue!
+                    fields["content"] = .array((fields["content"]?.arrayValue ?? []).map { block in
+                        guard let name = block.objectValue?["oxAttachment"]?.stringValue,
+                              !names.contains(name.lowercased()) else { return block }
+                        unavailableAttachments += 1
+                        return .object(["type": .string("text"), "text": .string("[Unavailable historical attachment: artifacts/\(name)]")])
+                    })
+                    return .object(fields)
+                }
             }
             var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["source": try archive(data).toAny()]]]
+            if checkpoint != nil, boundary == nil {
+                entries.append(["kind": "ox.native.context", "data": ["source": try archive(durableSourceFile(contextPath, at: profile.url)).toAny()]])
+            }
             var expected: [Any] = []
             for (index, turn) in sealed.enumerated() {
                 let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
-                let model = messages([turn]).map { $0.toAny() }
+                let model = messages(ChatProjection.makeWireMessages(from: [turn])).map { $0.toAny() }
                 expected.append(contentsOf: model)
                 entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "source": records[index].source.toAny()]])
                 if index == boundary, let checkpoint {
-                    expected = checkpoint.messages.map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id).toAny() }
+                    expected = messages(checkpoint.messages).map { $0.toAny() }
                     let source = try archive(durableSourceFile(contextPath, at: profile.url))
                     entries.append(["kind": "pi.reset", "head": "self", "data": ["source": source.toAny()], "model": expected])
                 }
+            }
+            if unavailableAttachments > 0 {
+                Log.app.warning("StorageMigrator.pi attachments unavailable path=\(path) count=\(unavailableAttachments) sourcePreserved=true")
             }
             var applicationMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             for key in ["id", "model", "title", "isFavorite", "hasUnreadResponse"] { applicationMetadata.removeValue(forKey: key) }
@@ -410,13 +441,67 @@ nonisolated enum StorageMigrator {
             "artifacts": artifacts, "payloads": payloads.values.map { $0.toAny() }, "conversations": conversations]), manifest: manifest, inventory: inventory)
     }
 
-    private static func durableCheckpointBoundary(_ checkpoint: AgentContextCheckpoint, turns: [Turn], store: DurableArtifactStore) throws -> Int? {
+    private static func decodeMigrationValue<T: Decodable>(_ type: T.Type, from data: Data, decoder: JSONDecoder, path: String) throws -> T {
+        do { return try decoder.decode(type, from: data) }
+        catch let error as DecodingError {
+            let context: DecodingError.Context
+            let reason: String
+            switch error {
+            case .keyNotFound(let key, let detail): context = detail; reason = "missingKey:\(key.stringValue)"
+            case .valueNotFound(_, let detail): context = detail; reason = "missingValue"
+            case .typeMismatch(_, let detail): context = detail; reason = "typeMismatch"
+            case .dataCorrupted(let detail): context = detail; reason = "dataCorrupted"
+            @unknown default: throw error
+            }
+            let field = String(context.codingPath.map(\.stringValue).joined(separator: ".").prefix(512))
+            Log.app.error("StorageMigrator.pi decode failed path=\(path) field=\(field) reason=\(reason) sourcePreserved=true")
+            throw error
+        }
+    }
+
+    private static func mapMigrationInvocations(in value: JSONValue, transform: ([String: JSONValue]) -> [String: JSONValue]) -> JSONValue {
+        guard var root = value.objectValue, root["type"] == .string("agent"),
+              var agent = root["agent"]?.objectValue, let steps = agent["steps"]?.arrayValue else { return value }
+        agent["steps"] = .array(steps.map { value in
+            guard var step = value.objectValue, step["type"] == .string("action"),
+                  var action = step["action"]?.objectValue, action["type"] == .string("execute"),
+                  var execution = action["execute"]?.objectValue, let effects = execution["effects"]?.arrayValue else { return value }
+            execution["effects"] = .array(effects.compactMap { value in
+                guard var effect = value.objectValue else { return value }
+                if ["step", "widget", "media"].contains(effect["type"]?.stringValue ?? ""),
+                   let fields = value.toAny() as? [String: Any] {
+                    guard let legacy = canonicalLegacyEffect(fields) else { return nil }
+                    effect = JSONValue.from(legacy).objectValue!
+                }
+                if effect["type"] == .string("invocation"), let invocation = effect["invocation"]?.objectValue {
+                    effect["invocation"] = .object(transform(invocation))
+                }
+                return .object(effect)
+            })
+            action["execute"] = .object(execution)
+            step["action"] = .object(action)
+            return .object(step)
+        })
+        root["agent"] = .object(agent)
+        return .object(root)
+    }
+
+    private static func durableCheckpointBoundary(_ checkpoint: AgentContextCheckpoint,
+        records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)], originalMessages: JSONValue?, store: DurableArtifactStore) throws -> Int? {
+        let turns = records.map(\.turn)
         if let boundary = checkpoint.boundary(in: turns) { return boundary }
         guard checkpoint.schemaVersion == AgentContextCheckpoint.currentSchemaVersion,
-              let boundary = turns.firstIndex(where: { $0.id == checkpoint.throughTurnID }) else { return nil }
+              let boundary = turns.firstIndex(where: { $0.id == checkpoint.throughTurnID }) else {
+            throw StorageMigrationError.invalidApplicationStorage("compaction checkpoint boundary")
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        guard durableDigest(try encoder.encode(checkpoint.messages)) == checkpoint.messagesDigest else { return nil }
+        let currentMessagesDigest = durableDigest(try encoder.encode(checkpoint.messages))
+        let originalMessagesDigest = try originalMessages.map { durableDigest(try encoder.encode($0)) }
+        guard currentMessagesDigest == checkpoint.messagesDigest || originalMessagesDigest == checkpoint.messagesDigest else {
+            Log.app.error("StorageMigrator.pi checkpoint invalid component=messages turn=\(checkpoint.throughTurnID.rawValue)")
+            throw StorageMigrationError.invalidApplicationStorage("compaction checkpoint messages")
+        }
         var hash = SHA256()
         func append(_ value: JSONValue) throws {
             if let fields = value.objectValue, let reference = fields["oxPayload"]?.objectValue, reference["format"] == .int(1),
@@ -447,12 +532,25 @@ nonisolated enum StorageMigrator {
             }
         }
         hash.update(data: Data("[".utf8))
-        for (index, turn) in turns[...boundary].enumerated() {
+        for (index, record) in records[...boundary].enumerated() {
             if index > 0 { hash.update(data: Data(",".utf8)) }
-            try append(JSONDecoder().decode(JSONValue.self, from: encoder.encode(turn)))
+            let canonical = try JSONDecoder().decode(JSONValue.self, from: encoder.encode(record.turn))
+            let original = mapMigrationInvocations(in: canonical) { invocation in
+                var invocation = invocation
+                if let id = invocation["id"]?.stringValue.flatMap(UUID.init(uuidString:)), record.missingPurposes.contains(id) {
+                    invocation.removeValue(forKey: "purpose")
+                }
+                return invocation
+            }
+            try append(original)
         }
         hash.update(data: Data("]".utf8))
-        return hash.finalize().map { String(format: "%02x", $0) }.joined() == checkpoint.transcriptPrefixDigest ? boundary : nil
+        let digest = hash.finalize().map { String(format: "%02x", $0) }.joined()
+        guard digest == checkpoint.transcriptPrefixDigest else {
+            Log.app.warning("StorageMigrator.pi checkpoint stale component=transcript turn=\(checkpoint.throughTurnID.rawValue)")
+            return nil
+        }
+        return boundary
     }
 
     private static func durableExpectedContext(_ source: [Any]) throws -> [[String: Any]] {
@@ -2436,7 +2534,7 @@ nonisolated enum StorageMigrator {
         case "widget":
             return nil
         case "media":
-            effect["media"] = effect.removeValue(forKey: "artifact")
+            if effect["media"] == nil { effect["media"] = effect.removeValue(forKey: "artifact") }
         default:
             break
         }
