@@ -884,6 +884,7 @@ nonisolated enum StorageMigrator {
                     : stored
                 let originalCount = configuration.actions.count
                 let storedActions = configuration.actions
+                let renamedCount = storedActions.keys.filter { canonicalApprovalAction($0) != $0 }.count
                 var migratedActions = storedActions.reduce(into: [String: ActionPolicy]()) { actions, entry in
                     guard !isRetiredApproval(entry.key, retired: retired), !entry.key.hasPrefix("ios:files:") else { return }
                     let action = canonicalApprovalAction(entry.key)
@@ -903,7 +904,7 @@ nonisolated enum StorageMigrator {
                 defaults.removeObject(forKey: ServiceManager.legacyAutoApproveActionsKey)
                 defaults.removeObject(forKey: ServiceManager.legacyAutoApproveAllKey)
                 defaults.synchronize()
-                Log.app.info("StorageMigrator.actionPolicies current format=\(configuration.format) migrated=\(migratedFormat) actions=\(configuration.actions.count) removed=\(originalCount - configuration.actions.count)")
+                Log.app.info("StorageMigrator.actionPolicies current format=\(configuration.format) migrated=\(migratedFormat) actions=\(configuration.actions.count) renamed=\(renamedCount) removed=\(originalCount - configuration.actions.count)")
             } catch {
                 Log.app.error("StorageMigrator.actionPolicies invalid preserved=true error=\(error.localizedDescription)")
             }
@@ -950,6 +951,11 @@ nonisolated enum StorageMigrator {
     }
 
     private static func canonicalApprovalAction(_ action: String) -> String {
+        switch action {
+        case "ox.chat.start": return "ox.conversation.start"
+        case "ox.chat.delete": return "ox.conversation.delete"
+        default: break
+        }
         let renamed = action.replacingOccurrences(of: "ox.service.repository.", with: "ox.repository.")
             .replacingOccurrences(of: "ox.service.git.", with: "ox.repository.git.")
             .replacingOccurrences(of: "ox.app.serviceRepositories", with: "ox.app.repositories")

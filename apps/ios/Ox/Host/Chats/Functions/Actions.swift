@@ -1,8 +1,8 @@
 import Foundation
 
 nonisolated enum Actions {
-    static let chatStart = "ox.chat.start"
-    static let chatDelete = "ox.chat.delete"
+    static let chatStart = "ox.conversation.start"
+    static let chatDelete = "ox.conversation.delete"
     static let providerDefault = "ox.provider.default"
     static let providerList = "ox.provider.list"
     static let providerGet = "ox.provider.get"

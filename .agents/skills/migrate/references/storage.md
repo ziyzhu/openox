@@ -74,6 +74,11 @@ legacy bundle-derived identifiers.
 At startup, `StorageMigrator` removes retired Gemma 4 model artifacts and clears
 that provider when it was the saved default.
 
+Approval-policy keys `ox.chat.start` and `ox.chat.delete` are migrated by
+`StorageMigrator` to `ox.conversation.start` and `ox.conversation.delete` before
+policy consumers initialize. Existing destination policies win collisions;
+subsequent launches are no-ops. User-authored code is not rewritten.
+
 Primary owners:
 
 - UserDefaults onboarding state — owner: App.swift

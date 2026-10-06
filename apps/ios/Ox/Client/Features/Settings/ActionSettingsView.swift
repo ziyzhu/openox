@@ -186,7 +186,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         }
         // Group by user-facing feature, not by permission policy or storage source.
         return switch action.split(separator: ".").dropFirst().first {
-        case "chat", "user": .chats
+        case "conversation", "user": .chats
         case "provider", "secret": .models
         case "web": .web
         case "artifact", "vision", "widget": .artifacts
