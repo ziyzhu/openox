@@ -2,22 +2,16 @@
 
 ## Status and goal
 
-This is the agreed architectural direction. The host-neutral Session, opt-in
-native temporary-chat adapter, physical artifacts and qualified conversation
-projections are implemented. Custom mock proofs, effect receipts, fault injection,
+The local production cutover is implemented and undergoing final acceptance. Production and temporary chats use Pi; the Swift legacy loop and compactor are removed. Local Profiles activate through staged conversion/publication journals into `profile.json`, `state.sqlite`, and immutable physical artifacts. Qualified history, document-backed skills, verified provider/preview bytes, global recovery admission, native committed-tool hydration, and independent qualified fork routes are integrated. Custom mock proofs, effect receipts, fault injection,
 codec/file fixtures, conversion/package experiments and the agent-overhead benchmark
 have been removed. Only published Pi Durable storage conformance and benchmarks
 remain in a separate diagnostics bundle; application acceptance uses actual-chat E2E.
-Production activation, real-Profile conversion/export/import and full replacement
-remain unimplemented. Earlier native evidence below is historical, not a pass of
-this cleanup. Native RPC verification requires approved Tailscale ingress; do not
+Current simulator evidence verifies real local conversion/activation, persisted normal/native-tool chats, canonical reopen, interrupted-model recovery, temporary-chat Stop/reopen, and regeneration via qualified Pi forks. Closed-snapshot export/import, exhaustive lifecycle/media/native cold-tool interruption acceptance, predecessor publication failures, and physical-device durability remain unfinished. Earlier native evidence below is historical, not a pass of the current tree. Native RPC verification requires approved Tailscale ingress; do not
 weaken transport checks or treat loopback discovery as verification. See
 [`packages/agent/README.md`](../packages/agent/README.md) for current commands and gates.
 
 Actual UI acceptance is available through `bun run test:agent-ui-ios --device ox-1
---app /absolute/Ox.app`. An explicit DEBUG Simulator launch UUID attaches only idle
-temporary chats to the physical-backend cache; preparation failure never falls back
-to the Swift loop. The replay uses native Mock, reasoning/Markdown, native snippet
+--app /absolute/Ox.app`. Ordinary temporary chats attach automatically; an explicit launch UUID selects a private QA cache identity. Preparation failure never falls back to another execution loop. The replay uses native Mock, reasoning/Markdown, native snippet
 tools, Stop and process reopen with full retained Pi history. It does not use Host
 RPC, change credentials, convert Profiles, or establish power-loss durability.
 
@@ -33,7 +27,7 @@ Use Pi Durable as Ox's sole agent harness through a host-neutral `@openox/agent`
 
 `profile.json` is the authoritative top-level manifest: stable Profile identity, creation date and overall format/migration milestone. `state.sqlite` owns execution, conversation history and application documents, not a competing copy of manifest fields. `artifacts/` owns ordinary text and binary artifact/attachment files, referenced by Profile-relative paths. Together they compose one Profile store; SQLite is not a duplicate authority for artifact bytes. Keep a virtual filesystem for agent access. SQLite's WAL/SHM sidecars and private incomplete-write staging are implementation details, not additional content authorities.
 
-This supersedes the earlier all-content-in-SQLite proposal. It is a target design, not the current implementation: temporary-chat caches still use `session.sqlite`, `ox_blobs`/`ox_blob_chunks`, and UUID bindings. Do not rename or adopt those caches as production Profiles implicitly.
+This supersedes the earlier all-content-in-SQLite proposal and is the current local production representation. Temporary physical caches remain separate, with explicit UUID compatibility only. Retired blob/experiment caches are ignored, not renamed or adopted as production Profiles.
 
 Profiles use export/import, not live synchronization or external in-place editing. Pi Durable is experimental; pin the adopted package versions and verify upgrades before shipping them.
 
