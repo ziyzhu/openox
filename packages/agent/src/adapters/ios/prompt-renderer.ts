@@ -1,2 +1,1 @@
-export { responseDirective } from "../../core/prompts";
-export { websiteInstructions } from "../../core/provider-prompts";
+export * from "../../core/prompt-renderer";

@@ -7,19 +7,19 @@ nonisolated enum OxSecret {
         schema: {
             [
                 ("ox.secret.list", .object([
-                    "description": .string("List secret metadata without exposing values: `await ox.secret.list({ purpose })`. Returns each secret's key, displayName, sorted JSON field names in fields, and available status."),
+                    "description": .string(ModelGuidance.text("ox.secret.list")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([:])]),
                     "outputSchema": .object(["description": .string("Array of { key, displayName, fields: string[], available: boolean }. Fields contains only top-level JSON field names, sorted, or [] when the secret is unavailable. Never includes secret values.")]),
                 ])),
                 ("ox.secret.add", .object([
-                    "description": .string("Ask the person to add or replace a named JSON secret in a native inline card: `await ox.secret.add({ key, purpose })`. The value is never a JavaScript argument or result."),
+                    "description": .string(ModelGuidance.text("ox.secret.add")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([
                         "key": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
                     ]), "required": .array([.string("key")])]),
                     "outputSchema": .object(["description": .string("Key and saved or cancelled status.")]),
                 ])),
                 ("ox.secret.delete", .object([
-                    "description": .string("Ask the person to delete a secret and clear its connections: `await ox.secret.delete({ key, purpose })`."),
+                    "description": .string(ModelGuidance.text("ox.secret.delete")),
                     "inputSchema": .object(["type": .string("object"), "properties": .object([
                         "key": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(128)]),
                     ]), "required": .array([.string("key")])]),

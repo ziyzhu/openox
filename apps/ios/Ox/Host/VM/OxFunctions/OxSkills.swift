@@ -8,7 +8,7 @@ nonisolated enum OxSkills {
             [
                 entry(
                     "ox.skill.create",
-                    "Create one Profile-owned skill: `await ox.skill.create({ name, description, instructions, services?, purpose })`. The name is normalized to lowercase kebab-case and creation fails rather than replacing an existing skill.",
+                    ModelGuidance.text("ox.skill.create"),
                     input: object([
                         "name": name,
                         "description": description,
@@ -19,18 +19,18 @@ nonisolated enum OxSkills {
                 ),
                 entry(
                     "ox.skill.copy",
-                    "Copy one resolved skill, including references and helpers into a new Profile-owned skill: `await ox.skill.copy({ source, name, purpose })`. The destination name is normalized to lowercase kebab-case and must not already exist. Service dependencies are retained.",
+                    ModelGuidance.text("ox.skill.copy"),
                     input: object([
                         "source": source,
                         "name": name,
                     ], required: ["source", "name"]),
                     output: skill
                 ),
-                entry("ox.skill.share", "Copy the complete resolved skill into the Local repository for review and publication. Fails if Local already contains the name.", input: object(["name": name], required: ["name"]), output: skill),
-                entry("ox.skill.run", "Run a packaged JavaScript helper in this Ox VM. The script is an async function body with ox and args parameters. It uses normal Action permissions. Read the skill instructions first.", input: object(["name": name, "script": source, "args": .object([:])], required: ["name", "script"]), output: .object([:])),
+                entry("ox.skill.share", ModelGuidance.text("ox.skill.share"), input: object(["name": name], required: ["name"]), output: skill),
+                entry("ox.skill.run", ModelGuidance.text("ox.skill.run"), input: object(["name": name, "script": source, "args": .object([:])], required: ["name", "script"]), output: .object([:])),
                 entry(
                     "ox.skill.delete",
-                    "Delete one writable skill: `await ox.skill.delete({ name, purpose })`. System and installed repository skills cannot be deleted.",
+                    ModelGuidance.text("ox.skill.delete"),
                     input: object(["name": name], required: ["name"]),
                     output: deletion
                 ),

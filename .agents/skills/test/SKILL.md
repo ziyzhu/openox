@@ -89,6 +89,10 @@ selectable text `FILES`, `unsupported.bin`, malformed `invalid.png`, and a file 
 32 MiB named `too-large.png`. It overwrites `receipt.png` after attachment to verify
 immutable model bytes; restore the fixture afterward. Use no personal files.
 
+Mock `99` verifies complete live values with bounded Action previews, including large edit arguments, wide edit arrays, Unicode, and escaping. It creates a QA artifact and temporarily writes/restores `MEMORY.md`; use a dedicated QA Profile. Mock `101` verifies that all 261 Actions execute while only 256 traces are retained, and that a later script failure reports omitted calls without losing completed side effects. Reopen and inspect both previews and omission notices. Mock `100` remains a historical file-backed-payload recovery check; it requires an existing predecessor capture.
+
+Mock `102` exercises complex MCP values against a synthetic echo server on ox-2's registry port 8102. The server needs initialize, tools/list, and tools/call with the arguments returned as structuredContent. Launch the owned simulator with `OX_SERVICES_ENDPOINT=http://127.0.0.1:8102` to use the existing DEBUG endpoint allow-list; approve only the synthetic echo call. Restore preferences and ordinary bundled-service launch afterward. Verify full values at execution and bounded arguments/results in saved history; do not weaken endpoint policy or feed credentials into the fixture.
+
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use
 the `demo` skill for its workflow.

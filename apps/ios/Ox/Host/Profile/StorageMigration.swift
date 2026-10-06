@@ -291,6 +291,16 @@ nonisolated enum StorageMigrator {
         var documents: [[String: Any]] = []
         var artifacts: [[String: Any]] = []
         var conversations: [[String: Any]] = []
+        var payloads: [String: JSONValue] = [:]
+        let payloadStore = DurableArtifactStore(root: destination)
+        defer { payloadStore.close() }
+        func archive(_ data: Data) throws -> JSONValue {
+            let writer = try payloadStore.payloadWriter()
+            try writer.append(data)
+            let source = try writer.finish()
+            payloads[source.objectValue!["path"]!.stringValue!] = source
+            return source
+        }
         let savedPath = "artifacts/.saved.json"
         let saved = inventory[savedPath] == nil ? [] : try decoder.decode([String].self, from: durableSourceFile(savedPath, at: profile.url))
         let artifactDirectory = destination.appendingPathComponent("artifacts", isDirectory: true)
@@ -328,9 +338,19 @@ nonisolated enum StorageMigrator {
                 throw StorageMigrationError.invalidApplicationStorage(path)
             }
             let transcriptPath = prefix + "turns.jsonl"
-            let lines: [Data] = inventory[transcriptPath] == nil ? [] : try [UInt8](durableSourceFile(transcriptPath, at: profile.url))
-                .split(separator: 0x0A).map { Data($0) }
-            let turns = try lines.map { try decoder.decode(Turn.self, from: $0) }
+            var records: [(turn: Turn, source: JSONValue)] = []
+            if inventory[transcriptPath] != nil {
+                let descriptor = try durableSourceDescriptor(transcriptPath, at: profile.url)
+                defer { Darwin.close(descriptor) }
+                let reader = DurableTranscriptReader(descriptor: descriptor, store: payloadStore)
+                while let record = try reader.next() {
+                    let turn = try decoder.decode(Turn.self, from: Data(record.value.jsonString().utf8))
+                    records.append((turn, record.source))
+                    payloads[record.source.objectValue!["path"]!.stringValue!] = record.source
+                }
+                Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) bytes=\(reader.position)")
+            }
+            let turns = records.map(\.turn)
             var document = ChatDocument(turns: turns)
             guard document.turns.map(\.id) == turns.map(\.id) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
             document.apply(.sealAllTurns)
@@ -338,27 +358,26 @@ nonisolated enum StorageMigrator {
             let contextPath = prefix + "context.json"
             let checkpoint = inventory[contextPath] == nil ? nil : try decoder.decode(AgentContextCheckpoint.self,
                 from: durableSourceFile(contextPath, at: profile.url))
-            let boundary = checkpoint?.boundary(in: turns)
-            guard checkpoint == nil || boundary != nil, !turns.requiresContextCheckpoint || checkpoint != nil else {
-                throw StorageMigrationError.invalidApplicationStorage(contextPath)
+            let boundary = try checkpoint.map { try durableCheckpointBoundary($0, turns: turns, store: payloadStore) } ?? nil
+            guard checkpoint == nil || boundary != nil else { throw StorageMigrationError.invalidApplicationStorage(contextPath) }
+            if turns.requiresContextCheckpoint, checkpoint == nil {
+                Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=missingCheckpoint source=completeTranscript turns=\(turns.count)")
             }
             let alias = "ox-native:\(metadata.id.uuidString)"
             func messages(_ source: [Turn]) -> [JSONValue] {
                 ChatProjection.makeWireMessages(from: source).map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id) }
             }
-            guard let metadataJSON = String(data: data, encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(path) }
-            var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["sourceJSON": metadataJSON]]]
+            var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["source": try archive(data).toAny()]]]
             var expected: [Any] = []
             for (index, turn) in sealed.enumerated() {
-                guard let original = String(data: lines[index], encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
                 let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
                 let model = messages([turn]).map { $0.toAny() }
                 expected.append(contentsOf: model)
-                entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "sourceJSON": original]])
+                entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "source": records[index].source.toAny()]])
                 if index == boundary, let checkpoint {
                     expected = checkpoint.messages.map { DurableMessageCodec.message($0, provider: alias, profileID: profile.id).toAny() }
-                    guard let original = String(data: try durableSourceFile(contextPath, at: profile.url), encoding: .utf8) else { throw StorageMigrationError.invalidApplicationStorage(contextPath) }
-                    entries.append(["kind": "pi.reset", "head": "self", "data": ["sourceJSON": original], "model": expected])
+                    let source = try archive(durableSourceFile(contextPath, at: profile.url))
+                    entries.append(["kind": "pi.reset", "head": "self", "data": ["source": source.toAny()], "model": expected])
                 }
             }
             var applicationMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
@@ -375,7 +394,52 @@ nonisolated enum StorageMigrator {
                 "unread": metadata.hasUnreadResponse, "agent": agent, "metadata": applicationMetadata, "entries": entries, "expectedContext": try durableExpectedContext(expected)])
         }
         return DurableProfileDraft(draft: .from(["format": 1, "profileID": profile.id.uuidString, "documents": documents,
-            "artifacts": artifacts, "conversations": conversations]), manifest: manifest, inventory: inventory)
+            "artifacts": artifacts, "payloads": payloads.values.map { $0.toAny() }, "conversations": conversations]), manifest: manifest, inventory: inventory)
+    }
+
+    private static func durableCheckpointBoundary(_ checkpoint: AgentContextCheckpoint, turns: [Turn], store: DurableArtifactStore) throws -> Int? {
+        if let boundary = checkpoint.boundary(in: turns) { return boundary }
+        guard checkpoint.schemaVersion == AgentContextCheckpoint.currentSchemaVersion,
+              let boundary = turns.firstIndex(where: { $0.id == checkpoint.throughTurnID }) else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard durableDigest(try encoder.encode(checkpoint.messages)) == checkpoint.messagesDigest else { return nil }
+        var hash = SHA256()
+        func append(_ value: JSONValue) throws {
+            if let fields = value.objectValue, let reference = fields["oxPayload"]?.objectValue, reference["format"] == .int(1),
+               let source = reference["source"], let offset = reference["offset"]?.intValue, let length = reference["length"]?.intValue {
+                let original = try store.capturePayload(source, offset: offset, length: length)
+                let decoded = try JSONDecoder().decode(JSONValue.self, from: original)
+                hash.update(data: try encoder.encode(decoded))
+                return
+            }
+            switch value {
+            case .array(let values):
+                hash.update(data: Data("[".utf8))
+                for (index, item) in values.enumerated() {
+                    if index > 0 { hash.update(data: Data(",".utf8)) }
+                    try append(item)
+                }
+                hash.update(data: Data("]".utf8))
+            case .object(let fields):
+                hash.update(data: Data("{".utf8))
+                for (index, key) in fields.keys.sorted().enumerated() {
+                    if index > 0 { hash.update(data: Data(",".utf8)) }
+                    hash.update(data: try encoder.encode(key))
+                    hash.update(data: Data(":".utf8))
+                    try append(fields[key]!)
+                }
+                hash.update(data: Data("}".utf8))
+            default: hash.update(data: try encoder.encode(value))
+            }
+        }
+        hash.update(data: Data("[".utf8))
+        for (index, turn) in turns[...boundary].enumerated() {
+            if index > 0 { hash.update(data: Data(",".utf8)) }
+            try append(JSONDecoder().decode(JSONValue.self, from: encoder.encode(turn)))
+        }
+        hash.update(data: Data("]".utf8))
+        return hash.finalize().map { String(format: "%02x", $0) }.joined() == checkpoint.transcriptPrefixDigest ? boundary : nil
     }
 
     private static func durableExpectedContext(_ source: [Any]) throws -> [[String: Any]] {
@@ -500,6 +564,210 @@ nonisolated enum StorageMigrator {
             throw StorageMigrationError.invalidApplicationStorage(path)
         }
         return output
+    }
+
+    private final class DurableTranscriptReader {
+        private let descriptor: Int32
+        private let store: DurableArtifactStore
+        private var buffer = [UInt8](repeating: 0, count: 128 * 1024)
+        private var count = 0
+        private var index = 0
+        private var archived = 0
+        private var writer: DurablePayloadWriter?
+        private var recordStart = 0
+        private var captures: [[String]: (offset: Int, length: Int)] = [:]
+        private(set) var position = 0
+        private(set) var externalized = 0
+
+        init(descriptor: Int32, store: DurableArtifactStore) {
+            self.descriptor = descriptor
+            self.store = store
+        }
+
+        func next() throws -> (value: JSONValue, source: JSONValue)? {
+            while let byte = try peek(), byte == 10 || byte == 13 { advance() }
+            guard try peek() != nil else { return nil }
+            recordStart = position
+            captures.removeAll(keepingCapacity: true)
+            writer = try store.payloadWriter()
+            archived = index
+            let value = try parse(path: [], build: true, depth: 0)
+            try spaces()
+            guard let value, try peek() == nil || peek() == 10 else { throw invalid() }
+            try flush()
+            let source = try writer!.finish()
+            writer = nil
+            return (bind(value, source: source), source)
+        }
+
+        private func bind(_ value: JSONValue, path: [String] = [], source: JSONValue) -> JSONValue {
+            if let capture = captures[path] {
+                let digest = source.objectValue!["sha256"]!.stringValue!
+                return .object([
+                    "oxPayload": .object(["format": .int(1), "source": source, "offset": .int(capture.offset), "length": .int(capture.length)]),
+                    "preview": .string("Large result retained in file-backed storage. Read its complete JSON with ox.output.read({ id: 'payload:\(digest):\(capture.offset):\(capture.length)', purpose: 'Read archived result' }), then JSON.parse the returned string and filter before printing."),
+                ])
+            }
+            switch value {
+            case .array(let values): return .array(values.enumerated().map { bind($0.element, path: path + [String($0.offset)], source: source) })
+            case .object(let fields): return .object(Dictionary(uniqueKeysWithValues: fields.map { ($0.key, bind($0.value, path: path + [$0.key], source: source)) }))
+            default: return value
+            }
+        }
+
+        private func parse(path: [String], build: Bool, depth: Int) throws -> JSONValue? {
+            guard depth <= 128 else { throw invalid() }
+            try spaces()
+            if build, path.suffix(4) == ["invocation", "outcome", "succeeded", "_0"] || path.suffix(2) == ["invocation", "args"] {
+                let start = position - recordStart
+                _ = try parse(path: path, build: false, depth: depth)
+                let length = position - recordStart - start
+                try flush()
+                if length <= DurablePayloadWriter.inlineLimit {
+                    return try JSONDecoder().decode(JSONValue.self, from: writer!.read(offset: start, length: length))
+                }
+                externalized += 1
+                captures[path] = (start, length)
+                return .null
+            }
+            guard let byte = try peek() else { throw invalid() }
+            if byte == 123 {
+                advance()
+                var fields: [String: JSONValue] = [:]
+                var keys = Set<String>()
+                try spaces()
+                if try peek() == 125 { advance(); return build ? .object(fields) : nil }
+                while true {
+                    guard try peek() == 34 else { throw invalid() }
+                    let data = try string(collect: true)
+                    let key = try JSONDecoder().decode(String.self, from: data!)
+                    guard keys.insert(key).inserted else { throw invalid() }
+                    try spaces()
+                    try expect(58)
+                    let value = try parse(path: build ? path + [key] : [], build: build, depth: depth + 1)
+                    if let value { fields[key] = value }
+                    try spaces()
+                    if try peek() == 125 { advance(); break }
+                    try expect(44)
+                    try spaces()
+                }
+                return build ? .object(fields) : nil
+            }
+            if byte == 91 {
+                advance()
+                var values: [JSONValue] = []
+                var ordinal = 0
+                try spaces()
+                if try peek() == 93 { advance(); return build ? .array(values) : nil }
+                while true {
+                    if let value = try parse(path: build ? path + [String(ordinal)] : [], build: build, depth: depth + 1) { values.append(value) }
+                    ordinal += 1
+                    try spaces()
+                    if try peek() == 93 { advance(); break }
+                    try expect(44)
+                }
+                return build ? .array(values) : nil
+            }
+            if byte == 34 {
+                let data = try string(collect: build)
+                return try data.map { try JSONDecoder().decode(JSONValue.self, from: $0) }
+            }
+            var token = Data()
+            while let byte = try peek(), ![9, 10, 13, 32, 44, 93, 125].contains(byte) {
+                guard token.count < 1024 else { throw invalid() }
+                token.append(byte)
+                advance()
+            }
+            let value = try JSONDecoder().decode(JSONValue.self, from: token)
+            return build ? value : nil
+        }
+
+        private func string(collect: Bool) throws -> Data? {
+            try expect(34)
+            var token: Data? = collect ? Data([34]) : nil
+            var remaining = 0
+            var lower: UInt8 = 0x80
+            var upper: UInt8 = 0xbf
+            while true {
+                guard try peek() != nil else { throw invalid() }
+                let start = index
+                while index < count {
+                    let byte = buffer[index]
+                    if byte == 34 || byte == 92 || byte < 32 { break }
+                    if remaining > 0 {
+                        guard byte >= lower, byte <= upper else { throw invalid() }
+                        remaining -= 1
+                        lower = 0x80; upper = 0xbf
+                    } else if byte >= 0x80 {
+                        switch byte {
+                        case 0xc2...0xdf: remaining = 1
+                        case 0xe0: remaining = 2; lower = 0xa0
+                        case 0xe1...0xec, 0xee...0xef: remaining = 2
+                        case 0xed: remaining = 2; upper = 0x9f
+                        case 0xf0: remaining = 3; lower = 0x90
+                        case 0xf1...0xf3: remaining = 3
+                        case 0xf4: remaining = 3; upper = 0x8f
+                        default: throw invalid()
+                        }
+                    }
+                    index += 1; position += 1
+                }
+                if collect {
+                    token!.append(contentsOf: buffer[start..<index])
+                    guard token!.count <= 64 * 1024 * 1024 else { throw invalid() }
+                }
+                guard let byte = try peek() else { throw invalid() }
+                if byte == 34 {
+                    guard remaining == 0 else { throw invalid() }
+                    advance()
+                    token?.append(34)
+                    return token
+                }
+                if byte == 92 {
+                    guard remaining == 0 else { throw invalid() }
+                    advance()
+                    token?.append(92)
+                    guard let escape = try peek(), [34, 47, 92, 98, 102, 110, 114, 116, 117].contains(escape) else { throw invalid() }
+                    advance()
+                    token?.append(escape)
+                    if escape == 117 {
+                        for _ in 0..<4 {
+                            guard let hex = try peek(), (48...57).contains(hex) || (65...70).contains(hex) || (97...102).contains(hex) else { throw invalid() }
+                            advance()
+                            token?.append(hex)
+                        }
+                    }
+                } else if byte < 32 { throw invalid() }
+            }
+        }
+
+        private func spaces() throws {
+            while let byte = try peek(), [9, 13, 32].contains(byte) { advance() }
+        }
+
+        private func expect(_ byte: UInt8) throws {
+            guard try peek() == byte else { throw invalid() }
+            advance()
+        }
+
+        private func advance() { index += 1; position += 1 }
+
+        private func peek() throws -> UInt8? {
+            if index == count {
+                try flush()
+                repeat { count = Darwin.read(descriptor, &buffer, buffer.count) } while count < 0 && errno == EINTR
+                guard count >= 0 else { throw invalid() }
+                index = 0; archived = 0
+            }
+            return index < count ? buffer[index] : nil
+        }
+
+        private func flush() throws {
+            if let writer, archived < index { try writer.append(Data(buffer[archived..<index])) }
+            archived = index
+        }
+
+        private func invalid() -> StorageMigrationError { .invalidApplicationStorage("chat transcript near byte \(position)") }
     }
 
     private static func durableDigest(_ data: Data) -> String {

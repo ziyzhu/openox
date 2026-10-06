@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatSidebar: View {
+struct ConversationSidebar: View {
     enum ContentState {
         case loading
         case unavailable
@@ -212,11 +212,11 @@ struct ChatSidebar: View {
                 Button(role: .destructive) {
                     pendingDelete = meta
                 } label: {
-                    Label(A11yLabel.deleteChat, systemImage: "trash")
+                    Label(A11yLabel.deleteConversation, systemImage: "trash")
                 }
                 .accessibilityIdentifier(A11yID.Sidebar.deleteRow(meta.id.uuidString))
             } preview: {
-                ChatContextMenuPreview(meta: meta)
+                ConversationContextMenuPreview(meta: meta)
             }
             .id(meta.id.uuidString)
     }

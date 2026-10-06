@@ -199,18 +199,18 @@ test("Session ExecutionEnv exposes only visible, read-only Pi metadata and full-
   const original = await visible.commit(tx => tx.appendEntry(visible.id, { kind: "pi.user", model: [{ role: "user", content: "old scrollback", timestamp: 1 }] }), context);
   await visible.commit(tx => tx.appendEntry(visible.id, { kind: "pi.reset", head: "self" }), context);
   expect(value(await session.env.listDir("/chats", context)).map(info => info.name)).toEqual([String(visible.id)]);
-  expect(value(await session.env.listDir(`/chats/${visible.id}`, context)).map(info => info.name)).toEqual(["metadata", "history"]);
-  const metadata = JSON.parse(value(await session.env.readTextFile(`/chats/${visible.id}/metadata`, context)));
+  expect(value(await session.env.listDir(`/conversations/${visible.id}`, context)).map(info => info.name)).toEqual(["metadata", "history"]);
+  const metadata = JSON.parse(value(await session.env.readTextFile(`/conversations/${visible.id}/metadata`, context)));
   expect(metadata.reference).toEqual(reference); expect(metadata.presentation.title).toBe("Virtual");
-  const history = JSON.parse(value(await session.env.readTextFile(`/chats/${visible.id}/history`, context)));
+  const history = JSON.parse(value(await session.env.readTextFile(`/conversations/${visible.id}/history`, context)));
   expect(history.order).toBe("newest-first");
   expect(history.items.some((entry: { id: number }) => entry.id === original.id)).toBe(true);
   expect((await visible.context(context)).entries.some(entry => entry.id === original.id)).toBe(false);
-  expect(value(await session.env.exists(`/chats/${internal.id}`, context))).toBe(false);
-  expect(value(await session.env.exists(`/chats/0${visible.id}`, context))).toBe(false);
-  const path = `/chats/${visible.id}/history`;
+  expect(value(await session.env.exists(`/conversations/${internal.id}`, context))).toBe(false);
+  expect(value(await session.env.exists(`/conversations/0${visible.id}`, context))).toBe(false);
+  const path = `/conversations/${visible.id}/history`;
   for (const result of [await session.env.writeFile(path, "override", context), await session.env.remove(path, undefined, context),
-    await session.env.createDir(`/chats/${visible.id}`, undefined, context), await session.env.flushFile(path, context)]) {
+    await session.env.createDir(`/conversations/${visible.id}`, undefined, context), await session.env.flushFile(path, context)]) {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("permission_denied");
   }
@@ -247,7 +247,7 @@ test("presentation and history reopen from SQLite without creating another chat 
     expect(metadata.reference).toEqual(reference);
     expect(metadata.presentation?.title).toBe("Retained");
     expect(metadata.favorite).toBe(true); expect(metadata.unread).toBe(false);
-    expect(value(await reopened.env.exists(`/chats/${handle.id}/history`, context))).toBe(true);
+    expect(value(await reopened.env.exists(`/conversations/${handle.id}/history`, context))).toBe(true);
     expect((await reopened.harness.inspect(context)).scheduling).toBe("paused");
     await reopened.close();
   } finally { for (const suffix of ["", "-wal", "-shm"]) await rm(path + suffix, { force: true }); }
@@ -278,7 +278,9 @@ test("bounded iOS commands route qualified references and execute structured pro
   };
   try {
     await adapter.command({ action: "open", profileID: "ios-profile" });
-    const config = { chatID: "external-uuid", title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory" }, model: "mock", contextWindow: 100000,
+    const scope = { hostID: "ios-host", profileID: "ios-profile" };
+    const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "chat-bubbles" as const, externalFiles: true }] };
+    const config = { chatID: "external-uuid", title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
       maxTokens: 1000, reasoning: false, tools: [], messages: [{ role: "user" as const, content: "seed", timestamp: 1 }] };
     const attached = await adapter.command({ action: "attach", config }) as { conversationID: ConversationId; reference: ConversationReference };
     expect(attached.reference).toEqual({ profileID: "ios-profile", conversationID: attached.conversationID });
@@ -303,8 +305,12 @@ test("bounded iOS commands route qualified references and execute structured pro
     const prompt = composeIOSPrompt(config.promptState);
     expect(await adapter.command({ action: "composePrompt", promptState: config.promptState })).toEqual(prompt);
     const turnState = { skills: [{ name: "example", description: "Example skill" }], skillConflicts: [],
-      attachedServices: [{ domain: "ios:files", signIn: "authorized" as const }], fileMountPaths: ["files/a"],
-      artifactPaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" } };
+      attachedServices: [{ domain: "ios:files", signIn: "authorized" as const, fileMounts: ["files/a"] }],
+      artifactPaths: ["artifacts/note.md"], storageMode: "temporary" as const, responseLanguage: { identifier: "zh-Hans", name: "Chinese (Simplified)" }, hostContext };
+    const foreignScope = { ...scope, hostID: "another-host" };
+    await expect(adapter.command({ action: "run", reference: attached.reference, content: "wrong owner", turnState: { ...turnState,
+      hostContext: { active: foreignScope, hosts: [{ ...hostContext.hosts[0]!, ...foreignScope }] } } })).rejects.toThrow("attached host/Profile scope");
+    expect(modelRequests).toHaveLength(0);
     const run = await adapter.command({ action: "run", reference: attached.reference, content: "first", turnState }) as { receipt: { status: string } };
     expect(run.receipt.status).toBe("done");
     expect(modelRequests[0]!.systemPrompt.startsWith(prompt.rendered)).toBe(true);
@@ -313,12 +319,14 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[0]!.messages.every(message => message.role !== "system")).toBe(true);
     expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("<turn-state>");
     expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("files/a");
-    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("This is a temporary chat");
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("Active host/Profile:");
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("ios-host");
+    expect(JSON.stringify(modelRequests[0]!.messages.at(-1))).toContain("This is a temporary conversation");
     const updated = { ...config, promptState: { ...config.promptState, soul: "## Voice\nBe direct." } };
     await adapter.command({ action: "fileWrite", path: "MEMORY.md", text: "new live memory" });
     await adapter.command({ action: "attach", config: updated, reference: attached.reference });
     await adapter.command({ action: "run", reference: attached.reference, content: "second",
-      turnState: { ...turnState, skills: [], attachedServices: [], fileMountPaths: [], artifactPaths: [], storageMode: "persisted", responseLanguage: null } });
+      turnState: { ...turnState, skills: [], attachedServices: [], artifactPaths: [], storageMode: "persisted", responseLanguage: null } });
     expect(modelRequests[1]!.systemPrompt).toContain("Be direct.");
     expect(modelRequests[1]!.systemPrompt).not.toContain("Be helpful.");
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");

@@ -6,7 +6,7 @@ extension EnvironmentValues {
     @Entry var chatLinkHandler: ((URL) -> Void)? = nil
 }
 
-enum ChatLinkDestination: Equatable {
+enum ConversationLinkDestination: Equatable {
     case web(URL)
     case artifact(String)
     case unsupported(URL)
@@ -27,7 +27,7 @@ enum ChatLinkDestination: Equatable {
 @MainActor
 enum LinkOpener {
     static func open(url: URL, serviceManager: ServiceManager) {
-        guard case .web = ChatLinkDestination(url) else {
+        guard case .web = ConversationLinkDestination(url) else {
             Log.ui.warning("LinkOpener.rejected url=\(LogPrivacy.url(url.absoluteString))")
             return
         }

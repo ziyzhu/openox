@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatModelButton: View {
+struct ConversationModelButton: View {
     let title: String
     let size: CGFloat
     let action: () -> Void

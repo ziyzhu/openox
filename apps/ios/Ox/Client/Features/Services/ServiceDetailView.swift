@@ -2,26 +2,26 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum ServiceDetailPrimaryAction {
-    case startChat
+    case startConversation
     case attach
 
     func label(isAttached: Bool) -> LocalizedStringKey {
         switch self {
-        case .startChat: "Start chat"
+        case .startConversation: "Start chat"
         case .attach: isAttached ? "Remove" : "Attach"
         }
     }
 
     func systemImage(isAttached: Bool) -> String {
         switch self {
-        case .startChat: "paperclip"
+        case .startConversation: "paperclip"
         case .attach: isAttached ? "minus.circle" : "plus.circle"
         }
     }
 
     func accessibilityIdentifier(_ domain: String, isAttached: Bool) -> String {
         switch self {
-        case .startChat: A11yID.Chat.Attach.startChat(domain)
+        case .startConversation: A11yID.Chat.Attach.startConversation(domain)
         case .attach:
             isAttached
                 ? A11yID.Chat.Attach.remove(domain)

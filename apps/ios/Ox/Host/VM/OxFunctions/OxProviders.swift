@@ -58,15 +58,15 @@ nonisolated enum OxProviders {
     ])
 
     static let operations: [(String, String)] = [
-        ("default", "Return a read-only copy of bundled provider definitions. Does not read or change the active catalog or credentials. Save a definition explicitly to restore or customize a default."),
-        ("list", "List providers with source, transport, endpoint, website, regions, inference location, model availability, authentication status and methods, capabilities, and getting-started metadata. Never returns credentials."),
-        ("get", "Read one complete provider definition by id. Models are declared tool-capable entries."),
-        ("validate", "Validate a complete provider document without saving or making network requests. Does not verify credentials or model capabilities."),
-        ("save", "Create or replace a complete provider definition. Always validates before saving. Models are supplied directly; no discovery is performed."),
-        ("delete", "Remove a saved provider definition and clear its local credentials. Removing an override restores the bundled default; removing an added provider removes it entirely. Unmodified bundled defaults cannot be deleted. Requires approval."),
-        ("authenticate", "Present the same provider authentication UI used in Settings and wait for completion. Credentials are entered by the user and never passed to JavaScript. Returns status authenticated, credential-stored, or not-required; throws on cancellation or failure."),
-        ("connect", "Connect a provider to an existing Secret entry or its managed OAuth flow: `await ox.provider.connect({ id, credential: { kind: 'secret', secretKey } | { kind: 'oauth' }, purpose })`. The agent never receives credential values. A Secret binding requires native destination confirmation."),
-        ("deauthenticate", "Clear a provider's local credentials and account authentication. Does not revoke access at the provider."),
+        ("default", ModelGuidance.text("ox.provider.default")),
+        ("list", ModelGuidance.text("ox.provider.list")),
+        ("get", ModelGuidance.text("ox.provider.get")),
+        ("validate", ModelGuidance.text("ox.provider.validate")),
+        ("save", ModelGuidance.text("ox.provider.save")),
+        ("delete", ModelGuidance.text("ox.provider.delete")),
+        ("authenticate", ModelGuidance.text("ox.provider.authenticate")),
+        ("connect", ModelGuidance.text("ox.provider.connect")),
+        ("deauthenticate", ModelGuidance.text("ox.provider.deauthenticate")),
     ]
 
     static let function = OxFunction(

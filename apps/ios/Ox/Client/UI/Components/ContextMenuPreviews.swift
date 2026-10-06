@@ -18,7 +18,7 @@ struct ContextMenuPreviewSurface<Content: View>: View {
     }
 }
 
-struct ChatContextMenuPreview: View {
+struct ConversationContextMenuPreview: View {
     let meta: ChatMeta
 
     var body: some View {

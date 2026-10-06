@@ -13,7 +13,7 @@ final class IOSHost: OxHost {
     static let shared = IOSHost()
 
     let services: ServiceManager
-    let chats: ConversationManager
+    let conversations: ConversationManager
 
     private var preparation: Preparation?
     private var optionalRecovery: Task<Void, Never>?
@@ -36,14 +36,14 @@ final class IOSHost: OxHost {
         storage _: PreparedStorage
     ) {
         services = serviceManager
-        chats = ConversationManager(
+        conversations = ConversationManager(
             repository: .shared,
             storage: .shared,
             providerRegistry: .shared,
             serviceManager: serviceManager,
             presentations: presentations
         )
-        chats.profilePreparation = { [weak self] in await self?.waitUntilProfilePrepared() }
+        conversations.profilePreparation = { [weak self] in await self?.waitUntilProfilePrepared() }
         recoveryObservers = [
             NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.resumeOptionalStorageRecovery() }
@@ -60,14 +60,14 @@ final class IOSHost: OxHost {
     }
 
     func listChats() -> [HostChatSummary] {
-        chats.orderedSummaries.map { summary in
+        conversations.orderedSummaries.map { summary in
             HostChatSummary(
                 id: summary.id,
                 title: summary.displayTitle,
                 model: summary.modelID,
                 createdAt: summary.createdAt,
                 lastActivity: summary.lastActivity,
-                active: summary.id == chats.currentId
+                active: summary.id == conversations.currentId
             )
         }
     }
@@ -130,7 +130,7 @@ final class IOSHost: OxHost {
 
     private func beginPreparation() -> Preparation {
         let services = services
-        let chats = chats
+        let conversations = conversations
         let storage = Task { @MainActor in
             try await StorageMigrator.prepare(storage: .shared, services: services)
             Log.app.info("IOSHost storage prepared")
@@ -143,7 +143,7 @@ final class IOSHost: OxHost {
                 try await Task.sleep(for: .milliseconds(SimEnv.startupDelayMilliseconds))
             }
             #endif
-            await chats.loadSummariesNow()
+            await conversations.loadSummariesNow()
             _ = Soul.shared
             _ = UserMemory.shared
             try await UserMemory.shared.waitUntilCurrent()

@@ -1,4 +1,5 @@
 import AVFAudio
+import Accelerate
 import Foundation
 import Speech
 import Synchronization
@@ -175,8 +176,8 @@ nonisolated private final class SpeechAudioInput: @unchecked Sendable {
         defer { lock.unlock() }
         guard !finished else { return }
         if let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 {
-            let power = (0..<Int(buffer.frameLength)).reduce(Float.zero) { $0 + samples[$1] * samples[$1] }
-            onLevel(min(1, sqrt(power / Float(buffer.frameLength)) * 8))
+            let channel = UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength))
+            onLevel(min(1, vDSP.rootMeanSquare(channel) * 8))
         }
         let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * converter.outputFormat.sampleRate / buffer.format.sampleRate)) + 32
         let supplied = Mutex(false)

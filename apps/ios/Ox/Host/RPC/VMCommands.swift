@@ -14,11 +14,11 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMInspect(
         _ command: VMRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         let session: Conversation?
-        switch resolveSession(chatManager, command.sessionId) {
+        switch resolveSession(conversationManager, command.sessionId) {
         case .error(let error):
             reply.failure(error)
             return
@@ -31,7 +31,7 @@ extension OxHostProtocol {
                 "temporary": .bool($0.isTemporary),
             ])
         } ?? .null
-        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "chats"]
+        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "conversations"]
         if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
             roots.append("files")
         }
@@ -79,7 +79,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMCall(
         _ command: VMCallRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard command.arguments.objectValue != nil else {
@@ -92,7 +92,7 @@ extension OxHostProtocol {
         }
         let source = "return await \(command.function)(\(command.arguments.jsonString()));"
         executeVM(
-            chatManager: chatManager,
+            conversationManager: conversationManager,
             id: reply.id,
             sessionID: command.sessionId,
             source: source,
@@ -104,7 +104,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleVMEval(
         _ command: VMEvalRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard !command.script.isEmpty else {
@@ -112,7 +112,7 @@ extension OxHostProtocol {
             return
         }
         executeVM(
-            chatManager: chatManager,
+            conversationManager: conversationManager,
             id: reply.id,
             sessionID: command.sessionId,
             source: command.script,
@@ -123,7 +123,7 @@ extension OxHostProtocol {
 
     @MainActor
     static func executeVM(
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         id: String,
         sessionID: String?,
         source: String,
@@ -131,7 +131,7 @@ extension OxHostProtocol {
         reply: OxHostRPC.Reply
     ) {
         let session: Conversation
-        switch resolveSession(chatManager, sessionID) {
+        switch resolveSession(conversationManager, sessionID) {
         case .error(let error):
             reply.failure(error)
             return

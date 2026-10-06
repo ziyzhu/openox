@@ -48,7 +48,7 @@ extension View {
 // SwiftUI's `.textSelection(.enabled)` only copies a whole Text at once on iOS
 // (no loupe, no partial range) and is unreliable inside a ScrollView on iOS 18.
 // A non-editable UITextView gives real cursor/range selection and owns its own
-// selection gestures, so the chat ScrollView and sidebar drag don't steal them.
+// selection gestures, so the conversation ScrollView and sidebar drag don't steal them.
 struct SelectableText: UIViewRepresentable {
     let attributed: NSAttributedString
     private let streaming: Streaming?
@@ -398,7 +398,7 @@ struct SelectableText: UIViewRepresentable {
             guard case let .link(url) = textItem.content else {
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             }
-            switch ChatLinkDestination(url) {
+            switch ConversationLinkDestination(url) {
             case .web:
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             case .artifact:

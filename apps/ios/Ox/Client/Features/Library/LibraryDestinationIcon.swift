@@ -19,7 +19,7 @@ enum OxActionIconKind: String, Equatable {
     case artifacts
     case skills
     case memory
-    case chats
+    case conversations
     case web
     case files
     case help
@@ -62,7 +62,7 @@ enum OxActionIconKind: String, Equatable {
         case "artifact": .artifacts
         case "skill": .skills
         case "memory": .memory
-        case "chat": .chats
+        case "chat": .conversations
         case "web": .web
         case "fs": .files
         case "help": .help
@@ -87,7 +87,7 @@ enum OxActionIconKind: String, Equatable {
         case .artifacts: "square.on.square"
         case .skills: "command"
         case .memory: "brain"
-        case .chats: "bubble.left.and.bubble.right"
+        case .conversations: "bubble.left.and.bubble.right"
         case .web: "globe"
         case .files: "folder"
         case .help: "doc.text.magnifyingglass"

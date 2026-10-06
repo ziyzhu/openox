@@ -52,6 +52,8 @@ Exercise an upgrade fixture produced by the oldest supported shipped representat
 - an older build is never installed over data stamped by a newer build during upgrade testing unless the downgrade path is explicitly under test;
 - fresh install still works, but is not the only tested path.
 
+Include oversized predecessor transcripts and individual JSONL records when verifying chat migrations. A generic file-read cap is not a format incompatibility, and line-by-line processing is not bounded if one record contains huge invocation results. Hash and archive source bytes incrementally; validate checkpoints against the original representation before changing payloads to references.
+
 Keep sanitized predecessor snapshots and upgrade evidence outside the repository. For Local services, include dirty and clean Git states when relevant. Run the relevant repository checks and exercise the installed iOS build through the startup flow before calling the migration verified.
 
 ### Required repository gate

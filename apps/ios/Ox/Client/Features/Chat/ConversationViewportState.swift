@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatViewportLayout {
+struct ConversationViewportLayout {
     static let responseComposerSpacing: CGFloat = 48
 
     var composerHeight: CGFloat = 0

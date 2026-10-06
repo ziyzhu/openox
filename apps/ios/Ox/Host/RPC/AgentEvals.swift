@@ -19,7 +19,7 @@ extension OxHostProtocol {
     }
 
     @MainActor
-    static func handleEvaluateAgent(_ command: EvaluateAgentRequest, chatManager: ConversationManager, reply: OxHostRPC.Reply) {
+    static func handleEvaluateAgent(_ command: EvaluateAgentRequest, conversationManager: ConversationManager, reply: OxHostRPC.Reply) {
         Log.agent.warning("OxHostRPC.agents.evaluate refused: native post-turn eval limits unsupported by Pi Durable")
         reply.failure("This eval workflow requires a native post-turn stop hook that Pi Durable does not support. No input was submitted and no provider or tool was invoked.")
     }

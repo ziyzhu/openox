@@ -5,7 +5,7 @@ enum ClientAutomation {
     typealias PromptRequest = OxHostProtocol.PromptRequest
     typealias ComposerFormattingResult = OxHostProtocol.ComposerFormattingResult
 
-    @MainActor weak static var composer: ChatComposerModel?
+    @MainActor weak static var composer: ConversationComposerModel?
     @MainActor static var setEditDraft: ((String) -> Void)?
 
 

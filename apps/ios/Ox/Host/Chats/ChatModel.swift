@@ -138,6 +138,7 @@ nonisolated struct Execution: Codable, Equatable, Sendable {
     var source: String
     var effects: [ExecutionEffect]
     var outcome: ExecutionOutcome
+    var invocationTrace: InvocationTrace? = nil
 
     var output: String {
         switch outcome {

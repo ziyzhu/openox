@@ -21,7 +21,7 @@ nonisolated enum A11yID {
         static let copy = "skillImport.copy"
     }
 
-    enum ChatImport {
+    enum ConversationImport {
         static let preview = "chatImport.preview"
         static let cancel = "chatImport.cancel"
         static let add = "chatImport.add"
@@ -164,7 +164,7 @@ nonisolated enum A11yID {
         static let modelAccessNotice = "chat.modelAccessNotice"
         static let modelRegion = "chat.modelRegion"
         static let modelProvider = "chat.modelProvider"
-        static func modelProviderOption(_ clientId: String) -> String { "chat.modelProviderOption.\(clientId)" }
+        static func modelProviderOption(_ clientId: String) -> String { "conversation.modelProviderOption.\(clientId)" }
         static let modelSelection = "chat.modelSelection"
         static let modelThinkingLevel = "chat.modelThinkingLevel"
         static let modelAuthAPIKey = "chat.modelAuth.apiKey"
@@ -178,10 +178,10 @@ nonisolated enum A11yID {
         static let persistedEmpty = "chat.persistedEmpty"
         static let importMemory = "chat.importMemory"
         static let followIntent = "chat.followIntent"
-        static func modelOption(_ modelId: String) -> String { "chat.modelOption.\(modelId)" }
-        static func modelThinkingLevelOption(_ effort: String) -> String { "chat.modelThinkingLevelOption.\(effort)" }
-        static func modelKey(_ clientId: String) -> String { "chat.modelKey.\(clientId)" }
-        static func modelKeySignIn(_ clientId: String) -> String { "chat.modelKeySignIn.\(clientId)" }
+        static func modelOption(_ modelId: String) -> String { "conversation.modelOption.\(modelId)" }
+        static func modelThinkingLevelOption(_ effort: String) -> String { "conversation.modelThinkingLevelOption.\(effort)" }
+        static func modelKey(_ clientId: String) -> String { "conversation.modelKey.\(clientId)" }
+        static func modelKeySignIn(_ clientId: String) -> String { "conversation.modelKeySignIn.\(clientId)" }
         static let modelKeySignInError = "chat.modelKeySignInError"
         static let modelKeyNotice = "chat.modelKeyNotice"
         static let modelWebsiteAuthStatus = "chat.modelWebsiteAuthStatus"
@@ -205,7 +205,7 @@ nonisolated enum A11yID {
             static let open = "chat.artifact.open"
             static let list = "chat.artifact.list"
             static let done = "chat.artifact.done"
-            static func item(_ filename: String) -> String { "chat.artifact.item.\(filename)" }
+            static func item(_ filename: String) -> String { "conversation.artifact.item.\(filename)" }
         }
 
         enum ArtifactPicker {
@@ -213,7 +213,7 @@ nonisolated enum A11yID {
             static let attach = "chat.artifactPicker.attach"
             static let cancel = "chat.artifactPicker.cancel"
             static let empty = "chat.artifactPicker.empty"
-            static func item(_ filename: String) -> String { "chat.artifactPicker.item.\(filename)" }
+            static func item(_ filename: String) -> String { "conversation.artifactPicker.item.\(filename)" }
         }
 
         enum Message {
@@ -224,10 +224,10 @@ nonisolated enum A11yID {
             static let branch = "chat.message.branch"
             static let retry = "chat.message.retry"
             static let contextCompaction = "chat.contextCompacted"
-            static func artifact(_ artifactId: String) -> String { "chat.message.artifact.\(artifactId)" }
-            static func serviceInspector(_ domain: String) -> String { "chat.message.serviceInspector.\(domain)" }
-            static func skill(_ name: String) -> String { "chat.message.skill.\(name)" }
-            static func shoveler(_ blockId: String) -> String { "chat.message.shoveler.\(blockId)" }
+            static func artifact(_ artifactId: String) -> String { "conversation.message.artifact.\(artifactId)" }
+            static func serviceInspector(_ domain: String) -> String { "conversation.message.serviceInspector.\(domain)" }
+            static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
+            static func shoveler(_ blockId: String) -> String { "conversation.message.shoveler.\(blockId)" }
             static let videoPlay = "chat.message.video.play"
         }
 
@@ -242,52 +242,52 @@ nonisolated enum A11yID {
             static let servicesLoading = "chat.attach.servicesLoading"
             static let filter = "chat.attach.filter"
             static let connectMCP = "chat.attach.connectMCP"
-            static func catalogMCP(_ id: String) -> String { "chat.attach.catalogMCP.\(id)" }
-            static func mcpConnecting(_ id: String) -> String { "chat.attach.mcpConnecting.\(id)" }
-            static func retryMCP(_ id: String) -> String { "chat.attach.retryMCP.\(id)" }
+            static func catalogMCP(_ id: String) -> String { "conversation.attach.catalogMCP.\(id)" }
+            static func mcpConnecting(_ id: String) -> String { "conversation.attach.mcpConnecting.\(id)" }
+            static func retryMCP(_ id: String) -> String { "conversation.attach.retryMCP.\(id)" }
             static let mcpEndpoint = "chat.attach.mcpEndpoint"
-            static func startChat(_ domain: String) -> String { "chat.attach.startChat.\(domain)" }
-            static func save(_ domain: String) -> String { "chat.attach.save.\(domain)" }
-            static func service(_ domain: String) -> String { "chat.attach.service.\(domain)" }
-            static func domain(_ domain: String) -> String { "chat.attach.domain.\(domain)" }
-            static func signIn(_ domain: String) -> String { "chat.attach.signIn.\(domain)" }
-            static func signInProgress(_ domain: String) -> String { "chat.attach.signInProgress.\(domain)" }
-            static func signInDismiss(_ domain: String) -> String { "chat.attach.signInDismiss.\(domain)" }
-            static func botControl(_ domain: String) -> String { "chat.attach.botControl.\(domain)" }
-            static func botControlExpand(_ domain: String) -> String { "chat.attach.botControlExpand.\(domain)" }
-            static func botControlCancel(_ domain: String) -> String { "chat.attach.botControlCancel.\(domain)" }
-            static func payment(_ domain: String) -> String { "chat.attach.payment.\(domain)" }
-            static func signOut(_ domain: String) -> String { "chat.attach.signOut.\(domain)" }
-            static func signOutProgress(_ domain: String) -> String { "chat.attach.signOutProgress.\(domain)" }
-            static func inspectPage(_ domain: String) -> String { "chat.attach.inspectPage.\(domain)" }
-            static func clearWebData(_ domain: String) -> String { "chat.attach.clearWebData.\(domain)" }
-            static func deleteLocalService(_ domain: String) -> String { "chat.attach.deleteLocalService.\(domain)" }
-            static func shareLocalService(_ domain: String) -> String { "chat.attach.shareLocalService.\(domain)" }
-            static func disconnectMCP(_ domain: String) -> String { "chat.attach.disconnectMCP.\(domain)" }
-            static func repository(_ domain: String) -> String { "chat.attach.repository.\(domain)" }
-            static func attach(_ domain: String) -> String { "chat.attach.attach.\(domain)" }
-            static func remove(_ domain: String) -> String { "chat.attach.remove.\(domain)" }
-            static func action(_ id: String) -> String { "chat.attach.action.\(id)" }
-            static func actionApproval(_ id: String) -> String { "chat.attach.actionApproval.\(id)" }
+            static func startConversation(_ domain: String) -> String { "conversation.attach.startConversation.\(domain)" }
+            static func save(_ domain: String) -> String { "conversation.attach.save.\(domain)" }
+            static func service(_ domain: String) -> String { "conversation.attach.service.\(domain)" }
+            static func domain(_ domain: String) -> String { "conversation.attach.domain.\(domain)" }
+            static func signIn(_ domain: String) -> String { "conversation.attach.signIn.\(domain)" }
+            static func signInProgress(_ domain: String) -> String { "conversation.attach.signInProgress.\(domain)" }
+            static func signInDismiss(_ domain: String) -> String { "conversation.attach.signInDismiss.\(domain)" }
+            static func botControl(_ domain: String) -> String { "conversation.attach.botControl.\(domain)" }
+            static func botControlExpand(_ domain: String) -> String { "conversation.attach.botControlExpand.\(domain)" }
+            static func botControlCancel(_ domain: String) -> String { "conversation.attach.botControlCancel.\(domain)" }
+            static func payment(_ domain: String) -> String { "conversation.attach.payment.\(domain)" }
+            static func signOut(_ domain: String) -> String { "conversation.attach.signOut.\(domain)" }
+            static func signOutProgress(_ domain: String) -> String { "conversation.attach.signOutProgress.\(domain)" }
+            static func inspectPage(_ domain: String) -> String { "conversation.attach.inspectPage.\(domain)" }
+            static func clearWebData(_ domain: String) -> String { "conversation.attach.clearWebData.\(domain)" }
+            static func deleteLocalService(_ domain: String) -> String { "conversation.attach.deleteLocalService.\(domain)" }
+            static func shareLocalService(_ domain: String) -> String { "conversation.attach.shareLocalService.\(domain)" }
+            static func disconnectMCP(_ domain: String) -> String { "conversation.attach.disconnectMCP.\(domain)" }
+            static func repository(_ domain: String) -> String { "conversation.attach.repository.\(domain)" }
+            static func attach(_ domain: String) -> String { "conversation.attach.attach.\(domain)" }
+            static func remove(_ domain: String) -> String { "conversation.attach.remove.\(domain)" }
+            static func action(_ id: String) -> String { "conversation.attach.action.\(id)" }
+            static func actionApproval(_ id: String) -> String { "conversation.attach.actionApproval.\(id)" }
             static let deviceFilesAdd = "chat.attach.deviceFiles.add"
-            static func deviceFilesRemove(_ id: String) -> String { "chat.attach.deviceFiles.remove.\(id)" }
-            static func devicePermission(_ id: String) -> String { "chat.attach.devicePermission.\(id)" }
+            static func deviceFilesRemove(_ id: String) -> String { "conversation.attach.deviceFiles.remove.\(id)" }
+            static func devicePermission(_ id: String) -> String { "conversation.attach.devicePermission.\(id)" }
         }
 
-        static func servicePill(_ domain: String) -> String { "chat.servicePill.\(domain)" }
-        static func composerAttachment(_ filename: String) -> String { "chat.composerAttachment.\(filename)" }
-        static func mention(_ domain: String) -> String { "chat.mention.\(domain)" }
-        static func skill(_ name: String) -> String { "chat.skill.\(name)" }
-        static func canvasExpand(_ filename: String) -> String { "chat.canvas.expand.\(filename)" }
+        static func servicePill(_ domain: String) -> String { "conversation.servicePill.\(domain)" }
+        static func composerAttachment(_ filename: String) -> String { "conversation.composerAttachment.\(filename)" }
+        static func mention(_ domain: String) -> String { "conversation.mention.\(domain)" }
+        static func skill(_ name: String) -> String { "conversation.skill.\(name)" }
+        static func canvasExpand(_ filename: String) -> String { "conversation.canvas.expand.\(filename)" }
 
-        static func permissionRequest(_ icon: String) -> String { "chat.permissionRequest.\(icon)" }
-        static func step(_ icon: String) -> String { "chat.step.\(icon)" }
+        static func permissionRequest(_ icon: String) -> String { "conversation.permissionRequest.\(icon)" }
+        static func step(_ icon: String) -> String { "conversation.step.\(icon)" }
         static let permissionAcknowledgement = "chat.permissionAcknowledgement"
         static let choiceAcknowledgement = "chat.choiceAcknowledgement"
         static let choiceCustomInput = "chat.choice.customInput"
         static let choiceCustomSubmit = "chat.choice.customSubmit"
-        static func confirm(_ option: String) -> String { "chat.confirm.\(option)" }
-        static func confirmReceipt(_ option: String) -> String { "chat.confirm.receipt.\(option)" }
+        static func confirm(_ option: String) -> String { "conversation.confirm.\(option)" }
+        static func confirmReceipt(_ option: String) -> String { "conversation.confirm.receipt.\(option)" }
     }
 
     enum ServiceHandoff {
@@ -321,7 +321,7 @@ enum A11yLabel {
     static var addAttachment: String { L10n.string("Add attachment", comment: "") }
     static var newChat: String { L10n.string("New chat", comment: "") }
     static var settings: String { L10n.string("Settings", comment: "") }
-    static var deleteChat: String { L10n.string("Delete chat", comment: "") }
+    static var deleteConversation: String { L10n.string("Delete chat", comment: "") }
     static var renameChat: String { L10n.string("Rename chat", comment: "") }
     static var pin: String { L10n.string("Pin", comment: "") }
     static var unpin: String { L10n.string("Unpin", comment: "") }

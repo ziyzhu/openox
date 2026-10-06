@@ -161,7 +161,7 @@ actor ProfileRepository {
         } catch { Log.session.error("ProfileRepository.save chat=\(request.chatID) failed=\(error.localizedDescription)"); return ChatSaveReceipt(saveID: request.saveID, succeeded: false) }
     }
 
-    func deleteChat(_ id: ChatID, in scope: ProfileScope) async throws {
+    func deleteConversation(_ id: ChatID, in scope: ProfileScope) async throws {
         let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationDelete"), "reference": reference.value]))
         deleted[scope, default: []].insert(id)

@@ -13,6 +13,7 @@ export interface NormalizedProfileDraft {
   profileID: string;
   documents: { path: string; text: string }[];
   artifacts: (ArtifactRecord & { binary: boolean; saved: boolean })[];
+  payloads?: ArtifactRecord[];
   conversations: {
     key: string;
     title: string;
@@ -57,6 +58,29 @@ function validate(draft: NormalizedProfileDraft) {
     if (artifacts.has(file.path) || typeof file.binary !== "boolean" || typeof file.saved !== "boolean") throw new Error("Invalid or duplicate Profile artifact");
     artifacts.add(file.path);
   }
+  const payloads = new Map<string, ArtifactRecord>();
+  for (const file of draft.payloads ?? []) {
+    artifactRecord(file, artifactPath(file.path), file.size);
+    if (file.path !== `artifacts/payload-${file.sha256}.json` || !Number.isSafeInteger(file.size) || file.size < 0 || payloads.has(file.path) || artifacts.has(file.path)) {
+      throw new Error("Invalid or duplicate Profile payload");
+    }
+    payloads.set(file.path, file);
+  }
+  const payload = (value: unknown): void => {
+    if (Array.isArray(value)) { value.forEach(payload); return; }
+    if (!value || typeof value !== "object") return;
+    const fields = value as Record<string, unknown>;
+    const candidate = fields.oxPayload;
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate as { format?: unknown }).format === 1) {
+      const reference = candidate as { source?: ArtifactRecord; offset?: number; length?: number };
+      const record = reference?.source && payloads.get(reference.source.path);
+      if (!record || !same(record, reference!.source) || !Number.isSafeInteger(reference!.offset) || !Number.isSafeInteger(reference!.length)
+          || reference!.offset! < 0 || reference!.length! < 0 || reference!.offset! > record.size || reference!.length! > record.size - reference!.offset!) {
+        throw new Error("Payload is not declared in the owning Profile");
+      }
+    }
+    Object.values(fields).forEach(payload);
+  };
   const attachment = (value: unknown): void => {
     if (Array.isArray(value)) { value.forEach(attachment); return; }
     if (!value || typeof value !== "object") return;
@@ -78,6 +102,11 @@ function validate(draft: NormalizedProfileDraft) {
     for (const entry of conversation.entries) {
       if (!entry.kind || (entry.head !== undefined && entry.head !== "self") || entry.edits !== undefined) throw new Error("Normalized entries cannot reference source database IDs");
       attachment(entry.model);
+      payload(entry.data);
+      if (entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) && entry.data.source !== undefined) {
+        const source = entry.data.source as unknown as ArtifactRecord;
+        if (!same(payloads.get(source.path), source)) throw new Error("Missing source archive payload");
+      }
     }
     attachment(conversation.expectedContext);
   }
@@ -100,6 +129,11 @@ async function verify(session: OxAgentSession, draft: NormalizedProfileDraft, re
     await session.files.readReference(file.path);
     const record = await session.harness.snapshot(ProfileArtifact, file.path, context);
     if (!same(record, file)) throw new Error("Profile artifact verification failed");
+  }
+  for (const file of draft.payloads ?? []) {
+    if (!session.files.immutableArtifacts) throw new Error("Payload archives require physical files");
+    const record = await session.harness.snapshot(ProfileArtifact, file.path, context);
+    if (!same(record, { ...file, binary: true, saved: false })) throw new Error("Profile payload metadata verification failed");
   }
   for (const [index, source] of draft.conversations.entries()) {
     const reference = references[index]!;
@@ -138,6 +172,14 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
       await session.harness.commit(async tx => {
         Object.assign(await tx.doc(ProfileArtifact, file.path, null), file);
         (await tx.doc(ProfileIndex)).files[file.path] = { size: file.size, mtime: 0, binary: file.binary };
+      }, context);
+    }
+    for (const file of draft.payloads ?? []) {
+      if (!host.artifacts.verifyPayload) throw new Error("Profile installation requires a streaming payload verifier");
+      await host.artifacts.verifyPayload(file);
+      await host.artifacts.flush(file.path);
+      await session.harness.commit(async tx => {
+        Object.assign(await tx.doc(ProfileArtifact, file.path, null), file, { binary: true, saved: false });
       }, context);
     }
     const references: ConversationReference[] = [];

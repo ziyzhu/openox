@@ -4,7 +4,7 @@ import Observation
 
 @MainActor
 @Observable
-final class ChatSpeechInput {
+final class ConversationSpeechInput {
     enum ReleaseAction: String {
         case send
         case cancel

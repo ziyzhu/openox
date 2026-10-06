@@ -267,10 +267,10 @@ final class ConversationManager {
         return chat
     }
 
-    func startChat(prompt: String, title: String, requestedBy caller: Conversation) throws -> UUID {
+    func startConversation(prompt: String, title: String, requestedBy caller: Conversation) throws -> UUID {
         guard caller.scope == repositoryScope, caller.scope == storage.scope,
               contains(caller.id) else {
-            throw RuntimeError.bridge("ox.chat.start: the calling chat must belong to the active Profile.")
+            throw RuntimeError.bridge("ox.conversation.start: the calling chat must belong to the active Profile.")
         }
         let chat = makeChat()
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -599,7 +599,7 @@ final class ConversationManager {
         let deletion = Task { [weak self] in
             _ = await inFlight?.value
             do {
-                try await scopedRepository.deleteChat(id, in: storageScope)
+                try await scopedRepository.deleteConversation(id, in: storageScope)
             } catch {
                 if let self, self.repositoryScope == storageScope {
                     record.persistence = .clean
@@ -631,7 +631,7 @@ final class ConversationManager {
               chat.scope.root == storage.scope.root, chat.scope.location == storage.scope.location,
               id != chat.id,
               let meta = summaries.first(where: { $0.id == id }) else {
-            throw RuntimeError.bridge("ox.chat.delete: choose another existing chat in the active Profile.")
+            throw RuntimeError.bridge("ox.conversation.delete: choose another existing chat in the active Profile.")
         }
         return meta
     }
@@ -759,7 +759,7 @@ final class ConversationManager {
     }
 
     private func attachPersistence(_ chat: Conversation) {
-        chat.chatManager = self
+        chat.conversationManager = self
         chat.durablePreparation = Task { @MainActor [weak self, weak chat] in
             guard let self, let chat else { throw CancellationError() }
             if chat.isTemporary {

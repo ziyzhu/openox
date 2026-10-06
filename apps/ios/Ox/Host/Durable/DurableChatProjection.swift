@@ -230,7 +230,8 @@ nonisolated enum DurableChatProjection {
         case .choice(let prompt): return .choice(sealed(prompt))
         case .execute(let execution):
             return .execute(Execution(source: call.arguments.objectValue?["source"]?.stringValue ?? "",
-                                      effects: sealed(execution.effects), outcome: .failed(output: "Interrupted")))
+                                      effects: sealed(execution.effects), outcome: .failed(output: "Interrupted"),
+                                      invocationTrace: execution.invocationTrace))
         default:
             let invocation = Invocation(id: StableID.uuid("pi:invocation:\(id.rawValue.uuidString)"), name: call.name,
                                         purpose: call.arguments.objectValue?["purpose"]?.stringValue ?? call.name,

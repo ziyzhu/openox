@@ -59,35 +59,60 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
         switch self {
         case .memory:
             """
-            Your combined memory is ready to review in Ox.
+            Imported what ChatGPT, Claude, and Muse exposed; merged overlapping preferences into Ox memory.
 
-            - **Communication:** concise explanations with practical next steps.
-            - **Work:** protect focused mornings and keep a short list of priorities.
-            - **Preferences:** keep useful context together and easy to edit.
+            - **ChatGPT:** concise answers, with trade-offs up front.
+            - **Claude:** Swift and TypeScript examples; small, reviewable changes.
+            - **Muse:** protect the first morning focus block.
+
+            This isn't a complete export of private memory stores. Source labels are kept so you can review the merge.
             """
         case .offline:
             """
-            Start with one priority:
+            Protect one hour, rather than planning the entire morning.
 
-            1. Choose a small, concrete first step.
-            2. Put your phone aside for a 45-minute focus block.
-            3. Check messages after the block.
+            1. **9:00–9:05:** Choose one task and define what “done” means.
+            2. **9:05–9:50:** Silence notifications and work only on that task.
+            3. **9:50–10:00:** Note the next step, then check messages.
+
+            If you get interrupted, return to the same task instead of restarting the plan.
             """
         case .reddit:
             """
-            Reddit is now a reusable service.
+            Created **Reddit** in Local and checked its search and comment-reading actions.
 
-            It can **browse posts**, **search discussions**, and **read comments**. These public reads don't require a Reddit sign-in.
+            Start with [r/productivity](https://www.reddit.com/r/productivity/) for distractions and protecting your first work block, or [r/GetDisciplined](https://www.reddit.com/r/GetDisciplined/) for routines that are easier to repeat.
+
+            The service is attached. I'll use it for the next search. These public reads don't need a Reddit sign-in.
             """
         case .reuse:
             """
-            Three practical ideas from [r/productivity](https://www.reddit.com/r/productivity/):
+            A recurring theme in [r/productivity](https://www.reddit.com/r/productivity/): make starting easier instead of adding more rules.
 
-            - Choose your first task the night before.
-            - Put your phone out of reach.
-            - Protect one focus block before opening your inbox.
+            - Pick one concrete first task the night before.
+            - Keep your phone outside the workspace until the first break.
+            - Check messages after a 45-minute block, not before.
+
+            Try the first two tomorrow. Measure whether you started on time, not whether the morning was perfect.
             """
         default: ""
+        }
+    }
+
+    var progress: [String] {
+        switch self {
+        case .memory:
+            ["Reading preferences exposed by ChatGPT, Claude, and Muse",
+             "Merging overlaps and preserving source labels",
+             "Saving the combined notes to Ox memory"]
+        case .reddit:
+            ["Checking Reddit's pages and available reads",
+             "Building reusable search and comment-reading actions",
+             "Checking the saved service with a public search"]
+        case .reuse:
+            ["Searching discussions about focused mornings",
+             "Reading comments and comparing practical suggestions"]
+        default: []
         }
     }
 }
@@ -109,8 +134,8 @@ nonisolated enum OxDemoLaunch {
 @Observable
 final class OxDemoPlayback {
     let services: ServiceManager
-    let composer = ChatComposerModel()
-    let speech = ChatSpeechInput()
+    let composer = ConversationComposerModel()
+    let speech = ConversationSpeechInput()
     let sessionID = UUID()
     let artwork: [String: Data]
     private let catalog: [String: Service]
@@ -118,6 +143,8 @@ final class OxDemoPlayback {
     private(set) var sent = false
     private(set) var reply = ""
     private(set) var isStreaming = false
+    private(set) var thinking: ThinkingTrace?
+    private(set) var thinkingStartedAt = Date()
     private(set) var serviceCreated = false
     var focusComposer = false
     var selectedProvider: String? = "chatgpt"
@@ -139,7 +166,11 @@ final class OxDemoPlayback {
                 "domain": .string(domain), "name": .string(name),
                 "baseUrl": .string("https://\(domain)"), "actions": .array([]),
             ]))
-            built[domain] = Service(definition: definition, manager: manager)
+            let service = Service(definition: definition, manager: manager)
+            service.setAuth(domain == "reddit.com" ? .notRequired : .observed(.init(
+                value: .signedIn, observedAt: .distantPast, evidence: .configured
+            )))
+            built[domain] = service
         }
         catalog = built
         let bundle = Bundle.main.url(forResource: "OxDemoArtwork", withExtension: "bundle")
@@ -166,6 +197,7 @@ final class OxDemoPlayback {
         task = nil
         focusComposer = false
         isStreaming = false
+        if thinking != nil { thinking?.completedAt = Date() }
     }
 
     func play(reduceMotion: Bool) {
@@ -198,6 +230,14 @@ final class OxDemoPlayback {
         } else if !scene.prompt.isEmpty {
             sent = true
             reply = scene.reply
+            if !scene.progress.isEmpty {
+                let now = Date()
+                thinkingStartedAt = now.addingTimeInterval(-Double(scene.progress.count) * 1.6)
+                thinking = ThinkingTrace(
+                    entries: scene.progress.map { .reasoning(Reasoning(text: $0)) },
+                    completedAt: now
+                )
+            }
         }
         serviceCreated = [.reddit, .reuse].contains(scene)
     }
@@ -208,6 +248,7 @@ final class OxDemoPlayback {
         sent = false
         reply = ""
         isStreaming = false
+        thinking = nil
         serviceCreated = false
         focusComposer = false
     }
@@ -240,11 +281,21 @@ final class OxDemoPlayback {
             self.sent = true
         }
         isStreaming = true
-        try await Task.sleep(for: .milliseconds(800))
+        if !scene.progress.isEmpty {
+            thinkingStartedAt = Date()
+            thinking = ThinkingTrace(entries: [], completedAt: nil)
+            for label in scene.progress {
+                thinking?.entries.append(.reasoning(Reasoning(text: label)))
+                try await Task.sleep(for: .milliseconds(1600))
+            }
+            thinking?.completedAt = Date()
+        }
+        try await Task.sleep(for: .milliseconds(500))
         var streamed = ""
-        for character in scene.reply {
-            try await Task.sleep(for: .milliseconds(14))
-            streamed.append(character)
+        for (index, word) in scene.reply.split(separator: " ", omittingEmptySubsequences: false).enumerated() {
+            try await Task.sleep(for: .milliseconds(word.contains("\n") ? 220 : index.isMultiple(of: 5) ? 180 : 65))
+            if index > 0 { streamed.append(" ") }
+            streamed.append(contentsOf: word)
             reply = streamed
         }
         isStreaming = false

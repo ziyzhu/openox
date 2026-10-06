@@ -171,7 +171,7 @@ private final class ComposerTextViewReference {
     }
 }
 
-struct ChatComposer: View, Equatable {
+struct ConversationComposer: View, Equatable {
     static let surfaceSpacing = Theme.Spacing.md
     static let restingVerticalOffset = Theme.Spacing.md
     private static let topStripSurfaceInset = max(
@@ -209,10 +209,10 @@ struct ChatComposer: View, Equatable {
         let isEligible: Bool
     }
 
-    @Bindable var composer: ChatComposerModel
+    @Bindable var composer: ConversationComposerModel
     let isEditingMessage: Bool
     @Binding var editDraft: AttributedString
-    let speech: ChatSpeechInput
+    let speech: ConversationSpeechInput
     let attachedServices: [Service]
     let chatArtifacts: [Artifact]
     let fieldFocused: FocusState<Bool>.Binding
@@ -239,7 +239,7 @@ struct ChatComposer: View, Equatable {
     let onSend: () -> Void
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
-    var showsServiceAuthStatus = true
+    var serviceAuthSource = ServiceChip.AuthSource.live
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -256,7 +256,7 @@ struct ChatComposer: View, Equatable {
     @Environment(\.appTheme) private var appTheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
+    static func == (lhs: ConversationComposer, rhs: ConversationComposer) -> Bool {
         lhs.composer === rhs.composer
             && lhs.speech === rhs.speech
             && lhs.isEditingMessage == rhs.isEditingMessage
@@ -273,6 +273,7 @@ struct ChatComposer: View, Equatable {
             && lhs.isEmbedded == rhs.isEmbedded
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
+            && lhs.serviceAuthSource == rhs.serviceAuthSource
     }
 
     private var empty: Bool {
@@ -324,7 +325,7 @@ struct ChatComposer: View, Equatable {
                 guard opportunity.isEligible, !hasShownImportMemory, importMemoryIntentDisplays < 3 else { return }
                 hasShownImportMemory = true
                 importMemoryIntentDisplays += 1
-                Log.ui.info("ChatComposer.importMemoryIntent shown chat=\(sessionID) display=\(importMemoryIntentDisplays)")
+                Log.ui.info("ConversationComposer.importMemoryIntent shown conversation=\(sessionID) display=\(importMemoryIntentDisplays)")
             }
             .onChange(of: speech.isPresented) { _, isPresented in
                 if !isPresented { speechLayoutState = nil }
@@ -571,11 +572,11 @@ struct ChatComposer: View, Equatable {
             case .suggested(let suggestion):
                 let message = suggestion.message
                 composer.draft = message
-                Log.ui.info("ChatComposer.followIntent send chat=\(sessionID) chars=\(message.count)")
+                Log.ui.info("ConversationComposer.followIntent send conversation=\(sessionID) chars=\(message.count)")
                 submit()
             case .importMemory:
                 guard let skill = BuiltInSkills.skills.first(where: { $0.name == "import-memory" }) else {
-                    Log.ui.error("ChatComposer.importMemoryIntent missingSkill chat=\(sessionID)")
+                    Log.ui.error("ConversationComposer.importMemoryIntent missingSkill conversation=\(sessionID)")
                     return
                 }
                 onSubmitSkill(skill, "")
@@ -621,7 +622,7 @@ struct ChatComposer: View, Equatable {
             ForEach(chatArtifacts) { artifact in
                 Button {
                     Haptics.impact(.artifactTabSelected)
-                    Log.ui.info("ChatComposer.artifactSelect chat=\(sessionID) filename=\(artifact.fileName)")
+                    Log.ui.info("ConversationComposer.artifactSelect conversation=\(sessionID) filename=\(artifact.fileName)")
                     onOpenChatArtifact(artifact)
                 } label: {
                     Label(
@@ -823,11 +824,11 @@ struct ChatComposer: View, Equatable {
             "Press and hold to talk.",
             comment: "Hint shown when the user taps instead of holding the microphone button."
         )
-        Log.ui.info("ChatComposer.speechHint chat=\(sessionID)")
+        Log.ui.info("ConversationComposer.speechHint conversation=\(sessionID)")
     }
 
     private func setMenu(_ visible: Bool) {
-        Log.ui.info("ChatComposer.attachMenu chat=\(sessionID) visible=\(visible)")
+        Log.ui.info("ConversationComposer.attachMenu conversation=\(sessionID) visible=\(visible)")
         composer.setAttachmentMenuPresented(visible)
     }
 
@@ -879,9 +880,10 @@ struct ChatComposer: View, Equatable {
             service: picked,
             title: picked.title,
             onOpen: { onOpenService(picked) },
-            showsAuthStatus: showsServiceAuthStatus,
+            showsAuthStatus: true,
+            authSource: serviceAuthSource,
             onRemove: {
-                Log.ui.info("ChatComposer.detachService domain=\(picked.domain)")
+                Log.ui.info("ConversationComposer.detachService domain=\(picked.domain)")
                 onRemoveService(picked)
             },
             fill: Theme.Colors.chipOnBackground,
@@ -949,7 +951,7 @@ struct ChatComposer: View, Equatable {
             get: { composer.attributedDraft },
             set: { value in
                 guard composer.draftID == draftID else {
-                    Log.ui.info("ChatComposer.draftWrite stale chat=\(sessionID) draft=\(draftID) current=\(composer.draftID) chars=\(value.characters.count)")
+                    Log.ui.info("ConversationComposer.draftWrite stale conversation=\(sessionID) draft=\(draftID) current=\(composer.draftID) chars=\(value.characters.count)")
                     return
                 }
                 if textViewReference.hasMarkedText {
@@ -987,7 +989,7 @@ struct ChatComposer: View, Equatable {
                 }
                 composer.attributedDraft = draft
                 if !pastedImages.isEmpty {
-                    Log.ui.info("ChatComposer.paste chat=\(sessionID) images=\(pastedImages.count)")
+                    Log.ui.info("ConversationComposer.paste conversation=\(sessionID) images=\(pastedImages.count)")
                     onPasteImages(pastedImages)
                 }
             }
@@ -1055,7 +1057,7 @@ private struct DraftAttachmentChip: View {
 }
 
 private struct PendingAttachmentChip: View {
-    let pending: ChatComposerModel.PendingAttachment
+    let pending: ConversationComposerModel.PendingAttachment
     let onRemove: () -> Void
 
     private var userFacingName: String { Artifact.userFacingName(forFileName: pending.displayName) }

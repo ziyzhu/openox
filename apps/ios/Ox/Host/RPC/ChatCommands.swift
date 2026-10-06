@@ -15,11 +15,11 @@ extension OxHostProtocol {
     @MainActor
     static func handleGetChat(
         _ command: SessionRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         let session: Conversation?
-        switch resolveSession(chatManager, command.sessionId) {
+        switch resolveSession(conversationManager, command.sessionId) {
         case .found(let s): session = s
         case .error(let error):
             reply.failure(error)
@@ -39,7 +39,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleOpenChat(
         _ command: SessionRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard let rawID = command.sessionId.flatMap(UUID.init(uuidString:)) else {
@@ -47,7 +47,7 @@ extension OxHostProtocol {
         }
         Task { @MainActor in
             do {
-                let chat = try await chatManager.openForClient(rawID)
+                let chat = try await conversationManager.openForClient(rawID)
                 Log.agent.info("OxHostRPC.chats.open id=\(reply.id) chat=\(chat.id)")
                 reply.success(GetChatResult(data: try await ChatSnapshot(chat)))
             } catch { reply.failure(error.localizedDescription) }
@@ -57,10 +57,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleRespondChat(
         _ command: RespondChatRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
-        guard case .found(let chat?) = resolveSession(chatManager, command.sessionId),
+        guard case .found(let chat?) = resolveSession(conversationManager, command.sessionId),
               case .prompt(let prompt) = chat.interaction,
               UUID(uuidString: command.promptId) == prompt.id else {
             return reply.failure("pending prompt not found; inspect the chat before responding")
@@ -86,7 +86,7 @@ extension OxHostProtocol {
     @MainActor
     static func handleNewChat(
         _ command: NewChatRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         let selection: (client: any ProviderClient, model: ProviderModel)?
@@ -104,9 +104,9 @@ extension OxHostProtocol {
         default:
             return reply.failure("provide both providerId and modelId")
         }
-        let chat = chatManager.startNewChat()
+        let chat = conversationManager.startNewChat()
         if chat.isTemporary != (command.temporary ?? false) {
-            chatManager.toggleTemporaryChat()
+            conversationManager.toggleTemporaryChat()
         }
         if let selection {
             chat.switchModel(
@@ -127,12 +127,12 @@ extension OxHostProtocol {
     @MainActor
     static func handleSendChat(
         _ command: SendChatRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         guard !command.text.isEmpty else { return reply.failure("missing text") }
         let chat: Conversation
-        switch resolveSession(chatManager, command.sessionId) {
+        switch resolveSession(conversationManager, command.sessionId) {
         case .error(let error): return reply.failure(error)
         case .found(nil): return reply.failure("no active chat; create one with chats.new")
         case .found(let resolved?): chat = resolved
@@ -153,11 +153,11 @@ extension OxHostProtocol {
     @MainActor
     static func handleStopChat(
         _ command: SessionRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
         let chat: Conversation
-        switch resolveSession(chatManager, command.sessionId) {
+        switch resolveSession(conversationManager, command.sessionId) {
         case .error(let error): return reply.failure(error)
         case .found(nil): return reply.failure("no active chat")
         case .found(let resolved?): chat = resolved
@@ -298,10 +298,10 @@ extension OxHostProtocol {
     @MainActor
     static func handleRepositorySaveGate(
         _ command: RepositoryGateRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
-        guard command.domain == "save", let entered = chatManager.debugControlRepositorySaveGate(command.action) else {
+        guard command.domain == "save", let entered = conversationManager.debugControlRepositorySaveGate(command.action) else {
             reply.failure("expected hold, release, or status for save")
             return
         }

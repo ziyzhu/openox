@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum AnthropicProvider {
     static let subscriptionClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     static let subscriptionRedirectURI = "http://localhost:53692/callback"
-    static let subscriptionSystemIdentity = "You are Claude Code, Anthropic's official CLI for Claude."
+    static let subscriptionSystemIdentity = ModelGuidance.text("provider.claude-subscription.identity")
     static let subscriptionScopes = [
         "org:create_api_key", "user:profile", "user:inference", "user:sessions:claude_code",
         "user:mcp_servers", "user:file_upload",

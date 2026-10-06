@@ -46,7 +46,7 @@ types remain authoritative in their `Codable` implementations.
 │   └── <ProfileName>/
 │       ├── profile.json
 │       ├── state.sqlite                     Pi execution, full history, application documents; WAL sidecars
-│       └── artifacts/<filename>             immutable physical text/binary files
+│       └── artifacts/<filename>             immutable physical text/binary files; hidden-index payload-<sha256>.json archives
 ├── Keychain                                 provider and service credentials
 └── WKWebsiteDataStore(forIdentifier:)       shared app-wide website state
 
@@ -74,11 +74,6 @@ legacy bundle-derived identifiers.
 
 At startup, `StorageMigrator` removes retired Gemma 4 model artifacts and clears
 that provider when it was the saved default.
-
-Approval-policy keys `ox.chat.start` and `ox.chat.delete` are migrated by
-`StorageMigrator` to `ox.conversation.start` and `ox.conversation.delete` before
-policy consumers initialize. Existing destination policies win collisions;
-subsequent launches are no-ops. User-authored code is not rewritten.
 
 Primary owners:
 
@@ -172,7 +167,7 @@ The Profile document kinds checkpoint every 32 ordinary changes.
 latest projections. Title/visibility fork current; favorite/read fork initial.
 Qualified `(profileID,conversationID)` references and bound cursors route full
 fork-aware scrollback separately from active model context. Read-only virtual
-`chats/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts.
+`conversations/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts. The native UUID projection uses `conversations/<uuid>/conversation.json` and `turns.jsonl`. Old `chats/` virtual paths and `ox.chat` calls remain compatibility aliases for user-authored code. `StorageMigrator` rewrites stored `ox.chat.start` and `ox.chat.delete` approval keys to `ox.conversation.start` and `ox.conversation.delete` before policy consumers initialize; existing destination policies win collisions, and subsequent launches are no-ops. Predecessor disk paths, document kinds, and UUID binding keys are unchanged.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
 Local production Profiles now activate Pi after the storage gate. No live cloud/external database synchronization or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
@@ -181,7 +176,7 @@ Local production Profiles now activate Pi after the storage gate. No live cloud/
 staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
 only the current native representation, pins source-file reads without following
 links, retains source files, fingerprints the source before/after installation,
-and refuses unknown files, missing references or invalid compaction boundaries.
+and refuses unknown files, missing references or invalid supplied compaction boundaries. Source inventory hashing and JSONL archival stream in 128 KiB buffers; oversized invocation values become ranges in their exact archived source record before Turn decoding. A missing compaction checkpoint falls back to the fully decoded transcript, matching native hydration, with a structured recovery warning. Supplied checkpoint digests are validated against the original invocation bytes rather than the new reference projection.
 The shared normalized installer has no legacy decoder or model/tool execution.
 Pi entries retain the full ledger and application payloads; self-head checkpoints
 retain compacted active context separately. `ox.conversation.metadata` v1 stores
@@ -193,7 +188,9 @@ staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now
 
 The current local Profile is `profile.json`, `state.sqlite`, and ordinary immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
-`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. Migration archives retain exact `sourceJSON`; runtime presentation never decodes it. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
+`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded retrieval notice instead of embedding their full bytes. Existing live-capture references remain readable. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` can read their UTF-8 JSON ranges after reopening, with a 32 MiB per-read limit and committed-Profile identity checks. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
+
+New native Action traces retain bounded JSON previews rather than complete inner results. `Invocation.preview` records argument, result, and purpose clipping; optional `sources` retains bounded query/domain/link metadata for source chips. `Execution.invocationTrace` counts retained and omitted calls and preview bytes. Each execution retains at most 256 Actions and a 64 KiB combined preview/source budget, with 8 KiB arguments and 4 KiB results per call. Preview traversal also limits depth, nodes, keys, and array items. Purpose/error text is limited to 500 Unicode scalars. `ThinkingTrace.omittedInvocations` projects omissions into the inspector. These optional fields are additive; older records, canonical Pi context, source archives, and artifact effects are unchanged. Recording is synchronous and nonthrowing; approvals, Actions, and JavaScript receive complete original values. Temporary chats use the same preview policy. Actual artifact effects keep their existing byte-retention policy; diagnostic previews do not publish artifacts.
 
 Pi scheduling is global to a Session. Before any progress, every recovered task/submission conversation must have its qualified native route and saved model/transport configuration installed. Recovery uses existing durable submissions and waits for both settlement and committed native-event delivery; it never resubmits user input. Cold native tools hydrate from actual Pi task/assistant/context proof without model re-stream or native hook replay. Unsafe interrupted tool intents are not rerun. Storage admission failure can poison a Pi Session even after SQLite rolls back: report failure and explicitly close/reacquire; never blindly retry effects through the failed Session.
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatArtifactsSheet: View {
+struct ConversationArtifactsSheet: View {
     let artifacts: [Artifact]
     let onOpenArtifact: (Artifact) -> Void
 
@@ -12,7 +12,7 @@ struct ChatArtifactsSheet: View {
                 LazyVStack(spacing: Theme.Spacing.sm) {
                     ForEach(artifacts) { artifact in
                         Button {
-                            Log.ui.info("ChatArtifactsSheet.navigation select filename=\(artifact.fileName)")
+                            Log.ui.info("ConversationArtifactsSheet.navigation select filename=\(artifact.fileName)")
                             onOpenArtifact(artifact)
                         } label: {
                             ArtifactLibraryRow(artifact: artifact)

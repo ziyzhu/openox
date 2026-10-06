@@ -29,6 +29,31 @@ nonisolated final class DurableArtifactStore {
         if op == "close" { close(); return NSNull() }
         guard !closed else { throw failure("Artifact owner closed; reacquire after reopening") }
         try prepare()
+        if op == "payloadVerify" || op == "payloadRead" {
+            let name = try basename(params["path"] as? String)
+            guard let size = params["size"] as? Int, size >= 0, let digest = params["sha256"] as? String,
+                  name == "payload-" + digest + ".json", digest.count == 64,
+                  digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else { throw failure("Invalid payload reference") }
+            let fd = try openFile(name, flags: O_RDONLY)
+            defer { Darwin.close(fd) }
+            try DurablePayloadWriter.verify(fd, size: size, digest: digest)
+            if op == "payloadVerify" { return NSNull() }
+            guard let offset = params["offset"] as? Int, let length = params["length"] as? Int,
+                  offset >= 0, length >= 0, length <= 32 * 1024 * 1024, offset <= size, length <= size - offset else {
+                throw failure("Payload range exceeds the bounded read limit")
+            }
+            var data = Data(count: length)
+            try data.withUnsafeMutableBytes { buffer in
+                var read = 0
+                while read < length {
+                    let count = pread(fd, buffer.baseAddress!.advanced(by: read), length - read, off_t(offset + read))
+                    if count < 0 && errno == EINTR { continue }
+                    guard count > 0 else { throw failure("Payload range was truncated") }
+                    read += count
+                }
+            }
+            return data.base64EncodedString()
+        }
         if op == "release" {
             if let token = params["token"] as? String { release(token) }
             return NSNull()
@@ -111,6 +136,38 @@ nonisolated final class DurableArtifactStore {
             return ["path": "artifacts/\(handle.name)", "size": handle.size, "sha256": digest]
         }
         throw failure("Unknown artifact operation")
+    }
+
+    func capturePayload(_ reference: JSONValue, offset: Int, length: Int) throws -> Data {
+        guard !closed else { throw failure("Payload owner closed") }
+        try prepare()
+        guard let fields = reference.objectValue, let path = fields["path"]?.stringValue,
+              let size = fields["size"]?.intValue, let digest = fields["sha256"]?.stringValue,
+              path == "artifacts/payload-" + digest + ".json", offset >= 0, length >= 0,
+              length <= 64 * 1024 * 1024, offset <= size, length <= size - offset else {
+            throw failure("Invalid bounded payload capture")
+        }
+        let fd = try openFile(try basename(path), flags: O_RDONLY)
+        defer { Darwin.close(fd) }
+        var info = stat()
+        guard fstat(fd, &info) == 0, info.st_size == size else { throw failure("Payload capture size mismatch") }
+        var data = Data(count: length)
+        try data.withUnsafeMutableBytes { buffer in
+            var read = 0
+            while read < length {
+                let count = pread(fd, buffer.baseAddress!.advanced(by: read), length - read, off_t(offset + read))
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { throw failure("Payload capture was truncated") }
+                read += count
+            }
+        }
+        return data
+    }
+
+    func payloadWriter() throws -> DurablePayloadWriter {
+        guard !closed else { throw failure("Payload owner closed") }
+        try prepare()
+        return try DurablePayloadWriter(directory: directory)
     }
 
     func acquire() throws {

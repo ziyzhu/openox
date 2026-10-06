@@ -131,7 +131,7 @@ struct HoldToTalkBackdrop: View {
 }
 
 struct HoldToTalkCard: View {
-    let speech: ChatSpeechInput
+    let speech: ConversationSpeechInput
     @Environment(\.appTheme) private var appTheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -232,7 +232,7 @@ struct HoldToTalkCard: View {
         }
     }
 
-    private func target(_ action: ChatSpeechInput.ReleaseAction, title: LocalizedStringKey, symbol: String) -> some View {
+    private func target(_ action: ConversationSpeechInput.ReleaseAction, title: LocalizedStringKey, symbol: String) -> some View {
         let selected = speech.selection == action
         let color = (action == .cancel ? Theme.Colors.error : Theme.Colors.primary).color(for: appTheme)
         return Button {

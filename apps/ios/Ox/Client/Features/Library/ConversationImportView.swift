@@ -1,9 +1,9 @@
 import SwiftUI
 
-struct ChatImportView: View {
+struct ConversationImportView: View {
     let proposal: ChatImportProposal
     let coordinator: ChatImportCoordinator
-    let chats: ConversationManager
+    let conversations: ConversationManager
 
     private var artifactBytes: Int {
         proposal.header.files.reduce(0) { total, file in
@@ -33,7 +33,7 @@ struct ChatImportView: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityIdentifier(A11yID.ChatImport.preview)
+                .accessibilityIdentifier(A11yID.ConversationImport.preview)
 
                 Label(
                     "\(proposal.header.artifactCount) artifacts · \(artifactSize)",
@@ -69,11 +69,11 @@ struct ChatImportView: View {
 
                 Spacer(minLength: 0)
 
-                Button("Add Chat") { coordinator.install(using: chats) }
+                Button("Add Chat") { coordinator.install(using: conversations) }
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
                     .disabled(coordinator.isSaving)
-                    .accessibilityIdentifier(A11yID.ChatImport.add)
+                    .accessibilityIdentifier(A11yID.ConversationImport.add)
             }
             .padding(Theme.Spacing.lg)
             .background(Theme.Colors.background)
@@ -83,7 +83,7 @@ struct ChatImportView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { coordinator.dismissProposal() }
                         .disabled(coordinator.isSaving)
-                        .accessibilityIdentifier(A11yID.ChatImport.cancel)
+                        .accessibilityIdentifier(A11yID.ConversationImport.cancel)
                 }
             }
             .overlay {

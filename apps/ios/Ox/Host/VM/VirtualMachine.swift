@@ -355,6 +355,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         const ox = {
         \(oxMembers)
         };
+        Object.defineProperty(ox, 'chat', { value: ox.conversation });
         const __oxAttachHelp = (value, prefix = 'ox') => {
           for (const [key, member] of Object.entries(value)) {
             const name = `${prefix}.${key}`;

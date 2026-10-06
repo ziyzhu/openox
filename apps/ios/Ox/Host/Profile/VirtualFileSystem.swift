@@ -47,10 +47,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
             case .serviceItem(let kind, let domain, let components):
                 "services/\(kind.rawValue)/\(domain)/\(components.joined(separator: "/"))"
-            case .chats: "chats"
-            case .chat(let id): "chats/\(id)"
-            case .chatMetadata(let id): "chats/\(id)/chat.json"
-            case .chatTurns(let id): "chats/\(id)/turns.jsonl"
+            case .chats: "conversations"
+            case .chat(let id): "conversations/\(id)"
+            case .chatMetadata(let id): "conversations/\(id)/conversation.json"
+            case .chatTurns(let id): "conversations/\(id)/turns.jsonl"
             case .files: "files"
             case .deviceFolder(let id): "files/\(id)"
             case .deviceItem(let id, let components): "files/\(id)/\(components.joined(separator: "/"))"
@@ -117,7 +117,11 @@ nonisolated public struct VirtualFileSystem: Sendable {
               !path.hasPrefix("/"),
               !path.hasSuffix("/"),
               !path.contains("\\") else { throw Error.invalidPath(rawPath) }
-        let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        var parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        if parts.first == "chats" {
+            parts[0] = "conversations"
+            if parts.count == 3, parts[2] == "chat.json" { parts[2] = "conversation.json" }
+        }
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw Error.invalidPath(rawPath)
         }
@@ -159,14 +163,14 @@ nonisolated public struct VirtualFileSystem: Sendable {
                 throw Error.invalidPath(rawPath)
             }
             return .serviceItem(kind, parts[2], Array(parts.dropFirst(3)))
-        case ["chats"]: return .chats
-        case let parts where parts.count == 2 && parts[0] == "chats":
+        case ["conversations"]: return .chats
+        case let parts where parts.count == 2 && parts[0] == "conversations":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
             return .chat(ChatID(id))
-        case let parts where parts.count == 3 && parts[0] == "chats" && parts[2] == "chat.json":
+        case let parts where parts.count == 3 && parts[0] == "conversations" && parts[2] == "conversation.json":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
             return .chatMetadata(ChatID(id))
-        case let parts where parts.count == 3 && parts[0] == "chats" && parts[2] == "turns.jsonl":
+        case let parts where parts.count == 3 && parts[0] == "conversations" && parts[2] == "turns.jsonl":
             guard let id = UUID(uuidString: parts[1]) else { throw Error.invalidPath(rawPath) }
             return .chatTurns(ChatID(id))
         case ["files"]: return .files

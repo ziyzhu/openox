@@ -21,6 +21,8 @@ nonisolated enum ChatDocumentEvent {
     case embedSkill(Skill)
     case attachMedia(Artifact)
     case appendInvocation(Invocation)
+    case recordInvocation(Invocation)
+    case setInvocationTrace(InvocationTrace)
     case appendProgress(String)
     case resolveInvocation(id: UUID, outcome: Invocation.Outcome)
     case appendReasoning(String, id: StepID = StepID())
@@ -87,6 +89,7 @@ nonisolated struct ChatDocument {
                                 case let .media(artifact): state.apply(.attachMedia(artifact))
                                 }
                             }
+                            if let trace = execution.invocationTrace { state.apply(.setInvocationTrace(trace)) }
                             if execution.outcome != .running {
                                 state.apply(.finishExecution(output: execution.output, isError: execution.isError))
                             }
@@ -313,6 +316,16 @@ nonisolated struct ChatDocument {
             attachMedia(artifact)
         case let .appendInvocation(invocation):
             appendInvocation(invocation)
+            reconcileTail()
+        case let .recordInvocation(invocation):
+            mutateExecution { execution in
+                var trace = execution.invocationTrace ?? InvocationTrace()
+                if let preview = trace.begin(invocation) { execution.effects.append(.invocation(preview)) }
+                execution.invocationTrace = trace
+            }
+            reconcileTail()
+        case let .setInvocationTrace(trace):
+            mutateExecution { $0.invocationTrace = trace }
             reconcileTail()
         case let .appendProgress(message):
             appendProgress(message)
@@ -573,14 +586,21 @@ nonisolated struct ChatDocument {
             return false
         }
         var resolved = false
+        var omitted = false
         mutateTurn { turn in
             for stepIndex in turn.steps.indices.reversed() where turn.steps[stepIndex].generation == generation.id {
                 guard case .execute(var execution) = turn.steps[stepIndex].kind else { continue }
+                omitted = omitted || (execution.invocationTrace?.omittedCalls ?? 0) > 0
                 for effectIndex in execution.effects.indices {
                     guard case .invocation(var invocation) = execution.effects[effectIndex],
                           invocation.id == id,
                           invocation.outcome == .running else { continue }
-                    invocation.outcome = outcome
+                    if var trace = execution.invocationTrace {
+                        trace.finish(&invocation, outcome: outcome)
+                        execution.invocationTrace = trace
+                    } else {
+                        invocation.outcome = outcome
+                    }
                     execution.effects[effectIndex] = .invocation(invocation)
                     turn.steps[stepIndex].kind = .execute(execution)
                     resolved = true
@@ -588,7 +608,7 @@ nonisolated struct ChatDocument {
                 }
             }
         }
-        if !resolved {
+        if !resolved, !omitted {
             Log.session.info("ChatDocument.resolveInvocation ignored id=\(id) reason=settled")
         }
         return resolved
@@ -648,6 +668,9 @@ nonisolated struct ChatDocument {
                 let outcome = Invocation.Outcome.failed("Execution finished before the invocation completed")
                 invocation.outcome = outcome
                 execution.effects[index] = .invocation(invocation)
+            }
+            if let trace = execution.invocationTrace {
+                Log.session.info("Chat.invocation trace completed recorded=\(trace.recordedCalls) omitted=\(trace.omittedCalls) previewBytes=\(trace.previewBytes)")
             }
             execution.outcome = isError ? .failed(output: output) : .succeeded(output: output)
         }

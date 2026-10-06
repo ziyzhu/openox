@@ -1,11 +1,14 @@
 #if DEBUG
 import SwiftUI
+import UIKit
 
 /// Uses production components only. Playback configuration lives outside the rendered UI.
 struct OxDemoSceneView: View {
     @State private var playback: OxDemoPlayback
     @State private var editDraft = AttributedString()
     @FocusState private var composerFocused: Bool
+    @ScaledMetric(relativeTo: .title3) private var iconButtonSize: CGFloat = 44
+    @ScaledMetric(relativeTo: .body) private var composerButtonSize: CGFloat = 34
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let autoplay: Bool
 
@@ -20,10 +23,9 @@ struct OxDemoSceneView: View {
             .background(Theme.Colors.background, ignoresSafeAreaEdges: .all)
             .environment(playback.services)
             .environment(\.localDomainArtwork, playback.artwork)
-            .environment(\.appTheme, .dark)
             .environment(\.locale, Locale(identifier: "en"))
             .environment(\.openURL, OpenURLAction { _ in .discarded })
-            .preferredColorScheme(.dark)
+            .themed()
             .onChange(of: playback.focusComposer) { _, focused in composerFocused = focused }
             .onDisappear { playback.stop() }
             .task {
@@ -56,24 +58,24 @@ struct OxDemoSceneView: View {
 
     private var chat: some View {
         VStack(spacing: 0) {
-            ChatHeader(
+            ConversationHeader(
                 modelTitle: playback.sent ? nil : "GPT-6 Sol · Fast",
-                iconButtonSize: 44,
+                iconButtonSize: iconButtonSize,
                 onShowSidebar: {},
                 onPickModel: { playback.select(.providers) }
             ) {
                 if playback.sent {
-                    ChatOverflowMenu(size: 44) {
+                    ConversationOverflowMenu(size: iconButtonSize) {
                         Button { playback.select(.providers) } label: {
                             Label("Models", systemImage: "slider.horizontal.3")
                         }
                     }
                 } else {
-                    TemporaryChatButton(isActive: false, size: 44, action: {})
+                    TemporaryChatButton(isActive: false, size: iconButtonSize, action: {})
                 }
             }
             ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+                VStack(alignment: .leading, spacing: ConversationTranscriptMetrics.blockSpacing) {
                     if playback.sent {
                         HStack {
                             Spacer(minLength: 40)
@@ -86,10 +88,38 @@ struct OxDemoSceneView: View {
                             .accessibilityIdentifier(A11yID.Chat.Message.user)
                         }
                     }
-                    if playback.isStreaming && playback.reply.isEmpty { ActivityBubble() }
+                    if let thinking = playback.thinking {
+                        ThinkingRow(
+                            trace: thinking,
+                            sourceInvocations: [],
+                            startedAt: playback.thinkingStartedAt,
+                            isLive: thinking.completedAt == nil
+                        )
+                        .padding(.horizontal, 4)
+                        .accessibilityIdentifier("demo.thinking")
+                    } else if playback.isStreaming && playback.reply.isEmpty {
+                        ActivityBubble()
+                    }
                     if !playback.reply.isEmpty {
-                        StreamingMarkdownText(source: playback.reply, isStreaming: playback.isStreaming)
-                            .accessibilityIdentifier("demo.reply")
+                        VStack(alignment: .leading, spacing: ConversationTranscriptMetrics.responseFooterSpacing) {
+                            StreamingMarkdownText(source: playback.reply, isStreaming: playback.isStreaming)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel(playback.reply, isEnabled: !playback.isStreaming)
+                                .accessibilityIdentifier("demo.reply")
+                            ResponseFooterBlockView(
+                                id: playback.sessionID,
+                                text: playback.reply,
+                                isVisible: !playback.isStreaming,
+                                controls: MessageControls(
+                                    onCopy: { UIPasteboard.general.string = $0 },
+                                    isCopied: false,
+                                    canMutate: false,
+                                    onBranch: {},
+                                    onRetry: {},
+                                    onEdit: {}
+                                )
+                            )
+                        }
                     }
                 }
                 .padding(Theme.Spacing.lg)
@@ -101,7 +131,7 @@ struct OxDemoSceneView: View {
     }
 
     private var composer: some View {
-        ChatComposer(
+        ConversationComposer(
             composer: playback.composer,
             isEditingMessage: false,
             editDraft: $editDraft,
@@ -115,10 +145,10 @@ struct OxDemoSceneView: View {
             isTemporary: false,
             isBusy: playback.isStreaming,
             followIntents: [],
-            floatsTopStrip: false,
+            floatsTopStrip: !playback.attachedServices.isEmpty,
             isEmbedded: false,
-            iconButtonSize: 44,
-            composerButtonSize: 44,
+            iconButtonSize: iconButtonSize,
+            composerButtonSize: composerButtonSize,
             onOpenAttachment: { _, _ in },
             onOpenChatArtifact: { _ in },
             onPasteImages: { _ in },
@@ -132,7 +162,7 @@ struct OxDemoSceneView: View {
             onSend: { playback.showCompletedScene() },
             onStop: { playback.stop() },
             onSpeechBegin: { _ in },
-            showsServiceAuthStatus: false
+            serviceAuthSource: .snapshot
         )
     }
 

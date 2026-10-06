@@ -20,7 +20,7 @@ nonisolated enum OxFileSystem {
             [
                 entry(
                     "ox.fs.list",
-                    "List one directory in the active Profile's virtual filesystem: `await ox.fs.list({ path?, options?, purpose })`. The default path is `.`. Persisted chats are read-only under `chats/<chat-id>/`. When Files is attached, chosen folders are mounted under `files/<folder-id>/`. Returns virtual paths only; local paths are never exposed.",
+                    ModelGuidance.text("ox.fs.list"),
                     input: object([
                         "path": path("Directory path. Defaults to `.`."),
                         "options": object(["limit": integer("Maximum entries to return, clamped to 1-100.", minimum: 1, maximum: 100)]),
@@ -30,7 +30,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.read",
-                    "Read a file's complete text into JavaScript: `await ox.fs.read({ path, options?, purpose })`. There is no default text or PDF page cutoff. Filter or slice the result in JavaScript before printing; execution output has fixed line and byte limits. If console output is truncated, use its ox.output.read reference to inspect missing portions before claiming a full review. Optional `maxBytes` and `maxPages` request a shorter read and set `truncated` when content remains. A 32 MiB file safety limit applies. Chat metadata and transcripts are read-only snapshots (current for loaded chats, saved for unloaded chats) under `chats/<chat-id>/{chat.json,turns.jsonl}`; runtime `context.json` is private. Images return guidance for local `ox.vision.analyze` or explicit `ox.fs.attach`; this read never uploads original pixels. Unsupported binary formats require conversion.",
+                    ModelGuidance.text("ox.fs.read"),
                     input: object([
                         "path": path("File path to read."),
                         "options": object([
@@ -43,7 +43,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.attach",
-                    "Attach an immutable snapshot of one image or PDF to model context: `await ox.fs.attach({ path, purpose })`. Accepts `artifacts/<filename>` or `files/<folder-id>/<file>` inside a selected folder when Files is attached. This explicitly makes original content available to the selected model/provider; it does not present the file in chat or modify the source. Prefer `ox.fs.read` for text and PDF text, or `ox.vision.analyze` for local image OCR and classification. Other binary formats require conversion. Source files are limited to 10 MiB; prepared attachments share the execution limit of four transient attachments and 20 MiB total. For models without image input, adapters may substitute local OCR/classification. Unsupported PDF input fails explicitly.",
+                    ModelGuidance.text("ox.fs.attach"),
                     input: object(["path": path("Image or PDF virtual path."), "purpose": purpose], required: ["path", "purpose"]),
                     output: object([
                         "filename": string("Attachment display filename."),
@@ -54,7 +54,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.write",
-                    writeGuide,
+                    ModelGuidance.text("ox.fs.write"),
                     input: object([
                         "path": path("File path to create or replace."),
                         "content": string("Complete UTF-8 file contents."),
@@ -64,7 +64,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.edit",
-                    "Atomically edit one UTF-8 file with exact replacements: `await ox.fs.edit({ path, edits, purpose })`. Every edit is matched against the original file, not after earlier edits. Each non-empty `oldText` must match exactly once; keep it as small as possible while unique. Put several separate changes in one call, and merge nearby or overlapping changes into one edit. One empty `oldText` appends. Line endings are preserved. Artifact edits display the updated artifact automatically. Returns the file item and the first changed line.",
+                    ModelGuidance.text("ox.fs.edit"),
                     input: object([
                         "path": path("Existing UTF-8 file path."),
                         "edits": .object([
@@ -80,13 +80,13 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.delete",
-                    "Delete one artifact, Profile-owned skill, Local service source file, or file inside a chosen Files folder: `await ox.fs.delete({ path, purpose })`. Read or inspect the existing item before deletion. Resource roots such as Local services use their `ox.service.delete` lifecycle function. Deleting inside a chosen Files folder requires approval unless the user has allowed that action without asking. `MEMORY.md`, `SOUL.md`, and chosen folders themselves cannot be deleted.",
+                    ModelGuidance.text("ox.fs.delete"),
                     input: object(["path": path("Artifact, skill, Local service source, or chosen Files path."), "purpose": purpose], required: ["path", "purpose"]),
                     output: deletion
                 ),
                 entry(
                     "ox.fs.glob",
-                    "Find file paths by glob: `await ox.fs.glob({ pattern, path?, options?, purpose })`. Supports `*`, `**`, and `?`. The optional directory path bounds the search; results are full virtual paths.",
+                    ModelGuidance.text("ox.fs.glob"),
                     input: object([
                         "pattern": string("Glob pattern matched relative to `path`."),
                         "path": path("Directory to search. Defaults to `.`."),
@@ -97,7 +97,7 @@ nonisolated enum OxFileSystem {
                 ),
                 entry(
                     "ox.fs.grep",
-                    "Search text inside files: `await ox.fs.grep({ pattern, path?, options?, purpose })`. The optional `glob` filters candidate paths. Persisted chat transcripts are searched only when `path` explicitly names `chats` or one of its descendants; a root search does not sweep chat history. Matching excerpts are centered on the match. Unsupported binary artifacts are skipped.",
+                    ModelGuidance.text("ox.fs.grep"),
                     input: object([
                         "pattern": string("Regular expression, or literal text when `options.literal` is true."),
                         "path": path("Directory or file to search. Defaults to `.`."),
@@ -167,13 +167,6 @@ nonisolated enum OxFileSystem {
     ])
     private static let nullableString = JSONValue.object(["type": .array([.string("string"), .string("null")])])
 
-    private static let writeGuide = """
-    Atomically create or replace one UTF-8 file: `await ox.fs.write({ path, content, purpose })`. The writable virtual layout is `MEMORY.md`, `SOUL.md`, `artifacts/<filename>`, writable `skills/<name>/SKILL.md` and their `references/` and `scripts/` resources, Local service source under `services/<kind>/<id>/...`, and files inside an attached chosen folder at `files/<folder-id>/...`. Bundled service source is read-only, while Development and Remote services expose only read-only manifests. Persisted chats, system skills, and installed repository skills are read-only. Skill ownership and source selection determine write access.
-
-    Read before overwriting an existing file and prefer `ox.fs.edit` for targeted changes. Writing or editing inside a chosen Files folder requires its attached Files service and existing folder grant. Profile-owned memory, soul, artifact, and skill writes do not require approval. Persist concise durable memories when they are worth keeping, without waiting for an explicit request; do not register redundant memories. Persist soul or skills only when the user explicitly asks for a durable change. Create or change artifacts when the user wants a durable result or when a Canvas materially improves the requested explanation. Write Markdown notes as artifacts/<name>.md and read skills/visualize/SKILL.md for HTML canvases. Artifact writes and edits display automatically; preserve valid requested filenames and report the final path. These operations edit UTF-8 text, not arbitrary binary formats.
-
-    Local service file operations enforce filesystem safety without validating service contents or reloading running attachments. Finish related source changes in any order, then call `ox.service.validate` to check the whole draft and `ox.service.attach` to reload this chat's attachment. Attach and Save require a valid complete service.
-    """
 
     private static let itemProperties: [String: JSONValue] = [
         "path": path("Full virtual path."),

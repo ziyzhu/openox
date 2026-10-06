@@ -9,7 +9,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.conflicts",
                     .object([
-                        "description": .string("Read service source conflicts: `await ox.repository.conflicts({ service?, purpose })`. Returns up to 100 conflicts, each with service, selectedRepository (or null), and candidates with repository IDs and names. Only enabled, available repositories are candidates. If truncated, filter by the exact service identity. This includes conflicts with an already selected source. Select the source identified by the user's task; ask only when the intended source is unclear. Do not detach services or disable a repository to resolve one service conflict."),
+                        "description": .string(ModelGuidance.text("ox.repository.conflicts")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -23,7 +23,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.resolve",
                     .object([
-                        "description": .string("Select an existing service source: `await ox.repository.resolve({ service, repository, purpose })`. Use exact IDs from ox.repository.conflicts. Persists the device-wide choice through the normal Action policy without changing repository enablement or source files. Revalidates availability before saving. Returns service, selectedRepository, and reloadRequired for this chat. Selection refreshes the service catalog. Repair or validate Local source, then call ox.service.attach to reload this chat and verify its repository before invoking actions."),
+                        "description": .string(ModelGuidance.text("ox.repository.resolve")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -39,7 +39,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.connect",
                     .object([
-                        "description": .string("Install a public HTTPS Git repository: `await ox.repository.connect({ origin, purpose })`. The repository must contain repository.json at its root. Returns its ID for later disconnection; services and skills become available after the repository loads."),
+                        "description": .string(ModelGuidance.text("ox.repository.connect")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -54,7 +54,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.sync",
                     .object([
-                        "description": .string("Refresh an installed Remote repository in place: `await ox.repository.sync({ repository, purpose })`. Find its ID with ox.app.repositories. Returns the refreshed service and skill counts. Use sync rather than reconnecting to fetch newer services; the runtime handles approval."),
+                        "description": .string(ModelGuidance.text("ox.repository.sync")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -69,7 +69,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.disconnect",
                     .object([
-                        "description": .string("Remove an installed remote repository by ID: `await ox.repository.disconnect({ repository, purpose })`. Find its ID with ox.app.repositories. This removes the local snapshot, service definitions, and skills; website sign-ins and data remain. Bundled, Development, and Local repositories cannot be disconnected; the runtime handles approval."),
+                        "description": .string(ModelGuidance.text("ox.repository.disconnect")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -84,7 +84,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.propose",
                     .object([
-                        "description": .string("Publish selected services and skills from one saved Local commit and create a pull request in a GitHub repository without cloning or forking it: `await ox.repository.propose({ repository, base?, commitHash, services?, skills?, title, body, status, purpose })`. `repository` is an HTTPS GitHub repository URL. `base` defaults to its default branch. The signed-in user must have permission to push the proposal ref. `status` must be `draft` or `open`. Validate and verify selected services, review Local status and diff, and Save the intended changes first. Never publish credentials, session data, raw captures, or machine-specific files. The user approves publication and may be asked to authorize GitHub."),
+                        "description": .string(ModelGuidance.text("ox.repository.propose")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -118,7 +118,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.status",
                     .object([
-                        "description": .string("Inspect the Local repository's active commit, main tip, live or historical view, and staged, unstaged, and untracked paths: `await ox.repository.git.status({ purpose })`. Local is the only Git-managed repository."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.status")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([:]),
@@ -130,7 +130,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.log",
                     .object([
-                        "description": .string("Read the Local repository's linear main history newest-first: `await ox.repository.git.log({ limit?, cursor?, purpose })`. `limit` defaults to 20. Pass the returned `nextCursor` to continue."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.log")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -145,7 +145,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.show",
                     .object([
-                        "description": .string("Inspect one Local service commit without changing the active service view: `await ox.repository.git.show({ commitHash, path?, purpose })`. Add a repository-relative UTF-8 `path`, such as `web/example.com/actions.js`, to read that historical file."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.show")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -161,7 +161,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.diff",
                     .object([
-                        "description": .string("Review Local repository changes without changing its active view: `await ox.repository.git.diff({ commitHash?, baseCommitHash?, path?, purpose })`. With no commit hashes, compares the active commit to the working tree. With `commitHash`, compares that commit to its parent. Add `baseCommitHash` to compare two commits. `path` narrows the result. When `truncated` is true, call again with a narrower path."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.diff")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -177,7 +177,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.checkout",
                     .object([
-                        "description": .string("Temporarily visit a Local service commit without moving its linear main tip: `await ox.repository.git.checkout({ commitHash, purpose })`. Historical views are read-only. Use `commitHash: \"latest\"` to return to the live tip. Requires a clean worktree."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.checkout")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -192,7 +192,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.commit",
                     .object([
-                        "description": .string("Validate, stage, and commit all Local service changes to its linear history: `await ox.repository.git.commit({ message, purpose })`. Local must be at its live tip and the call fails when there are no changes. Review status and diff first: this includes all Local changes, so preserve unrelated work. Present this operation as Save, keeping Git mechanics internal unless requested or needed for recovery."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.commit")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -207,7 +207,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.revert",
                     .object([
-                        "description": .string("Revert one Local commit by applying its inverse and creating a new commit at the live tip: `await ox.repository.git.revert({ commitHash, message, purpose })`. This never rewrites history and requires a clean Local worktree. Inspect status and diff first and keep abandoned work recoverable."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.revert")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -223,7 +223,7 @@ nonisolated enum OxRepositories {
                 (
                     "ox.repository.git.restore",
                     .object([
-                        "description": .string("Restore Local changes from its live tip: `await ox.repository.git.restore({ path?, purpose })`. With a changed file `path` from `ox.repository.git.status`, or the same `services/` path passed to `ox.fs.delete`, restores only that file; without one, erases every uncommitted staged, unstaged, and untracked change. It is unavailable in a historical checkout. Inspect status and diff first; preserve unrelated changes and keep abandoned work recoverable."),
+                        "description": .string(ModelGuidance.text("ox.repository.git.restore")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

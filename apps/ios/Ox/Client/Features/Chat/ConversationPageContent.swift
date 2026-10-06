@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatPromptBlock: Equatable {
+struct ConversationPromptBlock: Equatable {
     let kind: ChatPromptKind
     let prompt: String
     let options: [String]
@@ -12,7 +12,7 @@ struct ChatPromptBlock: Equatable {
     let secretEntry: SecretEntryRequest?
 }
 
-struct ChatBlock: Identifiable, Equatable {
+struct ConversationBlock: Identifiable, Equatable {
     enum ResponseFooterPhase: Equatable {
         case streaming
         case settled
@@ -26,7 +26,7 @@ struct ChatBlock: Identifiable, Equatable {
         case agentContent(ContentItem)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
-        case prompt(ChatPromptBlock)
+        case prompt(ConversationPromptBlock)
         case serviceControl(ServiceControl, interactionID: UUID?)
         case responseFooter(text: String, phase: ResponseFooterPhase)
     }
@@ -70,12 +70,12 @@ struct ChatBlock: Identifiable, Equatable {
     }
 }
 
-extension ChatBlock {
+extension ConversationBlock {
     private typealias ServiceControlLocation = Conversation.PendingServiceControl.Source
 
     private struct ProjectedTurn {
         let id: TurnID
-        var blocks: [ChatBlock] = []
+        var blocks: [ConversationBlock] = []
         var thinkingCount = 0
         var footerSourceBlockID: UUID? = nil
         var footerCreatedAt: Date? = nil
@@ -87,7 +87,7 @@ extension ChatBlock {
         thinkingActivity: Conversation.ThinkingActivity?,
         isBusy: Bool,
         interaction: Conversation.Interaction?
-    ) -> [ChatBlock] {
+    ) -> [ConversationBlock] {
         var projectedTurns: [ProjectedTurn] = []
         let pendingPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
         let pendingServiceControl: Conversation.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
@@ -111,11 +111,11 @@ extension ChatBlock {
             let turnIndex = projectedTurns.count - 1
             if case let .prompt(kind, prompt, options, answer, resolution, permission) = block.kind {
                 let activePrompt = pendingPrompt?.id == block.id ? pendingPrompt : nil
-                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
                     id: block.id,
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
-                    kind: .prompt(ChatPromptBlock(
+                    kind: .prompt(ConversationPromptBlock(
                         kind: kind,
                         prompt: prompt,
                         options: options,
@@ -126,30 +126,30 @@ extension ChatBlock {
                         isActive: activePrompt != nil,
                         secretEntry: activePrompt?.secretEntry
                     )),
-                    spacingBefore: ChatTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
             if case .thinking(let trace) = block.kind {
                 let index = projectedTurns[turnIndex].thinkingCount
                 projectedTurns[turnIndex].thinkingCount += 1
-                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
                     id: thinkingID(turnID: source.turnID, index: index),
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: .thinking(trace),
-                    spacingBefore: ChatTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
             guard case .agentContent(let items) = block.kind else {
                 guard let kind = Self.kind(block.kind) else { continue }
-                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
                     id: block.id,
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: ChatTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
                 continue
             }
@@ -184,12 +184,12 @@ extension ChatBlock {
                 } else {
                     kind = .agentContent(item)
                 }
-                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
                     id: id,
                     sourceBlockID: block.id,
                     createdAt: block.createdAt,
                     kind: kind,
-                    spacingBefore: ChatTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
             }
         }
@@ -205,12 +205,12 @@ extension ChatBlock {
             if projectedTurns[turnIndex].blocks.last?.isThinking != true {
                 let index = projectedTurns[turnIndex].thinkingCount
                 let id = thinkingID(turnID: activity.turnID, index: index)
-                projectedTurns[turnIndex].blocks.append(ChatBlock(
+                projectedTurns[turnIndex].blocks.append(ConversationBlock(
                     id: id,
                     sourceBlockID: sources.last?.block.id ?? id,
                     createdAt: activity.startedAt,
                     kind: .thinking(ThinkingTrace(entries: [], completedAt: nil)),
-                    spacingBefore: ChatTranscriptMetrics.blockSpacing
+                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
                 ))
                 projectedTurns[turnIndex].thinkingCount += 1
             }
@@ -237,27 +237,27 @@ extension ChatBlock {
                   let createdAt = turn.footerCreatedAt else { return turnBlocks }
             let text = turn.footerText.joined(separator: "\n\n")
             guard !text.isEmpty else { return turnBlocks }
-            return turnBlocks + [ChatBlock(
-                id: StableID.uuid("chat.turn.\(turn.id.rawValue.uuidString).footer"),
+            return turnBlocks + [ConversationBlock(
+                id: StableID.uuid("conversation.turn.\(turn.id.rawValue.uuidString).footer"),
                 sourceBlockID: sourceBlockID,
                 createdAt: createdAt,
                 kind: .responseFooter(
                     text: text,
                     phase: turn.id == activeTurnID ? .streaming : .settled
                 ),
-                spacingBefore: ChatTranscriptMetrics.responseFooterSpacing
+                spacingBefore: ConversationTranscriptMetrics.responseFooterSpacing
             )]
         }
         return blocks.enumerated().map { index, block in
             guard index > 0, blocks[index - 1].isThinking, block.isThinking else { return block }
-            return ChatBlock(
+            return ConversationBlock(
                 id: block.id,
                 sourceBlockID: block.sourceBlockID,
                 createdAt: block.createdAt,
                 kind: block.kind,
                 spacingBefore: max(
-                    ChatTranscriptMetrics.blockSpacing,
-                    Theme.Size.minimumTouchTarget - ChatTranscriptMetrics.thinkingRowHeight
+                    ConversationTranscriptMetrics.blockSpacing,
+                    Theme.Size.minimumTouchTarget - ConversationTranscriptMetrics.thinkingRowHeight
                 ),
                 sourceInvocations: block.sourceInvocations,
                 isLiveThinking: block.isLiveThinking
@@ -278,11 +278,11 @@ extension ChatBlock {
     }
 
     private static func contentItemID(blockID: UUID, index: Int) -> UUID {
-        StableID.uuid("chat.block.\(blockID.uuidString).item.\(index)")
+        StableID.uuid("conversation.block.\(blockID.uuidString).item.\(index)")
     }
 
     private static func thinkingID(turnID: TurnID, index: Int) -> UUID {
-        StableID.uuid("chat.turn.\(turnID.rawValue.uuidString).thinking.\(index)")
+        StableID.uuid("conversation.turn.\(turnID.rawValue.uuidString).thinking.\(index)")
     }
 
     private static func kind(_ kind: Block.Kind) -> Kind? {

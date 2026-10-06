@@ -19,7 +19,7 @@ private struct AttachmentThumb: View {
     }
 }
 
-private struct ChatArtifactRow: View {
+private struct ConversationArtifactRow: View {
     let artifact: Artifact
     var previewSourceID: String? = nil
 
@@ -66,7 +66,7 @@ private struct ChatArtifactRow: View {
     }
 }
 
-private struct ChatInteractiveRowSurface: ViewModifier {
+private struct ConversationInteractiveRowSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
         content
@@ -117,7 +117,7 @@ private struct TranscriptStatusDivider: View {
 
 private struct ServiceInspectorRow: View {
     let link: ServiceInspectorLink
-    let chatID: UUID
+    let conversationID: UUID
     let rowID: UUID
     let pageMount: WebPageMountCoordinator
     @Environment(ServiceManager.self) private var serviceManager
@@ -126,7 +126,7 @@ private struct ServiceInspectorRow: View {
     private var service: Service? { serviceManager.inspectionService(domain: link.domain) }
     private var browserSession: ServiceBrowserActionSession? {
         guard let service, service.domain == BrowserFunctionCatalog.internalDomain else { return nil }
-        return serviceManager.browserActionSessions.existingSession(for: chatID, service: service)
+        return serviceManager.browserActionSessions.existingSession(for: conversationID, service: service)
     }
     private var canInspect: Bool {
         guard let service else { return false }
@@ -181,7 +181,7 @@ private struct ServiceInspectorRow: View {
         }) {
             if let service {
                 NavigationStack {
-                    ServicePageInspector(service: service, browserSessionID: chatID)
+                    ServicePageInspector(service: service, browserSessionID: conversationID)
                 }
             }
         }
@@ -222,8 +222,8 @@ struct ActivityBubble: View {
     }
 }
 
-private struct ThinkingRow: View {
-    private let singleLineHeight = ChatTranscriptMetrics.thinkingRowHeight
+struct ThinkingRow: View {
+    private let singleLineHeight = ConversationTranscriptMetrics.thinkingRowHeight
     let trace: ThinkingTrace
     let sourceInvocations: [Invocation]
     let startedAt: Date
@@ -486,6 +486,13 @@ private struct ThinkingSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    if let omitted = trace.omittedInvocations, omitted > 0 {
+                        Text("Details omitted for \(omitted) additional Actions.")
+                            .font(Theme.Fonts.captionMd)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .accessibilityIdentifier("chat.trace.omitted")
+                    }
                     ForEach(Array(displayedEntries.enumerated()), id: \.element.id) { idx, entry in
                         TraceRow(entry: entry, isLast: idx == displayedEntries.count - 1)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -755,8 +762,14 @@ private struct InvocationDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                section("Input") { inputValue }
-                section("Output") { outputValue }
+                section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
+                    if invocation.preview?.argumentsTruncated == true { previewNotice }
+                    inputValue
+                }
+                section(invocation.preview?.resultTruncated == true ? "Output preview" : "Output") {
+                    if invocation.preview?.resultTruncated == true { previewNotice }
+                    outputValue
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Theme.Spacing.lg)
@@ -781,7 +794,13 @@ private struct InvocationDetailView: View {
     @ViewBuilder
     private var inputValue: some View {
         if InvocationFormat.isEmpty(invocation.args) {
-            emptyValue
+            if invocation.preview?.argumentsTruncated == true {
+                Text("Input not retained.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(.secondary)
+            } else {
+                emptyValue
+            }
         } else {
             CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(invocation.args)), language: "json")
         }
@@ -793,7 +812,13 @@ private struct InvocationDetailView: View {
         case let .succeeded(result?):
             CodeBlockView(code: InvocationFormat.clamp(InvocationFormat.prettyJSON(result)), language: "json")
         case .succeeded(nil):
-            emptyValue
+            if invocation.preview?.resultTruncated == true {
+                Text("Result not retained.")
+                    .font(Theme.Fonts.bodySm)
+                    .foregroundStyle(.secondary)
+            } else {
+                emptyValue
+            }
         case let .failed(error):
             CodeBlockView(code: InvocationFormat.clamp(error))
         case .running:
@@ -804,6 +829,13 @@ private struct InvocationDetailView: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
+    }
+
+    private var previewNotice: some View {
+        Text("This value was shortened or omitted. Its complete contents were not saved.")
+            .font(Theme.Fonts.captionMd)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("chat.invocation.previewNotice")
     }
 
     private var emptyValue: some View {
@@ -857,22 +889,22 @@ private enum InvocationFormat {
     }
 
     static func sources(_ invocation: Invocation, serviceManager: ServiceManager) -> [Source]? {
-        let args = invocation.args.objectValue
+        let args = invocation.preview == nil ? invocation.args.objectValue : nil
         switch invocation.name {
         case Actions.webSearch:
             if let sources = searchSources(invocation), !sources.isEmpty {
                 return sources
             }
-            let query = args?["query"]?.stringValue ?? ""
+            let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
             return query.isEmpty ? nil : [Source(label: query, icon: .none)]
         case Actions.webFetch:
             guard let source = fetchSource(invocation) else { return nil }
             return [source]
         case Actions.serviceFind:
-            let query = args?["query"]?.stringValue ?? ""
+            let query = invocation.sources?.query ?? args?["query"]?.stringValue ?? ""
             return query.isEmpty ? nil : [Source(label: query, icon: .none)]
         case Actions.serviceAttach, Actions.serviceValidate, Actions.serviceSignIn, Actions.serviceSolve, Actions.servicePayment, Actions.serviceDetach:
-            guard let domain = args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
+            guard let domain = invocation.sources?.domain ?? args?["domain"]?.stringValue, !domain.isEmpty else { return nil }
             let service = serviceManager.service(domain: domain)
             return [Source(label: service?.title ?? domain, icon: service.map(Source.Icon.service) ?? .none)]
         default:
@@ -883,6 +915,14 @@ private enum InvocationFormat {
     }
 
     private static func searchSources(_ invocation: Invocation) -> [Source]? {
+        if invocation.preview != nil {
+            return (invocation.sources?.links ?? []).compactMap { link in
+                guard let url = URL(string: link.url), let domain = domain(url) else { return nil }
+                let title = link.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return Source(label: domain, icon: .domain(domain), url: url,
+                              accessibilityLabel: title.flatMap { $0.isEmpty ? nil : "\(domain), \($0)" })
+            }
+        }
         guard case .succeeded(let result?) = invocation.outcome,
               let items = result.objectValue?["items"]?.arrayValue else { return nil }
         return items.compactMap { item in
@@ -896,8 +936,8 @@ private enum InvocationFormat {
     }
 
     private static func fetchSource(_ invocation: Invocation) -> Source? {
-        let argsURL = invocation.args.objectValue?["url"]?.stringValue
-        let finalURL: String? = if case .succeeded(let result?) = invocation.outcome {
+        let argsURL = invocation.preview == nil ? invocation.args.objectValue?["url"]?.stringValue : invocation.sources?.links.first?.url
+        let finalURL: String? = if invocation.preview == nil, case .succeeded(let result?) = invocation.outcome {
             result.objectValue?["url"]?.stringValue
         } else {
             nil
@@ -1030,7 +1070,7 @@ private struct UserSkillBubble: View {
                 SkillLibraryRow(skill: invocation.skill)
             }
             .buttonStyle(.plain)
-            .modifier(ChatInteractiveRowSurface())
+            .modifier(ConversationInteractiveRowSurface())
             .accessibilityLabel("/\(invocation.skill.displayName), \(invocation.skill.description)")
             .accessibilityIdentifier(A11yID.Chat.Message.skill(invocation.skill.name))
 
@@ -1099,10 +1139,10 @@ struct QueuedBubble: View {
 }
 
 struct BlockView: View, Equatable {
-    let block: ChatBlock
+    let block: ConversationBlock
     let isLatestCanvas: Bool
     let isStreamingTail: Bool
-    let chatID: UUID
+    let conversationID: UUID
     let browserPageMount: WebPageMountCoordinator
     let isThinkingTail: Bool
     let controls: MessageControls
@@ -1257,7 +1297,7 @@ struct BlockView: View, Equatable {
                     case let .serviceInspector(link):
                         ServiceInspectorRow(
                             link: link,
-                            chatID: chatID,
+                            conversationID: conversationID,
                             rowID: block.id,
                             pageMount: browserPageMount
                         )
@@ -1293,7 +1333,7 @@ struct BlockView: View, Equatable {
                                 ArtifactContextMenuPreview(artifact: artifact)
                             }
                         } else {
-                            ChatArtifactRow(artifact: artifact)
+                            ConversationArtifactRow(artifact: artifact)
                                 .padding(.horizontal, 4)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(String(
@@ -1307,7 +1347,7 @@ struct BlockView: View, Equatable {
                             SkillLibraryRow(skill: skill)
                         }
                         .buttonStyle(.plain)
-                        .modifier(ChatInteractiveRowSurface())
+                        .modifier(ConversationInteractiveRowSurface())
                         .padding(.horizontal, 4)
                         .accessibilityLabel("/\(skill.displayName), \(skill.description)")
                         .accessibilityIdentifier(A11yID.Chat.Message.skill(skill.name))
@@ -1320,10 +1360,10 @@ struct BlockView: View, Equatable {
 
     private func artifactRow(_ artifact: Artifact, sourceID: String) -> some View {
         Button { onOpenAttachment(artifact, sourceID) } label: {
-            ChatArtifactRow(artifact: artifact, previewSourceID: sourceID)
+            ConversationArtifactRow(artifact: artifact, previewSourceID: sourceID)
         }
         .buttonStyle(.plain)
-        .modifier(ChatInteractiveRowSurface())
+        .modifier(ConversationInteractiveRowSurface())
         .accessibilityLabel(artifact.userFacingAccessibilityLabel)
         .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))
     }

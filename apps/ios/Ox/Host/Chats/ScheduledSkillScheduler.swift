@@ -152,7 +152,7 @@ final class ScheduledSkillScheduler {
             let outcome: ChatSubmissionOutcome
             let chatID: UUID?
             if StorageRoot.shared.activeId == schedule.profileID {
-                (outcome, chatID) = await IOSHost.shared.chats.runScheduledSkill(
+                (outcome, chatID) = await IOSHost.shared.conversations.runScheduledSkill(
                     schedule,
                     executionLease: executionLease
                 )

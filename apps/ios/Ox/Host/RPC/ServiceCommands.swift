@@ -5,11 +5,11 @@ extension OxHostProtocol {
     @MainActor
     static func handleSetAttachedService(
         _ command: SetAttachedServiceRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         serviceManager: ServiceManager,
         reply: OxHostRPC.Reply
     ) {
-        guard let session = chatManager.current else {
+        guard let session = conversationManager.current else {
             reply.failure("session unavailable")
             return
         }
@@ -67,7 +67,7 @@ extension OxHostProtocol {
 
     static func handleInvokeAction(
         _ command: ActionRequest,
-        chatManager: ConversationManager,
+        conversationManager: ConversationManager,
         serviceManager: ServiceManager,
         reply: OxHostRPC.Reply
     ) {
@@ -100,7 +100,7 @@ extension OxHostProtocol {
                     approve: approve)
             }
             if let iOSService = svc.iOSService {
-                guard let session = chatManager.current else {
+                guard let session = conversationManager.current else {
                     return .failure(RuntimeError.bridge("session unavailable"))
                 }
                 return await iOSService.invoke(

@@ -9,7 +9,7 @@ nonisolated enum OxUser {
                 (
                     "ox.user.follow",
                     .object([
-                        "description": .string("Show up to two likely next intents scoped to the current conversation above the empty composer without waiting for a response: `await ox.user.follow({ intents, purpose })`. Use `send` with a short label and the user message to send. Tapping any intent immediately sends its request. Collect any missing details in chat afterward."),
+                        "description": .string(ModelGuidance.text("ox.user.follow")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -40,7 +40,7 @@ nonisolated enum OxUser {
                 (
                     "ox.user.reportProgress",
                     .object([
-                        "description": .string("Post a concise progress update in the chat without ending the run: `await ox.user.reportProgress({ message, purpose })`. Use it during longer multi-step work; later reasoning and actions continue below the update."),
+                        "description": .string(ModelGuidance.text("ox.user.reportProgress")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -59,7 +59,7 @@ nonisolated enum OxUser {
                 (
                     "ox.user.choose",
                     .object([
-                        "description": .string("Ask the user to pick one of 2-4 short labels or provide a short custom answer, then wait for their response: `await ox.user.choose({ body, options, purpose })`. Returns the chosen label or custom answer verbatim."),
+                        "description": .string(ModelGuidance.text("ox.user.choose")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

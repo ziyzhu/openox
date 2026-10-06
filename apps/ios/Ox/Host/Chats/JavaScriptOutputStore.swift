@@ -41,7 +41,7 @@ final class JavaScriptOutputStore {
     func save(_ text: String) throws -> String {
         let data = Data(text.utf8)
         guard storedBytes + data.count <= ArtifactLimits.fileBytes else {
-            throw RuntimeError.bridge("JavaScript output cache exceeds 32 MiB. Filter results before printing and rerun the source.")
+            throw RuntimeError.bridge(ModelGuidance.text("output.cacheExceeded"))
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let id = UUID().uuidString
@@ -54,7 +54,7 @@ final class JavaScriptOutputStore {
         guard let uuid = UUID(uuidString: id) else { throw RuntimeError.bridge("Invalid output reference.") }
         let url = directory.appendingPathComponent(uuid.uuidString)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            throw RuntimeError.bridge("Output reference is unavailable in this chat. Rerun the original source and print the needed portion.")
+            throw RuntimeError.bridge(ModelGuidance.text("output.unavailable"))
         }
         return try String(contentsOf: url, encoding: .utf8)
     }
@@ -63,7 +63,11 @@ final class JavaScriptOutputStore {
 extension Conversation {
     public func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.outputRead, .object(["id": .string(id)]), purpose: purpose) {
-            .string(try javaScriptOutputs.read(id))
+            if id.hasPrefix("payload:") {
+                guard let route = durableRoute else { throw RuntimeError.bridge("No durable payload owner is attached to this chat") }
+                return .string(try await route.session.runtime.readPayload(id: id))
+            }
+            return .string(try javaScriptOutputs.read(id))
         }
     }
 }

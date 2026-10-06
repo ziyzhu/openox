@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct ChatPageTopBar: View {
-    let chat: Conversation
+struct ConversationPageTopBar: View {
+    let conversation: Conversation
     let blockCount: Int
     let hasArtifacts: Bool
     let showsModelPicker: Bool
@@ -11,26 +11,26 @@ struct ChatPageTopBar: View {
     let onPickModel: () -> Void
     let onShowArtifacts: () -> Void
     let onCopyTranscript: () -> Void
-    let onDeleteChat: () -> Void
+    let onDeleteConversation: () -> Void
 
     var body: some View {
-        ChatHeader(
-            modelTitle: showsModelPicker && blockCount == 0 && (chat.canChangeRetention || !chat.isTemporary)
-                ? chat.model.displayName : nil,
+        ConversationHeader(
+            modelTitle: showsModelPicker && blockCount == 0 && (conversation.canChangeRetention || !conversation.isTemporary)
+                ? conversation.model.displayName : nil,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onPickModel: onPickModel
         ) {
-            if chat.canChangeRetention {
-                TemporaryChatButton(isActive: chat.isTemporary, size: iconButtonSize, action: onToggleTemporary)
+            if conversation.canChangeRetention {
+                TemporaryChatButton(isActive: conversation.isTemporary, size: iconButtonSize, action: onToggleTemporary)
             } else {
-                overflowMenu(chat: chat)
+                overflowMenu(conversation: conversation)
             }
         }
     }
 
-    private func overflowMenu(chat: Conversation) -> some View {
-        ChatOverflowMenu(size: iconButtonSize) {
+    private func overflowMenu(conversation: Conversation) -> some View {
+        ConversationOverflowMenu(size: iconButtonSize) {
             Button(action: onPickModel) {
                 Label("Models", systemImage: "slider.horizontal.3")
             }
@@ -51,16 +51,16 @@ struct ChatPageTopBar: View {
                 }
                 ShareLink(
                     item: ChatPackageDocument(
-                        state: chat.state,
-                        fileName: ArtifactStore.sanitizedFilename(chat.title)
+                        state: conversation.state,
+                        fileName: ArtifactStore.sanitizedFilename(conversation.title)
                     ),
-                    preview: SharePreview(Text(verbatim: chat.title))
+                    preview: SharePreview(Text(verbatim: conversation.title))
                 ) {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
-                .disabled(chat.isBusy)
+                .disabled(conversation.isBusy)
                 .accessibilityIdentifier(A11yID.Chat.export)
-                Button(role: .destructive, action: onDeleteChat) {
+                Button(role: .destructive, action: onDeleteConversation) {
                     Label("Delete Chat", systemImage: "trash")
                 }
                 .accessibilityIdentifier(A11yID.Chat.delete)

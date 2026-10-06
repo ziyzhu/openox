@@ -9,7 +9,7 @@ nonisolated enum OxWidgets {
                 (
                     "ox.widget.shoveler",
                     .object([
-                        "description": .string("Display one horizontal strip of cards in the chat. A card with an `artifact` filename opens that artifact; other cards are read-only: `await ox.widget.shoveler({ cards, purpose })`."),
+                        "description": .string(ModelGuidance.text("ox.widget.shoveler")),
                         "inputSchema": object([
                             "cards": .object([
                                 "type": .string("array"),
@@ -25,7 +25,7 @@ nonisolated enum OxWidgets {
                 (
                     "ox.widget.video",
                     .object([
-                        "description": .string("Display one inline video player in the chat: `await ox.widget.video({ video, purpose })`. `video` may be a public HTTPS URL or an existing video artifact filename."),
+                        "description": .string(ModelGuidance.text("ox.widget.video")),
                         "inputSchema": object([
                             "video": string(minLength: 1, maxLength: 2_000),
                             "purpose": string(minLength: 1, maxLength: 80),

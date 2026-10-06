@@ -160,6 +160,8 @@ private struct FaviconShimmer: View {
 }
 
 struct ServiceChip: View {
+    enum AuthSource { case live, snapshot }
+
     private enum AuthStatus {
         case signedIn
         case signedOut
@@ -170,6 +172,7 @@ struct ServiceChip: View {
     let title: String
     var onOpen: (() -> Void)? = nil
     var showsAuthStatus = false
+    var authSource = AuthSource.live
     var onRemove: (() -> Void)? = nil
     var removeAccessibilityIdentifier: String? = nil
     var fill = Theme.Colors.surfaceSunken
@@ -179,7 +182,7 @@ struct ServiceChip: View {
     var body: some View {
         chipContent
             .task(id: "\(service?.id ?? "none"):\(scenePhase)") {
-                guard showsAuthStatus, scenePhase == .active, let service else { return }
+                guard showsAuthStatus, authSource == .live, scenePhase == .active, let service else { return }
                 await service.checkAccess(reason: .chatOpen)
             }
     }

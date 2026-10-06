@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ComposerServicePicker: View {
-    @Bindable var composer: ChatComposerModel
+    @Bindable var composer: ConversationComposerModel
     let excludedDomains: Set<String>
     let composerHeight: CGFloat
     let onSelect: (Service) -> Void
@@ -28,7 +28,7 @@ struct ComposerServicePicker: View {
 }
 
 struct ComposerSlashPicker: View {
-    @Bindable var composer: ChatComposerModel
+    @Bindable var composer: ConversationComposerModel
     let isFocused: Bool
     let composerHeight: CGFloat
     let onSelect: (Skill) -> Void

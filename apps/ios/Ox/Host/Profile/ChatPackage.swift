@@ -504,13 +504,13 @@ final class ChatImportCoordinator {
                 guard !Task.isCancelled else { return }
                 self.proposal = proposal
                 isLoading = false
-                Log.ui.info("ChatImport.ready request=\(request) title=\(proposal.header.title) source=\(proposal.sourceName)")
+                Log.ui.info("ConversationImport.ready request=\(request) title=\(proposal.header.title) source=\(proposal.sourceName)")
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
                 isLoading = false
                 errorMessage = error.localizedDescription
-                Log.ui.error("ChatImport.open request=\(request) source=\(url.lastPathComponent) failed=\(error.localizedDescription)")
+                Log.ui.error("ConversationImport.open request=\(request) source=\(url.lastPathComponent) failed=\(error.localizedDescription)")
             }
         }
     }
@@ -525,13 +525,13 @@ final class ChatImportCoordinator {
                 self.proposal = nil
                 isSaving = false
                 importedChatID = chat.id
-                Log.ui.info("ChatImport.saved chat=\(chat.id) title=\(proposal.header.title)")
+                Log.ui.info("ConversationImport.saved chat=\(chat.id) title=\(proposal.header.title)")
             } catch is CancellationError {
             } catch {
                 guard !Task.isCancelled else { return }
                 isSaving = false
                 errorMessage = error.localizedDescription
-                Log.ui.error("ChatImport.save title=\(proposal.header.title) failed=\(error.localizedDescription)")
+                Log.ui.error("ConversationImport.save title=\(proposal.header.title) failed=\(error.localizedDescription)")
             }
         }
     }

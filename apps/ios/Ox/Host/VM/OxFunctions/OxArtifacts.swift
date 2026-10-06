@@ -8,7 +8,7 @@ nonisolated enum OxArtifacts {
             [
                 entry(
                     "ox.artifact.attach",
-                    "Add one stored artifact's original content to model context: `await ox.artifact.attach({ source, purpose })`. Use `ox.fs.read` for readable documents or `ox.vision.analyze` for on-device image OCR and classification when originals are unnecessary. This is transient and does not present the artifact in the visible conversation. Web images and PDFs are attached directly by `ox.web.fetch`.",
+                    ModelGuidance.text("ox.artifact.attach"),
                     input: object([
                         "source": filename,
                         "purpose": purpose,
@@ -17,7 +17,7 @@ nonisolated enum OxArtifacts {
                 ),
                 entry(
                     "ox.artifact.import",
-                    "Fetch and persist one public HTTP or HTTPS resource as an artifact: `await ox.artifact.import({ url, filename?, purpose })`.",
+                    ModelGuidance.text("ox.artifact.import"),
                     input: object([
                         "url": string("Public HTTP or HTTPS resource URL."),
                         "filename": filename,
@@ -27,13 +27,13 @@ nonisolated enum OxArtifacts {
                 ),
                 entry(
                     "ox.artifact.rename",
-                    "Rename an artifact and rewrite Ox-controlled chat references: `await ox.artifact.rename({ filename, newFilename, purpose })`. Inspect the existing artifact first. Fails on a case-insensitive collision.",
+                    ModelGuidance.text("ox.artifact.rename"),
                     input: object(["filename": filename, "newFilename": filename, "purpose": purpose], required: ["filename", "newFilename", "purpose"]),
                     output: item
                 ),
                 entry(
                     "ox.artifact.present",
-                    "Show one or more existing artifacts from the active Profile in the conversation: `await ox.artifact.present({ filename, purpose })` or `await ox.artifact.present({ filenames, purpose })`. Use this for artifacts that were not just written or edited, because successful `ox.fs.write` and `ox.fs.edit` calls for artifacts display them automatically. Adds live filename references the user can open; the files themselves are never copied. The single form returns one item, while the plural form returns items in the requested order.",
+                    ModelGuidance.text("ox.artifact.present"),
                     input: presentInput,
                     output: presentOutput
                 ),

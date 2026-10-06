@@ -17,6 +17,7 @@ import { nativeStream } from "./native-model";
 import { nativeArtifacts } from "./artifacts";
 import { composeIOSPrompt } from "./prompts";
 import { composeTurnContext, type SystemPromptInput, type TurnState } from "../../core/prompts";
+import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 
 const context = BACKGROUND_CONTEXT;
 interface Config { chatID: string; title?: string; promptState: SystemPromptInput; isolatedWorkspace?: boolean; model: string; contextWindow: number; maxTokens: number;
@@ -26,6 +27,7 @@ interface Command extends ApplicationPresentationChange { action: string; draft?
   promptState?: SystemPromptInput; turnState?: TurnState;
   requestID?: string; submissionID?: SubmissionId; profileID?: string; path?: string; prefix?: string; text?: string; base64?: string; saved?: boolean; artifactFiles?: boolean;
   artifact?: ArtifactRecord & { binary: boolean; saved: boolean }; writes?: { path: string; text: string }[]; removes?: string[]; entries?: EntryDraft[];
+  offset?: number; length?: number;
   reference?: ConversationReference | null; limit?: number; historyCursor?: ConversationHistoryCursor | null; listCursor?: ConversationListCursor | null;
   presentation?: PresentationChange | null; lastReadEntryID?: EntryId | null; entryID?: EntryId }
 export interface NativeRecoveryPlan {
@@ -66,7 +68,7 @@ export class IOSAgentAdapter {
   private artifacts?: ArtifactFiles;
   private routes = new Map<ConversationId, string>();
   private configured = new Map<ConversationId, { provider: string; modelId: string; thinkingLevel: ModelThinkingLevel;
-    nativeProviderID?: string; nativeReasoningEffort?: string }>();
+    nativeProviderID?: string; nativeReasoningEffort?: string; scope?: HostScope }>();
   private providerRoutes = new Map<string, ConversationId>();
   private models = createModels();
 
@@ -142,6 +144,10 @@ export class IOSAgentAdapter {
       case "recoveryPlan": return this.recoveryPlan();
       case "run": {
         const target = attached();
+        if (args.turnState?.hostContext) {
+          const expected = this.configured.get(target.conversationID)?.scope;
+          if (!expected || !sameScope(expected, activeHost(args.turnState.hostContext))) throw new Error("Turn state does not belong to the attached host/Profile scope");
+        }
         await this.guardProgress(target);
         const content = args.content ?? "";
         const contextualContent = args.turnState ? [...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content),
@@ -187,6 +193,12 @@ export class IOSAgentAdapter {
       }
       case "fileArtifact": return { artifact: await session.harness.snapshot(ProfileArtifact, artifactPath(canonical(args.path!)), context) ?? null };
       case "fileAdopt": await this.adopt(args.artifact!); return this.fileReceipt(args.artifact!.path);
+      case "payloadRead": {
+        const path = artifactPath(canonical(args.path!));
+        const record = await session.harness.snapshot(ProfileArtifact, path, context);
+        if (!this.artifacts?.readPayload || !record || path !== `artifacts/payload-${record.sha256}.json` || !record.binary) throw new Error("Payload is not committed in this Profile");
+        return { base64: await this.artifacts.readPayload(record, args.offset!, args.length!) };
+      }
       case "fileSaved": await this.fileSaved(args.path!, args.saved!); return {};
       case "fileRemove": await session.files.remove(args.path!); return {};
       case "close": await session.close(); this.session = undefined; this.bindings = undefined; this.application = undefined; this.artifacts = undefined; this.routes.clear(); this.configured.clear(); this.providerRoutes.clear(); return {};
@@ -460,6 +472,7 @@ export class IOSAgentAdapter {
       await session.observe(reference);
       const saved = (await session.harness.snapshot(ConversationApplicationMetadata, conversation.id, context))?.fields;
       this.configured.set(conversation.id, { provider: alias, modelId: config.model,
+        scope: config.promptState.hostContext ? { ...config.promptState.hostContext.active } : undefined,
         thinkingLevel: config.thinkingLevel === undefined ? metadata.agent?.thinkingLevel ?? "off" : config.thinkingLevel ?? "off",
         nativeProviderID: config.providerID ?? (typeof saved?.nativeProviderID === "string" ? saved.nativeProviderID : undefined),
         nativeReasoningEffort: config.nativeReasoningEffort === undefined ? typeof saved?.nativeReasoningEffort === "string" ? saved.nativeReasoningEffort : undefined : config.nativeReasoningEffort ?? undefined });

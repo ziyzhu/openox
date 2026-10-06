@@ -9,7 +9,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.find",
                     .object([
-                        "description": .string("Search the merged service MonoRepository with the same service search used by the app when no attached service covers the task: `await ox.service.find({ query, purpose })`. Returns up to ten ranked matches (domain, kind, manifestPath, repository, repositoryProvenance, name, description, matchedAction, signIn, saved, attached). Read a strong candidate's `manifestPath` when its action contract matters, then bring the best match in with `ox.service.attach({ domain, purpose })`. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
+                        "description": .string(ModelGuidance.text("ox.service.find")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -32,7 +32,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.list",
                     .object([
-                        "description": .string("List all available services from enabled repositories and saved MCP connections, sorted by domain: `await ox.service.list({ kind?, purpose })`. Filter by `kind: \"web\"` for website services hosted by Ox Server, `kind: \"ios\"` for client-owned device services, or `kind: \"mcp\"` for directly connected remote MCP servers. Every result includes its kind and current chat attachment state. Returns every service without a result limit; omits action contracts. Disabled repositories are excluded."),
+                        "description": .string(ModelGuidance.text("ox.service.list")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -51,7 +51,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.listAttached",
                     .object([
-                        "description": .string("List the services currently attached to this chat: `await ox.service.listAttached({ kind?, purpose })`. Filter by `kind: \"web\"` for website services hosted by Ox Server, `kind: \"ios\"` for client-owned device services, or `kind: \"mcp\"` for directly connected remote MCP servers. Every result includes its kind."),
+                        "description": .string(ModelGuidance.text("ox.service.listAttached")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -70,7 +70,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.inspect",
                     .object([
-                        "description": .string("Inspect one attached service: `await ox.service.inspect({ domain, actions?, purpose })`. Omit `actions` for a compact index of exposed actions. Pass up to ten exposed action IDs to receive their complete, self-contained input and output schemas. Both forms include `signIn`, `botControl`, and `payment` contracts when supported, with the ox.service helper to call, service-specific input schemas, and helper output schemas. Standard URL/state actions are handled by these helpers and cannot be requested in `actions`."),
+                        "description": .string(ModelGuidance.text("ox.service.inspect")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -102,7 +102,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.validate",
                     .object([
-                        "description": .string("Validate a complete Local web or API service draft: `await ox.service.validate({ domain, purpose })`. Checks the manifest, action installer and matching action IDs, declared skills, required files, and service size limits together. Returns `{ domain, valid: true }` or throws with the validation error. Does not edit, attach, reload, Save, or invoke service actions. Finish related source edits before calling; individual file writes do not validate service contents."),
+                        "description": .string(ModelGuidance.text("ox.service.validate")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -129,7 +129,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.create",
                     .object([
-                        "description": .string("Create a Local API service with kind api and a stable domain identifier, a Local web service with `{ kind: \"web\", domain, purpose }`, or save a remote MCP connection with `{ kind: \"mcp\", endpoint, transport?, purpose }`. MCP discovers tools and may request user sign-in before saving; it returns the assigned domain for inspect/attach/invoke/delete. An existing endpoint is reused; use update to change its transport or refresh tools. MCP connections save immediately, have read-only manifests, and do not use Local Git. Never put credentials in the endpoint; use sign-in. This connects to a server, not hosts one."),
+                        "description": .string(ModelGuidance.text("ox.service.create")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -147,7 +147,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.update",
                     .object([
-                        "description": .string("Update a directly connected MCP service: `await ox.service.update({ domain, endpoint?, transport?, purpose })`. With no settings, reconnects and refreshes tools. Omitted settings are preserved; transport auto enables detection. Validates before replacing and saves immediately. A failed connection leaves the previous service intact. A changed endpoint gets a new domain, clears old local authorization, and must be attached separately; it never inherits old tool approvals. Repository MCP definitions are read-only. For Local web services, edit source with ox.fs instead."),
+                        "description": .string(ModelGuidance.text("ox.service.update")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -164,7 +164,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.copy",
                     .object([
-                        "description": .string("Copy the selected Bundled, Development, or Remote service into the editable Local repository and select that candidate: `await ox.service.copy({ domain, purpose })`. Edit its expanded source under `services/` with `ox.fs`. If a Local copy already exists, inspect ox.repository.conflicts and select that Local candidate with ox.repository.resolve; never overwrite it to resolve a conflict. iOS services are not authorable."),
+                        "description": .string(ModelGuidance.text("ox.service.copy")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -183,7 +183,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.delete",
                     .object([
-                        "description": .string("Delete a Local web service or remove a saved MCP connection: `await ox.service.delete({ domain, purpose })`. The user approves deletion. Inspect Local status and diff before deleting source and preserve unrelated changes. For web services, source deletion becomes an uncommitted Local Git change and another repository candidate may become active. MCP removal is immediate, detaches it from this chat, clears local authorization and tool approvals, and does not revoke access at the server or delete a repository definition."),
+                        "description": .string(ModelGuidance.text("ox.service.delete")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -202,7 +202,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.attach",
                     .object([
-                        "description": .string("Attach an Ox Server service by domain after inspecting its `services/<kind>/<id>/service.json`: `await ox.service.attach({ domain, purpose })`. The first call saves and attaches the service to this chat; a later call reloads that chat's attachment from the current service source so a coherent set of Local edits can be tested. Source writes do not reload running attachments. The first attach is allowed by default and respects configured Action policies. If approval is required and the user declines, this throws, so surface that and don't retry blindly. Returns the service snapshot with `reloaded` indicating whether an existing attachment was replaced; a `requireAuth` action revalidates before use. `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
+                        "description": .string(ModelGuidance.text("ox.service.attach")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -225,7 +225,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.detach",
                     .object([
-                        "description": .string("Detach a service (by domain) from this chat: `await ox.service.detach({ domain, purpose })`. Removes it from the chat's attachment bar so its actions stop being available; the service stays saved. Use when the user is done with it or you attached the wrong one. Returns the service snapshot (`attached: false`). `purpose` is a short (<10 words) human-readable description shown to the user as the step label."),
+                        "description": .string(ModelGuidance.text("ox.service.detach")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -248,7 +248,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.signIn",
                     .object([
-                        "description": .string("Ask the user to sign in to an attached service and wait for completion: `await ox.service.signIn({ domain, purpose })`. Returns `{ domain, signedIn: true }` after successful sign-in so dependent JavaScript can continue. Throws when the user cancels, sign-in fails, or the service does not expose authentication."),
+                        "description": .string(ModelGuidance.text("ox.service.signIn")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -279,7 +279,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.solve",
                     .object([
-                        "description": .string("Ask the user to complete a service's human verification and wait for completion: `await ox.service.solve({ domain, args, purpose })`. Inspect the service's `botControl` contract with `ox.service.inspect` and pass args matching its inputSchema. Resolves after successful verification so dependent JavaScript can continue. Throws when the user cancels or verification fails. Never ask for challenge answers or tokens."),
+                        "description": .string(ModelGuidance.text("ox.service.solve")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
@@ -303,7 +303,7 @@ nonisolated enum OxServices {
                 (
                     "ox.service.pay",
                     .object([
-                        "description": .string("Hand final commitment to the user through an attached service's checkout: `await ox.service.pay({ domain, args, purpose })`. Prepare and price the pending cart, booking, or order first with the service's exposed actions. Pass the payment arguments required by that service. The user reviews and completes the payment on the service page; this function never commits payment itself. Resolves with the completed payment state and reference, and throws on cancellation, failure, or unsupported services."),
+                        "description": .string(ModelGuidance.text("ox.service.pay")),
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([

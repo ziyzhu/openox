@@ -9,54 +9,54 @@ import Observation
 
 @MainActor
 @Observable
-private final class ChatBotControlPresenter: ServiceHandoffPresenting {
+private final class ConversationBotControlPresenter: ServiceHandoffPresenting {
     private(set) var session: ServiceHandoffSession?
     let pageMount = WebPageMountCoordinator()
 
     func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
         guard self.session == nil else {
-            Log.ui.warning("ChatBotControlPresenter rejected domain=\(session.serviceDomain) reason=occupied")
+            Log.ui.warning("ConversationBotControlPresenter rejected domain=\(session.serviceDomain) reason=occupied")
             session.presentationFailed()
             return .failed
         }
         self.session = session
         pageMount.reconcile(page: session.page, ownerIDs: [session.id])
-        Log.ui.info("ChatBotControlPresenter present domain=\(session.serviceDomain)")
+        Log.ui.info("ConversationBotControlPresenter present domain=\(session.serviceDomain)")
         let outcome = await session.run()
         if self.session === session {
             pageMount.clear()
             self.session = nil
         }
-        Log.ui.info("ChatBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+        Log.ui.info("ConversationBotControlPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
         return outcome
     }
 }
 
 @MainActor
 @Observable
-private final class ChatServiceAuthPresenter: ServiceAuthPresenting {
+private final class ConversationServiceAuthPresenter: ServiceAuthPresenting {
     private(set) var session: ServiceAuthSession?
     let pageMount = WebPageMountCoordinator()
 
     func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
         if let outcome = await session.preflight(for: .seconds(1)) {
-            Log.ui.info("ChatServiceAuthPresenter preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+            Log.ui.info("ConversationServiceAuthPresenter preflight domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
             return outcome
         }
         guard self.session == nil else {
-            Log.ui.warning("ChatServiceAuthPresenter rejected domain=\(session.serviceDomain) reason=occupied")
+            Log.ui.warning("ConversationServiceAuthPresenter rejected domain=\(session.serviceDomain) reason=occupied")
             session.presentationFailed()
             return .failed
         }
         self.session = session
         pageMount.reconcile(page: session.page, ownerIDs: [session.id])
-        Log.ui.info("ChatServiceAuthPresenter present domain=\(session.serviceDomain)")
+        Log.ui.info("ConversationServiceAuthPresenter present domain=\(session.serviceDomain)")
         let outcome = await session.run()
         if self.session === session {
             pageMount.clear()
             self.session = nil
         }
-        Log.ui.info("ChatServiceAuthPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
+        Log.ui.info("ConversationServiceAuthPresenter finish domain=\(session.serviceDomain) outcome=\(outcome.rawValue)")
         return outcome
     }
 }
@@ -135,7 +135,7 @@ private struct ScrollToBottomButton: View {
 }
 
 private struct ScrollToBottomControl: View {
-    let composer: ChatComposerModel
+    let composer: ConversationComposerModel
     let composerFocused: Bool
     let isEditingMessage: Bool
     let hasArtifacts: Bool
@@ -153,27 +153,27 @@ private struct ScrollToBottomControl: View {
         let touchTargetInset = max(0, (Theme.Size.minimumTouchTarget - composerButtonSize) / 2)
         let isResting = !composerFocused && composer.isEmpty && !isEditingMessage
         let showsTopStrip = isEditingMessage || hasArtifacts || hasAttachedServices
-        let firstSurfaceTop = ChatComposer.firstSurfaceTopOffset(
+        let firstSurfaceTop = ConversationComposer.firstSurfaceTopOffset(
             isResting: isResting,
             showsTopStrip: showsTopStrip,
             floatsTopStrip: floatsTopStrip
         )
-        return firstSurfaceTop - ChatComposer.surfaceSpacing - composerButtonSize - touchTargetInset
+        return firstSurfaceTop - ConversationComposer.surfaceSpacing - composerButtonSize - touchTargetInset
     }
 }
 
-private struct ChatTranscriptProjectionSnapshot {
-    let key: ChatTranscriptProjectionKey
+private struct ConversationTranscriptProjectionSnapshot {
+    let key: ConversationTranscriptProjectionKey
     let totalBlockCount: Int
     let sourceRange: Range<Int>
     let sourceBlockIDs: [UUID]
-    let blocks: [ChatBlock]
+    let blocks: [ConversationBlock]
     let latestCanvasBlockIDs: [URL: UUID]
 
-    init(key: ChatTranscriptProjectionKey, chat: Conversation) {
+    init(key: ConversationTranscriptProjectionKey, conversation: Conversation) {
         self.key = key
-        let sourceWindow = chat.blocksWithTurnID(in: key.requestedSourceRange)
-        let projectedBlocks = ChatBlock.project(
+        let sourceWindow = conversation.blocksWithTurnID(in: key.requestedSourceRange)
+        let projectedBlocks = ConversationBlock.project(
             sourceWindow.blocks,
             thinkingActivity: key.thinkingActivity,
             isBusy: key.isBusy,
@@ -181,7 +181,7 @@ private struct ChatTranscriptProjectionSnapshot {
         )
         let requestedOffset = key.requestedSourceRange.lowerBound - sourceWindow.range.lowerBound
         let requestedSourceIDs = sourceWindow.blocks.dropFirst(requestedOffset).map(\.block.id)
-        let blocks: [ChatBlock]
+        let blocks: [ConversationBlock]
         if requestedOffset > 0 {
             let requestedSourceIDSet = Set(requestedSourceIDs)
             blocks = projectedBlocks.filter {
@@ -194,12 +194,12 @@ private struct ChatTranscriptProjectionSnapshot {
         sourceRange = key.requestedSourceRange
         sourceBlockIDs = requestedSourceIDs
         self.blocks = blocks
-        latestCanvasBlockIDs = ChatBlock.latestCanvasBlockIDs(in: sourceWindow.blocks.map(\.block))
+        latestCanvasBlockIDs = ConversationBlock.latestCanvasBlockIDs(in: sourceWindow.blocks.map(\.block))
     }
 }
 
-private struct ChatTranscriptProjectionKey: Equatable {
-    let chatID: UUID
+private struct ConversationTranscriptProjectionKey: Equatable {
+    let conversationID: UUID
     let transcriptRevision: UInt64
     let totalBlockCount: Int
     let requestedSourceRange: Range<Int>
@@ -209,57 +209,57 @@ private struct ChatTranscriptProjectionKey: Equatable {
 }
 
 private struct DelayedActivityKey: Equatable {
-    let chatID: UUID
+    let conversationID: UUID
     let activity: Conversation.Activity
     let transcriptRevision: UInt64
 }
 
-private final class ChatTranscriptProjectionCache {
-    private var snapshot: ChatTranscriptProjectionSnapshot?
+private final class ConversationTranscriptProjectionCache {
+    private var snapshot: ConversationTranscriptProjectionSnapshot?
 
-    func snapshot(for key: ChatTranscriptProjectionKey, chat: Conversation) -> ChatTranscriptProjectionSnapshot {
+    func snapshot(for key: ConversationTranscriptProjectionKey, conversation: Conversation) -> ConversationTranscriptProjectionSnapshot {
         if let snapshot, snapshot.key == key { return snapshot }
-        let resolved = ChatTranscriptProjectionSnapshot(key: key, chat: chat)
+        let resolved = ConversationTranscriptProjectionSnapshot(key: key, conversation: conversation)
         snapshot = resolved
         return resolved
     }
 }
 
-private struct ChatTranscriptProjection<Content: View>: View {
-    let chat: Conversation
+private struct ConversationTranscriptProjection<Content: View>: View {
+    let conversation: Conversation
     let transcriptWindow: TranscriptWindow
     let interaction: Conversation.Interaction?
-    let content: (ChatTranscriptProjectionSnapshot) -> Content
+    let content: (ConversationTranscriptProjectionSnapshot) -> Content
 
-    @State private var cache = ChatTranscriptProjectionCache()
+    @State private var cache = ConversationTranscriptProjectionCache()
 
     var body: some View {
-        content(cache.snapshot(for: projectionKey, chat: chat))
+        content(cache.snapshot(for: projectionKey, conversation: conversation))
     }
 
-    private var projectionKey: ChatTranscriptProjectionKey {
-        let totalBlockCount = chat.transcriptBlockCount
+    private var projectionKey: ConversationTranscriptProjectionKey {
+        let totalBlockCount = conversation.transcriptBlockCount
         let requestedSourceRange = transcriptWindow.resolvedRange(total: totalBlockCount)
-        return ChatTranscriptProjectionKey(
-            chatID: chat.id,
-            transcriptRevision: chat.transcriptRevision,
+        return ConversationTranscriptProjectionKey(
+            conversationID: conversation.id,
+            transcriptRevision: conversation.transcriptRevision,
             totalBlockCount: totalBlockCount,
             requestedSourceRange: requestedSourceRange,
-            thinkingActivity: chat.thinkingActivity,
-            isBusy: chat.isBusy,
+            thinkingActivity: conversation.thinkingActivity,
+            isBusy: conversation.isBusy,
             interaction: interaction
         )
     }
 }
 
-struct ChatPage: View {
+struct ConversationPage: View {
     private enum SendHandoff: Equatable {
         case idle
         case waitingForAnchor(UUID)
         case animating(submissionID: UUID, anchorID: UUID)
     }
 
-    let chat: Conversation
+    let conversation: Conversation
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -277,7 +277,7 @@ struct ChatPage: View {
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
     private var modelService: Service? {
-        guard let provider = chat.client as? WebServiceModelProvider else { return nil }
+        guard let provider = conversation.client as? WebServiceModelProvider else { return nil }
         return serviceManager.service(domain: provider.domain)
     }
 
@@ -286,8 +286,8 @@ struct ChatPage: View {
         return !service.signInState.isAuthenticated && service.signInState != .notRequired
     }
 
-    @State var composer = ChatComposerModel()
-    @State private var speechInput = ChatSpeechInput()
+    @State var composer = ConversationComposerModel()
+    @State private var speechInput = ConversationSpeechInput()
     @Environment(\.scenePhase) private var scenePhase
     @State private var latestSubmissionID: UUID?
     @State private var sendHandoff = SendHandoff.idle
@@ -331,13 +331,13 @@ struct ChatPage: View {
     @State private var modalPresentation: ModalPresentation?
 
     private enum AlertPresentation: Identifiable {
-        case deleteChat
+        case deleteConversation
         case branch(UUID)
         case retry(UUID)
 
         var id: String {
             switch self {
-            case .deleteChat: "deleteChat"
+            case .deleteConversation: "deleteConversation"
             case .branch(let id): "branch:\(id)"
             case .retry(let id): "retry:\(id)"
             }
@@ -350,17 +350,17 @@ struct ChatPage: View {
     @State private var choiceInputFocused = false
     @State private var showsDelayedActivity = false
 
-    @State private var viewportLayout = ChatViewportLayout()
+    @State private var viewportLayout = ConversationViewportLayout()
     @State private var transcriptWindow = TranscriptWindow()
-    @State private var botControlPresenter = ChatBotControlPresenter()
-    @State private var serviceAuthPresenter = ChatServiceAuthPresenter()
+    @State private var botControlPresenter = ConversationBotControlPresenter()
+    @State private var serviceAuthPresenter = ConversationServiceAuthPresenter()
     @State private var browserPageMount = WebPageMountCoordinator()
     @State private var expandedBotControlSessionID: UUID?
     @State private var expandedServiceAuthSessionID: UUID?
 
     private var browserPage: WebPage? {
         guard let service = serviceManager.inspectionService(domain: BrowserFunctionCatalog.publicNamespace),
-              let session = serviceManager.browserActionSessions.existingSession(for: chat.id, service: service) else {
+              let session = serviceManager.browserActionSessions.existingSession(for: conversation.id, service: service) else {
             return nil
         }
         return session.webPage
@@ -422,7 +422,7 @@ struct ChatPage: View {
             },
             set: { service in
                 if let service {
-                    Log.ui.info("ChatPage.serviceDetailPresent chat=\(chat.id) domain=\(service.domain) composerFocused=\(composerFocused)")
+                    Log.ui.info("ChatPage.serviceDetailPresent conversation=\(conversation.id) domain=\(service.domain) composerFocused=\(composerFocused)")
                     composerFocused = false
                     modalPresentation = .serviceDetail(service)
                 } else if case .serviceDetail = modalPresentation {
@@ -455,11 +455,11 @@ struct ChatPage: View {
                             }
                         }
                             .onAppear {
-                                Log.ui.info("ChatPage.artifactNavigation present chat=\(chat.id) filename=\(artifact.fileName)")
+                                Log.ui.info("ChatPage.artifactNavigation present conversation=\(conversation.id) filename=\(artifact.fileName)")
                                 onArtifactNavigationChange(true)
                             }
                             .onDisappear {
-                                Log.ui.info("ChatPage.artifactNavigation return chat=\(chat.id) filename=\(artifact.fileName)")
+                                Log.ui.info("ChatPage.artifactNavigation return conversation=\(conversation.id) filename=\(artifact.fileName)")
                                 onArtifactNavigationChange(false)
                             }
                     }
@@ -471,11 +471,11 @@ struct ChatPage: View {
                         profileID: StorageRoot.shared.activeId
                     )
                         .onAppear {
-                            Log.ui.info("ChatPage.skillNavigation present chat=\(chat.id) name=\(draft.name)")
+                            Log.ui.info("ChatPage.skillNavigation present conversation=\(conversation.id) name=\(draft.name)")
                             onArtifactNavigationChange(true)
                         }
                         .onDisappear {
-                            Log.ui.info("ChatPage.skillNavigation return chat=\(chat.id) name=\(draft.name)")
+                            Log.ui.info("ChatPage.skillNavigation return conversation=\(conversation.id) name=\(draft.name)")
                             onArtifactNavigationChange(false)
                         }
                 }
@@ -486,16 +486,16 @@ struct ChatPage: View {
     private var page: some View {
         let interaction = activeInteraction
         let showsComposer = interaction == nil && isModelConfigured
-        let authProbe = chat.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
+        let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
         }
-        let botControlProbe = chat.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
+        let botControlProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard case .botControl = item.control else { return nil }
             return item
         }
-        return ChatTranscriptProjection(
-            chat: chat,
+        return ConversationTranscriptProjection(
+            conversation: conversation,
             transcriptWindow: transcriptWindow,
             interaction: interaction
         ) { projection in
@@ -509,14 +509,14 @@ struct ChatPage: View {
     }
 
     private func projectedPage(
-        _ projection: ChatTranscriptProjectionSnapshot,
+        _ projection: ConversationTranscriptProjectionSnapshot,
         showsComposer: Bool,
         authProbe: Conversation.PendingServiceControl?,
         botControlProbe: Conversation.PendingServiceControl?
     ) -> some View {
         let floatsTopStrip = floatsTopStrip(showsComposer: showsComposer)
-        let dockClearance = ChatViewportLayout.responseComposerSpacing
-            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
+        let dockClearance = ConversationViewportLayout.responseComposerSpacing
+            + (floatsTopStrip ? ConversationComposer.floatingTopStripClearance : 0)
         let totalBlockCount = projection.totalBlockCount
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
@@ -552,10 +552,10 @@ struct ChatPage: View {
             .onChange(of: toast?.id) { _, _ in
                 if toast == nil {
                     copiedBlockId = nil
-                    chat.clearNotice()
+                    conversation.clearNotice()
                 }
             }
-            .onChange(of: chat.notice, initial: true) { previous, notice in
+            .onChange(of: conversation.notice, initial: true) { previous, notice in
                 if let message = notice.errorMessage {
                     toast = Toast(message: message, role: .error)
                 } else if previous.errorMessage != nil, toast?.role == .error {
@@ -583,7 +583,7 @@ struct ChatPage: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if showsComposer {
                     composerDock(
-                        isChatEmpty: chat.canChangeRetention && blocks.isEmpty,
+                        isChatEmpty: conversation.canChangeRetention && blocks.isEmpty,
                         totalBlockCount: totalBlockCount,
                         floatsTopStrip: floatsTopStrip
                     )
@@ -627,7 +627,7 @@ struct ChatPage: View {
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
         }
-        .onChange(of: chat.id) { _, _ in
+        .onChange(of: conversation.id) { _, _ in
             sendHandoff = .idle
             scroller.endSendHandoff()
             speechInput.cancel(reason: "chatChanged")
@@ -660,8 +660,8 @@ struct ChatPage: View {
             speechInput.cancel(reason: "pageDisappear")
             ClientAutomation.setEditDraft = nil
         }
-        .task(id: chat.serviceBootstrapRevision) {
-            let updated = await chat.syncToMonoRepository()
+        .task(id: conversation.serviceBootstrapRevision) {
+            let updated = await conversation.syncToMonoRepository()
             guard !Task.isCancelled else { return }
             if !updated.isEmpty {
                 let msg = updated.count == 1
@@ -690,9 +690,9 @@ struct ChatPage: View {
             modalPresentation = nil
         }
         .task(id: DelayedActivityKey(
-            chatID: chat.id,
-            activity: chat.activity,
-            transcriptRevision: chat.transcriptRevision
+            conversationID: conversation.id,
+            activity: conversation.activity,
+            transcriptRevision: conversation.transcriptRevision
         )) {
             await updateDelayedActivity()
         }
@@ -702,33 +702,33 @@ struct ChatPage: View {
             Group {
                 switch presented {
                 case .modelPicker:
-                    ModelPickerSheet(chat: chat)
+                    ModelPickerSheet(conversation: conversation)
                         .presentationDetents([.medium, .large])
                 case .serviceDetail(let service):
                     NavigationStack {
                         ServiceDetailView(
                             initialService: service,
                             primaryAction: .attach,
-                            isAttached: chat.attachedServices.contains { $0.domain == service.domain },
+                            isAttached: conversation.attachedServices.contains { $0.domain == service.domain },
                             onPrimaryAction: {
                                 toggleServiceAttachment(service)
                                 modalPresentation = nil
                             },
-                            browserSessionID: chat.id
+                            browserSessionID: conversation.id
                         )
                     }
                     .presentationDetents([.medium, .large])
                 case .artifacts:
-                    ChatArtifactsSheet(artifacts: chatArtifacts) { artifact in
+                    ConversationArtifactsSheet(artifacts: chatArtifacts) { artifact in
                         pendingArtifactPreview = artifact
                         modalPresentation = nil
-                        Log.ui.info("ChatPage.artifactPreview select chat=\(chat.id) filename=\(artifact.fileName)")
+                        Log.ui.info("ChatPage.artifactPreview select conversation=\(conversation.id) filename=\(artifact.fileName)")
                     }
                     .presentationDetents([.medium, .large])
                 case .artifactPicker:
                     ArtifactPickerSheet(attachedIDs: composer.draftArtifactIDs) { picked in
                         picked.forEach(composer.attachArtifact)
-                        Log.ui.info("ChatPage.attachArtifacts chat=\(chat.id) count=\(picked.count)")
+                        Log.ui.info("ChatPage.attachArtifacts conversation=\(conversation.id) count=\(picked.count)")
                     }
                     .presentationDetents([.medium, .large])
                 case .camera, .photos, .files, .attachment, .botControl, .serviceAuth:
@@ -755,14 +755,14 @@ struct ChatPage: View {
         }
         .alert(item: $alertPresentation) { presented in
             switch presented {
-            case .deleteChat:
+            case .deleteConversation:
                 Alert(
                     title: Text("Delete this chat?"),
                     message: Text("This removes the chat from your history. This can't be undone."),
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Delete Chat")) {
-                        Log.ui.info("ChatPage.deleteChat chat=\(chat.id) blocks=\(chat.transcript.count)")
-                        chat.cancelAll()
+                        Log.ui.info("ChatPage.deleteConversation conversation=\(conversation.id) blocks=\(conversation.transcript.count)")
+                        conversation.cancelAll()
                         onDeleteChat()
                     }
                 )
@@ -772,7 +772,7 @@ struct ChatPage: View {
                     message: Text("Forks this chat at this reply and switches to the new one. The original stays put."),
                     primaryButton: .cancel(),
                     secondaryButton: .default(Text("Branch")) {
-                        Log.ui.info("ChatPage.branch chat=\(chat.id) atBlock=\(id)")
+                        Log.ui.info("ChatPage.branch conversation=\(conversation.id) atBlock=\(id)")
                         onBranch(id)
                     }
                 )
@@ -782,8 +782,8 @@ struct ChatPage: View {
                     message: Text("Creates a new branch from this prompt. The original conversation is kept."),
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Regenerate")) {
-                        Log.ui.info("ChatPage.retry chat=\(chat.id) atBlock=\(id)")
-                        latestSubmissionID = chat.retry(at: id)?.id
+                        Log.ui.info("ChatPage.retry conversation=\(conversation.id) atBlock=\(id)")
+                        latestSubmissionID = conversation.retry(at: id)?.id
                     }
                 )
             }
@@ -820,8 +820,8 @@ struct ChatPage: View {
     }
 
     private func pageTopBar(blockCount: Int) -> some View {
-        ChatPageTopBar(
-            chat: chat,
+        ConversationPageTopBar(
+            conversation: conversation,
             blockCount: blockCount,
             hasArtifacts: !chatArtifacts.isEmpty,
             showsModelPicker: isModelConfigured,
@@ -831,7 +831,7 @@ struct ChatPage: View {
             onPickModel: { modalPresentation = .modelPicker },
             onShowArtifacts: { modalPresentation = .artifacts },
             onCopyTranscript: { copyTranscript(blockCount: blockCount) },
-            onDeleteChat: { alertPresentation = .deleteChat }
+            onDeleteConversation: { alertPresentation = .deleteConversation }
         )
     }
 
@@ -869,7 +869,7 @@ struct ChatPage: View {
     private func startServiceMention() {
         composer.startMention()
         DispatchQueue.main.async { composerFocused = true }
-        Log.ui.info("ChatPage.startServiceMention chat=\(chat.id)")
+        Log.ui.info("ChatPage.startServiceMention conversation=\(conversation.id)")
     }
 
     @ViewBuilder
@@ -877,7 +877,7 @@ struct ChatPage: View {
         if editedBlockID == nil {
             ComposerServicePicker(
                 composer: composer,
-                excludedDomains: Set(chat.attachedServices.map(\.domain)),
+                excludedDomains: Set(conversation.attachedServices.map(\.domain)),
                 composerHeight: effectiveComposerHeight(floatsTopStrip: floatsTopStrip),
                 onSelect: selectMentionService,
                 onExplore: openServiceExplorer
@@ -899,7 +899,7 @@ struct ChatPage: View {
 
     private func effectiveComposerHeight(floatsTopStrip: Bool) -> CGFloat {
         viewportLayout.composerHeight
-            + (floatsTopStrip ? ChatComposer.floatingTopStripClearance : 0)
+            + (floatsTopStrip ? ConversationComposer.floatingTopStripClearance : 0)
     }
 
     private func selectMentionService(_ service: Service) {
@@ -912,7 +912,7 @@ struct ChatPage: View {
         composer.finishMention()
         composerFocused = false
         onExploreServices()
-        Log.ui.info("ChatPage.openServiceExplorer chat=\(chat.id)")
+        Log.ui.info("ChatPage.openServiceExplorer conversation=\(conversation.id)")
     }
 
     private func handleAttachChoice(_ choice: AttachmentChoice) {
@@ -937,19 +937,19 @@ struct ChatPage: View {
     }
 
     private func attachService(_ picked: Service) {
-        Log.ui.info("ChatPage.attachService chat=\(chat.id) picked=\(picked.domain)")
-        if chat.attachService(picked) {
+        Log.ui.info("ChatPage.attachService conversation=\(conversation.id) picked=\(picked.domain)")
+        if conversation.attachService(picked) {
             Haptics.impact(.serviceAttached)
         }
     }
 
     private func removeService(_ service: Service) {
-        Log.ui.info("ChatPage.removeService chat=\(chat.id) service=\(service.domain)")
-        chat.setAttachedServices(chat.attachedServices.filter { $0.domain != service.domain })
+        Log.ui.info("ChatPage.removeService conversation=\(conversation.id) service=\(service.domain)")
+        conversation.setAttachedServices(conversation.attachedServices.filter { $0.domain != service.domain })
     }
 
     private func toggleServiceAttachment(_ service: Service) {
-        if chat.attachedServices.contains(where: { $0.domain == service.domain }) {
+        if conversation.attachedServices.contains(where: { $0.domain == service.domain }) {
             removeService(service)
         } else {
             attachService(service)
@@ -961,9 +961,9 @@ struct ChatPage: View {
     }
 
     private var showsActivity: Bool {
-        switch chat.activity {
+        switch conversation.activity {
         case .running(.thinking):
-            chat.thinkingActivity == nil
+            conversation.thinkingActivity == nil
         case .running(.awaiting(_)):
             activeInteraction == nil
         case .running(.streaming):
@@ -975,24 +975,24 @@ struct ChatPage: View {
 
     private func updateDelayedActivity() async {
         showsDelayedActivity = false
-        guard chat.activity == .running(.streaming) else { return }
+        guard conversation.activity == .running(.streaming) else { return }
         do {
             try await Task.sleep(for: .milliseconds(700))
         } catch {
             return
         }
-        guard !Task.isCancelled, chat.activity == .running(.streaming) else { return }
+        guard !Task.isCancelled, conversation.activity == .running(.streaming) else { return }
         withAnimation(Theme.Animation.standard) {
             showsDelayedActivity = true
         }
     }
 
     private var chatArtifacts: [Artifact] {
-        chat.referencedArtifacts
+        conversation.referencedArtifacts
     }
 
     private var submissionAnchor: Conversation.SubmissionAnchor? {
-        latestSubmissionID.flatMap { chat.anchor(forSubmissionID: $0) }
+        latestSubmissionID.flatMap { conversation.anchor(forSubmissionID: $0) }
     }
 
     private var anchoredTurnID: TurnID? {
@@ -1001,7 +1001,7 @@ struct ChatPage: View {
 
     private var anchoredQueuedMessage: Conversation.QueuedMessage? {
         guard case .queued(let id) = submissionAnchor else { return nil }
-        return chat.queuedMessages.first { $0.id == id }
+        return conversation.queuedMessages.first { $0.id == id }
     }
 
     private var anchorSlack: CGFloat {
@@ -1010,14 +1010,14 @@ struct ChatPage: View {
 
     private func floatsTopStrip(showsComposer: Bool) -> Bool {
         showsComposer
-            && (editedBlockID != nil || !chatArtifacts.isEmpty || !chat.attachedServices.isEmpty)
+            && (editedBlockID != nil || !chatArtifacts.isEmpty || !conversation.attachedServices.isEmpty)
     }
 
     private func messageControls(sourceBlockID: UUID, editableBlock: Block? = nil) -> MessageControls {
         MessageControls(
             onCopy: { text in copyMessage(text, blockId: sourceBlockID) },
             isCopied: copiedBlockId == sourceBlockID,
-            canMutate: !chat.isBusy && !chat.isTemporary,
+            canMutate: !conversation.isBusy && !conversation.isTemporary,
             onBranch: { alertPresentation = .branch(sourceBlockID) },
             onRetry: { alertPresentation = .retry(sourceBlockID) },
             onEdit: {
@@ -1029,14 +1029,14 @@ struct ChatPage: View {
     private var artifactControls: ArtifactControls {
         ArtifactControls(
             revision: artifactRevision,
-            canMutate: !chat.isTemporary,
+            canMutate: !conversation.isTemporary,
             onRename: { beginRenamingArtifact($0) },
             onDelete: { artifactMutation = .deleting($0) }
         )
     }
 
     @ViewBuilder
-    private func chatBlockHost(_ block: ChatBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
+    private func chatBlockHost(_ block: ConversationBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
         switch block.kind {
         case .responseFooter(let text, let phase):
             ResponseFooterBlockView(
@@ -1050,7 +1050,7 @@ struct ChatPage: View {
                     ActivityBubble()
                         .padding(
                             .top,
-                            ChatTranscriptMetrics.blockSpacing - ChatTranscriptMetrics.responseFooterSpacing
+                            ConversationTranscriptMetrics.blockSpacing - ConversationTranscriptMetrics.responseFooterSpacing
                         )
                         .padding(.horizontal, 4)
                         .transition(.opacity)
@@ -1068,12 +1068,12 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func promptBlock(_ prompt: ChatPromptBlock, sourceBlockID: UUID) -> some View {
+    private func promptBlock(_ prompt: ConversationPromptBlock, sourceBlockID: UUID) -> some View {
         if let request = prompt.secretEntry, prompt.isActive {
             SecretEntryRequestCard(request: request, onSaved: {
-                chat.resolvePrompt(blockId: sourceBlockID, answer: "Saved")
+                conversation.resolvePrompt(blockId: sourceBlockID, answer: "Saved")
             }, onCancel: {
-                chat.resolvePrompt(blockId: sourceBlockID, answer: "Cancelled")
+                conversation.resolvePrompt(blockId: sourceBlockID, answer: "Cancelled")
             })
             .id(request.id)
         } else {
@@ -1091,7 +1091,7 @@ struct ChatPage: View {
                     resolution: prompt.resolution
                 ) { option in
                     guard prompt.isActive else { return }
-                    chat.resolvePrompt(blockId: sourceBlockID, answer: option)
+                    conversation.resolvePrompt(blockId: sourceBlockID, answer: option)
                 }
                 .allowsHitTesting(prompt.isActive)
                 .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
@@ -1113,7 +1113,7 @@ struct ChatPage: View {
                 onCustomFocusChange: { choiceInputFocused = $0 }
             ) { option in
                 guard prompt.isActive else { return }
-                chat.resolvePrompt(blockId: sourceBlockID, answer: option)
+                conversation.resolvePrompt(blockId: sourceBlockID, answer: option)
             }
             .allowsHitTesting(prompt.isActive)
             .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
@@ -1143,7 +1143,7 @@ struct ChatPage: View {
                         if let session = serviceAuthPresenter.session {
                             session.cancel()
                         } else if let interactionID {
-                            chat.resolveServiceControl(id: interactionID, result: nil)
+                            conversation.resolveServiceControl(id: interactionID, result: nil)
                         }
                     }
                 )
@@ -1154,19 +1154,19 @@ struct ChatPage: View {
                     reflectsAuthentication: false,
                     signIn: { domain in
                         guard prepareServiceControl(control) else { return false }
-                        return await chat.signInService(domain: domain, resumeAgent: false)
+                        return await conversation.signInService(domain: domain, resumeAgent: false)
                     },
                     completeBotControl: { domain, args in
                         guard prepareServiceControl(control) else { return false }
-                        return await chat.completeBotControl(domain: domain, args: args, resumeAgent: false)
+                        return await conversation.completeBotControl(domain: domain, args: args, resumeAgent: false)
                     },
                     completePayment: { domain, args in
                         guard prepareServiceControl(control) else { return nil }
-                        return await chat.completePayment(domain: domain, args: args)
+                        return await conversation.completePayment(domain: domain, args: args)
                     },
                     onResolved: { result in
                         guard let interactionID else { return }
-                        chat.resolveServiceControl(id: interactionID, result: result)
+                        conversation.resolveServiceControl(id: interactionID, result: result)
                     }
                 )
             }
@@ -1199,25 +1199,25 @@ struct ChatPage: View {
         guard let pending,
               case .botControl(let domain, _, let args) = pending.control else { return }
         guard prepareServiceControl(pending.control) else {
-            chat.resolveServiceControl(id: pending.id, result: nil)
+            conversation.resolveServiceControl(id: pending.id, result: nil)
             return
         }
-        let completed = await chat.completeBotControl(
+        let completed = await conversation.completeBotControl(
             domain: domain,
             args: args,
             resumeAgent: false,
             using: botControlPresenter
         )
-        chat.resolveServiceControl(id: pending.id, result: completed ? .null : nil)
+        conversation.resolveServiceControl(id: pending.id, result: completed ? .null : nil)
     }
 
     private func prepareServiceControl(_ control: ServiceControl) -> Bool {
         if isAttached(control) { return true }
         guard let service = serviceManager.service(domain: control.domain) else {
-            Log.ui.warning("ChatPage.serviceControl unavailable chat=\(chat.id) domain=\(control.domain)")
+            Log.ui.warning("ChatPage.serviceControl unavailable conversation=\(conversation.id) domain=\(control.domain)")
             return false
         }
-        chat.attachService(service)
+        conversation.attachService(service)
         return true
     }
 
@@ -1237,8 +1237,8 @@ struct ChatPage: View {
             }
     }
 
-    private func transcriptContentBlock(_ block: ChatBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
-        let isTail = block.sourceBlockID == chat.transcript.last?.id
+    private func transcriptContentBlock(_ block: ConversationBlock, latestCanvasBlockIDs: [URL: UUID]) -> some View {
+        let isTail = block.sourceBlockID == conversation.transcript.last?.id
         let isLatestCanvas: Bool = if case .agentContent(.artifact(let artifact)) = block.kind,
                                       artifact.kind == .html {
             latestCanvasBlockIDs[artifact.fileURL] == block.id
@@ -1248,8 +1248,8 @@ struct ChatPage: View {
         return BlockView(
             block: block,
             isLatestCanvas: isLatestCanvas,
-            isStreamingTail: chat.isBusy && isTail,
-            chatID: chat.id,
+            isStreamingTail: conversation.isBusy && isTail,
+            conversationID: conversation.id,
             browserPageMount: browserPageMount,
             isThinkingTail: block.isLiveThinking,
             controls: messageControls(
@@ -1263,7 +1263,7 @@ struct ChatPage: View {
         )
     }
 
-    private func editableBlock(_ block: ChatBlock) -> Block? {
+    private func editableBlock(_ block: ConversationBlock) -> Block? {
         let kind: Block.Kind
         switch block.kind {
         case .userText(let text, let attachments):
@@ -1278,7 +1278,7 @@ struct ChatPage: View {
 
     @ViewBuilder
     private func blockRow(
-        _ block: ChatBlock,
+        _ block: ConversationBlock,
         latestCanvasBlockIDs: [URL: UUID],
         identified: Bool = true
     ) -> some View {
@@ -1293,7 +1293,7 @@ struct ChatPage: View {
     }
 
     @ViewBuilder
-    private func activityRow(blocks: [ChatBlock]) -> some View {
+    private func activityRow(blocks: [ConversationBlock]) -> some View {
         if showsActivity, !blocks.contains(where: {
             if case .responseFooter(_, .streaming) = $0.kind { return true }
             return false
@@ -1301,17 +1301,17 @@ struct ChatPage: View {
             ActivityBubble()
                 .id("__activity")
                 .transition(.opacity)
-                .padding(.top, ChatTranscriptMetrics.blockSpacing)
+                .padding(.top, ConversationTranscriptMetrics.blockSpacing)
                 .padding(.horizontal, 4)
         }
     }
 
     @ViewBuilder
     private var stoppedRow: some View {
-        if chat.showsStoppedTurn {
+        if conversation.showsStoppedTurn {
             StoppedTurnDivider()
                 .id("__stopped")
-                .padding(.top, ChatTranscriptMetrics.blockSpacing)
+                .padding(.top, ConversationTranscriptMetrics.blockSpacing)
         }
     }
 
@@ -1321,9 +1321,9 @@ struct ChatPage: View {
             message: queued,
             onOpenAttachment: { artifact, sourceID in openAttachment(artifact, sourceID: sourceID) },
             onOpenSkill: { openSkill($0) }
-        ) { chat.cancelQueued(queued.id) }
+        ) { conversation.cancelQueued(queued.id) }
             .transition(.opacity)
-            .padding(.top, ChatTranscriptMetrics.blockSpacing)
+            .padding(.top, ConversationTranscriptMetrics.blockSpacing)
         if identified {
             row.id(queued.id)
         } else {
@@ -1332,15 +1332,15 @@ struct ChatPage: View {
     }
 
     private var queuedRows: some View {
-        ForEach(chat.queuedMessages) { queued in
+        ForEach(conversation.queuedMessages) { queued in
             queuedRow(queued)
         }
     }
 
-    @State private var scroller = ChatViewportController()
+    @State private var scroller = ConversationViewportController()
 
     private func transcript(
-        blocks: [ChatBlock],
+        blocks: [ConversationBlock],
         latestCanvasBlockIDs: [URL: UUID],
         totalBlockCount: Int,
         sourceRange: Range<Int>,
@@ -1375,8 +1375,8 @@ struct ChatPage: View {
                     }
                 }
                 .contentMargins(.bottom, dockClearance, for: .scrollContent)
-                .onScrollGeometryChange(for: ChatViewportController.Frame?.self) { geo in
-                    let frame = ChatViewportController.Frame(geo)
+                .onScrollGeometryChange(for: ConversationViewportController.Frame?.self) { geo in
+                    let frame = ConversationViewportController.Frame(geo)
                     return frame.insetTop == 0 && frame.insetBottom == 0 ? nil : frame
                 } action: { _, new in
                     guard let new else { return }
@@ -1403,11 +1403,11 @@ struct ChatPage: View {
                 .scrollBounceBehavior(.always, axes: .vertical)
                 .scrollDismissesKeyboard(.interactively)
                 .dismissesSelectableTextSelection {
-                    Log.ui.info("ChatPage.dismissTextSelection chat=\(chat.id) via=transcriptTap")
+                    Log.ui.info("ChatPage.dismissTextSelection conversation=\(conversation.id) via=transcriptTap")
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     guard anyInputFocused else { return }
-                    Log.ui.info("ChatUX.intent chat=\(chat.id) kind=dismissKeyboard via=transcriptTap")
+                    Log.ui.info("ChatUX.intent conversation=\(conversation.id) kind=dismissKeyboard via=transcriptTap")
                     composerFocused = false
                     if choiceInputFocused {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -1417,7 +1417,7 @@ struct ChatPage: View {
                     transcriptWindow.reconcile(total: total)
                     logTranscriptWindow(reason: "blocks", total: total)
                 }
-                .onChange(of: chat.isBusy) { _, busy in
+                .onChange(of: conversation.isBusy) { _, busy in
                     logTranscriptWindow(reason: busy ? "busy" : "settled", total: totalBlockCount)
                 }
                 .onChange(of: submissionAnchor) { old, new in
@@ -1453,22 +1453,22 @@ struct ChatPage: View {
                 }
                 .onAppear {
                     transcriptWindow.open(total: totalBlockCount)
-                    Log.ui.info("ChatUX.lifecycle chat=\(chat.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
-                    scroller.openAtBottom(chatID: "\(chat.id)", onSettled: onInitialTranscriptPresented)
+                    Log.ui.info("ChatUX.lifecycle conversation=\(conversation.id) phase=viewportOpening target=bottom range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(totalBlockCount) anchor=\(submissionAnchor?.id.uuidString ?? "none") scale=\(displayScale) dynamicType=\(String(describing: dynamicTypeSize)) reduceMotion=\(reduceMotion) reduceTransparency=\(reduceTransparency)")
+                    scroller.openAtBottom(conversationID: "\(conversation.id)", onSettled: onInitialTranscriptPresented)
                 }
             }
         }
     }
 
     private func transcriptRows(
-        blocks: [ChatBlock],
-        renderedBlocks: [ChatBlock],
+        blocks: [ConversationBlock],
+        renderedBlocks: [ConversationBlock],
         latestCanvasBlockIDs: [URL: UUID],
         anchoredViewportHeight: CGFloat,
         scrollToTurn: @escaping (TurnID) -> Void
     ) -> some View {
         VStack(spacing: 0) {
-            if chat.canChangeRetention {
+            if conversation.canChangeRetention {
                 emptyChatState
             }
             earlierWindowBoundary(blocks: blocks)
@@ -1478,7 +1478,7 @@ struct ChatPage: View {
                 }
                 activityRow(blocks: renderedBlocks)
                 stoppedRow
-                ForEach(chat.queuedMessages.filter { $0.id != anchor.id }) { queued in
+                ForEach(conversation.queuedMessages.filter { $0.id != anchor.id }) { queued in
                     queuedRow(queued)
                 }
                 VStack(spacing: 0) {
@@ -1560,7 +1560,7 @@ struct ChatPage: View {
 
         scroller.beginSendHandoff()
         sendHandoff = .animating(submissionID: submissionID, anchorID: anchorID)
-        Log.ui.info("ChatUX.sendHandoff chat=\(chat.id) phase=animating submission=\(submissionID) anchor=\(anchorID)")
+        Log.ui.info("ChatUX.sendHandoff conversation=\(conversation.id) phase=animating submission=\(submissionID) anchor=\(anchorID)")
         let dismissesKeyboard = anyInputFocused
         if dismissesKeyboard { prepareComposerSubmission() }
         scroller.rideToTurn(
@@ -1575,7 +1575,7 @@ struct ChatPage: View {
             ) else { return }
             sendHandoff = .idle
             scroller.endSendHandoff()
-            Log.ui.info("ChatUX.sendHandoff chat=\(chat.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
+            Log.ui.info("ChatUX.sendHandoff conversation=\(conversation.id) phase=settled submission=\(submissionID) anchor=\(anchorID)")
         }
     }
 
@@ -1583,7 +1583,7 @@ struct ChatPage: View {
     private var emptyChatState: some View {
         if !isModelConfigured {
             modelSetupState
-        } else if chat.isTemporary {
+        } else if conversation.isTemporary {
             temporaryEmptyState
         } else {
             persistedEmptyState
@@ -1635,7 +1635,7 @@ struct ChatPage: View {
         .accessibilityIdentifier(A11yID.Chat.temporaryEmpty)
     }
 
-    private func earlierWindowBoundary(blocks: [ChatBlock]) -> some View {
+    private func earlierWindowBoundary(blocks: [ConversationBlock]) -> some View {
         Color.clear
             .frame(height: transcriptWindow.hasEarlier ? 1 : 0)
             .onScrollVisibilityChange(threshold: 0.01) { visible in
@@ -1644,20 +1644,20 @@ struct ChatPage: View {
             }
     }
 
-    private func requestEarlierReveal(blocks: [ChatBlock]) {
+    private func requestEarlierReveal(blocks: [ConversationBlock]) {
         transcriptWindow.requestEarlier(
             anchor: readerAnchor(in: blocks),
             isUserScrolling: scroller.isUserScrolling
         )
     }
 
-    private func readerAnchor(in blocks: [ChatBlock]) -> UUID? {
+    private func readerAnchor(in blocks: [ConversationBlock]) -> UUID? {
         if let visible = scroller.visibleBlockID { return visible }
         return blocks.first?.id
     }
 
     private func logTranscriptWindow(reason: String, total: Int) {
-        Log.ui.info("ChatUX.content chat=\(chat.id) reason=\(reason) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") busy=\(chat.isBusy)")
+        Log.ui.info("ChatUX.content conversation=\(conversation.id) reason=\(reason) range=\(transcriptWindow.range.lowerBound)..<\(transcriptWindow.range.upperBound) total=\(total) anchor=\(submissionAnchor?.id.uuidString ?? "none") busy=\(conversation.isBusy)")
     }
 
     private func inputBar(
@@ -1665,20 +1665,20 @@ struct ChatPage: View {
         floatsTopStrip: Bool,
         isEmbedded: Bool
     ) -> some View {
-        ChatComposer(
+        ConversationComposer(
             composer: composer,
             isEditingMessage: editedBlockID != nil,
             editDraft: $editDraft,
             speech: speechInput,
-            attachedServices: chat.attachedServices,
+            attachedServices: conversation.attachedServices,
             chatArtifacts: chatArtifacts,
             fieldFocused: $composerFocused,
             isFieldFocused: composerFocused,
-            sessionID: chat.id,
+            sessionID: conversation.id,
             isChatEmpty: isChatEmpty,
-            isTemporary: chat.isTemporary,
-            isBusy: chat.isBusy,
-            followIntents: chat.followIntents,
+            isTemporary: conversation.isTemporary,
+            isBusy: conversation.isBusy,
+            followIntents: conversation.followIntents,
             floatsTopStrip: floatsTopStrip,
             isEmbedded: isEmbedded,
             iconButtonSize: iconButtonSize,
@@ -1691,12 +1691,12 @@ struct ChatPage: View {
             onAttachmentChoice: handleAttachChoice,
             onServices: startServiceMention,
             onSubmitSkill: submitSkill,
-            onPreparationIntent: chat.setModelPreparationIntent,
+            onPreparationIntent: conversation.setModelPreparationIntent,
             onCancelEdit: { cancelEditing(reason: "user", keepFocus: true) },
             onSend: { send() },
             onStop: {
-                Log.ui.info("ChatPage.stop chat=\(chat.id)")
-                chat.stopCurrentTurn()
+                Log.ui.info("ChatPage.stop conversation=\(conversation.id)")
+                conversation.stopCurrentTurn()
             },
             onSpeechBegin: beginSpeech
         )
@@ -1705,7 +1705,7 @@ struct ChatPage: View {
             guard let composerFocusRequestID else { return }
             await Task.yield()
             composerFocused = true
-            Log.ui.info("ChatUX.intent chat=\(chat.id) kind=focusRequest phase=applied request=\(composerFocusRequestID)")
+            Log.ui.info("ChatUX.intent conversation=\(conversation.id) kind=focusRequest phase=applied request=\(composerFocusRequestID)")
             onComposerFocusRequestHandled(composerFocusRequestID)
         }
     }
@@ -1724,7 +1724,7 @@ struct ChatPage: View {
                         composerFocused: composerFocused,
                         isEditingMessage: editedBlockID != nil,
                         hasArtifacts: !chatArtifacts.isEmpty,
-                        hasAttachedServices: !chat.attachedServices.isEmpty,
+                        hasAttachedServices: !conversation.attachedServices.isEmpty,
                         floatsTopStrip: floatsTopStrip,
                         composerButtonSize: composerButtonSize
                     ) {
@@ -1767,28 +1767,28 @@ struct ChatPage: View {
         switch modelService?.auth {
         case .unknown?, .checking?: L10n.string("Checking sign-in…")
         case .unavailable?: L10n.string("Sign-in unavailable")
-        default: String(localized: "Sign in with \(chat.client.displayName)")
+        default: String(localized: "Sign in with \(conversation.client.displayName)")
         }
     }
 
     private func ensureModelAccess() -> Bool {
         guard modelAccessNeedsAttention else { return true }
-        Log.ui.info("ChatPage.modelAccess blocked chat=\(chat.id) provider=\(chat.client.id) state=\(modelService?.signInState.rawValue ?? "unknown")")
+        Log.ui.info("ChatPage.modelAccess blocked conversation=\(conversation.id) provider=\(conversation.client.id) state=\(modelService?.signInState.rawValue ?? "unknown")")
         modalPresentation = .modelPicker
         return false
     }
 
     private var activeInteraction: Conversation.Interaction? {
-        chat.interaction
+        conversation.interaction
     }
 
     private func isAttached(_ control: ServiceControl) -> Bool {
-        chat.attachedServices.contains { $0.domain == control.domain }
+        conversation.attachedServices.contains { $0.domain == control.domain }
     }
 
     private func refreshAttachedServiceAuth() async {
         await withTaskGroup(of: Void.self) { group in
-            for service in chat.attachedServices {
+            for service in conversation.attachedServices {
                 group.addTask { @MainActor in
                     await service.checkAccess(reason: .chatOpen)
                 }
@@ -1799,38 +1799,38 @@ struct ChatPage: View {
     private func resolveSignInControl(_ item: Conversation.PendingServiceControl?) async {
         guard let item,
               case .signIn(let domain, _) = item.control,
-              let service = chat.attachedService(domain: domain) else { return }
-        Log.ui.info("ChatPage.authProbe start chat=\(chat.id) domain=\(domain) state=\(service.signInState.rawValue)")
+              let service = conversation.attachedService(domain: domain) else { return }
+        Log.ui.info("ChatPage.authProbe start conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
         await service.checkAccess(policy: .current, reason: .pendingSignIn, preflight: item.accessPreflight)
         guard !Task.isCancelled else {
-            Log.ui.info("ChatPage.authProbe canceled chat=\(chat.id) domain=\(domain)")
+            Log.ui.info("ChatPage.authProbe canceled conversation=\(conversation.id) domain=\(domain)")
             return
         }
         await service.attemptSilentSignIn(reason: .chatOpen)
         guard !Task.isCancelled else { return }
-        Log.ui.info("ChatPage.authProbe done chat=\(chat.id) domain=\(domain) state=\(service.signInState.rawValue)")
+        Log.ui.info("ChatPage.authProbe done conversation=\(conversation.id) domain=\(domain) state=\(service.signInState.rawValue)")
         if service.signInState.isAuthenticated {
-            chat.resolveServiceControl(id: item.id, result: .null)
+            conversation.resolveServiceControl(id: item.id, result: .null)
         } else {
-            let signedIn = await chat.signInService(
+            let signedIn = await conversation.signInService(
                 domain: domain,
                 resumeAgent: false,
                 using: service.supportsWebAuthentication ? serviceAuthPresenter : nil
             )
-            chat.resolveServiceControl(id: item.id, result: signedIn ? .null : nil)
+            conversation.resolveServiceControl(id: item.id, result: signedIn ? .null : nil)
         }
     }
 
     private func copyTranscript(blockCount: Int) {
         Task {
             do {
-                let text = String(decoding: try await chat.exportTranscript(), as: UTF8.self)
+                let text = String(decoding: try await conversation.exportTranscript(), as: UTF8.self)
                 UIPasteboard.general.string = text
                 Haptics.impact(.copy)
-                Log.ui.info("ChatPage.copyTranscript chat=\(chat.id) blocks=\(blockCount) chars=\(text.count)")
+                Log.ui.info("ChatPage.copyTranscript conversation=\(conversation.id) blocks=\(blockCount) chars=\(text.count)")
                 showCopiedToast()
             } catch {
-                Log.ui.error("ChatPage.copyTranscript chat=\(chat.id) encode failed: \(error.localizedDescription)")
+                Log.ui.error("ChatPage.copyTranscript conversation=\(conversation.id) encode failed: \(error.localizedDescription)")
             }
         }
     }
@@ -1838,7 +1838,7 @@ struct ChatPage: View {
     fileprivate func copyMessage(_ text: String, blockId: UUID) {
         UIPasteboard.general.string = text
         Haptics.impact(.copy)
-        Log.ui.info("ChatPage.copyMessage chat=\(chat.id) block=\(blockId) chars=\(text.count)")
+        Log.ui.info("ChatPage.copyMessage conversation=\(conversation.id) block=\(blockId) chars=\(text.count)")
         copiedBlockId = blockId
         showCopiedToast()
     }
@@ -1887,24 +1887,24 @@ struct ChatPage: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func enqueue(_ message: ChatComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) {
-        let receipt = chat.enqueue(
+    private func enqueue(_ message: ConversationComposerModel.Message, skillInvocation: UserSkillInvocation? = nil) {
+        let receipt = conversation.enqueue(
             message.text,
             attachments: message.attachments,
             skillInvocation: skillInvocation
         )
         latestSubmissionID = receipt.id
         sendHandoff = .waitingForAnchor(receipt.id)
-        Log.ui.info("ChatPage.send chat=\(chat.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
+        Log.ui.info("ChatPage.send conversation=\(conversation.id) draft=\(message.id) submission=\(receipt.id) disposition=\(receipt.disposition.rawValue) chars=\(message.text.count) attachments=\(message.attachments.count)")
     }
 
     private func submitSkill(_ skill: Skill, argument: String) {
         guard ensureModelAccess() else { return }
-        Log.ui.info("ChatComposer.skillSelect chat=\(chat.id) name=\(skill.name) services=\(skill.services.count)")
-        if chat.attachServiceDomains(skill.services) {
+        Log.ui.info("ConversationComposer.skillSelect conversation=\(conversation.id) name=\(skill.name) services=\(skill.services.count)")
+        if conversation.attachServiceDomains(skill.services) {
             Haptics.impact(.serviceAttached)
         }
-        Log.ui.info("ChatComposer.skillSubmit chat=\(chat.id) name=\(skill.name) argumentChars=\(argument.count)")
+        Log.ui.info("ConversationComposer.skillSubmit conversation=\(conversation.id) name=\(skill.name) argumentChars=\(argument.count)")
         let invocation = UserSkillInvocation(skill: skill, argument: argument)
         composer.draft = invocation.expandedIntent
         composer.delayStopControl()
@@ -1914,7 +1914,7 @@ struct ChatPage: View {
 
     private func beginEditing(_ block: Block) {
         guard case let .userText(text, _) = block.kind else { return }
-        Log.ui.info("ChatPage.beginEditing chat=\(chat.id) block=\(block.id) chars=\(text.count)")
+        Log.ui.info("ChatPage.beginEditing conversation=\(conversation.id) block=\(block.id) chars=\(text.count)")
         Haptics.impact(.editStarted)
         composer.setAttachmentMenuPresented(false)
         editDraft = AttributedString(text)
@@ -1928,19 +1928,19 @@ struct ChatPage: View {
     private func commitEdit(blockID: UUID) {
         let trimmed = String(editDraft.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        Log.ui.info("ChatPage.commitEdit chat=\(chat.id) block=\(blockID) chars=\(trimmed.count)")
+        Log.ui.info("ChatPage.commitEdit conversation=\(conversation.id) block=\(blockID) chars=\(trimmed.count)")
         prepareComposerSubmission()
         withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
-            latestSubmissionID = chat.editAndRerun(at: blockID, newText: trimmed)?.id
+            latestSubmissionID = conversation.editAndRerun(at: blockID, newText: trimmed)?.id
         }
     }
 
     private func cancelEditing(reason: String, keepFocus: Bool) {
         guard let editedBlockID else { return }
-        Log.ui.info("ChatPage.cancelEditing chat=\(chat.id) block=\(editedBlockID) reason=\(reason)")
+        Log.ui.info("ChatPage.cancelEditing conversation=\(conversation.id) block=\(editedBlockID) reason=\(reason)")
         withAnimation(Theme.Animation.handoff, completionCriteria: .logicallyComplete) {
             self.editedBlockID = nil
             editDraft = AttributedString()
@@ -1950,7 +1950,7 @@ struct ChatPage: View {
     }
 
     private func openAttachment(_ att: Artifact, sourceID _: String? = nil) {
-        Log.ui.info("ChatPage.openAttachment chat=\(chat.id) kind=\(att.kind.rawValue) name=\(att.displayName)")
+        Log.ui.info("ChatPage.openAttachment conversation=\(conversation.id) kind=\(att.kind.rawValue) name=\(att.displayName)")
         navigationArtifact = att
     }
 
@@ -1958,11 +1958,11 @@ struct ChatPage: View {
         Skills.shared.refresh()
         let current = Skills.shared.skill(named: skill.name) ?? skill
         navigationSkill = SkillDraft(current)
-        Log.ui.info("ChatPage.skillNavigation select chat=\(chat.id) name=\(current.name)")
+        Log.ui.info("ChatPage.skillNavigation select conversation=\(conversation.id) name=\(current.name)")
     }
 
     private func openLink(_ url: URL) {
-        switch ChatLinkDestination(url) {
+        switch ConversationLinkDestination(url) {
         case .web(let url):
             LinkOpener.open(url: url, serviceManager: serviceManager)
         case .artifact(let filename):
@@ -1988,9 +1988,9 @@ struct ChatPage: View {
             do {
                 let renamed = try await onRenameArtifact(artifact, newFilename)
                 artifactRevision += 1
-                Log.ui.info("ChatPage.renameArtifact chat=\(chat.id) from=\(artifact.fileName) to=\(renamed.fileName)")
+                Log.ui.info("ChatPage.renameArtifact conversation=\(conversation.id) from=\(artifact.fileName) to=\(renamed.fileName)")
             } catch {
-                Log.ui.error("ChatPage.renameArtifact chat=\(chat.id) from=\(artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("ChatPage.renameArtifact conversation=\(conversation.id) from=\(artifact.fileName) error=\(error.localizedDescription)")
                 artifactMutation = .renameFailed(artifact.userFacingErrorDescription(error))
             }
         }
@@ -2001,9 +2001,9 @@ struct ChatPage: View {
             do {
                 try await onDeleteArtifact(artifact)
                 artifactRevision += 1
-                Log.ui.info("ChatPage.deleteArtifact chat=\(chat.id) file=\(artifact.fileName)")
+                Log.ui.info("ChatPage.deleteArtifact conversation=\(conversation.id) file=\(artifact.fileName)")
             } catch {
-                Log.ui.error("ChatPage.deleteArtifact chat=\(chat.id) file=\(artifact.fileName) error=\(error.localizedDescription)")
+                Log.ui.error("ChatPage.deleteArtifact conversation=\(conversation.id) file=\(artifact.fileName) error=\(error.localizedDescription)")
                 artifactMutation = .deleteFailed(artifact.userFacingErrorDescription(error))
             }
         }

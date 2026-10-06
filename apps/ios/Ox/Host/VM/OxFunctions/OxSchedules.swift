@@ -8,7 +8,7 @@ nonisolated enum OxSchedules {
             [
                 entry(
                     "ox.schedule.create",
-                    "Schedule a frozen snapshot of one resolved skill package after explicit user confirmation: `await ox.schedule.create({ skill, argument?, frequency, fireAt?, hour?, minute?, weekday?, timeZone?, purpose })`. Use `fireAt` for `once`; use `hour` and `minute` for `daily`; add a weekday name for `weekly`. Times are best-effort on iOS.",
+                    ModelGuidance.text("ox.schedule.create"),
                     input: object([
                         "skill": text,
                         "argument": longText,
@@ -23,25 +23,25 @@ nonisolated enum OxSchedules {
                 ),
                 entry(
                     "ox.schedule.list",
-                    "List scheduled skill invocations for the active Profile: `await ox.schedule.list({ purpose })`.",
+                    ModelGuidance.text("ox.schedule.list"),
                     input: object([:]),
                     output: .object(["type": .string("array"), "items": schedule])
                 ),
                 entry(
                     "ox.schedule.delete",
-                    "Delete one scheduled skill after explicit user confirmation: `await ox.schedule.delete({ id, purpose })`.",
+                    ModelGuidance.text("ox.schedule.delete"),
                     input: object(["id": id], required: ["id"]),
                     output: object(["id": id, "deleted": boolean], required: ["id", "deleted"])
                 ),
                 entry(
                     "ox.schedule.enable",
-                    "Enable or disable one scheduled skill after explicit user confirmation: `await ox.schedule.enable({ id, enabled, purpose })`.",
+                    ModelGuidance.text("ox.schedule.enable"),
                     input: object(["id": id, "enabled": boolean], required: ["id", "enabled"]),
                     output: schedule
                 ),
                 entry(
                     "ox.schedule.run",
-                    "Run one scheduled skill snapshot now after explicit user confirmation: `await ox.schedule.run({ id, purpose })`.",
+                    ModelGuidance.text("ox.schedule.run"),
                     input: object(["id": id], required: ["id"]),
                     output: object(["id": id, "started": boolean], required: ["id", "started"])
                 ),

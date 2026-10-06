@@ -7,6 +7,10 @@ nonisolated final class ModelPromptRenderer: @unchecked Sendable {
     enum Method: String {
         case responseDirective
         case websiteInstructions
+        case runtimeEvent
+        case failureReceipt
+        case outputTruncation
+        case imageReadGuidance
     }
 
     private let queue = DispatchQueue(label: "ox.prompt.javascript")

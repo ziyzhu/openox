@@ -6,7 +6,7 @@ nonisolated enum OxVision {
         namespace: "vision",
         schema: {
             [("ox.vision.analyze", .object([
-                "description": .string("Analyze one image with on-device OCR and classification: `await ox.vision.analyze({ source, purpose })`. Source may be an artifact basename, an `artifacts/<filename>` path, or a file under `files/<folder-id>/` when Files is attached and the user has selected that folder. Image pixels stay on device; print only the returned text, dimensions, or labels needed for the task. Use `ox.fs.attach` when the model needs original pixels."),
+                "description": .string(ModelGuidance.text("ox.vision.analyze")),
                 "inputSchema": .object([
                     "type": .string("object"),
                     "properties": .object([

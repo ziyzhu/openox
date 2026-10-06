@@ -30,6 +30,8 @@ export function nativeArtifacts(): ArtifactFiles {
         return bytes;
       } finally { await request("release", { token }); }
     },
+    async verifyPayload(record) { await request("payloadVerify", record); },
+    async readPayload(record, offset, length) { return request<string>("payloadRead", { ...record, offset, length }); },
     async flush(path) { await request("flush", { path }); },
     async close() { await request("close"); },
   };

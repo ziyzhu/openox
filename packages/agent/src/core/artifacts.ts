@@ -10,6 +10,8 @@ export interface ArtifactRecord {
 export interface ArtifactFiles {
   publish(path: string, bytes: Uint8Array): Promise<ArtifactRecord>;
   read(record: ArtifactRecord): Promise<Uint8Array>;
+  verifyPayload?(record: ArtifactRecord): Promise<void>;
+  readPayload?(record: ArtifactRecord, offset: number, length: number): Promise<string>;
   flush(path: string): Promise<void>;
   close(): Promise<void>;
 }

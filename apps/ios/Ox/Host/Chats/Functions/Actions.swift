@@ -1,8 +1,8 @@
 import Foundation
 
 nonisolated enum Actions {
-    static let chatStart = "ox.conversation.start"
-    static let chatDelete = "ox.conversation.delete"
+    static let conversationStart = "ox.conversation.start"
+    static let conversationDelete = "ox.conversation.delete"
     static let providerDefault = "ox.provider.default"
     static let providerList = "ox.provider.list"
     static let providerGet = "ox.provider.get"
@@ -94,7 +94,7 @@ nonisolated enum Actions {
     static let userReportProgress = "ox.user.reportProgress"
 
     static let builtIn = [
-        chatStart, chatDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
+        conversationStart, conversationDelete, providerDefault, providerList, providerGet, providerValidate, providerSave, providerDelete,
         providerAuthenticate, providerDeauthenticate, providerConnect, secretList, secretAdd, secretDelete,
         appInfo, appProfile, appProfiles, appNotifications, appLanguage, appTheme,
         appModel, appDefaultModel, appActionPolicies, appRepositories,
@@ -127,8 +127,8 @@ nonisolated enum Actions {
             return "Browser: \(browser.label)"
         }
         return switch action {
-        case chatStart: L10n.string("Start chat")
-        case chatDelete: L10n.string("Delete Chat")
+        case conversationStart: L10n.string("Start chat")
+        case conversationDelete: L10n.string("Delete Chat")
         case providerDefault: L10n.string("Default model")
         case providerList: L10n.string("List model providers")
         case providerGet: L10n.string("View a model provider")
@@ -220,7 +220,7 @@ nonisolated enum Actions {
 
     static func iconKind(for action: String) -> OxActionIconKind? {
         guard builtIn.contains(action) else { return nil }
-        if action == appRenameChat || action.hasPrefix("ox.user.") { return .chats }
+        if action == appRenameChat || action.hasPrefix("ox.user.") { return .conversations }
         if action.hasPrefix("ox.provider.") || action.hasPrefix("ox.app.") || action.hasPrefix("ox.secret.") { return .device }
         if action.hasPrefix("ox.service.") { return .services }
         if action.hasPrefix("ox.artifact.") || action.hasPrefix("ox.vision.") { return .artifacts }

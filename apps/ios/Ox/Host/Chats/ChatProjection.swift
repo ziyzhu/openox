@@ -142,6 +142,7 @@ nonisolated enum ChatProjection {
     ) -> [(Block, Int)] {
         var out: [(Block, Int)] = []
         var trace: [TraceEntry] = []
+        var omittedInvocations = 0
         var bubble: [ContentItem] = []
         var groupStart = Date.distantPast
         var groupEntry = 0
@@ -157,7 +158,7 @@ nonisolated enum ChatProjection {
             groupSealedAt = nil
         }
         func flushTrace() {
-            guard !trace.isEmpty else { return }
+            guard !trace.isEmpty || omittedInvocations > 0 else { return }
             var previous = out.count - 1
             while previous >= 0,
                   out[previous].1 == groupEntry,
@@ -177,14 +178,19 @@ nonisolated enum ChatProjection {
                out[previous].1 == groupEntry,
                case .thinking(var existing) = out[previous].0.kind {
                 existing.entries.append(contentsOf: trace)
+                let omitted = (existing.omittedInvocations ?? 0) + omittedInvocations
+                existing.omittedInvocations = omitted > 0 ? omitted : nil
                 existing.completedAt = groupSealedAt
                 out[previous].0.kind = .thinking(existing)
                 trace = []
+                omittedInvocations = 0
                 return
             }
             out.append((Block(id: slot(), createdAt: groupStart,
-                              kind: .thinking(ThinkingTrace(entries: trace, completedAt: groupSealedAt))), groupEntry))
+                              kind: .thinking(ThinkingTrace(entries: trace, completedAt: groupSealedAt,
+                                                            omittedInvocations: omittedInvocations > 0 ? omittedInvocations : nil))), groupEntry))
             trace = []
+            omittedInvocations = 0
         }
         func flushBubble() {
             guard !bubble.isEmpty else { return }
@@ -280,6 +286,11 @@ nonisolated enum ChatProjection {
                             case .media:
                                 break
                             }
+                        }
+                        if let omitted = execution.invocationTrace?.omittedCalls, omitted > 0 {
+                            flushBubble()
+                            openGroup(at: createdAt, entry: entry)
+                            omittedInvocations += omitted
                         }
                     case let .confirm(prompt):
                         flushTrace()

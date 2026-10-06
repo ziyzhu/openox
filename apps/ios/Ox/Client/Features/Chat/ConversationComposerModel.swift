@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class ChatComposerModel {
+final class ConversationComposerModel {
     struct SlashInvocation {
         let skill: Skill
         let command: String
@@ -203,7 +203,7 @@ final class ChatComposerModel {
         let pending = PendingAttachment(id: UUID(), displayName: displayName)
         let importingDraftID = draftID
         draftAttachments.append(.importing(pending))
-        Log.ui.info("ChatComposer.import begin draft=\(importingDraftID) import=\(pending.id) name=\(displayName)")
+        Log.ui.info("ConversationComposer.import begin draft=\(importingDraftID) import=\(pending.id) name=\(displayName)")
         importTasks[pending.id] = Task { [weak self] in
             do {
                 let artifact = try await operation()
@@ -221,11 +221,11 @@ final class ChatComposerModel {
 
     func attachArtifact(_ artifact: Artifact) {
         guard !draftAttachments.contains(where: { $0.id == .artifact(artifact.id) }) else {
-            Log.ui.info("ChatComposer.attachment duplicate draft=\(draftID) artifact=\(artifact.id)")
+            Log.ui.info("ConversationComposer.attachment duplicate draft=\(draftID) artifact=\(artifact.id)")
             return
         }
         draftAttachments.append(.ready(artifact))
-        Log.ui.info("ChatComposer.attachment artifact draft=\(draftID) artifact=\(artifact.id)")
+        Log.ui.info("ConversationComposer.attachment artifact draft=\(draftID) artifact=\(artifact.id)")
     }
 
     var draftArtifactIDs: Set<String> {
@@ -237,25 +237,25 @@ final class ChatComposerModel {
     func removeDraftAttachment(_ item: DraftAttachment) {
         draftAttachments.removeAll { $0.id == item.id }
         if case .operation(let id) = item.id { importTasks.removeValue(forKey: id)?.cancel() }
-        Log.ui.info("ChatComposer.attachment remove draft=\(draftID) item=\(item.id)")
+        Log.ui.info("ConversationComposer.attachment remove draft=\(draftID) item=\(item.id)")
     }
 
     private func finishImport(_ id: UUID, draftID importingDraftID: UUID, artifact: Artifact) {
         importTasks.removeValue(forKey: id)
         guard draftID == importingDraftID else {
             draftAttachments.removeAll { $0.id == .operation(id) }
-            Log.ui.info("ChatComposer.import stale draft=\(importingDraftID) current=\(draftID) import=\(id)")
+            Log.ui.info("ConversationComposer.import stale draft=\(importingDraftID) current=\(draftID) import=\(id)")
             return
         }
         guard let index = draftAttachments.firstIndex(where: { $0.id == .operation(id) }) else { return }
         draftAttachments[index] = .ready(artifact)
-        Log.ui.info("ChatComposer.import ready draft=\(draftID) import=\(id) artifact=\(artifact.id)")
+        Log.ui.info("ConversationComposer.import ready draft=\(draftID) import=\(id) artifact=\(artifact.id)")
     }
 
     private func cancelImport(_ id: UUID, draftID importingDraftID: UUID) {
         importTasks.removeValue(forKey: id)
         draftAttachments.removeAll { $0.id == .operation(id) }
-        Log.ui.info("ChatComposer.import cancelled draft=\(importingDraftID) import=\(id)")
+        Log.ui.info("ConversationComposer.import cancelled draft=\(importingDraftID) import=\(id)")
     }
 
     private func failImport(_ id: UUID, draftID importingDraftID: UUID, error: Error) {
@@ -263,7 +263,7 @@ final class ChatComposerModel {
         guard draftID == importingDraftID,
               draftAttachments.contains(where: { $0.id == .operation(id) }) else { return }
         draftAttachments.removeAll { $0.id == .operation(id) }
-        Log.ui.error("ChatComposer.import failed draft=\(importingDraftID) import=\(id) error=\(error.localizedDescription)")
+        Log.ui.error("ConversationComposer.import failed draft=\(importingDraftID) import=\(id) error=\(error.localizedDescription)")
     }
 }
 

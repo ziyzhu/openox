@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatHeader<Trailing: View>: View {
+struct ConversationHeader<Trailing: View>: View {
     let modelTitle: String?
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
@@ -11,7 +11,7 @@ struct ChatHeader<Trailing: View>: View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
             if let modelTitle {
-                ChatModelButton(title: modelTitle, size: iconButtonSize, action: onPickModel)
+                ConversationModelButton(title: modelTitle, size: iconButtonSize, action: onPickModel)
             }
             Spacer()
             trailing()
@@ -43,7 +43,7 @@ struct TemporaryChatButton: View {
     }
 }
 
-struct ChatOverflowMenu<Content: View>: View {
+struct ConversationOverflowMenu<Content: View>: View {
     let size: CGFloat
     @ViewBuilder let content: () -> Content
 

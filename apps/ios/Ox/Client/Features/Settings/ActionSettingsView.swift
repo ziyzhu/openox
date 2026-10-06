@@ -152,13 +152,13 @@ struct ActionSettingsView: View {
 }
 
 private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
-    case chats, models, web, artifacts, memory, skills, services, repositories, settings
+    case conversations, models, web, artifacts, memory, skills, services, repositories, settings
 
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
         switch self {
-        case .chats: "Chats"
+        case .conversations: "Chats"
         case .models: "Models & secrets"
         case .web: "Web & browser"
         case .artifacts: "Artifacts & images"
@@ -178,7 +178,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
 
     private static func group(for action: String) -> Self {
         switch action {
-        case Actions.appRenameChat: return .chats
+        case Actions.appRenameChat: return .conversations
         case Actions.appModel, Actions.appDefaultModel: return .models
         case Actions.appRepositories: return .repositories
         case Actions.outputRead: return .artifacts
@@ -186,7 +186,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         }
         // Group by user-facing feature, not by permission policy or storage source.
         return switch action.split(separator: ".").dropFirst().first {
-        case "conversation", "user": .chats
+        case "conversation", "user": .conversations
         case "provider", "secret": .models
         case "web": .web
         case "artifact", "vision", "widget": .artifacts

@@ -108,9 +108,10 @@ nonisolated enum ContentItem: Equatable, Codable {
 nonisolated struct ThinkingTrace: Equatable, Codable {
     var entries: [TraceEntry]
     var completedAt: Date?
+    var omittedInvocations: Int? = nil
 
     var invocations: [Invocation] { entries.compactMap { if case let .invocation(value) = $0 { value } else { nil } } }
-    var isEmpty: Bool { entries.isEmpty }
+    var isEmpty: Bool { entries.isEmpty && (omittedInvocations ?? 0) == 0 }
 }
 
 nonisolated struct Reasoning: Identifiable, Equatable, Hashable, Codable {
@@ -183,6 +184,25 @@ nonisolated struct Invocation: Identifiable, Equatable, Hashable, Codable, Senda
     let purpose: String
     let args: JSONValue
     var outcome: Outcome
+    var preview: Preview? = nil
+    var sources: Sources? = nil
+
+    nonisolated struct Sources: Equatable, Codable, Sendable {
+        var query: String?
+        var domain: String?
+        var links: [Link] = []
+
+        nonisolated struct Link: Equatable, Codable, Sendable {
+            var url: String
+            var title: String?
+        }
+    }
+
+    nonisolated struct Preview: Equatable, Codable, Sendable {
+        var argumentsTruncated: Bool
+        var resultTruncated: Bool
+        var purposeTruncated: Bool
+    }
 
     nonisolated enum Outcome: Equatable, Codable, Sendable {
         case running

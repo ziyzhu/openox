@@ -434,7 +434,7 @@ struct MarkdownText: View {
         return switch (previous, block) {
         case (.paragraph, .lists): 8
         case (.heading, .paragraph): 16
-        default: ChatTranscriptMetrics.blockSpacing
+        default: ConversationTranscriptMetrics.blockSpacing
         }
     }
 
@@ -537,7 +537,7 @@ private struct MarkdownRenderBlockView: View {
                     font: MarkdownText.bodyFont,
                     color: textColor.uiColor,
                     lineSpacing: 1,
-                    paragraphSpacing: ChatTranscriptMetrics.blockSpacing
+                    paragraphSpacing: ConversationTranscriptMetrics.blockSpacing
                 )
             )
         case .block(let block):

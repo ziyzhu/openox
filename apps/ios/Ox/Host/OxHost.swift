@@ -11,7 +11,7 @@ nonisolated struct HostChatSummary: Sendable {
 
 @MainActor
 protocol OxHost: AnyObject {
-    var chats: ConversationManager { get }
+    var conversations: ConversationManager { get }
     var services: ServiceManager { get }
 
     func listChats() -> [HostChatSummary]

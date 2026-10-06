@@ -736,7 +736,7 @@ final class Conversation: Identifiable {
     }
     private(set) var lastActivityAt: Date?
 
-    @ObservationIgnored weak var chatManager: ConversationManager?
+    @ObservationIgnored weak var conversationManager: ConversationManager?
     @ObservationIgnored var onPersistableChange: (() -> Void)?
     @ObservationIgnored var onPrivateDataTemporaryContinuation: ((ChatContinuation) -> Void)?
 
@@ -1140,17 +1140,24 @@ final class Conversation: Identifiable {
         )
     }
 
-    func executionInvocations() -> [Invocation] {
-        guard case let .agent(turn, _) = document.turns.last else { return [] }
+    private var runningExecution: Execution? {
+        guard case let .agent(turn, _) = document.turns.last else { return nil }
         for step in turn.steps.reversed() {
             guard case let .execute(execution) = step.kind else { continue }
-            guard execution.outcome == .running else { return [] }
-            return execution.effects.compactMap {
-                if case let .invocation(invocation) = $0 { return invocation }
-                return nil
-            }
+            return execution.outcome == .running ? execution : nil
         }
-        return []
+        return nil
+    }
+
+    func executionInvocations() -> [Invocation] {
+        runningExecution?.effects.compactMap {
+            if case let .invocation(invocation) = $0 { return invocation }
+            return nil
+        } ?? []
+    }
+
+    func executionOmittedInvocations() -> Int {
+        runningExecution?.invocationTrace?.omittedCalls ?? 0
     }
 
     func executionActivatedSkills() -> [ActivatedSkillContext] {
@@ -1502,9 +1509,9 @@ final class Conversation: Identifiable {
     func appendInvocation(name: String, purpose: String, args: JSONValue) -> UUID {
         ensureExecutionContext()
         let invocation = Invocation(name: name, purpose: purpose, args: args)
-        document.apply(.appendInvocation(invocation))
-        activeRun?.backgroundExecution?.updateStep(purpose)
-        Log.session.info("Chat.invocation appended id=\(invocation.id) name=\(name) purpose=\(purpose)")
+        document.apply(.recordInvocation(invocation))
+        activeRun?.backgroundExecution?.updateStep(InvocationPreview.text(purpose).value)
+        Log.session.info("Chat.invocation appended id=\(invocation.id) name=\(name)")
         return invocation.id
     }
 
@@ -1629,8 +1636,8 @@ final class Conversation: Identifiable {
                 purpose: purpose
             )
             let (value, effect) = try await body()
-            resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             apply(effect)
+            resolveInvocation(invocationID: invocationID, outcome: .succeeded(Self.outcomeValue(value)))
             if standalone { finishStandaloneExecution() }
             return value
         } catch {
@@ -1781,7 +1788,7 @@ final class Conversation: Identifiable {
         let text = replacingText ?? cut.text
         Log.session.info("Chat.rerun id=\(id) at=\(blockId) cutEntry=\(cut.cutEntry) edited=\(replacingText != nil)")
         cancelAll()
-        guard let branched = chatManager?.branch(from: self, atBlock: blockId, submit: false) else { return nil }
+        guard let branched = conversationManager?.branch(from: self, atBlock: blockId, submit: false) else { return nil }
         return branched.enqueue(
             text,
             attachments: cut.attachments,
@@ -1988,7 +1995,14 @@ final class Conversation: Identifiable {
         }
     }
 
-    private func enqueueSystemEvent(_ note: String, source: SystemEventSource) {
+    private func enqueueSystemEvent(_ event: JSONValue, source: SystemEventSource) {
+        let note: String
+        do {
+            note = try ModelPromptRenderer.shared.render(.runtimeEvent, input: event)
+        } catch {
+            Log.session.error("Chat.enqueueSystemEvent rendering failed id=\(id) source=\(source.logLabel) error=\(error.localizedDescription)")
+            return
+        }
         Log.session.info("Chat.enqueueSystemEvent id=\(id) source=\(source.logLabel) queueDepth=\(submissions.count)")
         notice = .none
         let submissionID = SubmissionID()
@@ -2020,9 +2034,8 @@ final class Conversation: Identifiable {
         let ok = service.signInState.isAuthenticated
         Log.session.info("Chat.signInService done id=\(id) domain=\(domain) ok=\(ok) auth=\(service.signInState.rawValue)")
         if ok, resumeAgent {
-            let outcome = service.isMCPService ? "authorized" : "signed in to"
             enqueueSystemEvent(
-                "[system] The user just \(outcome) \(domain). Continue the task that needed it.",
+                .object(["type": .string("serviceSignIn"), "domain": .string(domain), "authorized": .bool(service.isMCPService)]),
                 source: .serviceSignIn(domain)
             )
         }
@@ -2060,7 +2073,7 @@ final class Conversation: Identifiable {
             let data = try? JSONEncoder().encode(args)
             let argsText = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             enqueueSystemEvent(
-                "[system] The user just completed bot control for \(domain) with args \(argsText). Continue the task. The verification page may already have completed the operation, so inspect its resulting state before retrying a write.",
+                .object(["type": .string("botControl"), "domain": .string(domain), "argsJSON": .string(argsText)]),
                 source: .botControl(domain)
             )
         }
@@ -2332,9 +2345,9 @@ final class Conversation: Identifiable {
     }
 
     private func waitUntilProfilePrepared(runID: RunID) async {
-        guard let chatManager else { return }
+        guard let conversationManager else { return }
         let startedAt = Date()
-        await chatManager.profilePreparation()
+        await conversationManager.profilePreparation()
         let waitedMs = Int(Date().timeIntervalSince(startedAt) * 1_000)
         Log.session.info("Chat.worker profileReady id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) waitedMs=\(waitedMs)")
     }
@@ -2487,7 +2500,9 @@ final class Conversation: Identifiable {
             fileMountPaths: fileMountPaths,
             artifactPaths: referencedArtifacts.map { "artifacts/\($0.fileName)" },
             isTemporary: retention == .temporary,
-            responseLanguage: AppLocale.shared.responseLanguage
+            responseLanguage: AppLocale.shared.responseLanguage,
+            hostID: "ios:\(Device.id)",
+            profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
         )
         submission.latency.mark(.promptReady)
         let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
@@ -2742,7 +2757,7 @@ final class Conversation: Identifiable {
         return AgentConfiguration(
             client: client,
             model: model,
-            promptState: ChatPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory),
+            promptState: ChatPromptState.system(soul: Soul.shared.directive, memory: systemPromptMemory, hostID: "ios:\(Device.id)", profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
             tools: [ConversationTool(chat: self)],
             streamOptions: StreamOptions(sessionID: chatID.uuidString),
             transformContext: { request in

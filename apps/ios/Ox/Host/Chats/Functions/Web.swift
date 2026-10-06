@@ -1,5 +1,11 @@
 import Foundation
 
+nonisolated enum WebExecutionLimits {
+    static let maxFetches = 8
+    static let maxTransientAttachments = 4
+    static let maxBytes = 20 * 1_024 * 1_024
+}
+
 extension Conversation {
     public func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue? {
         guard let catalogAction = BrowserFunctionCatalog.action(id: action) else {
@@ -100,22 +106,22 @@ extension Conversation {
 
     func fetchWebResource(_ request: WebFetchRequest) async throws -> (Int, WebFetchResponse) {
         ensureExecutionContext()
-        guard currentExecutionFetchCount < 8 else {
+        guard currentExecutionFetchCount < WebExecutionLimits.maxFetches else {
             throw RuntimeError.bridge("ox.web.fetch: one JavaScript execution may fetch at most eight resources")
         }
         let sequence = currentExecutionFetchCount
         currentExecutionFetchCount += 1
         let response = try await WebFetchClient.shared.fetch(request)
         let totalBytes = currentExecutionFetchBytes + response.data.count
-        guard totalBytes <= 20 * 1_024 * 1_024 else { throw WebFetchError.executionTooLarge }
+        guard totalBytes <= WebExecutionLimits.maxBytes else { throw WebFetchError.executionTooLarge }
         currentExecutionFetchBytes = totalBytes
         return (sequence, response)
     }
 
     func appendTransientAttachment(_ attachment: TransientAttachment, sequence: Int? = nil) throws {
-        guard currentExecutionTransientAttachments.count < 4 else { throw WebAttachmentError.tooMany }
+        guard currentExecutionTransientAttachments.count < WebExecutionLimits.maxTransientAttachments else { throw WebAttachmentError.tooMany }
         let totalBytes = currentExecutionTransientAttachments.reduce(attachment.data.count) { $0 + $1.attachment.data.count }
-        guard totalBytes <= 20 * 1_024 * 1_024 else { throw WebAttachmentError.tooLarge }
+        guard totalBytes <= WebExecutionLimits.maxBytes else { throw WebAttachmentError.tooLarge }
         currentExecutionTransientAttachments.append((sequence ?? currentExecutionTransientAttachments.count, attachment))
     }
 

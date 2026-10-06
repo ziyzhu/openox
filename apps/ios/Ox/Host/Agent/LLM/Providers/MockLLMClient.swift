@@ -346,6 +346,10 @@ extension Scenario {
             Entry("92", "Files media — read, analyze, attach, and bound selected-folder content", .filesMedia),
             Entry("93", "provider catalog — add, override, and restore bundled defaults", .providerCatalog),
             Entry("94", "repository conflicts — select and reload an existing Local source", .repositoryConflicts),
+            Entry("99", "Action previews — complete live values and bounded history", .invocationPreview),
+            Entry("100", "payload recovery — read archived results after reopening", .payloadRecovery),
+            Entry("101", "Action trace limits — side effects survive later script failure", .invocationTraceLimits),
+            Entry("102", "MCP previews — complex complete values (local QA server)", .invocationMCPPreview),
         ]),
     ]
 
@@ -977,6 +981,173 @@ extension Scenario {
             return [.say("Truncation lost the execution error."), .stop(.stop)]
         }
         return [.say("Fixed byte and line caps, Unicode boundaries, and full-output recovery passed."), .stop(.stop)]
+    }
+
+    private static let payloadRecoverySource = """
+    const chats = await ox.fs.list({ path: "chats", purpose: "Find the payload proof transcript" });
+    let reference;
+    const visit = value => {
+        if (!value || typeof value !== "object") return;
+        if (value.name === "ox.fs.read" && value.args?.path?.includes("payload-proof-")) {
+            reference = value.outcome?.succeeded?._0?.oxPayload ?? reference;
+        }
+        for (const child of Object.values(value)) visit(child);
+    };
+    for (const item of chats.items) {
+        const transcript = await ox.fs.read({ path: item.path + "/turns.jsonl", purpose: "Find committed payload references" });
+        for (const line of transcript.text.split("\\n").filter(Boolean)) visit(JSON.parse(line));
+    }
+    if (!reference) throw new Error("Missing durable invocation reference");
+    const id = "payload:" + reference.source.sha256 + ":" + reference.offset + ":" + reference.length;
+    const archived = JSON.parse(await ox.output.read({ id, purpose: "Recover the complete archived result" }));
+    if (archived.text !== "药💊".repeat(20000) || archived.truncated) throw new Error("Archived output lost bytes");
+    const files = await ox.fs.list({ path: "artifacts", purpose: "Verify internal payloads stay out of artifacts" });
+    if (files.items.some(item => /payload-[a-f0-9]{64}\\.json$/.test(item.path))) throw new Error("Private payload leaked into artifact list");
+    console.log("File-backed payload bytes, UTF-8 recovery, and hidden archive references passed.");
+    """
+
+    private static let invocationPreviewVerification = """
+    const chats = await ox.fs.list({ path: "chats", purpose: "Find committed preview proofs" });
+    const calls = [], traces = [];
+    const visit = value => {
+        if (!value || typeof value !== "object") return;
+        if (value.name && value.purpose?.includes("preview-proof")) calls.push(value);
+        if (value.invocationTrace) traces.push(value.invocationTrace);
+        for (const child of Object.values(value)) visit(child);
+    };
+    let newest;
+    for (const item of chats.items) {
+        const metadataPath = item.path + (item.path.startsWith("conversations/") ? "/conversation.json" : "/chat.json");
+        const metadata = JSON.parse((await ox.fs.read({ path: metadataPath, purpose: "Find the current preview proof chat" })).text);
+        const at = metadata.lastActivity ?? metadata.createdAt;
+        if (!newest || at > newest.at) newest = { item, at };
+    }
+    const transcript = await ox.fs.read({ path: newest.item.path + "/turns.jsonl", purpose: "Inspect retained preview proofs" });
+    for (const line of (transcript.text ?? "").split("\\n").filter(Boolean)) visit(JSON.parse(line));
+    const bytes = value => unescape(encodeURIComponent(JSON.stringify(value))).length;
+    const writes = calls.filter(call => call.name === "ox.fs.edit");
+    const reads = calls.filter(call => call.name === "ox.fs.read");
+    if (!writes.some(call => call.preview?.argumentsTruncated)) throw new Error("Large arguments were not bounded");
+    if (!reads.some(call => call.preview?.resultTruncated)) throw new Error("Large results were not bounded");
+    if (reads.length < 20 || calls.some(call => bytes(call.args) > 8192 || bytes(call.outcome?.succeeded?._0 ?? null) > 4096)) throw new Error("Preview limits failed");
+    if (!traces.some(trace => trace.previewBytes > 60000) || traces.some(trace => trace.previewBytes > 65536)) throw new Error("Combined preview budget failed");
+    if (JSON.stringify(calls).includes('"oxPayload"')) throw new Error("New diagnostics were archived");
+    console.log("Bounded Action previews, complete live values, and no diagnostic archives passed.");
+    """
+
+    static let invocationPreview = Scenario(name: "invocation-preview") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            const path = "artifacts/preview-proof-" + Date.now() + ".txt";
+            const text = "药💊".repeat(20000);
+            await ox.fs.write({ path, content: text, purpose: "Create preview-proof complete arguments" });
+            const original = (await ox.fs.read({ path: "MEMORY.md", purpose: "Save QA memory before preview proof" })).text;
+            if (typeof original !== "string") throw new Error("QA memory could not be saved");
+            try {
+                await ox.fs.write({ path: "MEMORY.md", content: "preview seed", purpose: "Prepare preview-proof argument fixture" });
+                await ox.fs.edit({ path: "MEMORY.md", edits: [{ oldText: "preview seed", newText: text }], purpose: "Edit preview-proof complete arguments" });
+                if ((await ox.fs.read({ path: "MEMORY.md", purpose: "Verify preview-proof complete edit" })).text !== text) throw new Error("The Action lost complete arguments");
+                const edits = Array.from({ length: 80 }, (_, i) => ({ oldText: "[[" + i + "]]", newText: "a\\u0301\\n\\t\\\"".repeat(30) + i }));
+                await ox.fs.write({ path: "MEMORY.md", content: edits.map(edit => edit.oldText).join("|"), purpose: "Prepare preview-proof wide array" });
+                await ox.fs.edit({ path: "MEMORY.md", edits, purpose: "Edit preview-proof wide arguments" });
+                if ((await ox.fs.read({ path: "MEMORY.md", purpose: "Verify preview-proof complete array" })).text !== edits.map(edit => edit.newText).join("|")) throw new Error("The Action lost array arguments");
+                for (let i = 0; i < 20; i++) {
+                    const result = await ox.fs.read({ path, purpose: "Read preview-proof complete result " + i });
+                    if (result.text !== text || result.truncated) throw new Error("Live JavaScript lost the full result");
+                }
+            } finally {
+                await ox.fs.write({ path: "MEMORY.md", content: original, purpose: "Restore QA memory after preview proof" });
+            }
+            console.log("Live JavaScript received every complete value.");
+            """)]
+        }
+        if ctx.turn == 1 {
+            guard ctx.toolResults.last?.isError == false else {
+                let failure = ctx.resultText("execute") ?? ""
+                return [.say("Action preview execution failed: \(failure)"), .stop(.stop)]
+            }
+            return [execute(invocationPreviewVerification)]
+        }
+        let result = ctx.resultText("execute") ?? ""
+        return [.say(ctx.toolResults.last?.isError == false && result.contains("no diagnostic archives passed")
+            ? "Bounded Action previews and complete live values passed." : "Action preview proof failed: \(result)"), .stop(.stop)]
+    }
+
+    static let invocationTraceLimits = Scenario(name: "invocation-trace-limits") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            const path = "artifacts/trace-count-proof-" + Date.now() + ".txt";
+            await ox.fs.write({ path, content: "side effect survived", purpose: "Create trace-count-proof side effect" });
+            for (let i = 0; i < 260; i++) {
+                const value = await ox.fs.read({ path, purpose: "Read trace-count-proof " + i });
+                if (value.text !== "side effect survived") throw new Error("An omitted Action did not execute");
+            }
+            throw new Error("EXPECTED_AFTER_ACTION");
+            """)]
+        }
+        if ctx.turn == 1 {
+            let failure = ctx.resultText("execute") ?? ""
+            guard ctx.toolResults.last?.isError == true, failure.contains("EXPECTED_AFTER_ACTION"),
+                  failure.contains("5 additional calls were not retained") else {
+                return [.say("Action trace proof lost the later script failure."), .stop(.stop)]
+            }
+            return [execute("""
+            const files = await ox.fs.list({ path: "artifacts", purpose: "Find the trace-count-proof artifact" });
+            const file = files.items.find(item => item.path.includes("trace-count-proof-"));
+            if (!file || (await ox.fs.read({ path: file.path, purpose: "Verify the completed side effect" })).text !== "side effect survived") throw new Error("Completed side effect was lost");
+            const chats = await ox.fs.list({ path: "chats", purpose: "Find committed Action count proofs" });
+            let proof;
+            const visit = value => {
+                if (!value || typeof value !== "object") return;
+                if (value.invocationTrace?.omittedCalls >= 5 && JSON.stringify(value).includes("trace-count-proof")) proof = value;
+                for (const child of Object.values(value)) visit(child);
+            };
+            let newest;
+            for (const item of chats.items) {
+                const metadataPath = item.path + (item.path.startsWith("conversations/") ? "/conversation.json" : "/chat.json");
+                const metadata = JSON.parse((await ox.fs.read({ path: metadataPath, purpose: "Find the current count proof chat" })).text);
+                const at = metadata.lastActivity ?? metadata.createdAt;
+                if (!newest || at > newest.at) newest = { item, at };
+            }
+            const transcript = await ox.fs.read({ path: newest.item.path + "/turns.jsonl", purpose: "Inspect Action trace count limits" });
+            for (const line of (transcript.text ?? "").split("\\n").filter(Boolean)) visit(JSON.parse(line));
+            const calls = proof?.effects?.filter(effect => effect.type === "invocation").map(effect => effect.invocation) ?? [];
+            if (!proof || calls.length !== 256 || proof.invocationTrace.recordedCalls !== 256 || !calls.some(call => call.name === "ox.fs.write" && call.outcome?.succeeded)) throw new Error("Bounded trace lost completed Actions");
+            console.log("Action count limits, complete execution, and side effects before script failure passed.");
+            """)]
+        }
+        let result = ctx.resultText("execute") ?? ""
+        return [.say(ctx.toolResults.last?.isError == false && result.contains("side effects before script failure passed")
+            ? "Bounded Action count and later script failure passed." : "Action count proof failed: \(result)"), .stop(.stop)]
+    }
+
+    static let invocationMCPPreview = Scenario(name: "invocation-mcp-preview") { ctx in
+        if ctx.turn == 0 {
+            return [execute("""
+            const service = await ox.service.create({ kind: "mcp", endpoint: "http://127.0.0.1:8102/mcp", transport: "streamable-http", purpose: "Connect the local diagnostic QA server" });
+            await ox.service.attach({ domain: service.domain, purpose: "Attach the local diagnostic QA server" });
+            let deep = { value: "deep value survived" };
+            for (let i = 0; i < 20; i++) deep = { child: deep };
+            const payload = { text: "药💊".repeat(20000), deep, wide: Array.from({ length: 300 }, (_, id) => ({ id })), escapes: "\\n\\t\\\"\\\\".repeat(3000), marker: { oxPayload: "ordinary user data" } };
+            payload["k".repeat(10000)] = "long key survived";
+            const result = await ox.service.invoke({ name: "mcp:" + service.domain + ":echo", input: payload, purpose: "Echo complex complete diagnostic values" });
+            let leaf = result.deep;
+            for (let i = 0; i < 20; i++) leaf = leaf.child;
+            if (result.text !== payload.text || leaf.value !== "deep value survived" || result.wide.length !== 300 || result.wide[299].id !== 299 || result.escapes !== payload.escapes || result.marker.oxPayload !== "ordinary user data" || result["k".repeat(10000)] !== "long key survived") throw new Error("Diagnostic previews changed live MCP values");
+            await ox.service.detach({ domain: service.domain, purpose: "Detach the local diagnostic QA server" });
+            console.log("Complete MCP deep JSON, wide arrays, long keys, Unicode, and escapes passed.");
+            """)]
+        }
+        let result = ctx.resultText("execute") ?? ""
+        return [.say(ctx.toolResults.last?.isError == false && result.contains("Unicode, and escapes passed")
+            ? "Complete MCP values and bounded diagnostic previews passed." : "MCP preview proof failed: \(result)"), .stop(.stop)]
+    }
+
+    static let payloadRecovery = Scenario(name: "payload-recovery") { ctx in
+        if ctx.turn == 0 { return [execute(payloadRecoverySource)] }
+        let result = ctx.resultText("execute") ?? ""
+        return [.say(ctx.toolResults.last?.isError == false && result.contains("hidden archive references passed")
+            ? "Reopened file-backed payload recovery passed." : "Payload recovery failed: \(result)"), .stop(.stop)]
     }
 
     static let artifactWorkflow = Scenario(name: "artifact") { ctx in

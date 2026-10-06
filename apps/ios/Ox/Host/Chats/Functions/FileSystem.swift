@@ -24,7 +24,7 @@ extension Conversation {
                     fileSystemItem(path: "artifacts", type: "directory", size: nil),
                     fileSystemItem(path: "skills", type: "directory", size: nil),
                     fileSystemItem(path: "services", type: "directory", size: nil),
-                    fileSystemItem(path: "chats", type: "directory", size: nil),
+                    fileSystemItem(path: "conversations", type: "directory", size: nil),
                 ]
                 if self.attachedServices.contains(where: { $0.domain == "ios:files" }) {
                     rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
@@ -80,17 +80,17 @@ extension Conversation {
                 }
             case .chats:
                 items = await fileSystemChatSummaries().map {
-                    fileSystemItem(path: "chats/\(ChatID($0.id))", type: "directory", size: nil)
+                    fileSystemItem(path: "conversations/\(ChatID($0.id))", type: "directory", size: nil)
                 }
             case .chat(let id):
                 let sizes = try await repository.virtualChatFileSizes(
                     id,
                     in: scope,
-                    snapshot: chatManager?.readableChatState(id, in: scope)
+                    snapshot: conversationManager?.readableChatState(id, in: scope)
                 )
                 items = [
-                    fileSystemItem(path: "chats/\(id)/chat.json", type: "file", size: sizes.metadata),
-                    fileSystemItem(path: "chats/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
+                    fileSystemItem(path: "conversations/\(id)/conversation.json", type: "file", size: sizes.metadata),
+                    fileSystemItem(path: "conversations/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
                 ]
             case .files:
                 items = DeviceFolderStore.shared.grants.map {
@@ -116,16 +116,16 @@ extension Conversation {
     }
 
     private func virtualChatMetadata(_ id: ChatID) async throws -> Data {
-        try await repository.virtualChatMetadata(id, in: scope, snapshot: chatManager?.readableChatState(id, in: scope))
+        try await repository.virtualChatMetadata(id, in: scope, snapshot: conversationManager?.readableChatState(id, in: scope))
     }
 
     private func virtualChatTranscript(_ id: ChatID) async throws -> Data {
-        try await repository.virtualChatTranscript(id, in: scope, snapshot: chatManager?.readableChatState(id, in: scope))
+        try await repository.virtualChatTranscript(id, in: scope, snapshot: conversationManager?.readableChatState(id, in: scope))
     }
 
     private func fileSystemChatSummaries() async -> [ChatMeta] {
         let saved = await repository.chatSummaries(in: scope)
-        let loaded = chatManager?.readableChatSummaries(in: scope) ?? []
+        let loaded = conversationManager?.readableChatSummaries(in: scope) ?? []
         return Array(Dictionary(saved.map { ($0.id, $0) } + loaded.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest }).values)
     }
 
@@ -323,7 +323,7 @@ extension Conversation {
             let limit = fileSystemInt(options, key: "limit", default: 100, minimum: 1, maximum: 200)
             var allPaths = try await fileSystemPaths(for: base)
             if base == .root {
-                allPaths.removeAll { $0.hasPrefix("chats/") }
+                allPaths.removeAll { $0.hasPrefix("conversations/") }
             }
             let candidates: [String]
             if try await self.fileSystemIsDirectory(base) {
@@ -562,9 +562,9 @@ extension Conversation {
             let unsupported: String?
             switch media.kind {
             case .image:
-                unsupported = "Use ox.vision.analyze({ source: \"\(location.path)\", purpose }) for local OCR, or ox.fs.attach({ path: \"\(location.path)\", purpose }) when original pixels are needed."
+                unsupported = try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(location.path)]))
             case .file:
-                unsupported = "This file type can't be read as text or attached. Convert it to a supported text, image, or PDF format first."
+                unsupported = ModelGuidance.text("file.conversion")
             default:
                 unsupported = result.unsupported
             }
@@ -703,7 +703,7 @@ extension Conversation {
             return [base.path]
         case .chat(let id):
             _ = try await virtualChatMetadata(id)
-            return ["chats/\(id)/chat.json", "chats/\(id)/turns.jsonl"]
+            return ["conversations/\(id)/conversation.json", "conversations/\(id)/turns.jsonl"]
         case .chatMetadata, .chatTurns:
             return [base.path]
         case .skill(let name):
@@ -752,8 +752,8 @@ extension Conversation {
 
     private func chatFileSystemPaths() async -> [String] {
         await fileSystemChatSummaries().flatMap { summary -> [String] in
-            let directory = "chats/\(ChatID(summary.id))"
-            return ["\(directory)/chat.json", "\(directory)/turns.jsonl"]
+            let directory = "conversations/\(ChatID(summary.id))"
+            return ["\(directory)/conversation.json", "\(directory)/turns.jsonl"]
         }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
