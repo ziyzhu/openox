@@ -627,7 +627,7 @@ struct ConversationPage: View {
         .onChange(of: showsComposer) { _, visible in
             if !visible { composerFocused = false }
         }
-        .onChange(of: conversation.id) { _, _ in
+        .onChange(of: ObjectIdentifier(conversation)) { _, _ in
             sendHandoff = .idle
             scroller.endSendHandoff()
             speechInput.cancel(reason: "chatChanged")

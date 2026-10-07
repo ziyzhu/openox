@@ -339,7 +339,7 @@ private struct SplitSidebarResizer: View {
 
 private struct ComposerFocusRequest: Equatable {
     let id = UUID()
-    let conversationID: UUID
+    let conversationIdentity: ObjectIdentifier
     let reason: String
 }
 
@@ -832,7 +832,7 @@ struct RootView: View {
                !compactChatTransition.isClosing,
                pendingChatPresentationId == nil || pendingChatPresentationId == conversation.id {
                 ConversationPage(conversation: conversation,
-                         composerFocusRequestID: composerFocusRequest?.conversationID == conversation.id
+                         composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
                              : nil,
                          onComposerFocusRequestHandled: handleComposerFocusRequest,
@@ -853,7 +853,7 @@ struct RootView: View {
                         conversation.setTranscriptVisible(scenePhase == .active)
                     }
                     .onDisappear { conversation.setTranscriptVisible(false) }
-                    .id(conversation.id)
+                    .id(ObjectIdentifier(conversation))
             }
 
             if conversations.current == nil
@@ -985,7 +985,7 @@ struct RootView: View {
     }
 
     private func requestComposerFocus(for conversation: Conversation, reason: String) {
-        let request = ComposerFocusRequest(conversationID: conversation.id, reason: reason)
+        let request = ComposerFocusRequest(conversationIdentity: ObjectIdentifier(conversation), reason: reason)
         composerFocusRequest = request
         Log.ui.info("ChatUX.intent conversation=\(conversation.id) kind=focusRequest phase=requested request=\(request.id) reason=\(reason)")
     }
