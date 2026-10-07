@@ -51,15 +51,28 @@ address explicitly:
 ox --host ws://<phone-name>.<tailnet>.ts.net:9876 host describe
 ```
 
-Debug and Release builds use the same JSON-RPC 2.0 WebSocket API and network
-restrictions. The Host listens only on its configured Tailscale VPN interface
-and local addresses; missing or ambiguous VPN ingress disables networking.
-Tailscale grants control access. There is no separate Ox pairing credential,
-LAN, public-internet, loopback, or USB-forwarding fallback. Browser-origin
-handshakes are rejected. Turning off Allow connections closes existing Clients.
+All builds use the same JSON-RPC 2.0 WebSocket API. Physical-device and Release
+Hosts listen only on their configured Tailscale VPN interface and addresses;
+missing or ambiguous VPN ingress disables networking. Tailscale grants control
+access. There is no separate Ox pairing credential, LAN, public-internet, or
+USB-forwarding fallback. Browser-origin handshakes are rejected. Turning off
+Allow connections closes existing Clients.
 
-Port 9876 is the default. A launch endpoint can override the port, not the
-interface. Simulator Hosts have the same ingress requirements.
+Debug Simulator builds can explicitly opt into local development access:
+
+```sh
+sim --device ox-3 run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios \
+  --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9103 --env OX_HOST_LOOPBACK=1
+ox --host ws://127.0.0.1:9103 host describe
+```
+
+Allow connections must still be enabled. This launch-only mode binds exclusively
+to `127.0.0.1`, trusts local processes, and requires no Tailscale. The loopback code
+is compiled out on physical devices and Release builds. Relaunch without the flag
+to restore Tailscale-only access. Use a dedicated QA simulator, not personal state.
+
+Port 9876 is the default. `OX_HOST_ENDPOINT`/`OX_DEBUG_ENDPOINT` can override the
+port; only `OX_HOST_LOOPBACK=1` selects Debug Simulator loopback.
 
 ```sh
 ox host list
@@ -85,7 +98,7 @@ ox host logs --level warning
 Global flags are position-independent. Without `--chat`, live commands use the
 Host's active chat. `--host` defaults to `OX_HOST_ENDPOINT`, then compatibility
 `OX_DEBUG_ENDPOINT`, then `ws://127.0.0.1:9876`. That legacy loopback default
-cannot reach an iOS Host under the Tailscale policy.
+works only with an explicitly opted-in Debug Simulator Host on that port.
 
 Connections are scoped to the Profile present when they connect; reconnect
 after switching Profiles. `--repository` never selects a Host's live runtime.
@@ -173,8 +186,8 @@ never embed credentials in URLs.
 
 ## Troubleshooting
 
-For connection failures, check Tailscale, foreground Host availability, Allow
-connections, and the selected endpoint. Complete sign-in and human verification
+For connection failures, check foreground Host availability, Allow connections,
+the selected endpoint, and Tailscale or the explicit Debug Simulator loopback opt-in. Complete sign-in and human verification
 through the Host's UI. If a changed service stays cached, refresh its repository
 source and run `ox host service sync`.
 

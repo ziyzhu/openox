@@ -6,12 +6,13 @@ import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 
 const config = qaCommand({
-  usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>]
+  usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>] [--loopback]
 Reserve the device and prepare the common QA state first. Host connections must already be enabled.
 Builds/launches the app and runs a temporary Mock chat. Never resets app data or changes credentials/settings.
+--loopback opts this Debug Simulator launch into localhost Host access; other launches remain Tailscale-only.
 Evidence stays outside the repository.`,
   options: {
-    host: { type: "string" }, bundle: { type: "string" }, output: { type: "string" },
+    host: { type: "string" }, bundle: { type: "string" }, output: { type: "string" }, loopback: { type: "boolean" },
   },
 });
 if (!config.values.device) throw new Error("Pass --device ox-N explicitly after reserving the simulator");
@@ -20,6 +21,9 @@ const endpoint = config.values.host ?? config.debugEndpoint;
 const url = new URL(endpoint);
 if (!["ws:", "wss:"].includes(url.protocol) || Number(url.port) !== config.debugPort) {
   throw new Error(`Use this simulator's Host on port ${config.debugPort}; do not target another device`);
+}
+if (config.values.loopback && (url.protocol !== "ws:" || url.hostname !== "127.0.0.1")) {
+  throw new Error("Debug Simulator loopback requires ws://127.0.0.1 on this simulator's assigned port");
 }
 const localConfig = await Bun.file(join(ROOT, "apps/ios/Local.xcconfig")).text().catch(() => "");
 const bundle = config.values.bundle ?? Bun.env.OX_BUNDLE_ID
@@ -55,7 +59,7 @@ async function waitForHost(): Promise<void> {
     try { await ox("host", "describe", "--timeout", "1000"); return; } catch {}
     await Bun.sleep(200);
   }
-  throw new Error(`Host unavailable at ${endpoint}; enable Host connections in Ox and pass --host for VPN ingress`);
+  throw new Error(`Host unavailable at ${endpoint}; enable Host connections and use --loopback for Debug Simulator localhost or --host for Tailscale ingress`);
 }
 
 const release = claimSimulator(config.device);
@@ -77,14 +81,16 @@ try {
   const build = await run([
     "sim", "--device", config.device, "run", bundle,
     "--project", "apps/ios/Ox.xcodeproj", "--scheme", "ios", "--configuration", "Debug", "--force",
-    "--env", `OX_DEBUG_ENDPOINT=${endpoint}`,
+    "--env", `OX_DEBUG_ENDPOINT=${endpoint}`, "--env", `OX_HOST_LOOPBACK=${config.values.loopback ? "1" : "0"}`,
   ], { capture: true });
   await writeFile(join(evidence, "build.json"), build.stdout, { mode: 0o600 });
   await waitForHost();
   const rows = await ox("chat", "list", "--active") as Array<{ id: string }>;
   previousChat = rows[0]?.id;
   const created = await ox("chat", "new", "--temporary", "--provider", "mock", "--model", "mock");
-  if (typeof created.chatId !== "string") throw new Error("Host did not return a temporary chat ID");
+  if (typeof created.chatId !== "string" || !created.chatId || created.temporary !== true || created.model !== "mock:mock") {
+    throw new Error("Host did not return the requested temporary Mock chat");
+  }
   chatId = created.chatId;
   const outcome = await ox("--chat", chatId!, "chat", "send", "2", "--timeout", "60000");
   if (outcome.outcome !== "completed" || outcome.text !== "Sorry that took a moment.") {

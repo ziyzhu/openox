@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
 
-async function ios(args: string[], state = "Booted", launchFails = false) {
+async function ios(args: string[], state = "Booted", launchFails = false, temporary = true) {
   const directory = await mkdtemp(join(tmpdir(), "openox-ios-ci-e2e-"));
   const trace = join(directory, "calls.jsonl");
   try {
@@ -28,7 +28,7 @@ appendFileSync(Bun.env.IOS_TRACE, JSON.stringify(["ox", ...args.slice(1)]) + "\\
 const command = args[args.indexOf("chat") + 1];
 const text = "Sorry that took a moment.";
 const snapshot = { id: "fixture-chat", model: { id: "mock" }, isBusy: false, messages: [{ content: text }] };
-const result = command === "list" ? [] : command === "new" ? { chatId: "fixture-chat" }
+const result = command === "list" ? [] : command === "new" ? { chatId: "fixture-chat", temporary: Bun.env.IOS_TEMPORARY === "true", model: "mock:mock" }
   : command === "send" ? { outcome: "completed", text } : command === "inspect" ? snapshot : {};
 console.log(JSON.stringify(result));
 `);
@@ -38,7 +38,7 @@ console.log(JSON.stringify(result));
     const child = Bun.spawn([join(directory, "bun"), "run", "--cwd", ROOT, "ci:ios", ...args], {
       cwd: directory, env: { ...Bun.env, PATH: `${directory}:${Bun.env.PATH}`, TMPDIR: directory,
         OX_QA_DEVICE: "", OX_BUNDLE_ID: "ai.openox.local", IOS_TRACE: trace,
-        IOS_INVENTORY: JSON.stringify(inventory), IOS_LAUNCH_FAIL: String(launchFails) },
+        IOS_INVENTORY: JSON.stringify(inventory), IOS_LAUNCH_FAIL: String(launchFails), IOS_TEMPORARY: String(temporary) },
       stdout: "pipe", stderr: "pipe",
     });
     const [code, stdout, stderr] = await Promise.all([
@@ -52,7 +52,7 @@ console.log(JSON.stringify(result));
 }
 
 test("iOS CI requires an explicit valid target and does not provision missing devices", async () => {
-  for (const args of [[], ["--device", "ox-6"], ["--device", "ox-5", "--host", "ws://127.0.0.1:9876"]]) {
+  for (const args of [[], ["--device", "ox-6"], ["--device", "ox-5", "--host", "ws://127.0.0.1:9876"], ["--device", "ox-5", "--loopback", "--host", "ws://100.64.0.1:9105"]]) {
     const result = await ios(args);
     expect(result.code).toBe(1);
     expect(result.calls).toEqual([]);
@@ -75,12 +75,22 @@ test("iOS CI build failures preserve data/settings and restore prior boot state"
 });
 
 test("iOS CI orchestrates a Mock smoke against stubbed sim/Ox commands", async () => {
-  const result = await ios(["--device", "ox-5"]);
-  expect(result.code).toBe(0);
-  expect(result.stdout).toContain("PASS iOS build, launch, Mock reply");
-  expect(result.calls).toContainEqual(["--device", "ox-5", "wait", "--id", "chat.message.agent", "--timeout", "10000"]);
-  expect(result.calls.some(call => call[0] === "ox" && call.includes("mock") && call.includes("--temporary"))).toBe(true);
-  expect(result.calls.some(call => call.includes("screenshot"))).toBe(true);
-  expect(result.calls.some(call => call.includes("uninstall") || call.includes("defaults"))).toBe(false);
-  expect(result.calls.some(call => call.includes("shutdown"))).toBe(false);
+  for (const loopback of [false, true]) {
+    const result = await ios(["--device", "ox-5", ...(loopback ? ["--loopback"] : [])]);
+    expect(result.code).toBe(0);
+    expect(result.calls.some(call => call.includes(`OX_HOST_LOOPBACK=${loopback ? "1" : "0"}`))).toBe(true);
+    expect(result.stdout).toContain("PASS iOS build, launch, Mock reply");
+    expect(result.calls).toContainEqual(["--device", "ox-5", "wait", "--id", "chat.message.agent", "--timeout", "10000"]);
+    expect(result.calls.some(call => call[0] === "ox" && call.includes("mock") && call.includes("--temporary"))).toBe(true);
+    expect(result.calls.some(call => call.includes("screenshot"))).toBe(true);
+    expect(result.calls.some(call => call.includes("uninstall") || call.includes("defaults"))).toBe(false);
+    expect(result.calls.some(call => call.includes("shutdown"))).toBe(false);
+  }
+});
+
+test("iOS CI refuses a non-temporary chat before submitting a model prompt", async () => {
+  const result = await ios(["--device", "ox-5", "--loopback"], "Booted", false, false);
+  expect(result.code).toBe(1);
+  expect(result.stderr).toContain("requested temporary Mock chat");
+  expect(result.calls.some(call => call.includes("send"))).toBe(false);
 });

@@ -16,7 +16,7 @@ final class WebSocketOxHostTransport {
     private struct Client {
         let connection: NWConnection
         let scope: ProfileScope?
-        let ingress: TailscaleHostIngress
+        let ingress: HostTransportIngress
         let address: String
         var pending = 0
     }
@@ -29,7 +29,7 @@ final class WebSocketOxHostTransport {
     private var monitor: NWPathMonitor?
     private var addressPoll: DispatchSourceTimer?
     private var path: NWPath?
-    private var ingress: TailscaleHostIngress?
+    private var ingress: HostTransportIngress?
     private var listeners: [String: NWListener] = [:]
     private var connections: [ObjectIdentifier: Client] = [:]
 
@@ -50,7 +50,7 @@ final class WebSocketOxHostTransport {
     private func start() {
         guard access.enabled, prepared, UIApplication.shared.applicationState == .active,
               monitor == nil else { return }
-        let monitor = NWPathMonitor(requiredInterfaceType: .other)
+        let monitor = HostTransportIngress.pathMonitor()
         self.monitor = monitor
         monitor.pathUpdateHandler = { [weak self, weak monitor] path in
             Task { @MainActor in
@@ -72,12 +72,12 @@ final class WebSocketOxHostTransport {
         addressPoll = poll
         poll.resume()
         monitor.start(queue: queue)
-        Log.app.info("WebSocketOxHostTransport waiting for Tailscale port=\(port)")
+        Log.app.info("WebSocketOxHostTransport starting mode=\(HostTransportIngress.loopbackEnabled ? "debug-simulator-loopback" : "tailscale") port=\(port)")
     }
 
     private func refreshIngress() {
         guard let path, UIApplication.shared.applicationState == .active else { return }
-        let next = TailscaleHostIngress.current(on: path)
+        let next = HostTransportIngress.current(on: path)
         guard next != ingress else { return }
         closeListeners()
         ingress = next
@@ -88,7 +88,7 @@ final class WebSocketOxHostTransport {
         for address in next.addresses { listen(on: address, ingress: next) }
     }
 
-    private func listen(on address: String, ingress: TailscaleHostIngress) {
+    private func listen(on address: String, ingress: HostTransportIngress) {
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.autoReplyPing = true
         webSocket.maximumMessageSize = 96 * 1024 * 1024
@@ -99,7 +99,7 @@ final class WebSocketOxHostTransport {
             return NWProtocolWebSocket.Response(status: browser ? .reject : .accept, subprotocol: nil)
         }
         let parameters = NWParameters.tcp
-        parameters.requiredInterface = ingress.interface
+        ingress.constrain(parameters)
         parameters.allowLocalEndpointReuse = true
         parameters.requiredLocalEndpoint = .hostPort(host: .init(address), port: port)
         parameters.defaultProtocolStack.applicationProtocols.insert(webSocket, at: 0)
@@ -110,7 +110,7 @@ final class WebSocketOxHostTransport {
                     guard let self, let listener, self.listeners[address] === listener else { return }
                     switch state {
                     case .ready:
-                        Log.app.info("WebSocketOxHostTransport ready interface=\(ingress.interface.name) address=\(address) port=\(self.port)")
+                        Log.app.info("WebSocketOxHostTransport ready mode=\(ingress.description) address=\(address) port=\(self.port)")
                     case .failed(let error):
                         self.closeListeners()
                         Log.app.warning("WebSocketOxHostTransport failed error=\(error.localizedDescription); reopen Ox to retry")
@@ -156,11 +156,11 @@ final class WebSocketOxHostTransport {
 
     private func hasCurrentIngress(_ client: Client) -> Bool {
         guard access.enabled, let path, ingress == client.ingress,
-              TailscaleHostIngress.current(on: path) == client.ingress else { return false }
+              HostTransportIngress.current(on: path) == client.ingress else { return false }
         return client.ingress.accepts(client.connection.currentPath, address: client.address, port: port)
     }
 
-    private func accept(_ connection: NWConnection, ingress: TailscaleHostIngress, address: String) {
+    private func accept(_ connection: NWConnection, ingress: HostTransportIngress, address: String) {
         guard access.enabled, self.ingress == ingress, !listeners.isEmpty, connections.count < 8,
               UIApplication.shared.applicationState == .active else { connection.cancel(); return }
         let key = ObjectIdentifier(connection)
@@ -172,7 +172,7 @@ final class WebSocketOxHostTransport {
                 case .ready:
                     guard self.hasCurrentIngress(client) else { connection.cancel(); return }
                     self.receive(on: connection)
-                    Log.app.info("WebSocketOxHostTransport connected interface=\(ingress.interface.name) clients=\(self.connections.count)")
+                    Log.app.info("WebSocketOxHostTransport connected mode=\(ingress.description) clients=\(self.connections.count)")
                 case .failed, .cancelled: self.connections.removeValue(forKey: key)
                 default: break
                 }
@@ -209,7 +209,7 @@ final class WebSocketOxHostTransport {
                         guard self.connections[key] != nil,
                               UIApplication.shared.applicationState == .active,
                               self.hasCurrentIngress(client) else {
-                            return "Host unavailable; connect Tailscale, open Ox and reconnect"
+                            return "Host unavailable; verify Host access, open Ox and reconnect"
                         }
                         guard client.scope == StorageRoot.currentScope else {
                             return "Profile changed; reconnect before continuing"

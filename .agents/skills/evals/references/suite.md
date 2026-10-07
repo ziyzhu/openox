@@ -10,6 +10,9 @@ Prepare an exclusively owned numbered QA simulator using the normal `sim`
 workflow. Rebuild/install the checkout, use bundled services and a sanitized QA
 Profile, configure a real provider, and enable normal Host access. The runner
 requires an explicit Host and provider/model; it does not provision or enable them.
+For local Debug Simulator access, launch with `--env OX_HOST_LOOPBACK=1` and its
+assigned `OX_DEBUG_ENDPOINT` port, with Allow connections already enabled. Use the
+explicit `ws://127.0.0.1:<port>` Host; physical-device/Release access stays Tailscale-only.
 It refuses an active busy chat or pending prompt but changes the active chat and
 can discard an outgoing temporary chat. Never run against personal working state.
 

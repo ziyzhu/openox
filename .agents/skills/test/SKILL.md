@@ -20,7 +20,7 @@ bun run ci
 bun run ci --standalone-only --out /tmp/ox-cli-artifacts
 bun run test:e2e
 bun run test:logs
-bun run ci:ios --device ox-1
+bun run ci:ios --device ox-1 --loopback
 bun run test:demo --device ox-1
 bun .agents/skills/test/apps/ios/settings.ts --device ox-1 --host <ws-url> --app <Ox.app>
 bun .agents/skills/test/apps/ios/durable-chat.ts --device ox-1 --app <Ox.app> --evidence /tmp/ox-model-qa --models
@@ -65,7 +65,10 @@ changes credentials, or enables Host access.
 
 The bundle comes from `--bundle`, `OX_BUNDLE_ID`, or `apps/ios/Local.xcconfig`.
 The default Host uses the selected device's assigned port; VPN ingress can use
-`--host ws://<simulator-vpn-address>:9101` for ox-1.
+`--host ws://<simulator-vpn-address>:9101` for ox-1. `ci:ios --loopback` explicitly
+opts a Debug Simulator launch into `127.0.0.1`; it still requires Allow connections,
+uses ordinary Host APIs, and is compiled out on physical devices and Release builds.
+The opt-in is launch-only; relaunch without it to restore Tailscale-only networking.
 
 The runner force-builds/installs/launches bundled services through sim, following
 [Apple's Simulator workflow](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices).
@@ -91,7 +94,7 @@ Keep Mock focused on model streaming, tool loops, handoffs, and model-visible co
 
 Built-in guidance boundaries use `bun .agents/skills/test/apps/ios/guidance.ts --device ox-N --host ws://<VPN-address>:<assigned-port> --chat <QA-chat-id>` after installing a fresh build. It verifies read-only documentation, discovery/search, and old-path compatibility without model inference or Profile writes. Mock `72 guidance` covers model-visible loading without skill activation; it is not full workflow verification.
 
-`settings.ts` requires an already reachable Host on the selected simulator's assigned port and an idle saved chat. It exercises language/theme and default/current-model setters, automatic-model reset, and Local repository enablement through `ox`, checks validation and no-op results, relaunches the supplied app to verify persistence, and restores the original preferences and saved chat. It does not enable Host access, change credentials, or reset data. Host ingress failures block live verification; never add a loopback bypass to make the test pass.
+`settings.ts` requires an already reachable Host on the selected simulator's assigned port and an idle saved chat. It exercises language/theme and default/current-model setters, automatic-model reset, and Local repository enablement through `ox`, checks validation and no-op results, relaunches the supplied app to verify persistence, and restores the original preferences and saved chat. It does not enable Host access, change credentials, or reset data. Host ingress failures block live verification. For authorized local QA, launch the Debug Simulator app with `OX_HOST_LOOPBACK=1`; never widen physical-device/Release access or bypass approvals to make a test pass.
 
 `durable-chat.ts --models` uses native Mock scenario `23` through the actual UI without Host ingress. It verifies deferred switches, pending no-ops, Stop/failure cancellation, and the next queued turn's model, then runs `23 defaults` to verify default selection/reset, invalid arguments, current-chat isolation, and restoration. It uses the explicit temporary SQLite fixture and restores the normal launch environment; it does not change provider credentials and restores the original new-chat default. This fixture requires automatic or Mock defaults. Default relaunch checks require the Host-based suite; persisted-chat model reload is not covered.
 

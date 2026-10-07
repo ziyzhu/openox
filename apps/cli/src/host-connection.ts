@@ -127,7 +127,7 @@ export class HostConnection {
 function requestFailure(message: string, sent: boolean): Error {
   return new Error(`${message}. ${sent
     ? "Request outcome unknown; reconnect and inspect state before retrying. This request was not automatically resent."
-    : "Host unavailable; connect Tailscale on both devices, open Ox on the Host device, and check the endpoint and tailnet grants."}`);
+    : "Host unavailable; open Ox, enable Host connections, and check the endpoint and access configuration (Tailscale or opt-in Debug Simulator loopback)."}`);
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {

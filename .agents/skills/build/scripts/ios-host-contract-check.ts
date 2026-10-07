@@ -86,11 +86,19 @@ export async function check(): Promise<string> {
       failures.push(`${path}: Client–Host capabilities must not depend on build or Simulator`);
     }
   }
-  for (const required of ["parameters.requiredInterface = ingress.interface", "parameters.requiredLocalEndpoint = .hostPort", "TailscaleHostIngress.current(on:", "pathUpdateHandler", "self.hasCurrentIngress(client)"]) {
-    if (!webSocketTransport.includes(required)) failures.push(`WebSocket transport must enforce VPN-only ingress (${required})`);
+  for (const required of ["ingress.constrain(parameters)", "parameters.requiredLocalEndpoint = .hostPort", "HostTransportIngress.current(on:", "pathUpdateHandler", "self.hasCurrentIngress(client)"]) {
+    if (!webSocketTransport.includes(required)) failures.push(`WebSocket transport must enforce its selected ingress (${required})`);
   }
-  if (webSocketTransport.includes(".loopback") || webSocketTransport.includes("NWListener(using: parameters, on:")) {
-    failures.push("WebSocket transport must not expose a loopback or unrestricted listener");
+  if (/\.loopback\b/.test(webSocketTransport) || webSocketTransport.includes("NWListener(using: parameters, on:")) {
+    failures.push("WebSocket transport must not select loopback directly or expose an unrestricted listener");
+  }
+  const transportIngress = await readFile(join(ROOT, "apps/ios/Ox/Host/HostTransportIngress.swift"), "utf8");
+  for (const required of ["#if DEBUG && targetEnvironment(simulator)", 'environment["OX_HOST_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleHostIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
+    if (!transportIngress.includes(required)) failures.push(`Host ingress must constrain its opt-in Debug Simulator loopback (${required})`);
+  }
+  const productionIngress = transportIngress.replace(/#if DEBUG && targetEnvironment\(simulator\)[\s\S]*?#endif/g, "");
+  if ([".loopback", '"127.0.0.1"', '"OX_HOST_LOOPBACK"'].some(value => productionIngress.includes(value))) {
+    failures.push("Host loopback must be compiled out of Release and physical-device builds");
   }
   if (app.includes("WebSocketOxHostTransport.configuredPort != nil")) {
     failures.push("Foreground Host access must not require launch configuration");

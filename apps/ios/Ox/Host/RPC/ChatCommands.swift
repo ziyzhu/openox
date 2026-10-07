@@ -104,9 +104,13 @@ extension OxHostProtocol {
         default:
             return reply.failure("provide both providerId and modelId")
         }
-        let chat = conversationManager.startNewChat()
+        var chat = conversationManager.startNewChat()
         if chat.isTemporary != (command.temporary ?? false) {
             conversationManager.toggleTemporaryChat()
+            guard let current = conversationManager.current, current.isTemporary == (command.temporary ?? false) else {
+                return reply.failure("could not create the requested chat mode")
+            }
+            chat = current
         }
         if let selection {
             chat.switchModel(
