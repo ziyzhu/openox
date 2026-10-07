@@ -91,6 +91,15 @@ async function stopWithQueuedInput(chatID: string) {
   await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
   await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
   check(JSON.stringify(await sim("describe")).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
+  const after = (await logs()).slice(before.length);
+  const workers = after.filter(message => message.includes(`Chat.worker start id=${chatID}`));
+  check(workers.length === 2, "Stopped and queued submissions have separate worker owners");
+  const stoppedRun = /run=([A-F0-9]+)/.exec(workers[0]!)?.[1];
+  const nextRun = /run=([A-F0-9]+)/.exec(workers[1]!)?.[1];
+  check(stoppedRun && nextRun && stoppedRun !== nextRun, "Queued input cannot reuse a cancelled worker");
+  const finished = after.findIndex(message => message.includes(`Chat.worker finish id=${chatID} run=${stoppedRun}`));
+  const restarted = after.findIndex(message => message === workers[1]);
+  check(finished >= 0 && finished < restarted, "The cancelled worker drains before queued input starts");
 }
 async function verifyModelChanges(chatID: string) {
   const matches = (messages: string[], text: string) => messages.filter(message => message.includes(text) && message.includes(`id=${chatID}`)).length;

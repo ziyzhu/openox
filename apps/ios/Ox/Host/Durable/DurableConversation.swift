@@ -86,54 +86,44 @@ extension Conversation {
 
     private func executeSubmission(action: String, fields: [String: JSONValue], configuration: AgentConfiguration) async throws -> ConversationRunResult {
         try Task.checkCancellation()
-        guard submissionTask == nil else { throw RuntimeError.bridge("Conversation submission is still running") }
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }
         let cancellation = Mutex(SubmissionCancellation.ready)
-        let task = Task { @MainActor in
-            let result: ConversationRunResult
-            do {
-                let reference = try await prepareDurableConversation(configuration: configuration)
-                try Task.checkCancellation()
-                let request = fields.merging(["action": .string(action), "chatID": .string(route.nativeID.uuidString),
-                                              "reference": reference]) { _, value in value }
-                let response = try await withTaskCancellationHandler {
-                    try await route.session.runtime.command(.object(request))
-                } onCancel: {
-                    cancellation.withLock { state in
-                        guard case .ready = state else { return }
-                        state = .aborting(Task {
-                            do {
-                                _ = try await route.session.runtime.command(.object(["action": .string("abort"),
-                                    "chatID": .string(route.nativeID.uuidString), "reference": reference]))
-                            } catch { Log.agent.error("PiDurable abort failed conversation=\(route.nativeID) error=\(error.localizedDescription)") }
-                        })
-                    }
+        let result: ConversationRunResult
+        do {
+            let reference = try await prepareDurableConversation(configuration: configuration)
+            try Task.checkCancellation()
+            let request = fields.merging(["action": .string(action), "chatID": .string(route.nativeID.uuidString),
+                                          "reference": reference]) { _, value in value }
+            let response = try await withTaskCancellationHandler {
+                try await route.session.runtime.command(.object(request))
+            } onCancel: {
+                cancellation.withLock { state in
+                    guard case .ready = state else { return }
+                    state = .aborting(Task {
+                        do {
+                            _ = try await route.session.runtime.command(.object(["action": .string("abort"),
+                                "chatID": .string(route.nativeID.uuidString), "reference": reference]))
+                        } catch { Log.agent.error("PiDurable abort failed conversation=\(route.nativeID) error=\(error.localizedDescription)") }
+                    })
                 }
-                let status = response.objectValue?["receipt"]?.objectValue?["status"]?.stringValue
-                let failure = await route.session.host.failure(chatID: route.nativeID.uuidString)
-                let outcome: ConversationRunOutcome = Task.isCancelled || failure?.0 == "aborted" ? .aborted : status == "done" ? .completed :
-                    .failed(message: failure?.0 ?? "Durable submission was not answered: \(response.objectValue?["receipt"]?.jsonString() ?? "unknown")", kind: failure?.1 ?? .provider)
-                result = ConversationRunResult(outcome: outcome)
-            } catch {
-                result = ConversationRunResult(outcome: Task.isCancelled ? .aborted :
-                    .failed(message: error.localizedDescription, kind: llmFailureKind(error: error)))
             }
-            let abort = cancellation.withLock { state -> Task<Void, Never>? in
-                let task: Task<Void, Never>? = if case .aborting(let task) = state { task } else { nil }
-                state = .settled
-                return task
-            }
-            await abort?.value
-            await receiveAgentEvent(.runFinished(result))
-            submissionTask = nil
-            return result
+            let status = response.objectValue?["receipt"]?.objectValue?["status"]?.stringValue
+            let failure = await route.session.host.failure(chatID: route.nativeID.uuidString)
+            let outcome: ConversationRunOutcome = Task.isCancelled || failure?.0 == "aborted" ? .aborted : status == "done" ? .completed :
+                .failed(message: failure?.0 ?? "Durable submission was not answered: \(response.objectValue?["receipt"]?.jsonString() ?? "unknown")", kind: failure?.1 ?? .provider)
+            result = ConversationRunResult(outcome: outcome)
+        } catch {
+            result = ConversationRunResult(outcome: Task.isCancelled ? .aborted :
+                .failed(message: error.localizedDescription, kind: llmFailureKind(error: error)))
         }
-        submissionTask = task
-        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
-    }
-
-    func waitForSubmission() async {
-        _ = await submissionTask?.value
+        let abort = cancellation.withLock { state -> Task<Void, Never>? in
+            let task: Task<Void, Never>? = if case .aborting(let task) = state { task } else { nil }
+            state = .settled
+            return task
+        }
+        await abort?.value
+        await receiveAgentEvent(.runFinished(result))
+        return result
     }
 
     func canonicalMessages() async throws -> [Message] {

@@ -27,7 +27,7 @@ extension OxHostProtocol {
 
     @MainActor
     static func releaseDurableTemporaryChat(_ chat: Conversation) async {
-        await chat.waitForSubmission()
+        await chat.waitForRun()
         await DurableChatController.release(chat)
     }
 

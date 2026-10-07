@@ -196,14 +196,13 @@ final class Conversation: Identifiable {
     let scheduledSkillID: UUID?
     let javaScriptOutputs = JavaScriptOutputStore()
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
-    @ObservationIgnored var submissionTask: Task<ConversationRunResult, Never>?
     @ObservationIgnored var preparedConfiguration: AgentConfiguration?
     @ObservationIgnored var durablePreparation: Task<Void, Error>?
     @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int)?
     var conversationReference: DurableConversationReference? { durableRoute?.reference }
 
     func installDurableRoute(_ route: DurableConversationRoute?) throws {
-        guard submissionTask == nil else { throw RuntimeError.bridge("Conversation submission is still running") }
+        guard durableRoute == nil || !isBusy else { throw RuntimeError.bridge("Conversation worker is still running") }
         if let reference = route?.reference {
             guard reference.profileID == scope.profileID else { throw RuntimeError.bridge("Conversation belongs to another Profile") }
             id = reference.compatibilityID.rawValue
@@ -527,7 +526,7 @@ final class Conversation: Identifiable {
             return .idle(hasUnreadResponse ? .unread : .read)
         case .some(let run):
             switch run.phase {
-            case .thinking:
+            case .preparing, .thinking:
                 return .running(.thinking)
             case .streaming, .finishing:
                 return .running(.streaming)
@@ -866,6 +865,7 @@ final class Conversation: Identifiable {
     }
 
     private enum RunPhase: Equatable {
+        case preparing
         case thinking
         case streaming
         case awaiting(Interaction)
@@ -873,6 +873,7 @@ final class Conversation: Identifiable {
 
         var logLabel: String {
             switch self {
+            case .preparing: "preparing"
             case .thinking: "thinking"
             case .streaming: "streaming"
             case .awaiting: "awaiting"
@@ -912,6 +913,11 @@ final class Conversation: Identifiable {
     private var activeRun: Run?
     private var submissions: [Submission] = []
     var isBusy: Bool { activeRun != nil }
+
+    func waitForRun() async {
+        while let run = activeRun { await run.task.value }
+    }
+
     var showsStoppedTurn: Bool {
         guard !isBusy,
               submissions.isEmpty,
@@ -2150,14 +2156,9 @@ final class Conversation: Identifiable {
         for continuation in waiters { continuation.resume(returning: .cancelled) }
         notice = .none
         submissionPresentation = .cancelled
-        submissionTask?.cancel()
         cancelInteractions()
-        let task = activeRun?.task
         let runID = activeRun?.id
-        activeRun?.backgroundExecution?.finish(success: true)
-        finishFinishingDiagnostics(next: "idle")
-        activeRun = nil
-        task?.cancel()
+        activeRun?.task.cancel()
         Log.session.info("Chat.cancelAll id=\(id) run=\(runID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "idle")")
         resetOutputDelivery()
         stopStreamLink()
@@ -2173,11 +2174,11 @@ final class Conversation: Identifiable {
         cancelModelSelectionChange()
         notice = .none
         submissionPresentation = .cancelled
-        submissionTask?.cancel()
+        activeRun?.task.cancel()
         cancelInteractions()
         resetOutputDelivery()
         stopStreamLink()
-        setRunPhase(.thinking)
+        if activeRun?.phase != .preparing { setRunPhase(.thinking) }
     }
 
     private func stageCompletionNotification(assistant: AssistantMessage) {
@@ -2303,7 +2304,7 @@ final class Conversation: Identifiable {
 
     func prepareDurableRecovery() async throws {
         try await durablePreparation?.value
-        await waitForSubmission()
+        if activeRun?.phase != .preparing { await waitForRun() }
         try await freezeMemorySnapshot()
         await Skills.shared.waitUntilCurrent()
         _ = try await prepareDurableConversation(configuration: agentConfiguration(client: client, model: model))
@@ -2317,10 +2318,7 @@ final class Conversation: Identifiable {
         else { document.apply(.beginAgentTurn(at: Date())) }
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer {
-                finishWorker(runID)
-                if !submissions.isEmpty { startWorker() }
-            }
+            defer { finishWorker(runID) }
             do {
                 let result = try await resumeSubmission(submissionID, requestID: requestID)
                 if let error = result.errorMessage, error != "aborted" { notice = .error(error) }
@@ -2339,45 +2337,42 @@ final class Conversation: Identifiable {
     }
 
     private func startWorker() {
-        guard !isBusy else { return }
+        guard !isBusy, !submissions.isEmpty else { return }
         let runID = RunID()
         let queueDepth = submissions.count
+        let submission = submissions.removeFirst()
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { self.finishWorker(runID) }
+            defer { finishWorker(runID) }
             await waitUntilProfilePrepared(runID: runID)
-            await waitForSubmission()
-            while !submissions.isEmpty {
-                if Task.isCancelled { break }
-                var submission = submissions.removeFirst()
-                if submission.needsPosting {
-                    let at = Date()
-                    document.apply(.appendUser(
-                        intent: submission.text,
-                        attachments: submission.attachments,
-                        skillInvocation: submission.skillInvocation,
-                        at: at,
-                        submissionID: submission.id
-                    ))
-                    submission.post()
-                    submission.latency.mark(.posted)
-                    Log.session.info("Chat.submission posted id=\(id) submission=\(submission.id.rawValue)")
-                    markActivity(at)
-                }
-                submission.consume()
-                submission.latency.mark(.consumed)
-                Log.session.info("Chat.worker consume id=\(id) submission=\(submission.id.rawValue)")
-                activeLatency = submission.latency
-                await runOne(submission, runID: runID)
-                activeLatency = nil
-                activeRun?.backgroundExecution?.advance()
+            setRunPhase(.thinking)
+            var submission = submission
+            if submission.needsPosting {
+                let at = Date()
+                document.apply(.appendUser(
+                    intent: submission.text,
+                    attachments: submission.attachments,
+                    skillInvocation: submission.skillInvocation,
+                    at: at,
+                    submissionID: submission.id
+                ))
+                submission.post()
+                submission.latency.mark(.posted)
+                Log.session.info("Chat.submission posted id=\(id) submission=\(submission.id.rawValue)")
+                markActivity(at)
             }
+            submission.consume()
+            submission.latency.mark(.consumed)
+            Log.session.info("Chat.worker consume id=\(id) submission=\(submission.id.rawValue)")
+            activeLatency = submission.latency
+            await runOne(submission, runID: runID)
+            activeLatency = nil
         }
         activeRun = Run(
             id: runID,
             task: task,
-            phase: .thinking,
-            activeSubmission: nil,
+            phase: .preparing,
+            activeSubmission: submission,
             backgroundExecutionExpired: false,
             backgroundExecution: nil,
             completionNotification: nil
@@ -2396,13 +2391,14 @@ final class Conversation: Identifiable {
 
     private func finishWorker(_ runID: RunID) {
         guard let run = activeRun, run.id == runID else { return }
+        defer { if !submissions.isEmpty { startWorker() } }
         let backgroundExecutionExpired = run.backgroundExecutionExpired
         let chatFailed = notice.errorMessage != nil
         let chatSucceeded = !submissionPresentation.isCancelled && notice.errorMessage == nil
         let hasUnreadResult = chatSucceeded || chatFailed
         let leaseSucceeded = !backgroundExecutionExpired
         if chatFailed { run.backgroundExecution?.updatePhase(.failed) }
-        settleModelSelectionChange(runID: runID, succeeded: chatSucceeded && !run.task.isCancelled && submissionTask == nil)
+        settleModelSelectionChange(runID: runID, succeeded: chatSucceeded && !run.task.isCancelled)
         let completionNotification = chatSucceeded ? run.completionNotification : nil
         run.backgroundExecution?.finish(success: leaseSucceeded)
         finishFinishingDiagnostics(next: "idle")
@@ -2503,9 +2499,12 @@ final class Conversation: Identifiable {
                 succeeded: submissionResult?.outcome == .completed && !Task.isCancelled)
             if activeRun?.id == runID { activeRun?.activeSubmission = nil }
         }
-        do { try await freezeMemorySnapshot() }
-        catch {
+        do {
+            try Task.checkCancellation()
+            try await freezeMemorySnapshot()
+        } catch {
             let cancelled = error is CancellationError || submissionPresentation.isCancelled
+            submissionPresentation = cancelled ? .cancelled : .completed
             let message = cancelled ? "aborted" : error.localizedDescription
             Log.session.error("Chat Profile documents unavailable id=\(id) error=\(message)")
             if !cancelled { notice = .error(message) }
@@ -2597,10 +2596,10 @@ final class Conversation: Identifiable {
             Log.session.error("Chat.runOne agent error: \(err)")
             notice = .error(Self.userFacingError(err, kind: failureKind))
         }
-        let outcomeName = if Task.isCancelled {
-            "cancelled"
-        } else if err == "aborted" {
+        let outcomeName = if err == "aborted" {
             "aborted"
+        } else if Task.isCancelled {
+            "cancelled"
         } else if err != nil {
             "error"
         } else {
