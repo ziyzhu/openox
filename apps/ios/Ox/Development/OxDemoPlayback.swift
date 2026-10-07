@@ -23,6 +23,13 @@ nonisolated enum OxDemoChapter: String {
     }
 }
 
+nonisolated struct OxDemoConversation {
+    let prompt: String
+    let domains: [String]
+    let reply: String
+    let progress: [String]
+}
+
 nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
     case connect, memory, planning, publishing, local, offline, yours, providers, reddit, reuse, creative
 
@@ -35,6 +42,9 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
         }
     }
     var isHeading: Bool { [.connect, .local, .yours].contains(self) }
+    var conversation: OxDemoConversation {
+        .init(prompt: prompt, domains: domains, reply: reply, progress: progress)
+    }
     var prompt: String {
         switch self {
         case .memory: "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."
@@ -166,7 +176,7 @@ nonisolated enum OxDemoLaunch {
 @MainActor
 @Observable
 final class OxDemoPlayback {
-    enum Presentation { case storyboard, appStore }
+    enum Presentation { case storyboard, appStore(OxAppStoreScreenshot) }
 
     private let presentation: Presentation
     let services: ServiceManager
@@ -237,8 +247,15 @@ final class OxDemoPlayback {
         }
     }
 
+    var conversation: OxDemoConversation {
+        switch presentation {
+        case .appStore(let screenshot) where screenshot.scene == scene: screenshot.conversation
+        default: scene.conversation
+        }
+    }
+
     var attachedServices: [Service] {
-        (scene.domains + (scene == .reddit && serviceCreated ? ["reddit.com"] : [])).compactMap { catalog[$0] }
+        (conversation.domains + (scene == .reddit && serviceCreated ? ["reddit.com"] : [])).compactMap { catalog[$0] }
     }
 
     func select(_ scene: OxDemoScene) {
@@ -284,16 +301,17 @@ final class OxDemoPlayback {
         stop()
         guard scene != .creative else { return }
         composer.replaceDraft("")
-        if presentation == .storyboard && [.planning, .publishing].contains(scene) {
-            composer.replaceDraft(scene.prompt)
-        } else if !scene.prompt.isEmpty {
+        let conversation = self.conversation
+        if case .storyboard = presentation, [.planning, .publishing].contains(scene) {
+            composer.replaceDraft(conversation.prompt)
+        } else if !conversation.prompt.isEmpty {
             sent = true
-            reply = scene.reply
-            if !scene.progress.isEmpty {
+            reply = conversation.reply
+            if !conversation.progress.isEmpty {
                 let now = Date()
-                thinkingStartedAt = now.addingTimeInterval(-Double(scene.progress.count) * 1.6)
+                thinkingStartedAt = now.addingTimeInterval(-Double(conversation.progress.count) * 1.6)
                 thinking = ThinkingTrace(
-                    entries: scene.progress.map { .reasoning(Reasoning(text: $0)) },
+                    entries: conversation.progress.map { .reasoning(Reasoning(text: $0)) },
                     completedAt: now
                 )
             }

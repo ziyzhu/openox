@@ -125,19 +125,31 @@ try {
   const screenshotDirectory = join(directory, "app-store");
   await mkdir(screenshotDirectory);
   let screenshotSize: string | undefined;
-  for (const [index, [name, outcome]] of ([
-    ["planning", "The email includes the review time."],
-    ["publishing", "The branch has not been merged."],
-    ["memory", "Source labels are kept so you can review the merge."],
-    ["reminder", "Added **Morning focus block** to Reminders"],
-    ["service", "Both write actions require your approval"],
-    ["post", "Published **My focused-morning routine**"],
+  for (const [index, [name, outcome, domains]] of ([
+    ["planning", "Saved as `release-checklist.md` in this Profile. Nothing was sent.", ["chatgpt.com", "muse.ai", "outlook.live.com"]],
+    ["publishing", "The branch has not been merged.", ["github.com", "mail.google.com", "ios:reminders"]],
+    ["memory", "Source labels are kept so you can review the merge.", ["chatgpt.com", "claude.ai", "muse.ai"]],
+    ["reminder", "Added **Morning focus block** to Reminders", ["ios:reminders"]],
+    ["service", "then used it to publish your post.", ["reddit.com"]],
+    ["research", "The brief keeps each assistant's reasoning and trade-offs.", ["gemini.google.com", "claude.ai", "grok.com"]],
   ] as const).entries()) {
     await sim(...launch, "--env", `OX_APP_STORE_SCREENSHOT=${name}`);
     await wait("demo.reply");
     tree = await elements();
     check(tree.some(element => element.AXUniqueId === "chat.message.user"), `App Store ${name}: native user message`);
     check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes(outcome)), `App Store ${name}: completed action fixture`);
+    for (const domain of domains) {
+      check(tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === (domain.startsWith("ios:") ? "Permission granted" : "Signed in")), `App Store ${name}: assigned snapshot service ${domain}`);
+    }
+    check(tree.filter(element => element.AXUniqueId?.startsWith("conversation.servicePill.")).length === domains.length, `App Store ${name}: no unassigned services`);
+    if (["planning", "service", "research"].includes(name)) {
+      const prompts = {
+        planning: "Use my ChatGPT and Muse launch plans and Alex's latest Outlook email to save a release checklist in Ox.",
+        service: "Post to my Reddit profile: one task, 45 minutes of focus, no notifications.",
+        research: "Research where to stay in Kyoto with Gemini, Claude, and Grok. Compare their recommendations and save a brief.",
+      };
+      check(tree.some(element => element.AXLabel === prompts[name as keyof typeof prompts]), `App Store ${name}: screenshot-specific task prompt`);
+    }
     check(tree.some(element => element.AXUniqueId === "chat.message.copy"), `App Store ${name}: native completed response controls`);
     check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "chat.stop", "chat.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
     check(await value("chat.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);

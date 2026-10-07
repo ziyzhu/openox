@@ -84,7 +84,7 @@ struct OxDemoSceneView: View {
                         HStack {
                             Spacer(minLength: 40)
                             UserBubble(
-                                text: playback.scene.prompt,
+                                text: playback.conversation.prompt,
                                 attachments: [],
                                 sourcePrefix: "demo",
                                 onOpenAttachment: { _, _ in }
