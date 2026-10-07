@@ -59,6 +59,8 @@ Different simulators still share a checkout's DerivedData build database. Serial
 shared builds, or use `sim --device ox-N build --project apps/ios/Ox.xcodeproj --scheme ios --derived-data /tmp/<campaign>/DerivedData --force`
 and launch the resulting `.app` with `sim run --app` on the same explicit device.
 Separate DerivedData avoids build-database locks, not concurrent source-generation races.
+A matched tap does not prove a native switch changed: wait for stable frames, use
+`sim tap ... --duration 0.25` for switch controls, and verify AX value and behavior.
 `ci:ios` requires sim, Xcode, an explicitly reserved numbered simulator, and Host
 connections already enabled. It never provisions, clones, uninstalls, erases,
 changes credentials, or enables Host access.
