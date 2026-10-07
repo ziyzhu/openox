@@ -2,7 +2,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { JsonValue } from "@earendil-works/chord";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type EntryRecord, type JsonObject, type Tx } from "@earendil-works/pi-durable";
-import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference } from "./conversations";
+import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor } from "./conversations";
 import { ConversationApplicationMetadata } from "./profile-install";
 import type { OxAgentSession } from "./session";
 
@@ -65,6 +65,28 @@ async function presentation(tx: Tx, id: ConversationId, change: ApplicationPrese
 }
 export class ApplicationPresentation {
   constructor(private session: OxAgentSession) {}
+  private async hasTranscript(reference: ConversationReference) {
+    let cursor: ConversationHistoryCursor | undefined;
+    do {
+      const page = await this.session.conversations.history(reference, 1, cursor);
+      if (page.items.some(entry => entry.kind !== "pi.reset" && entry.kind !== "pi.compaction"
+        && entry.model?.some(message => message.role === "user" || message.role === "assistant"))) return true;
+      cursor = page.next;
+    } while (cursor);
+    return false;
+  }
+  async list(limit = 100, cursor?: ConversationListCursor) {
+    const page = await this.session.conversations.list(limit, cursor);
+    const items = await Promise.all(page.items.map(async state => {
+      const [metadata, hasTranscript] = await Promise.all([
+        this.session.harness.snapshot(ConversationApplicationMetadata, state.reference.conversationID, context),
+        this.hasTranscript(state.reference),
+      ]);
+      return { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
+        agent: { model: state.agent?.model, thinkingLevel: state.agent?.thinkingLevel }, metadata: metadata?.fields ?? {}, hasTranscript };
+    }));
+    return { items, next: page.next };
+  }
   private async agentChange(tx: Tx, id: ConversationId, change: ApplicationAgentChange, requireIdle: boolean) {
     const state = await tx.doc(AgentDoc, id);
     const provider = state.model?.provider.startsWith("ox-native:") ? state.model.provider

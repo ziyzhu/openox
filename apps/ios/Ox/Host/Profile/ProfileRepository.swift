@@ -92,13 +92,12 @@ actor ProfileRepository {
             var result: [ChatMeta] = []
             var cursor: JSONValue = .null
             repeat {
-                let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("conversationList"), "limit": .int(100), "listCursor": cursor]))
+                let page = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationList"), "limit": .int(100), "listCursor": cursor]))
                 for item in page.objectValue?["items"]?.arrayValue ?? [] {
-                    guard let value = item.objectValue?["reference"] else { continue }
+                    guard let fields = item.objectValue, fields["hasTranscript"]?.boolValue == true,
+                          let value = fields["reference"] else { continue }
                     let reference = try decodeReference(value, scope: scope)
-                    let loaded = try await load(reference, scope: scope)
-                    if loaded.state.turns.isEmpty { continue }
-                    result.append(loaded.state.meta)
+                    result.append(try decodeMeta(fields, reference: reference, scope: scope))
                 }
                 cursor = page.objectValue?["next"] ?? .null
             } while cursor != .null
@@ -115,6 +114,12 @@ actor ProfileRepository {
     private func load(_ reference: DurableConversationReference, scope: ProfileScope) async throws -> ChatLoadResult {
         let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationLoad"), "reference": reference.value]))
         let fields = value.objectValue ?? [:]
+        let meta = try decodeMeta(fields, reference: reference, scope: scope)
+        let turns = try DurableChatProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope)
+        return ChatLoadResult(state: ChatState(meta: meta, turns: turns, context: nil), needsPersistence: false)
+    }
+
+    private func decodeMeta(_ fields: [String: JSONValue], reference: DurableConversationReference, scope: ProfileScope) throws -> ChatMeta {
         var metadata = fields["metadata"]?.objectValue ?? [:]
         metadata["id"] = .string(reference.compatibilityID.rawValue.uuidString)
         metadata["schemaVersion"] = .int(ChatFormat.currentSchemaVersion)
@@ -131,9 +136,7 @@ actor ProfileRepository {
                 "reasoningEffort": nativeEffort ?? agent["thinkingLevel"] ?? .null])
         }
         let decoder = JSONDecoder(); decoder.userInfo[.profileScope] = scope
-        let meta = try decoder.decode(ChatMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
-        let turns = try DurableChatProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope)
-        return ChatLoadResult(state: ChatState(meta: meta, turns: turns, context: nil), needsPersistence: false)
+        return try decoder.decode(ChatMeta.self, from: Data(JSONValue.object(metadata).jsonString().utf8))
     }
 
     func saveChat(_ request: ChatSaveRequest, in scope: ProfileScope) async -> ChatSaveReceipt {

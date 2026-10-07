@@ -136,6 +136,7 @@ export class IOSAgentAdapter {
       case "conversationCreate": return this.application!.create(args);
       case "conversationFork": return this.fork(required(), args.entryID!, args.title);
       case "applicationLoad": return this.application!.load(required());
+      case "applicationList": return this.application!.list(args.limit, args.listCursor ?? undefined);
       case "applicationSave": await this.application!.save(required(), args); return {};
       case "applicationDelete": await this.application!.delete(required()); return {};
       case "conversationList": return session.conversations.list(args.limit, args.listCursor ?? undefined);

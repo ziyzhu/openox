@@ -2,12 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
-import { createRegistry, defineExtension, defineTool, type ConversationId, type AgentState } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, defineTool, type ConversationId, type AgentState, type EntryRecord } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { rm } from "node:fs/promises";
 import { ChatBindings, ConversationIdentity } from "../src/chat-bindings";
 import { openOxAgentSession, type OxAgentSession, type CommittedEvent, type SessionOptions,
-  type ConversationReference, type ConversationHistoryCursor } from "../src/index";
+  type ConversationReference, type ConversationHistoryCursor, type ConversationListCursor } from "../src/index";
 import { IOSAgentAdapter } from "../src/adapters/ios/agent";
 import { deliver, streamEvent } from "../src/adapters/ios/bridge";
 import { composeIOSPrompt } from "../src/adapters/ios/prompts";
@@ -362,3 +362,73 @@ test("failed initialization closes storage and rejects before exposing a Session
     createBlobID: async () => crypto.randomUUID(), authorizeFile: async () => {} })).rejects.toThrow("identity");
   await expect(db.get("SELECT 1")).rejects.toThrow("closed");
 });
+
+test("iOS startup lists summaries without loading long histories and opens them on demand after restart", async () => {
+  const path = `/tmp/ox-ios-summaries-${crypto.randomUUID()}.sqlite`;
+  let storage = backend(path);
+  let entryRows = 0;
+  const host = globalThis as typeof globalThis & { __oxDurableRequest?: (id: number, json: string) => void };
+  const previous = host.__oxDurableRequest;
+  let adapter = new IOSAgentAdapter();
+  host.__oxDurableRequest = (id, json) => {
+    const request = JSON.parse(json);
+    void (async () => {
+      if (request.method === "sql") {
+        const result = await storage.request(request.params.op, request.params.sql, request.params.params);
+        if (/SELECT.*FROM entries/s.test(request.params.sql)) entryRows += Array.isArray(result) ? result.length : result ? 1 : 0;
+        return result;
+      }
+      if (request.method === "uuid") return crypto.randomUUID();
+      if (request.method === "report" || request.method === "agentEvents") return {};
+      throw new Error(`Unexpected native capability: ${request.method}`);
+    })().then(result => deliver(id, JSON.stringify(result), null), error => deliver(id, "null", String(error)));
+  };
+  try {
+    await adapter.command({ action: "open", profileID: "summary-profile" });
+    const entries = [...Array.from({ length: 120 }, (_, index) => ({ kind: "pi.user",
+      model: [{ role: "user" as const, content: `history-${index}-${"x".repeat(1024)}`, timestamp: index + 1 }] })),
+      { kind: "pi.reset", head: "self" as const }, { kind: "ox.native.presentation", data: {} }];
+    const metadata = { createdAt: 123, lastActivity: 456, preview: "Retained preview", nativeProviderID: "fixture" };
+    const saved = await adapter.command({ action: "conversationCreate", title: "Retained", favorite: true, unread: false,
+      metadata, agent: { model: { provider: "fixture", modelId: "mock" } }, entries }) as { reference: ConversationReference };
+    await adapter.command({ action: "conversationCreate" });
+    entryRows = 0;
+    const full = await adapter.command({ action: "applicationLoad", reference: saved.reference }) as { entries: EntryRecord[] };
+    expect(full.entries).toHaveLength(122);
+    expect(entryRows).toBeGreaterThanOrEqual(120);
+    const fork = await adapter.command({ action: "conversationFork", reference: saved.reference,
+      entryID: full.entries[50]!.id, title: "Fork" }) as typeof saved;
+    const hidden = await adapter.command({ action: "conversationCreate", entries }) as typeof saved;
+    await adapter.command({ action: "applicationDelete", reference: hidden.reference });
+    await adapter.command({ action: "close" });
+    storage = backend(path);
+    adapter = new IOSAgentAdapter();
+    await adapter.command({ action: "open", profileID: "summary-profile" });
+    entryRows = 0;
+    type Summary = { reference: ConversationReference; metadata: typeof metadata; hasTranscript: boolean;
+      presentation: { title: string }; favorite: boolean; unread: boolean; agent: { model: { modelId: string } } };
+    const summaries: Summary[] = [];
+    let cursor: ConversationListCursor | undefined;
+    do {
+      const page = await adapter.command({ action: "applicationList", limit: 1, listCursor: cursor }) as { items: Summary[]; next?: ConversationListCursor };
+      summaries.push(...page.items); cursor = page.next;
+    } while (cursor);
+    const summary = summaries.find(item => item.reference.conversationID === saved.reference.conversationID)!;
+    expect(summary.metadata).toEqual(metadata);
+    expect(summary.presentation.title).toBe("Retained");
+    expect(summary.favorite).toBe(true);
+    expect(summary.unread).toBe(false);
+    expect(summary.agent.model.modelId).toBe("mock");
+    expect(summaries.filter(item => item.hasTranscript).map(item => item.reference)).toEqual([saved.reference, fork.reference]);
+    expect(summaries.some(item => item.reference.conversationID === hidden.reference.conversationID)).toBe(false);
+    expect(JSON.stringify(summaries)).not.toContain("history-");
+    expect(entryRows).toBeLessThan(20);
+    const reopened = await adapter.command({ action: "applicationLoad", reference: saved.reference }) as { entries: unknown[] };
+    expect(reopened.entries).toEqual(full.entries);
+    await expect(adapter.command({ action: "applicationList", listCursor: { profileID: "wrong", pi: {} } })).rejects.toThrow("Profile mismatch");
+  } finally {
+    await adapter.command({ action: "close" });
+    host.__oxDurableRequest = previous;
+    for (const suffix of ["", "-wal", "-shm"]) await rm(path + suffix, { force: true });
+  }
+}, 20_000);
