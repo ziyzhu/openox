@@ -117,7 +117,7 @@ ln -s "$PWD/skills/sim-cli" "$HOME/.agents/skills/sim-cli"
 
 Inspect an existing destination before changing it; do not replace another installation blindly. Pi discovers `~/.agents/skills/` without extra settings. Run `/reload` after installing or editing skills. Use `sim` help as the fallback when the external skill is unavailable.
 
-Use `tmux list-panes -a` and `tmux capture-pane` for read-only inspection of other agents' sessions; never send keystrokes to another agent or interrupt its device. Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
+Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
 
 ## Completion
 
