@@ -74,7 +74,7 @@ nonisolated enum OxActions {
     static var signInDetail: JSONValue {
         .object([
             "function": .string("ox.service.signIn"),
-            "description": .string("Call `await ox.service.signIn({ domain, purpose })` to ask the user to sign in or authorize access. No service-specific input is required."),
+            "description": .string("Call `await ox.service.signIn({ purpose, domain })` to ask the user to sign in or authorize access. No service-specific input is required."),
             "inputSchema": .object([
                 "type": .string("object"),
                 "properties": .object([:]),
@@ -97,7 +97,7 @@ nonisolated enum OxActions {
               let url = definition.action(Manifest.BOT_CONTROL_URL_ACTION_ID, includingStandard: true) else { return nil }
         return .object([
             "function": .string("ox.service.solve"),
-            "description": .string("Call `await ox.service.solve({ domain, args, purpose })` to ask the user to complete human verification. Pass args matching inputSchema; Ox supplies pageUrl to the completion probe. Resolves to null after success; throws on cancellation or failure."),
+            "description": .string("Call `await ox.service.solve({ purpose, domain, args })` to ask the user to complete human verification. Pass args matching inputSchema; Ox supplies pageUrl to the completion probe. Resolves to null after success; throws on cancellation or failure."),
             "inputSchema": attachDefs(url.inputSchema ?? .object([:]), defs: .object(definition.definitions)),
             "outputSchema": .object(["type": .string("null")]),
         ])
@@ -109,7 +109,7 @@ nonisolated enum OxActions {
         let definitions = JSONValue.object(definition.definitions)
         return .object([
             "function": .string("ox.service.pay"),
-            "description": .string("Call `await ox.service.pay({ domain, args, purpose })` with args matching inputSchema. Hands the prepared payment to the user for final review and commitment."),
+            "description": .string("Call `await ox.service.pay({ purpose, domain, args })` with args matching inputSchema. Hands the prepared payment to the user for final review and commitment."),
             "inputSchema": attachDefs(url.inputSchema ?? .object([:]), defs: definitions),
             "outputSchema": attachDefs(state.outputSchema ?? .null, defs: definitions),
         ])

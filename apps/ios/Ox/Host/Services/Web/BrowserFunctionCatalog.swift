@@ -24,7 +24,7 @@ nonisolated enum BrowserFunctionCatalog {
 
         var functionSchema: JSONValue {
             .object([
-                "description": .string("\(description) `await \(name)({ ..., purpose })`."),
+                "description": .string("\(description) `await \(name)({ purpose, ... })`."),
                 "inputSchema": inputSchema,
                 "outputSchema": outputSchema,
             ])

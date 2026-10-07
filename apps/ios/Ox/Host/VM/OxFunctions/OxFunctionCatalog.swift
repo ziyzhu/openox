@@ -56,8 +56,7 @@ nonisolated enum OxFunctionCatalog {
             "maxLength": .int(80),
             "description": .string("Short (<10 words) description shown to the user as the step label."),
         ])
-        var required = input["required"]?.arrayValue?.compactMap(\.stringValue) ?? []
-        if !required.contains("purpose") { required.append("purpose") }
+        let required = ["purpose"] + (input["required"]?.arrayValue?.compactMap(\.stringValue) ?? []).filter { $0 != "purpose" }
         input["properties"] = .object(properties)
         input["required"] = .array(required.map(JSONValue.string))
         input["additionalProperties"] = .bool(false)

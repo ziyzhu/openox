@@ -6,7 +6,7 @@ nonisolated enum OxOutput {
         namespace: "output",
         schema: {
             [("ox.output.read", .object([
-                "description": .string("Read the complete text of a captured JavaScript output into JavaScript: `await ox.output.read({ id, purpose })`. Use an id from an output-truncation notice or an archived invocation result. Filter or slice the returned string before printing. Ordinary output ids expire when this chat is unloaded. `payload:<sha256>:<offset>:<length>` ids read bounded UTF-8 JSON ranges from immutable files committed in this chat's durable Profile; saved Profile payloads survive reopening. Use JSON.parse to recover the archived result. Each payload read is limited to 32 MiB; larger ranges must be read in smaller pieces."),
+                "description": .string("Read the complete text of a captured JavaScript output into JavaScript: `await ox.output.read({ purpose, id })`. Use an id from an output-truncation notice or an archived invocation result. Filter or slice the returned string before printing. Ordinary output ids expire when this chat is unloaded. `payload:<sha256>:<offset>:<length>` ids read bounded UTF-8 JSON ranges from immutable files committed in this chat's durable Profile; saved Profile payloads survive reopening. Use JSON.parse to recover the archived result. Each payload read is limited to 32 MiB; larger ranges must be read in smaller pieces."),
                 "inputSchema": .object([
                     "type": .string("object"),
                     "properties": .object(["id": .object(["type": .string("string")])]),

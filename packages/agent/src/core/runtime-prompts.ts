@@ -43,10 +43,10 @@ export function failureReceipt(input: { invocations: ReceiptInvocation[]; omitte
 
 export function outputTruncation(input: OutputTruncation) {
   if (typeof input?.id !== "string" || !Number.isSafeInteger(input.maxLines) || input.maxLines < 1 || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1) throw new Error("Invalid output truncation state");
-  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output id: ${input.id}. Read with ox.output.read({ id: '${input.id}', purpose: 'Read remaining output' }), then filter or slice before printing. Reference expires when this conversation is unloaded.]`;
+  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output id: ${input.id}. Read with ox.output.read({ purpose: 'Read remaining output', id: '${input.id}' }), then filter or slice before printing. Reference expires when this conversation is unloaded.]`;
 }
 
 export function imageReadGuidance(input: { path: string }) {
   if (typeof input?.path !== "string") throw new Error("Image guidance requires a virtual path");
-  return `Use ox.vision.analyze({ source: "${input.path}", purpose }) for local OCR, or ox.fs.attach({ path: "${input.path}", purpose }) when original pixels are needed.`;
+  return `Use ox.vision.analyze({ purpose, source: "${input.path}" }) for local OCR, or ox.fs.attach({ purpose, path: "${input.path}" }) when original pixels are needed.`;
 }
