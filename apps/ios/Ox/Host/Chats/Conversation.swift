@@ -1016,6 +1016,7 @@ final class Conversation: Identifiable {
             requestPersistence(.generationFinished)
             activeRun?.backgroundExecution?.advance()
         case .runFinished(let result):
+            activeLatency?.mark(.agentCompleted)
             activeRun?.backgroundExecution?.updatePhase(.finishing)
             finishAgentTurnFromEvents(error: result.errorMessage)
             requestPersistence(.agentTurnFinished)
@@ -1557,6 +1558,7 @@ final class Conversation: Identifiable {
         let invocation = Invocation(name: name, purpose: purpose, args: args)
         document.apply(.recordInvocation(invocation))
         activeRun?.backgroundExecution?.updateStep(InvocationPreview.text(purpose).value)
+        activeLatency?.recordCallStarted(id: invocation.id.uuidString, name: name, kind: .function)
         Log.session.info("Chat.invocation appended id=\(invocation.id) name=\(name)")
         return invocation.id
     }
@@ -1641,6 +1643,8 @@ final class Conversation: Identifiable {
     }
 
     func resolveInvocation(invocationID: UUID, outcome: Invocation.Outcome) {
+        let failed: Bool = if case .failed = outcome { true } else { false }
+        activeLatency?.recordCallCompleted(id: invocationID.uuidString, failed: failed)
         document.apply(.resolveInvocation(id: invocationID, outcome: outcome))
     }
 
@@ -1992,7 +1996,7 @@ final class Conversation: Identifiable {
         publishFollowIntents([])
         let posting = !isBusy
         notice = .none
-        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, kind: "user")
+        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, conversationID: id, kind: "user")
         if posting {
             let at = Date()
             document.apply(.appendUser(
@@ -2052,7 +2056,7 @@ final class Conversation: Identifiable {
         Log.session.info("Chat.enqueueSystemEvent id=\(id) source=\(source.logLabel) queueDepth=\(submissions.count)")
         notice = .none
         let submissionID = SubmissionID()
-        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, kind: source.logLabel)
+        let latency = TurnLatencyTrace(submissionID: submissionID.rawValue, conversationID: id, kind: source.logLabel)
         latency.mark(.posted)
         submissions.append(Submission(
             id: submissionID,
@@ -2559,6 +2563,7 @@ final class Conversation: Identifiable {
             Log.session.info("Chat.runOne service=\(definition.domain) actions=[\(actions)]")
         }
         let turnID = transcript.last(where: { $0.isUserInitiated })?.id
+        submission.latency.bindTurn(turnID)
         submission.latency.mark(.agentSubmitted)
         let result: ConversationRunResult
         do {
@@ -2568,13 +2573,15 @@ final class Conversation: Identifiable {
                 result = ConversationRunResult(outcome: .aborted)
                 await receiveAgentEvent(.runFinished(result))
             } else {
-                result = try await LogContext.$latency.withValue(submission.latency) {
-                    try await submit(ConversationInput(
-                        text: submission.text,
-                        attachments: submission.attachments,
-                        turnState: turnState,
-                        turnID: turnID
-                    ), configuration: configuration)
+                result = try await LogContext.$turnID.withValue(turnID) {
+                    try await LogContext.$latency.withValue(submission.latency) {
+                        try await submit(ConversationInput(
+                            text: submission.text,
+                            attachments: submission.attachments,
+                            turnState: turnState,
+                            turnID: turnID
+                        ), configuration: configuration)
+                    }
                 }
             }
         } catch {

@@ -25,6 +25,7 @@ or tab session IDs; a live service is addressed by its domain.
 
 - Use `ox host list` to find reachable simulator Hosts and online iOS Tailscale peers; use `--all` to include unavailable candidates.
 - Use `ox host logs`, `ox host providers`, and `ox host describe` for Host introspection.
+- For agent-loop diagnostics, filter logs by `AgentLatency.summary`, `AgentModel.end`, or `AgentCall.`. Correlate `conversation`, `submission`, and `turn`; `tools` counts model-tool executions, while `functions` counts nested `ox.*` invocations. Token totals cover reported model usage, including compaction; check `usageComplete`, `missingUsage`, and `unfinishedCalls` before treating a summary as complete. All-zero provider usage is conservatively reported as unknown, not measured zero.
 - Use `ox chat` to create, open, drive, respond to, stop, inspect, and watch chats; `ox chat send`
   runs the real chat turn, including tools, services, and compaction.
 - Use `ox vm` for VM functions, VM-visible skills, and execution through the

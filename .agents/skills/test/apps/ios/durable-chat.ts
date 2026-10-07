@@ -68,17 +68,66 @@ async function post(text: string) {
   check(draft?.AXValue === text, "Composer did not receive exact input; never retry an uncertain send");
   await sim("tap", "--id", "chat.send", "--wait", "5000", "--stable", "200");
 }
+function metricFields(message: string) {
+  return Object.fromEntries([...message.matchAll(/\b([A-Za-z]+)=([^\s]+)/g)].map(match => [match[1]!, match[2]!]));
+}
+function verifyTelemetry(messages: string[], conversationID: string, prompt: string, aborted: boolean) {
+  const summary = messages.findLast(message => message.includes(`AgentLatency.summary conversation=${conversationID}`));
+  check(summary, "Every submitted conversation produces a correlated agent summary");
+  const fields = metricFields(summary!);
+  const correlated = messages.filter(message => message.includes(`submission=${fields.submission}`));
+  const models = correlated.filter(message => message.includes("AgentModel.end "));
+  check(models.length === Number(fields.modelTurns), "Every model invocation, including cancellation, has one terminal diagnostic");
+  const knownUsage = models.map(metricFields).filter(model => model.usageKnown === "true");
+  check(Number(fields.usageSamples) === knownUsage.length && Number(fields.missingUsage) === models.length - knownUsage.length, "Known and unavailable usage are counted exactly once per model invocation");
+  check(fields.usageComplete === String(knownUsage.length === models.length), "Usage completeness reflects missing provider reports");
+  for (const key of ["tokens", "input", "output", "cached"]) {
+    check(knownUsage.length ? Number(fields[key]) === knownUsage.reduce((sum, usage) => sum + Number(usage[key]), 0) : fields[key] === "n/a", `Aggregate ${key} equals reported model consumption or is explicitly unknown`);
+  }
+  const toolStarts = correlated.filter(message => message.includes("AgentCall.start ") && message.includes("kind=tool"));
+  const toolEnds = correlated.filter(message => message.includes("AgentCall.end ") && message.includes("kind=tool"));
+  check(toolStarts.length === Number(fields.toolCalls), "Tool count reflects actual executions, not offered tools");
+  if (!aborted) {
+    check(Number(fields.modelTurns) > 0 && Number(fields.output) > 0, "Completed native model turns aggregate reported output usage");
+    check(fields.prepareMs !== "n/a" && fields.ttftMs !== "n/a" && fields.firstTextMs !== "n/a", "Model and first-token milestones cross the durable bridge");
+    check(Number(fields.unfinishedCalls) === 0 && toolStarts.length === toolEnds.length, "Completed calls have matched lifecycle diagnostics");
+    check([...models, ...toolStarts, ...toolEnds].every(message => message.includes("conversation=") && message.includes("turn=")), "Model and tool diagnostics carry conversation, submission and turn correlation");
+    check(models.every(message => metricFields(message).tokensPerSecond !== undefined), "Every provider exposes throughput availability in its terminal diagnostic");
+  }
+  if (prompt === "22") {
+    check(Number(fields.modelTurns) === 2 && Number(fields.toolCalls) === 2 && fields.tools === "[execute:2]", "Two native tools and the synthesis round appear in the summary");
+    check(Number(fields.functionCalls) === 0, "Console-only snippets do not count as ox function invocations");
+    check(Number(fields.toolWallMs) <= Number(fields.toolMs), "Parallel tool wall time does not double-count overlapping calls");
+  }
+  if (prompt === "29") {
+    const compactions = models.filter(message => message.includes("purpose=compaction"));
+    check(Number(fields.compactionTurns) === compactions.length, "Compaction count reflects actual summarization requests, not a scenario label");
+    check(Number(fields.input) >= 900_000, "Explicit provider input usage is aggregated across the long tool loop");
+  }
+  if (prompt === "53") {
+    check(Number(fields.toolFailures) === 1 && Number(fields.toolCalls) === 2, "A recovered tool failure remains visible in the completed run summary");
+  }
+  if (prompt === "80" || prompt === "23 defaults") {
+    check(Number(fields.functionCalls) > 0 && fields.functions?.includes("ox.app."), "Nested ox function usage is distinct from model tools");
+    const functions = correlated.filter(message => message.includes("AgentCall.end ") && message.includes("kind=function"));
+    check(functions.every(message => message.includes("turn=")), "Nested function diagnostics preserve turn identity across VM callbacks");
+    if (prompt === "23 defaults") check(Number(fields.functionFailures) > 0, "Expected validation failures are counted even when the snippet handles them");
+  }
+  const telemetry = (evidence.telemetry ??= []) as unknown[];
+  telemetry.push({ prompt, ...fields, modelDiagnostics: models.length, toolStarts: toolStarts.length, toolEnds: toolEnds.length });
+}
 async function send(chatID: string, text: string, stop = false) {
   const outcome = stop ? "aborted" : "completed";
-  const ended = (messages: string[]) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
-  const count = ended(await logs());
+  const summaries = (messages: string[]) => messages.filter(message => message.includes(`AgentLatency.summary conversation=${chatID}`));
+  const previous = new Set(summaries(await logs()).map(message => metricFields(message).submission));
   await post(text);
   if (stop) {
     await sim("wait", "--id", "chat.stop", "--timeout", "10000");
     await sim("tap", "--id", "chat.stop");
   }
-  await waitForLog(messages => ended(messages) > count ? true : undefined);
+  await waitForLog(messages => summaries(messages).some(message => !previous.has(metricFields(message).submission) && metricFields(message).outcome === outcome) ? true : undefined);
   await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
+  verifyTelemetry(await logs(), chatID, text, stop);
 }
 async function stopWithQueuedInput(chatID: string) {
   const count = (messages: string[], outcome: string) => messages.filter(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)).length;
@@ -183,12 +232,16 @@ try {
     const secondChat = await attach();
     check(secondChat !== firstChat, "Temporary UI chat identity must not survive process loss");
     await send(secondChat, "12");
+    await send(secondChat, "80");
+    await send(secondChat, "53");
+    check(JSON.stringify(await sim("describe")).includes("Recovered via the cached mirror"), "A failed native tool recovers without hiding its diagnostic outcome");
+    await send(secondChat, "29");
     await sim("screenshot", "--out", `${directory}/reopened-session.png`);
     await launch(false);
     const after = await inspect("after-reopen");
     check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
     check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
-    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 7, "All actual user turns, no duplicates");
+    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 10, "All actual user turns, no duplicates");
     Object.assign(evidence, { passed: true, firstChat, secondChat, before, after });
     console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
   }

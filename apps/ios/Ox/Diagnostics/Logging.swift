@@ -4,6 +4,7 @@ import Synchronization
 
 nonisolated enum LogContext {
     @TaskLocal static var turnID: UUID?
+    @TaskLocal static var conversationID: String?
     @TaskLocal static var latency: TurnLatencyTrace?
 }
 
@@ -54,6 +55,16 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         let elapsedMs: Int64
     }
 
+    enum CallKind: String, Sendable {
+        case tool, function
+    }
+
+    private struct Call: Sendable {
+        let kind: CallKind
+        let name: String
+        let startedMs: Int64
+    }
+
     private struct State: Sendable {
         var events: [Event] = []
         var counts: [Milestone: Int] = [:]
@@ -62,24 +73,45 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         var cacheWriteInputTokens = 0
         var cacheWriteSamples = 0
         var outputTokens = 0
+        var totalTokens = 0
+        var usageSamples = 0
+        var missingUsage = 0
+        var compactionTurns = 0
+        var turnID: UUID?
+        var calls: [String: Call] = [:]
+        var callCounts: [CallKind: [String: Int]] = [:]
+        var callFailures: [CallKind: Int] = [:]
+        var callDurations: [CallKind: Int64] = [:]
+        var toolIntervals: [ClosedRange<Int64>] = []
         var finished = false
     }
 
     let submissionID: UUID
+    let conversationID: UUID
     let kind: String
     private let clock = ContinuousClock()
     private let startedAt: ContinuousClock.Instant
     private let state = Mutex(State())
 
-    init(submissionID: UUID, kind: String) {
+    init(submissionID: UUID, conversationID: UUID, kind: String) {
         self.submissionID = submissionID
+        self.conversationID = conversationID
         self.kind = kind
         startedAt = clock.now
         mark(.submitted)
     }
 
+    var turnID: UUID? { state.withLock { $0.turnID } }
+
+    func bindTurn(_ turnID: UUID?) {
+        state.withLock { state in
+            guard !state.finished else { return }
+            state.turnID = turnID
+        }
+    }
+
     func mark(_ milestone: Milestone) {
-        let elapsedMs = milliseconds(startedAt.duration(to: clock.now))
+        let elapsedMs = Self.milliseconds(startedAt.duration(to: clock.now))
         state.withLock { state in
             guard !state.finished else { return }
             let count = state.counts[milestone, default: 0] + 1
@@ -90,9 +122,34 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
         }
     }
 
-    func recordModelCompleted(_ usage: Usage) {
+    func recordModelStarted(compaction: Bool) {
         state.withLock { state in
             guard !state.finished else { return }
+            if compaction { state.compactionTurns += 1 }
+        }
+        mark(.modelStarted)
+    }
+
+    static func hasUsage(_ usage: Usage) -> Bool {
+        usage.input > 0 || usage.output > 0 || usage.totalTokens > 0 || usage.cachedInput > 0 || (usage.cacheWriteInput ?? 0) > 0
+    }
+
+    static func usageDescription(_ usage: Usage?) -> String {
+        guard let usage, hasUsage(usage) else {
+            return "usageKnown=false tokens=n/a input=n/a cached=n/a cacheWrite=n/a output=n/a"
+        }
+        let total = usage.totalTokens > 0 ? usage.totalTokens : usage.input + usage.output
+        return "usageKnown=true tokens=\(total) input=\(usage.input) cached=\(usage.cachedInput) cacheWrite=\(usage.cacheWriteInput.map(String.init) ?? "n/a") output=\(usage.output)"
+    }
+
+    func recordModelCompleted(_ usage: Usage?) {
+        state.withLock { state in
+            guard !state.finished else { return }
+            guard let usage, Self.hasUsage(usage) else {
+                state.missingUsage += 1
+                return
+            }
+            state.usageSamples += 1
             state.inputTokens += usage.input
             state.cachedInputTokens += usage.cachedInput
             if let cacheWriteInput = usage.cacheWriteInput {
@@ -100,13 +157,56 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
                 state.cacheWriteSamples += 1
             }
             state.outputTokens += usage.output
+            state.totalTokens += usage.totalTokens > 0 ? usage.totalTokens : usage.input + usage.output
         }
         mark(.modelCompleted)
     }
 
+    func recordCallStarted(id: String, name: String, kind: CallKind) {
+        let elapsedMs = Self.milliseconds(startedAt.duration(to: clock.now))
+        let started = state.withLock { state in
+            guard !state.finished, state.calls[id] == nil else { return false }
+            state.calls[id] = Call(kind: kind, name: name, startedMs: elapsedMs)
+            state.callCounts[kind, default: [:]][name, default: 0] += 1
+            return true
+        }
+        guard started else { return }
+        if kind == .tool { mark(.toolStarted) }
+        LogContext.$latency.withValue(self) {
+            Log.agent.info("AgentCall.start kind=\(kind.rawValue) id=\(id) name=\(name)")
+        }
+    }
+
+    func recordCallCompleted(id: String, failed: Bool) {
+        let elapsedMs = Self.milliseconds(startedAt.duration(to: clock.now))
+        let completed = state.withLock { state -> (Call, Int64)? in
+            guard !state.finished, let call = state.calls.removeValue(forKey: id) else { return nil }
+            let duration = max(0, elapsedMs - call.startedMs)
+            state.callDurations[call.kind, default: 0] += duration
+            if failed { state.callFailures[call.kind, default: 0] += 1 }
+            if call.kind == .tool { state.toolIntervals.append(call.startedMs...max(call.startedMs, elapsedMs)) }
+            return (call, duration)
+        }
+        guard let (call, duration) = completed else { return }
+        if call.kind == .tool { mark(.toolCompleted) }
+        LogContext.$latency.withValue(self) {
+            Log.agent.info("AgentCall.end kind=\(call.kind.rawValue) id=\(id) name=\(call.name) outcome=\(failed ? "failed" : "completed") durationMs=\(duration)")
+        }
+    }
+
+    private func toolWallMilliseconds(_ intervals: [ClosedRange<Int64>]) -> Int64 {
+        var end: Int64 = 0
+        var total: Int64 = 0
+        for interval in intervals.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            total += max(0, interval.upperBound - max(end, interval.lowerBound))
+            end = max(end, interval.upperBound)
+        }
+        return total
+    }
+
     func finish(outcome: String, client: String, model: String) {
         let now = clock.now
-        let totalMs = milliseconds(startedAt.duration(to: now))
+        let totalMs = Self.milliseconds(startedAt.duration(to: now))
         let summary = state.withLock { state -> String? in
             guard !state.finished else { return nil }
             state.finished = true
@@ -116,10 +216,6 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
 
             func first(_ milestone: Milestone) -> Int64? {
                 state.events.first(where: { $0.milestone == milestone })?.elapsedMs
-            }
-
-            func last(_ milestone: Milestone) -> Int64? {
-                state.events.last(where: { $0.milestone == milestone })?.elapsedMs
             }
 
             func delta(_ start: Milestone, _ end: Milestone) -> Int64? {
@@ -133,19 +229,21 @@ nonisolated final class TurnLatencyTrace: @unchecked Sendable {
             let firstThinkingMs = first(.firstThinkingReceived)
             let firstTextMs = first(.firstTextReceived)
             let firstVisibleMs = first(.firstTextVisible)
-            let toolWallMs: Int64? = if let startMs = first(.toolStarted), let endMs = last(.toolCompleted) {
-                max(0, endMs - startMs)
-            } else {
-                nil
+            let openToolIntervals = state.calls.values.filter { $0.kind == .tool }.map { min($0.startedMs, totalMs)...totalMs }
+            let toolWallMs = toolWallMilliseconds(state.toolIntervals + openToolIntervals)
+            func calls(_ kind: CallKind) -> String {
+                (state.callCounts[kind] ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ",")
             }
+            func tokens(_ count: Int) -> String { state.usageSamples > 0 ? String(count) : "n/a" }
+            let usageComplete = state.missingUsage == 0 && state.counts[.modelCompleted, default: 0] == state.counts[.modelStarted, default: 0]
             let timeline = state.events.map { "\($0.label):\($0.elapsedMs)" }.joined(separator: ",")
             let cacheWrite = state.cacheWriteSamples > 0 ? String(state.cacheWriteInputTokens) : "n/a"
-            return "AgentLatency.summary submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(value(toolWallMs)) modelTurns=\(state.counts[.modelStarted, default: 0]) toolCalls=\(state.counts[.toolStarted, default: 0]) input=\(state.inputTokens) cached=\(state.cachedInputTokens) cacheWrite=\(cacheWrite) output=\(state.outputTokens) timeline=\(timeline)"
+            return "AgentLatency.summary conversation=\(conversationID) submission=\(submissionID.uuidString) kind=\(kind) outcome=\(outcome) client=\(client) model=\(model) totalMs=\(totalMs) queueMs=\(value(queueMs)) prepareMs=\(value(prepareMs)) ttftMs=\(value(ttftMs)) firstThinkingMs=\(value(firstThinkingMs)) firstTextMs=\(value(firstTextMs)) firstVisibleMs=\(value(firstVisibleMs)) toolWallMs=\(toolWallMs) modelTurns=\(state.counts[.modelStarted, default: 0]) compactionTurns=\(state.compactionTurns) toolCalls=\(state.counts[.toolStarted, default: 0]) toolFailures=\(state.callFailures[.tool, default: 0]) toolMs=\(state.callDurations[.tool, default: 0]) tools=[\(calls(.tool))] functionCalls=\((state.callCounts[.function] ?? [:]).values.reduce(0, +)) functionFailures=\(state.callFailures[.function, default: 0]) functionMs=\(state.callDurations[.function, default: 0]) functions=[\(calls(.function))] unfinishedCalls=\(state.calls.count) usageSamples=\(state.usageSamples) missingUsage=\(state.missingUsage) usageComplete=\(usageComplete) tokens=\(tokens(state.totalTokens)) input=\(tokens(state.inputTokens)) cached=\(tokens(state.cachedInputTokens)) cacheWrite=\(cacheWrite) output=\(tokens(state.outputTokens)) timeline=\(timeline)"
         }
         if let summary { Log.perf.info(summary) }
     }
 
-    private func milliseconds(_ duration: Duration) -> Int64 {
+    static func milliseconds(_ duration: Duration) -> Int64 {
         let components = duration.components
         return components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000
     }
@@ -196,7 +294,12 @@ nonisolated final class Logger: @unchecked Sendable {
     private func emit(_ level: Level, _ msg: () -> String, _ file: String, _ line: Int) {
         guard isEnabled, level >= minLevel else { return }
         let message = msg()
-        let msg = LogContext.turnID.map { "turn=\($0.uuidString) \(message)" } ?? message
+        let context = [
+            (LogContext.latency?.conversationID.uuidString ?? LogContext.conversationID).map { "conversation=\($0)" },
+            LogContext.latency.map { "submission=\($0.submissionID.uuidString)" },
+            (LogContext.turnID ?? LogContext.latency?.turnID).map { "turn=\($0.uuidString)" },
+        ].compactMap { $0 }.joined(separator: " ")
+        let msg = context.isEmpty ? message : "\(context) \(message)"
         let loc = Self.loc(file, line)
         let thread = Self.currentThread()
         let date = Date()

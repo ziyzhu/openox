@@ -23,6 +23,8 @@ actor DurableAgentHost {
         let runtimeProfileID: String?
         let artifactScope: ProfileScope?
         let isolatedWorkspace: Bool
+        let latency: TurnLatencyTrace?
+        let turnID: UUID?
         var conversationID: Int?
         var context: AgentContext?
         var providerInputs: ProviderArtifactInputs?
@@ -46,7 +48,7 @@ actor DurableAgentHost {
         previous?.toolHydration?.task.cancel()
         bindings[chatID] = Binding(scope: scope, configuration: configuration, emit: emit, runtime: runtime,
                                    runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedWorkspace: isolatedWorkspace,
-                                   conversationID: previous?.conversationID)
+                                   latency: LogContext.latency, turnID: LogContext.turnID, conversationID: previous?.conversationID)
     }
 
     func expectReference(chatID: String, reference: JSONValue) throws {
@@ -80,6 +82,17 @@ actor DurableAgentHost {
                 throw RuntimeError.bridge("Native capability belongs to another Profile/conversation route")
             }
         }
+        return try await LogContext.$conversationID.withValue(chatID) {
+            try await LogContext.$turnID.withValue(binding.turnID) {
+                try await LogContext.$latency.withValue(binding.latency) {
+                    try await perform(method, fields: fields, chatID: chatID, binding: binding, runtime: runtime, stream: stream)
+                }
+            }
+        }
+    }
+
+    private func perform(_ method: String, fields: [String: JSONValue], chatID: String, binding: Binding,
+                         runtime: DurableRuntime, stream: @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue {
         switch method {
         case "agentEvents":
             Log.agent.debug("PiDurable committed events chat=\(chatID) count=\(fields["events"]?.arrayValue?.count ?? 0)")
@@ -117,6 +130,27 @@ actor DurableAgentHost {
                                   parameters: tool["parameters"] ?? .object([:]),
                                   strict: config.tools.first(where: { $0.name == tool["name"]?.stringValue })?.strict ?? true)
             }
+            binding.latency?.recordModelStarted(compaction: compaction)
+            let startedAt = ContinuousClock.now
+            var completion: AssistantMessage?
+            var milestones: Set<TurnLatencyTrace.Milestone> = []
+            var firstTokenMs: Int64?
+            func markFirst(_ milestone: TurnLatencyTrace.Milestone) {
+                guard milestones.insert(milestone).inserted else { return }
+                if milestone == .firstToken { firstTokenMs = TurnLatencyTrace.milliseconds(startedAt.duration(to: .now)) }
+                binding.latency?.mark(milestone)
+            }
+            defer {
+                binding.latency?.recordModelCompleted(completion?.usage)
+                let durationMs = TurnLatencyTrace.milliseconds(startedAt.duration(to: .now))
+                let ttft = firstTokenMs.map(String.init) ?? "n/a"
+                let decodeMs = firstTokenMs.map { durationMs - $0 } ?? 0
+                let throughput = if let usage = completion?.usage, TurnLatencyTrace.hasUsage(usage), decodeMs > 0 {
+                    String(format: "%.1f", Double(usage.output) * 1_000 / Double(decodeMs))
+                } else { "n/a" }
+                let outcome = completion?.stopReason.rawValue ?? (Task.isCancelled ? "aborted" : "error")
+                Log.agent.info("AgentModel.end purpose=\(compaction ? "compaction" : "generation") provider=\(config.client.id) model=\(config.model.id) outcome=\(outcome) durationMs=\(durationMs) ttftMs=\(ttft) tokensPerSecond=\(throughput) \(TurnLatencyTrace.usageDescription(completion?.usage))")
+            }
             let response = config.client.stream(model: config.model, systemPrompt: systemPrompt,
                                                 messages: messages, tools: config.client.supportsTools(for: config.model) ? tools : [],
                                                 options: options)
@@ -124,6 +158,19 @@ actor DurableAgentHost {
             Log.agent.info("PiDurable native model start chat=\(chatID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count) mediaFiles=\(media.files) mediaBytes=\(media.bytes)")
             for try await event in response {
                 try Task.checkCancellation()
+                switch event {
+                case .textDelta(_, let delta, _) where !delta.isEmpty:
+                    markFirst(.firstToken)
+                    markFirst(.firstTextReceived)
+                case .thinkingDelta(_, let delta, _) where !delta.isEmpty:
+                    markFirst(.firstToken)
+                    markFirst(.firstThinkingReceived)
+                case .toolCallDelta, .toolCallEnd:
+                    markFirst(.firstToken)
+                case .done(_, let assistant), .failed(_, let assistant):
+                    completion = assistant
+                default: break
+                }
                 if !compaction, case .done(_, let assistant) = event {
                     bindings[chatID]?.modelAssistant = assistant
                     for block in assistant.content {
@@ -283,11 +330,13 @@ actor DurableAgentHost {
         guard let fields = event.objectValue, let type = fields["type"]?.stringValue, var binding = bindings[chatID] else { return }
         var events: [AgentEvent] = []
         switch type {
-        case "run_start": events = [.runStarted(turnID: nil)]
+        case "run_start":
+            binding.latency?.mark(.agentStarted)
+            events = [.runStarted(turnID: binding.turnID)]
         case "turn_start":
             binding.assistant = nil
             binding.results = []
-            events = [.generationStarted(model: binding.configuration.model.id, turnID: nil)]
+            events = [.generationStarted(model: binding.configuration.model.id, turnID: binding.turnID)]
         case "message_start":
             if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" {
                 events = [.messageStart(try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope))]
@@ -312,12 +361,14 @@ actor DurableAgentHost {
             let id = fields["toolCallId"]?.stringValue ?? ""
             let call = binding.calls[id] ?? ToolCall(id: id, name: fields["toolName"]?.stringValue ?? "", arguments: fields["args"] ?? .object([:]))
             binding.calls[id] = call
+            binding.latency?.recordCallStarted(id: id, name: call.name, kind: .tool)
             events = [.toolExecutionStart(toolCall: call)]
         case "tool_execution_end":
             if let id = fields["toolCallId"]?.stringValue, let call = binding.calls.removeValue(forKey: id),
                let value = fields["entry"]?.objectValue?["model"]?.arrayValue?.first,
                case .toolResult(let result) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
                 binding.results.append(result)
+                binding.latency?.recordCallCompleted(id: id, failed: result.isError)
                 events = [.toolExecutionEnd(toolCall: call, result: result)]
             }
         case "turn_end":
