@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare and verify OpenOx npm and standalone CLI releases, inspect package artifacts, and invoke the authorized publication workflow. Use for package release work; App Store release operations use asc-cli and repository commit/version rules remain in AGENTS.md.
+description: Prepare and verify OpenOx npm and standalone CLI releases, inspect package artifacts, and invoke the authorized publication workflow. Use for package release work; App Store releases use app-store-release and asc-cli; repository commit/version rules remain in AGENTS.md.
 ---
 
 # Release

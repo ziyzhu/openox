@@ -13,6 +13,7 @@
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
+1. OpenOx owns App Store release guidance in `.agents/skills/app-store-release/SKILL.md`. App Store Connect is the source of truth for listing metadata and media; do not store local copies in either repository. Keep credentials, signing material, review contacts, demo access, and release evidence outside Git. Website and infrastructure deployment remain in `openox-dev`.
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
 1. Use `sim` and `ox` CLI for testing.
