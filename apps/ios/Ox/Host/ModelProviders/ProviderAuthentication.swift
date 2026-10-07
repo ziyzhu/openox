@@ -13,7 +13,7 @@ nonisolated extension ProviderDefinition {
     }
 }
 
-nonisolated struct ProviderRequestAuthentication: OpenAIChatTransportAuth, OpenAIResponsesTransportAuth {
+nonisolated struct ProviderRequestAuthentication: OpenAITransportAuth {
     let definition: ProviderDefinition
     let account: ProviderOAuthAccount?
 
@@ -41,12 +41,14 @@ nonisolated struct ProviderRequestAuthentication: OpenAIChatTransportAuth, OpenA
         return headers
     }
 
-    func resolve(forceRefresh: Bool) async throws -> OpenAIChatEndpoint {
-        OpenAIChatEndpoint(baseURL: definition.url, headers: try await headers(forceRefresh: forceRefresh))
-    }
-
-    func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
-        OpenAIResponsesEndpoint(url: definition.url.appendingPathComponent("responses"), headers: try await headers(forceRefresh: forceRefresh))
+    func resolve(forceRefresh: Bool) async throws -> OpenAIEndpoint {
+        let path: String
+        switch definition.api {
+        case .openAIChatCompletions: path = "chat/completions"
+        case .openAIResponses: path = "responses"
+        default: throw RuntimeError.bridge("Unsupported OpenAI transport: \(definition.api.rawValue)")
+        }
+        return OpenAIEndpoint(url: definition.url.appendingPathComponent(path), headers: try await headers(forceRefresh: forceRefresh))
     }
 }
 

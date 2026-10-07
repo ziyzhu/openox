@@ -25,6 +25,7 @@ test("Xcode Cloud prepares a clean checkout and rejects incomplete agent resourc
       "--", "package.json", "bun.lock", "packages", "apps/cli/package.json", "apps/ios"], { cwd: ROOT });
     expect(files.exitCode).toBe(0);
     for (const path of files.stdout.toString().split("\0").filter(Boolean)) {
+      if (!await Bun.file(join(ROOT, path)).exists()) continue;
       await mkdir(dirname(join(directory, path)), { recursive: true });
       await copyFile(join(ROOT, path), join(directory, path));
     }

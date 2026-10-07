@@ -5,16 +5,7 @@ import Speech
 import Synchronization
 
 @MainActor
-protocol SpeechRecording: AnyObject {
-    func prepare(locale: Locale) async throws -> Bool
-    func start(onLevel: @escaping (Float) -> Void, onFailure: @escaping (Error) -> Void) async throws
-    func stopCapture()
-    func finish() async throws -> String
-    func cancel()
-}
-
-@MainActor
-final class OnDeviceSpeechRecording: SpeechRecording {
+final class OnDeviceSpeechRecording {
     private let audioSessionID = UUID()
     private var analyzer: SpeechAnalyzer?
     private var module: (any SpeechModule)?

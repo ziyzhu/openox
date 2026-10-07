@@ -88,11 +88,11 @@ nonisolated struct OpenAICompatibleProvider: Sendable {
     func client(for region: LLMRegion, models fallbackModels: [ProviderModel]) -> OpenAIChatTransport {
         let baseURL = endpoint.value(for: region)
         let credentialID = regionalCredentials && region != .global ? "\(id):\(region.rawValue)" : id
-        let resolvedAuth: any OpenAIChatTransportAuth
+        let resolvedAuth: any OpenAITransportAuth
         let usesAPIKey: Bool
         switch auth {
         case .requiredAPIKey(let extraHeaders):
-            resolvedAuth = OpenAIAPIKeyAuth(clientID: credentialID, baseURL: baseURL, extraHeaders: extraHeaders)
+            resolvedAuth = OpenAIAPIKeyAuth(clientID: credentialID, baseURL: baseURL, path: "chat/completions", extraHeaders: extraHeaders)
             usesAPIKey = true
         case .optionalBearer:
             resolvedAuth = OpenAIOptionalAPIKeyAuth(clientID: credentialID, baseURL: baseURL)

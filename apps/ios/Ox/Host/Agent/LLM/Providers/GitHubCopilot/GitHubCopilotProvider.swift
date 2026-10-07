@@ -1,12 +1,12 @@
 import Foundation
 
-nonisolated struct GitHubCopilotResponsesAuth: OpenAIResponsesTransportAuth {
+nonisolated struct GitHubCopilotResponsesAuth: OpenAITransportAuth {
     var canRefresh: Bool { false }
-    func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
+    func resolve(forceRefresh: Bool) async throws -> OpenAIEndpoint {
         let accessToken = try GitHubCopilotSubscriptionAccount.shared.accessToken()
         var url = GitHubCopilotOAuth.apiURL
         url.appendPathComponent("responses")
-        return OpenAIResponsesEndpoint(
+        return OpenAIEndpoint(
             url: url,
             headers: [
                 "Authorization": "Bearer \(accessToken)",

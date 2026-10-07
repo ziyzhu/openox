@@ -8,7 +8,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     public let usesAPIKey: Bool
     public let acceptsAPIKey: Bool
     public let subscriptionAccount: (any SubscriptionAccount)?
-    public let auth: any OpenAIResponsesTransportAuth
+    public let auth: any OpenAITransportAuth
     public let sessionHeaderName: String
     public let extraBody: [String: JSONValue]
     public let reasoningEffort: LLMReasoningEffort
@@ -28,7 +28,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
         acceptsAPIKey: Bool? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
         subscriptionAccount: (any SubscriptionAccount)? = nil,
-        auth: any OpenAIResponsesTransportAuth,
+        auth: any OpenAITransportAuth,
         sessionHeaderName: String = "x-session-id",
         extraBody: [String: JSONValue] = [:],
         reasoningEffort: LLMReasoningEffort = .none,
@@ -159,7 +159,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     }
 
     private func openServerSentEvents(
-        endpoint: OpenAIResponsesEndpoint,
+        endpoint: OpenAIEndpoint,
         body: Data,
         model: ProviderModel,
         messages: [Message],
@@ -186,7 +186,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
     }
 
     private func runWebSocket(
-        endpoint: OpenAIResponsesEndpoint,
+        endpoint: OpenAIEndpoint,
         body: Data,
         model: ProviderModel,
         cacheKey: String,

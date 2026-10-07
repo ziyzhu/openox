@@ -5,7 +5,7 @@ public struct OpenAIChatTransport: ProviderClient {
     public let displayName: String
     public let models: [ProviderModel]
     public let presentation: ProviderPresentation
-    public let auth: any OpenAIChatTransportAuth
+    public let auth: any OpenAITransportAuth
     public let usesAPIKey: Bool
     public let acceptsAPIKey: Bool
     public let credentialID: String
@@ -87,7 +87,7 @@ public struct OpenAIChatTransport: ProviderClient {
         displayName: String,
         models: [ProviderModel],
         regions: Set<LLMRegion>,
-        auth: any OpenAIChatTransportAuth,
+        auth: any OpenAITransportAuth,
         usesAPIKey: Bool = true,
         acceptsAPIKey: Bool? = nil,
         credentialKind: LLMCredentialKind = .apiKey,
@@ -146,7 +146,7 @@ public struct OpenAIChatTransport: ProviderClient {
             displayName: displayName,
             models: models,
             regions: regions,
-            auth: OpenAIAPIKeyAuth(clientID: id, baseURL: baseURL, extraHeaders: extraHeaders),
+            auth: OpenAIAPIKeyAuth(clientID: id, baseURL: baseURL, path: "chat/completions", extraHeaders: extraHeaders),
             extraBody: extraBody,
             cachesSystemPrompt: cachesSystemPrompt,
             promptCacheRouting: promptCacheRouting,
@@ -201,10 +201,7 @@ public struct OpenAIChatTransport: ProviderClient {
         for attempt in 1...maxAttempts {
             let endpoint = try await auth.resolve(forceRefresh: forceRefresh)
             LogContext.latency?.mark(.authReady)
-            var url = endpoint.baseURL
-            url.appendPathComponent("chat/completions")
-
-            var req = URLRequest(url: url)
+            var req = URLRequest(url: endpoint.url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -214,7 +211,7 @@ public struct OpenAIChatTransport: ProviderClient {
             }
             req.httpBody = body
 
-            Log.network.info("\(label) POST \(LogPrivacy.url(url.absoluteString)) attempt=\(attempt) model=\(model.id) msgs=\(messages.count) sysChars=\(sysLen) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") route=\(promptCacheRouting.rawValue) session=\(cacheKey ?? "none") bodyBytes=\(body.count)")
+            Log.network.info("\(label) POST \(LogPrivacy.url(endpoint.url.absoluteString)) attempt=\(attempt) model=\(model.id) msgs=\(messages.count) sysChars=\(sysLen) tools=\(tools.count) [\(toolNames)] reasoning=\(reasoningPolicy.rawValue) cache=\(options.promptCachePolicy == .standard ? "standard" : "disabled") route=\(promptCacheRouting.rawValue) session=\(cacheKey ?? "none") bodyBytes=\(body.count)")
             Log.network.info("\(label) wire=[\(messages.wireSignature)]")
             let response = try await StreamingHTTP.open(req, label: label) {
                 OpenAIClientError(message: "No HTTP response")

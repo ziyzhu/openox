@@ -26,7 +26,7 @@ final class ConversationSpeechInput {
     var notice: String?
     @ObservationIgnored var cancelFrame = CGRect.zero
     @ObservationIgnored var editFrame = CGRect.zero
-    @ObservationIgnored private var session: (any SpeechRecording)?
+    @ObservationIgnored private var session: OnDeviceSpeechRecording?
     @ObservationIgnored private var sessionID: UUID?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var deadline: Task<Void, Never>?

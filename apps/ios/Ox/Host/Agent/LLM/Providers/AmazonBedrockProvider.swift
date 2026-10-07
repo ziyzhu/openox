@@ -25,9 +25,10 @@ nonisolated struct AmazonBedrockProvider: ProviderClient {
             iconURL: iconURL,
             website: website,
             authNotice: authNotice,
-            auth: OpenAIResponsesAPIKeyAuth(
+            auth: OpenAIAPIKeyAuth(
                 clientID: id,
-                baseURL: URL(string: "https://bedrock-mantle.us-east-1.api.aws/openai/v1")!
+                baseURL: URL(string: "https://bedrock-mantle.us-east-1.api.aws/openai/v1")!,
+                path: "responses"
             )
         )
         messages = AnthropicMessagesTransport(

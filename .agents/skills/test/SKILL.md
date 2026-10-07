@@ -43,6 +43,8 @@ CI requires Bun, Git, and npm, installs with the frozen lockfile, and runs:
 Live-target environment variables are cleared and automatic `.env` loading is
 disabled. No simulator, provider credentials, OAuth session, or publication is
 needed. A green portable run does not verify live iOS or service behavior.
+Checkout fixtures must include untracked files and skip working-tree deletions;
+`git ls-files --cached` still lists deleted files until they are staged.
 
 Standalone mode additionally requires platform installation tools such as curl
 and tar. It builds, downloads, and installs the current platform's CLI archive,

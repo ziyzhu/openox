@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesTransportAuth {
+nonisolated struct ChatGPTResponsesAuth: OpenAITransportAuth {
     private static let installationID: String = {
         let key = "chatgpt.installationId"
         if let existing = UserDefaults.standard.string(forKey: key) { return existing }
@@ -10,10 +10,10 @@ nonisolated struct ChatGPTResponsesAuth: OpenAIResponsesTransportAuth {
     }()
 
     var canRefresh: Bool { true }
-    func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
+    func resolve(forceRefresh: Bool) async throws -> OpenAIEndpoint {
         let (access, accountID) = try await ChatGPTSubscriptionAccount.shared.validToken(forceRefresh: forceRefresh)
         guard !accountID.isEmpty else { throw ChatGPTAuthError(message: "Missing ChatGPT account id") }
-        return OpenAIResponsesEndpoint(
+        return OpenAIEndpoint(
             url: ChatGPTOAuth.responsesURL,
             headers: [
                 "Authorization": "Bearer \(access)",

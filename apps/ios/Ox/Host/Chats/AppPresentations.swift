@@ -165,6 +165,12 @@ extension AppPresentationCoordinator: ServiceAuthPresenting {
     }
 }
 
+extension AppPresentationCoordinator: ServiceHandoffPresenting {
+    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
+        await presentServiceHandoff(session)
+    }
+}
+
 @MainActor
 private struct UnavailableServiceAuthPresenter: ServiceAuthPresenting {
     func present(session: ServiceAuthSession) async -> ServiceAuthSession.Outcome {
@@ -197,19 +203,10 @@ extension AppPresentations {
 
     static let live = AppPresentations(
         serviceSignIn: AppPresentationCoordinator.shared,
-        serviceHandoff: ServiceHandoffSheetPresenter(coordinator: .shared),
+        serviceHandoff: AppPresentationCoordinator.shared,
         messages: MessageSheetComposer(),
         providerAuthentication: AppPresentationCoordinator.shared
     )
-}
-
-@MainActor
-private struct ServiceHandoffSheetPresenter: ServiceHandoffPresenting {
-    let coordinator: AppPresentationCoordinator
-
-    func present(session: ServiceHandoffSession) async -> ServiceHandoffSession.Outcome {
-        await coordinator.presentServiceHandoff(session)
-    }
 }
 
 @MainActor

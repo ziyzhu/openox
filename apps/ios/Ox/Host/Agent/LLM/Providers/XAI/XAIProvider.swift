@@ -1,8 +1,8 @@
 import Foundation
 
-nonisolated struct XAIResponsesAuth: OpenAIResponsesTransportAuth {
+nonisolated struct XAIResponsesAuth: OpenAITransportAuth {
     var canRefresh: Bool { XAISubscriptionAccount.shared.isSignedIn }
-    func resolve(forceRefresh: Bool) async throws -> OpenAIResponsesEndpoint {
+    func resolve(forceRefresh: Bool) async throws -> OpenAIEndpoint {
         let token: String
         if XAISubscriptionAccount.shared.isSignedIn {
             token = try await XAISubscriptionAccount.shared.validToken(forceRefresh: forceRefresh)
@@ -13,7 +13,7 @@ nonisolated struct XAIResponsesAuth: OpenAIResponsesTransportAuth {
         }
         var url = XAIOAuth.responsesBaseURL
         url.appendPathComponent("responses")
-        return OpenAIResponsesEndpoint(
+        return OpenAIEndpoint(
             url: url,
             headers: ["Authorization": "Bearer \(token)", "User-Agent": "Ox/iOS"]
         )

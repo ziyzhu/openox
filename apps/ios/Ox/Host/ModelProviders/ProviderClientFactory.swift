@@ -20,8 +20,8 @@ nonisolated enum ProviderClientFactory {
         case .web:
             throw RuntimeError.bridge("Website model providers are resolved from services")
         case .openAIChatCompletions:
-            let auth: any OpenAIChatTransportAuth
-            if definition.auth.kind == .custom { auth = try customChatAuth(definition) }
+            let auth: any OpenAITransportAuth
+            if definition.auth.kind == .custom { auth = try customAuth(definition) }
             else { auth = authentication }
             native = OpenAIChatTransport(
                 id: definition.id, displayName: definition.name, models: models, regions: presentation.regions,
@@ -38,8 +38,8 @@ nonisolated enum ProviderClientFactory {
                 inferenceLocation: presentation.inferenceLocation, diagnosticsEndpoint: definition.url
             )
         case .openAIResponses:
-            let auth: any OpenAIResponsesTransportAuth
-            if definition.auth.kind == .custom { auth = try customResponsesAuth(definition) }
+            let auth: any OpenAITransportAuth
+            if definition.auth.kind == .custom { auth = try customAuth(definition) }
             else { auth = authentication }
             let tiers = Dictionary(uniqueKeysWithValues: definition.models.compactMap { model in model.options?.serviceTier.map { (model.id, $0) } })
             native = OpenAIResponsesTransport(
@@ -103,19 +103,14 @@ nonisolated enum ProviderClientFactory {
         }
     }
 
-    private static func customChatAuth(_ definition: ProviderDefinition) throws -> any OpenAIChatTransportAuth {
-        try validateAdapter(definition)
-        guard definition.auth.adapter == "openrouter" else { throw RuntimeError.bridge("Unsupported custom chat authentication") }
-        return OpenRouterAuth()
-    }
-
-    private static func customResponsesAuth(_ definition: ProviderDefinition) throws -> any OpenAIResponsesTransportAuth {
+    private static func customAuth(_ definition: ProviderDefinition) throws -> any OpenAITransportAuth {
         try validateAdapter(definition)
         switch definition.auth.adapter {
         case "chatgpt": return ChatGPTResponsesAuth()
         case "github-copilot": return GitHubCopilotResponsesAuth()
+        case "openrouter": return OpenRouterAuth()
         case "xai": return XAIResponsesAuth()
-        default: throw RuntimeError.bridge("Unsupported custom Responses authentication")
+        default: throw RuntimeError.bridge("Unsupported custom OpenAI authentication")
         }
     }
 

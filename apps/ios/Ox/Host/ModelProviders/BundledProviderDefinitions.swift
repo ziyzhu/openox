@@ -23,7 +23,7 @@ nonisolated extension BuiltInProviders {
         entries.append(custom(router, url: OpenRouterOAuth.apiBaseURL, api: .openAIChatCompletions, options: chatOptions(router), models: chatModels(router)))
         entries += profiles([ModelArkProvider.profile], modelLookup: modelLookup)
         let openai = OpenAIProvider.client(models: modelLookup("openai", .global))
-        entries.append(entry(openai, url: (openai.auth as! OpenAIResponsesAPIKeyAuth).baseURL, api: .openAIResponses,
+        entries.append(entry(openai, url: (openai.auth as! OpenAIAPIKeyAuth).baseURL, api: .openAIResponses,
                              auth: .init(kind: .bearer), options: .init(reasoningEffort: openai.reasoningEffort.rawValue)))
         entries.append(messages(AnthropicProvider.client(models: modelLookup("anthropic", .global))))
         let claude = AnthropicProvider.subscriptionClient(models: modelLookup("anthropic", .global))
@@ -41,7 +41,7 @@ nonisolated extension BuiltInProviders {
                                             beta: ["claude-code-20250219", "oauth-2025-04-20"]),
                              models: claude.models.map { .init($0, options: claude.adaptiveThinkingModelIDs.contains($0.wireID) ? .init(adaptiveThinking: true) : nil) }))
         let bedrock = AmazonBedrockProvider(models: modelLookup("amazon-bedrock", .global))
-        var bedrockResponses = entry(bedrock.responses, url: (bedrock.responses.auth as! OpenAIResponsesAPIKeyAuth).baseURL,
+        var bedrockResponses = entry(bedrock.responses, url: (bedrock.responses.auth as! OpenAIAPIKeyAuth).baseURL,
                                     api: .openAIResponses, auth: .init(kind: .bearer))
         bedrockResponses.definition.id = "amazon-bedrock:responses"
         bedrockResponses.definition.name = "Amazon Bedrock API · Responses"
