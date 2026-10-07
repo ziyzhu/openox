@@ -1,6 +1,9 @@
 import Foundation
 
 nonisolated enum ModelServiceContract {
+    static let maximumSubmissions = 32
+    static let maximumResponseBytes = 2_000_000
+    static let maximumRetainedResponseBytes = 8_000_000
     static let list = "listModels"
     static let start = "startModelGeneration"
     static let resume = "continueModelGeneration"

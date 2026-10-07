@@ -39,14 +39,14 @@ private struct OxApplicationView: View {
     @State private var presentations = AppPresentationCoordinator.shared
     @State private var hostAccess: HostAccess
     private let client: OxClient
-    private let webSocketTransport: WebSocketOxHostTransport
+    @State private var webSocketTransport: WebSocketOxHostTransport
 
     init() {
         let host = IOSHost.shared
         let access = HostAccess()
         _hostAccess = State(initialValue: access)
         client = OxClient(host: host)
-        webSocketTransport = WebSocketOxHostTransport(host: host, access: access)
+        _webSocketTransport = State(initialValue: WebSocketOxHostTransport(host: host, access: access))
         AppRegion.shared.start()
         Log.app.info("Device.launch id=\(Device.id) internal=\(Device.isInternal)")
         PerfMonitor.shared.start()

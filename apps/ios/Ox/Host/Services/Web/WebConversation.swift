@@ -135,7 +135,7 @@ final class WebConversation {
     }
 
     private func submit(_ args: JSONValue, attachments: [WebsiteAttachment]) async throws -> JSONValue {
-        guard !isBusy, submissions.count < 32, var fields = args.objectValue else {
+        guard !isBusy, submissions.count < ModelServiceContract.maximumSubmissions, var fields = args.objectValue else {
             throw WebsiteProviderError("Website conversation is busy or its submission limit was reached")
         }
         guard let messages = fields["messages"]?.arrayValue, !messages.isEmpty,
@@ -235,7 +235,7 @@ final class WebConversation {
                 guard !submission.terminal else { throw WebsiteProviderError("Website emitted events after completion") }
                 switch event.objectValue?["type"]?.stringValue {
                 case "text":
-                    guard let text = event.objectValue?["text"]?.stringValue, text.hasPrefix(submission.text), text.utf8.count <= 2_000_000 else {
+                    guard let text = event.objectValue?["text"]?.stringValue, text.hasPrefix(submission.text), text.utf8.count <= ModelServiceContract.maximumResponseBytes else {
                         throw WebsiteProviderError("Website revised published text or exceeded the response limit")
                     }
                     submission.text = text
@@ -245,7 +245,7 @@ final class WebConversation {
                 submission.eventDigests.append(digest)
             }
             let retainedBytes = submissions.filter { $0.key != handle }.values.reduce(0) { $0 + $1.text.utf8.count }
-            guard retainedBytes + submission.text.utf8.count <= 8_000_000 else { throw WebsiteProviderError("Website response history exceeded the retained size limit") }
+            guard retainedBytes + submission.text.utf8.count <= ModelServiceContract.maximumRetainedResponseBytes else { throw WebsiteProviderError("Website response history exceeded the retained size limit") }
             submissions[handle] = submission
             if submission.terminal, handle == latestSubmission {
                 isBusy = false

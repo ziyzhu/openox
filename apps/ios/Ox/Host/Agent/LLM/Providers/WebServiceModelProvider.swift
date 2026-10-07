@@ -106,10 +106,22 @@ nonisolated struct WebServiceModelProvider: ProviderClient {
                         reply = state.text
                         assembler.finish(reason: .stop, label: id, lines: state.cursor)
                     }
-                    await context.finish(started, history: prepared + [WebModelHistory.assistantTurn(reply)], chatID: chatID)
+                    await context.finish(started, history: prepared + [WebModelHistory.assistantTurn(reply)], responseBytes: state.text.utf8.count, chatID: chatID)
                 } catch {
                     await context.cancelAndClose(generation)
-                    throw error
+                    if Task.isCancelled { throw error }
+                    if let invocationError = error as? Service.InvokeError {
+                        switch invocationError {
+                        case .requiresAuth, .authUnavailable: throw error
+                        default: break
+                        }
+                    }
+                    switch llmFailureKind(error: error) {
+                    case .authentication, .contextOverflow, .unsupportedInput: throw error
+                    default:
+                        Log.service.error("ModelService.responseUnverified domain=\(domain) generation=\(generation?.id ?? "unknown") error=\(LogPrivacy.text(error.localizedDescription))")
+                        throw WebsiteProviderError("The website response could not be verified. Inspect the website before sending this request again.")
+                    }
                 }
             } catch {
                 if let invocationError = error as? Service.InvokeError {

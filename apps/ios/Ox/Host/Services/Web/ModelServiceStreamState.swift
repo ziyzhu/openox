@@ -19,7 +19,7 @@ nonisolated struct ModelServiceStreamState {
             guard let event = value.objectValue else { throw WebsiteProviderError("Invalid model event") }
             switch event["type"]?.stringValue {
             case "text":
-                guard let snapshot = event["text"]?.stringValue, snapshot.utf8.count <= 2_000_000 else { throw WebsiteProviderError("Model response is too large") }
+                guard let snapshot = event["text"]?.stringValue, snapshot.utf8.count <= ModelServiceContract.maximumResponseBytes else { throw WebsiteProviderError("Model response is too large") }
                 guard snapshot.hasPrefix(updated.text) else { throw WebsiteProviderError("Model service revised already streamed text") }
                 updated.text = snapshot
             case "completed": updated.completed = true

@@ -14,6 +14,8 @@ When OpenOx functionality uses OAuth, use apps registered as OpenOx.
 
 Website authentication, submission, upload, completion, and model discovery belong in `apps/ios/Ox/Resources/OxServices.bundle/web/<domain>/actions.js`. Follow the built-in `evolve` model contract and reuse `WebServiceModelProvider`; do not add a site-specific Swift composition file.
 
+Preserve Ox's logical instructions and tools across API and website providers; optimize website delivery through verified continuation, not a reduced assistant prompt. Verify failures through the outer agent too: closing a page does not prevent its retry policy from submitting again. Keep the original failure in on-device diagnostics when surfacing an uncertain outcome.
+
 Verify both fetch and XHR on a fresh owned generation page. A warm inspection page can use a different transport, and hidden-page animation state may lag completed server responses. Require a native completion marker correlated with the submitted conversation.
 
 Test signed-out and expired-session behavior with synthetic fixtures or an isolated session. Do not remove authentication from a live signed-in website-client request: its unauthorized-response handler can clear the user's session even for a read-only request. Verify the signed-out-to-signed-in transition across a separate handoff page. Sign-in probes must read fresh shared state and avoid website-client handlers that clear credentials on unauthorized responses; an already authenticated page is insufficient evidence.

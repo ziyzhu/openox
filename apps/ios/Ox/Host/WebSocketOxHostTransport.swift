@@ -50,12 +50,13 @@ final class WebSocketOxHostTransport {
     private func start() {
         guard access.enabled, prepared, UIApplication.shared.applicationState == .active,
               monitor == nil else { return }
-        let monitor = NWPathMonitor()
+        let monitor = NWPathMonitor(requiredInterfaceType: .other)
         self.monitor = monitor
         monitor.pathUpdateHandler = { [weak self, weak monitor] path in
             Task { @MainActor in
                 guard let self, let monitor, self.monitor === monitor else { return }
                 self.path = path
+                Log.app.info("WebSocketOxHostTransport path status=\(path.status) interfaces=\(path.availableInterfaces.map { "\($0.name):\($0.type)" }.joined(separator: ","))")
                 self.refreshIngress()
             }
         }

@@ -30,7 +30,10 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
     const rendered = runInContext("OxPrompts.websiteInstructions(input)", realm) as string;
     expect(rendered).toBe(websiteInstructions(input));
     expect(rendered.includes("<ox_actions>")).toBe(input.actionsJSON !== "");
-    expect(rendered).toContain("Continue the latest user request.");
+    expect(rendered).toContain("Answer the latest user request or continue from its Ox Action result.");
+    if (input.systemPrompt) expect(rendered).toContain(input.systemPrompt);
+    if (input.actionsJSON) expect(rendered).toContain(input.actionsJSON);
+    expect(rendered).not.toContain("uploaded_file");
   }
   expect(() => runInContext("OxPrompts.responseDirective({})", realm)).toThrow("Response language requires");
   expect(() => runInContext("OxPrompts.websiteInstructions({})", realm)).toThrow("Website prompt requires");

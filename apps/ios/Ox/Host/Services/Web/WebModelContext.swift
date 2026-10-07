@@ -25,6 +25,12 @@ final class WebModelContext {
     private var supportsContinuation: Bool {
         usesConversation ? conversation.continuation : service.definition.action(ModelServiceContract.resume, includingStandard: true) != nil
     }
+    private var hasContinuationCapacity: Bool {
+        completedGenerations < ModelServiceContract.maximumSubmissions
+            && retainedResponseBytes <= ModelServiceContract.maximumRetainedResponseBytes - ModelServiceContract.maximumResponseBytes
+    }
+    private var completedGenerations = 0
+    private var retainedResponseBytes = 0
     private var lastGenerationID: String?
     private var history: [JSONValue] = []
     private var isClosed = false
@@ -69,6 +75,7 @@ final class WebModelContext {
         if configuration.modelID != self.configuration.modelID { return "model" }
         if configuration != self.configuration { return "options" }
         if !supportsContinuation { return "unsupported" }
+        if !hasContinuationCapacity { return "capacity" }
         return nil
     }
 
@@ -128,8 +135,13 @@ final class WebModelContext {
         ]))
     }
 
-    func finish(_ generation: Generation, history: [JSONValue], chatID: UUID?) {
-        guard supportsContinuation, !isClosed, isPageCurrent,
+    func finish(_ generation: Generation, history: [JSONValue], responseBytes: Int, chatID: UUID?) {
+        completedGenerations += 1
+        retainedResponseBytes += responseBytes
+        if !hasContinuationCapacity {
+            Log.service.info("ModelService.rollover domain=\(service.domain) generations=\(completedGenerations) responseBytes=\(retainedResponseBytes) page=\(page.logLabel)")
+        }
+        guard supportsContinuation, hasContinuationCapacity, !isClosed, isPageCurrent,
               let chatID, service.manager.isChatAttached(chatID) else {
             close()
             return
