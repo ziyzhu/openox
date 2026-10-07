@@ -35,7 +35,7 @@ Opening a Harness is dormant; asking for progress can schedule every surviving t
 
 `resumeExisting` waits for the existing submission receipt and final committed native-event delivery. It does not resubmit user input. Cold native tools restore missing context from actual Pi task/calling-assistant proof, preserve cached normal generation context, and never rerun native transform/before-request hooks. Parallel tools share hydration and await native UI presentation readiness. Unsafe interrupted intents remain interrupted, not replayed.
 
-Close cooperatively preserves durable recovery; Stop durably aborts. Request IDs are not an exactly-once guarantee for external effects. A failed storage admission can poison a Session even after SQLite rollback: explicitly close/reacquire and diagnose; never blindly retry inputs or effects through the failed Session. Native post-turn `shouldStopAfterTurn` eval limits are unsupported; `agents.evaluate` fails explicitly before invoking providers/tools.
+Close cooperatively preserves durable recovery; Stop durably aborts. Request IDs are not an exactly-once guarantee for external effects. A failed storage admission can poison a Session even after SQLite rollback: explicitly close/reacquire and diagnose; never blindly retry inputs or effects through the failed Session. Behavioral evals drive ordinary chats through the Ox CLI, independently observe state through existing APIs, and probe results in fresh chats; no eval-only runtime hooks are installed.
 
 ## Verification
 

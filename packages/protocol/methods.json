@@ -161,14 +161,6 @@
         "$ref": "./schema.json#/definitions/RepositorySaveGateResult"
       }
     },
-    "agents.evaluate": {
-      "params": {
-        "$ref": "./schema.json#/definitions/EvaluateAgentRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/EvaluateAgentResult"
-      }
-    },
     "vm.inspect": {
       "params": {
         "$ref": "./schema.json#/definitions/VMRequest"

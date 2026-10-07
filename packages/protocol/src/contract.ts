@@ -50,10 +50,6 @@ export const Schemas = {
   VMFunctionsRequest: object("VMFunctionsRequest", { function: nullable(S()) }),
   VMCallRequest: object("VMCallRequest", { sessionId: nullable(S()), function: S(), arguments: json() }),
   VMEvalRequest: object("VMEvalRequest", { sessionId: nullable(S()), script: S() }),
-  EvaluateAgentRequest: object("EvaluateAgentRequest", {
-    sessionId: S(), providerId: S(), modelId: S(), prompts: A(S()), fixtures: A(R("AgentEvalFixture")), maxTurns: I(), timeoutMs: I(),
-  }),
-  AgentEvalFixture: object("AgentEvalFixture", { tool: S(), sourceIncludes: A(S()), text: S(), isError: B(), terminate: B() }),
   ProviderModel: opaque("ProviderModel", "Existing ProviderModel Codable payload; not a new model catalog format."),
   Message: opaque("Message", "Existing tagged Agent Message Codable payload."),
   Block: opaque("Block", "Existing transcript Block Codable payload."),
@@ -109,11 +105,6 @@ export const Schemas = {
   BootstrapArtifactsResult: object("BootstrapArtifactsResult", { artifacts: optional(A(S())) }),
   WebsiteDataResult: object("WebsiteDataResult", { data: optional(data()), bytes: optional(I()) }),
   RepositorySaveGateResult: object("RepositorySaveGateResult", { entered: optional(B()) }),
-  EvalTool: object("EvalTool", { name: S(), description: S(), parameters: Type.Unknown() }),
-  EvaluateAgentResult: object("EvaluateAgentResult", {
-    messages: A(R("Message")), systemPrompt: S(), tools: A(R("EvalTool")), temperature: optional(Type.Number()), maxTokens: optional(I()),
-    totalMs: I(), errors: A(S()), executionError: optional(S()),
-  }),
 };
 
 type SchemaName = keyof typeof Schemas;
@@ -139,7 +130,6 @@ export const Methods = {
   "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
   "debug.repositories.saveGate": method("repositoryGate", "RepositoryGateRequest", "RepositorySaveGateResult"),
-  "agents.evaluate": method("evaluateAgent", "EvaluateAgentRequest", "EvaluateAgentResult"),
   "vm.inspect": method("vmInspect", "VMRequest", "VMControlResult"),
   "vm.functions": method("vmFunctions", "VMFunctionsRequest", "VMControlResult"),
   "vm.call": method("vmCall", "VMCallRequest", "VMControlResult"),

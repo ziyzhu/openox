@@ -78,7 +78,7 @@ export async function check(): Promise<string> {
     "apps/ios/Ox/Host/Profile/StorageRoot.swift",
     "apps/ios/Ox/Host/Services/ServiceDebug.swift",
     "apps/ios/Ox/Host/Profile/ProfileRepositorySaveGate.swift",
-    ...["ChatCommands", "ServiceCommands", "BootstrapCommands", "AgentEvals"].map(name => `apps/ios/Ox/Host/RPC/${name}.swift`),
+    ...["ChatCommands", "ServiceCommands", "BootstrapCommands"].map(name => `apps/ios/Ox/Host/RPC/${name}.swift`),
     ...["ComposerCommands", "ClientAutomation"].map(name => `apps/ios/Ox/Client/Automation/${name}.swift`),
   ]) {
     const source = await readFile(join(ROOT, path), "utf8");

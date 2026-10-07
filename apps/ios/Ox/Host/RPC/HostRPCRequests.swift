@@ -24,7 +24,6 @@ extension OxHostProtocol {
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
         case repositoryGate = "debug.repositories.saveGate"
-        case evaluateAgent = "agents.evaluate"
         case vmInspect = "vm.inspect"
         case vmFunctions = "vm.functions"
         case vmCall = "vm.call"
@@ -103,16 +102,6 @@ extension OxHostProtocol {
         let action: String
     }
 
-    struct EvaluateAgentRequest: Decodable {
-        let sessionId: String
-        let providerId: String
-        let modelId: String
-        let prompts: [String]
-        let fixtures: [AgentEvalFixture]
-        let maxTurns: Int
-        let timeoutMs: Int
-    }
-
     struct VMRequest: Decodable {
         let sessionId: String?
     }
@@ -168,12 +157,4 @@ extension OxHostProtocol {
         let name: String
         let data: Data
     }
-}
-
-nonisolated struct AgentEvalFixture: Decodable, Sendable {
-    let tool: String
-    let sourceIncludes: [String]
-    let text: String
-    let isError: Bool
-    let terminate: Bool
 }

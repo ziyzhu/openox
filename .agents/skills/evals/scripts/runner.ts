@@ -3,12 +3,13 @@ import { mkdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { HostRPCClient } from "../../../../apps/cli/src/host-rpc.ts";
 import { ROOT as root } from "../../../lib.ts";
 import { cases } from "./cases/index.ts";
 import { score } from "./scoring.ts";
-import type { EvalCase, EvalResponse, Report } from "./types.ts";
+import type { EvalCase, EvalSnapshot, Report } from "./types.ts";
 import { compare } from "./compare.ts";
+import { ox } from "./cli.ts";
+import { runCase } from "./ox.ts";
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
@@ -30,8 +31,13 @@ export function validateCases(tests: EvalCase[]): void {
     if (!/^[a-z0-9-]+$/.test(test.id) || ids.has(test.id)) throw new Error(`Invalid or duplicate case ID: ${test.id}`);
     ids.add(test.id);
     if (!test.prompts.length || test.prompts.length > 10 || !test.prompts.every(prompt => prompt.trim()) || !test.rules.length || !test.rubric.trim()) throw new Error(`Incomplete case: ${test.id}`);
-    for (const fixture of test.fixtures) {
-      if (fixture.tool !== "execute" || fixture.sourceIncludes.length === 0) throw new Error(`Unconstrained fixture: ${test.id}`);
+    if (!["quick", "tasks", "workflows"].includes(test.suite)) throw new Error(`Invalid suite: ${test.id}`);
+    if ((test.suite === "workflows") !== (test.workflow?.kind === "createSkill")) throw new Error(`Invalid workflow authorization: ${test.id}`);
+    if (test.workflow?.kind === "createSkill" && (!test.workflow.description.trim() || !test.workflow.instructions.trim() || !test.workflow.probe.trim() || test.workflow.probe.includes("{{answer}}"))) throw new Error(`Invalid independent probe: ${test.id}`);
+    for (const rule of test.rules) {
+      if (rule.kind === "actionAtLeast" && (!rule.name || !Number.isInteger(rule.count) || rule.count < 0)) throw new Error(`Invalid call rule: ${test.id}`);
+      if (rule.kind === "readsGuidance" && (!/^guidance\/[a-z-]+\/guide\.md$/.test(rule.path) || test.workflow?.kind !== "guidance" || test.workflow.path !== rule.path)) throw new Error(`Invalid guidance observation: ${test.id}`);
+      if (rule.kind === "skillWorks" && test.workflow?.kind !== "createSkill") throw new Error(`Missing skill workflow: ${test.id}`);
     }
   }
 }
@@ -64,29 +70,32 @@ async function main(): Promise<void> {
   }
   const { values } = parseArgs({ args: Bun.argv.slice(2), options: {
     help: { type: "boolean" }, list: { type: "boolean" }, validate: { type: "boolean" },
-    host: { type: "string" }, chat: { type: "string" }, provider: { type: "string" }, model: { type: "string" },
+    host: { type: "string" }, provider: { type: "string" }, model: { type: "string" },
     suite: { type: "string", default: "quick" }, case: { type: "string" }, repeat: { type: "string", default: "1" },
-    timeout: { type: "string", default: "120000" }, "max-turns": { type: "string", default: "6" }, output: { type: "string" },
+    timeout: { type: "string", default: "120000" }, output: { type: "string" },
+    "allow-profile-writes": { type: "boolean" }, "qa-profile": { type: "string" },
   }, strict: true });
   if (values.help) {
     console.log(`Usage: bun run evals --host <ws-url> --provider <id> --model <id> [options]
-  --chat <id>        Empty chat whose prompt and tools are used (defaults to active)
-  --suite quick|tasks|all   Default: quick
+  --suite quick|tasks|workflows|all   Default: quick
+  --allow-profile-writes   Authorize run-owned skill creation and cleanup
+  --qa-profile <name>      Required named local QA Profile for workflows
   --case <id>        Run one case instead of a suite
   --repeat <1..20>   Repetitions per case (default 1)
-  --timeout <ms>    Per-case Host deadline, at most 300000 (default 120000)
-  --max-turns <1..20>  Model-turn budget per case (default 6)
+  --timeout <ms>    Per-case chat deadline, at most 300000 (default 120000)
   --output <path>   New JSON report outside the repo (default temporary directory)
   --list            List selected cases without contacting a provider
   --validate        Check case definitions without contacting a provider
   compare <baseline.json> <candidate.json>
 
-Runs real models with the production Agent loop and fixture-backed tools.
-Requires a running simulator Host built from this checkout; never executes generated JavaScript.`);
+Drives ordinary chats through this checkout's Ox CLI and scores history plus independent state.
+Workflows use saved task chats and fresh probes; observers never repair results.
+Captures Host logs for diagnosis. Tools execute normally; use a sanitized QA Profile.
+Never approves prompts. Stops its chat on timeout and does not retry submitted input.`);
     return;
   }
   validateCases(cases);
-  if (!["quick", "tasks", "all"].includes(values.suite!)) throw new Error(`Unknown suite: ${values.suite}`);
+  if (!["quick", "tasks", "workflows", "all"].includes(values.suite!)) throw new Error(`Unknown suite: ${values.suite}`);
   const selected = cases.filter(test => values.case ? test.id === values.case : values.suite === "all" || test.suite === values.suite);
   if (!selected.length) throw new Error("No matching eval cases");
   if (values.list || values.validate) {
@@ -94,43 +103,41 @@ Requires a running simulator Host built from this checkout; never executes gener
     console.log(`Validated ${cases.length} cases`);
     return;
   }
+  const writes = selected.some(test => test.workflow?.kind === "createSkill");
+  if (writes && (!values["allow-profile-writes"] || !values["qa-profile"]?.trim())) throw new Error("Workflows require --allow-profile-writes and --qa-profile <local-QA-name>");
   if (!values.host || !values.provider || !values.model) throw new Error("Specify --host, --provider, and --model; use ox host list and ox host providers to select them");
   if (values.provider.toLowerCase() === "mock") throw new Error("Mock responses cannot measure prompt quality");
   const repetitions = integer(values.repeat!, 20);
   const timeoutMs = integer(values.timeout!, 300_000);
-  const maxTurns = integer(values["max-turns"]!, 20);
   const output = await outputPath(values.output ?? resolve(tmpdir(), `ox-evals-${Date.now()}.json`));
   await writeFile(output, "", { flag: "wx", mode: 0o600 });
-  const host = new HostRPCClient(values.host);
+  const host = values.host;
   const report: Report = {
-    version: 1, startedAt: new Date().toISOString(), revision: git("rev-parse", "HEAD"), dirty: git("status", "--porcelain").length > 0,
-    limits: { timeoutMs, maxTurns, repetitions }, host: null, provider: values.provider, model: values.model, catalog: null, mode: "production-agent-fixture-tools", results: [],
+    version: 3, startedAt: new Date().toISOString(), revision: git("rev-parse", "HEAD"), dirty: git("status", "--porcelain").length > 0,
+    limits: { timeoutMs, repetitions }, authorization: { profileWrites: !!values["allow-profile-writes"], qaProfile: values["qa-profile"] ?? null }, host: null, provider: values.provider, model: values.model, catalog: null, mode: "ox-cli-chat", plannedCases: selected.map(test => test.id), results: [],
   };
   try {
-    const description = await host.describe(10000);
-    if (!description.methods.includes("agents.evaluate")) throw new Error("Host does not support agents.evaluate; rebuild and install this checkout");
+    const description = await ox<{ implementation: unknown; methods: string[] }>(host, ["host", "describe"]);
+    const methods = ["chats.new", "chats.send", "chats.get", "chats.stop", "logs.list", ...(selected.some(test => test.workflow) ? ["vm.call"] : []), ...(writes ? ["chats.open"] : [])];
+    if (!methods.every(method => description.methods.includes(method))) throw new Error("Host lacks required chat/log commands; update Ox");
     report.host = description.implementation;
-    const catalog = await host.call("providers.list", 10000);
-    const providers = catalog.providers as Array<{ id: string; models: Array<{ id: string }> }>;
+    const providers = await ox<Array<{ id: string; models: Array<{ id: string }> }>>(host, ["host", "providers"]);
     const provider = providers.find(entry => entry.id === values.provider);
     const model = provider?.models.find(entry => entry.id === values.model);
     if (!model) throw new Error("Requested provider/model is not exposed by this Host");
-    report.catalog = { region: catalog.region, model };
-    const snapshot = await host.call("chats.get", 10000, values.chat ? { sessionId: values.chat } : {});
-    const template = snapshot.data as { id?: string; messages?: unknown[] } | null;
-    if (!template?.id || !Array.isArray(template.messages) || template.messages.length) throw new Error("Open a fresh empty chat before running evals");
+    report.catalog = { provider, model };
+    const active = await ox<EvalSnapshot | null>(host, ["chat", "inspect"]);
+    if (active?.isBusy || active?.pendingPrompt) throw new Error("QA Host has a running chat or pending prompt; leave it untouched");
     for (const test of selected) {
       for (let repetition = 1; repetition <= repetitions; repetition++) {
         const base = { id: test.id, caseHash: hash(test), repetition, rubric: test.rubric };
         try {
-          const response = await host.call("agents.evaluate", timeoutMs + 10000, {
-            sessionId: template.id, providerId: values.provider, modelId: values.model,
-            prompts: test.prompts, fixtures: test.fixtures, maxTurns, timeoutMs,
-          }) as unknown as EvalResponse;
-          if (!Array.isArray(response.messages) || !Array.isArray(response.errors) || typeof response.systemPrompt !== "string") throw new Error("Invalid eval response");
+          const response = await runCase(host, values.provider, values.model, test, timeoutMs, values["qa-profile"]);
           const checks = score(test, response);
-          const status = response.executionError ? "error" : checks.every(check => check.passed) ? "pass" : "fail";
-          report.results.push({ ...base, status, checks, contextHash: hash({ systemPrompt: response.systemPrompt, tools: response.tools, temperature: response.temperature, maxTokens: response.maxTokens }), response });
+          const status = response.errors.length || response.outcomes.some(turn => ["failed", "cancelled"].includes(turn.outcome)) ? "error" : checks.every(check => check.passed) ? "pass" : "fail";
+          const initial = response.initial;
+          const contextHash = initial ? hash({ systemPrompt: initial.systemPrompt, renderedSystemPrompt: initial.renderedSystemPrompt, soul: initial.soul, memory: initial.memory, tools: initial.tools, model: initial.model }) : undefined;
+          report.results.push({ ...base, status, checks, contextHash, response });
           console.log(`${status.toUpperCase()} ${test.id} ${repetition}/${repetitions}`);
           for (const check of checks.filter(check => !check.passed)) console.log(`  ${check.detail}`);
           for (const error of response.errors) console.log(`  ${error}`);
@@ -141,13 +148,12 @@ Requires a running simulator Host built from this checkout; never executes gener
         } finally {
           await writeFile(output, JSON.stringify(report, null, 2), { mode: 0o600 });
         }
-        if (report.results.at(-1)?.status === "error") break;
+        if (report.results.at(-1)?.status === "error" || report.results.at(-1)?.response?.continuation === "stop") break;
       }
-      if (report.results.at(-1)?.status === "error") break;
+      if (report.results.at(-1)?.status === "error" || report.results.at(-1)?.response?.continuation === "stop") break;
     }
     if (report.results.some(result => result.status !== "pass")) process.exitCode = 1;
   } finally {
-    host.close();
     await writeFile(output, JSON.stringify(report, null, 2), { mode: 0o600 });
     console.log(`Report: ${output}`);
   }
