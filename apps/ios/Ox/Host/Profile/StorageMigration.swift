@@ -256,13 +256,25 @@ nonisolated enum StorageMigrator {
                 attributes: [.posixPermissions: 0o700])
             return try durableProfileDraft(profile, destination: destination)
         }.value
-        let runtime = DurableRuntime(databaseURL: destination.appendingPathComponent("state.sqlite"), artifactRoot: destination)
+        let runtime = DurableRuntime(databaseURL: destination.appendingPathComponent("state.sqlite"), artifactRoot: destination) { method, params, _ in
+            guard method == "profileInstallConversation", let index = params.objectValue?["index"]?.intValue,
+                  (0..<prepared.conversationCount).contains(index) else {
+                throw StorageMigrationError.invalidApplicationStorage("staged conversation request")
+            }
+            return try await Task.detached(priority: .userInitiated) {
+                let data = try durableSourceFile("\(index).json", at: prepared.conversationDirectory)
+                Log.app.info("StorageMigrator.pi installing conversation=\(index + 1)/\(prepared.conversationCount) bytes=\(data.count)")
+                return try JSONDecoder().decode(JSONValue.self, from: data)
+            }.value
+        }
         do {
-            let result = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": prepared.draft]).jsonString())
+            let result = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": prepared.draft,
+                "conversationCount": .int(prepared.conversationCount)]).jsonString())
             await runtime.dispose()
             try await Task.detached(priority: .userInitiated) {
                 let current = try durableSourceInventory(at: profile.url)
                 guard current == prepared.inventory else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
+                try FileManager.default.removeItem(at: prepared.conversationDirectory)
                 var manifest = prepared.manifest
                 manifest["version"] = durableProfileVersion
                 try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
@@ -289,6 +301,8 @@ nonisolated enum StorageMigrator {
         let draft: JSONValue
         let manifest: [String: Any]
         let inventory: [String: String]
+        let conversationDirectory: URL
+        let conversationCount: Int
     }
 
     private static func durableProfileDraft(_ profile: Profile, destination: URL) throws -> DurableProfileDraft {
@@ -303,7 +317,8 @@ nonisolated enum StorageMigrator {
         decoder.userInfo[.artifactDirectoryListing] = ArtifactDirectoryListing()
         var documents: [[String: Any]] = []
         var artifacts: [[String: Any]] = []
-        var conversations: [[String: Any]] = []
+        let conversationDirectory = destination.appendingPathComponent(".migration-conversations", isDirectory: true)
+        try manager.createDirectory(at: conversationDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         var payloads: [String: JSONValue] = [:]
         let payloadStore = DurableArtifactStore(root: destination)
         defer { payloadStore.close() }
@@ -342,103 +357,109 @@ nonisolated enum StorageMigrator {
             return parts.count == 3 && UUID(uuidString: String(parts[1])) != nil && inventory["\(parts[0])/\(parts[1])/chat.json"] != nil
         }) else { throw StorageMigrationError.invalidApplicationStorage("chats") }
         let chatPaths = chatFiles.filter { $0.hasSuffix("/chat.json") }.sorted()
-        for path in chatPaths {
-            let prefix = String(path.dropLast("chat.json".count))
-            let data = try durableSourceFile(path, at: profile.url)
-            let metadata = try decodeMigrationValue(ChatMeta.self, from: data, decoder: decoder, path: path)
-            guard metadata.schemaVersion == ChatFormat.currentSchemaVersion,
-                  UUID(uuidString: String(prefix.split(separator: "/")[1])) == metadata.id else {
-                throw StorageMigrationError.invalidApplicationStorage(path)
-            }
-            let transcriptPath = prefix + "turns.jsonl"
-            var records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)] = []
-            if inventory[transcriptPath] != nil {
-                let descriptor = try durableSourceDescriptor(transcriptPath, at: profile.url)
-                defer { Darwin.close(descriptor) }
-                let reader = DurableTranscriptReader(descriptor: descriptor, store: payloadStore)
-                while let record = try reader.next() {
-                    var missingPurposes: Set<UUID> = []
-                    let value = mapMigrationInvocations(in: record.value) { invocation in
-                        var invocation = invocation
-                        if invocation["purpose"] == nil {
-                            invocation["purpose"] = .string("")
-                            if let id = invocation["id"]?.stringValue.flatMap(UUID.init(uuidString:)) { missingPurposes.insert(id) }
+        for (ordinal, path) in chatPaths.enumerated() {
+            try autoreleasepool {
+                let prefix = String(path.dropLast("chat.json".count))
+                let data = try durableSourceFile(path, at: profile.url)
+                let metadata = try decodeMigrationValue(ChatMeta.self, from: data, decoder: decoder, path: path)
+                guard metadata.schemaVersion == ChatFormat.currentSchemaVersion,
+                      UUID(uuidString: String(prefix.split(separator: "/")[1])) == metadata.id else {
+                    throw StorageMigrationError.invalidApplicationStorage(path)
+                }
+                let transcriptPath = prefix + "turns.jsonl"
+                var records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)] = []
+                if inventory[transcriptPath] != nil {
+                    let descriptor = try durableSourceDescriptor(transcriptPath, at: profile.url)
+                    defer { Darwin.close(descriptor) }
+                    let reader = DurableTranscriptReader(descriptor: descriptor, store: payloadStore)
+                    while let record = try reader.next() {
+                        var missingPurposes: Set<UUID> = []
+                        let value = mapMigrationInvocations(in: record.value) { invocation in
+                            var invocation = invocation
+                            if invocation["purpose"] == nil {
+                                invocation["purpose"] = .string("")
+                                if let id = invocation["id"]?.stringValue.flatMap(UUID.init(uuidString:)) { missingPurposes.insert(id) }
+                            }
+                            return invocation
                         }
-                        return invocation
+                        let turn = try decodeMigrationValue(Turn.self, from: Data(value.jsonString().utf8), decoder: decoder,
+                            path: "\(transcriptPath):\(records.count + 1)")
+                        records.append((turn, record.source, missingPurposes))
+                        payloads[record.source.objectValue!["path"]!.stringValue!] = record.source
                     }
-                    let turn = try decodeMigrationValue(Turn.self, from: Data(value.jsonString().utf8), decoder: decoder,
-                        path: "\(transcriptPath):\(records.count + 1)")
-                    records.append((turn, record.source, missingPurposes))
-                    payloads[record.source.objectValue!["path"]!.stringValue!] = record.source
+                    let missingPurposes = records.reduce(0) { $0 + $1.missingPurposes.count }
+                    Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) legacyPurposes=\(missingPurposes) bytes=\(reader.position)")
                 }
-                let missingPurposes = records.reduce(0) { $0 + $1.missingPurposes.count }
-                Log.app.info("StorageMigrator.pi transcript archived path=\(transcriptPath) turns=\(records.count) externalized=\(reader.externalized) legacyPurposes=\(missingPurposes) bytes=\(reader.position)")
-            }
-            let turns = records.map(\.turn)
-            var document = ChatDocument(turns: turns)
-            guard document.turns.map(\.id) == turns.map(\.id) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
-            document.apply(.sealAllTurns)
-            let sealed = document.turns
-            let contextPath = prefix + "context.json"
-            let checkpoint = inventory[contextPath] == nil ? nil : try decodeMigrationValue(AgentContextCheckpoint.self,
-                from: durableSourceFile(contextPath, at: profile.url), decoder: decoder, path: contextPath)
-            let boundary = try checkpoint.map {
-                let original = try decoder.decode(JSONValue.self, from: durableSourceFile(contextPath, at: profile.url))
-                return try durableCheckpointBoundary($0, records: records, originalMessages: original.objectValue?["messages"], store: payloadStore)
-            } ?? nil
-            if checkpoint != nil, boundary == nil {
-                Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=staleTranscriptCheckpoint source=completeTranscript turns=\(turns.count)")
-            } else if turns.requiresContextCheckpoint, checkpoint == nil {
-                Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=missingCheckpoint source=completeTranscript turns=\(turns.count)")
-            }
-            let alias = "ox-native:\(metadata.id.uuidString)"
-            var unavailableAttachments = 0
-            func messages(_ source: [Message]) -> [JSONValue] {
-                source.map { message in
-                    var fields = DurableMessageCodec.message(message, provider: alias, profileID: profile.id).objectValue!
-                    fields["content"] = .array((fields["content"]?.arrayValue ?? []).map { block in
-                        guard let name = block.objectValue?["oxAttachment"]?.stringValue,
-                              !names.contains(name.lowercased()) else { return block }
-                        unavailableAttachments += 1
-                        return .object(["type": .string("text"), "text": .string("[Unavailable historical attachment: artifacts/\(name)]")])
-                    })
-                    return .object(fields)
+                let turns = records.map(\.turn)
+                var document = ChatDocument(turns: turns)
+                guard document.turns.map(\.id) == turns.map(\.id) else { throw StorageMigrationError.invalidApplicationStorage(transcriptPath) }
+                document.apply(.sealAllTurns)
+                let sealed = document.turns
+                let contextPath = prefix + "context.json"
+                let checkpoint = inventory[contextPath] == nil ? nil : try decodeMigrationValue(AgentContextCheckpoint.self,
+                    from: durableSourceFile(contextPath, at: profile.url), decoder: decoder, path: contextPath)
+                let boundary = try checkpoint.map {
+                    let original = try decoder.decode(JSONValue.self, from: durableSourceFile(contextPath, at: profile.url))
+                    return try durableCheckpointBoundary($0, records: records, originalMessages: original.objectValue?["messages"], store: payloadStore)
+                } ?? nil
+                if checkpoint != nil, boundary == nil {
+                    Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=staleTranscriptCheckpoint source=completeTranscript turns=\(turns.count)")
+                } else if turns.requiresContextCheckpoint, checkpoint == nil {
+                    Log.app.warning("StorageMigrator.pi context recovered path=\(contextPath) reason=missingCheckpoint source=completeTranscript turns=\(turns.count)")
                 }
-            }
-            var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["source": try archive(data).toAny()]]]
-            if checkpoint != nil, boundary == nil {
-                entries.append(["kind": "ox.native.context", "data": ["source": try archive(durableSourceFile(contextPath, at: profile.url)).toAny()]])
-            }
-            var expected: [Any] = []
-            for (index, turn) in sealed.enumerated() {
-                let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
-                let model = messages(ChatProjection.makeWireMessages(from: [turn])).map { $0.toAny() }
-                expected.append(contentsOf: model)
-                entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "source": records[index].source.toAny()]])
-                if index == boundary, let checkpoint {
-                    expected = messages(checkpoint.messages).map { $0.toAny() }
-                    let source = try archive(durableSourceFile(contextPath, at: profile.url))
-                    entries.append(["kind": "pi.reset", "head": "self", "data": ["source": source.toAny()], "model": expected])
+                let alias = "ox-native:\(metadata.id.uuidString)"
+                var unavailableAttachments = 0
+                func messages(_ source: [Message]) -> [JSONValue] {
+                    source.map { message in
+                        var fields = DurableMessageCodec.message(message, provider: alias, profileID: profile.id).objectValue!
+                        fields["content"] = .array((fields["content"]?.arrayValue ?? []).map { block in
+                            guard let name = block.objectValue?["oxAttachment"]?.stringValue,
+                                  !names.contains(name.lowercased()) else { return block }
+                            unavailableAttachments += 1
+                            return .object(["type": .string("text"), "text": .string("[Unavailable historical attachment: artifacts/\(name)]")])
+                        })
+                        return .object(fields)
+                    }
                 }
-            }
-            if unavailableAttachments > 0 {
-                Log.app.warning("StorageMigrator.pi attachments unavailable path=\(path) count=\(unavailableAttachments) sourcePreserved=true")
-            }
-            var applicationMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-            for key in ["id", "model", "title", "isFavorite", "hasUnreadResponse"] { applicationMetadata.removeValue(forKey: key) }
-            var agent: [String: Any] = [:]
-            if let model = metadata.model {
-                agent["model"] = ["provider": model.providerID, "modelId": model.modelID]
-                if let effort = model.reasoningEffort {
-                    if ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains(effort) { agent["thinkingLevel"] = effort }
-                    else { applicationMetadata["nativeReasoningEffort"] = effort }
+                var entries: [[String: Any]] = [["kind": "ox.native.metadata", "data": ["source": try archive(data).toAny()]]]
+                if checkpoint != nil, boundary == nil {
+                    entries.append(["kind": "ox.native.context", "data": ["source": try archive(durableSourceFile(contextPath, at: profile.url)).toAny()]])
                 }
+                var expected: [Any] = []
+                for (index, turn) in sealed.enumerated() {
+                    let canonical = try JSONSerialization.jsonObject(with: JSONEncoder().encode(turn))
+                    let model = messages(ChatProjection.makeWireMessages(from: [turn])).map { $0.toAny() }
+                    expected.append(contentsOf: model)
+                    entries.append(["kind": "ox.native.turn", "model": model, "data": ["turn": canonical, "source": records[index].source.toAny()]])
+                    if index == boundary, let checkpoint {
+                        expected = messages(checkpoint.messages).map { $0.toAny() }
+                        let source = try archive(durableSourceFile(contextPath, at: profile.url))
+                        entries.append(["kind": "pi.reset", "head": "self", "data": ["source": source.toAny()], "model": expected])
+                    }
+                }
+                if unavailableAttachments > 0 {
+                    Log.app.warning("StorageMigrator.pi attachments unavailable path=\(path) count=\(unavailableAttachments) sourcePreserved=true")
+                }
+                var applicationMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                for key in ["id", "model", "title", "isFavorite", "hasUnreadResponse"] { applicationMetadata.removeValue(forKey: key) }
+                var agent: [String: Any] = [:]
+                if let model = metadata.model {
+                    agent["model"] = ["provider": model.providerID, "modelId": model.modelID]
+                    if let effort = model.reasoningEffort {
+                        if ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains(effort) { agent["thinkingLevel"] = effort }
+                        else { applicationMetadata["nativeReasoningEffort"] = effort }
+                    }
+                }
+                let conversation: [String: Any] = ["key": metadata.id.uuidString, "title": metadata.title ?? "", "favorite": metadata.isFavorite,
+                    "unread": metadata.hasUnreadResponse, "agent": agent, "metadata": applicationMetadata, "entries": entries, "expectedContext": try durableExpectedContext(expected)]
+                let encoded = try JSONSerialization.data(withJSONObject: conversation, options: [.sortedKeys])
+                try encoded.write(to: conversationDirectory.appendingPathComponent("\(ordinal).json"), options: .withoutOverwriting)
+                Log.app.info("StorageMigrator.pi conversation staged ordinal=\(ordinal + 1)/\(chatPaths.count) bytes=\(encoded.count)")
             }
-            conversations.append(["key": metadata.id.uuidString, "title": metadata.title ?? "", "favorite": metadata.isFavorite,
-                "unread": metadata.hasUnreadResponse, "agent": agent, "metadata": applicationMetadata, "entries": entries, "expectedContext": try durableExpectedContext(expected)])
         }
         return DurableProfileDraft(draft: .from(["format": 1, "profileID": profile.id.uuidString, "documents": documents,
-            "artifacts": artifacts, "payloads": payloads.values.map { $0.toAny() }, "conversations": conversations]), manifest: manifest, inventory: inventory)
+            "artifacts": artifacts, "payloads": payloads.values.map { $0.toAny() }, "conversations": []]), manifest: manifest, inventory: inventory,
+            conversationDirectory: conversationDirectory, conversationCount: chatPaths.count)
     }
 
     private static func decodeMigrationValue<T: Decodable>(_ type: T.Type, from data: Data, decoder: JSONDecoder, path: String) throws -> T {

@@ -28,6 +28,7 @@ export interface NormalizedProfileDraft {
 export interface ProfileInstallHost {
   database: SqliteDatabase;
   artifacts: ArtifactFiles;
+  conversations?: AsyncIterable<NormalizedProfileDraft["conversations"][number]>;
 }
 export const ConversationApplicationMetadata = defineDoc<{ fields: JsonObject }>({
   kind: "ox.conversation.metadata", version: 1, scope: "conversation", history: "latest", fork: "current",
@@ -93,7 +94,7 @@ function validate(draft: NormalizedProfileDraft) {
     Object.values(fields).forEach(attachment);
   };
   const keys = new Set<string>();
-  for (const conversation of draft.conversations) {
+  return (conversation: NormalizedProfileDraft["conversations"][number]) => {
     if (!conversation.key || keys.has(conversation.key)) throw new Error("Invalid or duplicate source conversation key");
     keys.add(conversation.key);
     if (Object.keys(conversation.metadata ?? {}).some(key => ["id", "profileID", "conversationID", "model", "title", "isFavorite", "hasUnreadResponse"].includes(key))) {
@@ -109,7 +110,7 @@ function validate(draft: NormalizedProfileDraft) {
       }
     }
     attachment(conversation.expectedContext);
-  }
+  };
 }
 async function history(session: OxAgentSession, reference: ConversationReference) {
   const entries: EntryRecord[] = [];
@@ -121,7 +122,7 @@ async function history(session: OxAgentSession, reference: ConversationReference
   } while (cursor);
   return entries.reverse();
 }
-async function verify(session: OxAgentSession, draft: NormalizedProfileDraft, references: ConversationReference[]) {
+async function verifyFiles(session: OxAgentSession, draft: NormalizedProfileDraft) {
   for (const file of draft.documents) {
     if (await session.files.read(file.path) !== file.text) throw new Error("Profile document verification failed");
   }
@@ -135,24 +136,25 @@ async function verify(session: OxAgentSession, draft: NormalizedProfileDraft, re
     const record = await session.harness.snapshot(ProfileArtifact, file.path, context);
     if (!same(record, { ...file, binary: true, saved: false })) throw new Error("Profile payload metadata verification failed");
   }
-  for (const [index, source] of draft.conversations.entries()) {
-    const reference = references[index]!;
-    const entries = await history(session, reference);
-    if (entries.length !== source.entries.length) throw new Error("Conversation ledger count mismatch");
-    for (const [ordinal, entry] of entries.entries()) {
-      const expected = source.entries[ordinal]!;
-      if (!same({ kind: entry.kind, model: entry.model, data: entry.data }, { kind: expected.kind, model: expected.model, data: expected.data })
-          || entry.head !== (expected.head === "self" ? entry.id : undefined)) throw new Error("Conversation ledger verification failed");
-    }
-    const conversation = (await session.harness.conversation(reference.conversationID, context))!;
-    const active = (await conversation.context(context)).messages;
-    if (!same(active, source.expectedContext)) throw new Error(`Conversation active context mismatch: key=${source.key} stored=${active.length} expected=${source.expectedContext.length}`);
-    const metadata = await session.conversations.metadata(reference);
-    if (!same((await session.harness.snapshot(ConversationApplicationMetadata, reference.conversationID, context))?.fields, source.metadata ?? {})) throw new Error("Conversation application metadata mismatch");
-    if (!same(metadata.agent?.model, source.agent.model ?? undefined)
-        || (source.agent.thinkingLevel !== undefined && metadata.agent?.thinkingLevel !== source.agent.thinkingLevel)) throw new Error("Conversation model selection mismatch");
-    if (metadata.presentation?.title !== source.title || metadata.favorite !== source.favorite || metadata.unread !== source.unread) throw new Error("Conversation presentation mismatch");
+}
+async function verifyConversation(session: OxAgentSession, source: NormalizedProfileDraft["conversations"][number], reference: ConversationReference) {
+  const entries = await history(session, reference);
+  if (entries.length !== source.entries.length) throw new Error("Conversation ledger count mismatch");
+  for (const [ordinal, entry] of entries.entries()) {
+    const expected = source.entries[ordinal]!;
+    if (!same({ kind: entry.kind, model: entry.model, data: entry.data }, { kind: expected.kind, model: expected.model, data: expected.data })
+        || entry.head !== (expected.head === "self" ? entry.id : undefined)) throw new Error("Conversation ledger verification failed");
   }
+  const conversation = (await session.harness.conversation(reference.conversationID, context))!;
+  const active = (await conversation.context(context)).messages;
+  if (!same(active, source.expectedContext)) throw new Error(`Conversation active context mismatch: key=${source.key} stored=${active.length} expected=${source.expectedContext.length}`);
+  const metadata = await session.conversations.metadata(reference);
+  if (!same((await session.harness.snapshot(ConversationApplicationMetadata, reference.conversationID, context))?.fields, source.metadata ?? {})) throw new Error("Conversation application metadata mismatch");
+  if (!same(metadata.agent?.model, source.agent.model ?? undefined)
+      || (source.agent.thinkingLevel !== undefined && metadata.agent?.thinkingLevel !== source.agent.thinkingLevel)) throw new Error("Conversation model selection mismatch");
+  if (metadata.presentation?.title !== source.title || metadata.favorite !== source.favorite || metadata.unread !== source.unread) throw new Error("Conversation presentation mismatch");
+}
+async function verifySession(session: OxAgentSession) {
   const inspection = await session.harness.inspect(context);
   if (inspection.scheduling !== "paused" || inspection.tasks.length || inspection.submissions.length) throw new Error("Profile installation must remain dormant");
   if (await session.files.integrity() !== "ok") throw new Error("Profile SQLite integrity failed");
@@ -160,7 +162,9 @@ async function verify(session: OxAgentSession, draft: NormalizedProfileDraft, re
 export async function installOxProfile(draft: NormalizedProfileDraft, host: ProfileInstallHost) {
   let session: OxAgentSession | undefined;
   try {
-    validate(draft);
+    const validateConversation = validate(draft);
+    if (host.conversations && draft.conversations.length) throw new Error("Profile installation cannot mix inline and streamed conversations");
+    for (const source of draft.conversations) validateConversation(source);
     if ((await host.database.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")).length) throw new Error("Profile installation requires a fresh staged database");
     session = await openOxAgentSession({ ...host, profileID: draft.profileID, models: createModels(),
       authorizeFile: async () => { throw new Error("Profile installation cannot invoke tools"); } });
@@ -182,21 +186,24 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
         Object.assign(await tx.doc(ProfileArtifact, file.path, null), file, { binary: true, saved: false });
       }, context);
     }
-    const references: ConversationReference[] = [];
-    for (const source of draft.conversations) {
+    await verifyFiles(session, draft);
+    const conversations: { key: string; reference: ConversationReference }[] = [];
+    for await (const source of host.conversations ?? draft.conversations) {
+      if (host.conversations) validateConversation(source);
       const conversation = await session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: source.agent,
         init: async (tx, id) => {
           (await tx.doc(ConversationApplicationMetadata, id)).fields = source.metadata ?? {};
           for (const entry of source.entries) await tx.appendEntry(id, entry);
         } }, context);
       const reference = session.conversations.reference(conversation.id);
-      references.push(reference);
       await session.conversations.present(reference, { title: source.title, favorite: source.favorite, visible: true });
       const newest = (await conversation.entries({}, 1, undefined, context)).items[0]?.id;
       if (!source.unread) await session.conversations.markRead(reference, newest ?? null);
+      await verifyConversation(session, source, reference);
+      conversations.push({ key: source.key, reference });
     }
-    await verify(session, draft, references);
-    return { conversations: draft.conversations.map((source, index) => ({ key: source.key, reference: references[index]! })) };
+    await verifySession(session);
+    return { conversations };
   } finally {
     if (session) await session.close();
     else { try { await host.database.close(); } finally { await host.artifacts.close(); } }

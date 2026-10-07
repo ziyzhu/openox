@@ -99,6 +99,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = ACA9693E2FA332BD00D0412F /* Build configuration list for PBXNativeTarget "ios" */;
 			buildPhases = (
+				AF0000010000000000000001,
 				ACA9692F2FA332BC00D0412F /* Sources */,
 				ACA969302FA332BC00D0412F /* Frameworks */,
 				ACA969312FA332BC00D0412F /* Resources */,
@@ -200,6 +201,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+		AF0000010000000000000001 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/validate-agent-bundle.sh",
+				"$(SRCROOT)/Ox/Resources",
+			);
+			name = "Validate agent bundle";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"$SRCROOT/validate-agent-bundle.sh\"\n";
+		};
 
 /* Begin PBXSourcesBuildPhase section */
 		ACA9692F2FA332BC00D0412F /* Sources */ = {

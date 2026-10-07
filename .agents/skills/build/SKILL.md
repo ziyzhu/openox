@@ -39,6 +39,7 @@ files, and creates a deterministic Local Git seed and model-action resources.
 Package builds copy this source; hosted icon artwork lives in `assets/services/`.
 It is a build operation, not live service verification.
 Do not overwrite unrelated repository or generated changes.
+`PiDurable.bundle` is ignored by Git: run `build:agent` before local Xcode builds. Xcode Cloud installs the pinned Bun version and generates it in `ci_post_clone.sh`; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path.
 Prompt scaffolds use explicit adapter-selected variants; prefer some duplicated wording over capability-driven prose parsing or rendered-text patching.
 
 Run `bun run ci` through the `test` skill after maintenance. Simulator provisioning

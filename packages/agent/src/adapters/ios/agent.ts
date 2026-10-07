@@ -24,6 +24,7 @@ interface Config { chatID: string; title?: string; promptState: SystemPromptInpu
   reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; messages: Message[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
 interface Command extends ApplicationPresentationChange { action: string; draft?: NormalizedProfileDraft; config?: Config; chatID?: string | null; content?: UserInput;
+  conversationCount?: number;
   promptState?: SystemPromptInput; turnState?: TurnState;
   requestID?: string; submissionID?: SubmissionId; profileID?: string; path?: string; prefix?: string; text?: string; base64?: string; saved?: boolean; artifactFiles?: boolean;
   artifact?: ArtifactRecord & { binary: boolean; saved: boolean }; writes?: { path: string; text: string }[]; removes?: string[]; entries?: EntryDraft[];
@@ -76,7 +77,15 @@ export class IOSAgentAdapter {
     if (args.action === "composePrompt") return composeIOSPrompt(args.promptState!);
     if (args.action === "installProfile") {
       if (this.session || !args.draft) throw new Error("Profile installation requires an unopened staged runtime and normalized draft");
-      return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })), artifacts: nativeArtifacts() });
+      const count = args.conversationCount;
+      if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) throw new Error("Invalid Profile conversation count");
+      async function* conversations() {
+        for (let index = 0; index < count!; index++) {
+          yield await native<NormalizedProfileDraft["conversations"][number]>("profileInstallConversation", { index });
+        }
+      }
+      return installOxProfile(args.draft, { database: nativeDatabase((op, sql, params) => native("sql", { op, sql, params })),
+        artifacts: nativeArtifacts(), conversations: count === undefined ? undefined : conversations() });
     }
     if (args.action === "open") {
       if (this.session) throw new Error("Session already open");

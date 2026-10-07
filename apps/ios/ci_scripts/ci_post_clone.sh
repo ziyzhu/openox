@@ -16,3 +16,16 @@ printf '%s\n' \
   "OX_BUNDLE_IDENTIFIER = $OX_BUNDLE_IDENTIFIER" \
   > "$configuration"
 echo "Wrote Xcode Cloud configuration"
+
+cd "$(dirname "$0")/../../.."
+bun_version=1.3.13
+if ! command -v bun >/dev/null 2>&1 || [ "$(bun --version)" != "$bun_version" ]; then
+  export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+  installer="$(mktemp)"
+  trap 'rm -f "$installer"' EXIT
+  curl --fail --silent --show-error --location https://bun.sh/install --output "$installer"
+  bash "$installer" "bun-v$bun_version"
+  export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+bun --no-env-file install --frozen-lockfile
+bun --no-env-file run build:agent

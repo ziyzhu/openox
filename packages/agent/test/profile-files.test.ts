@@ -191,6 +191,23 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     expect(await installedProbe.db.all("SELECT id FROM tasks")).toHaveLength(0);
     expect(await installedProbe.db.all("SELECT id FROM documents WHERE kind='\"ox.chat\"'")).toHaveLength(0);
     await installedProbe.db.close();
+    const streamed = `${directory}/streamed`;
+    await mkdir(`${streamed}/artifacts`, { recursive: true });
+    await writeFile(`${streamed}/artifacts/chart.png`, imageBytes);
+    async function* conversations() {
+      yield draft.conversations[0]!;
+      const probe = backend(`${streamed}/state.sqlite`);
+      try { expect(await probe.db.all("SELECT id FROM entries")).toHaveLength(3); }
+      finally { await probe.db.close(); }
+      yield { ...draft.conversations[0]!, key: "second-source" };
+    }
+    const streamedResult = await installOxProfile({ ...draft, conversations: [] }, {
+      database: backend(`${streamed}/state.sqlite`).db, artifacts: host(streamed), conversations: conversations(),
+    });
+    expect(streamedResult.conversations.map(value => value.key)).toEqual(["source-key", "second-source"]);
+    const streamedProbe = backend(`${streamed}/state.sqlite`);
+    try { expect(await streamedProbe.db.all("SELECT id FROM entries")).toHaveLength(6); }
+    finally { await streamedProbe.db.close(); }
     await expect(installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) })).rejects.toThrow("fresh staged database");
     const untouched = backend(`${installed}/state.sqlite`);
     expect(await untouched.db.all("SELECT id FROM entries")).toHaveLength(3);

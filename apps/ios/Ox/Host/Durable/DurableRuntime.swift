@@ -42,7 +42,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                     if context == nil { try install() }
                     nextID += 1
                     calls[nextID] = continuation
-                    context?.evaluateScript("OxDurable.\(entry)(\(json)).then(value => __oxDurableComplete(\(nextID), JSON.stringify(value), null), error => __oxDurableComplete(\(nextID), null, String(error) + '\\n' + (error.stack || '')));", withSourceURL: URL(string: "ox-trusted://durable-command.js"))
+                    context?.objectForKeyedSubscript("__oxDurableCommand")?.call(withArguments: [entry, json, nextID])
                 } catch { continuation.resume(throwing: error) }
             }
         }
@@ -189,6 +189,14 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             throw failure("Missing PiDurable.bundle; run bun run build:agent before building")
         }
         ctx.evaluateScript(try String(contentsOf: url, encoding: .utf8), withSourceURL: URL(string: "ox-trusted://harness.js"))
+        ctx.evaluateScript("""
+            globalThis.__oxDurableCommand = (entry, json, id) => {
+                Promise.resolve().then(() => OxDurable[entry](JSON.parse(json))).then(
+                    value => __oxDurableComplete(id, JSON.stringify(value), null),
+                    error => __oxDurableComplete(id, null, String(error) + '\\n' + (error.stack || ''))
+                );
+            };
+            """, withSourceURL: URL(string: "ox-trusted://durable-command.js"))
         if let fatalError { throw failure(fatalError) }
         Log.agent.info("PiDurable trusted context opened durable=1.0.0 ai=1.0.0 chord=1.0.0")
     }
