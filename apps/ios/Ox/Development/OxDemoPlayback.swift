@@ -24,12 +24,12 @@ nonisolated enum OxDemoChapter: String {
 }
 
 nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
-    case connect, memory, planning, publishing, local, offline, yours, providers, reddit, reuse
+    case connect, memory, planning, publishing, local, offline, yours, providers, reddit, reuse, creative
 
     var id: String { rawValue }
     var chapter: OxDemoChapter {
         switch self {
-        case .connect, .memory, .planning, .publishing: .connect
+        case .connect, .memory, .planning, .publishing, .creative: .connect
         case .local, .offline: .local
         case .yours, .providers, .reddit, .reuse: .yours
         }
@@ -53,6 +53,7 @@ nonisolated enum OxDemoScene: String, CaseIterable, Identifiable {
         case .publishing: ["github.com", "mail.google.com", "ios:reminders"]
         case .offline: ["ios:reminders"]
         case .reuse: ["reddit.com"]
+        case .creative: OxAppStoreCreative.domains
         default: []
         }
     }
@@ -158,6 +159,7 @@ nonisolated enum OxDemoLaunch {
     }
     static var completed: Bool { ProcessInfo.processInfo.environment["OX_DEMO_COMPLETE"] == "1" }
     static var autoplay: Bool { ProcessInfo.processInfo.environment["OX_DEMO_AUTOPLAY"] == "1" }
+    static var time: TimeInterval { Double(ProcessInfo.processInfo.environment["OX_DEMO_TIME"] ?? "") ?? 0 }
 }
 
 /// In-memory presentation fixtures. Never prepares a Host, checks service access, or calls a model.
@@ -180,6 +182,7 @@ final class OxDemoPlayback {
     private(set) var thinking: ThinkingTrace?
     private(set) var thinkingStartedAt = Date()
     private(set) var serviceCreated = false
+    private(set) var serviceScrollProgress: CGFloat?
     var focusComposer = false
     var selectedProvider: String? = "chatgpt"
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -194,8 +197,10 @@ final class OxDemoPlayback {
             "manus.im": "Manus", "doubao.com": "Doubao", "grok.com": "Grok",
             "outlook.live.com": "Outlook", "linkedin.com": "LinkedIn",
             "www.1point3acres.com": "1Point3Acres", "reddit.com": "Reddit",
-            "mail.google.com": "Gmail", "github.com": "GitHub",
+            "mail.google.com": "Gmail", "github.com": "GitHub", "gemini.google.com": "Gemini",
             "ios:calendar": "Calendar", "ios:reminders": "Reminders",
+            "www.kimi.com": "Kimi", "qwen.ai": "Qwen", "chat.deepseek.com": "DeepSeek",
+            "www.perplexity.ai": "Perplexity", "copilot.com": "Copilot", "chat.z.ai": "Z.ai",
         ]
         var built: [String: Service] = [:]
         for (domain, name) in names {
@@ -219,13 +224,17 @@ final class OxDemoPlayback {
         }
         catalog = built
         let bundle = Bundle.main.url(forResource: "OxDemoArtwork", withExtension: "bundle")
-        artwork = Dictionary(uniqueKeysWithValues: (Array(names.keys) + ["www.kimi.com", "gemini.google.com", "qwen.ai"]).compactMap { domain in
+        artwork = Dictionary(uniqueKeysWithValues: names.keys.compactMap { domain in
             guard let url = bundle?.appendingPathComponent("\(domain).png"),
                   let data = try? Data(contentsOf: url) else { return nil }
             return (domain, data)
         })
         Log.ui.info("Demo.fixture initialized artwork=\(artwork.count) liveRequests=false")
-        if completed { showCompletedScene() }
+        if scene == .creative {
+            updateCreative(at: OxDemoLaunch.time, reduceMotion: false)
+        } else if completed {
+            showCompletedScene()
+        }
     }
 
     var attachedServices: [Service] {
@@ -250,7 +259,11 @@ final class OxDemoPlayback {
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                let scenes = OxDemoScene.allCases
+                if scene == .creative {
+                    try await performCreative(reduceMotion: reduceMotion)
+                    return
+                }
+                let scenes = OxDemoScene.allCases.filter { $0 != .creative }
                 let start = scenes.firstIndex(of: scene) ?? 0
                 for next in scenes[start...] {
                     try Task.checkCancellation()
@@ -269,6 +282,7 @@ final class OxDemoPlayback {
 
     func showCompletedScene() {
         stop()
+        guard scene != .creative else { return }
         composer.replaceDraft("")
         if presentation == .storyboard && [.planning, .publishing].contains(scene) {
             composer.replaceDraft(scene.prompt)
@@ -296,6 +310,27 @@ final class OxDemoPlayback {
         thinking = nil
         serviceCreated = false
         focusComposer = false
+    }
+
+    private func updateCreative(at elapsed: TimeInterval, reduceMotion: Bool) {
+        serviceScrollProgress = reduceMotion ? 0 : OxAppStoreCreative.scrollProgress(at: elapsed) * OxAppStoreCreative.travelFraction
+    }
+
+    private func performCreative(reduceMotion: Bool) async throws {
+        try await Task.sleep(for: .seconds(1))
+        let clock = ContinuousClock()
+        while !Task.isCancelled {
+            let start = clock.now
+            Log.ui.info("Demo.creative cycleStart duration=20 liveRequests=false")
+            var elapsed: TimeInterval = 0
+            while elapsed < OxAppStoreCreative.duration {
+                updateCreative(at: elapsed, reduceMotion: reduceMotion)
+                try await Task.sleep(for: .milliseconds(16))
+                let components = start.duration(to: clock.now).components
+                elapsed = Double(components.seconds) + Double(components.attoseconds) / 1e18
+            }
+            updateCreative(at: OxAppStoreCreative.duration, reduceMotion: reduceMotion)
+        }
     }
 
     private func perform(reduceMotion: Bool) async throws {

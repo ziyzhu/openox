@@ -6,14 +6,19 @@ import { run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 
-const config = qaCommand({ usage: "Usage: bun run test:demo --device ox-N\nExercises native demo scenes without player controls or live model/service calls." });
+const config = qaCommand({
+  usage: "Usage: bun run test:demo --device ox-N [--app /absolute/Ox.app]\nExercises native demo scenes without player controls or live model/service calls.",
+  options: { app: { type: "string" } },
+});
 const bundle = "ai.oxcraft.bot";
 const directory = await mkdtemp(join(tmpdir(), "ox-demo-preview-"));
 const release = claimSimulator(config.device);
 const checks: string[] = [];
-const launch = ["run", bundle, "--project", "apps/ios/Ox.xcodeproj", "--scheme", "ios", "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`];
+const launch = ["run", bundle,
+  ...(config.values.app ? ["--app", config.values.app] : ["--project", "apps/ios/Ox.xcodeproj", "--scheme", "ios"]),
+  "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`];
 const sim = async (...args: string[]) => JSON.parse((await run(["sim", "--device", config.device, ...args], { capture: true })).stdout);
-type Element = { AXUniqueId?: string; AXLabel?: string; AXValue?: string; frame?: { width: number; height: number }; children?: Element[] };
+type Element = { AXUniqueId?: string; AXLabel?: string; AXValue?: string; frame?: { x: number; width: number; height: number }; children?: Element[] };
 const elements = async (): Promise<Element[]> => {
   const tree = await sim("describe") as { accessibility: Element[] };
   const flatten = (nodes: Element[]): Element[] => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
@@ -45,16 +50,17 @@ async function snapshot(label: string) {
   return output;
 }
 let launched = false;
-async function scene(name: string, completed = true, autoplay = false) {
+async function scene(name: string, completed = true, autoplay = false, time = 0) {
   await sim(...launch, "--env", "OX_DEMO=1", "--env", `OX_DEMO_SCENE=${name}`,
-    "--env", `OX_DEMO_COMPLETE=${completed ? 1 : 0}`, "--env", `OX_DEMO_AUTOPLAY=${autoplay ? 1 : 0}`);
+    "--env", `OX_DEMO_COMPLETE=${completed ? 1 : 0}`, "--env", `OX_DEMO_AUTOPLAY=${autoplay ? 1 : 0}`,
+    "--env", `OX_DEMO_TIME=${time}`);
   launched = true;
   const heading = ["connect", "local", "yours"].includes(name);
   await wait(heading ? "demo.chapter" : name === "providers" ? "demo.provider.chatgpt"
-    : completed && !["planning", "publishing"].includes(name) ? "chat.message.user" : "chat.input");
+    : completed && !["planning", "publishing", "creative"].includes(name) ? "chat.message.user" : "chat.input");
   const tree = await elements();
   check(!tree.some(element => ["demo.playPause", "demo.record", "demo.disclosure", "demo.airplane"].includes(element.AXUniqueId ?? "")), `${name}: no custom player or simulated system UI`);
-  await sim("screenshot", "--out", join(directory, `${name}${autoplay ? "-autoplay" : ""}.png`));
+  await sim("screenshot", "--out", join(directory, `${name}${autoplay ? "-autoplay" : name === "creative" ? `-${time}` : ""}.png`));
   return tree;
 }
 try {
@@ -144,6 +150,40 @@ try {
     screenshotSize = `${width}x${height}`;
   }
   check((await readdir(screenshotDirectory)).length === 6, "exactly six app-only screenshot PNGs");
+  let creativeHeight: number | undefined;
+  let openingChipX: number | undefined;
+  const creativePositions = new Map<number, number>();
+  let fullScrollTravel = 0;
+  for (const time of [0, 3, 4, 5, 10, 15, 20]) {
+    tree = await scene("creative", false, false, time);
+    check(await value("chat.input") === "Type a message", `creative ${time}s: composer remains empty`);
+    const speech = tree.find(element => element.AXUniqueId === "chat.speechHold")?.frame;
+    check(speech?.width === 44 && speech.height === 44, `creative ${time}s: normal production 44-point control size`);
+    const input = tree.find(element => element.AXUniqueId === "chat.input")?.frame;
+    check(input && (creativeHeight === undefined || input.height === creativeHeight), `creative ${time}s: stable empty composer height`);
+    creativeHeight = input?.height;
+    const chips = tree.filter(element => element.AXUniqueId?.startsWith("conversation.servicePill."));
+    check(chips.length === 13 && chips.every(element => element.AXValue === "Signed in"), `creative ${time}s: all 13 assistants have snapshot sign-in status`);
+    check(chips.every(element => element.frame?.height === 44), `creative ${time}s: normal production 44-point chip size`);
+    check(!tree.some(element => ["chat.message.user", "demo.reply", "demo.thinking", "chat.openSidebar", "chat.modelPicker"].includes(element.AXUniqueId ?? "")), `creative ${time}s: only production chips and composer`);
+    const x = chips[0]?.frame?.x;
+    if (x !== undefined) creativePositions.set(time, x);
+    if (time === 0) {
+      openingChipX = x;
+      const last = chips.at(-1)?.frame;
+      const viewport = tree[0]?.frame;
+      check(last && viewport && x !== undefined, "creative: scroll content geometry available");
+      fullScrollTravel = last!.x + last!.width - x! - (viewport!.width - 2 * x!);
+    }
+    if (time === 10) check(x !== undefined && openingChipX !== undefined && x < openingChipX - 300, "creative: limited-distance scroll reveals more assistants");
+    if (time === 20) check(x === openingChipX, "creative: opening scroll position restored at loop boundary");
+  }
+  const travel = Math.abs(creativePositions.get(10)! - creativePositions.get(0)!);
+  check(Math.abs(travel - fullScrollTravel / 2) < 1, "creative: half-distance native scroll keeps the loop at 20 seconds");
+  const step = Math.abs(creativePositions.get(5)! - creativePositions.get(4)!);
+  const previousStep = Math.abs(creativePositions.get(4)! - creativePositions.get(3)!);
+  check(Math.abs(step - previousStep) < 1, "creative: steady mid-scroll speed instead of accelerating through the center");
+  check(step < travel * 0.13, "creative: peak speed stays below 13 percent of total travel per second");
   await scene("connect");
   const after = await snapshot("after");
   check(JSON.stringify(before) === JSON.stringify(after), "profile and Local repository contents unchanged");

@@ -1,6 +1,6 @@
 ---
 name: demo
-description: "Prepare and record the three-part Ox iOS demo: Connect anything, Local first, and Yours. Use when recording, recreating, or preparing this specific demo."
+description: "Prepare and record Ox’s three-part iOS demo, native SwiftUI previews, App Store screenshots, and product-page/search creative assets. Use for demo or App Store visual capture, composition, and export."
 ---
 
 # Ox Demo
@@ -34,11 +34,17 @@ sim --device <owned-device> run ai.oxcraft.bot \
   --env OX_DEMO=1 --env OX_DEMO_SCENE=memory --env OX_DEMO_COMPLETE=1
 ```
 
-`OX_DEMO_SCENE` accepts `connect`, `memory`, `planning`, `publishing`, `local`, `offline`, `yours`, `providers`, `reddit`, or `reuse`. Use `OX_DEMO_AUTOPLAY=1` without `OX_DEMO_COMPLETE=1` for the timeline. Relaunch without demo environment variables to return to normal Ox. This entry point and its fixtures are DEBUG-only; demo artwork is excluded from Release builds. Start recording before autoplay; simulator command latency can otherwise miss the opening chapter. Trim the relaunch transition and verify the opening in the exported video.
+`OX_DEMO_SCENE` accepts `connect`, `memory`, `planning`, `publishing`, `local`, `offline`, `yours`, `providers`, `reddit`, `reuse`, or `creative`. Use `OX_DEMO_AUTOPLAY=1` without `OX_DEMO_COMPLETE=1` for the timeline. Relaunch without demo environment variables to return to normal Ox. This entry point and its fixtures are DEBUG-only; demo artwork is excluded from Release builds. Start recording before autoplay; simulator command latency can otherwise miss the opening chapter. Trim the relaunch transition and verify the opening in the exported video.
 
 The preview uses in-memory, illustrative data and local artwork. Task traces, source-specific replies, and streaming cadence are scripted presentation fixtures, not captured model reasoning or evidence of completed operations. Service chips use the production status layout with snapshot-only auth state; preview status indicators are not proof of a real sign-in or native permission grant. It bypasses normal Host preparation and performs no model requests, account imports, service execution, or persisted service creation. Disclose this distinction in the accompanying description or delivery notes, not through extra in-app UI. The `offline` preview presents existing messages only; it does not demonstrate offline inference or change radio settings. A real airplane-mode action still requires separate system footage, following the live requirements below. Do not present preview screenshots as evidence that signed-out services succeeded.
 
-Run `bun run test:demo --device <owned-device>` to check native rendering, exact prompts and service assignments, absence of special UI, and unchanged profile/Local repository contents. This checks presentation fixtures, not live integrations. Keep its private diagnostics outside the repository.
+Run `bun run test:demo --device <owned-device> [--app /absolute/Ox.app]` to check native rendering, exact prompts and service assignments, absence of special UI, and unchanged profile/Local repository contents. This checks presentation fixtures, not live integrations. Keep its private diagnostics outside the repository.
+
+## App Store creative preview
+
+`OX_DEMO_SCENE=creative` is a separate 20-second service-chip loop with all 13 assistant website services in snapshot signed-in state and an empty composer. Production chips travel halfway along the row and back, keeping the loop at 20 seconds with lower velocity; not every attached assistant passes through the visible area. Use normal production sizes and the recording device’s actual width; do not shrink a wider composition to fit. No prompts are typed or sent. It does not change the ordinary storyboard or demonstrate authenticated service execution.
+
+Use `OX_DEMO_AUTOPLAY=1` for looping playback or `OX_DEMO_TIME=<seconds>` without autoplay for static review frames. Record before launching; playback waits one second for layout, then logs `Demo.creative cycleStart`. Crop away system chrome and keep equal composer edge padding plus background above the chip row. Export separate silent 60 fps H.264 MP4s at 3840 × 1646 (header) and 3840 × 2560 (search), retaining 20 seconds of source time. For slower scrolling, reduce native travel distance and re-record at full speed; do not slow an existing export, which repeats frames and changes the requested duration. Use [Apple’s creative asset specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/creative-assets-specifications), not ordinary screenshot/app-preview sizes. Verify the first/last framing and complete decoding; inspect representative frames before sharing. The native E2E checks an empty composer, normal 44-point chip/control targets, snapshot statuses, stable height, scroll endpoints, and unchanged persisted data.
 
 ## App Store screenshot previews
 
@@ -68,7 +74,7 @@ Launch with `sim --device <owned-device> run ai.oxcraft.bot --app <Ox.app> --env
 - Reuse configured providers and authenticated sessions when they match this storyboard. Recheck authentication before a take rather than repeating sign-in unnecessarily. Reuse sanitized response files and a healthy replay server only for explicitly requested replay footage.
 - Keep a private run manifest with the device, profile and chat IDs, sign-in checks, actual pre-run results and limitations, inference mode per scene, response directory, raw scene paths, source trim timestamps, original radio settings, and final export command.
 - Preserve each scene separately. Before a full take, review a short sample covering typing, cursor blinking, Send, and keyboard dismissal. Confirm text and composer move together and export timing matches the source. Reuse a successful sample as finished footage when possible.
-- For a revision, record only scenes whose visible content changed. For timing or trimming changes, re-export existing raw captures. Verify changed scenes and final joins without repeating unrelated setup.
+- For a revision, record only changed scenes. Re-export existing raw captures for trim or framing changes; for animation velocity changes, adjust native playback and re-record while preserving the requested duration. Verify changed scenes and final joins without repeating unrelated setup.
 - Trim using source timestamps, reset each trimmed clip to zero, then convert to a constant frame rate. Preserve pauses and cursor cadence on the first export.
 - For a commit-only follow-up, review the diff, complete repository-required commit checks, and reuse completed validation unless changes invalidate it.
 

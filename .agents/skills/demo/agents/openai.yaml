@@ -1,4 +1,4 @@
 interface:
   display_name: "Ox Demo"
-  short_description: "Record Connect anything, Local first, and Yours"
-  default_prompt: "Use $demo to prepare and record the three-part Ox demo on the selected device, using the existing feature copy verbatim and verifying all required services are signed in."
+  short_description: "Record Ox demos and App Store visual assets"
+  default_prompt: "Use $demo to prepare the requested Ox demo or App Store visual asset. Choose live capture or native preview explicitly, reuse production UI, preserve feature copy, verify live sign-ins when required, and review exports."

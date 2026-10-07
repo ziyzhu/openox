@@ -240,6 +240,7 @@ struct ConversationComposer: View, Equatable {
     let onStop: () -> Void
     let onSpeechBegin: (Bool) -> Void
     var serviceAuthSource = ServiceChip.AuthSource.live
+    var serviceScrollProgress: CGFloat? = nil
 
     private let textLineFragmentPadding: CGFloat = 5
     private let textEditorVerticalInset: CGFloat = 9
@@ -247,6 +248,8 @@ struct ConversationComposer: View, Equatable {
 
     @State private var containerWidth: CGFloat = 0
     @State private var composerTextEditorHeight: CGFloat = 40
+    @State private var serviceScrollPosition = ScrollPosition(edge: .leading)
+    @State private var serviceScrollExtent: CGFloat = 0
     @State private var composerSelection = AttributedTextSelection()
     @State private var textViewReference = ComposerTextViewReference()
     @State private var hasShownImportMemory = false
@@ -274,6 +277,7 @@ struct ConversationComposer: View, Equatable {
             && lhs.iconButtonSize == rhs.iconButtonSize
             && lhs.composerButtonSize == rhs.composerButtonSize
             && lhs.serviceAuthSource == rhs.serviceAuthSource
+            && lhs.serviceScrollProgress == rhs.serviceScrollProgress
     }
 
     private var empty: Bool {
@@ -673,6 +677,16 @@ struct ConversationComposer: View, Equatable {
                     }
                 }
             }
+        }
+        .scrollPosition($serviceScrollPosition)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            max(0, geometry.contentSize.width - geometry.containerSize.width)
+        } action: { _, extent in
+            serviceScrollExtent = extent
+            if let progress = serviceScrollProgress { serviceScrollPosition.scrollTo(x: extent * progress) }
+        }
+        .onChange(of: serviceScrollProgress) { _, progress in
+            if let progress { serviceScrollPosition.scrollTo(x: serviceScrollExtent * progress) }
         }
         .scrollClipDisabled()
         .frame(minHeight: Theme.Size.minimumTouchTarget)

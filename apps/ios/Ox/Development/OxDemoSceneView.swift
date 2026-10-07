@@ -46,6 +46,10 @@ struct OxDemoSceneView: View {
             .accessibilityIdentifier("demo.chapter")
             .id(playback.scene)
             .transition(.opacity)
+        } else if playback.scene == .creative {
+            composer
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .allowsHitTesting(false)
         } else if playback.scene == .providers {
             providerList
                 .transition(.opacity)
@@ -145,8 +149,8 @@ struct OxDemoSceneView: View {
             isTemporary: false,
             isBusy: playback.isStreaming,
             followIntents: [],
-            floatsTopStrip: !playback.attachedServices.isEmpty,
-            isEmbedded: false,
+            floatsTopStrip: playback.scene != .creative && !playback.attachedServices.isEmpty,
+            isEmbedded: playback.scene == .creative,
             iconButtonSize: iconButtonSize,
             composerButtonSize: composerButtonSize,
             onOpenAttachment: { _, _ in },
@@ -162,7 +166,8 @@ struct OxDemoSceneView: View {
             onSend: { playback.showCompletedScene() },
             onStop: { playback.stop() },
             onSpeechBegin: { _ in },
-            serviceAuthSource: .snapshot
+            serviceAuthSource: .snapshot,
+            serviceScrollProgress: playback.serviceScrollProgress
         )
     }
 
@@ -211,6 +216,11 @@ struct OxDemoSceneView: View {
             ),
         ]
     }
+}
+
+#Preview("App Store creative · 20-second loop") {
+    OxDemoSceneView(scene: .creative, autoplay: true)
+        .previewLayout(.fixed(width: 402, height: 268))
 }
 
 #Preview("Storyboard · native UI") {

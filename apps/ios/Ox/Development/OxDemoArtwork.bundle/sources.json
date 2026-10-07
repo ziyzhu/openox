@@ -66,5 +66,21 @@
   "qwen.ai": {
     "source": "https://openox.ai/assets/services/qwen.ai/favicon.png",
     "finalURL": "https://openox.ai/assets/services/qwen.ai/favicon.png"
+  },
+  "chat.deepseek.com": {
+    "source": "https://openox.ai/assets/services/chat.deepseek.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/chat.deepseek.com/favicon.png"
+  },
+  "www.perplexity.ai": {
+    "source": "https://openox.ai/assets/services/www.perplexity.ai/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/www.perplexity.ai/favicon.png"
+  },
+  "copilot.com": {
+    "source": "https://openox.ai/assets/services/copilot.com/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/copilot.com/favicon.png"
+  },
+  "chat.z.ai": {
+    "source": "https://openox.ai/assets/services/chat.z.ai/favicon.png",
+    "finalURL": "https://openox.ai/assets/services/chat.z.ai/favicon.png"
   }
 }
