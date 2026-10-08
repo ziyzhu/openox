@@ -206,7 +206,6 @@ final class OxCanvas {
                 }
                 Log.service.info("Canvas.result caller=\(id) request=\(invocation) outcome=\(outcome)")
             },
-            repositoryAuthorization: AppPresentations.liveRepositoryAuthorization,
             native: NativeServiceOperations(
                 id: id,
                 serviceManager: serviceManager,

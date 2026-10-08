@@ -18,7 +18,6 @@ final class ServiceOperations {
     let begin: (String, JSONValue, String) -> UUID
     let finish: (UUID, Result<JSONValue?, Error>) -> Void
     let native: NativeServiceOperations
-    let repositoryAuthorization: RepositoryTokenPresenter?
 
     init(
         serviceManager: ServiceManager,
@@ -37,7 +36,6 @@ final class ServiceOperations {
         botControlRequired: @escaping (Service, JSONValue, Service.ServiceWebPage) -> Void = { _, _, _ in },
         begin: @escaping (String, JSONValue, String) -> UUID,
         finish: @escaping (UUID, Result<JSONValue?, Error>) -> Void,
-        repositoryAuthorization: RepositoryTokenPresenter? = nil,
         native: NativeServiceOperations
     ) {
         self.serviceManager = serviceManager
@@ -53,7 +51,6 @@ final class ServiceOperations {
         self.botControlRequired = botControlRequired
         self.begin = begin
         self.finish = finish
-        self.repositoryAuthorization = repositoryAuthorization
         self.native = native
     }
 
@@ -450,62 +447,6 @@ final class ServiceOperations {
                 "skillCount": .int(synced.skills.count),
                 "synced": .bool(true),
             ])
-        }
-    }
-
-    func proposeRepository(
-        repository: String,
-        base: String?,
-        commitHash: String,
-        services: [String],
-        skills: [String],
-        title: String,
-        body: String,
-        status: String,
-        purpose: String
-    ) async throws -> JSONValue? {
-        let target = try RepositoryProposalTarget(repository: repository, baseRef: base)
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard commitHash.range(of: "^[a-f0-9]{40}$", options: .regularExpression) != nil else {
-            throw RuntimeError.bridge("ox.repository.propose: commitHash must be a full Local commit hash")
-        }
-        guard (1...20).contains(services.count + skills.count), Set(services).count == services.count,
-              Set(skills).count == skills.count, skills.allSatisfy(SkillFiles.isLocalName),
-              services.allSatisfy({ !$0.isEmpty && $0.count <= 500 }) else {
-            throw RuntimeError.bridge("ox.repository.propose: services and skills must select 1-20 unique Local items")
-        }
-        guard !title.isEmpty, title.count <= 200 else {
-            throw RuntimeError.bridge("ox.repository.propose: title must contain 1-200 characters")
-        }
-        guard body.count <= 20_000 else {
-            throw RuntimeError.bridge("ox.repository.propose: body must contain at most 20,000 characters")
-        }
-        guard let proposalStatus = RepositoryProposalRequest.Status(rawValue: status) else {
-            throw RuntimeError.bridge("ox.repository.propose: status must be draft or open")
-        }
-        let snapshot = try await serviceManager.repositoryProposalSnapshot(commitHash: commitHash, services: services, skills: skills)
-        var fields: [String: JSONValue] = [
-            "repository": .string(target.url),
-            "commitHash": .string(commitHash),
-            "services": .array(services.map(JSONValue.string)),
-            "skills": .array(skills.map(JSONValue.string)),
-            "title": .string(title),
-            "body": .string(body),
-            "status": .string(status),
-        ]
-        if let base = target.requestedBaseRef { fields["base"] = .string(base) }
-        return try await tracked(Actions.repositoryPropose, .object(fields), purpose: purpose) {
-            let result = try await RepositoryProposal.shared.propose(
-                .init(
-                    target: target,
-                    title: title,
-                    body: body,
-                    status: proposalStatus,
-                    content: snapshot
-                ),
-                authorization: self.repositoryAuthorization
-            )
-            return try Self.encodeToJSON(result)
         }
     }
 

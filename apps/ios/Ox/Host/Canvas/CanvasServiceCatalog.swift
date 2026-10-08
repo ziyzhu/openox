@@ -64,18 +64,6 @@ extension ServiceOperations {
             return try await syncRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
         case "ox.repository.disconnect":
             return try await disconnectRepository(repository: fields["repository"]?.stringValue ?? "", purpose: purpose)
-        case "ox.repository.propose":
-            return try await proposeRepository(
-                repository: fields["repository"]?.stringValue ?? "",
-                base: fields["base"]?.stringValue,
-                commitHash: fields["commitHash"]?.stringValue ?? "",
-                services: fields["services"]?.arrayValue?.compactMap(\.stringValue) ?? [],
-                skills: fields["skills"]?.arrayValue?.compactMap(\.stringValue) ?? [],
-                title: fields["title"]?.stringValue ?? "",
-                body: fields["body"]?.stringValue ?? "",
-                status: fields["status"]?.stringValue ?? "",
-                purpose: purpose
-            )
         case "ox.repository.git.status":
             return try await repositoryGitStatus(repository: fields["repository"]?.stringValue ?? "local", purpose: purpose)
         case "ox.repository.git.log":

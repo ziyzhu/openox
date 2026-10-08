@@ -22,8 +22,8 @@ Each skill directory contains:
 
 Use `ox.fs` to read and edit resources. Helpers are async function bodies receiving `ox` and `args`; return a JSON-compatible result. Invoke them with `ox.skill.run({ name, script, args, purpose })`, where `script` is relative to `scripts/`. Helpers use the same Action policies and capabilities as ordinary VM execution.
 
-## Share
+## Local repository
 
-Read `guidance/manage-skills/references/repository-skill.md` when publishing a skill or editing Local repository content. `ox.skill.share` copies the complete resolved skill into Local and refuses to replace an existing Local name. Review personal information before sharing. Repository publication is an explicit user choice, separate from creating or customizing a Profile skill.
+Read `guidance/manage-skills/references/repository-skill.md` when copying a skill to Local or editing Local repository content. `ox.skill.share` copies the complete resolved skill into Local and refuses to replace an existing Local name. Review personal information before copying Profile content into Local.
 
 Deleting a skill uses `ox.skill.delete`. Saved invocations and schedules retain their own snapshots. Explain that deletion does not delete those snapshots or their schedules.

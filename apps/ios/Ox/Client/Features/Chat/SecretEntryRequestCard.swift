@@ -14,19 +14,12 @@ struct SecretEntryRequestCard: View {
         self.request = request
         self.onSaved = onSaved
         self.onCancel = onCancel
-        switch request.form {
-        case .named(let key):
-            let entry = try? Secret.entry(key: key)
-            isEditing = entry != nil
-            _displayName = State(initialValue: entry?.displayName ?? key)
-            let savedValue = try? Secret.value(key: key)
-            let fields = savedValue.flatMap { try? SecretFieldCodec.decode($0) }
-            _fieldModel = StateObject(wrappedValue: SecretFieldsModel(fields: fields ?? [SecretFieldDraft(name: "", value: "")]))
-        case .githubPublication:
-            isEditing = false
-            _displayName = State(initialValue: "OpenOx GitHub publication token")
-            _fieldModel = StateObject(wrappedValue: SecretFieldsModel(fields: [SecretFieldDraft(name: "token", value: "")]))
-        }
+        let entry = try? Secret.entry(key: request.key)
+        isEditing = entry != nil
+        _displayName = State(initialValue: entry?.displayName ?? request.key)
+        let savedValue = try? Secret.value(key: request.key)
+        let fields = savedValue.flatMap { try? SecretFieldCodec.decode($0) }
+        _fieldModel = StateObject(wrappedValue: SecretFieldsModel(fields: fields ?? [SecretFieldDraft(name: "", value: "")]))
     }
 
     var body: some View {
@@ -38,11 +31,6 @@ struct SecretEntryRequestCard: View {
             .font(Theme.Fonts.title)
             .foregroundStyle(Theme.Colors.onSurface)
             Group {
-                if case .githubPublication = request.form {
-                    Text("Use a classic token with public_repo access. [Create token](https://github.com/settings/tokens/new?scopes=public_repo&description=OpenOx), then return to Ox and paste it below. It is saved in Secrets and never sent to the model.")
-                        .font(Theme.Fonts.caption)
-                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                }
                 TextField("Display name", text: $displayName)
                     .textInputAutocapitalization(.sentences)
                 SecretFieldsEditor(model: fieldModel)

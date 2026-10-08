@@ -31,16 +31,6 @@
     "Connect through Tailscale while Ox is open." : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保持 Ox 打开，通过 Tailscale 连接。" } } }
     },
-    "GitHub publication requires a single token field." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GitHub 发布需要且只能包含 token 字段。"
-          }
-        }
-      }
-    },
     "" : {
       "shouldTranslate" : false
     },

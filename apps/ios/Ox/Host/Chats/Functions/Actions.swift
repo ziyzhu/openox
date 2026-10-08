@@ -58,7 +58,6 @@ nonisolated enum Actions {
     static let repositorySync = "ox.repository.sync"
     static let repositoryEnable = "ox.repository.enable"
     static let repositoryDisconnect = "ox.repository.disconnect"
-    static let repositoryPropose = "ox.repository.propose"
     static let repositoryGitStatus = "ox.repository.git.status"
     static let repositoryGitLog = "ox.repository.git.log"
     static let repositoryGitShow = "ox.repository.git.show"
@@ -109,7 +108,7 @@ nonisolated enum Actions {
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
-        repositoryPropose, repositoryConflicts, repositoryResolve,
+        repositoryConflicts, repositoryResolve,
         repositoryGitStatus, repositoryGitLog,
         repositoryGitShow, repositoryGitDiff, repositoryGitCheckout, repositoryGitCommit, repositoryGitRevert,
         repositoryGitRestore, serviceAttach, serviceSignIn, serviceSolve, servicePayment, serviceDetach,
@@ -182,7 +181,6 @@ nonisolated enum Actions {
         case repositorySync: L10n.string("Sync")
         case repositoryEnable: L10n.string("Repositories")
         case repositoryDisconnect: L10n.string("Remove Repository")
-        case repositoryPropose: L10n.string("Share Service")
         case repositoryGitStatus, repositoryGitDiff: L10n.string("Check repository changes")
         case repositoryGitLog: L10n.string("Read repository history")
         case repositoryGitShow: L10n.string("Read a saved repository version")

@@ -51,7 +51,6 @@ public protocol OxFunctionBridge: AnyObject {
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue?
     func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue?
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue?
-    func proposeRepository(repository: String, base: String?, commitHash: String, services: [String], skills: [String], title: String, body: String, status: String, purpose: String) async throws -> JSONValue?
     func repositoryGitStatus(repository: String, purpose: String) async throws -> JSONValue?
     func repositoryGitLog(repository: String, limit: Int, cursor: String?, purpose: String) async throws -> JSONValue?
     func repositoryGitShow(repository: String, commitHash: String, path: String?, purpose: String) async throws -> JSONValue?

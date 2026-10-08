@@ -109,40 +109,6 @@ nonisolated enum OxRepositories {
                     ])
                 ),
                 (
-                    "ox.repository.propose",
-                    .object([
-                        "description": .string(ModelGuidance.text("ox.repository.propose")),
-                        "inputSchema": .object([
-                            "type": .string("object"),
-                            "properties": .object([
-                                "repository": .object(["type": .string("string"), "pattern": .string("^https://github\\.com/[^/]+/[^/]+(?:\\.git)?$"), "maxLength": .int(2048)]),
-                                "base": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(255)]),
-                                "commitHash": .object(["type": .string("string"), "pattern": .string("^[a-f0-9]{40}$")]),
-                                "services": .object([
-                                    "type": .string("array"),
-                                    "items": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
-                                    "minItems": .int(0),
-                                    "maxItems": .int(20),
-                                    "uniqueItems": .bool(true),
-                                ]),
-                                "skills": .object([
-                                    "type": .string("array"),
-                                    "items": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(500)]),
-                                    "minItems": .int(0),
-                                    "maxItems": .int(20),
-                                    "uniqueItems": .bool(true),
-                                ]),
-                                "title": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(200)]),
-                                "body": .object(["type": .string("string"), "maxLength": .int(20_000)]),
-                                "status": .object(["type": .string("string"), "enum": .array([.string("draft"), .string("open")])]),
-                            ]),
-                            "required": .array([.string("repository"), .string("commitHash"), .string("title"), .string("body"), .string("status")]),
-                            "additionalProperties": .bool(false),
-                        ]),
-                        "outputSchema": .object(["type": .string("object")]),
-                    ])
-                ),
-                (
                     "ox.repository.git.status",
                     .object([
                         "description": .string(ModelGuidance.text("ox.repository.git.status")),
@@ -299,27 +265,6 @@ nonisolated enum OxRepositories {
             }
             ctx.setObject(disconnectRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryDisconnect" as NSString)
 
-            let proposeRepositoryBlock: @convention(block) (String, JSValue, String, JSValue, JSValue, String, String, String, JSValue) -> JSValue = {
-                repository, baseValue, commitHash, servicesValue, skillsValue, title, body, status, purposeValue in
-                let services = servicesValue.toArray().compactMap { $0 as? String }
-                let skills = skillsValue.toArray().compactMap { $0 as? String }
-                let base = baseValue.isString ? baseValue.toString() : nil
-                return env.call(suspendingTimeout: true) {
-                    try await $0.proposeRepository(
-                        repository: repository,
-                        base: base,
-                        commitHash: commitHash,
-                        services: services,
-                        skills: skills,
-                        title: title,
-                        body: body,
-                        status: status,
-                        purpose: purposeValue.toString()!
-                    )
-                }
-            }
-            ctx.setObject(proposeRepositoryBlock as AnyObject, forKeyedSubscript: "__nativeRepositoryPropose" as NSString)
-
             let gitStatusBlock: @convention(block) (String, JSValue) -> JSValue = { repository, purposeValue in
                 env.call { try await $0.repositoryGitStatus(repository: repository, purpose: purposeValue.toString()!) }
             }
@@ -411,7 +356,6 @@ nonisolated enum OxRepositories {
             sync: (value) => { const options = __oxOptions(value, 'ox.repository.sync'); return __nativeRepositorySync(String(options.repository), String(options.purpose)); },
             enable: (value) => { const options = __oxOptions(value, 'ox.repository.enable'); return __nativeRepositoryEnable(String(options.repository), options.enabled, String(options.purpose)); },
             disconnect: (value) => { const options = __oxOptions(value, 'ox.repository.disconnect'); return __nativeRepositoryDisconnect(String(options.repository), String(options.purpose)); },
-            propose: (value) => { const options = __oxOptions(value, 'ox.repository.propose'); return __nativeRepositoryPropose(String(options.repository), options.base ?? null, String(options.commitHash), options.services ?? [], options.skills ?? [], String(options.title), String(options.body), String(options.status), String(options.purpose)); },
           git: {
             status: (value) => { const options = __oxOptions(value, 'ox.repository.git.status'); return __nativeRepositoryGitStatus(String(options.repository ?? 'local'), String(options.purpose)); },
             log: (value) => { const options = __oxOptions(value, 'ox.repository.git.log'); return __nativeRepositoryGitLog(String(options.repository ?? 'local'), Number(options.limit ?? 20), options.cursor ?? null, String(options.purpose)); },

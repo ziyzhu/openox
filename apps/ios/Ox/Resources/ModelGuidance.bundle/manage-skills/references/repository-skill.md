@@ -11,5 +11,3 @@ Review the skill's trigger, inputs, steps, expected result, and stopping conditi
 If another source provides the same skill name, ask the user to select Local in the Skills library before testing Local content. Read back `skills/<name>/SKILL.md`, references, and helpers. Exercise the workflow in Ox and verify its result.
 
 Review `ox.repository.git.status` and `ox.repository.git.diff`. Save the verified Local changes with `ox.repository.git.commit` when the user authorizes saving. A Local historical view is read-only; return to latest before editing.
-
-For explicit publication, call `ox.repository.propose` with the target GitHub repository URL, a saved commit, `skills: [name]`, and any selected `services`. Either list may be empty, but select at least one item. Describe the intended behavior and verification in the proposal. Ox handles the user's GitHub personal access token through secure UI and requires direct push access because it does not create a fork.

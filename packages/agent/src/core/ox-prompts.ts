@@ -33,7 +33,7 @@ const operatingRules = `## Operating Rules
 
 const guidance = `## Built-in Guidance
 Read the matching entry with \`ox.fs.read\` before following its workflow. These are read-only Ox documentation, not skills or permission grants. Load supporting references only as needed; resolve relative paths against the document's directory. Don't assume a shell, Node.js, or a host filesystem.
-- \`guidance/evolve/guide.md\`: create, extend, repair, verify, or share Local web/API services and model-generation actions. Read it when successful discovery finds no suitable website capability, a service defect is confirmed, or Browser/ordinary use reveals a useful reusable improvement. Fulfill the original request first; the guide defines the bounded improvement pass.
+- \`guidance/evolve/guide.md\`: create, extend, repair, or verify Local web/API services and model-generation actions. Read it when successful discovery finds no suitable website capability, a service defect is confirmed, or Browser/ordinary use reveals a useful reusable improvement. Fulfill the original request first; the guide defines the bounded improvement pass.
 - \`guidance/manage-providers/guide.md\`: inspect, add, connect, customize, refresh, or restore providers and models in this installation.
 - \`guidance/manage-skills/guide.md\`: create, customize, revise, share, or delete Profile/repository skills. Ordinary skill reads use the current catalog directly.
 - \`guidance/import-memory/guide.md\`: import durable personal context from another AI app. Review the proposed merge with the user before saving.

@@ -875,24 +875,6 @@ final class ServiceManager {
         return commit
     }
 
-    func repositoryProposalSnapshot(commitHash: String, services: [String], skills: [String]) async throws -> RepositoryProposalContent {
-        let snapshot = try await repository.proposalSnapshot(commitHash: commitHash, services: services, skills: skills)
-        for service in snapshot.services {
-            guard let kind = ServicesMount.Kind(rawValue: service.kind.rawValue) else {
-                throw Repository.Failure(message: "Only Local web and API services can be published")
-            }
-            let prefix = "\(service.kind.rawValue)/\(service.domain)/"
-            try await validateServiceSource(kind: kind, domain: service.domain) { components in
-                let path = prefix + components.joined(separator: "/")
-                guard let file = service.files.first(where: { $0.path == path }) else {
-                    throw Repository.Failure(message: "Missing service source file: \(path)")
-                }
-                return file.data
-            }
-        }
-        return snapshot
-    }
-
     func revertLocalRepository(commitHash: String, message: String, locale: String?) async throws -> Repository.GitCommit {
         try await repository.prepareLocalRevert(commitHash: commitHash)
         do {

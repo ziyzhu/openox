@@ -78,30 +78,6 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.disconnectRepository(repository: repository, purpose: purpose)
     }
 
-    public func proposeRepository(
-        repository: String,
-        base: String?,
-        commitHash: String,
-        services: [String],
-        skills: [String],
-        title: String,
-        body: String,
-        status: String,
-        purpose: String
-    ) async throws -> JSONValue? {
-        try await serviceOperations.proposeRepository(
-            repository: repository,
-            base: base,
-            commitHash: commitHash,
-            services: services,
-            skills: skills,
-            title: title,
-            body: body,
-            status: status,
-            purpose: purpose
-        )
-    }
-
     public func repositoryGitLog(
         repository: String,
         limit: Int,

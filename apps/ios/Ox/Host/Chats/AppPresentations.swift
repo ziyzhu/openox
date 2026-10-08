@@ -197,10 +197,6 @@ private struct UnavailableMessageComposer: MessageComposing {
 }
 
 extension AppPresentations {
-    static var liveRepositoryAuthorization: RepositoryTokenPresenter {
-        { validate in await RepositoryTokenPrompt.present(validate: validate) }
-    }
-
     static let live = AppPresentations(
         serviceSignIn: AppPresentationCoordinator.shared,
         serviceHandoff: AppPresentationCoordinator.shared,

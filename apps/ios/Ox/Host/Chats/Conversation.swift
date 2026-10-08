@@ -622,13 +622,6 @@ final class Conversation: Identifiable {
                     }
                 }
             },
-            repositoryAuthorization: { [unowned self] validate in
-                await awaitPrompt(
-                    prompt: String(localized: "GitHub personal access token"),
-                    options: ["Saved", "Cancelled"],
-                    secretEntry: SecretEntryRequest(validate: validate)
-                ) == "Saved"
-            },
             native: nativeServiceOperations
         )
     }

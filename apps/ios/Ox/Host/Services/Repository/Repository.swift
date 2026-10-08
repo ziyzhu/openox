@@ -1061,57 +1061,6 @@ actor Repository {
         )
     }
 
-    func proposalSnapshot(commitHash: String, services requested: [String], skills requestedSkills: [String]) throws -> RepositoryProposalContent {
-        let loaded = try gitRepository(Self.localID)
-        let repository = try SwiftGitX.Repository.open(at: loaded.root)
-        let commit = try Self.historyCommit(commitHash, in: repository)
-        let package = try Self.package(at: commit, in: repository)
-        let byDomain = Dictionary(uniqueKeysWithValues: package.services.map { ($0.id.runtimeID, $0) })
-        let selected = try requested.map { domain in
-            guard let service = byDomain[domain], service.id.kind == .web || service.id.kind == .api else {
-                throw Failure(message: "No publishable Local service exists for \(domain) at that commit")
-            }
-            return service
-        }
-        let blobs = try Self.gitBlobs(in: commit.tree, repository: repository)
-        let services = selected.map { service in
-            let prefix = service.id.path + "/"
-            let files = blobs.compactMap { path, blob -> RepositoryProposalContent.File? in
-                guard path.hasPrefix(prefix) else { return nil }
-                return .init(path: path, data: blob.content)
-            }
-            return RepositoryProposalContent.Service(
-                id: service.id.rawValue,
-                kind: service.id.kind,
-                domain: service.id.runtimeID,
-                files: files.sorted { $0.path < $1.path }
-            )
-        }
-        let skills = try requestedSkills.map { name -> RepositoryProposalContent.SharedSkill in
-            guard package.skills.contains(name) else { throw SkillError.missing(name) }
-            let prefix = "skills/\(name)/"
-            let files = blobs.compactMap { path, blob -> RepositoryProposalContent.File? in
-                path.hasPrefix(prefix) ? .init(path: path, data: blob.content) : nil
-            }.sorted { $0.path < $1.path }
-            guard let main = files.first(where: { $0.path == prefix + "SKILL.md" }),
-                  let content = String(data: main.data, encoding: .utf8),
-                  var skill = SkillFiles.parse(content, directoryName: name) else { throw SkillError.invalidPackage }
-            var resources: [String: String] = [:]
-            for file in files where file.path != main.path {
-                guard let text = String(data: file.data, encoding: .utf8) else { throw SkillError.invalidPackage }
-                resources[String(file.path.dropFirst(prefix.count))] = text
-            }
-            skill.resources = resources
-            try SkillFiles.validate(skill)
-            return .init(name: name, files: files)
-        }
-        let files = services.flatMap(\.files) + skills.flatMap(\.files)
-        guard files.count <= 1_000, files.reduce(0, { $0 + $1.data.count }) <= 32 * 1_024 * 1_024 else {
-            throw Failure(message: "The selected contents exceed the publication size limit")
-        }
-        return RepositoryProposalContent(commitHash: commit.id.hex, services: services, skills: skills)
-    }
-
     func gitDiff(
         repositoryID: String,
         commitHash: String?,
