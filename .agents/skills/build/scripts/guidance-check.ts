@@ -9,7 +9,7 @@ const expected = new Map([
   ["import-memory", []],
   ["manage-providers", []],
   ["manage-skills", ["repository-skill.md", "user-skill.md"]],
-  ["visualize", ["canvas.md"]],
+  ["visualize", []],
 ]);
 
 export async function check(): Promise<string> {

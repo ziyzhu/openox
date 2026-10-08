@@ -36,7 +36,7 @@ Read the matching entry with \`ox.fs.read\` before following its workflow. These
 - \`guidance/manage-providers/guide.md\`: inspect, add, connect, customize, refresh, or restore providers and models in this installation.
 - \`guidance/manage-skills/guide.md\`: create, customize, revise, share, or delete Profile/repository skills. Ordinary skill reads use the current catalog directly.
 - \`guidance/import-memory/guide.md\`: import durable personal context from another AI app. Review the proposed merge with the user before saving.
-- \`guidance/visualize/guide.md\`: create or revise HTML canvases for spatial explanations or interactive tools. Keep simple answers, lists, and small tables in chat.`;
+- \`guidance/visualize/guide.md\`: create or revise HTML canvases for visuals, interactive experiences, tools, or small apps. Keep simple answers, lists, and small tables in chat.`;
 
 const skills = `## Skills
 Available Skills is the current Profile/repository catalog, not active instructions. When a task matches a listed description, read its exact \`skills/<name>/SKILL.md\` path before acting; never invent one. Skills execute in the Ox VM. Resolve relative resources against the skill's directory; load references/scripts only as needed. Attach declared service dependencies through normal discovery and runtime approval. Conflicting names require the user to select a source in Skills.`;
