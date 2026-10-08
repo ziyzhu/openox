@@ -555,7 +555,7 @@ extension Scenario {
             return [execute("""
             const purpose = "Verify and restore new-chat model preferences";
             const baseline = await ox.app.defaultModel({ purpose });
-            const current = await ox.app.model({ purpose });
+            const current = await ox.conversation.model({ purpose });
             if (baseline.configured && baseline.provider.id !== "mock") throw Error("Use automatic or Mock defaults for this fixture");
             const original = baseline.configured ? { provider: "mock", model: baseline.model.id, thinkingLevel: baseline.thinkingLevel } : null;
             try {
@@ -567,16 +567,16 @@ extension Scenario {
               const automatic = await ox.app.setDefaultModel({ selection: null, purpose });
               if (automatic.configured || automatic.selection !== null || !automatic.changed) throw Error("Automatic reset failed");
               if ((await ox.app.setDefaultModel({ selection: null, purpose })).changed) throw Error("Automatic reset no-op failed");
-              for (const setter of ["setDefaultModel", "setModel"]) {
+              for (const setter of [ox.app.setDefaultModel, ox.conversation.setModel]) {
                 for (const invalid of [{ provider: "missing-model-qa", model: "mock" }, { provider: "mock", model: "missing-model-qa" }, { provider: "mock", model: "mock", thinkingLevel: "high" }]) {
                   let rejected = false;
-                  try { await ox.app[setter]({ selection: invalid, purpose }); } catch { rejected = true; }
+                  try { await setter({ selection: invalid, purpose }); } catch { rejected = true; }
                   if (!rejected) throw Error("Invalid model selection was accepted");
                 }
               }
-              const unchanged = await ox.app.model({ purpose });
+              const unchanged = await ox.conversation.model({ purpose });
               if (unchanged.model.id !== current.model.id) throw Error("Default changes affected the current chat");
-              const noop = await ox.app.setModel({ selection: { provider: current.provider.id, model: current.model.id }, purpose });
+              const noop = await ox.conversation.setModel({ selection: { provider: current.provider.id, model: current.model.id }, purpose });
               if (noop.changed || noop.status !== "applied") throw Error("Current model no-op failed");
             } finally {
               await ox.app.setDefaultModel({ selection: original, purpose });
@@ -596,12 +596,12 @@ extension Scenario {
         if ctx.turn == 0 {
             return [execute("""
             const purpose = "Verify requested model changes";
-            const before = await ox.app.model({ purpose });
+            const before = await ox.conversation.model({ purpose });
             if (before.provider.id !== "mock") throw Error("Native Mock is required");
             const selection = { provider: "mock", model: before.model.id === "mock" ? "mock-text-only" : "mock" };
-            const requested = await ox.app.setModel({ selection, purpose });
-            const duplicate = await ox.app.setModel({ selection, purpose });
-            const during = await ox.app.model({ purpose });
+            const requested = await ox.conversation.setModel({ selection, purpose });
+            const duplicate = await ox.conversation.setModel({ selection, purpose });
+            const during = await ox.conversation.model({ purpose });
             if (requested.status !== "pending" || !requested.changed || duplicate.changed || duplicate.status !== "pending") throw Error("Pending/no-op contract failed");
             if (during.model.id !== before.model.id || during.change.status !== "pending" || during.change.selection.model !== selection.model) throw Error("Current submission changed its model");
             console.log("MODEL_CHANGE_STAGED", JSON.stringify({ before: before.model.id, target: selection.model, during }));
@@ -930,7 +930,7 @@ extension Scenario {
         guard let output = ctx.resultText("execute") else {
             return [execute("""
             const info = await ox.app.info({ purpose: "Read app identity" });
-            const model = await ox.app.model({ purpose: "Read current model" });
+            const model = await ox.conversation.model({ purpose: "Read current model" });
             console.log({ info, model });
             """)]
         }

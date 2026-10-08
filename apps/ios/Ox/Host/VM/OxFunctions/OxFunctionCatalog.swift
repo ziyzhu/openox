@@ -74,7 +74,7 @@ nonisolated enum OxFunctionCatalog {
         }))
     }
 
-    static func helpTree(includesSummaries: Bool = true) -> String {
+    static func helpTree(includesSummaries: Bool = false) -> String {
         let catalog = catalogEntries
         var lines = ["ox"]
         let rootHelpers = catalog.compactMap { name, schema -> (String, String)? in

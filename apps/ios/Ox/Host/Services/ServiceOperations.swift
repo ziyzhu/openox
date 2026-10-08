@@ -382,7 +382,7 @@ final class ServiceOperations {
     func disconnectRepository(repository: String, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }),
               let origin = selected.origin else {
-            throw RuntimeError.bridge("ox.repository.disconnect: select an installed remote repository ID from ox.app.repositories")
+            throw RuntimeError.bridge("ox.repository.disconnect: select an installed remote repository ID from ox.repository.list")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),
@@ -401,7 +401,7 @@ final class ServiceOperations {
 
     func enableRepository(repository: String, enabled: Bool, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository }) else {
-            throw RuntimeError.bridge("ox.repository.enable: select an existing repository ID from ox.app.repositories")
+            throw RuntimeError.bridge("ox.repository.enable: select an existing repository ID from ox.repository.list")
         }
         let args: JSONValue = .object([
             "repository": .string(selected.id),
@@ -428,7 +428,7 @@ final class ServiceOperations {
 
     func syncRepository(repository: String, purpose: String) async throws -> JSONValue? {
         guard let selected = serviceManager.repositories.first(where: { $0.id == repository && $0.provenance == .remote }) else {
-            throw RuntimeError.bridge("ox.repository.sync: select an installed remote repository ID from ox.app.repositories")
+            throw RuntimeError.bridge("ox.repository.sync: select an installed remote repository ID from ox.repository.list")
         }
         let args: JSONValue = .object([
             "id": .string(selected.id),

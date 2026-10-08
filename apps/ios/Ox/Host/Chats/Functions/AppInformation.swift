@@ -5,13 +5,13 @@ extension Conversation {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let wordCount = trimmed.split(whereSeparator: \.isWhitespace).count
         guard !trimmed.isEmpty else {
-            throw RuntimeError.bridge("ox.app.renameChat: title must not be empty.")
+            throw RuntimeError.bridge("ox.conversation.rename: title must not be empty.")
         }
         guard trimmed.count <= 60 else {
-            throw RuntimeError.bridge("ox.app.renameChat: title must contain at most 60 characters.")
+            throw RuntimeError.bridge("ox.conversation.rename: title must contain at most 60 characters.")
         }
         guard wordCount <= 10 else {
-            throw RuntimeError.bridge("ox.app.renameChat: title must contain at most 10 words.")
+            throw RuntimeError.bridge("ox.conversation.rename: title must contain at most 10 words.")
         }
         let previousAgentTitle = latestAgentChatTitle
         let args = JSONValue.object(["title": .string(trimmed)])
@@ -162,7 +162,7 @@ extension Conversation {
             let previous = self.modelSelection
             let previousChange = self.modelSelectionChange
             guard let selection = options.objectValue?["selection"], selection != .null else {
-                throw RuntimeError.bridge("ox.app.setModel: an explicit selection is required")
+                throw RuntimeError.bridge("ox.conversation.setModel: an explicit selection is required")
             }
             let resolved = try await self.resolveAppModelSelection(selection, current: previous, pending: previousChange?.pendingSelection)
             try Task.checkCancellation()

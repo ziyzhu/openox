@@ -36,7 +36,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
 
     private static func executeDescription(website: Bool = false) -> String {
         ModelGuidance.execute(
-            catalog: OxFunctionCatalog.helpTree(includesSummaries: !website),
+            catalog: OxFunctionCatalog.helpTree(),
             website: website,
             timeoutSeconds: Int(VirtualMachine.defaultTimeout),
             maxLines: JavaScriptOutputLimits.maxLines,

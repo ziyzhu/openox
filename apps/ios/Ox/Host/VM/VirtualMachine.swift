@@ -375,6 +375,12 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
           }
         };
         __oxAttachHelp(ox);
+        Object.defineProperties(ox.app, {
+          model: { value: ox.conversation.model },
+          setModel: { value: ox.conversation.setModel },
+          renameChat: { value: ox.conversation.rename },
+          repositories: { value: ox.repository.list },
+        });
         Object.defineProperty(globalThis, 'ox', { value: ox, writable: false, configurable: false });
         """)
         if let exception = ctx.exception?.toString() {

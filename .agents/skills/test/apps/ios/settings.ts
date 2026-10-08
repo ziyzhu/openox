@@ -81,14 +81,22 @@ try {
     const inspected = await ox("--chat", previousChat, "vm", "inspect");
     assert.equal(inspected.value.session.temporary, false, "Preserve or close the temporary chat before testing");
   }
-  for (const name of ["ox.app.setLanguage", "ox.app.setTheme", "ox.repository.enable", "ox.app.setDefaultModel", "ox.app.setModel"]) {
+  for (const name of ["ox.app.setLanguage", "ox.app.setTheme", "ox.repository.enable", "ox.app.setDefaultModel", "ox.conversation.setModel", "ox.conversation.model", "ox.conversation.rename", "ox.repository.list"]) {
     const help = await ox("vm", "help", name);
     assert.equal(help.name, name);
   }
   await newChat();
   const language = await call("ox.app.language");
   const theme = await call("ox.app.theme");
-  const repositories = await call("ox.app.repositories");
+  const aliases = await ox("--chat", chat!, "vm", "eval", "--script", `return [
+    [ox.app.model, ox.conversation.model],
+    [ox.app.setModel, ox.conversation.setModel],
+    [ox.app.renameChat, ox.conversation.rename],
+    [ox.app.repositories, ox.repository.list],
+  ].every(([previous, current]) => previous === current && previous.help() === current.help())
+    && !["model", "setModel", "renameChat", "repositories"].some(name => Object.keys(ox.app).includes(name));`);
+  assert.equal(aliases.value, true, "Old helpers must remain hidden aliases with current validation and help");
+  const repositories = await call("ox.repository.list");
   const repository = repositories.repositories.find((candidate: Repository) => candidate.id === "local");
   assert.ok(repository && repository.state === "ready", "A prepared Local repository is required");
   const defaultModel = await call("ox.app.defaultModel") as DefaultModel;
@@ -112,26 +120,28 @@ try {
     await rejected(setter, { selection: choices[0], unexpected: true }, "unexpected");
   }
   const selection = { provider: "mock", model: "mock-text-only" };
-  const idle = await call("ox.app.setModel", { selection });
+  const idle = await call("ox.conversation.setModel", { selection });
   assert.equal(idle.status, "applied");
   assert.equal(idle.changed, true);
-  assert.equal((await call("ox.app.model")).model.id, selection.model);
-  assert.equal((await call("ox.app.setModel", { selection })).changed, false);
+  assert.equal((await call("ox.conversation.model")).model.id, selection.model);
+  assert.equal((await call("ox.conversation.setModel", { selection })).changed, false);
   await call("ox.app.setDefaultModel", { selection: null });
   assert.equal((await call("ox.app.defaultModel")).configured, false);
   assert.equal((await call("ox.app.setDefaultModel", { selection: null })).changed, false);
   assert.equal((await call("ox.app.setDefaultModel", { selection })).changed, true);
   assert.equal((await call("ox.app.setDefaultModel", { selection })).changed, false);
-  for (const setter of ["ox.app.setDefaultModel", "ox.app.setModel"]) {
+  for (const setter of ["ox.app.setDefaultModel", "ox.conversation.setModel"]) {
     await rejected(setter, {}, "selection");
     await rejected(setter, { selection: { provider: "missing-model-qa", model: "mock" } }, "existing provider");
     await rejected(setter, { selection: { provider: "mock", model: "missing-model-qa" } }, "available model");
     await rejected(setter, { selection: { ...selection, thinkingLevel: "high" } }, "thinking level");
     await rejected(setter, { selection: { ...selection, unexpected: true } }, "unexpected");
   }
-  await rejected("ox.app.setModel", { selection: null }, "selection");
+  await rejected("ox.conversation.setModel", { selection: null }, "selection");
+  await rejected("ox.conversation.rename", { title: "" }, "title");
+  await rejected("ox.conversation.rename", { title: "x".repeat(61) }, "title");
   assert.equal((await call("ox.app.defaultModel")).model.id, selection.model);
-  assert.equal((await call("ox.app.model")).model.id, selection.model);
+  assert.equal((await call("ox.conversation.model")).model.id, selection.model);
   await rejected("ox.repository.enable", { repository: "local", enabled: "false" }, "enabled");
   await rejected("ox.repository.enable", { repository: "missing-settings-qa", enabled: false }, "existing repository ID");
   const enabled = !repository.enabled;
@@ -139,7 +149,7 @@ try {
   assert.equal(updated.enabled, enabled);
   assert.equal(updated.changed, true);
   assert.equal((await call("ox.repository.enable", { repository: repository.id, enabled })).changed, false);
-  const after = await call("ox.app.repositories");
+  const after = await call("ox.repository.list");
   assert.equal(after.repositories.find((candidate: Repository) => candidate.id === repository.id).enabled, enabled);
   for (const candidate of repositories.repositories as Repository[]) {
     if (candidate.id !== repository.id) assert.equal(after.repositories.find((row: Repository) => row.id === candidate.id)?.enabled, candidate.enabled);
@@ -153,7 +163,7 @@ try {
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");
   assert.equal((await call("ox.app.language")).selection, "zh-Hans");
   assert.equal((await call("ox.app.theme")).selection, "dark");
-  assert.equal((await call("ox.app.repositories")).repositories.find((candidate: Repository) => candidate.id === repository.id).enabled, enabled);
+  assert.equal((await call("ox.repository.list")).repositories.find((candidate: Repository) => candidate.id === repository.id).enabled, enabled);
   console.log("PASS settings contracts, supported selections, validation, no-op results, repository isolation, and relaunch persistence");
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
@@ -165,12 +175,12 @@ try {
       ["ox.app.setLanguage", { selection: baseline.language.selection }, "ox.app.language", baseline.language.selection],
       ["ox.app.setTheme", { selection: baseline.theme.selection }, "ox.app.theme", baseline.theme.selection],
       ["ox.app.setDefaultModel", { selection: baseline.defaultModel.configured ? { provider: baseline.defaultModel.provider.id, model: baseline.defaultModel.model.id, thinkingLevel: baseline.defaultModel.thinkingLevel } : null }, "ox.app.defaultModel", baseline.defaultModel.configured],
-      ["ox.repository.enable", { repository: baseline.repository.id, enabled: baseline.repository.enabled }, "ox.app.repositories", baseline.repository.enabled],
+      ["ox.repository.enable", { repository: baseline.repository.id, enabled: baseline.repository.enabled }, "ox.repository.list", baseline.repository.enabled],
     ] as const) {
       try {
         await call(name, args);
         const restored = await call(reader);
-        assert.equal(reader === "ox.app.repositories" ? restored.repositories.find((row: Repository) => row.id === "local").enabled : reader === "ox.app.defaultModel" ? restored.configured : restored.selection, expected);
+        assert.equal(reader === "ox.repository.list" ? restored.repositories.find((row: Repository) => row.id === "local").enabled : reader === "ox.app.defaultModel" ? restored.configured : restored.selection, expected);
         if (reader === "ox.app.defaultModel" && baseline.defaultModel.configured) {
           assert.equal(restored.provider.id, baseline.defaultModel.provider.id);
           assert.equal(restored.model.id, baseline.defaultModel.model.id);

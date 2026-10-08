@@ -97,13 +97,6 @@ nonisolated enum OxAppInformation {
                     ], required: ["selection", "appearance", "changed"]),
                 ])
             ), (
-                "ox.app.model",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.model")),
-                    "inputSchema": object([:]),
-                    "outputSchema": modelInformation,
-                ])
-            ), (
                 "ox.app.defaultModel",
                 .object([
                     "description": .string(ModelGuidance.text("ox.app.defaultModel")),
@@ -128,17 +121,6 @@ nonisolated enum OxAppInformation {
                         "selection": nullable(modelSelection),
                         "changed": boolean,
                     ], required: ["configured", "selection", "changed"]),
-                ])
-            ), (
-                "ox.app.setModel",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.setModel")),
-                    "inputSchema": object(["selection": modelSelection], required: ["selection"]),
-                    "outputSchema": object([
-                        "status": enumeration(["pending", "applied"]),
-                        "selection": modelSelection,
-                        "changed": boolean,
-                    ], required: ["status", "selection", "changed"]),
                 ])
             ), (
                 "ox.app.actionPolicies",
@@ -166,25 +148,6 @@ nonisolated enum OxAppInformation {
                         ], required: ["scope", "id", "source", "policy"]), maximum: 100),
                         "truncated": boolean,
                     ], required: ["defaultPolicy", "resolved", "overrides", "truncated"]),
-                ])
-            ), (
-                "ox.app.repositories",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.repositories")),
-                    "inputSchema": object([:]),
-                    "outputSchema": object([
-                        "status": enumeration(["idle", "syncing", "ready", "failed"]),
-                        "repositories": array(object([
-                            "id": string,
-                            "name": string,
-                            "provenance": enumeration(["bundled", "local", "development", "remote"]),
-                            "enabled": boolean,
-                            "state": enumeration(["ready", "failed"]),
-                            "serviceCount": integer(minimum: 0),
-                            "skillCount": integer(minimum: 0),
-                        ], required: ["id", "name", "provenance", "enabled", "state", "serviceCount", "skillCount"]), maximum: 50),
-                        "truncated": boolean,
-                    ], required: ["status", "repositories", "truncated"]),
                 ])
             ), (
                 "ox.app.logs",
@@ -236,23 +199,6 @@ nonisolated enum OxAppInformation {
                         "oldestAvailable": nullable(string),
                     ], required: ["entries", "truncated", "oldestAvailable"]),
                 ])
-            ), (
-                "ox.app.renameChat",
-                .object([
-                    "description": .string(ModelGuidance.text("ox.app.renameChat")),
-                    "inputSchema": object([
-                        "title": .object([
-                            "type": .string("string"),
-                            "minLength": .int(1),
-                            "maxLength": .int(60),
-                            "description": .string("A concise 1–10 word title describing the chat's purpose."),
-                        ]),
-                    ], required: ["title"]),
-                    "outputSchema": object([
-                        "renamed": boolean,
-                        "title": string,
-                    ], required: ["renamed", "title"]),
-                ])
             )]
         },
         installNatives: { context, env in
@@ -280,9 +226,6 @@ nonisolated enum OxAppInformation {
             let setTheme: @convention(block) (String, String) -> JSValue = { selection, purpose in
                 env.call { try await $0.setAppTheme(selection: selection, purpose: purpose) }
             }
-            let model: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appModel(purpose: purpose) }
-            }
             let defaultModel: @convention(block) (String) -> JSValue = { purpose in
                 env.call { try await $0.appDefaultModel(purpose: purpose) }
             }
@@ -290,23 +233,13 @@ nonisolated enum OxAppInformation {
                 let value = jsValueToJSON(options) ?? .object([:])
                 return env.call(suspendingTimeout: true) { try await $0.setAppDefaultModel(options: value, purpose: purpose) }
             }
-            let setModel: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
-                let value = jsValueToJSON(options) ?? .object([:])
-                return env.call(suspendingTimeout: true) { try await $0.setAppModel(options: value, purpose: purpose) }
-            }
             let actionPolicies: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
                 let value = jsValueToJSON(options)
                 return env.call { try await $0.appActionPolicies(options: value, purpose: purpose) }
             }
-            let repositories: @convention(block) (String) -> JSValue = { purpose in
-                env.call { try await $0.appRepositories(purpose: purpose) }
-            }
             let logs: @convention(block) (JSValue, String) -> JSValue = { options, purpose in
                 let value = jsValueToJSON(options)
                 return env.call(suspendingTimeout: true) { try await $0.appLogs(options: value, purpose: purpose) }
-            }
-            let renameChat: @convention(block) (String, String) -> JSValue = { title, purpose in
-                env.call { try await $0.renameChat(title: title, purpose: purpose) }
             }
             context.setObject(info as AnyObject, forKeyedSubscript: "__nativeAppInfo" as NSString)
             context.setObject(profile as AnyObject, forKeyedSubscript: "__nativeAppProfile" as NSString)
@@ -316,14 +249,10 @@ nonisolated enum OxAppInformation {
             context.setObject(theme as AnyObject, forKeyedSubscript: "__nativeAppTheme" as NSString)
             context.setObject(setLanguage as AnyObject, forKeyedSubscript: "__nativeAppSetLanguage" as NSString)
             context.setObject(setTheme as AnyObject, forKeyedSubscript: "__nativeAppSetTheme" as NSString)
-            context.setObject(model as AnyObject, forKeyedSubscript: "__nativeAppModel" as NSString)
             context.setObject(defaultModel as AnyObject, forKeyedSubscript: "__nativeAppDefaultModel" as NSString)
             context.setObject(setDefaultModel as AnyObject, forKeyedSubscript: "__nativeAppSetDefaultModel" as NSString)
-            context.setObject(setModel as AnyObject, forKeyedSubscript: "__nativeAppSetModel" as NSString)
             context.setObject(actionPolicies as AnyObject, forKeyedSubscript: "__nativeAppActionPolicies" as NSString)
-            context.setObject(repositories as AnyObject, forKeyedSubscript: "__nativeAppRepositories" as NSString)
             context.setObject(logs as AnyObject, forKeyedSubscript: "__nativeAppLogs" as NSString)
-            context.setObject(renameChat as AnyObject, forKeyedSubscript: "__nativeAppRenameChat" as NSString)
         },
         jsFragment: """
           info: (value) => { const options = __oxOptions(value, 'ox.app.info'); return __nativeAppInfo(String(options.purpose)); },
@@ -334,46 +263,19 @@ nonisolated enum OxAppInformation {
           theme: (value) => { const options = __oxOptions(value, 'ox.app.theme'); return __nativeAppTheme(String(options.purpose)); },
           setLanguage: (value) => { const options = __oxOptions(value, 'ox.app.setLanguage'); return __nativeAppSetLanguage(String(options.selection), String(options.purpose)); },
           setTheme: (value) => { const options = __oxOptions(value, 'ox.app.setTheme'); return __nativeAppSetTheme(String(options.selection), String(options.purpose)); },
-          model: (value) => { const options = __oxOptions(value, 'ox.app.model'); return __nativeAppModel(String(options.purpose)); },
           defaultModel: (value) => { const options = __oxOptions(value, 'ox.app.defaultModel'); return __nativeAppDefaultModel(String(options.purpose)); },
           setDefaultModel: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.setDefaultModel'); return __nativeAppSetDefaultModel(options, String(purpose)); },
-          setModel: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.setModel'); return __nativeAppSetModel(options, String(purpose)); },
           actionPolicies: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.actionPolicies'); return __nativeAppActionPolicies(options, String(purpose)); },
-          repositories: (value) => { const options = __oxOptions(value, 'ox.app.repositories'); return __nativeAppRepositories(String(options.purpose)); },
-          logs: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.logs'); return __nativeAppLogs(options, String(purpose)); },
-          renameChat: (value) => { const options = __oxOptions(value, 'ox.app.renameChat'); return __nativeAppRenameChat(String(options.title), String(options.purpose)); }
+          logs: (value) => { const { purpose, ...options } = __oxOptions(value, 'ox.app.logs'); return __nativeAppLogs(options, String(purpose)); }
         """
     )
 
     private static let string = JSONValue.object(["type": .string("string")])
     private static let boolean = JSONValue.object(["type": .string("boolean")])
-    private static let namedValue = object([
-        "id": string,
-        "name": string,
-    ], required: ["id", "name"])
+    private static let namedValue = OxConversations.namedValue
     private static let actionPolicy = enumeration(["ask", "allow", "block"])
-    private static let authenticationInformation = object([
-        "method": enumeration(["apiKey", "subscriptionKey", "bearerToken", "subscription", "none"]),
-        "status": enumeration(["ready", "missingCredential", "signedOut", "notRequired"]),
-        "settingsPath": string,
-    ], required: ["method", "status", "settingsPath"])
-    private static let modelSelection = object([
-        "provider": boundedString(maximum: 100, description: "Exact provider ID from ox.provider.list."),
-        "model": boundedString(maximum: 500, description: "Exact available picker model ID from ox.provider.get, not its wire ID."),
-        "thinkingLevel": nullable(boundedString(maximum: 100, description: "Supported thinking level; null selects the model's lowest level. Omission preserves it for the same model.")),
-    ], required: ["provider", "model"])
-    private static let modelInformation = object([
-        "provider": namedValue,
-        "model": namedValue,
-        "supportsTools": boolean,
-        "thinkingLevel": nullable(string),
-        "change": nullable(object([
-            "status": enumeration(["pending", "applied", "failed", "cancelled"]),
-            "selection": modelSelection,
-            "error": nullable(string),
-        ], required: ["status", "selection", "error"])),
-        "authentication": authenticationInformation,
-    ], required: ["provider", "model", "supportsTools", "authentication"])
+    private static let authenticationInformation = OxConversations.authenticationInformation
+    private static let modelSelection = OxConversations.modelSelection
 
     private static func nullable(_ value: JSONValue) -> JSONValue {
         var fields = value.objectValue ?? [:]

@@ -7,6 +7,40 @@ nonisolated enum OxRepositories {
         schema: {
             [
                 (
+                    "ox.repository.list",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.repository.list")),
+                        "inputSchema": .object(["type": .string("object"), "properties": .object([:])]),
+                        "outputSchema": .object([
+                            "type": .string("object"),
+                            "properties": .object([
+                                "status": .object(["type": .string("string"), "enum": .array(["idle", "syncing", "ready", "failed"].map(JSONValue.string))]),
+                                "repositories": .object([
+                                    "type": .string("array"),
+                                    "maxItems": .int(50),
+                                    "items": .object([
+                                        "type": .string("object"),
+                                        "properties": .object([
+                                            "id": .object(["type": .string("string")]),
+                                            "name": .object(["type": .string("string")]),
+                                            "provenance": .object(["type": .string("string"), "enum": .array(["bundled", "local", "development", "remote"].map(JSONValue.string))]),
+                                            "enabled": .object(["type": .string("boolean")]),
+                                            "state": .object(["type": .string("string"), "enum": .array(["ready", "failed"].map(JSONValue.string))]),
+                                            "serviceCount": .object(["type": .string("integer"), "minimum": .int(0)]),
+                                            "skillCount": .object(["type": .string("integer"), "minimum": .int(0)]),
+                                        ]),
+                                        "required": .array(["id", "name", "provenance", "enabled", "state", "serviceCount", "skillCount"].map(JSONValue.string)),
+                                        "additionalProperties": .bool(false),
+                                    ]),
+                                ]),
+                                "truncated": .object(["type": .string("boolean")]),
+                            ]),
+                            "required": .array(["status", "repositories", "truncated"].map(JSONValue.string)),
+                            "additionalProperties": .bool(false),
+                        ]),
+                    ])
+                ),
+                (
                     "ox.repository.conflicts",
                     .object([
                         "description": .string(ModelGuidance.text("ox.repository.conflicts")),
@@ -230,6 +264,10 @@ nonisolated enum OxRepositories {
             ]
         },
         installNatives: { ctx, env in
+            let list: @convention(block) (String) -> JSValue = { purpose in
+                env.call { try await $0.appRepositories(purpose: purpose) }
+            }
+            ctx.setObject(list, forKeyedSubscript: "__nativeRepositoryList" as NSString)
             let conflictsBlock: @convention(block) (JSValue, JSValue) -> JSValue = { serviceValue, purposeValue in
                 let service = serviceValue.isString ? serviceValue.toString() : nil
                 return env.call { try await $0.repositoryConflicts(service: service, purpose: purposeValue.toString()!) }
@@ -350,6 +388,7 @@ nonisolated enum OxRepositories {
 
         },
         jsFragment: """
+          list: value => { const options = __oxOptions(value, 'ox.repository.list'); return __nativeRepositoryList(String(options.purpose)); },
             conflicts: (value) => { const options = __oxOptions(value, 'ox.repository.conflicts'); return __nativeRepositoryConflicts(options.service ?? null, String(options.purpose)); },
             resolve: (value) => { const options = __oxOptions(value, 'ox.repository.resolve'); return __nativeRepositoryResolve(String(options.service), String(options.repository), String(options.purpose)); },
             connect: (value) => { const options = __oxOptions(value, 'ox.repository.connect'); return __nativeRepositoryConnect(String(options.origin), String(options.purpose)); },
