@@ -108,6 +108,8 @@ nonisolated enum OxSchedules {
         "nextFireAt": text,
         "lastRunAt": text,
         "lastChatId": id,
+        "lastOutcome": enumeration(["succeeded", "cancelled", "failed"]),
+        "lastError": text,
     ], required: ["id", "skill", "argument", "enabled", "recurrence"])
 
     private static func optionalString(_ value: JSValue) -> String? {

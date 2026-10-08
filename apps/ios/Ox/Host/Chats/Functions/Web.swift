@@ -58,19 +58,17 @@ extension Conversation {
         case .some(.object(let value)): fields = value
         default: throw RuntimeError.bridge("ox.web.fetch: options must be an object")
         }
-        let unknown = Set(fields.keys).subtracting(["maxBytes"])
+        let unknown = Set(fields.keys).subtracting(["maxBytes", "maxPages"])
         guard unknown.isEmpty else {
             throw RuntimeError.bridge("ox.web.fetch: unknown option '\(unknown.sorted().joined(separator: ", "))'")
         }
         let request = try WebFetchRequest(url: url)
         return try await tracked(Actions.webFetch, .object(["url": .string(request.url.absoluteString)]), purpose: purpose) {
-            let (sequence, response) = try await fetchWebResource(request)
-            let attachment = try WebAttachmentFactory.make(response: response, filename: nil)
+            let (_, response) = try await fetchWebResource(request)
+            let readOptions = ArtifactLibrary.readOptions(from: options)
             let read: ArtifactLibrary.Read?
-            let attached: Bool
-            switch attachment.kind {
-            case .text:
-                let readOptions = ArtifactLibrary.readOptions(from: options)
+            switch response.kind {
+            case .text, .html, .pdf:
                 if response.kind == .html {
                     guard let html = String(data: response.data, encoding: .utf8) else {
                         throw WebFetchError.invalidText
@@ -89,17 +87,11 @@ extension Conversation {
                         try ArtifactLibrary.read(data: response.data, kind: response.kind, options: readOptions)
                     }.value
                 }
-                attached = false
-            case .image, .pdf:
-                try appendTransientAttachment(attachment, sequence: sequence)
+            case .image, .file:
                 read = nil
-                attached = true
-            case .file:
-                read = nil
-                attached = false
             }
-            let result = webFetchJSON(response, attachment: attachment, read: read, attached: attached)
-            Log.session.info("bridge.web.fetch kind=\(transientKind(attachment)) text=\(read?.text?.count ?? 0) attached=\(attached)")
+            let result = webFetchJSON(response, read: read)
+            Log.session.info("bridge.web.fetch kind=\(response.kind.rawValue) text=\(read?.text?.count ?? 0) attached=false")
             return result
         }
     }
@@ -127,19 +119,18 @@ extension Conversation {
 
     private func webFetchJSON(
         _ response: WebFetchResponse,
-        attachment: TransientAttachment,
-        read: ArtifactLibrary.Read?,
-        attached: Bool
+        read: ArtifactLibrary.Read?
     ) -> JSONValue {
         var fields = response.json().objectValue ?? [:]
-        fields["kind"] = .string(response.kind == .html ? "html" : transientKind(attachment))
-        fields["filename"] = .string(attachment.displayName)
+        fields["kind"] = .string(response.kind.rawValue)
+        fields["filename"] = .string(response.suggestedFilename)
         fields["bytes"] = .int(response.data.count)
         fields["text"] = read?.text.map(JSONValue.string) ?? .null
         fields["truncated"] = .bool(read?.truncated ?? false)
-        fields["attached"] = .bool(attached)
+        fields["attached"] = .bool(false)
         fields["unsupported"] = read?.unsupported.map(JSONValue.string)
-            ?? (attachment.kind == .file ? .string("This resource type can't be consumed by ox.web.fetch.") : .null)
+            ?? (read == nil || (response.kind == .pdf && read?.text?.isEmpty == true)
+                ? .string("No readable text. Use ox.fs.attach with the returned url to explicitly send the original file to the model.") : .null)
         return .object(fields)
     }
 

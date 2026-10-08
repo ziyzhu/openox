@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SkillSchedulesSection: View {
+    @Environment(ServiceManager.self) private var serviceManager
     let skill: Skill
     let profileID: UUID?
 
@@ -104,6 +105,11 @@ struct SkillSchedulesSection: View {
                     Text(schedule.recurrence.displaySummary)
                         .font(Theme.Fonts.bodyMd)
                         .foregroundStyle(Theme.Colors.onSurface)
+                    if case .failed(let message) = schedule.lastOutcome {
+                        Text(verbatim: message)
+                            .font(Theme.Fonts.captionSm)
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    }
                     if !schedule.isEnabled {
                         Text("Paused")
                             .font(Theme.Fonts.captionSm)
@@ -159,6 +165,7 @@ struct SkillSchedulesSection: View {
             get: { scheduledSkills.schedule(id: schedule.id)?.isEnabled ?? false },
             set: { enabled in
                 do {
+                    if enabled { try serviceManager.requireServices(domains: schedule.skill.services) }
                     try scheduledSkills.setEnabled(enabled, id: schedule.id)
                 } catch {
                     errorMessage = error.localizedDescription
@@ -190,6 +197,7 @@ private enum ScheduledSkillEditorFrequency: String, CaseIterable, Identifiable {
 }
 
 struct ScheduledSkillEditorView: View {
+    @Environment(ServiceManager.self) private var serviceManager
     @Environment(\.dismiss) private var dismiss
     @State private var frequency: ScheduledSkillEditorFrequency
     @State private var date: Date
@@ -209,6 +217,12 @@ struct ScheduledSkillEditorView: View {
 
     var body: some View {
         Form {
+            if let message = dependencyError {
+                Section {
+                    Text(verbatim: message)
+                    NavigationLink("Repositories") { RepositoriesView() }
+                }
+            }
             Section {
                 Picker("Repeat", selection: $frequency) {
                     ForEach(ScheduledSkillEditorFrequency.allCases) { value in
@@ -264,8 +278,18 @@ struct ScheduledSkillEditorView: View {
         }
     }
 
+    private var dependencyError: String? {
+        do {
+            try serviceManager.requireServices(domains: target.skill.services)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     private func save() {
         do {
+            try serviceManager.requireServices(domains: target.skill.services)
             if let schedule = target.schedule {
                 try ScheduledSkills.shared.update(
                     id: schedule.id,

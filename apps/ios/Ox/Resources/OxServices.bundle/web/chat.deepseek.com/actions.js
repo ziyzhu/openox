@@ -24,10 +24,11 @@ async function identity(){
       headers:{Authorization:'Bearer '+stored.value},
       credentials:'include',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(7000)
     });
+    if(r.status===401)return {signedIn:false};
     j = await r.json();
   } catch { throw new Error('DeepSeek identity check failed'); }
   if(r.status===200&&j?.code===0&&j.data?.biz_code===0&&typeof j.data.biz_data?.id==='string'&&j.data.biz_data.id.length>0)return {signedIn:true};
-  if(r.status===200&&j?.code===40002)return {signedIn:false};
+  if(r.status===200&&(j?.code===40002 || (j?.code===0&&j.data?.biz_code===40002)))return {signedIn:false};
   throw new Error('Unrecognized DeepSeek identity response: HTTP '+r.status);
 }
 function chatPath(){return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname);}

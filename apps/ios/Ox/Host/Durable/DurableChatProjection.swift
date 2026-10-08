@@ -2,20 +2,26 @@ import Foundation
 
 nonisolated enum DurableChatProjection {
     private struct Decoration {
-        let assistant: AssistantMessage
+        let generation: ModelGeneration
         let steps: [Step]
+
+        func matchingSteps(for call: ToolCall) -> [Step] {
+            steps.filter { step in
+                if let recorded = step.toolCall { return recorded == call }
+                if let result = step.toolResult { return result.toolCallId == call.id && result.toolName == call.name }
+                if step.id.rawValue.uuidString == call.id { return true }
+                guard case .execute(let execution) = step.kind else { return false }
+                return call.arguments.objectValue?["source"]?.stringValue == execution.source
+            }
+        }
     }
 
     static func turns(from entries: [JSONValue], scope: ProfileScope) throws -> [Turn] {
         let annotations = annotations(from: entries, scope: scope)
         let decorations = annotations.flatMap { turn -> [Decoration] in
-            guard case .agent(let agent, let id) = turn else { return [] }
-            return agent.generations.compactMap { generation in
-                let steps = agent.steps.filter { $0.generation == generation.id }
-                let projection = AgentTurn(at: generation.at, generations: [generation], steps: steps, outcome: agent.outcome)
-                guard let message = ChatProjection.wire([.agent(projection, id: id)]).first,
-                      case .assistant(let assistant) = message else { return nil }
-                return Decoration(assistant: assistant, steps: steps)
+            guard case .agent(let agent, _) = turn else { return [] }
+            return agent.generations.map { generation in
+                Decoration(generation: generation, steps: agent.steps.filter { $0.generation == generation.id })
             }
         }
         var builder = Builder(annotations: annotations, decorations: decorations)
@@ -101,17 +107,16 @@ nonisolated enum DurableChatProjection {
 
         mutating func appendAssistant(_ assistant: AssistantMessage, namespace: String, turnID: TurnID?) {
             let candidates = decorations.filter { decoration in
-                guard decoration.assistant.model == assistant.model,
-                      abs(decoration.assistant.timestamp.timeIntervalSince(assistant.timestamp)) < 0.001 else { return false }
-                let calls = assistant.content.compactMap { block -> ToolCall? in
-                    if case .toolCall(let call) = block { return call }
-                    return nil
+                guard decoration.generation.model == assistant.model,
+                      abs(decoration.generation.at.timeIntervalSince(assistant.timestamp)) < 0.001 else { return false }
+                let calls = assistant.content.toolCalls
+                if calls.isEmpty {
+                    return decoration.generation.assistantMessage?.content == assistant.content
                 }
-                let richCalls = decoration.assistant.content.compactMap { block -> ToolCall? in
-                    if case .toolCall(let call) = block { return call }
-                    return nil
+                return calls.allSatisfy { call in
+                    !decoration.matchingSteps(for: call).isEmpty
+                        || decoration.generation.assistantMessage?.content.toolCalls.contains(call) == true
                 }
-                return calls.isEmpty ? decoration.assistant.content == assistant.content : calls == richCalls
             }
             let rich = candidates.last
             if agent == nil {
@@ -129,13 +134,7 @@ nonisolated enum DurableChatProjection {
                 case .thinking(let thinking):
                     agent?.steps.append(Step(id: stepID, generation: generationID, kind: .reasoning(thinking.thinking)))
                 case .toolCall(let call):
-                    let matching = candidates.flatMap(\.steps).filter { step in
-                        if let recorded = step.toolCall { return recorded == call }
-                        if let result = step.toolResult { return result.toolCallId == call.id && result.toolName == call.name }
-                        if step.id.rawValue.uuidString == call.id { return true }
-                        guard case .execute(let execution) = step.kind else { return false }
-                        return call.arguments.objectValue?["source"]?.stringValue == execution.source
-                    }
+                    let matching = candidates.flatMap { $0.matchingSteps(for: call) }
                     toolDecorations[stepID] = matching
                     let kind = DurableChatProjection.action(for: call, decoration: matching.last, id: stepID)
                     agent?.steps.append(Step(id: stepID, generation: generationID, kind: kind, toolCall: call))

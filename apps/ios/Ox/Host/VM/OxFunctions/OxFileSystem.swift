@@ -44,7 +44,7 @@ nonisolated enum OxFileSystem {
                 entry(
                     "ox.fs.attach",
                     ModelGuidance.text("ox.fs.attach"),
-                    input: object(["path": path("Artifact or selected external file virtual path."), "purpose": purpose], required: ["path", "purpose"]),
+                    input: object(["path": path("Artifact or selected external file virtual path, or a public HTTP(S) URL fetched only when attaching."), "purpose": purpose], required: ["path", "purpose"]),
                     output: object([
                         "filename": string("Attachment display filename."),
                         "contentType": string("Attachment MIME type."),

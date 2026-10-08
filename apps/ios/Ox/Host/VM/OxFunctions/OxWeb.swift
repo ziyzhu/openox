@@ -87,6 +87,11 @@ nonisolated enum OxWeb {
                                         "maximum": .int(ArtifactLimits.fileBytes),
                                         "description": .string("Maximum text bytes to return."),
                                     ]),
+                                    "maxPages": .object([
+                                        "type": .string("integer"),
+                                        "minimum": .int(1),
+                                        "description": .string("Maximum PDF pages to read as text."),
+                                    ]),
                                 ]),
                                 "additionalProperties": .bool(false),
                             ]),
@@ -119,7 +124,7 @@ nonisolated enum OxWeb {
                             "bytes": .object(["type": .string("integer")]),
                             "text": .object(["type": .array([.string("string"), .string("null")])]),
                             "truncated": .object(["type": .string("boolean")]),
-                            "attached": .object(["type": .string("boolean")]),
+                            "attached": .object(["type": .string("boolean"), "const": .bool(false), "description": .string("Always false; use ox.fs.attach with url to attach the original file explicitly.")]),
                             "unsupported": .object(["type": .array([.string("string"), .string("null")])]),
                         ]),
                         "required": .array([

@@ -146,16 +146,27 @@ extension Conversation {
     }
 
     public func attachFileSystem(path: String, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path)
-        let args: JSONValue = .object(["path": .string(location.path)])
+        let webRequest = path.lowercased().hasPrefix("http:") || path.lowercased().hasPrefix("https:")
+            ? try WebFetchRequest(url: path) : nil
+        let source = try webRequest?.url.absoluteString ?? virtualMachine.fileSystem.location(path).path
+        let args: JSONValue = .object(["path": .string(source)])
         return try await tracked(Actions.fsAttach, args, purpose: purpose) {
-            let media = try await self.fileSystemMedia(path: location.path)
-            let attachment = try await Task.detached(priority: .userInitiated) {
-                try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
-            }.value
+            let attachment: TransientAttachment
+            if let webRequest {
+                let (_, response) = try await fetchWebResource(webRequest)
+                guard response.ok else { throw RuntimeError.bridge("ox.fs.attach: HTTP \(response.status)") }
+                attachment = try await Task.detached(priority: .userInitiated) {
+                    try WebAttachmentFactory.make(response: response, filename: nil)
+                }.value
+            } else {
+                let media = try await self.fileSystemMedia(path: source)
+                attachment = try await Task.detached(priority: .userInitiated) {
+                    try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
+                }.value
+            }
             try Task.checkCancellation()
             try appendTransientAttachment(attachment)
-            Log.session.info("bridge.fs.attach path=\(location.path) bytes=\(attachment.data.count) mimeType=\(attachment.mimeType)")
+            Log.session.info("bridge.fs.attach path=\(LogPrivacy.text(source)) bytes=\(attachment.data.count) mimeType=\(attachment.mimeType)")
             return attachmentJSON(attachment)
         }
     }

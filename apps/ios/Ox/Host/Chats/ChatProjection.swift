@@ -76,7 +76,6 @@ nonisolated enum ChatProjection {
                         }
                         if !missingCalls.isEmpty {
                             assistant.content.append(contentsOf: missingCalls)
-                            Log.session.warning("ChatProjection repaired generation=\(generation.id.rawValue) missingToolCalls=\(missingCalls.count)")
                         }
                     }
                     out.append(.assistant(assistant))

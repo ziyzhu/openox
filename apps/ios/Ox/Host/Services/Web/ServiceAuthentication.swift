@@ -288,6 +288,7 @@ extension Service {
 @MainActor
 final class ServiceAccess {
     private static let maxAge: TimeInterval = 30 * 60
+    private static let unavailableRetryInterval: TimeInterval = 30
     private(set) var signInPreflight: UUID?
     private var checkedAt: Date?
     private var revision = UUID()
@@ -314,7 +315,7 @@ final class ServiceAccess {
         signInPreflight = nil
         switch auth {
         case .observed(let observation): checkedAt = observation.observedAt
-        case .authorized, .notRequired: checkedAt = Date()
+        case .authorized, .notRequired, .unavailable: checkedAt = Date()
         default: break
         }
     }
@@ -387,6 +388,8 @@ final class ServiceAccess {
         switch auth {
         case .observed, .authorized, .notRequired:
             return checkedAt.map { Date().timeIntervalSince($0) < Self.maxAge } ?? false
+        case .unavailable:
+            return checkedAt.map { Date().timeIntervalSince($0) < Self.unavailableRetryInterval } ?? false
         default:
             return false
         }

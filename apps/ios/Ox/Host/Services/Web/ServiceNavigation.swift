@@ -349,8 +349,16 @@ extension Service {
             Log.webView.error("Service.navigation event=download domain=\(domain) session=\(session.logLabel) nav=\(load.generation)")
 
         case .webContentProcessTerminated:
+            let active = activeInvocationCount(in: session)
+            let queued = queuedInvocationCount(in: session)
+            let phase = session.navigationPhase.logLabel
             guard transitionNavigation(event, on: session) else { return }
-            Log.webView.error("Service.navigation event=process-terminated domain=\(domain) session=\(session.logLabel) active=\(activeInvocationCount(in: session)) queued=\(queuedInvocationCount(in: session))")
+            let message = "Service.navigation event=process-terminated domain=\(domain) session=\(session.logLabel) phase=\(phase) active=\(active) queued=\(queued)"
+            if active == 0, queued == 0 {
+                Log.webView.info(message)
+            } else {
+                Log.webView.error(message)
+            }
 
         default:
             _ = transitionNavigation(event, on: session)
@@ -399,10 +407,17 @@ extension Service {
         do {
             let raw = try await evalOnce(
                 session,
-                "return typeof window.ox?.callServiceAction === 'function';",
+                "return { dispatcher: typeof window.ox?.callServiceAction === 'function', runtime: typeof window.ox?.status === 'function' ? window.ox.status() : null, document: document.readyState };",
                 timeout: 5
             )
-            return raw as? Bool == true
+            guard owns(session), session.navigationGeneration == generation else { return false }
+            let probe = raw as? [String: Any]
+            let runtime = probe?["runtime"] as? [String: Any]
+            let ready = probe?["dispatcher"] as? Bool == true && runtime?["state"] as? String == "ready"
+            if !ready {
+                Log.webView.error("Service.dispatcher unavailable domain=\(domain) session=\(session.logLabel) nav=\(generation) repository=\(definition.repositoryID ?? "native") dispatcher=\(probe?["dispatcher"] as? Bool ?? false) installation=\(runtime?["state"] as? String ?? "missing") actions=\(runtime?["actionCount"] as? Int ?? 0) document=\(probe?["document"] as? String ?? "unknown") error=\(LogPrivacy.text(runtime?["error"] as? String ?? "none"))")
+            }
+            return ready
         } catch {
             Log.webView.error("Service.dispatcher probe failed domain=\(domain) session=\(session.logLabel) nav=\(generation) error=\(LogPrivacy.text(error.localizedDescription))")
             return false

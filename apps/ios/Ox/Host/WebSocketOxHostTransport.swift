@@ -31,6 +31,8 @@ final class WebSocketOxHostTransport {
     private var path: NWPath?
     private var ingress: HostTransportIngress?
     private var listeners: [String: NWListener] = [:]
+    private var listenerRetryAt = Date.distantPast
+    private var listenerRetryDelay: TimeInterval = 1
     private var connections: [ObjectIdentifier: Client] = [:]
 
     init(host: any OxHost, access: HostAccess, port: NWEndpoint.Port = defaultPort) {
@@ -76,9 +78,14 @@ final class WebSocketOxHostTransport {
     }
 
     private func refreshIngress() {
-        guard let path, UIApplication.shared.applicationState == .active else { return }
+        guard access.enabled, prepared, let path, UIApplication.shared.applicationState == .active else { return }
         let next = HostTransportIngress.current(on: path)
-        guard next != ingress else { return }
+        if next == ingress {
+            guard next != nil, listeners.isEmpty, Date() >= listenerRetryAt else { return }
+        } else {
+            listenerRetryAt = .distantPast
+            listenerRetryDelay = 1
+        }
         closeListeners()
         ingress = next
         guard let next else {
@@ -110,10 +117,10 @@ final class WebSocketOxHostTransport {
                     guard let self, let listener, self.listeners[address] === listener else { return }
                     switch state {
                     case .ready:
+                        self.listenerRetryDelay = 1
                         Log.app.info("WebSocketOxHostTransport ready mode=\(ingress.description) address=\(address) port=\(self.port)")
                     case .failed(let error):
-                        self.closeListeners()
-                        Log.app.warning("WebSocketOxHostTransport failed error=\(error.localizedDescription); reopen Ox to retry")
+                        self.listenerFailed(error)
                     default: break
                     }
                 }
@@ -127,9 +134,15 @@ final class WebSocketOxHostTransport {
             listeners[address] = listener
             listener.start(queue: queue)
         } catch {
-            closeListeners()
-            Log.app.warning("WebSocketOxHostTransport start failed error=\(error.localizedDescription); reopen Ox to retry")
+            listenerFailed(error)
         }
+    }
+
+    private func listenerFailed(_ error: any Error) {
+        closeListeners()
+        listenerRetryAt = Date().addingTimeInterval(listenerRetryDelay)
+        Log.app.warning("WebSocketOxHostTransport failed port=\(port) retrySeconds=\(Int(listenerRetryDelay)) error=\(LogPrivacy.text(error.localizedDescription))")
+        listenerRetryDelay = min(listenerRetryDelay * 2, 30)
     }
 
     func disconnectClients() {
@@ -150,6 +163,8 @@ final class WebSocketOxHostTransport {
         addressPoll = nil
         path = nil
         ingress = nil
+        listenerRetryAt = .distantPast
+        listenerRetryDelay = 1
         closeListeners()
         Log.app.info("WebSocketOxHostTransport stopped")
     }

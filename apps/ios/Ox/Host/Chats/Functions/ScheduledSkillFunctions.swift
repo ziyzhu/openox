@@ -16,6 +16,7 @@ extension Conversation {
         return try await tracked(Actions.scheduleCreate, args, purpose: purpose) {
             try requireProfileMutation(Actions.scheduleCreate)
             let skill = try await skillsMount.entry(named: skillName).skill
+            try serviceManager.requireServices(domains: skill.services)
             let recurrence = try scheduledRecurrence(
                 frequency: frequency,
                 fireAt: fireAt,
@@ -69,6 +70,7 @@ extension Conversation {
             purpose: purpose
         ) {
             try requireProfileMutation(Actions.scheduleEnable)
+            if enabled { try serviceManager.requireServices(domains: schedule.skill.services) }
             try await confirmScheduledSkillChange(
                 action: verb,
                 prompt: "\(verb) the schedule for /\(schedule.skill.displayName)?"
@@ -85,6 +87,7 @@ extension Conversation {
         let schedule = try ownedSchedule(id)
         return try await tracked(Actions.scheduleRun, .object(["id": .string(id)]), purpose: purpose) {
             try requireProfileMutation(Actions.scheduleRun)
+            try serviceManager.requireServices(domains: schedule.skill.services)
             try await confirmScheduledSkillChange(
                 action: L10n.string("Run Now"),
                 prompt: "Run the scheduled snapshot of /\(schedule.skill.displayName) now?"
@@ -154,6 +157,15 @@ extension Conversation {
         }
         if let lastRunAt = schedule.lastRunAt {
             result["lastRunAt"] = .string(ISODate.string(from: lastRunAt))
+        }
+        if let outcome = schedule.lastOutcome {
+            switch outcome {
+            case .succeeded: result["lastOutcome"] = .string("succeeded")
+            case .cancelled: result["lastOutcome"] = .string("cancelled")
+            case .failed(let message):
+                result["lastOutcome"] = .string("failed")
+                result["lastError"] = .string(message)
+            }
         }
         if let lastChatID = schedule.lastChatID {
             result["lastChatId"] = .string(lastChatID.uuidString)

@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import WebKit
 import Observation
 import SwiftUI
@@ -807,7 +808,8 @@ final class Service: NSObject, Identifiable {
             ucc.addUserScript(script)
         }
         servicePage.scriptMode = mode
-        Log.webView.info("Service.scripts domain=\(domain) session=\(servicePage.logLabel) mode=\(mode.rawValue)")
+        let digest = SHA256.hash(data: Data(servicePage.actions.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+        Log.webView.info("Service.scripts domain=\(domain) session=\(servicePage.logLabel) mode=\(mode.rawValue) repository=\(definition.repositoryID ?? "native") actionsBytes=\(servicePage.actions.utf8.count) actionsHash=\(digest)")
     }
 
     func invalidateResolved() {

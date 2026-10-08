@@ -1,7 +1,7 @@
 (() => {
   window.__openOxCreateServiceRuntime = domain => {
     const actions = new Map();
-    let installed = false;
+    let installation = { state: "pending", error: null };
     const log = message => {
       try {
         window.webkit?.messageHandlers?.oxConsole?.postMessage({
@@ -11,7 +11,7 @@
       } catch {}
     };
     const action = (name, definition) => {
-      if (installed) throw new Error("service installer has already completed");
+      if (installation.state !== "pending") throw new Error("service installer has already completed");
       if (typeof name !== "string" || !name) throw new Error("action name must be a non-empty string");
       if (actions.has(name)) throw new Error(`duplicate action: ${name}`);
       if (typeof definition?.invoke !== "function") throw new Error(`action ${name} has no invoke function`);
@@ -24,20 +24,21 @@
       },
     });
     const install = (installer, ...extra) => {
-      if (installed || actions.size > 0) throw new Error("service installer may run only once");
+      if (installation.state !== "pending" || actions.size > 0) throw new Error("service installer may run only once");
       if (typeof installer !== "function" || extra.length) throw new Error("window.ox.install takes only the installer");
       try {
         const result = installer(api);
         if (result && typeof result.then === "function") throw new Error("service installer must be synchronous");
-        installed = true;
+        installation = { state: "ready", error: null };
       } catch (error) {
+        installation = { state: "failed", error: String(error?.message ?? error).slice(0, 500) };
         actions.clear();
         log(`service installer threw: ${String(error?.stack ?? error?.message ?? error)}`);
         throw error;
       }
     };
     const callServiceAction = async (name, args = {}) => {
-      if (!installed) throw new Error("service installer has not completed");
+      if (installation.state !== "ready") throw new Error("service installer has not completed");
       const handler = actions.get(name);
       if (!handler) throw new Error(`unknown action: ${name}`);
       try {
@@ -47,6 +48,7 @@
         throw new Error(`action ${JSON.stringify(name)} failed: ${String(error?.message ?? error)}`);
       }
     };
-    return { install, callServiceAction };
+    const status = () => ({ ...installation, actionCount: actions.size });
+    return { install, callServiceAction, status };
   };
 })();
