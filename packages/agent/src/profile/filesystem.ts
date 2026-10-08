@@ -1,5 +1,5 @@
 import { err, ok, ExecutionError, FileError, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
-import { canonical, type ProfileFiles } from "./profile-files";
+import { canonical, type ProfileFiles } from "./files";
 import type { ConversationId } from "@earendil-works/pi-durable";
 import type { OxConversations, ConversationListCursor } from "./conversations";
 

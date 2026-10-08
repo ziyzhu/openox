@@ -1,4 +1,4 @@
-import type { ArtifactFiles, ArtifactRecord } from "../../core/artifacts";
+import type { ArtifactFiles, ArtifactRecord } from "../../profile/artifacts";
 import { native } from "./bridge";
 
 const chunkSize = 128 * 1024;

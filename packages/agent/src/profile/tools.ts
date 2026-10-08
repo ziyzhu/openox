@@ -1,6 +1,6 @@
 import { defineExtension, defineTool, wrapTool, section, type ConversationId, type ToolRegistration } from "@earendil-works/pi-durable";
 import { createReadTool, createWriteTool, createEditTool } from "@earendil-works/pi-durable/tools";
-import { canonical, type ProfileFiles } from "./profile-files";
+import { canonical, type ProfileFiles } from "./files";
 
 export type AuthorizeFile = (conversationId: ConversationId, action: "write" | "edit", path: string, signal?: AbortSignal) => Promise<void>;
 

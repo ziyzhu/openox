@@ -3,8 +3,8 @@ import type { JsonValue } from "@earendil-works/chord";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type EntryRecord, type JsonObject, type Tx } from "@earendil-works/pi-durable";
 import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor } from "./conversations";
-import { ConversationApplicationMetadata } from "./profile-install";
-import type { OxAgentSession } from "./session";
+import { ConversationApplicationMetadata } from "./install";
+import type { ProfileRuntime } from "./runtime";
 
 const context = BACKGROUND_CONTEXT;
 export interface ApplicationAgentChange {
@@ -64,11 +64,11 @@ async function presentation(tx: Tx, id: ConversationId, change: ApplicationPrese
   if (change.unread !== undefined) (await tx.doc(ConversationReadState, id)).lastReadEntryID = change.unread ? null : latest;
 }
 export class ApplicationPresentation {
-  constructor(private session: OxAgentSession) {}
+  constructor(private runtime: ProfileRuntime) {}
   private async hasTranscript(reference: ConversationReference) {
     let cursor: ConversationHistoryCursor | undefined;
     do {
-      const page = await this.session.conversations.history(reference, 1, cursor);
+      const page = await this.runtime.conversations.history(reference, 1, cursor);
       if (page.items.some(entry => entry.kind !== "pi.reset" && entry.kind !== "pi.compaction"
         && entry.model?.some(message => message.role === "user" || message.role === "assistant"))) return true;
       cursor = page.next;
@@ -76,10 +76,10 @@ export class ApplicationPresentation {
     return false;
   }
   async list(limit = 100, cursor?: ConversationListCursor) {
-    const page = await this.session.conversations.list(limit, cursor);
+    const page = await this.runtime.conversations.list(limit, cursor);
     const items = await Promise.all(page.items.map(async state => {
       const [metadata, hasTranscript] = await Promise.all([
-        this.session.harness.snapshot(ConversationApplicationMetadata, state.reference.conversationID, context),
+        this.runtime.harness.snapshot(ConversationApplicationMetadata, state.reference.conversationID, context),
         this.hasTranscript(state.reference),
       ]);
       return { reference: state.reference, presentation: state.presentation, favorite: state.favorite, unread: state.unread,
@@ -90,7 +90,7 @@ export class ApplicationPresentation {
   private async agentChange(tx: Tx, id: ConversationId, change: ApplicationAgentChange, requireIdle: boolean) {
     const state = await tx.doc(AgentDoc, id);
     const provider = state.model?.provider.startsWith("ox-native:") ? state.model.provider
-      : change.model?.provider?.startsWith("ox-native:") ? change.model.provider : `ox-native:${this.session.conversations.profileID}:${id}`;
+      : change.model?.provider?.startsWith("ox-native:") ? change.model.provider : `ox-native:${this.runtime.conversations.profileID}:${id}`;
     const model = change.model === undefined ? state.model : change.model === null ? undefined : { provider, modelId: change.model.modelId };
     const thinkingLevel = change.thinkingLevel === undefined ? state.thinkingLevel : change.thinkingLevel ?? undefined;
     const changed = state.model?.provider !== model?.provider || state.model?.modelId !== model?.modelId || state.thinkingLevel !== thinkingLevel;
@@ -106,23 +106,23 @@ export class ApplicationPresentation {
     validate(change);
     if (change.entries !== undefined && (!Array.isArray(change.entries) || change.entries.some(entry => !entry.kind || (entry.head !== undefined && entry.head !== "self") || entry.edits !== undefined))) throw new Error("New conversations require current entries without foreign database IDs");
     const frozen = JSON.parse(JSON.stringify(change)) as typeof change;
-    const conversation = await this.session.harness.createConversation({ ownership: { kind: "ownerless" }, init: async (tx, id) => {
+    const conversation = await this.runtime.harness.createConversation({ ownership: { kind: "ownerless" }, init: async (tx, id) => {
       if (frozen.agent) await this.agentChange(tx, id, frozen.agent, false);
       let latest: number | null = null;
       for (const entry of frozen.entries ?? []) latest = (await tx.appendEntry(id, entry)).id;
       if (latest === null) latest = (await tx.appendEntry(id, { kind: "ox.native.presentation", data: {} })).id;
       await presentation(tx, id, { metadata: frozen.metadata ?? {}, title: frozen.title ?? "", favorite: frozen.favorite ?? false, unread: frozen.unread ?? false }, latest, true);
     } }, context);
-    return { conversationID: conversation.id, reference: this.session.conversations.reference(conversation.id) };
+    return { conversationID: conversation.id, reference: this.runtime.conversations.reference(conversation.id) };
   }
   async load(reference: ConversationReference) {
-    const id = this.session.conversations.id(reference);
-    const conversation = await this.session.harness.conversation(id, context);
+    const id = this.runtime.conversations.id(reference);
+    const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     const [state, metadata, entries, active] = await Promise.all([
-      this.session.conversations.metadata(reference),
-      this.session.harness.snapshot(ConversationApplicationMetadata, id, context),
-      this.session.harness.commit(tx => ledger(tx, id), context),
+      this.runtime.conversations.metadata(reference),
+      this.runtime.harness.snapshot(ConversationApplicationMetadata, id, context),
+      this.runtime.harness.commit(tx => ledger(tx, id), context),
       conversation.context(context),
     ]);
     return { ...state, metadata: metadata?.fields ?? {}, entries, messages: active.messages };
@@ -130,8 +130,8 @@ export class ApplicationPresentation {
   async save(reference: ConversationReference, change: ApplicationPresentationChange) {
     validate(change);
     const frozen = JSON.parse(JSON.stringify(change)) as ApplicationPresentationChange;
-    const id = this.session.conversations.id(reference);
-    const conversation = await this.session.harness.conversation(id, context);
+    const id = this.runtime.conversations.id(reference);
+    const conversation = await this.runtime.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     await conversation.commit(async tx => {
       if (frozen.agent) await this.agentChange(tx, id, frozen.agent, true);
@@ -153,5 +153,5 @@ export class ApplicationPresentation {
       await presentation(tx, id, frozen, latest);
     }, context);
   }
-  async delete(reference: ConversationReference) { await this.session.conversations.present(reference, { visible: false }); }
+  async delete(reference: ConversationReference) { await this.runtime.conversations.present(reference, { visible: false }); }
 }

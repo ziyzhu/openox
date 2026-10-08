@@ -4,15 +4,15 @@ import { Harness, createRegistry, watchEvents, type AgentEvent, type AgentEventS
   type Conversation, type HarnessSettings, type InputSubmissionDraft, type Registry, type Submission, type SubmissionId } from "@earendil-works/pi-durable";
 import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { applyChanges } from "./committed-partial";
-import { ProfileFiles } from "./profile-files";
+import { ProfileFiles } from "./files";
 import type { ArtifactFiles } from "./artifacts";
-import { profileEnv } from "./profile-env";
+import { profileEnv } from "./filesystem";
 import { OxConversations, type ConversationReference } from "./conversations";
-import { profileTools, type AuthorizeFile } from "./file-tools";
+import { profileTools, type AuthorizeFile } from "./tools";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
-export interface SessionOptions {
+export interface ProfileRuntimeOptions {
   database: SqliteDatabase;
   profileID: string;
   models: Models;
@@ -34,31 +34,30 @@ interface Projection {
   waiter?: { id?: SubmissionId; delivered: Set<SubmissionId>; resolve(): void; reject(error: Error): void };
 }
 
-/** One Profile scope. Pi owns execution; this object owns adapters and committed presentation. */
-export class OxAgentSession {
+export class ProfileRuntime {
   readonly files: ProfileFiles;
   readonly conversations: OxConversations;
   readonly env: ReturnType<typeof profileEnv>;
   private projections = new Map<ConversationId, Projection>();
   private attaching = new Map<ConversationId, Promise<void>>();
   private closing?: Promise<void>;
-  private constructor(readonly harness: Harness, readonly registry: Registry, private options: SessionOptions) {
+  private constructor(readonly harness: Harness, readonly registry: Registry, private options: ProfileRuntimeOptions) {
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
     this.env = profileEnv(this.files, this.conversations);
   }
 
-  static async open(options: SessionOptions) {
+  static async open(options: ProfileRuntimeOptions) {
     const registry = options.registry ?? createRegistry();
-    let session: OxAgentSession | undefined;
+    let runtime: ProfileRuntime | undefined;
     let harness: Harness | undefined;
     try {
       harness = await Harness.open(await SqliteStorage.open(options.database), { models: options.models, registry,
-        settings: options.settings, env: () => session!.env, onReport: options.onReport }, context);
-      session = new OxAgentSession(harness, registry, options);
-      await session.files.initialize();
-      registry.install(profileTools(session.files, options.authorizeFile));
-      return session;
+        settings: options.settings, env: () => runtime!.env, onReport: options.onReport }, context);
+      runtime = new ProfileRuntime(harness, registry, options);
+      await runtime.files.initialize();
+      registry.install(profileTools(runtime.files, options.authorizeFile));
+      return runtime;
     } catch (error) {
       try { if (harness) await harness.close(context); else await options.database.close(); }
       finally { await options.artifacts?.close(); }
@@ -66,7 +65,7 @@ export class OxAgentSession {
     }
   }
 
-  private ready() { if (this.closing) throw new Error("Session closed or closing"); }
+  private ready() { if (this.closing) throw new Error("Profile runtime closed or closing"); }
   private async conversation(id: ConversationId) {
     this.ready();
     const conversation = await this.harness.conversation(id, context);
@@ -203,4 +202,4 @@ export class OxAgentSession {
   }
 }
 
-export const openOxAgentSession = (options: SessionOptions) => OxAgentSession.open(options);
+export const openProfileRuntime = (options: ProfileRuntimeOptions) => ProfileRuntime.open(options);

@@ -2,7 +2,7 @@ import type { Api, AssistantMessage, AssistantMessageEvent, Model, SimpleStreamO
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import { native } from "./bridge";
-import type { ConversationReference } from "../../core/conversations";
+import type { ConversationReference } from "../../profile/conversations";
 
 export const emptyUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });

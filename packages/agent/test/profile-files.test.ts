@@ -4,11 +4,11 @@ import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/provid
 import { Harness, createRegistry } from "@earendil-works/pi-durable";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { ProfileFiles, ProfileFile, canonical } from "../src/core/profile-files";
-import { profileEnv } from "../src/core/profile-env";
+import { ProfileFiles, ProfileFile, canonical } from "../src/profile/files";
+import { profileEnv } from "../src/profile/filesystem";
 import { backend } from "./sqlite-backend";
-import { openOxAgentSession, installOxProfile, type NormalizedProfileDraft, type ArtifactFiles } from "../src/index";
-import { artifactPath } from "../src/core/artifacts";
+import { openProfileRuntime, installOxProfile, type NormalizedProfileDraft, type ArtifactFiles } from "../src/index";
+import { artifactPath } from "../src/profile/artifacts";
 import { mkdtemp, mkdir, open, rm, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 
@@ -127,7 +127,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     },
   ]);
   models.setProvider(provider.provider);
-  const openSession = () => openOxAgentSession({ database: backend(`${directory}/state.sqlite`).db, profileID: "physical-profile",
+  const openSession = () => openProfileRuntime({ database: backend(`${directory}/state.sqlite`).db, profileID: "physical-profile",
     models, registry: createRegistry(), artifacts: host(), authorizeFile: async () => {} });
   await mkdir(`${directory}/artifacts`);
   let session = await openSession();
@@ -175,7 +175,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     const installation = await installOxProfile(draft, { database: backend(`${installed}/state.sqlite`).db, artifacts: host(installed) });
     expect(installation.conversations).toHaveLength(1);
     expect(installation.conversations[0]!.key).toBe("source-key");
-    const installedSession = await openOxAgentSession({ database: backend(`${installed}/state.sqlite`).db,
+    const installedSession = await openProfileRuntime({ database: backend(`${installed}/state.sqlite`).db,
       profileID: draft.profileID, models: createModels(), artifacts: host(installed), authorizeFile: async () => {} });
     try {
       const reference = installation.conversations[0]!.reference;

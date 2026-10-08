@@ -4,8 +4,8 @@ import type { Message } from "@earendil-works/pi-ai";
 import { defineDoc, type AgentChange, type EntryDraft, type EntryRecord, type Cursor, type JsonObject } from "@earendil-works/pi-durable";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { artifactPath, artifactRecord, type ArtifactFiles, type ArtifactRecord } from "./artifacts";
-import { canonical, ProfileArtifact, ProfileIndex } from "./profile-files";
-import { openOxAgentSession, type OxAgentSession } from "./session";
+import { canonical, ProfileArtifact, ProfileIndex } from "./files";
+import { openProfileRuntime, type ProfileRuntime } from "./runtime";
 import type { ConversationReference } from "./conversations";
 
 export interface NormalizedProfileDraft {
@@ -112,7 +112,7 @@ function validate(draft: NormalizedProfileDraft) {
     attachment(conversation.expectedContext);
   };
 }
-async function history(session: OxAgentSession, reference: ConversationReference) {
+async function history(session: ProfileRuntime, reference: ConversationReference) {
   const entries: EntryRecord[] = [];
   let cursor: Cursor | undefined;
   const conversation = (await session.harness.conversation(reference.conversationID, context))!;
@@ -122,7 +122,7 @@ async function history(session: OxAgentSession, reference: ConversationReference
   } while (cursor);
   return entries.reverse();
 }
-async function verifyFiles(session: OxAgentSession, draft: NormalizedProfileDraft) {
+async function verifyFiles(session: ProfileRuntime, draft: NormalizedProfileDraft) {
   for (const file of draft.documents) {
     if (await session.files.read(file.path) !== file.text) throw new Error("Profile document verification failed");
   }
@@ -137,7 +137,7 @@ async function verifyFiles(session: OxAgentSession, draft: NormalizedProfileDraf
     if (!same(record, { ...file, binary: true, saved: false })) throw new Error("Profile payload metadata verification failed");
   }
 }
-async function verifyConversation(session: OxAgentSession, source: NormalizedProfileDraft["conversations"][number], reference: ConversationReference) {
+async function verifyConversation(session: ProfileRuntime, source: NormalizedProfileDraft["conversations"][number], reference: ConversationReference) {
   const entries = await history(session, reference);
   if (entries.length !== source.entries.length) throw new Error("Conversation ledger count mismatch");
   for (const [ordinal, entry] of entries.entries()) {
@@ -154,19 +154,19 @@ async function verifyConversation(session: OxAgentSession, source: NormalizedPro
       || (source.agent.thinkingLevel !== undefined && metadata.agent?.thinkingLevel !== source.agent.thinkingLevel)) throw new Error("Conversation model selection mismatch");
   if (metadata.presentation?.title !== source.title || metadata.favorite !== source.favorite || metadata.unread !== source.unread) throw new Error("Conversation presentation mismatch");
 }
-async function verifySession(session: OxAgentSession) {
+async function verifyRuntime(session: ProfileRuntime) {
   const inspection = await session.harness.inspect(context);
   if (inspection.scheduling !== "paused" || inspection.tasks.length || inspection.submissions.length) throw new Error("Profile installation must remain dormant");
   if (await session.files.integrity() !== "ok") throw new Error("Profile SQLite integrity failed");
 }
 export async function installOxProfile(draft: NormalizedProfileDraft, host: ProfileInstallHost) {
-  let session: OxAgentSession | undefined;
+  let session: ProfileRuntime | undefined;
   try {
     const validateConversation = validate(draft);
     if (host.conversations && draft.conversations.length) throw new Error("Profile installation cannot mix inline and streamed conversations");
     for (const source of draft.conversations) validateConversation(source);
     if ((await host.database.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")).length) throw new Error("Profile installation requires a fresh staged database");
-    session = await openOxAgentSession({ ...host, profileID: draft.profileID, models: createModels(),
+    session = await openProfileRuntime({ ...host, profileID: draft.profileID, models: createModels(),
       authorizeFile: async () => { throw new Error("Profile installation cannot invoke tools"); } });
     for (const file of draft.documents) await session.files.write(file.path, file.text);
     for (const file of draft.artifacts) {
@@ -202,7 +202,7 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
       await verifyConversation(session, source, reference);
       conversations.push({ key: source.key, reference });
     }
-    await verifySession(session);
+    await verifyRuntime(session);
     return { conversations };
   } finally {
     if (session) await session.close();

@@ -6,7 +6,7 @@ import { createRegistry, defineExtension, defineTool, type ConversationId, type 
 import { Type } from "typebox";
 import { rm } from "node:fs/promises";
 import { ChatBindings, ConversationIdentity } from "../src/chat-bindings";
-import { openOxAgentSession, type OxAgentSession, type CommittedEvent, type SessionOptions,
+import { openProfileRuntime, type ProfileRuntime, type CommittedEvent, type ProfileRuntimeOptions,
   type ConversationReference, type ConversationHistoryCursor, type ConversationListCursor } from "../src/index";
 import { IOSAgentAdapter } from "../src/adapters/ios/agent";
 import { deliver, streamEvent } from "../src/adapters/ios/bridge";
@@ -14,21 +14,21 @@ import { composeIOSPrompt } from "../src/adapters/ios/prompts";
 import { backend } from "./sqlite-backend";
 
 const context = BACKGROUND_CONTEXT;
-const sessions: OxAgentSession[] = [];
+const sessions: ProfileRuntime[] = [];
 afterEach(async () => { await Promise.all(sessions.splice(0).map(session => session.close())); });
 
-async function fixture(profileID = "fixture", onEvents: (id: ConversationId, events: CommittedEvent[]) => Promise<void> = async () => {}, overrides: Partial<SessionOptions> = {}) {
+async function fixture(profileID = "fixture", onEvents: (id: ConversationId, events: CommittedEvent[]) => Promise<void> = async () => {}, overrides: Partial<ProfileRuntimeOptions> = {}) {
   const models = createModels();
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   faux.setResponses(Array.from({ length: 4 }, () => fauxAssistantMessage([{ type: "text", text: "hello" }])));
   models.setProvider(faux.provider);
-  const session = await openOxAgentSession({ database: backend().db, profileID, models, registry: createRegistry(),
+  const session = await openProfileRuntime({ database: backend().db, profileID, models, registry: createRegistry(),
     createBlobID: async () => crypto.randomUUID(), authorizeFile: async () => {}, onEvents,
     settings: { retry: { enabled: false }, compaction: { enabled: false } }, ...overrides });
   sessions.push(session);
   return session;
 }
-async function conversation(session: OxAgentSession) {
+async function conversation(session: ProfileRuntime) {
   return session.harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: { provider: "fixture", modelId: "mock" } } }, context);
 }
 
@@ -52,7 +52,7 @@ test("in-process host executes an unbound Pi conversation and delivers committed
   expect(events.some(event => event.type === "run_end")).toBe(true);
 });
 
-test("Sessions with colliding numeric conversation IDs isolate models, files, observers and close", async () => {
+test("Profile runtimes with colliding numeric conversation IDs isolate models, files, observers and close", async () => {
   const firstEvents: ConversationId[] = []; const secondEvents: ConversationId[] = [];
   const first = await fixture("first", async id => { firstEvents.push(id); });
   const second = await fixture("second", async id => { secondEvents.push(id); });
@@ -85,7 +85,7 @@ test("concurrent observer attachment creates one committed delivery stream", asy
   expect(events.filter(event => event.type === "run_end")).toHaveLength(1);
 });
 
-test("multiple conversations in one Session route events by Pi identity", async () => {
+test("multiple conversations in one Profile runtime route events by Pi identity", async () => {
   const ids = new Set<ConversationId>();
   const session = await fixture("fixture", async id => { ids.add(id); });
   const a = await conversation(session); const b = await conversation(session);
@@ -118,7 +118,7 @@ test("file tools request host authorization before mutating Profile documents", 
   await expect(session.files.read("MEMORY.md")).rejects.toThrow("not found");
 });
 
-async function holdingSession(database: SessionOptions["database"]) {
+async function holdingSession(database: ProfileRuntimeOptions["database"]) {
   let started!: () => void;
   const running = new Promise<void>(resolve => { started = resolve; });
   const registry = createRegistry();
@@ -191,7 +191,7 @@ function value<T>(result: { ok: true; value: T } | { ok: false; error: unknown }
   return result.value;
 }
 
-test("Session ExecutionEnv exposes only visible, read-only Pi metadata and full-history pages", async () => {
+test("Profile ExecutionEnv exposes only visible, read-only Pi metadata and full-history pages", async () => {
   const session = await fixture();
   const visible = await conversation(session); const internal = await conversation(session);
   const reference = session.conversations.reference(visible.id);
@@ -356,9 +356,9 @@ test("bounded iOS commands route qualified references and execute structured pro
   }
 });
 
-test("failed initialization closes storage and rejects before exposing a Session", async () => {
+test("failed initialization closes storage and rejects before exposing a Profile runtime", async () => {
   const db = backend().db;
-  await expect(openOxAgentSession({ database: db, profileID: "", models: createModels(), registry: createRegistry(),
+  await expect(openProfileRuntime({ database: db, profileID: "", models: createModels(), registry: createRegistry(),
     createBlobID: async () => crypto.randomUUID(), authorizeFile: async () => {} })).rejects.toThrow("identity");
   await expect(db.get("SELECT 1")).rejects.toThrow("closed");
 });

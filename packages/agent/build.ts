@@ -57,7 +57,7 @@ for (const generated of [result, promptResult]) for (const file of generated.out
   const inputs = Object.entries(output.inputs).filter(([, contribution]) => contribution.bytesInOutput > 0).map(([path]) => path);
   const forbidden = inputs.filter(path => /\/(env\/node|storage\/.*\/node|api\/(?!lazy\.js$).*|providers\/|node\/).*\.js$|\/tools\/bash\.js$/.test(path)
     || (name === "harness.js" && /\/(storage-diagnostics\.ts$|storage-check\.ts$|storage-benchmark\.ts$)/.test(path))
-    || (name === "harness-storage.js" && /\/src\/(core\/|chat-bindings\.ts$|adapters\/ios\/(agent|native-model)\.ts$)/.test(path))
+    || (name === "harness-storage.js" && /\/src\/(core\/|profile\/|chat-bindings\.ts$|adapters\/ios\/(agent|native-model)\.ts$)/.test(path))
     || (name === "prompts.js" && !/^packages\/agent\/src\/(adapters\/ios\/prompt-renderer|core\/(prompts|provider-prompts|tool-prompts|guidance-texts|runtime-prompts|host-context|ox-prompts|prompt-renderer))\.ts$/.test(path)));
   const external = output.imports.filter(item => item.external);
   if (forbidden.length || external.length || usesNodeRuntime(file.text)) {

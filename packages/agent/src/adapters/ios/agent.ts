@@ -4,13 +4,13 @@ import { createModels, createProvider } from "@earendil-works/pi-ai/models";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import type { Message, Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
-import { openOxAgentSession, type OxAgentSession, type ConversationReference, type ConversationHistoryCursor,
+import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
   ApplicationPresentation, type ApplicationPresentationChange, ProfileArtifact, ProfileFile, ProfileIndex, canonical,
   ConversationApplicationMetadata, ConversationPresentation, type ArtifactFiles, type ArtifactRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
 import { ChatBindings } from "../../chat-bindings";
-import { artifactPath, artifactRecord } from "../../core/artifacts";
+import { artifactPath, artifactRecord } from "../../profile/artifacts";
 import { nativeDatabase } from "../../sqlite";
 import { native } from "./bridge";
 import { nativeStream } from "./native-model";
@@ -63,7 +63,7 @@ function encodeBase64(bytes: Uint8Array) {
 }
 
 export class IOSAgentAdapter {
-  private session?: OxAgentSession;
+  private session?: ProfileRuntime;
   private bindings?: ChatBindings;
   private application?: ApplicationPresentation;
   private artifacts?: ArtifactFiles;
@@ -88,12 +88,12 @@ export class IOSAgentAdapter {
         artifacts: nativeArtifacts(), conversations: count === undefined ? undefined : conversations() });
     }
     if (args.action === "open") {
-      if (this.session) throw new Error("Session already open");
+      if (this.session) throw new Error("Profile runtime already open");
       this.models = createModels();
       this.routes.clear(); this.configured.clear(); this.providerRoutes.clear();
       this.artifacts = args.artifactFiles ? nativeArtifacts() : undefined;
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
-      const session: OxAgentSession = await openOxAgentSession({ database, models: this.models, profileID: args.profileID!,
+      const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID!,
         artifacts: this.artifacts,
         createBlobID: args.artifactFiles ? undefined : () => native<string>("uuid", {}),
         settings: { retry: { enabled: true, maxRetries: 2 }, toolExecution: "parallel" },
@@ -116,7 +116,7 @@ export class IOSAgentAdapter {
       } catch (error) { await session.close(); throw error; }
     }
     const session = this.session;
-    if (!session || !this.bindings) throw new Error("Session not open");
+    if (!session || !this.bindings) throw new Error("Profile runtime not open");
     if (args.profileID !== undefined && args.profileID !== session.conversations.profileID) throw new Error("Conversation Profile mismatch");
     const qualifiedID = args.reference == null ? undefined : session.conversations.id(args.reference);
     if (args.action === "attach") return this.attach(args.config!, args.reference ?? undefined);
