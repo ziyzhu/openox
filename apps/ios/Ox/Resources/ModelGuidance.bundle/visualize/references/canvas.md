@@ -12,7 +12,7 @@ Create a Canvas when a visual relationship, adjustable scenario, simulation, cha
 
 ## Write the artifact
 
-Write one self-contained UTF-8 HTML fragment to a short lowercase `artifacts/<name>.html` path with `ox.fs.write`. Put markup, `<style>`, and `<script>` in that file; omit `<!doctype>`, `<html>`, `<head>`, and `<body>`. Keep it below 200 KB. A successful write presents the Canvas automatically, so do not present it again.
+Write one self-contained UTF-8 HTML fragment to a short lowercase `artifacts/<name>.html` path with `ox.fs.write`. Start with `<meta name="viewport" content="width=device-width, initial-scale=1">` and `<meta name="color-scheme" content="light dark">` so the browser uses phone-width layout and an appearance-aware page background. Put markup, `<style>`, and `<script>` in that file; omit `<!doctype>`, `<html>`, `<head>`, and `<body>`. Keep it below 200 KB. A successful write presents the Canvas automatically, so do not present it again.
 
 Canvases run under a restrictive content policy. Do not use browser network requests, remote subresources, external libraries, `<form>` submission, frames, file input, workers, object embeds, sensors, geolocation, camera, or microphone. Keep markup and scripts inline. Native `button`, `input`, and `select` controls may update local state or invoke Host services through the injected `ox.service` SDK.
 
@@ -33,11 +33,14 @@ Calls are serialized per canvas, with at most 16 pending calls, 120 admissions p
 ## Compose for iPhone and iPad
 
 - Design for the bounded inline chat card first, then the expanded view. Keep the main visual and its primary control visible at phone width without requiring expansion.
-- Use a transparent or neutral page and one readable column by default. Favor a few large, legible elements over dense layouts.
+- Make the HTML feel like part of Ox. Default to its existing theme rather than inventing a dashboard skin, custom font, gradient, or decorative chrome. Follow a different style only when the user requests it.
+- Use one readable column with equal outer-edge padding, normally 16 px. Favor a few large, legible elements over dense layouts. Keep the outer background transparent to blend into the Host surface; use tonal fills only where content needs grouping.
+- Define root-scoped CSS variables for the Ox palette: `surface: #FFFDF7`, `surface-sunken: #FBE9C7`, `background: #FFF6E6`, `on-surface: #3A2410`, `on-surface-muted: #7A5A3A`, `primary: #FFA500`, `primary-pressed: #D87A0A`, and `error: #B8422E`. Reuse them throughout HTML and SVG rather than scattering color literals.
+- Support dark appearance with `color-scheme: light dark` and `prefers-color-scheme: dark` overrides: `surface: #1C1C1E`, `surface-sunken: #2C2C2E`, `background: #0A0A0A`, `on-surface: #ECECEC`, `on-surface-muted: #9A9A9A`, `primary: #F5A030`, `primary-pressed: #C77410`, and `error: #E25A45`. Keep text contrast readable and large color fills subtle.
 - Support widths from 320 px through iPad without horizontal page scrolling, clipped labels, fixed viewport heights, or fixed outer widths. Let controls wrap or stack with a media query.
-- Use native body type around 17 px, no more than two type sizes per visible region, an 8 px spacing rhythm, 12-18 px radii, and touch targets at least 44 px tall.
-- Separate structure with spacing and tonal surfaces, not borders or shadows. Use Ox harvest gold `#FFA500` for at most one primary action or active series per visible region; use pale hay `#FDF2D9` only for small recessed accents.
-- Support light and dark appearance with `color-scheme` and `prefers-color-scheme`. Keep text contrast readable and large color fills subtle.
+- Use system body type (`-apple-system, system-ui, sans-serif`) around 17 px, rounded system headings and labels (`ui-rounded, system-ui, sans-serif`), and monospaced type only for code or numeric diagnostics. Make controls inherit typography; use no more than two type sizes per visible region.
+- Use Ox's 4, 8, 12, 16, 24, and 32 px spacing scale, 12 px input radii, 18 px grouped-content radii, capsule buttons, and touch targets at least 44 px in both dimensions.
+- Separate structure with spacing and tonal surfaces, not decorative borders or shadows. Reserve harvest gold for at most one primary action or active series per visible region; use `surface-sunken` for small recessed accents. Do not imitate the Host's navigation, composer, or approval controls inside the Canvas.
 
 ## Make interaction accessible
 

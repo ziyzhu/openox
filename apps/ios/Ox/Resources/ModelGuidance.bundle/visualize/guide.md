@@ -4,7 +4,9 @@ Choose a Canvas when a visual relationship or adjustable scenario communicates b
 
 Canvas appears inline in Ox chat on iPhone and iPad, with an option to expand it. Design the inline mobile view first: make its first screen useful at phone width, keep controls touch-friendly, and let the same content grow naturally when expanded. Do not rely on expansion, hover, or a desktop-sized viewport to reveal the main result.
 
-Read `guidance/visualize/references/canvas.md` before creating or revising a Canvas. It defines the supported HTML format, responsive and accessible design, local media and maps, and the Canvas service SDK.
+Generate HTML using Ox's existing theme by default, not an unrelated visual identity. Reuse its warm cream surfaces, brown text, selective harvest-gold accents, system typography, spacing, and soft shapes. Use a different visual style only when the user requests it.
+
+Read `guidance/visualize/references/canvas.md` before creating or revising a Canvas. It defines the Ox theme palette, supported HTML format, responsive and accessible design, local media and maps, and the Canvas service SDK.
 
 Build one focused visual around the user's question. Use inspected service contracts when the visual needs live data or actions. Preserve Host authentication and Action policies, and show pending, successful, and failed states accurately.
 
