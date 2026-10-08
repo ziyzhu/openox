@@ -5,10 +5,24 @@ Create a Canvas when a visual relationship, adjustable scenario, simulation, cha
 ## Choose the form
 
 - Use labeled HTML or inline SVG for static flows, hierarchies, timelines, and comparisons.
-- Use native controls and local JavaScript for adjustable inputs, simulations, calculators, and stateful explainers.
-- Start numeric analysis with the plot. Put values and takeaways on marks, axes, or annotations instead of surrounding the chart with dashboard cards.
-- Use one dominant visual, compact controls, and at most one short selected-state detail. Avoid permanent toolbars, repeated legends, decorative metrics, and duplicate views of the same data.
+- Use semantic HTML and local JavaScript for reactive prose, adjustable inputs, simulations, calculators, and stateful explainers. A changing sentence can be the main result; a chart is not mandatory.
+- Place numeric plots beside the claims they support. Put values and takeaways on marks, axes, or annotations instead of surrounding the chart with dashboard cards.
+- Keep one focused question, with compact controls and only the representations needed to answer it. Link prose, a diagram, and a plot when each reveals a different aspect of the same model. Avoid permanent toolbars, repeated legends, decorative metrics, and duplicate views that add no insight.
 - Keep ordinary prose, a short list, or a simple table in chat unless interaction or spatial structure materially helps.
+
+## Build an explorable explanation
+
+Follow the principles in Bret Victor's [Ten Brighter Ideas](https://worrydream.com/TenBrighterIdeas/), [Tangle guide](https://worrydream.com/Tangle/guide.html), and [Explorable Explanations](https://worrydream.com/ExplorableExplanations/): integrate exploration into an authored explanation and let the reader scrutinize its model. Use Tangle's model-and-binding pattern as shown in the Visualize guide, with self-contained HTML and JavaScript. Do not load external libraries or rely on hover-only or drag-only controls.
+
+- Start with a concrete question or claim and a meaningful default scenario. The reader should understand the explanation without touching anything; do not dump them into an unexplained sandbox.
+- Choose inputs that answer real counterfactuals: what if usage doubles, a cost changes, or an assumption fails? Give inputs units, sensible bounds, and a clear way to restore the baseline. Avoid sliders that only change decoration.
+- Put adjustable values near the words or marks they affect. Use labeled native inputs or tap-to-edit buttons rather than hidden hover affordances or drag-only numbers; preserve readable sentences and 44 px touch targets. Offer a short exploration cue when the consequence is not obvious.
+- Keep independent inputs and named model constants in one local state object. Derive all outputs in one calculation function and update dependent sentences, graphics, labels, and accessible summaries from that same result. Update conclusions and conditional language as well as numbers when a threshold is crossed.
+- Make the argument inspectable. Distinguish sourced facts, reader-adjustable assumptions, and calculated estimates. Put source links, dates, units, formulas, and important model limits near the relevant claim or in a compact disclosure. Never invent provenance or present an illustrative model as a verified prediction; use precision justified by the data.
+- Preserve context while the reader explores. Keep labels and scales stable when comparison requires it; explicitly show a scale change when necessary. Use linked representations only when they reveal different relationships, and keep the baseline visible when it helps explain the effect of a change.
+- Keep exploration local and immediate. Do not call services on every slider movement. Separate hypothetical scenarios from explicit refresh or real-world action buttons, and distinguish modeled results from confirmed service outcomes.
+
+For example, a lighting explanation can let the reader change lamps and hours of use, then update a sentence about annual kWh, a baseline-versus-replacement plot, and the estimated savings together. State the wattage and tariff assumptions and their sources; let the reader test whether the savings claim still holds for their situation.
 
 ## Write the artifact
 
@@ -46,7 +60,7 @@ Calls are serialized per canvas, with at most 16 pending calls, 120 admissions p
 
 Use semantic headings, lists, tables, buttons, and labeled native controls. Keep the native tab order and focus behavior. Pair color with labels, shapes, or line styles. Give SVG a concise accessible name and provide a text alternative for any relationship that cannot be understood from its labels. Announce changing results with a restrained `aria-live` region.
 
-Keep presentation state local. Use one control mechanism per state, derive the entire visual from current inputs, and test the default plus both extremes of every adjustable value. Avoid animation unless it explains a state change; honor `prefers-reduced-motion` when motion is useful.
+Keep presentation state local. Derive the entire explanation from current inputs and retain focus while updating results. Test the baseline and reset, both extremes of every adjustable value, invalid or missing inputs, and values on either side of any threshold that changes the conclusion. Check units, calculations, and agreement between prose and graphics; show an unavailable result rather than NaN, infinity, or a stale claim. Avoid animation unless it explains a state change; honor `prefers-reduced-motion` when motion is useful.
 
 ## Use local media and maps
 
