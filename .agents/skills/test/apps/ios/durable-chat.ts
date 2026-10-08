@@ -211,6 +211,14 @@ try {
     await send(firstChat, "12");
     check(JSON.stringify(await sim("describe")).includes("Done."), "Native reasoning reply is visible");
     await sim("screenshot", "--out", `${directory}/reasoning.png`);
+    await send(firstChat, "74");
+    const progressTree = nodes(await sim("describe"));
+    const progressTurn = progressTree.slice(progressTree.findIndex(node => node.AXUniqueId === "chat.message.user" && node.AXLabel === "74"));
+    const answerIndex = progressTurn.findIndex(node => node.AXUniqueId === "chat.message.agent" && node.AXLabel === "The progress update stayed in order.");
+    check(answerIndex >= 0, "Reasoning cannot split the final answer into separate transcript rows");
+    const thinkingRows = progressTurn.filter(node => node.type === "Button" && /^(Thought for|Share progress|List artifacts)/.test(node.AXLabel ?? ""));
+    check(thinkingRows.length === 2 && thinkingRows.every(node => progressTurn.indexOf(node) < answerIndex), "Each progress phase has one thinking row before the final answer, with no late duplicate");
+    await sim("screenshot", "--out", `${directory}/progress-reasoning.png`);
     await send(firstChat, "10");
     check(JSON.stringify(await sim("describe")).includes("Mock markdown"), "Native markdown reply is visible");
     await sim("screenshot", "--out", `${directory}/two-turns.png`);
@@ -225,8 +233,8 @@ try {
     const before = await inspect("before-reopen");
     check(before.references.length === 1, "One Pi conversation before reopen");
     const firstModels = before.entries.flatMap(entry => entry.record.model ?? []);
-    check(firstModels.filter(message => message.role === "user").length === 6, "All initial and queued user turns committed exactly once");
-    check(firstModels.filter(message => message.role === "toolResult").length === 2, "Both native tool results retained in Pi history");
+    check(firstModels.filter(message => message.role === "user").length === 7, "All initial and queued user turns committed exactly once");
+    check(firstModels.filter(message => message.role === "toolResult").length === 3, "All native tool results retained in Pi history");
     check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "thinking")), "Committed reasoning retained");
     check(firstModels.some(message => message.role === "assistant" && message.content.some((block: any) => block.type === "text" && block.text.includes("# Mock markdown"))), "Full markdown retained in Pi history");
     const secondChat = await attach();
@@ -241,7 +249,7 @@ try {
     const after = await inspect("after-reopen");
     check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
     check(JSON.stringify(after.entries.slice(0, before.entries.length)) === JSON.stringify(before.entries), "Reopening preserves full prior ledger without reseeding");
-    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 10, "All actual user turns, no duplicates");
+    check(after.entries.flatMap(entry => entry.record.model ?? []).filter(message => message.role === "user").length === 11, "All actual user turns, no duplicates");
     Object.assign(evidence, { passed: true, firstChat, secondChat, before, after });
     console.log(`PASS actual native UI, reasoning/markdown, native tools, cancellation with queued input, qualified identities, physical backend, process reopen and preserved ledger; evidence ${directory}`);
   }

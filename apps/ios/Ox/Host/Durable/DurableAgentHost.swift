@@ -33,6 +33,17 @@ actor DurableAgentHost {
         var assistant: AssistantMessage?
         var calls: [String: ToolCall] = [:]
         var results: [ToolResultMessage] = []
+        var emittedReasoning = Set<Int>()
+
+        mutating func reasoningEvents(_ assistant: AssistantMessage, completed: Bool) -> [AgentEvent] {
+            assistant.content.enumerated().compactMap { index, block in
+                guard completed || index < assistant.content.count - 1,
+                      case .thinking(let thinking) = block,
+                      !thinking.thinking.isEmpty,
+                      emittedReasoning.insert(index).inserted else { return nil }
+                return .reasoning(thinking.thinking)
+            }
+        }
     }
     private var bindings: [String: Binding] = [:]
 
@@ -336,6 +347,7 @@ actor DurableAgentHost {
         case "turn_start":
             binding.assistant = nil
             binding.results = []
+            binding.emittedReasoning = []
             events = [.generationStarted(model: binding.configuration.model.id, turnID: binding.turnID)]
         case "message_start":
             if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" {
@@ -343,19 +355,20 @@ actor DurableAgentHost {
             }
         case "message_update":
             if let value = fields["partial"], case .assistant(let partial) = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope) {
-                events = [.messageUpdate(partial, event: .start(partial: partial))]
+                events = binding.reasoningEvents(partial, completed: false)
+                events.append(.messageUpdate(partial, event: .start(partial: partial)))
             }
         case "message_end":
             if let value = fields["entry"]?.objectValue?["model"]?.arrayValue?.first, value.objectValue?["role"]?.stringValue != "system" {
                 let message = try DurableMessageCodec.decode(value, scope: binding.scope, artifactScope: binding.artifactScope)
-                events.append(.messageEnd(message))
                 if case .assistant(let assistant) = message {
                     binding.assistant = assistant
+                    events += binding.reasoningEvents(assistant, completed: true)
                     for block in assistant.content {
                         if case .toolCall(let call) = block { binding.calls[call.id] = call }
-                        if case .thinking(let thinking) = block, !thinking.thinking.isEmpty { events.append(.reasoning(thinking.thinking)) }
                     }
                 }
+                events.append(.messageEnd(message))
             }
         case "tool_execution_start":
             let id = fields["toolCallId"]?.stringValue ?? ""
