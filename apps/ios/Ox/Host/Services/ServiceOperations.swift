@@ -167,15 +167,15 @@ final class ServiceOperations {
         }
     }
 
-    func createService(kind: String, domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
+    func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
         if kind == "mcp" {
             guard domain.isEmpty, let endpoint else {
                 throw RuntimeError.bridge("ox.service.create: MCP requires endpoint and no domain; Ox assigns the service ID.")
             }
-            return try await saveMCP(endpoint: endpoint, transport: transport, replacing: nil, purpose: purpose)
+            return try await saveMCP(endpoint: endpoint, transport: transport, faviconURL: faviconURL, replacing: nil, purpose: purpose)
         }
-        guard endpoint == nil, transport == nil else {
-            throw RuntimeError.bridge("ox.service.create: endpoint and transport apply only to MCP services.")
+        guard endpoint == nil, transport == nil, faviconURL == nil else {
+            throw RuntimeError.bridge("ox.service.create: endpoint, transport, and faviconUrl apply only to MCP services.")
         }
         guard let serviceKind = Repository.ServiceKind(rawValue: kind), [.web, .api].contains(serviceKind) else {
             throw RuntimeError.bridge("ox.service.create: kind must be 'web', 'api', or 'mcp'")
@@ -199,23 +199,42 @@ final class ServiceOperations {
         }
     }
 
-    func updateService(domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
-        let domain = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard let service = serviceManager.service(domain: domain), let currentEndpoint = service.definition.mcpEndpoint else {
+    func updateService(domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let identifier = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let directMatches = serviceManager.services.filter { service in
+            guard let endpoint = service.definition.mcpEndpoint else { return false }
+            return service.domain == identifier
+                || service.definition.name.lowercased() == identifier
+                || endpoint.host?.lowercased() == identifier
+        }
+        guard directMatches.count <= 1 else {
+            throw RuntimeError.bridge("ox.service.update: multiple saved MCP services match '\(identifier)'; use the assigned domain from ox.service.list.")
+        }
+        guard let service = directMatches.first, let currentEndpoint = service.definition.mcpEndpoint else {
             throw RuntimeError.bridge("ox.service.update: requires an existing MCP service; edit Local web source with ox.fs.")
         }
         return try await saveMCP(
             endpoint: endpoint ?? currentEndpoint.absoluteString,
             transport: transport ?? service.definition.mcpTransport?.rawValue,
+            faviconURL: faviconURL,
             replacing: service,
             purpose: purpose
         )
     }
 
-    private func saveMCP(endpoint: String, transport: String?, replacing: Service?, purpose: String) async throws -> JSONValue? {
+    private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, purpose: String) async throws -> JSONValue? {
         let endpoint = try RemoteMCPService.endpoint(endpoint)
         guard transport == nil || transport == "auto" || RemoteMCPTransport(rawValue: transport!) != nil else {
             throw RuntimeError.bridge("MCP transport must be 'auto', 'streamable-http', or 'sse'.")
+        }
+        let resolvedFaviconURL: URL?
+        if let faviconURL {
+            guard faviconURL == .null || faviconURL.stringValue != nil else {
+                throw RuntimeError.bridge("MCP faviconUrl must be an HTTPS URL or null.")
+            }
+            resolvedFaviconURL = try ServiceDefinition.faviconURL(faviconURL.stringValue)
+        } else {
+            resolvedFaviconURL = replacing?.definition.faviconURL
         }
         let resolvedTransport = transport.flatMap(RemoteMCPTransport.init(rawValue:))
         let action = replacing == nil ? Actions.serviceCreate : Actions.serviceUpdate
@@ -224,11 +243,15 @@ final class ServiceOperations {
             "endpoint": .string(endpoint.absoluteString),
             "transport": .string(transport ?? "auto"),
         ]
+        if let faviconURL { fields["faviconUrl"] = faviconURL }
         if let replacing { fields["domain"] = .string(replacing.domain) }
         let args: JSONValue = .object(fields)
         return try await tracked(action, args, purpose: purpose) {
             let service = try await self.serviceManager.connectRemoteMCP(
-                endpoint.absoluteString, transport: resolvedTransport, replacing: replacing
+                endpoint.absoluteString,
+                transport: resolvedTransport,
+                faviconURL: resolvedFaviconURL,
+                replacing: replacing
             )
             if let replacing { serviceChanged(replacing.domain) }
             return try serviceSnapshot(service)
@@ -813,6 +836,7 @@ final class ServiceOperations {
         if let endpoint = service.definition.mcpEndpoint {
             fields["endpoint"] = .string(endpoint.absoluteString)
             fields["transport"] = .string(service.definition.mcpTransport?.rawValue ?? "auto")
+            fields["faviconUrl"] = service.definition.faviconURL.map { .string($0.absoluteString) } ?? .null
         }
         if case .repository(let id, let provenance) = service.definition.source {
             fields["repository"] = .string(id)

@@ -29,12 +29,12 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.validateService(domain: domain, purpose: purpose)
     }
 
-    public func createService(kind: String, domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.createService(kind: kind, domain: domain, endpoint: endpoint, transport: transport, purpose: purpose)
+    public func createService(kind: String, domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.createService(kind: kind, domain: domain, endpoint: endpoint, transport: transport, faviconURL: faviconURL, purpose: purpose)
     }
 
-    public func updateService(domain: String, endpoint: String?, transport: String?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.updateService(domain: domain, endpoint: endpoint, transport: transport, purpose: purpose)
+    public func updateService(domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.updateService(domain: domain, endpoint: endpoint, transport: transport, faviconURL: faviconURL, purpose: purpose)
     }
 
     public func copyService(domain: String, purpose: String) async throws -> JSONValue? {

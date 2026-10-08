@@ -10,6 +10,13 @@ final class ServiceManager {
     nonisolated struct PersistedRemoteMCP: Codable {
         let endpoint: String
         let transport: RemoteMCPTransport?
+        let faviconURL: String?
+
+        init(endpoint: String, transport: RemoteMCPTransport?, faviconURL: String? = nil) {
+            self.endpoint = endpoint
+            self.transport = transport
+            self.faviconURL = faviconURL
+        }
     }
 
     enum RepositoryState: Equatable {
@@ -331,6 +338,7 @@ final class ServiceManager {
     func connectRemoteMCP(
         _ rawEndpoint: String,
         transport: RemoteMCPTransport? = nil,
+        faviconURL: URL? = nil,
         allowsAuthorization: Bool = true,
         replacing: Service? = nil
     ) async throws -> Service {
@@ -348,7 +356,7 @@ final class ServiceManager {
         let existing = services.first(where: { $0.definition.mcpEndpoint == endpoint })
         let service = (replacing == nil ? existing : nil)
             ?? Service(
-                definition: ServiceDefinition(mcpEndpoint: endpoint, transport: transport),
+                definition: ServiceDefinition(mcpEndpoint: endpoint, transport: transport, faviconURL: faviconURL),
                 manager: self
             )
         if await service.loadManifest(reason: .serviceDetail) == nil,
@@ -377,7 +385,8 @@ final class ServiceManager {
         persistedRemoteMCPServers.removeAll { $0.endpoint == endpoint.absoluteString }
         persistedRemoteMCPServers.append(PersistedRemoteMCP(
             endpoint: endpoint.absoluteString,
-            transport: service.definition.mcpTransport
+            transport: service.definition.mcpTransport,
+            faviconURL: service.definition.faviconURL?.absoluteString
         ))
         persistRemoteMCPServers()
         Log.service.info("RemoteMCP.save id=\(service.domain) updated=\(replacing != nil)")
@@ -1127,7 +1136,11 @@ final class ServiceManager {
         monoRepositoryMCPEndpoints = Set(repositoryMCPDefinitions.compactMap { $0.mcpEndpoint?.absoluteString })
         let localMCPDefinitions = persistedRemoteMCPServers.compactMap { server -> ServiceDefinition? in
             guard !monoRepositoryMCPEndpoints.contains(server.endpoint), let endpoint = URL(string: server.endpoint) else { return nil }
-            return ServiceDefinition(mcpEndpoint: endpoint, transport: server.transport)
+            return ServiceDefinition(
+                mcpEndpoint: endpoint,
+                transport: server.transport,
+                faviconURL: try? ServiceDefinition.faviconURL(server.faviconURL)
+            )
         }
         let definitions = listings.map(\.definition) + iOSDefinitions + repositoryMCPDefinitions + localMCPDefinitions
         guard monoRepositoryGeneration == generation else {

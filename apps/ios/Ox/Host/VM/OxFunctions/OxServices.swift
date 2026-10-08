@@ -137,6 +137,7 @@ nonisolated enum OxServices {
                                 "domain": .object(["type": .string("string"), "minLength": .int(3), "maxLength": .int(253)]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048), "description": .string("Public HTTPS MCP endpoint without credentials. Required for MCP; omit domain.")]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
+                                "faviconUrl": .object(["type": .string("string"), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Optional direct PNG or JPEG URL for this MCP connection.")]),
                             ]),
                             "required": .array([.string("kind")]),
                             "additionalProperties": .bool(false),
@@ -151,9 +152,10 @@ nonisolated enum OxServices {
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253)]),
+                                "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253), "description": .string("Assigned MCP domain, saved connection name, or unique endpoint host.")]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
+                                "faviconUrl": .object(["type": .array([.string("string"), .string("null")]), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Direct PNG or JPEG URL, or null to use icons advertised by the MCP server.")]),
                             ]),
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
@@ -363,13 +365,13 @@ nonisolated enum OxServices {
 
             let createBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
                 let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
-                return env.call(suspendingTimeout: true) { try await $0.createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purposeValue.toString()!) }
+                return env.call(suspendingTimeout: true) { try await $0.createService(kind: fields["kind"]?.stringValue ?? "", domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purposeValue.toString()!) }
             }
             ctx.setObject(createBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreate" as NSString)
 
             let updateBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
                 let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
-                return env.call(suspendingTimeout: true) { try await $0.updateService(domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, purpose: purposeValue.toString()!) }
+                return env.call(suspendingTimeout: true) { try await $0.updateService(domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purposeValue.toString()!) }
             }
             ctx.setObject(updateBlock as AnyObject, forKeyedSubscript: "__nativeServiceUpdate" as NSString)
 

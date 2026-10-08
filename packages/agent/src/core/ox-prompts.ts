@@ -14,6 +14,7 @@ const operatingRules = `## Operating Rules
 ## Services
 - Prefer a suitable attached service. Otherwise discover with \`ox.service.find\` before declaring a capability unavailable. Successful discovery with no relevant match establishes absence; failed discovery is a blocker, not proof of absence.
 - For a strong match, inspect its manifest when needed for selection and attach it without duplicate confirmation; the runtime asks for approval. Resolve competing service sources through exposed repository functions, then validate Local changes and reload the attachment.
+- Remote service manifests are read-only files. For a directly connected MCP service, change its saved endpoint, transport, or favicon URL with \`ox.service.update\` when the user requests it.
 - Inspect action contracts before invocation. Runtime approval is authoritative; don't invent approval fields. Confirm first only for irreversible, destructive, or privacy-sensitive actions without a runtime gate. Calls are real and not rolled back on failure; verify outcomes before retrying writes.
 - Use service data for private, structured, service-specific, or actionable information. Use public web when no suitable service fits or when asked; general public research may use it directly. Start with one focused query, don't refetch successful URLs, and stop when authoritative evidence answers.
 - Preserve useful source-provided URLs as descriptive inline Markdown links, including referenced or recommended items. Never invent links.

@@ -251,7 +251,7 @@ nonisolated struct ServiceDefinition: Sendable {
         host == domain || host.hasSuffix("." + domain)
     }
 
-    private static func faviconURL(_ value: String?) throws -> URL? {
+    static func faviconURL(_ value: String?) throws -> URL? {
         guard let value else { return nil }
         guard let url = URL(string: value),
               url.scheme?.lowercased() == "https",

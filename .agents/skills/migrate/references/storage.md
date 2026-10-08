@@ -13,7 +13,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── app.hasCompletedOnboarding       onboarding completion
 │   │   ├── savedServices                    attached service domains
 │   │   ├── actionApprovalPolicies           versioned Automatic, Ask, Allow, or Block policies for Actions
-│   │   ├── remoteMCPServers                  directly connected MCP URLs and transports
+│   │   ├── remoteMCPServers                  directly connected MCP URLs, transports, and optional favicon URLs
 │   │   ├── api.url                          Ox service API override
 │   │   ├── llm.defaultModel                 new-chat provider/model/thinking selection
 │   │   ├── llm.providerCatalog              added provider definitions and bundled overrides

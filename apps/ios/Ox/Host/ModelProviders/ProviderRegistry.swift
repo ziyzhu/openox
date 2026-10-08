@@ -185,16 +185,17 @@ final class ProviderRegistry {
         if let effort = selection.reasoningEffort, !model.reasoningEfforts.contains(effort) {
             throw RuntimeError.bridge("This model does not support the requested thinking level")
         }
-        let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
-        let signedIn = client.subscriptionAccount?.isSignedIn == true
-        let needsAuthentication = (try? definition(id: client.id).auth.requiresCredential) ?? (client.usesAPIKey || client.subscriptionAccount != nil)
-        guard !needsAuthentication || hasCredential || signedIn else {
-            throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
-        }
         if let provider = client as? WebServiceModelProvider {
             guard let service = IOSHost.shared.services.service(domain: provider.domain),
                   service.signInState.isAuthenticated || service.signInState == .notRequired else {
                 throw RuntimeError.bridge("Verify this website provider's sign-in before selecting its model")
+            }
+        } else {
+            let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
+            let signedIn = client.subscriptionAccount?.isSignedIn == true
+            let needsAuthentication = (try? definition(id: client.id).auth.requiresCredential) ?? (client.usesAPIKey || client.subscriptionAccount != nil)
+            guard !needsAuthentication || hasCredential || signedIn else {
+                throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
             }
         }
         model.reasoningEffort = selection.reasoningEffort ?? model.lowestReasoningEffort
