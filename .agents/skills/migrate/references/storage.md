@@ -458,8 +458,9 @@ the Files device service is attached. Security-scoped bookmarks live in
 `Application Support/device-folder-grants.json`, outside every Profile and outside
 backup. Each operation rejects traversal and symbolic links. `ox.vision.analyze` reads
 bounded image snapshots from these folders for on-device OCR and classification.
-`ox.fs.attach` explicitly attaches image/PDF byte snapshots through the existing
-immutable native media publication path; original external paths are never durable
+`ox.fs.attach` explicitly attaches file byte snapshots through the existing
+immutable native media publication path; binary format support depends on the selected
+provider, and original external paths are never durable
 attachment references. Saved chats retain published bytes in their Profile;
 temporary chats use their purgeable Session. No new storage format is introduced.
 Writes, edits, and deletes require the attached Files service and existing folder grant. Built-in

@@ -400,7 +400,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         case .text:
             return ["type": "text", "text": String(data: data, encoding: .utf8) ?? ""]
         case .file:
-            return ["type": "text", "text": "[Unsupported file attachment: \(displayName)]"]
+            throw UnsupportedModelInputError(message: "\(self.displayName) doesn't support this file attachment: \(displayName) (\(mimeType)). Convert it to text, an image, or PDF, or switch to a compatible provider.")
         }
     }
 

@@ -79,16 +79,18 @@ nonisolated enum WebAttachmentError: LocalizedError, Sendable {
     case invalidImage
     case imageTooLarge
     case invalidPDF
+    case invalidText
 
     var errorDescription: String? {
         switch self {
-        case .tooMany: "ox.artifact.attach: one JavaScript execution may attach at most four sources"
-        case .tooLarge: "ox.artifact.attach: attachments exceeded the 20 MiB execution limit"
-        case .unsupportedImage(let type): "ox.artifact.attach: unsupported image content type \(type)"
-        case .contentTypeMismatch(let declared, let decoded): "ox.artifact.attach: declared content type \(declared) does not match \(decoded)"
-        case .invalidImage: "ox.artifact.attach: response was not a supported raster image"
-        case .imageTooLarge: "ox.artifact.attach: image exceeded the 40 megapixel limit"
-        case .invalidPDF: "ox.artifact.attach: response was not a valid PDF"
+        case .tooMany: "Attachments: one JavaScript execution may attach at most four sources"
+        case .tooLarge: "Attachments: exceeded the attachment size limit (10 MiB per source, 20 MiB per execution)"
+        case .unsupportedImage(let type): "Attachments: unsupported image content type \(type)"
+        case .contentTypeMismatch(let declared, let decoded): "Attachments: declared content type \(declared) does not match \(decoded)"
+        case .invalidImage: "Attachments: source was not a supported raster image"
+        case .imageTooLarge: "Attachments: image exceeded the 40 megapixel limit"
+        case .invalidPDF: "Attachments: source was not a valid PDF"
+        case .invalidText: "Attachments: text source was not valid UTF-8"
         }
     }
 }
@@ -319,6 +321,7 @@ nonisolated enum WebAttachmentFactory {
             mimeType = "application/pdf"
             data = response.data
         } else if isText(declared) {
+            guard String(data: response.data, encoding: .utf8) != nil else { throw WebAttachmentError.invalidText }
             kind = .text
             mimeType = declared
             data = response.data

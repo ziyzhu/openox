@@ -7,15 +7,6 @@ nonisolated enum OxArtifacts {
         schema: {
             [
                 entry(
-                    "ox.artifact.attach",
-                    ModelGuidance.text("ox.artifact.attach"),
-                    input: object([
-                        "source": filename,
-                        "purpose": purpose,
-                    ], required: ["source", "purpose"]),
-                    output: attachment
-                ),
-                entry(
                     "ox.artifact.import",
                     ModelGuidance.text("ox.artifact.import"),
                     input: object([
@@ -40,9 +31,6 @@ nonisolated enum OxArtifacts {
             ]
         },
         installNatives: { context, env in
-            let attach: @convention(block) (String, JSValue) -> JSValue = { filename, purpose in
-                env.call { try await $0.attachArtifact(filename: filename, purpose: purpose.toString()!) }
-            }
             let importURL: @convention(block) (String, JSValue, JSValue) -> JSValue = { url, filename, purpose in
                 env.call {
                     try await $0.importWebArtifact(
@@ -62,14 +50,12 @@ nonisolated enum OxArtifacts {
                 let values = jsValueToJSON(filenames)?.arrayValue?.compactMap(\.stringValue) ?? []
                 return env.call { try await $0.presentArtifacts(filenames: values, purpose: purpose.toString()!) }
             }
-            context.setObject(attach as AnyObject, forKeyedSubscript: "__nativeArtifactAttach" as NSString)
             context.setObject(importURL as AnyObject, forKeyedSubscript: "__nativeArtifactImportURL" as NSString)
             context.setObject(rename as AnyObject, forKeyedSubscript: "__nativeArtifactRename" as NSString)
             context.setObject(present as AnyObject, forKeyedSubscript: "__nativeArtifactPresent" as NSString)
             context.setObject(presentMany as AnyObject, forKeyedSubscript: "__nativeArtifactsPresent" as NSString)
         },
         jsFragment: """
-          attach: (value) => { const options = __oxOptions(value, 'ox.artifact.attach'); return __nativeArtifactAttach(String(options.source), String(options.purpose)); },
           import: (value) => { const options = __oxOptions(value, 'ox.artifact.import'); return __nativeArtifactImportURL(String(options.url), options.filename == null ? null : String(options.filename), String(options.purpose)); },
           rename: (value) => { const options = __oxOptions(value, 'ox.artifact.rename'); return __nativeArtifactRename(String(options.filename), String(options.newFilename), String(options.purpose)); },
           present: (value) => { const options = __oxOptions(value, 'ox.artifact.present'); return options.filenames == null ? __nativeArtifactPresent(String(options.filename), String(options.purpose)) : __nativeArtifactsPresent(options.filenames, String(options.purpose)); }
@@ -109,13 +95,6 @@ nonisolated enum OxArtifacts {
             .object(["type": .string("array"), "items": item]),
         ]),
     ])
-
-    private static let attachment = object([
-        "filename": string("Attachment display filename."),
-        "contentType": string("Attachment MIME type."),
-        "bytes": .object(["type": .string("integer")]),
-        "kind": .object(["type": .string("string"), "enum": .array(["image", "pdf", "text", "html", "file"].map(JSONValue.string))]),
-    ], required: ["filename", "contentType", "bytes", "kind"])
 
     private static let item = object([
         "filename": string("Artifact filename."),

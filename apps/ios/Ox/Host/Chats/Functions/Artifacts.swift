@@ -1,19 +1,6 @@
 import Foundation
 
 extension Conversation {
-    public func attachArtifact(filename: String, purpose: String) async throws -> JSONValue? {
-        let args: JSONValue = .object(["source": .string("artifact"), "filename": .string(filename)])
-        return try await tracked(Actions.artifactAttach, args, purpose: purpose) {
-            let media = try await self.fileSystemMedia(path: "artifacts/\(filename)")
-            let attachment = try await Task.detached(priority: .userInitiated) {
-                try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
-            }.value
-            try Task.checkCancellation()
-            try appendTransientAttachment(attachment)
-            return attachmentJSON(attachment)
-        }
-    }
-
     public func importWebArtifact(url: String, filename: String?, purpose: String) async throws -> JSONValue? {
         let request = try WebFetchRequest(url: url)
         let args: JSONValue = .object([

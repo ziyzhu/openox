@@ -44,12 +44,12 @@ nonisolated enum OxFileSystem {
                 entry(
                     "ox.fs.attach",
                     ModelGuidance.text("ox.fs.attach"),
-                    input: object(["path": path("Image or PDF virtual path."), "purpose": purpose], required: ["path", "purpose"]),
+                    input: object(["path": path("Artifact or selected external file virtual path."), "purpose": purpose], required: ["path", "purpose"]),
                     output: object([
                         "filename": string("Attachment display filename."),
                         "contentType": string("Attachment MIME type."),
                         "bytes": integer("Prepared attachment size in bytes.", minimum: 1, maximum: 20 * 1_024 * 1_024),
-                        "kind": .object(["type": .string("string"), "enum": .array([.string("image"), .string("pdf")])]),
+                        "kind": .object(["type": .string("string"), "enum": .array(["image", "pdf", "text", "file"].map(JSONValue.string))]),
                     ], required: ["filename", "contentType", "bytes", "kind"])
                 ),
                 entry(

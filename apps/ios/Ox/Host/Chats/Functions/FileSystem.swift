@@ -150,9 +150,6 @@ extension Conversation {
         let args: JSONValue = .object(["path": .string(location.path)])
         return try await tracked(Actions.fsAttach, args, purpose: purpose) {
             let media = try await self.fileSystemMedia(path: location.path)
-            guard media.kind == .image || media.kind == .pdf else {
-                throw RuntimeError.bridge("ox.fs.attach supports images and PDFs only; use ox.fs.read for text: \(location.path)")
-            }
             let attachment = try await Task.detached(priority: .userInitiated) {
                 try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
             }.value
