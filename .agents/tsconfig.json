@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../packages/agent/src/skill-assets.d.ts"],
   "exclude": ["node_modules"]
 }

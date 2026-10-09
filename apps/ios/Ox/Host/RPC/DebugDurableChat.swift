@@ -84,8 +84,9 @@ private enum DurableChatController {
         guard var session = sessions[caseID], !session.opening, !session.closing, session.scope == chat.scope,
               requestedBackend == nil || requestedBackend == session.artifactFiles else { throw RuntimeError.bridge("Session unavailable or bound to another Profile scope") }
         guard session.chats.count < 8 || session.chats[chat.id] != nil else { throw RuntimeError.bridge("Durable Session chat limit reached") }
+        let resources = try await session.runtime.fileMounts(scope: caseID)
         try chat.installDurableRoute(DurableConversationRoute(
-            session: .init(runtime: session.runtime, host: session.host, scope: chat.scope),
+            session: .init(runtime: session.runtime, host: session.host, scope: chat.scope, resources: resources, skills: try await session.runtime.skillPackages(scope: caseID)),
             nativeID: chat.id, profileID: caseID, artifactScope: session.artifactScope, reference: nil))
         session.chats[chat.id] = chat; sessions[caseID] = session
         Log.agent.info("PiDurable rollout attached chat=\(chat.id) case=\(caseID) profile=\(chat.scope.profileID?.uuidString ?? "nil")")

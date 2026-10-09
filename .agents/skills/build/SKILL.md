@@ -18,11 +18,11 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services, Local Git seed, and model-action resources. |
-| `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, and TS-owned `ModelGuidance.generated.swift`. |
+| `bun run build:agent` | Rebuild native bundles, the portable prompt renderer, default SOUL, package-owned bundled skills, and TS-owned `ModelGuidance.generated.swift`. |
 | `bun run update:llms` | Refresh already-selected models from models.dev; requires network access. |
 
 `typecheck` validates public/private-content boundaries, iOS Client-Host layering,
-protocol schema consistency, built-in guidance resources and links, translations, provider models,
+protocol schema consistency, bundled skill packages and links, translations, provider models,
 and provider definitions before checking TypeScript. `.agents/tsconfig.json`
 includes test, eval, Gym, demo, setup, build, and release code.
 
@@ -39,7 +39,8 @@ files, and creates a deterministic Local Git seed and model-action resources.
 Package builds copy this source; hosted icon artwork lives in `assets/services/`.
 It is a build operation, not live service verification.
 Do not overwrite unrelated repository or generated changes.
-`PiDurable.bundle` is ignored by Git: run `build:agent` before local Xcode builds. Xcode Cloud installs the pinned Bun version and generates it in `ci_post_clone.sh`; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path.
+`PiDurable.bundle` is an ignored build output: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages and declarative activation requirements. Hosts receive a scoped `skillPackages` snapshot from the trusted runtime, resolve them through the normal skills catalog and filesystem, and enforce required activation before privileged effects. Xcode Cloud installs the pinned Bun version and generates it in `ci_post_clone.sh`; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path.
+The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
 Prompt scaffolds use explicit adapter-selected variants; prefer some duplicated wording over capability-driven prose parsing or rendered-text patching.
 
 Run `bun run ci` through the `test` skill after maintenance. Simulator provisioning

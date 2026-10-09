@@ -35,13 +35,12 @@ struct SkillsMount {
     func entries() async throws -> [Entry] {
         let catalog = try await catalog()
         var skills = Dictionary(uniqueKeysWithValues: catalog.skills.map { ($0.name, $0) })
-        for (name, skill) in session.snapshots where skill.owner != .system { skills[name] = skill }
+        for (name, skill) in session.snapshots where !SkillFiles.reservedNames.contains(name) || skill.owner == .system { skills[name] = skill }
         return skills.values.sorted { $0.name < $1.name }.map { Entry(skill: $0) }
     }
 
     func entry(named name: String) async throws -> Entry {
-        if let snapshot = session.snapshots[name] { return Entry(skill: snapshot) }
-        if let snapshot = try StorageMigrator.builtInSkillSnapshot(named: name) { return Entry(skill: snapshot) }
+        if let snapshot = session.snapshots[name], !SkillFiles.reservedNames.contains(name) || snapshot.owner == .system { return Entry(skill: snapshot) }
         let skill = try await catalog().skill(named: name)
         return Entry(skill: skill)
     }

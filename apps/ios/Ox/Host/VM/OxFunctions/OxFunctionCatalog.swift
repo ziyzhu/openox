@@ -40,7 +40,7 @@ nonisolated enum OxFunctionCatalog {
 
     private static let catalogEntries: [(String, JSONValue)] =
         all.flatMap { $0.schema() }.map { name, schema in
-            (name, closeInputSchema(schema))
+            (name, name.hasPrefix("ox.fs.") ? schema : closeInputSchema(schema))
         }
 
     private static let catalog = Dictionary(uniqueKeysWithValues: catalogEntries)

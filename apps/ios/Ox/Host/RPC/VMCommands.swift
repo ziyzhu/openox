@@ -16,7 +16,7 @@ extension OxHostProtocol {
         _ command: VMRequest,
         conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
-    ) {
+    ) async {
         let session: Conversation?
         switch resolveSession(conversationManager, command.sessionId) {
         case .error(let error):
@@ -31,7 +31,15 @@ extension OxHostProtocol {
                 "temporary": .bool($0.isTemporary),
             ])
         } ?? .null
-        var roots = session == nil ? [] : ["MEMORY.md", "SOUL.md", "artifacts", "guidance", "skills", "services", "conversations"]
+        var roots = session == nil ? [] : VirtualFileSystem.hostRoots
+        if let session {
+            do {
+                roots.append(contentsOf: try await session.resourceFiles().entries().map(\.path))
+            } catch {
+                reply.failure(error.localizedDescription)
+                return
+            }
+        }
         if session?.attachedServices.contains(where: { $0.domain == "ios:files" }) == true {
             roots.append("files")
         }

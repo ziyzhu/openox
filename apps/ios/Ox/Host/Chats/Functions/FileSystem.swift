@@ -9,11 +9,72 @@ extension Conversation {
         ServicesMount(manager: serviceManager)
     }
 
-    public func listFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path, defaultRoot: true)
+    func fileBackend(operation: String, path: String, arguments: JSONValue) async throws -> JSONValue {
+        try requireFileBackendScope()
+        let value: JSONValue?
+        switch operation {
+        case "info":
+            let location = try await fileSystemLocation(path)
+            try await authorizeFileAccess(location, operation: .list)
+            if try await fileSystemIsDirectory(location) {
+                _ = try await listFileBackend(path: path, options: nil, purpose: "Inspect directory")
+                value = .object(["path": .string(path), "name": .string(path.split(separator: "/").last.map(String.init) ?? path),
+                    "kind": .string("directory"), "size": .int(0), "mtimeMs": .int(0)])
+            } else {
+                let parent = path.split(separator: "/").dropLast().joined(separator: "/")
+                let listing = try await listFileBackend(path: parent.isEmpty ? "." : parent, options: nil, purpose: "Inspect file")
+                guard listing?.objectValue?["truncated"]?.boolValue != true else { throw RuntimeError.bridge("Directory exceeds entry limit") }
+                guard let item = listing?.objectValue?["items"]?.arrayValue?.first(where: { $0.objectValue?["path"]?.stringValue == path }),
+                      let fields = item.objectValue else {
+                    return .object(["error": .object(["code": .string("not_found"), "message": .string("File not found")])])
+                }
+                value = .object(["path": .string(path), "name": fields["name"] ?? .string(path),
+                    "kind": fields["type"] ?? .string("file"), "size": fields["size"] ?? .int(0), "mtimeMs": .int(0)])
+            }
+        case "list":
+            let listing = try await listFileBackend(path: path, options: nil, purpose: "List directory")
+            guard listing?.objectValue?["truncated"]?.boolValue != true else { throw RuntimeError.bridge("Directory exceeds entry limit") }
+            value = .array((listing?.objectValue?["items"]?.arrayValue ?? []).map { item in
+                let fields = item.objectValue ?? [:]
+                return .object(["path": fields["path"] ?? .null, "name": fields["name"] ?? .null,
+                    "kind": fields["type"] ?? .null, "size": fields["size"] == .null ? .int(0) : fields["size"] ?? .int(0), "mtimeMs": .int(0)])
+            })
+        case "read":
+            value = try await readFileBackend(path: path, options: nil, purpose: "Read file")
+        case "write":
+            guard let content = arguments.objectValue?["content"]?.stringValue else { throw RuntimeError.bridge("Missing file content") }
+            value = try await writeFileBackend(path: path, content: content, expected: arguments.objectValue?["expected"]?.stringValue, purpose: "Write file")
+        case "delete":
+            value = try await deleteFileBackend(path: path, purpose: "Delete file")
+        case "activate":
+            let location = try await fileSystemLocation(path)
+            guard case .skillFile(let name) = location else { throw RuntimeError.bridge("Invalid skill activation path") }
+            let skill = try await skillsMount.activate(named: name)
+            activateSkill(name: skill.name, path: skill.filePath, content: skill.content)
+            value = .null
+        default:
+            throw RuntimeError.bridge("Unavailable filesystem backend operation")
+        }
+        try Task.checkCancellation()
+        return .object(["value": value ?? .null])
+    }
+
+    private func requireFileBackendScope() throws {
+        try Task.checkCancellation()
+        guard StorageRoot.currentScope == scope else { throw RuntimeError.bridge("Filesystem Profile scope is no longer active") }
+    }
+
+    private func fileBackendEffect<T>(_ action: String, _ args: JSONValue, purpose: String, _ body: () async throws -> T) async throws -> T {
+        try Task.checkCancellation()
+        return try await body()
+    }
+
+    private func listFileBackend(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let location = try await fileSystemLocation(path, defaultRoot: true)
         let args = fileSystemArgs(path: location.path, options: options)
-        return try await tracked(Actions.fsList, args, purpose: purpose) {
+        return try await fileBackendEffect(Actions.fsList, args, purpose: purpose) {
             try await self.authorizeFileAccess(location, operation: .list)
+            try requireFileBackendScope()
             guard try await self.fileSystemIsDirectory(location) else { throw VirtualFileSystem.Error.notDirectory(location.path) }
             let items: [JSONValue]
             switch location {
@@ -22,7 +83,6 @@ extension Conversation {
                     fileSystemItem(path: "MEMORY.md", type: "file", size: UserMemory.shared.text.utf8.count),
                     fileSystemItem(path: "SOUL.md", type: "file", size: Soul.shared.text.utf8.count),
                     fileSystemItem(path: "artifacts", type: "directory", size: nil),
-                    fileSystemItem(path: "guidance", type: "directory", size: nil),
                     fileSystemItem(path: "skills", type: "directory", size: nil),
                     fileSystemItem(path: "services", type: "directory", size: nil),
                     fileSystemItem(path: "conversations", type: "directory", size: nil),
@@ -30,13 +90,16 @@ extension Conversation {
                 if self.attachedServices.contains(where: { $0.domain == "ios:files" }) {
                     rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
                 }
+                rootItems.append(contentsOf: try await resourceFiles().entries().map {
+                    fileSystemItem(path: $0.path, type: $0.isDirectory ? "directory" : "file", size: $0.size)
+                })
                 items = rootItems
             case .artifacts:
                 items = try await repository.artifacts(in: scope).map {
                     fileSystemItem(path: "artifacts/\($0.fileName)", type: "file", size: $0.size)
                 }
-            case .guidance(let path):
-                items = try BuiltInGuidance.entries(under: path).map {
+            case .resource(let path):
+                items = try await resourceFiles().entries(under: path).map {
                     fileSystemItem(path: $0.path, type: $0.isDirectory ? "directory" : "file", size: $0.size)
                 }
             case .skills:
@@ -111,7 +174,7 @@ extension Conversation {
                     rhs.objectValue?["path"]?.stringValue ?? ""
                 ) == .orderedAscending
             }
-            let limit = fileSystemInt(options, key: "limit", default: 50, minimum: 1, maximum: 100)
+            let limit = 10_000
             Log.session.info("bridge.fs.list path=\(location.path) count=\(min(sorted.count, limit)) total=\(sorted.count)")
             return .object([
                 "items": .array(Array(sorted.prefix(limit))),
@@ -134,10 +197,10 @@ extension Conversation {
         return Array(Dictionary(saved.map { ($0.id, $0) } + loaded.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest }).values)
     }
 
-    public func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path)
+    private func readFileBackend(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let location = try await fileSystemLocation(path)
         let args = fileSystemArgs(path: location.path, options: options)
-        return try await tracked(Actions.fsRead, args, purpose: purpose) {
+        return try await fileBackendEffect(Actions.fsRead, args, purpose: purpose) {
             try await self.authorizeFileAccess(location, operation: .read)
             let result = try await fileSystemRead(location, options: options)
             Log.session.info("bridge.fs.read path=\(location.path) text=\(result.text?.count ?? 0) truncated=\(result.truncated)")
@@ -148,7 +211,9 @@ extension Conversation {
     public func attachFileSystem(path: String, purpose: String) async throws -> JSONValue? {
         let webRequest = path.lowercased().hasPrefix("http:") || path.lowercased().hasPrefix("https:")
             ? try WebFetchRequest(url: path) : nil
-        let source = try webRequest?.url.absoluteString ?? virtualMachine.fileSystem.location(path).path
+        let source: String
+        if let webRequest { source = webRequest.url.absoluteString }
+        else { source = try await fileSystemLocation(path).path }
         let args: JSONValue = .object(["path": .string(source)])
         return try await tracked(Actions.fsAttach, args, purpose: purpose) {
             let attachment: TransientAttachment
@@ -186,7 +251,7 @@ extension Conversation {
     }
 
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {
-        let location = try virtualMachine.fileSystem.location(path)
+        let location = try await fileSystemLocation(path)
         try await authorizeFileAccess(location, operation: .read)
         let media: FileSystemMedia
         switch location {
@@ -218,44 +283,32 @@ extension Conversation {
         return media
     }
 
-    public func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path)
+    private func writeFileBackend(path: String, content: String, expected: String?, purpose: String) async throws -> JSONValue? {
+        let location = try await fileSystemLocation(path)
         let args: JSONValue = .object(["path": .string(location.path), "bytes": .int(content.utf8.count)])
-        return try await tracked(Actions.fsWrite, args, purpose: purpose) {
+        return try await fileBackendEffect(Actions.fsWrite, args, purpose: purpose) {
             try await self.requireWritableFileContext(location, action: Actions.fsWrite)
             try await self.authorizeFileAccess(location, operation: .write)
             let item = try await self.fileMutationCoordinator.perform(key: self.fileMutationKey(location)) {
-                try await self.writeFileSystem(location, content: content)
+                try Task.checkCancellation()
+                if let expected, case .deviceItem = location {
+                    return try await self.writeFileSystem(location, content: content, expected: expected)
+                }
+                if let expected, try await self.fileSystemUTF8Text(location) != expected {
+                    throw RuntimeError.bridge("File changed after reading; read again before editing")
+                }
+                try Task.checkCancellation()
+                return try await self.writeFileSystem(location, content: content)
             }
             Log.session.info("bridge.fs.write path=\(location.path) bytes=\(content.utf8.count)")
             return item
         }
     }
 
-    public func editFileSystem(path: String, edits value: JSONValue?, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path)
-        let edits = try fileSystemEdits(value)
-        let args: JSONValue = .object([
-            "path": .string(location.path),
-            "edits": .array(edits.map { .object(["oldText": .string($0.oldText), "newText": .string($0.newText)]) }),
-        ])
-        return try await tracked(Actions.fsEdit, args, purpose: purpose) {
-            try await self.requireWritableFileContext(location, action: Actions.fsEdit)
-            try await self.authorizeFileAccess(location, operation: .edit)
-            return try await self.fileMutationCoordinator.perform(key: self.fileMutationKey(location)) {
-                let original = try await self.fileSystemUTF8Text(location)
-                let applied = try ExactTextReplacement.apply(edits, to: original)
-                let item = try await self.writeFileSystem(location, content: applied.text)
-                Log.session.info("bridge.fs.edit path=\(location.path) edits=\(edits.count) chars=\(original.count)->\(applied.text.count) firstChangedLine=\(applied.firstChangedLine)")
-                return item.merging(["firstChangedLine": .int(applied.firstChangedLine)])
-            }
-        }
-    }
-
-    public func deleteFileSystem(path: String, purpose: String) async throws -> JSONValue? {
-        let location = try virtualMachine.fileSystem.location(path)
+    private func deleteFileBackend(path: String, purpose: String) async throws -> JSONValue? {
+        let location = try await fileSystemLocation(path)
         let args: JSONValue = .object(["path": .string(location.path)])
-        return try await tracked(Actions.fsDelete, args, purpose: purpose) {
+        return try await fileBackendEffect(Actions.fsDelete, args, purpose: purpose) {
             try await self.requireWritableFileContext(location, action: Actions.fsDelete)
             try await self.authorizeFileAccess(location, operation: .delete)
             switch location {
@@ -277,124 +330,6 @@ extension Conversation {
             }
             Log.session.info("bridge.fs.delete path=\(location.path)")
             return .object(["path": .string(location.path), "deleted": .bool(true)])
-        }
-    }
-
-    public func globFileSystem(
-        pattern: String,
-        path: String,
-        options: JSONValue?,
-        purpose: String
-    ) async throws -> JSONValue? {
-        let base = try virtualMachine.fileSystem.location(path, defaultRoot: true)
-        let args = fileSystemSearchArgs(pattern: pattern, path: base.path, options: options)
-        return try await tracked(Actions.fsGlob, args, purpose: purpose) {
-            try await self.authorizeFileAccess(base, operation: .search)
-            guard try await self.fileSystemIsDirectory(base) else { throw VirtualFileSystem.Error.notDirectory(base.path) }
-            let limit = fileSystemInt(options, key: "limit", default: 100, minimum: 1, maximum: 1_000)
-            let candidates = try await fileSystemPaths(for: base)
-            var matches: [String] = []
-            for candidate in candidates {
-                guard let relative = virtualMachine.fileSystem.relativePath(candidate, under: base),
-                      try virtualMachine.fileSystem.matches(path: relative, pattern: pattern) else { continue }
-                matches.append(candidate)
-            }
-            matches.sort { $0.localizedStandardCompare($1) == .orderedAscending }
-            Log.session.info("bridge.fs.glob path=\(base.path) patternChars=\(pattern.count) hits=\(min(matches.count, limit)) total=\(matches.count)")
-            return .object([
-                "paths": .array(matches.prefix(limit).map(JSONValue.string)),
-                "truncated": .bool(matches.count > limit),
-            ])
-        }
-    }
-
-    public func grepFileSystem(
-        pattern: String,
-        path: String,
-        options: JSONValue?,
-        purpose: String
-    ) async throws -> JSONValue? {
-        guard !pattern.isEmpty else { throw RuntimeError.bridge("ox.fs.grep: pattern cannot be empty.") }
-        let base = try virtualMachine.fileSystem.location(path, defaultRoot: true)
-        let args = fileSystemSearchArgs(pattern: pattern, path: base.path, options: options)
-        return try await tracked(Actions.fsGrep, args, purpose: purpose) {
-            try await self.authorizeFileAccess(base, operation: .search)
-            let values = options?.objectValue ?? [:]
-            let literal = values["literal"]?.boolValue == true
-            let expressionOptions: NSRegularExpression.Options = values["ignoreCase"]?.boolValue == true ? [.caseInsensitive] : []
-            let expression: NSRegularExpression
-            do {
-                expression = try NSRegularExpression(
-                    pattern: literal ? NSRegularExpression.escapedPattern(for: pattern) : pattern,
-                    options: expressionOptions
-                )
-            } catch {
-                throw RuntimeError.bridge("ox.fs.grep: invalid regular expression: \(error.localizedDescription)")
-            }
-            let glob = values["glob"]?.stringValue
-            let contextLines = fileSystemInt(options, key: "contextLines", default: 0, minimum: 0, maximum: 5)
-            let limit = fileSystemInt(options, key: "limit", default: 100, minimum: 1, maximum: 200)
-            var allPaths = try await fileSystemPaths(for: base)
-            if base == .root {
-                allPaths.removeAll { $0.hasPrefix("conversations/") }
-            }
-            let candidates: [String]
-            if try await self.fileSystemIsDirectory(base) {
-                candidates = try allPaths.filter { candidate in
-                    guard let relative = virtualMachine.fileSystem.relativePath(candidate, under: base) else { return false }
-                    return try glob.map { try virtualMachine.fileSystem.matches(path: relative, pattern: $0) } ?? true
-                }
-            } else {
-                candidates = allPaths.contains(base.path) ? [base.path] : []
-            }
-            var matches: [JSONValue] = []
-            var scannedFiles = 0
-            var skippedFiles = 0
-            var scannedBytes = 0
-            var truncated = candidates.count > VirtualFileSystem.maximumSearchFiles
-            let maximumSearchBytes = base.area == .chats
-                ? VirtualFileSystem.maximumChatSearchBytes
-                : VirtualFileSystem.maximumSearchBytes
-            candidateLoop: for candidate in candidates.prefix(VirtualFileSystem.maximumSearchFiles) {
-                guard let text = try await fileSystemSearchText(candidate) else {
-                    skippedFiles += 1
-                    continue
-                }
-                scannedFiles += 1
-                let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-                for index in lines.indices {
-                    let line = lines[index]
-                    let bytes = line.utf8.count + 1
-                    if scannedBytes + bytes > maximumSearchBytes {
-                        truncated = true
-                        break candidateLoop
-                    }
-                    scannedBytes += bytes
-                    let range = NSRange(line.startIndex..<line.endIndex, in: line)
-                    guard let match = expression.firstMatch(in: line, range: range) else { continue }
-                    let beforeStart = max(0, index - contextLines)
-                    let afterEnd = min(lines.count, index + contextLines + 1)
-                    matches.append(.object([
-                        "path": .string(candidate),
-                        "line": .int(index + 1),
-                        "text": .string(fileSystemLine(line, match: match.range)),
-                        "before": .array(lines[beforeStart..<index].map { .string(fileSystemLine($0)) }),
-                        "after": .array(lines[(index + 1)..<afterEnd].map { .string(fileSystemLine($0)) }),
-                    ]))
-                    if matches.count >= limit {
-                        truncated = true
-                        break
-                    }
-                }
-                if matches.count >= limit { break }
-            }
-            Log.session.info("bridge.fs.grep path=\(base.path) patternChars=\(pattern.count) scannedFiles=\(scannedFiles) scannedBytes=\(scannedBytes) skipped=\(skippedFiles) hits=\(matches.count) truncated=\(truncated)")
-            return .object([
-                "matches": .array(matches),
-                "scannedFiles": .int(scannedFiles),
-                "skippedFiles": .int(skippedFiles),
-                "truncated": .bool(truncated),
-            ])
         }
     }
 
@@ -423,18 +358,24 @@ extension Conversation {
             break
         case .deviceFolder(let id):
             guard DeviceFolderStore.shared.grant(id) != nil else { throw DeviceFolderStore.StoreError.missingGrant(id) }
-        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .chats:
             return
         }
         try requireIOSService("ios:files")
         Log.session.info("Chat.fileAccess service=ios:files operation=\(operation.rawValue) path=\(location.path)")
     }
 
+    func requireWritableFileAction(_ action: String, args: Any?) async throws {
+        guard [Actions.fsWrite, Actions.fsEdit, Actions.fsDelete].contains(action),
+              let path = (args as? [String: Any])?["path"] as? String else { return }
+        try await requireWritableFileContext(fileSystemLocation(path), action: action)
+    }
+
     private func requireWritableFileContext(_ location: VirtualFileSystem.Location, action: String) async throws {
         switch location {
         case .skill(let name), .skillFile(let name), .skillResource(let name, _):
             try await skillsMount.requireWritable(name: name, path: location.path)
-        case .guidance, .skillDirectory:
+        case .resource, .skillDirectory:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .serviceItem:
             return
@@ -446,15 +387,15 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return
-        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .chats:
             try requireProfileMutation(action)
         }
     }
 
     private func fileSystemIsDirectory(_ location: VirtualFileSystem.Location) async throws -> Bool {
         switch location {
-        case .guidance(let path):
-            return try BuiltInGuidance.isDirectory(path)
+        case .resource(let path):
+            return try await resourceFiles().isDirectory(path)
         case .skillResource(let name, let path):
             return try await skillsMount.entry(named: name).resources.contains { $0.name.hasPrefix(path + "/") }
         case .serviceItem(let kind, let domain, let path):
@@ -474,7 +415,7 @@ extension Conversation {
         switch location.area {
         case .files, .deviceFolder:
             return "files:\(path)"
-        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services, .chats:
+        case .root, .memory, .soul, .artifacts, .resources, .skills, .services, .chats:
             return "profile:\(scope.root.standardizedFileURL.path.lowercased()):\(path)"
         }
     }
@@ -528,6 +469,7 @@ extension Conversation {
     }
 
     private func fileSystemRead(_ location: VirtualFileSystem.Location, options: JSONValue?) async throws -> FileSystemRead {
+        try requireFileBackendScope()
         let maxBytes = fileSystemInt(
             options,
             key: "maxBytes",
@@ -547,15 +489,11 @@ extension Conversation {
                 try ArtifactLibrary.read(artifact, options: readOptions)
             }.value
             return FileSystemRead(text: result.text, truncated: result.truncated, unsupported: result.unsupported)
-        case .guidance(let path):
-            return try fileSystemTextRead(BuiltInGuidance.text(path), maxBytes: maxBytes)
+        case .resource(let path):
+            return try fileSystemTextRead(await resourceFiles().text(path), maxBytes: maxBytes)
         case .skillFile(let name):
-            let skill = try await skillsMount.activate(named: name)
-            let result = try fileSystemTextRead(skill.content, maxBytes: maxBytes)
-            if let content = result.text {
-                activateSkill(name: skill.name, path: skill.filePath, content: content)
-            }
-            return result
+            let skill = try await skillsMount.entry(named: name)
+            return try fileSystemTextRead(skill.content, maxBytes: maxBytes)
         case .skillResource(let name, let referenceName):
             let reference = try await skillsMount.resource(skill: name, path: referenceName)
             return try fileSystemTextRead(reference.content, maxBytes: maxBytes)
@@ -597,6 +535,7 @@ extension Conversation {
     }
 
     private func fileSystemUTF8Text(_ location: VirtualFileSystem.Location) async throws -> String {
+        try requireFileBackendScope()
         switch location {
         case .memory:
             return UserMemory.shared.text
@@ -613,8 +552,8 @@ extension Conversation {
             }
             guard let text = String(data: data, encoding: .utf8) else { throw ArtifactError.textNotUTF8 }
             return text
-        case .guidance(let path):
-            return try BuiltInGuidance.text(path)
+        case .resource(let path):
+            return try await resourceFiles().text(path)
         case .skillFile(let name):
             return try await skillsMount.entry(named: name).content
         case .skillResource(let name, let referenceName):
@@ -641,14 +580,16 @@ extension Conversation {
 
     private func writeFileSystem(
         _ location: VirtualFileSystem.Location,
-        content: String
+        content: String,
+        expected: String? = nil
     ) async throws -> JSONValue {
+        try requireFileBackendScope()
         let data = Data(content.utf8)
         guard data.count <= ArtifactLimits.textBytes else {
             throw ArtifactError.textTooLarge(bytes: data.count, limit: ArtifactLimits.textBytes)
         }
         switch location {
-        case .guidance:
+        case .resource:
             throw VirtualFileSystem.Error.unsupportedMutation(location.path)
         case .memory:
             UserMemory.shared.text = content
@@ -689,6 +630,15 @@ extension Conversation {
                 guard (try parent.resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else {
                     throw VirtualFileSystem.Error.notDirectory(parent.lastPathComponent)
                 }
+                if let expected {
+                    let file = try FileHandle(forReadingFrom: url)
+                    defer { try? file.close() }
+                    let current = try file.read(upToCount: ArtifactLimits.textBytes + 1) ?? Data()
+                    guard String(data: current, encoding: .utf8) == expected else {
+                        throw RuntimeError.bridge("File changed after reading; read again before editing")
+                    }
+                }
+                try Task.checkCancellation()
                 try data.write(to: url, options: .atomic)
             }
             return fileSystemItem(path: location.path, type: "file", size: data.count)
@@ -697,172 +647,8 @@ extension Conversation {
         }
     }
 
-    private func fileSystemPaths(for base: VirtualFileSystem.Location) async throws -> [String] {
-        switch base {
-        case .guidance(let path):
-            return try BuiltInGuidance.paths(under: path).map { "guidance/" + $0 }
-        case .services:
-            var paths: [String] = []
-            for service in servicesMount.entries() {
-                paths.append(contentsOf: try await servicesMount.sourcePaths(kind: service.kind, domain: service.domain))
-                if paths.count >= VirtualFileSystem.maximumSearchFiles { break }
-            }
-            return Array(paths.prefix(VirtualFileSystem.maximumSearchFiles))
-        case .serviceKind(let kind):
-            var paths: [String] = []
-            for service in servicesMount.entries(kind: kind) {
-                paths.append(contentsOf: try await servicesMount.sourcePaths(kind: kind, domain: service.domain))
-                if paths.count >= VirtualFileSystem.maximumSearchFiles { break }
-            }
-            return Array(paths.prefix(VirtualFileSystem.maximumSearchFiles))
-        case .service(let kind, let domain):
-            return try await servicesMount.sourcePaths(kind: kind, domain: domain)
-        case .serviceItem(let kind, let domain, _):
-            let paths = try await servicesMount.sourcePaths(kind: kind, domain: domain)
-            if try await fileSystemIsDirectory(base) {
-                let prefix = base.path + "/"
-                return paths.filter { $0.hasPrefix(prefix) }
-            }
-            return [base.path]
-        case .chat(let id):
-            _ = try await virtualChatMetadata(id)
-            return ["conversations/\(id)/conversation.json", "conversations/\(id)/turns.jsonl"]
-        case .chatMetadata, .chatTurns:
-            return [base.path]
-        case .skill(let name):
-            let skill = try await skillsMount.entry(named: name)
-            return [skill.filePath] + skill.resources.map(skill.resourcePath)
-        case .skillFile:
-            return [base.path]
-        case .skillDirectory(let name, let path), .skillResource(let name, let path):
-            let skill = try await skillsMount.entry(named: name)
-            let matches = skill.resources.filter { $0.name == path || $0.name.hasPrefix(path + "/") }
-            return matches.map(skill.resourcePath)
-        default:
-            break
-        }
-        switch base.area {
-        case .files:
-            var paths: [String] = []
-            for grant in DeviceFolderStore.shared.grants {
-                paths.append(contentsOf: try await deviceFilePaths(.deviceFolder(grant.id)))
-                if paths.count >= VirtualFileSystem.maximumSearchFiles { break }
-            }
-            return Array(paths.prefix(VirtualFileSystem.maximumSearchFiles)).sorted {
-                $0.localizedStandardCompare($1) == .orderedAscending
-            }
-        case .deviceFolder:
-            return try await deviceFilePaths(base)
-        case .chats:
-            return await chatFileSystemPaths()
-        case .root, .memory, .soul, .artifacts, .guidance, .skills, .services:
-            break
-        }
-        let artifacts = try await repository.artifacts(in: scope).map { "artifacts/\($0.fileName)" }
-        let skills = try await skillsMount.entries().flatMap { skill in
-            [skill.filePath] + skill.resources.map(skill.resourcePath)
-        }
-        var services: [String] = []
-        for service in servicesMount.entries() {
-            services.append(contentsOf: try await servicesMount.sourcePaths(kind: service.kind, domain: service.domain))
-            if services.count >= VirtualFileSystem.maximumSearchFiles { break }
-        }
-        let chats = await chatFileSystemPaths()
-        let guidance = try BuiltInGuidance.paths().map { "guidance/" + $0 }
-        var paths = ["MEMORY.md", "SOUL.md"]
-        for group in [guidance, artifacts, skills, services, chats] { paths.append(contentsOf: group) }
-        return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
-
-    private func chatFileSystemPaths() async -> [String] {
-        await fileSystemChatSummaries().flatMap { summary -> [String] in
-            let directory = "conversations/\(ChatID(summary.id))"
-            return ["\(directory)/conversation.json", "\(directory)/turns.jsonl"]
-        }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
-
-    private func deviceFilePaths(_ base: VirtualFileSystem.Location) async throws -> [String] {
-        try await withDeviceFile(base, mode: .read) { url in
-            let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
-            if values.isRegularFile == true { return [base.path] }
-            guard values.isDirectory == true else { return [] }
-            guard let enumerator = FileManager.default.enumerator(
-                at: url,
-                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else { return [] }
-            var paths: [String] = []
-            for case let item as URL in enumerator {
-                let itemValues = try item.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                guard itemValues.isSymbolicLink != true, itemValues.isRegularFile == true else { continue }
-                let relative = item.path.replacingOccurrences(of: url.path + "/", with: "", options: [.anchored])
-                paths.append(base.path + "/" + relative)
-                if paths.count >= VirtualFileSystem.maximumSearchFiles { break }
-            }
-            return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        }
-    }
-
-    private func fileSystemSearchText(_ path: String) async throws -> String? {
-        let location = try virtualMachine.fileSystem.location(path)
-        switch location {
-        case .guidance(let path):
-            return try BuiltInGuidance.isDirectory(path) ? nil : BuiltInGuidance.text(path)
-        case .memory:
-            return UserMemory.shared.text
-        case .soul:
-            return Soul.shared.text
-        case .skillFile(let name):
-            return try await skillsMount.entry(named: name).content
-        case .skillResource(let name, let referenceName):
-            return try await skillsMount.resource(skill: name, path: referenceName).content
-        case .serviceItem(let kind, let domain, let path):
-            return try await servicesMount.sourceText(kind: kind, domain: domain, path: path)
-        case .chatMetadata(let id):
-            return String(decoding: try await virtualChatMetadata(id), as: UTF8.self)
-        case .chatTurns(let id):
-            return String(decoding: try await virtualChatTranscript(id), as: UTF8.self)
-        case .artifact(let name):
-            let artifact = try await repository.artifact(named: name, in: scope)
-            guard artifact.exists, artifact.kind == .text || artifact.kind == .html else { return nil }
-            let data = try await Task.detached(priority: .userInitiated) {
-                try Data(contentsOf: artifact.fileURL)
-            }.value
-            guard data.count <= ArtifactLimits.textBytes else { return nil }
-            return String(data: data, encoding: .utf8)
-        case .deviceItem:
-            return try await withDeviceFile(location, mode: .read) { url in
-                let artifact = Artifact(fileName: url.lastPathComponent, directory: url.deletingLastPathComponent())
-                guard artifact.exists, artifact.kind == .text || artifact.kind == .html else { return nil }
-                let data = try Data(contentsOf: url)
-                guard data.count <= ArtifactLimits.textBytes else { return nil }
-                return String(data: data, encoding: .utf8)
-            }
-        case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder:
-            return nil
-        }
-    }
-
-    private func fileSystemEdits(_ value: JSONValue?) throws -> [ExactTextReplacement.Edit] {
-        guard let values = value?.arrayValue, !values.isEmpty else { throw ExactTextReplacement.Failure.emptyEdits }
-        return try values.map { value in
-            guard let fields = value.objectValue,
-                  let oldText = fields["oldText"]?.stringValue,
-                  let newText = fields["newText"]?.stringValue else {
-                throw RuntimeError.bridge("ox.fs.edit: each edit requires string oldText and newText fields.")
-            }
-            return ExactTextReplacement.Edit(oldText: oldText, newText: newText)
-        }
-    }
-
     private func fileSystemArgs(path: String, options: JSONValue?) -> JSONValue {
         var fields: [String: JSONValue] = ["path": .string(path)]
-        if let options, options != .null { fields["options"] = options }
-        return .object(fields)
-    }
-
-    private func fileSystemSearchArgs(pattern: String, path: String, options: JSONValue?) -> JSONValue {
-        var fields: [String: JSONValue] = ["pattern": .string(pattern), "path": .string(path)]
         if let options, options != .null { fields["options"] = options }
         return .object(fields)
     }
@@ -894,29 +680,6 @@ extension Conversation {
     ) -> Int {
         let value = options?.objectValue?[key]?.intValue ?? defaultValue
         return max(minimum, min(maximum, value))
-    }
-
-    private func fileSystemLine(_ text: String, match: NSRange? = nil) -> String {
-        guard text.count > VirtualFileSystem.maximumLineCharacters else { return text }
-        guard let match, let range = Range(match, in: text) else {
-            return String(text.prefix(VirtualFileSystem.maximumLineCharacters - 1)) + "…"
-        }
-        let count = text.count
-        let matchStart = text.distance(from: text.startIndex, to: range.lowerBound)
-        let matchLength = text.distance(from: range.lowerBound, to: range.upperBound)
-        let bodyLimit = VirtualFileSystem.maximumLineCharacters - 2
-        let leadingContext = max(0, (bodyLimit - min(matchLength, bodyLimit)) / 2)
-        var startOffset = max(0, matchStart - leadingContext)
-        startOffset = min(startOffset, max(0, count - bodyLimit))
-        let hasLeadingEllipsis = startOffset > 0
-        let preliminaryEnd = min(count, startOffset + bodyLimit)
-        let hasTrailingEllipsis = preliminaryEnd < count
-        let contentLimit = VirtualFileSystem.maximumLineCharacters
-            - (hasLeadingEllipsis ? 1 : 0)
-            - (hasTrailingEllipsis ? 1 : 0)
-        let start = text.index(text.startIndex, offsetBy: startOffset)
-        let body = String(text[start...].prefix(contentLimit))
-        return (hasLeadingEllipsis ? "…" : "") + body + (hasTrailingEllipsis ? "…" : "")
     }
 
     func refreshUserSkills() {

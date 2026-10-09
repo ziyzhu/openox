@@ -6,6 +6,7 @@
 1. Keep enough structured logs to diagnose production issues.
 1. Prefer composition and explicit state.
 1. Keep model-facing guides self-contained and free of external links; explain required concepts inline.
+1. Keep agent prompts and bundled System skills in `packages/agent`; use the normal skills catalog and package layout, scoped resource/capability contracts, and trusted activation requirements instead of a separate guidance inventory or mount.
 1. Keep the three feature headings and descriptions identical across `README.md`, `apps/ios/Ox/Client/Features/Onboarding/OnboardingView.swift`, and the website at `../openox-dev/web/index.html`; update the onboarding translations when this copy changes.
 1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.
 1. Do not modify the service manifest schema without maintainer approval.

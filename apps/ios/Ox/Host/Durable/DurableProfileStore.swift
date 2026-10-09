@@ -43,6 +43,8 @@ actor DurableProfileStore {
         let runtime: DurableRuntime
         let host: DurableAgentHost
         let scope: ProfileScope
+        let resources: ReadOnlyFiles
+        let skills: BundledSkillPackages
     }
 
     private var sessions: [URL: Task<Session, Error>] = [:]
@@ -66,8 +68,9 @@ actor DurableProfileStore {
             }
             do {
                 _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(profileID.uuidString), "artifactFiles": .bool(true)]).jsonString())
+                let resources = try await runtime.fileMounts(scope: profileID)
                 Log.agent.info("PiDurable Profile opened profile=\(profileID)")
-                return Session(runtime: runtime, host: host, scope: scope)
+                return Session(runtime: runtime, host: host, scope: scope, resources: resources, skills: try await runtime.skillPackages(scope: profileID))
             } catch { await runtime.dispose(); throw error }
         }
         sessions[root] = opening

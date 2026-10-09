@@ -1,3 +1,8 @@
+---
+name: visualize
+description: "Create or revise HTML canvases for visual results, explorable explanations, simulations, interactive tools, and small apps. Keep ordinary answers, lists, and small tables in chat."
+---
+
 # Visualize
 
 Create an HTML Canvas when the user wants a visual result, an interactive experience, or a small app. Choose the simplest composition that serves the task; explanations are one option, not a requirement. Keep ordinary answers, lists, and small tables in chat. Ordinary Markdown notes and artifact file operations use `ox.fs` and `ox.artifact` directly.
@@ -91,7 +96,7 @@ Canvases run under a restrictive content policy. Do not use browser network requ
 
 Give the fragment one unique root ID. Scope CSS and DOM queries to that root. Put the script after its markup, verify every queried element exists, and make the primary interaction update both the interface and its accessible state. Do not depend on browser storage or ambient globals.
 
-Read an existing Canvas before revising it and use `ox.fs.edit` for targeted changes. Edit the same artifact path when a later message changes that Canvas; use a new path for a distinct visual, experience, or app.
+Read an existing Canvas before revising it, following `ox.fs.read` continuation offsets until complete. Artifacts are immutable: write the revised Canvas under a distinct readable filename and use that new path. Never edit or overwrite the old artifact; historical messages retain its bytes.
 
 ## Use Host services
 

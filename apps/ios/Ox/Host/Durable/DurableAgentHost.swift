@@ -1,5 +1,6 @@
 import Foundation
 import UniformTypeIdentifiers
+import Synchronization
 
 actor DurableAgentHost {
     typealias EventSink = @Sendable (AgentEvent) async -> Void
@@ -46,6 +47,69 @@ actor DurableAgentHost {
         }
     }
     private var bindings: [String: Binding] = [:]
+    private final class FileCapability: Sendable {
+        let owner: Conversation
+        let scope: ProfileScope
+        let operation: String
+        let roots: Set<String>
+        let cancelled = Mutex(false)
+
+        init(owner: Conversation, scope: ProfileScope, operation: String, roots: Set<String>) {
+            self.owner = owner
+            self.scope = scope
+            self.operation = operation
+            self.roots = roots
+        }
+    }
+    private var fileCapabilities: [String: FileCapability] = [:]
+
+    func fileSystem(owner: Conversation, runtime: DurableRuntime, profileID: UUID, operation: String,
+                    arguments: JSONValue, mounts: [JSONValue]) async throws -> JSONValue {
+        guard fileCapabilities.count < 128 else { throw RuntimeError.bridge("Too many concurrent filesystem capabilities") }
+        let capability = UUID().uuidString
+        let state = FileCapability(owner: owner, scope: await owner.scope, operation: operation,
+            roots: Set(mounts.compactMap { $0.objectValue?["path"]?.stringValue }))
+        fileCapabilities[capability] = state
+        defer { fileCapabilities[capability] = nil }
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            let result = try await runtime.command(.object(["action": .string("filesystem"), "profileID": .string(profileID.uuidString),
+                "capability": .string(capability), "operation": .string(operation), "arguments": arguments, "fileMounts": .array(mounts)]))
+            try Task.checkCancellation()
+            return result
+        } onCancel: {
+            state.cancelled.withLock { $0 = true }
+            Task {
+                _ = try? await runtime.command(.object(["action": .string("filesystemAbort"), "capability": .string(capability)]))
+            }
+        }
+    }
+
+    private func fileBackend(_ params: JSONValue) async throws -> JSONValue {
+        guard let fields = params.objectValue, let token = fields["capability"]?.stringValue,
+              let capability = fileCapabilities[token], !capability.cancelled.withLock({ $0 }),
+              StorageRoot.currentScope == capability.scope,
+              let path = fields["path"]?.stringValue, let root = path.split(separator: "/").first,
+              capability.roots.contains(String(root)), let operation = fields["op"]?.stringValue,
+              ["info", "list", "read", "write", "delete", "activate"].contains(operation) else {
+            throw RuntimeError.bridge("Filesystem backend capability is expired or outside its scope")
+        }
+        if operation == "write", !["write", "edit"].contains(capability.operation) {
+            throw RuntimeError.bridge("Filesystem capability cannot write")
+        }
+        if operation == "delete", capability.operation != "delete" {
+            throw RuntimeError.bridge("Filesystem capability cannot delete")
+        }
+        if operation == "activate", capability.operation != "read" {
+            throw RuntimeError.bridge("Filesystem search cannot activate skills")
+        }
+        try Task.checkCancellation()
+        let result = try await capability.owner.fileBackend(operation: operation, path: path, arguments: params)
+        guard StorageRoot.currentScope == capability.scope, !capability.cancelled.withLock({ $0 }) else {
+            throw RuntimeError.bridge("Filesystem backend scope expired during the operation")
+        }
+        return result
+    }
 
     func bind(chatID: String, scope: ProfileScope, configuration: AgentConfiguration, runtime: DurableRuntime,
               runtimeProfileID: String? = nil, artifactScope: ProfileScope? = nil, isolatedWorkspace: Bool, emit: @escaping EventSink) throws {
@@ -81,6 +145,7 @@ actor DurableAgentHost {
     }
 
     func handle(_ method: String, _ params: JSONValue, stream: @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue {
+        if method == "fileBackend" { return try await fileBackend(params) }
         guard let fields = params.objectValue, let chatID = fields["chatID"]?.stringValue,
               let binding = bindings[chatID], let runtime = binding.runtime else { throw RuntimeError.bridge("Native conversation is not attached") }
         if method != "agentEvents", StorageRoot.currentScope != binding.scope {
@@ -234,29 +299,6 @@ actor DurableAgentHost {
                                              "details": .string(try DurableMessageCodec.toolDetails(message))]
             if terminate { value["control"] = .object(["terminate": .bool(true)]) }
             return .object(value)
-        case "filePermission":
-            guard let action = fields["action"]?.stringValue, ["write", "edit"].contains(action),
-                  let path = fields["path"]?.stringValue, !path.isEmpty,
-                  let tool = binding.configuration.tools.first(where: { $0 is ConversationTool }) as? ConversationTool,
-                  let chat = tool.chat else {
-                throw RuntimeError.bridge("Invalid virtual-file capability or missing permission owner")
-            }
-            let nativeAction = action == "write" ? Actions.fsWrite : Actions.fsEdit
-            if !binding.isolatedWorkspace {
-                try await chat.requireProfileMutation(nativeAction)
-                let location = try await chat.virtualMachine.fileSystem.location(path)
-                switch location {
-                case .skill(let name), .skillFile(let name), .skillResource(let name, _):
-                    try await chat.skillsMount.requireWritable(name: name, path: path)
-                case .memory, .soul, .artifact:
-                    break
-                default:
-                    throw RuntimeError.bridge("Dedicated Profile tools cannot mutate this path")
-                }
-            }
-            try await chat.requireApproval(action: nativeAction, defaultPolicy: .allow,
-                purpose: binding.isolatedWorkspace ? "Update the isolated durable test workspace" : "Update \(path)")
-            return .null
         default:
             throw RuntimeError.bridge("Native capability unavailable")
         }

@@ -136,8 +136,8 @@ export async function check(): Promise<string> {
     if (source.includes("ProfileMigrator") || source.includes("ProfileMigrationError")) {
       failures.push(`${path}: StorageMigrator must be the only persisted-storage migrator`);
     }
-    const readOnlySkillCompatibility = path === "apps/ios/Ox/Host/Profile/SkillsMount.swift"
-      && [...source.matchAll(/StorageMigrator\.([a-zA-Z0-9_]+)/g)].every(match => match[1] === "builtInSkillSnapshot");
+    const readOnlySkillCompatibility = path === "apps/ios/Ox/Host/Profile/VirtualFileSystem.swift"
+      && [...source.matchAll(/StorageMigrator\.([a-zA-Z0-9_]+)/g)].every(match => match[1] === "legacyWorkflowLocation");
     if (source.includes("StorageMigrator.") && !storageMigrationCallers.has(path) && !readOnlySkillCompatibility) {
       failures.push(`${path}: persisted compatibility must enter through an approved StorageMigrator caller`);
     }

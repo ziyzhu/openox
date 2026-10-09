@@ -1,3 +1,8 @@
+---
+name: evolve
+description: "Create, extend, repair, or verify Local web and API services, including model-generation actions and improvements discovered during ordinary use."
+---
+
 # Evolve
 
 Build useful service capabilities from observed behavior. Keep discovery, exploration, implementation, live verification, and Save in one workflow. Use existing services normally when their definitions already meet the request.
@@ -6,13 +11,13 @@ Evolve a service when a requested capability is missing, an existing action is c
 
 Fulfill the original request first, then run at most one bounded improvement pass. Optional improvement must not cause another user prompt, approval, sign-in, or external effect, and new user input takes priority. Never repeat a completed mutation for verification. If improvement requires expanded scope or user input, explain the opportunity instead of proceeding. Save verified improvements only when the Local repository was clean before this work began; otherwise leave them unsaved and report the limitation.
 
-Read `guidance/evolve/references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
+Read `references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
-For web-service authoring, read `guidance/evolve/references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
+For web-service authoring, read `references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
 
-Read `guidance/evolve/references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
+Read `references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
-Read `guidance/evolve/references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
+Read `references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
 
 ## Ownership and safeguards
 
@@ -25,4 +30,4 @@ Read `guidance/evolve/references/model-service.md` when adding or editing standa
 - Inspect complete Local repository status before creating, copying, or editing a service, and remember whether it was already dirty. If it had any uncommitted changes, skip automatic Save even after verification; do not commit, revert, or overwrite the pre-existing changes. Report that the improvement remains unsaved. Otherwise, Save verified Local changes after reviewing status and diff without asking for a separate Save confirmation. Present the operation as **Save**, for example `Save Outlook service`. Keep Git and revision mechanics internal unless the user asks or recovery requires them. Honor any runtime Action policy gate.
 - In user-facing plans, progress, and results, describe what Ox can do, what the user needs to do, and what remains uncertain in everyday language. Keep action IDs, service domains, base URLs, schemas, source files, captures, and repository mechanics internal unless the user asks for technical details or a specific detail is needed for a decision or recovery.
 
-Repositories can also store independent skills under root `skills/<name>/`. Read `guidance/manage-skills/guide.md` when creating or editing a reusable workflow. Services do not contain nested skills.
+Repositories can also store independent skills under root `skills/<name>/`. Read `skills/manage-skills/SKILL.md` when creating or editing a reusable workflow. Services do not contain nested skills.

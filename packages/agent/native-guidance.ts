@@ -1,5 +1,7 @@
 import { guidanceTexts } from "./src/core/guidance-texts";
 import { executeGuidance, countWords } from "./src/core/tool-prompts";
+import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
+import { filesystemContract } from "./src/core/filesystem-contract";
 
 const swiftString = (text: string) => JSON.stringify(text).replace(/\\u([0-9a-f]{4})/gi, "\\u{$1}");
 
@@ -11,7 +13,17 @@ export function nativeGuidanceSource() {
     .replaceAll("__OX_CATALOG__", "\\(catalog)").replaceAll("999001", "\\(timeoutSeconds)")
     .replaceAll("999002", "\\(maxLines)").replaceAll("999003", "\\(maxBytes / 1024)")
     .replaceAll("999004", "\\(word(maxFetches))").replaceAll("999005", "\\(word(maxTransientAttachments))");
-  return `nonisolated enum ModelGuidance {
+  return `import Foundation
+
+nonisolated enum ModelGuidance {
+    static let bundledSkillNames: Set<String> = ${JSON.stringify(SYSTEM_SKILL_NAMES)}
+    static let fileSystemSchemas: [(String, JSONValue)] = {
+        let data = Data(${swiftString(JSON.stringify(filesystemContract))}.utf8)
+        guard let schemas = try? JSONDecoder().decode(JSONValue.self, from: data).objectValue else {
+            preconditionFailure("Invalid agent filesystem schemas")
+        }
+        return schemas.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
+    }()
     private static let texts: [String: String] = [
 ${entries}
     ]

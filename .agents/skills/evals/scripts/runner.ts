@@ -36,7 +36,7 @@ export function validateCases(tests: EvalCase[]): void {
     if (test.workflow?.kind === "createSkill" && (!test.workflow.description.trim() || !test.workflow.instructions.trim() || !test.workflow.probe.trim() || test.workflow.probe.includes("{{answer}}"))) throw new Error(`Invalid independent probe: ${test.id}`);
     for (const rule of test.rules) {
       if (rule.kind === "actionAtLeast" && (!rule.name || !Number.isInteger(rule.count) || rule.count < 0)) throw new Error(`Invalid call rule: ${test.id}`);
-      if (rule.kind === "readsGuidance" && (!/^guidance\/[a-z-]+\/guide\.md$/.test(rule.path) || test.workflow?.kind !== "guidance" || test.workflow.path !== rule.path)) throw new Error(`Invalid guidance observation: ${test.id}`);
+      if (rule.kind === "readsSkill" && (!/^skills\/[a-z-]+\/SKILL\.md$/.test(rule.path) || test.workflow?.kind !== "readSkill" || test.workflow.path !== rule.path)) throw new Error(`Invalid skill read observation: ${test.id}`);
       if (rule.kind === "skillWorks" && test.workflow?.kind !== "createSkill") throw new Error(`Missing skill workflow: ${test.id}`);
     }
   }

@@ -6,9 +6,12 @@ import { SqliteStorage, type SqliteDatabase } from "@earendil-works/pi-durable/s
 import { applyChanges } from "./committed-partial";
 import { ProfileFiles } from "./files";
 import type { ArtifactFiles } from "./artifacts";
-import { profileEnv } from "./filesystem";
+import { profileMounts } from "./filesystem";
+import { mountedFileSystem, type FileMount, type TextFileMount } from "../core/file-mounts";
+import { bundledSkills, skillActivationRequirements } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
-import { profileTools, type AuthorizeFile } from "./tools";
+import { profileTools } from "./tools";
+import { AgentFileSystem } from "../core/filesystem";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
@@ -19,9 +22,9 @@ export interface ProfileRuntimeOptions {
   registry?: Registry;
   settings?: HarnessSettings;
   artifacts?: ArtifactFiles;
+  mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
   createBlobID?(): Promise<string>;
-  authorizeFile: AuthorizeFile;
   beforeProgress?(reference: ConversationReference): Promise<void>;
   onEvents?(conversationId: ConversationId, events: CommittedEvent[]): Promise<void>;
   onReport?(error: unknown): void;
@@ -36,15 +39,25 @@ interface Projection {
 
 export class ProfileRuntime {
   readonly files: ProfileFiles;
+  readonly filesystem = new AgentFileSystem();
   readonly conversations: OxConversations;
-  readonly env: ReturnType<typeof profileEnv>;
+  readonly env: ReturnType<typeof mountedFileSystem>;
+  get skillPackages() {
+    this.ready();
+    return { scope: this.options.profileID, skills: bundledSkills, activationRequirements: skillActivationRequirements };
+  }
+  get textMounts(): { scope: string; mounts: TextFileMount[] } {
+    this.ready();
+    return { scope: this.options.profileID, mounts: this.env.mounts.flatMap(mount => mount.source.kind === "text"
+      ? [{ path: mount.path, access: "readOnly" as const, files: mount.source.files }] : []) };
+  }
   private projections = new Map<ConversationId, Projection>();
   private attaching = new Map<ConversationId, Promise<void>>();
   private closing?: Promise<void>;
   private constructor(readonly harness: Harness, readonly registry: Registry, private options: ProfileRuntimeOptions) {
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
-    this.env = profileEnv(this.files, this.conversations);
+    this.env = mountedFileSystem(options.profileID, [...profileMounts(this.files, this.conversations), ...options.mounts ?? []]);
   }
 
   static async open(options: ProfileRuntimeOptions) {
@@ -56,7 +69,7 @@ export class ProfileRuntime {
         settings: options.settings, env: () => runtime!.env, onReport: options.onReport }, context);
       runtime = new ProfileRuntime(harness, registry, options);
       await runtime.files.initialize();
-      registry.install(profileTools(runtime.files, options.authorizeFile));
+      registry.install(profileTools(runtime.files));
       return runtime;
     } catch (error) {
       try { if (harness) await harness.close(context); else await options.database.close(); }
@@ -191,9 +204,11 @@ export class ProfileRuntime {
 
   close(): Promise<void> {
     if (!this.closing) this.closing = (async () => {
+      await this.filesystem.close();
       await this.files.flush();
       await Promise.allSettled(this.attaching.values());
       await this.harness.close(context);
+      await this.env.cleanup(context);
       await this.files.close();
       await Promise.all([...this.projections.values()].map(projection => projection.stream.closed));
       this.projections.clear();

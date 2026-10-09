@@ -398,6 +398,8 @@ artifact filename. Named exports use the same validation, collision-safe import
 path, Profile ownership, live chat reference, and synchronization behavior as
 other PDF artifact imports.
 
+The model accesses files only through `execute` → `ox.fs.*`. Agent-owned mount routing, pagination, exact-edit preflight/diffs, serialized mutations, and bounded traversal/search live in `packages/agent/src/core/filesystem.ts`. iOS supplies operation-scoped backing-store capabilities and retains `StorageMigrator` aliases, native approval, source permissions, Files grants, media conversion, and immutable physical publication. Read/write/edit inputs follow pinned Pi, with optional `purpose`; reads return at most 2,000 lines or 50 KiB with continuation offsets. No persisted path, encoding, milestone, or retention policy changes for this routing consolidation.
+
 The agent sees a virtual filesystem containing `MEMORY.md`, `SOUL.md`,
 `artifacts/<filename>`, persisted chat history, and source-aware skill and service
 mounts:
@@ -419,16 +421,24 @@ chats/
     └── turns.jsonl                              read-only, current or stored transcript
 ```
 
-Read-only built-in documentation lives in the signed `ModelGuidance.bundle` and
-is mounted at `guidance/<workflow>/guide.md` with supporting `references/` files.
-It is available before attachment and in temporary conversations, but is not
-Profile content, a skill package, or part of the skill catalog. Reads, listing,
-glob, and grep use the existing bounded filesystem APIs; mutations are refused.
+Bundled System packages are owned by `packages/agent/skills/` and exported through
+the same skills catalog and `skills/<name>/SKILL.md` namespace as other packages.
+They are available before attachment and in temporary chats, remain read-only,
+and copy into a distinct-name Profile package for customization. Relative resource
+links preserve customization; custom copies do not authorize System-gated effects.
+The trusted runtime supplies scoped packages and activation requirements to hosts.
+No guidance bundle, generated inventory, or separate workflow mount remains.
+`StorageMigrator.legacyWorkflowLocation` redirects old `guidance/<name>/guide.md`
+and reference/helper paths to canonical skills without exposing another root.
+Only the five known names are accepted; aliases have the same read-only permission
+and activation behavior. Persisted formats and captured historical snapshots remain
+unchanged; non-System snapshots cannot override a reserved System path or policy.
 
 The mount resolves permissions from the selected source, never frontmatter.
-Enabled repository and active Profile packages share one catalog before service
-attachment. Duplicate names require a Profile source selection; no source silently
-overrides another. Retired system names remain reserved. Local packages are writable only at
+System, enabled repository, and active Profile packages share one catalog before
+service attachment. Duplicate non-System names require a Profile source selection;
+System packages always own their reserved names. Untrusted packages cannot shadow
+System names or satisfy trusted activation requirements. Local packages are writable only at
 its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same

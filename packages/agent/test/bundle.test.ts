@@ -4,6 +4,7 @@ import { defaultSoul, responseDirective } from "../src/core/prompts";
 import { websiteInstructions, providerIdentity } from "../src/core/provider-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { nativeGuidanceSource } from "../native-guidance";
+import { bundledSkills } from "../src/core/bundled-skills";
 
 beforeAll(async () => {
   const build = Bun.spawn(["bun", "packages/agent/build.ts"], { cwd: new URL("../../../", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" });
@@ -52,13 +53,20 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
   expect(receipt).not.toContain("药💊".repeat(81));
   expect(receipt).toContain("incomplete/unknown outcome: 21");
   expect(() => runInContext("OxPrompts.failureReceipt({invocations:[{id:'x',name:'x',state:'__proto__'}]})", realm)).toThrow("Invalid receipt invocation");
+  for (const skill of bundledSkills) for (const [path, text] of Object.entries(skill.files)) {
+    const source = await Bun.file(new URL(`../skills/${skill.name}/${path}`, import.meta.url)).text();
+    expect(text).toBe(source);
+  }
   const nativeSource = await Bun.file(new URL("../../../apps/ios/Ox/Host/Agent/ModelGuidance.generated.swift", import.meta.url)).text();
   expect(nativeSource).toBe(nativeGuidanceSource());
   const seed = await Bun.file(new URL("default-soul.md", directory)).text();
   expect(seed).toBe(defaultSoul);
   const manifest = await Bun.file(new URL("manifest.json", directory)).json();
-  expect(manifest.resources["default-soul.md"]).toEqual({ bytes: new TextEncoder().encode(seed).length,
-    sha256: new Bun.CryptoHasher("sha256").update(seed).digest("hex") });
+  for (const name of ["default-soul.md"]) {
+    const text = await Bun.file(new URL(name, directory)).text();
+    expect(manifest.resources[name]).toEqual({ bytes: new TextEncoder().encode(text).length,
+      sha256: new Bun.CryptoHasher("sha256").update(text).digest("hex") });
+  }
 });
 
 it("uses explicit prompt variants without inferring prose from capabilities and rejects ambiguous ownership in the shipped renderer", async () => {

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
-import { Harness, createRegistry } from "@earendil-works/pi-durable";
+import { Harness, createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
+import { Type } from "typebox";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { ProfileFiles, ProfileFile, canonical } from "../src/profile/files";
@@ -119,7 +120,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
   const models = createModels();
   const provider = fauxProvider({ provider: "image-fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   provider.setResponses([
-    fauxAssistantMessage({ type: "toolCall", id: "read-image", name: "read", arguments: { path: "artifacts/chart.png" } }, { stopReason: "toolUse" }),
+    fauxAssistantMessage({ type: "toolCall", id: "attach-image", name: "execute", arguments: { path: "artifacts/chart.png" } }, { stopReason: "toolUse" }),
     transcript => {
       const image = transcript.messages.find(message => message.role === "toolResult");
       expect(image?.content as unknown).toEqual([{ type: "text", text: "[Attachment: artifacts/chart.png]", oxAttachment: "chart.png", oxProfileID: "physical-profile" }]);
@@ -127,8 +128,20 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     },
   ]);
   models.setProvider(provider.provider);
-  const openSession = () => openProfileRuntime({ database: backend(`${directory}/state.sqlite`).db, profileID: "physical-profile",
-    models, registry: createRegistry(), artifacts: host(), authorizeFile: async () => {} });
+  const openSession = async () => {
+    const runtime = await openProfileRuntime({ database: backend(`${directory}/state.sqlite`).db, profileID: "physical-profile",
+      models, registry: createRegistry(), artifacts: host() });
+    runtime.registry.install(defineExtension({ name: "fixture-attachment", tools: [defineTool({
+      name: "execute", description: "Attach an owned immutable file", parameters: Type.Object({ path: Type.String() }),
+      replay: "unsafe", execute: async ({ path }) => {
+        const bytes = await runtime.files.read(path);
+        if (!(bytes instanceof Uint8Array)) throw new Error("Attachment requires verified binary bytes");
+        return { content: [Object.assign({ type: "text" as const, text: `[Attachment: ${path}]` },
+          { oxAttachment: path.slice("artifacts/".length), oxProfileID: runtime.files.identity })] };
+      },
+    })] }));
+    return runtime;
+  };
   await mkdir(`${directory}/artifacts`);
   let session = await openSession();
   try {
@@ -151,8 +164,8 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     await session.files.write("artifacts/chart.png", Buffer.from(png, "base64"));
     const conversation = await session.harness.createConversation({ ownership: { kind: "ownerless" } }, BACKGROUND_CONTEXT);
     await conversation.configure({ model: { provider: "image-fixture", modelId: "mock" },
-      extensions: [session.registry.snapshot().extension("ox-profile-files")!] }, BACKGROUND_CONTEXT);
-    const result = await session.run(session.conversations.reference(conversation.id), { type: "input", content: "Read the owned image" });
+      extensions: [session.registry.snapshot().extension("ox-profile-files")!, session.registry.snapshot().extension("fixture-attachment")!] }, BACKGROUND_CONTEXT);
+    const result = await session.run(session.conversations.reference(conversation.id), { type: "input", content: "Attach the owned image" });
     expect(result.receipt.status).toBe("done");
     const ledger = await conversation.entries({}, 100, undefined, BACKGROUND_CONTEXT);
     expect(JSON.stringify(ledger.items)).not.toContain(png);
@@ -176,7 +189,7 @@ test("file-backed host integrates actual Pi SQLite commits, physical files, hist
     expect(installation.conversations).toHaveLength(1);
     expect(installation.conversations[0]!.key).toBe("source-key");
     const installedSession = await openProfileRuntime({ database: backend(`${installed}/state.sqlite`).db,
-      profileID: draft.profileID, models: createModels(), artifacts: host(installed), authorizeFile: async () => {} });
+      profileID: draft.profileID, models: createModels(), artifacts: host(installed) });
     try {
       const reference = installation.conversations[0]!.reference;
       expect((await installedSession.conversations.history(reference)).items).toHaveLength(3);

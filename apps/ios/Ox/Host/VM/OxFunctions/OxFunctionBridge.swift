@@ -28,14 +28,7 @@ public protocol OxFunctionBridge: AnyObject {
     func fetchWeb(url: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
     func browserOperation(action: String, arguments: JSONValue, purpose: String) async throws -> JSONValue?
     func analyzeVision(filename: String, purpose: String) async throws -> JSONValue?
-    func listFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
-    func readFileSystem(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
-    func attachFileSystem(path: String, purpose: String) async throws -> JSONValue?
-    func writeFileSystem(path: String, content: String, purpose: String) async throws -> JSONValue?
-    func editFileSystem(path: String, edits: JSONValue?, purpose: String) async throws -> JSONValue?
-    func deleteFileSystem(path: String, purpose: String) async throws -> JSONValue?
-    func globFileSystem(pattern: String, path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
-    func grepFileSystem(pattern: String, path: String, options: JSONValue?, purpose: String) async throws -> JSONValue?
+    func fileSystemOperation(name: String, arguments: JSONValue) async throws -> JSONValue?
     func findServices(query: String, purpose: String) async throws -> JSONValue?
     func listServices(kind: String?, purpose: String) async throws -> JSONValue?
     func listAttachedServices(kind: String?, purpose: String) async throws -> JSONValue?

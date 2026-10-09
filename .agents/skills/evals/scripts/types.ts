@@ -3,7 +3,7 @@ import type { ChatSnapshot } from "../../../../apps/cli/src/host-snapshot.ts";
 export type Rule =
   | { kind: "answerIncludes" | "answerExcludes" | "answerEquals"; value: string }
   | { kind: "noTools" }
-  | { kind: "readsGuidance"; path: string }
+  | { kind: "readsSkill"; path: string }
   | { kind: "actionAtLeast"; name: string; count: number }
   | { kind: "resultIncludes"; value: string }
   | { kind: "skillWorks" };
@@ -16,7 +16,7 @@ export type EvalCase = {
   rules: Rule[];
   rubric: string;
   workflow?:
-    | { kind: "guidance"; path: string }
+    | { kind: "readSkill"; path: string }
     | { kind: "createSkill"; description: string; instructions: string; probe: string };
 };
 
@@ -24,7 +24,7 @@ export type Check = { detail: string; passed: boolean };
 export type EvalMessage = {
   type: string;
   assistant?: {
-    content: Array<{ type: string; text?: { text: string }; toolCall?: { id: string; name: string; arguments: { source?: string } } }>;
+    content: Array<{ type: string; text?: { text: string }; toolCall?: { id: string; name: string; arguments: { source?: string; path?: string } } }>;
     usage?: unknown;
     stopReason: string;
   };

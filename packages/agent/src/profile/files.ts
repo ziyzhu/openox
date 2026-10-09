@@ -3,6 +3,9 @@ import { defineDoc, defineDocFamily, type Harness } from "@earendil-works/pi-dur
 import { FileError } from "@earendil-works/pi-durable/env";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { artifactPath, artifactRecord, type ArtifactFiles } from "./artifacts";
+import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
+import { canonical } from "../core/file-paths";
+export { canonical } from "../core/file-paths";
 
 const context = BACKGROUND_CONTEXT;
 const textLimit = 200 * 1024;
@@ -27,16 +30,8 @@ const FilesystemBinding = defineDoc<{ backend: string }>({
   kind: "ox.filesystem", version: 1, scope: "session", initial: () => ({ backend: "" }),
 });
 
-/** Logical paths only. Private DB/container paths, traversal and ambiguous aliases are never resolved. */
-export function canonical(path: string): string {
-  const relative = path.startsWith("/") ? path.slice(1) : path;
-  if (relative === "" || relative === ".") return "";
-  if (relative.includes("\\") || relative.includes("\0") || relative.split("/").some(part => !part || part === "." || part === ".." || part.startsWith("."))) {
-    throw new FileError("invalid", "Invalid virtual path", path);
-  }
-  return relative;
-}
 function owned(path: string) {
+  if (path.startsWith("skills/") && (SYSTEM_SKILL_NAMES as readonly string[]).includes(path.split("/")[1]!)) throw new FileError("permission_denied", "Bundled System skill names are reserved", path);
   if (!["MEMORY.md", "SOUL.md", "skill-selections.json"].includes(path) && !/^(artifacts|skills)\//.test(path)) {
     throw new FileError("permission_denied", "Path is not writable Profile content", path);
   }

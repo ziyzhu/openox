@@ -65,7 +65,7 @@ async function addLocalRepositorySeed(root: string): Promise<void> {
 try {
   const repository = await refreshBuiltinRepository();
   await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelServiceActions.json"), `${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n`);
-  await writeFile(join(ROOT, "apps/ios/Ox/Resources/ModelGuidance.bundle/evolve/references/model-schemas.md"),
+  await writeFile(join(ROOT, "packages/agent/skills/evolve/references/model-schemas.md"),
     `# Standard website Action schemas\n\nGenerated from packages/protocol/src/model-actions.ts by bun run build:services. conversation is the shared submit/read/cancel Action; add listModels for model-provider discovery. The existing four model Actions and optional continueModelGeneration remain supported during transition. Copy exact schemas; do not mix protocols on one conversation page.\n\n\`\`\`json\n${JSON.stringify(STANDARD_WEB_ACTION_SCHEMAS, null, 2)}\n\`\`\`\n`);
   await addLocalRepositorySeed(temporary);
   await rm(backup, { recursive: true, force: true });

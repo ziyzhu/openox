@@ -50,12 +50,14 @@ export function score(test: EvalCase, response: EvalResponse): Check[] {
       case "answerExcludes": checks.push({ detail: `Answer excludes ${rule.value}`, passed: !answer.toLowerCase().includes(rule.value.toLowerCase()) }); break;
       case "answerEquals": checks.push({ detail: `Answer equals ${rule.value}`, passed: answer === rule.value }); break;
       case "noTools": checks.push({ detail: "No tools used", passed: tools.length === 0 }); break;
-      case "readsGuidance": {
-        checks.push({ detail: `Actual read of ${rule.path} succeeded`, passed: invocations.some(call => call.name === "ox.fs.read" && call.args.path === rule.path && "succeeded" in call.outcome) });
-        checks.push({ detail: "Only guidance discovery and reads executed", passed: invocations.every(call => ["ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep"].includes(call.name)
-          && typeof call.args.path === "string" && (call.args.path === "guidance" || call.args.path.startsWith("guidance/"))) });
+      case "readsSkill": {
+        const dedicated = tools.some(call => call.name === "read" && call.arguments.path === rule.path
+          && history(response.snapshot).results.some(result => result.toolCallId === call.id && result.toolName === "read" && !result.isError));
+        checks.push({ detail: `Actual read of ${rule.path} succeeded`, passed: dedicated || invocations.some(call => call.name === "ox.fs.read" && call.args.path === rule.path && "succeeded" in call.outcome) });
+        checks.push({ detail: "Only skill discovery and reads executed", passed: invocations.every(call => ["ox.fs.read", "ox.fs.list", "ox.fs.glob", "ox.fs.grep"].includes(call.name)
+          && typeof call.args.path === "string" && (call.args.path === "skills" || call.args.path.startsWith("skills/"))) && tools.every(call => call.name === "execute" || call.name === "read" && call.arguments.path?.startsWith("skills/") === true) });
         const prefix = response.before?.guide?.slice(0, 256);
-        checks.push({ detail: "Real tool output contains an independently read guide excerpt", passed: !!prefix && [prefix, JSON.stringify(prefix).slice(1, -1)].some(value => output.includes(value)) });
+        checks.push({ detail: "Real tool output contains an independently read skill excerpt", passed: !!prefix && [prefix, JSON.stringify(prefix).slice(1, -1)].some(value => output.includes(value)) });
         break;
       }
       case "actionAtLeast": checks.push({ detail: `${rule.name} actually succeeded at least ${rule.count} times`, passed: invocations.filter(call => call.name === rule.name && "succeeded" in call.outcome).length >= rule.count }); break;

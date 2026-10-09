@@ -6,7 +6,7 @@ import type { Message, Model, Tool, Api, ModelThinkingLevel } from "@earendil-wo
 import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
-  ApplicationPresentation, type ApplicationPresentationChange, ProfileArtifact, ProfileFile, ProfileIndex, canonical,
+  ApplicationPresentation, type ApplicationPresentationChange, ProfileArtifact, ProfileFile, ProfileIndex, canonical, type TextFileMount,
   ConversationApplicationMetadata, ConversationPresentation, type ArtifactFiles, type ArtifactRecord } from "../../index";
 import type { CompactionCheckpoint, ConversationId, EntryId, GenerationCheckpoint, HarnessInspection, SubmissionId, TaskId, ToolExecutionApi, ToolTaskInput } from "@earendil-works/pi-durable";
 import { ChatBindings } from "../../chat-bindings";
@@ -14,6 +14,8 @@ import { artifactPath, artifactRecord } from "../../profile/artifacts";
 import { nativeDatabase } from "../../sqlite";
 import { native } from "./bridge";
 import { nativeStream } from "./native-model";
+import { invokeFilesystem, type NativeFileMount } from "./filesystem";
+import { validateFileRequest, type FileOperation, type FileRequest } from "../../core/filesystem";
 import { nativeArtifacts } from "./artifacts";
 import { composeIOSPrompt } from "./prompts";
 import { composeTurnContext, type SystemPromptInput, type TurnState } from "../../core/prompts";
@@ -24,7 +26,8 @@ interface Config { chatID: string; title?: string; promptState: SystemPromptInpu
   reasoning: boolean; tools: (Tool & { executionMode?: ToolExecutionMode })[]; messages: Message[]; toolExecutionMode?: ToolExecutionMode;
   providerID?: string; thinkingLevel?: ModelThinkingLevel | null; nativeReasoningEffort?: string | null }
 interface Command extends ApplicationPresentationChange { action: string; draft?: NormalizedProfileDraft; config?: Config; chatID?: string | null; content?: UserInput;
-  conversationCount?: number;
+  conversationCount?: number; mounts?: TextFileMount[];
+  capability?: string; fileMounts?: NativeFileMount[]; operation?: FileOperation; arguments?: FileRequest;
   promptState?: SystemPromptInput; turnState?: TurnState;
   requestID?: string; submissionID?: SubmissionId; profileID?: string; path?: string; prefix?: string; text?: string; base64?: string; saved?: boolean; artifactFiles?: boolean;
   artifact?: ArtifactRecord & { binary: boolean; saved: boolean }; writes?: { path: string; text: string }[]; removes?: string[]; entries?: EntryDraft[];
@@ -72,6 +75,7 @@ export class IOSAgentAdapter {
     nativeProviderID?: string; nativeReasoningEffort?: string; scope?: HostScope }>();
   private providerRoutes = new Map<string, ConversationId>();
   private models = createModels();
+  private filesystemCalls = new Map<string, AbortController>();
 
   async command(args: Command): Promise<unknown> {
     if (args.action === "composePrompt") return composeIOSPrompt(args.promptState!);
@@ -95,13 +99,13 @@ export class IOSAgentAdapter {
       const database = nativeDatabase((op, sql, params) => native("sql", { op, sql, params }));
       const session: ProfileRuntime = await openProfileRuntime({ database, models: this.models, profileID: args.profileID!,
         artifacts: this.artifacts,
+        mounts: args.mounts?.map(({ path, files, access }) => {
+          if (access !== "readOnly") throw new Error("Native text mounts must be read-only");
+          return { path, access, source: { kind: "text", files } };
+        }),
         createBlobID: args.artifactFiles ? undefined : () => native<string>("uuid", {}),
         settings: { retry: { enabled: true, maxRetries: 2 }, toolExecution: "parallel" },
         beforeProgress: reference => this.guardProgress(reference),
-        authorizeFile: async (id, action, path, signal) => {
-          const chatID = this.route(id);
-          await native("filePermission", { chatID, reference: session.conversations.reference(id), action, path }, signal);
-        },
         onEvents: async (id, events) => {
           const chatID = this.routes.get(id);
           if (chatID) await native("agentEvents", { chatID, reference: session.conversations.reference(id), events });
@@ -118,6 +122,15 @@ export class IOSAgentAdapter {
     const session = this.session;
     if (!session || !this.bindings) throw new Error("Profile runtime not open");
     if (args.profileID !== undefined && args.profileID !== session.conversations.profileID) throw new Error("Conversation Profile mismatch");
+    if (args.action === "filesystemValidate") return validateFileRequest(args.operation!, args.arguments!);
+    if (args.action === "filesystemAbort") { this.filesystemCalls.get(args.capability!)?.abort(); return {}; }
+    if (args.action === "filesystem") {
+      if (this.filesystemCalls.has(args.capability!)) throw new Error("Filesystem capability already in use");
+      const controller = new AbortController();
+      this.filesystemCalls.set(args.capability!, controller);
+      try { return await invokeFilesystem(session, args.capability!, args.fileMounts!, args.operation!, args.arguments!, controller.signal); }
+      finally { this.filesystemCalls.delete(args.capability!); }
+    }
     const qualifiedID = args.reference == null ? undefined : session.conversations.id(args.reference);
     if (args.action === "attach") return this.attach(args.config!, args.reference ?? undefined);
     const routeID = args.chatID ? [...this.routes].find(([, chatID]) => chatID === args.chatID)?.[0] : undefined;
@@ -183,6 +196,8 @@ export class IOSAgentAdapter {
         return { ...result, recovery: await this.recoveryPlan(result.inspection), conversations, streamEnds: Object.fromEntries(conversations
           .filter(({ id }) => result.streamEnds[id]).map(({ id, chatID }) => [chatID, result.streamEnds[id]])) };
       }
+      case "fileMounts": return session.textMounts;
+      case "skillPackages": return session.skillPackages;
       case "fileList": return this.fileList(args.prefix);
       case "fileBatch": await this.fileBatch(args.writes ?? [], args.removes ?? []); return {};
       case "fileSeed": return this.fileSeed(args.path!, args.text!);

@@ -37,9 +37,9 @@ export async function observeState(host: string, provider: string, model: string
     if (bytes > 1_048_576) throw new Error("Observed files exceed the 1 MiB evidence budget");
     state.files[path] = text;
   }
-  if (test.workflow?.kind === "guidance") {
+  if (test.workflow?.kind === "readSkill") {
     state.guide = await readText(host, chatId, test.workflow.path, remaining());
-    if (!state.guide.trim()) throw new Error("Missing independent guide contents");
+    if (!state.guide.trim()) throw new Error("Missing independent skill contents");
   }
   return state;
 }

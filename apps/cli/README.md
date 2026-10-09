@@ -135,7 +135,7 @@ another chat discards an outgoing temporary chat, just as in the app.
 ox vm functions
 ox vm help ox.fs.read
 ox vm skills
-ox vm call ox.fs.read --args '{"path":"guidance/manage-skills/guide.md","purpose":"Read skill authoring guidance"}'
+ox vm call ox.fs.read --args '{"path":"skills/manage-skills/SKILL.md","purpose":"Activate the System authoring skill"}'
 ox host services
 ox host service invoke <domain>:<action> --args-file - < action-args.json
 ox host service sync

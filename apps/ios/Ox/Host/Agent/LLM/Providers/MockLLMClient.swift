@@ -320,7 +320,7 @@ extension Scenario {
         var library = Dictionary(uniqueKeysWithValues: catalog.flatMap(\.entries).map { ($0.number, $0.scenario) })
         library["23 defaults"] = defaultModelSelection
         library["23 error"] = modelSelectionChange
-        library["72 guidance"] = skillCatalog
+        library["72 bundled"] = skillCatalog
         library[String(repeating: "slow ", count: 200).trimmingCharacters(in: .whitespaces)] = slowFirstToken
         return library
     }
@@ -813,9 +813,8 @@ extension Scenario {
         let expectsUserSkill = ctx.latestUserSaid("user")
         let verifiesStablePrefix = ctx.latestUserSaid("cache")
         let activatesUserSkill = ctx.latestUserSaid("activate")
-        let hasStableGuidance = BuiltInGuidance.names.allSatisfy {
-            ctx.systemPrompt.contains("guidance/\($0)/guide.md") && !ctx.transientContext.contains("skills/\($0)/SKILL.md")
-        }
+        let bundledPaths = ctx.systemPrompt.components(separatedBy: "`").filter { $0.hasPrefix("skills/") && $0.hasSuffix("/SKILL.md") }
+        let hasBundledSkills = !bundledPaths.isEmpty
         let hasTimestamp = ctx.serializedUserText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
             .first
@@ -850,7 +849,7 @@ extension Scenario {
               !ctx.transientContext.contains("User slash commands:"),
               !ctx.transientContext.contains("System skills:"),
               !ctx.transientContext.contains("127.0.0.1:delayedEcho"),
-              hasStableGuidance,
+              hasBundledSkills,
               hasTimestamp,
               hasTurnStateAfterTimestamp,
               !verifiesStablePrefix || retainedServiceState,
@@ -858,21 +857,21 @@ extension Scenario {
               hasServiceSkill == expectsService else {
             return [.say("Skill catalog context was incorrect."), .stop(.stop)]
         }
-        if ctx.latestUserSaid("guidance") {
+        if ctx.latestUserSaid("bundled") {
             guard let result = ctx.toolResults.last else {
                 return [execute("""
-                const files = await ox.fs.glob({ path: "guidance", pattern: "**/guide.md", purpose: "Find built-in guidance" });
-                const guide = await ox.fs.read({ path: "guidance/manage-skills/guide.md", purpose: "Read built-in guidance" });
-                const references = await ox.fs.list({ path: "guidance/manage-skills/references", purpose: "List guidance references" });
+                const files = await ox.fs.glob({ path: "skills", pattern: "**/SKILL.md", purpose: "Find bundled skills" });
+                const guide = await ox.fs.read({ path: "skills/manage-skills/SKILL.md", purpose: "Activate the bundled authoring skill" });
+                const references = await ox.fs.list({ path: "skills/manage-skills/references", purpose: "List skill references" });
                 console.log({ count: files.paths.length, guide: guide.text.includes("# Manage Skills"), references: references.items.length });
                 """), .stop(.toolUse)]
             }
-            guard !result.isError, result.activatedSkills.isEmpty,
+            guard !result.isError, result.activatedSkills.contains(where: { $0.name == "manage-skills" }),
                   let text = ctx.resultText("execute"), let values = JSONValue.parse(jsonString: text)?.objectValue,
-                  values["count"]?.intValue == 5, values["guide"]?.boolValue == true, values["references"]?.intValue == 2 else {
-                return [.say("Built-in guidance context was incorrect."), .stop(.stop)]
+                  (values["count"]?.intValue ?? 0) >= 5, values["guide"]?.boolValue == true, values["references"]?.intValue == 2 else {
+                return [.say("Bundled skill context was incorrect."), .stop(.stop)]
             }
-            return [.say("Built-in guidance loaded without activating a skill."), .stop(.stop)]
+            return [.say("Bundled System skill loaded and activated."), .stop(.stop)]
         }
         if activatesUserSkill {
             guard let result = ctx.toolResults.last else {

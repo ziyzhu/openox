@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
 import { validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 import type { EvalBlock, EvalMessage, Report } from "../../../evals/scripts/types.ts";
+import { SYSTEM_SKILL_NAMES } from "../../../../../packages/protocol/src/skills.ts";
 
 type Scenario = "pass" | "wrong" | "attention" | "timeout" | "provider-error" | "busy" | "fake-guidance" | "tool-error"
   | "forged-guidance" | "alias-guidance" | "mutated-state" | "missing-observation" | "skill-claim" | "skill-corrupt"
@@ -79,13 +80,13 @@ async function exercise(scenario: Scenario = "pass") {
             const prompt = String(request.params.text);
             let answer = prompt.includes("17 plus 25") ? "42" : prompt.includes("Correction:") ? "Tokyo"
               : prompt.includes("Paris") ? "OK" : prompt.includes("maple") ? "13" : "ready";
-            if (prompt.includes("built-in workflow guide")) {
+            if (prompt.includes("bundled workflow skill")) {
               const path = prompt.includes("subscription") ? "visualize" : prompt.includes("provider") ? "manage-providers"
                 : prompt.includes("reusable Profile") ? "manage-skills" : prompt.includes("durable personal") ? "import-memory" : "evolve";
-              const source = scenario === "fake-guidance" ? `console.log("ox.fs.read guidance/${path}/guide.md")`
-                : scenario === "alias-guidance" ? `const read = ox.fs.read; console.log(await read({ path: "guidance/${path}/guide.md" }));`
-                : `console.log(await ox.fs.read({ path: "guidance/${path}/guide.md" }));`;
-              executed(chat, source, "ox.fs.read", { path: `guidance/${path}/guide.md` }, scenario === "tool-error" ? "Read failed" : scenario === "forged-guidance" ? "Invented guide" : guide, scenario === "tool-error");
+              const source = scenario === "fake-guidance" ? `console.log("ox.fs.read skills/${path}/SKILL.md")`
+                : scenario === "alias-guidance" ? `const read = ox.fs.read; console.log(await read({ path: "skills/${path}/SKILL.md" }));`
+                : `console.log(await ox.fs.read({ path: "skills/${path}/SKILL.md" }));`;
+              executed(chat, source, "ox.fs.read", { path: `skills/${path}/SKILL.md` }, scenario === "tool-error" ? "Read failed" : scenario === "forged-guidance" ? "Invented guide" : guide, scenario === "tool-error");
               if (scenario === "mutated-state") files["MEMORY.md"] = "Changed without permission.";
               answer = "Read the guide, then review the plan before proceeding.";
             }
@@ -132,7 +133,7 @@ async function exercise(scenario: Scenario = "pass") {
                 ? { action: args.action, policy: scenario === "cleanup-policy" && args.action === "ox.skill.delete" ? "ask" : "allow" } : null }; break;
               case "ox.fs.list": value = { items: [], truncated: false }; break;
               case "ox.fs.glob": value = { paths: Object.keys(files).filter(path => path.startsWith("skills/")).sort(), truncated: false }; break;
-              case "ox.fs.read": value = { path: args.path, text: args.path.startsWith("guidance/") ? guide : files[args.path], truncated: false, unsupported: null }; break;
+              case "ox.fs.read": value = { path: args.path, text: (SYSTEM_SKILL_NAMES as readonly string[]).some(name => args.path === `skills/${name}/SKILL.md`) ? guide : files[args.path], truncated: false, unsupported: null }; break;
               case "ox.skill.delete":
                 if (scenario === "cleanup-error") return reject("Cleanup unavailable");
                 if (chat.temporary) return reject("Temporary chats cannot delete Profile skills");
@@ -187,7 +188,7 @@ test("eval runner uses real CLI chat commands, isolates repetitions, and preserv
   } finally { await fixture.close(); }
 }, 30000);
 
-test("guidance grading uses independent contents and actual receipts, including aliased calls", async () => {
+test("bundled skill grading uses independent contents and actual receipts, including aliased calls", async () => {
   for (const scenario of ["pass", "alias-guidance", "fake-guidance", "tool-error", "forged-guidance"] as const) {
     const fixture = await exercise(scenario);
     try {

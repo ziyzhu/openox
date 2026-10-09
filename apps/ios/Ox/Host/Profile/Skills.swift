@@ -35,7 +35,7 @@ nonisolated enum SkillError: LocalizedError, Sendable {
         switch self {
         case .invalidPackage: "The skill package is invalid or too large."
         case .conflict(let name): "Choose a source for /\(name) in Skills before using it."
-        case .reserved(let name): "The name /\(name) is reserved for compatibility with built-in Ox workflows."
+        case .reserved(let name): "The name /\(name) is reserved for a bundled System skill. Copy it to a distinct name to customize."
         case .invalidName: "User skill names must use lowercase kebab-case."
         case .missing(let name): "No skill named /\(name) exists."
         case .exists(let name): "A skill named /\(name) already exists."
@@ -51,7 +51,7 @@ nonisolated enum SkillFiles {
     static let fileName = "SKILL.md"
     static let maximumBytes = 524_288
     static let maximumFiles = 64
-    static let reservedNames: Set<String> = ["evolve", "import-memory", "manage-providers", "manage-skills", "visualize"]
+    static let reservedNames = ModelGuidance.bundledSkillNames
 
     static func displayName(_ name: String) -> String {
         name
@@ -361,7 +361,8 @@ final class Skills {
     static func catalog(in scope: ProfileScope, repositorySkills: [Skill]) async throws -> SkillCatalog {
         let users = try await ProfileRepository.shared.skills(in: scope)
         let selections = try await ProfileRepository.shared.skillSelections(in: scope)
-        return SkillCatalog(candidates: repositorySkills + users, selections: selections.sources)
+        let bundled = try await DurableProfileStore.shared.session(in: scope).skills.skills
+        return SkillCatalog(candidates: bundled + repositorySkills + users, selections: selections.sources)
     }
 
     func refresh() { enqueue { _, _ in } }

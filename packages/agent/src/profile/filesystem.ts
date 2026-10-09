@@ -1,7 +1,41 @@
-import { err, ok, ExecutionError, FileError, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
+import { err, ok, getOrThrow, ExecutionError, FileError, type ExecutionEnv, type FileInfo, type Result } from "@earendil-works/pi-durable/env";
 import { canonical, type ProfileFiles } from "./files";
 import type { ConversationId } from "@earendil-works/pi-durable";
 import type { OxConversations, ConversationListCursor } from "./conversations";
+import { mountedFileSystem, type FileBackend, type FileMount } from "../core/file-mounts";
+import { bundledSkills } from "../core/bundled-skills";
+
+export function profileMounts(files: ProfileFiles, conversations: OxConversations): FileMount[] {
+  const env = profileEnv(files, conversations);
+  const system = mountedFileSystem("ox-bundled-skills", [{ path: "skills", access: "readOnly", source: { kind: "text", files: Object.fromEntries(
+    bundledSkills.flatMap(skill => Object.entries(skill.files).map(([path, text]) => [`${skill.name}/${path}`, text])),
+  ) } }]);
+  const names = new Set(bundledSkills.map(skill => skill.name));
+  const bundled = (path: string) => path.startsWith("skills/") && names.has(path.split("/")[1]!);
+  const writable = (path: string) => { if (bundled(path)) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path); };
+  const backend: FileBackend = {
+    id: env.id, assertWritable: writable,
+    info: async (path, context) => getOrThrow(await (bundled(path) ? system : env).fileInfo(path, context)),
+    list: async (path, context) => {
+      if (bundled(path)) return getOrThrow(await system.listDir(path, context));
+      const entries = getOrThrow(await env.listDir(path, context));
+      if (path !== "skills") return entries;
+      return [...new Map([...entries, ...getOrThrow(await system.listDir(path, context))].map(entry => [entry.path, entry])).values()].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    },
+    read: async (path, context) => bundled(path) ? getOrThrow(await system.readTextFile(path, context)) : (await files.index())[path]?.binary
+      ? getOrThrow(await env.readBinaryFile(path, context)) : getOrThrow(await env.readTextFile(path, context)),
+    write: async (path, content, context) => { writable(path); getOrThrow(await env.writeFile(path, content, context)); },
+    edit: async (path, edits) => { writable(path); await files.edit(path, edits); },
+    remove: async (path, context) => { writable(path); getOrThrow(await env.remove(path, undefined, context)); },
+    flush: async (path, context) => { writable(path); getOrThrow(await env.flushFile(path, context)); },
+    createDirectory: async (path, context) => { writable(path); getOrThrow(await env.createDir(path, undefined, context)); },
+  };
+  return ["MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts", "skills", "conversations", "chats"].map(path => ({
+    path, access: path === "conversations" || path === "chats" ? "readOnly" : "readWrite",
+    source: { kind: "backend", backend, path: path === "chats" ? "conversations" : path },
+    visibility: path === "chats" ? "unlisted" : "listed",
+  }));
+}
 
 export function profileEnv(files: ProfileFiles, conversations?: OxConversations): ExecutionEnv {
   const unsupported = async () => err<never, FileError>(new FileError("not_supported", "Operation is unavailable in the Profile filesystem"));

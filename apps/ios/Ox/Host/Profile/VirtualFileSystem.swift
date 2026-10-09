@@ -1,11 +1,9 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
+    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "conversations"]
     static let maximumReadBytes = ArtifactLimits.textBytes
-    static let maximumSearchBytes = 2 * 1024 * 1024
-    static let maximumChatSearchBytes = 16 * 1024 * 1024
     static let maximumSearchFiles = 1_000
-    static let maximumLineCharacters = 500
 
     enum Location: Equatable, Sendable {
         case root
@@ -13,7 +11,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case soul
         case artifacts
         case artifact(String)
-        case guidance(String)
+        case resource(String)
         case skills
         case skill(String)
         case skillFile(String)
@@ -38,7 +36,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .soul: "SOUL.md"
             case .artifacts: "artifacts"
             case .artifact(let name): "artifacts/\(name)"
-            case .guidance(let path): path.isEmpty ? "guidance" : "guidance/\(path)"
+            case .resource(let path): path
             case .skills: "skills"
             case .skill(let name): "skills/\(name)"
             case .skillFile(let name): "skills/\(name)/SKILL.md"
@@ -62,7 +60,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         var isDirectory: Bool {
             switch self {
             case .root, .artifacts, .skills, .skill, .skillDirectory, .services, .serviceKind, .service, .chats, .chat, .files, .deviceFolder: true
-            case .guidance, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
+            case .resource, .memory, .soul, .artifact, .skillFile, .skillResource, .serviceItem, .chatMetadata, .chatTurns, .deviceItem: false
             }
         }
 
@@ -71,7 +69,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .memory: .memory
             case .soul: .soul
             case .artifacts, .artifact: .artifacts
-            case .guidance: .guidance
+            case .resource: .resources
             case .skills, .skill, .skillFile, .skillDirectory, .skillResource: .skills
             case .services, .serviceKind, .service, .serviceItem: .services
             case .chats, .chat, .chatMetadata, .chatTurns: .chats
@@ -88,7 +86,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case memory
         case soul
         case artifacts
-        case guidance
+        case resources
         case skills
         case services
         case chats
@@ -101,7 +99,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
         case notDirectory(String)
         case notFile(String)
         case unsupportedMutation(String)
-        case invalidPattern(String)
 
         var errorDescription: String? {
             switch self {
@@ -109,12 +106,11 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .notDirectory(let path): "Not a directory: \(path)"
             case .notFile(let path): "Not a file: \(path)"
             case .unsupportedMutation(let path): "This operation isn't supported for \(path)."
-            case .invalidPattern(let pattern): "Invalid search pattern: \(pattern)"
             }
         }
     }
 
-    func location(_ rawPath: String, defaultRoot: Bool = false) throws -> Location {
+    func location(_ rawPath: String, defaultRoot: Bool = false, resources: ReadOnlyFiles) throws -> Location {
         let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         if defaultRoot, path.isEmpty || path == "." { return .root }
         guard !path.isEmpty,
@@ -129,6 +125,8 @@ nonisolated public struct VirtualFileSystem: Sendable {
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw Error.invalidPath(rawPath)
         }
+        if let legacy = try StorageMigrator.legacyWorkflowLocation(parts) { return legacy }
+        if resources.owns(path) { return .resource(path) }
         switch parts {
         case ["MEMORY.md"]: return .memory
         case ["SOUL.md"]: return .soul
@@ -137,11 +135,6 @@ nonisolated public struct VirtualFileSystem: Sendable {
             let name = parts[1]
             _ = try ArtifactStore.validatedFilename(name)
             return .artifact(name)
-        case ["guidance"]: return .guidance("")
-        case let parts where parts.count >= 2 && parts[0] == "guidance":
-            let relative = parts.dropFirst().joined(separator: "/")
-            guard BuiltInGuidance.validPath(relative) else { throw Error.invalidPath(rawPath) }
-            return .guidance(relative)
         case ["skills"]: return .skills
         case let parts where parts.count == 2 && parts[0] == "skills":
             let name = parts[1]
@@ -191,53 +184,4 @@ nonisolated public struct VirtualFileSystem: Sendable {
         }
     }
 
-    func relativePath(_ path: String, under base: Location) -> String? {
-        switch base {
-        case .root:
-            return path
-        default:
-            let prefix = base.path + "/"
-            guard path.hasPrefix(prefix) else { return nil }
-            return String(path.dropFirst(prefix.count))
-        }
-    }
-
-    func matches(path: String, pattern: String) throws -> Bool {
-        let expression = try globExpression(pattern)
-        let range = NSRange(path.startIndex..<path.endIndex, in: path)
-        return expression.firstMatch(in: path, range: range) != nil
-    }
-
-    private func globExpression(_ pattern: String) throws -> NSRegularExpression {
-        guard !pattern.isEmpty else { throw Error.invalidPattern(pattern) }
-        var source = "^"
-        var index = pattern.startIndex
-        while index < pattern.endIndex {
-            let character = pattern[index]
-            let next = pattern.index(after: index)
-            if character == "*", next < pattern.endIndex, pattern[next] == "*" {
-                let afterDouble = pattern.index(after: next)
-                if afterDouble < pattern.endIndex, pattern[afterDouble] == "/" {
-                    source += "(?:.*/)?"
-                    index = pattern.index(after: afterDouble)
-                } else {
-                    source += ".*"
-                    index = afterDouble
-                }
-            } else {
-                switch character {
-                case "*": source += "[^/]*"
-                case "?": source += "[^/]"
-                default: source += NSRegularExpression.escapedPattern(for: String(character))
-                }
-                index = next
-            }
-        }
-        source += "$"
-        do {
-            return try NSRegularExpression(pattern: source)
-        } catch {
-            throw Error.invalidPattern(pattern)
-        }
-    }
 }

@@ -98,8 +98,8 @@ export async function runCase(host: string, provider: string, model: string, tes
       });
     } catch (error) { response.errors.push(`Cleanup failed: ${String(error)}`); }
   }
-  if (test.workflow?.kind === "guidance") {
-    response.observationChecks.push({ detail: "Independent guide contents unchanged", passed: !!response.before?.guide && response.before.guide === response.after?.guide });
+  if (test.workflow?.kind === "readSkill") {
+    response.observationChecks.push({ detail: "Independent skill contents unchanged", passed: !!response.before?.guide && response.before.guide === response.after?.guide });
   }
   if (settled && response.errors.length === 0 && response.observationChecks.every(check => check.passed)) response.continuation = "safe";
   try {

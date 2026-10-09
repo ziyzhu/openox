@@ -4,9 +4,14 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { createRegistry, defineExtension, defineTool, type ConversationId, type AgentState, type EntryRecord } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
-import { rm } from "node:fs/promises";
+import type { ToolCall } from "@earendil-works/pi-ai";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { FileError, getOrThrow } from "@earendil-works/pi-durable/env";
+import { profileEnv } from "../src/profile/filesystem";
 import { ChatBindings, ConversationIdentity } from "../src/chat-bindings";
 import { openProfileRuntime, type ProfileRuntime, type CommittedEvent, type ProfileRuntimeOptions,
+  canonical, type FileOperation, type FileRequest,
   type ConversationReference, type ConversationHistoryCursor, type ConversationListCursor } from "../src/index";
 import { IOSAgentAdapter } from "../src/adapters/ios/agent";
 import { deliver, streamEvent } from "../src/adapters/ios/bridge";
@@ -17,14 +22,32 @@ const context = BACKGROUND_CONTEXT;
 const sessions: ProfileRuntime[] = [];
 afterEach(async () => { await Promise.all(sessions.splice(0).map(session => session.close())); });
 
-async function fixture(profileID = "fixture", onEvents: (id: ConversationId, events: CommittedEvent[]) => Promise<void> = async () => {}, overrides: Partial<ProfileRuntimeOptions> = {}) {
+type FixtureOptions = Partial<ProfileRuntimeOptions> & {
+  authorizeFile?(id: ConversationId, action: "write" | "edit", path: string): Promise<void>;
+  onSkillActivation?(id: ConversationId, callID: string, name: string): Promise<string>;
+};
+async function fixture(profileID = "fixture", onEvents: (id: ConversationId, events: CommittedEvent[]) => Promise<void> = async () => {}, overrides: FixtureOptions = {}) {
   const models = createModels();
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   faux.setResponses(Array.from({ length: 4 }, () => fauxAssistantMessage([{ type: "text", text: "hello" }])));
   models.setProvider(faux.provider);
   const session = await openProfileRuntime({ database: backend().db, profileID, models, registry: createRegistry(),
-    createBlobID: async () => crypto.randomUUID(), authorizeFile: async () => {}, onEvents,
+    createBlobID: async () => crypto.randomUUID(), onEvents,
     settings: { retry: { enabled: false }, compaction: { enabled: false } }, ...overrides });
+  session.registry.install(defineExtension({ name: "fixture-filesystem", tools: [defineTool({
+    name: "execute", description: "Invoke the fixture's ox.fs adapter", parameters: Type.Object({ operation: Type.String(), args: Type.Any() }),
+    replay: "unsafe", execute: async ({ operation, args }, api, context) => {
+      const request = args as FileRequest;
+      if (operation === "write" || operation === "edit") {
+        session.env.assertWritable(request.path!);
+        await overrides.authorizeFile?.(api.conversationId, operation, canonical(request.path!));
+      }
+      const value = await session.filesystem.invoke(session.env, operation as FileOperation, request, context);
+      const skill = /^skills\/([^/]+)\/SKILL\.md$/.exec(canonical(request.path ?? ""));
+      const details = operation === "read" && skill ? await overrides.onSkillActivation?.(api.conversationId, api.callId, skill[1]!) : undefined;
+      return { content: [{ type: "text", text: JSON.stringify(value) }], ...(details === undefined ? {} : { details }) };
+    },
+  })] }));
   sessions.push(session);
   return session;
 }
@@ -104,7 +127,7 @@ test("identical external chat UUIDs bind independently without changing persiste
   expect((await b.forChat("same-external-uuid")).id).toBe(secondHandle.id);
 });
 
-test("file tools request host authorization before mutating Profile documents", async () => {
+test("dedicated file tools are absent and cannot mutate Profile documents", async () => {
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "write", name: "write", arguments: { path: "MEMORY.md", content: "forbidden" } }], { stopReason: "toolUse" }),
     fauxAssistantMessage([{ type: "text", text: "Denied" }])]);
@@ -113,9 +136,66 @@ test("file tools request host authorization before mutating Profile documents", 
   const session = await fixture("fixture", undefined, { models, authorizeFile: async id => { authorized.push(id); throw new Error("Permission denied"); } });
   const handle = await conversation(session);
   const result = await session.run(handle.id, { type: "input", content: "write" });
-  expect(authorized).toEqual([handle.id]);
+  expect(authorized).toEqual([]);
   expect(result.messages.some(message => message.role === "toolResult" && message.isError)).toBe(true);
   await expect(session.files.read("MEMORY.md")).rejects.toThrow("not found");
+});
+
+test("one execute filesystem surface composes scoped text and physical mounts without shadowing or fallback", async () => {
+  const root = await mkdtemp("/tmp/ox-mounted-workspace-");
+  await writeFile(join(root, "denied.md"), "Do not expose these bytes");
+  const permissions: string[] = [];
+  const activations: string[] = [];
+  const models = createModels();
+  const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
+  const tool = (name: string, args: ToolCall["arguments"]) => fauxAssistantMessage([{ type: "toolCall", id: crypto.randomUUID(), name: "execute", arguments: { operation: name, args } }], { stopReason: "toolUse" });
+  faux.setResponses([tool("read", { path: "skills/manage-skills/SKILL.md" }), tool("read", { path: "notes/private/readme.md" }),
+    tool("write", { path: "workspace/note.md", content: "original" }), tool("edit", { path: "workspace/note.md", edits: [{ oldText: "original", newText: "edited" }] }),
+    tool("read", { path: "workspace/note.md" }), tool("write", { path: "notes/private/readme.md", content: "forbidden" }),
+    tool("write", { path: "workspace/../MEMORY.md", content: "forbidden" }), tool("read", { path: "workspace/denied.md" }),
+    fauxAssistantMessage([{ type: "text", text: "done" }])]);
+  models.setProvider(faux.provider);
+  try {
+    const first = await fixture("mount-first", undefined, { models, onSkillActivation: async (_, __, name) => { activations.push(name); return "native activation context"; }, authorizeFile: async (_, action, path) => { permissions.push(`${action}:${path}`); }, mounts: [
+      { path: "notes/private", access: "readOnly", source: { kind: "text", files: { "readme.md": "first private notes" } } },
+      { path: "workspace", access: "readWrite", source: { kind: "backend", backend: {
+        id: "qa-physical-workspace",
+        info: async path => { const metadata = await stat(join(root, path)); return { path: "/" + path, name: path.split("/").at(-1)!, kind: metadata.isDirectory() ? "directory" : "file", size: metadata.size, mtimeMs: metadata.mtimeMs }; },
+        list: async path => Promise.all((await readdir(join(root, path))).map(async name => {
+          const child = [path, name].filter(Boolean).join("/"); const metadata = await stat(join(root, child));
+          return { path: "/" + child, name, kind: metadata.isDirectory() ? "directory" as const : "file" as const, size: metadata.size, mtimeMs: metadata.mtimeMs };
+        })),
+        read: async path => { if (path === "denied.md") throw new FileError("permission_denied", "Workspace access denied", path); return readFile(join(root, path), "utf8"); },
+        write: async (path, content) => { await writeFile(join(root, path), content); },
+        edit: async (path, edits) => { let text = await readFile(join(root, path), "utf8"); for (const edit of edits) { if (text.split(edit.oldText).length !== 2) throw new Error("Ambiguous edit"); text = text.replace(edit.oldText, edit.newText); } await writeFile(join(root, path), text); },
+      } } },
+    ] });
+    const second = await fixture("mount-second", undefined, { mounts: [
+      { path: "notes/shared", access: "readOnly", source: { kind: "text", files: { "readme.md": "second shared notes" } } },
+    ] });
+    expect((await profileEnv(first.files, first.conversations).readTextFile("skills/manage-skills/SKILL.md", context)).ok).toBe(false);
+    const firstChat = await conversation(first); const secondChat = await conversation(second);
+    expect(firstChat.id).toBe(secondChat.id);
+    const result = await first.run(firstChat.id, { type: "input", content: "Use the mounted files" });
+    const results = result.messages.filter(message => message.role === "toolResult");
+    expect(results).toHaveLength(8);
+    expect(activations).toEqual(["manage-skills"]);
+    expect(results[0]!.details).toBe("native activation context");
+    expect(results.map(message => message.isError === true)).toEqual([false, false, false, false, false, true, true, true]);
+    expect(JSON.stringify(results[1])).toContain("first private notes");
+    expect(JSON.stringify(results[4])).toContain("edited");
+    expect(JSON.stringify(results[7])).toContain("Workspace access denied");
+    expect(await readFile(join(root, "note.md"), "utf8")).toBe("edited");
+    expect(permissions).toEqual(["write:workspace/note.md", "edit:workspace/note.md"]);
+    expect(getOrThrow(await first.env.listDir("notes", context)).map(entry => entry.path)).toEqual(["/notes/private"]);
+    expect(getOrThrow(await second.env.listDir("notes", context)).map(entry => entry.path)).toEqual(["/notes/shared"]);
+    expect(getOrThrow(await second.env.exists("workspace/note.md", context))).toBe(false);
+    expect(getOrThrow(await second.env.readTextFile("notes/shared/readme.md", context))).toBe("second shared notes");
+    await expect(fixture("overlap", undefined, { mounts: [{ path: "skills/nested", access: "readOnly", source: { kind: "text", files: {} } }] })).rejects.toThrow("Overlapping");
+    await first.close();
+    expect((await first.env.readTextFile("notes/private/readme.md", context)).ok).toBe(false);
+    expect(getOrThrow(await second.env.readTextFile("notes/shared/readme.md", context))).toBe("second shared notes");
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 async function holdingSession(database: ProfileRuntimeOptions["database"]) {
@@ -217,7 +297,7 @@ test("Profile ExecutionEnv exposes only visible, read-only Pi metadata and full-
   expect(await session.files.index()).toEqual({});
   // Use Pi's real model/tool loop, not merely a direct filesystem call.
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
-  faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "history", name: "read", arguments: { path } }], { stopReason: "toolUse" }),
+  faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "history", name: "execute", arguments: { operation: "read", args: { path } } }], { stopReason: "toolUse" }),
     fauxAssistantMessage([{ type: "text", text: "read history" }])]);
   const models = createModels(); models.setProvider(faux.provider);
   const readerSession = await fixture("reader", undefined, { models });
@@ -277,7 +357,16 @@ test("bounded iOS commands route qualified references and execute structured pro
     })().then(result => deliver(id, JSON.stringify(result), null), error => deliver(id, "null", String(error)));
   };
   try {
-    await adapter.command({ action: "open", profileID: "ios-profile" });
+    await adapter.command({ action: "open", profileID: "ios-profile", mounts: [{ path: "notes/shared", access: "readOnly", files: { "readme.md": "native notes" } }] });
+    const mounts = await adapter.command({ action: "fileMounts", profileID: "ios-profile" }) as { scope: string; mounts: { path: string; files: Record<string, string> }[] };
+    expect(mounts.scope).toBe("ios-profile");
+    expect(mounts.mounts.map(mount => mount.path)).toEqual(["notes/shared"]);
+    expect(mounts.mounts[0]!.files).toEqual({ "readme.md": "native notes" });
+    const packages = await adapter.command({ action: "skillPackages" }) as { scope: string; skills: { name: string; source: string; files: Record<string, string> }[] };
+    expect(packages.scope).toBe("ios-profile");
+    expect(packages.skills.map(skill => skill.name)).toEqual(["evolve", "import-memory", "manage-providers", "manage-skills", "visualize"]);
+    expect(packages.skills.every(skill => skill.source === "system" && skill.files["SKILL.md"]?.startsWith("---"))).toBe(true);
+    await expect(adapter.command({ action: "fileMounts", profileID: "wrong" })).rejects.toThrow("Profile mismatch");
     const scope = { hostID: "ios-host", profileID: "ios-profile" };
     const hostContext = { active: scope, hosts: [{ ...scope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"] as ("web" | "ios" | "mcp")[], presentation: "chat-bubbles" as const, externalFiles: true }] };
     const config = { chatID: "external-uuid", title: "Native", promptState: { soul: "## Voice\nBe helpful.", memory: "frozen memory", hostContext }, model: "mock", contextWindow: 100000,
@@ -339,7 +428,8 @@ test("bounded iOS commands route qualified references and execute structured pro
     await adapter.command({ action: "close" });
     storage = backend(path);
     adapter = new IOSAgentAdapter();
-    await adapter.command({ action: "open", profileID: "ios-profile" });
+    await adapter.command({ action: "open", profileID: "ios-profile", mounts: [{ path: "notes/shared", access: "readOnly", files: { "readme.md": "native notes" } }] });
+    expect(await adapter.command({ action: "fileMounts" })).toEqual(mounts);
     expect(await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 })).toEqual(retained);
     for (const [config_, reference_] of [[updated, attached.reference], [{ ...config, chatID: "second-uuid" }, second.reference],
       [{ ...config, chatID: "isolated", isolatedWorkspace: true }, isolated.reference]] as const) {
@@ -359,7 +449,7 @@ test("bounded iOS commands route qualified references and execute structured pro
 test("failed initialization closes storage and rejects before exposing a Profile runtime", async () => {
   const db = backend().db;
   await expect(openProfileRuntime({ database: db, profileID: "", models: createModels(), registry: createRegistry(),
-    createBlobID: async () => crypto.randomUUID(), authorizeFile: async () => {} })).rejects.toThrow("identity");
+    createBlobID: async () => crypto.randomUUID() })).rejects.toThrow("identity");
   await expect(db.get("SELECT 1")).rejects.toThrow("closed");
 });
 

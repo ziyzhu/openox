@@ -106,17 +106,21 @@ nonisolated enum StorageMigrator {
     static let durableProfileVersion = "2026-10-05-pi-durable"
     static let nativeProfileVersion = "2026-09-28-provider-skill"
 
-    static func builtInSkillSnapshot(named name: String) throws -> Skill? {
-        guard SkillFiles.reservedNames.contains(name) else { return nil }
-        let prefix = name + "/"
-        let instructions = try BuiltInGuidance.text(prefix + "guide.md")
-        var resources: [String: String] = [:]
-        for path in try BuiltInGuidance.paths(under: name) where path != prefix + "guide.md" {
-            resources[String(path.dropFirst(prefix.count))] = try BuiltInGuidance.text(path)
+    static func legacyWorkflowLocation(_ parts: [String]) throws -> VirtualFileSystem.Location? {
+        guard parts.first == "guidance" else { return nil }
+        if parts.count == 1 { return .skills }
+        let names = ["evolve", "import-memory", "manage-providers", "manage-skills", "visualize"]
+        guard parts.count >= 2, names.contains(parts[1]) else { throw VirtualFileSystem.Error.invalidPath(parts.joined(separator: "/")) }
+        let name = parts[1]
+        if parts.count == 2 { return .skill(name) }
+        let path = parts.dropFirst(2).joined(separator: "/")
+        if path == "guide.md" { return .skillFile(name) }
+        if ["references", "scripts"].contains(path) { return .skillDirectory(name, path) }
+        guard SkillFiles.isResourcePath(path) || SkillFiles.isResourcePath(path + "/file.js") else {
+            throw VirtualFileSystem.Error.invalidPath(parts.joined(separator: "/"))
         }
-        Log.app.info("StorageMigrator.builtInSkillSnapshot name=\(name) resources=\(resources.count)")
-        return Skill(name: name, description: "Built-in Ox workflow retained for compatibility.", instructions: instructions,
-            resources: resources.isEmpty ? nil : resources, source: .system)
+        Log.app.info("StorageMigrator.workflowAlias from=\(parts.joined(separator: "/")) to=skills/\(name)/\(path)")
+        return .skillResource(name, path)
     }
 
     static func createFreshProfile(name: String, base: URL, unique: Bool = false) async throws -> Profile {

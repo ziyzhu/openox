@@ -78,6 +78,54 @@ nonisolated struct SkillCatalog: Sendable {
     }
 }
 
+nonisolated struct BundledSkillPackages: Sendable {
+    struct Requirement: Decodable, Sendable {
+        let action: String
+        let skill: String
+        let pathPrefix: String?
+    }
+    private struct Snapshot: Decodable {
+        struct Package: Decodable {
+            let name: String
+            let source: String
+            let files: [String: String]
+        }
+        let scope: String
+        let skills: [Package]
+        let activationRequirements: [Requirement]
+    }
+    let skills: [Skill]
+    let activationRequirements: [Requirement]
+
+    init(data: Data, scope: String) throws {
+        guard data.count <= 1024 * 1024 else { throw SkillError.invalidPackage }
+        let snapshot = try JSONDecoder().decode(Snapshot.self, from: data)
+        guard snapshot.scope == scope, snapshot.skills.count <= 64,
+              Set(snapshot.skills.map(\.name)) == SkillFiles.reservedNames,
+              snapshot.skills.count == SkillFiles.reservedNames.count else { throw SkillError.invalidPackage }
+        skills = try snapshot.skills.map { package in
+            guard package.source == "system", let text = package.files[SkillFiles.fileName],
+                  var skill = SkillFiles.parse(text, directoryName: package.name),
+                  package.files.count <= SkillFiles.maximumFiles,
+                  package.files.values.allSatisfy({ $0.utf8.count <= VirtualFileSystem.maximumReadBytes }) else { throw SkillError.invalidPackage }
+            let resources = package.files.filter { $0.key != SkillFiles.fileName }
+            skill.resources = resources.isEmpty ? nil : resources
+            skill.source = .system
+            try SkillFiles.validate(skill)
+            return skill
+        }
+        guard snapshot.activationRequirements.count <= 64, snapshot.activationRequirements.allSatisfy({ requirement in
+            SkillFiles.reservedNames.contains(requirement.skill) && requirement.action.hasPrefix("ox.") &&
+            (requirement.pathPrefix == nil || requirement.pathPrefix!.hasSuffix("/") && !requirement.pathPrefix!.hasPrefix("/") &&
+                requirement.pathPrefix!.dropLast().split(separator: "/", omittingEmptySubsequences: false).allSatisfy {
+                    $0.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$", options: .regularExpression) != nil
+                })
+        }) else { throw SkillError.invalidPackage }
+        activationRequirements = snapshot.activationRequirements
+        Log.agent.info("Skills.bundle scope=\(scope) packages=\(skills.count) requirements=\(activationRequirements.count)")
+    }
+}
+
 @MainActor
 final class SkillSession {
     var snapshots: [String: Skill] = [:]

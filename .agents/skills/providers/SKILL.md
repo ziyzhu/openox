@@ -5,14 +5,14 @@ description: Drive Ox's manage-providers workflow, review and promote verified p
 
 # Ox Providers
 
-Ox owns provider and model management through `guidance/manage-providers/guide.md`. This desktop workflow exercises that same path, ships reviewed defaults, and maintains runtime support that cannot be expressed as provider data. Do not maintain a second catalog-management playbook here.
+Ox owns provider and model management through `skills/manage-providers/SKILL.md`. This desktop workflow exercises that same path, ships reviewed defaults, and maintains runtime support that cannot be expressed as provider data. Do not maintain a second catalog-management playbook here.
 
 ## Drive Ox
 
 Read the `sim-cli` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
 
 1. Establish whether the request is for an on-device change, bundled defaults, or native runtime support. On-device management does not authorize publication.
-2. Drive a real Ox chat through `guidance/manage-providers/guide.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
+2. Drive a real Ox chat through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
 3. Observe chat history, provider state, and structured logs. Report missing capabilities or unclear boundaries; improve the shared guidance or runtime and exercise the workflow again.
 4. Preserve sanitized verification evidence outside the repository. State separately which definitions were validated, which models were exercised, and which checks remain unperformed.
 

@@ -47,7 +47,7 @@ bun --no-env-file .agents/skills/evals/scripts/runner.ts --validate --suite all
 bun --no-env-file run build:services
 git diff --exit-code -- apps/ios/Ox/Resources/OxServices.bundle \
   apps/ios/Ox/Resources/ModelServiceActions.json \
-  apps/ios/Ox/Resources/ModelGuidance.bundle/evolve/references/model-schemas.md
+  packages/agent/skills/evolve/references/model-schemas.md
 for package in protocol services; do
   bun --no-env-file run --cwd "packages/$package" package:check
 done

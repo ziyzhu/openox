@@ -51,7 +51,9 @@ enum OxHostProtocol {
         case .getLogs: handleGetLogs(try decode(GetLogsRequest.self), reply: reply)
         case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), conversationManager: chats, reply: reply)
-        case .vmInspect: handleVMInspect(try decode(VMRequest.self), conversationManager: chats, reply: reply)
+        case .vmInspect:
+            let request = try decode(VMRequest.self)
+            Task { await handleVMInspect(request, conversationManager: chats, reply: reply) }
         case .vmFunctions: handleVMFunctions(try decode(VMFunctionsRequest.self), reply: reply)
         case .vmCall: handleVMCall(try decode(VMCallRequest.self), conversationManager: chats, reply: reply)
         case .vmEval: handleVMEval(try decode(VMEvalRequest.self), conversationManager: chats, reply: reply)

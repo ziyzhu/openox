@@ -52,6 +52,19 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         try JSONDecoder().decode(JSONValue.self, from: Data(try await command(value.jsonString()).utf8))
     }
 
+    func fileMounts(scope: UUID) async throws -> ReadOnlyFiles {
+        let data = Data(try await command(JSONValue.object(["action": .string("fileMounts")]).jsonString()).utf8)
+        guard data.count <= 1024 * 1024 else { throw failure("Read-only mount snapshot exceeds size limit") }
+        let snapshot = try JSONDecoder().decode(ReadOnlyFiles.Snapshot.self, from: data)
+        return try ReadOnlyFiles(snapshot: snapshot, scope: scope.uuidString,
+                                 reservedPaths: VirtualFileSystem.hostRoots + ["files", "skill-selections.json", "chats"])
+    }
+
+    func skillPackages(scope: UUID) async throws -> BundledSkillPackages {
+        let data = Data(try await command(JSONValue.object(["action": .string("skillPackages")]).jsonString()).utf8)
+        return try BundledSkillPackages(data: data, scope: scope.uuidString)
+    }
+
     func publishArtifact(data: Data, filename: String) async throws -> JSONValue {
         _ = try ArtifactStore.validatedFilename(filename)
         let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string("artifacts/" + filename),

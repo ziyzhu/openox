@@ -79,6 +79,7 @@ struct SkillsListView: View {
         }
         .searchable(text: $query, prompt: "Search skills")
         .onChange(of: Skills.shared.repositorySkills) { _, _ in skills.refresh() }
+        .onChange(of: Skills.shared.all) { _, _ in skills.refresh() }
         .alert("Could not update skill", isPresented: Binding(get: { skills.errorMessage != nil }, set: { if !$0 { skills.dismissError() } })) {
             Button("OK") { skills.dismissError() }
         } message: { Text(verbatim: skills.errorMessage ?? "") }

@@ -166,8 +166,7 @@ export async function installOxProfile(draft: NormalizedProfileDraft, host: Prof
     if (host.conversations && draft.conversations.length) throw new Error("Profile installation cannot mix inline and streamed conversations");
     for (const source of draft.conversations) validateConversation(source);
     if ((await host.database.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")).length) throw new Error("Profile installation requires a fresh staged database");
-    session = await openProfileRuntime({ ...host, profileID: draft.profileID, models: createModels(),
-      authorizeFile: async () => { throw new Error("Profile installation cannot invoke tools"); } });
+    session = await openProfileRuntime({ ...host, profileID: draft.profileID, models: createModels() });
     for (const file of draft.documents) await session.files.write(file.path, file.text);
     for (const file of draft.artifacts) {
       if (file.size > (file.binary ? 32 * 1024 * 1024 : 200 * 1024)) throw new Error("Profile artifact exceeds supported size");
