@@ -869,6 +869,7 @@ final class ServiceManager {
     }
 
     func commitLocalRepository(message: String, locale: String?) async throws -> Repository.GitCommit {
+        try await repository.requireLocalEnabled()
         try await validateLocalRepository()
         let commit = try await repository.gitCommitLocal(message: message)
         _ = await loadRepositories(locale: locale)
@@ -906,6 +907,10 @@ final class ServiceManager {
 
     func readServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> Data {
         try await repository.readSource(kind: kind.repositoryKind, id: domain, path: path)
+    }
+
+    func requireServiceSourceMutationEnabled(kind: ServicesMount.Kind, domain: String, operation: String) async throws {
+        try await repository.requireSourceMutationEnabled(kind: kind.repositoryKind, id: domain, operation: operation)
     }
 
     func writeServiceSource(kind: ServicesMount.Kind, domain: String, path: [String], data: Data) async throws {

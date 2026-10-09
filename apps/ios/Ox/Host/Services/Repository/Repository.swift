@@ -514,6 +514,7 @@ actor Repository {
     }
 
     func setResolution(serviceID: String, repositoryID: String) async throws {
+        if repositoryID == Self.localID { try requireLocalEnabled() }
         let catalog = try await monoRepository()
         guard let conflict = catalog.conflicts.first(where: { $0.serviceID == serviceID }),
               conflict.candidates.contains(where: { $0.repositoryID == repositoryID }) else {
@@ -674,10 +675,10 @@ actor Repository {
     }
 
     func copyServiceToLocal(id: String) throws {
+        _ = try editableLocalRepository()
         guard let source = activeSources[id] else { throw Failure(message: "Service not found") }
         guard source.provenance != .local else { return }
         guard source.kind != .iOS else { throw Failure(message: "Native iOS services cannot be copied to Local.") }
-        _ = try editableLocalRepository()
         var package = try Self.loadPackage(at: localRoot, provenance: .local)
         guard !package.services.contains(where: { $0.id.runtimeID == id }) else {
             throw Failure(message: "A Local service already exists for \(id). Use ox.repository.conflicts and ox.repository.resolve to select it without replacing its files.")
@@ -1123,6 +1124,7 @@ actor Repository {
     }
 
     func gitCheckout(repositoryID: String, commitHash: String) throws -> GitStatus {
+        try requireLocalEnabled()
         let loaded = try gitRepository(repositoryID)
         let repository = try SwiftGitX.Repository.open(at: loaded.root)
         guard try repository.status().isEmpty else {
@@ -1226,7 +1228,15 @@ actor Repository {
         return loaded
     }
 
-    private func editableLocalRepository() throws -> SwiftGitX.Repository {
+    func requireLocalEnabled(operation: String = #function) throws {
+        guard configuration.localEnabled else {
+            Log.service.warning("Repository.mutation rejected repository=local operation=\(operation) reason=disabled")
+            throw Failure(message: "The Local repository is disabled. Enable Local in Settings > Repositories, then retry. This operation made no changes.")
+        }
+    }
+
+    private func editableLocalRepository(operation: String = #function) throws -> SwiftGitX.Repository {
+        try requireLocalEnabled(operation: operation)
         try materializeLocalRepository()
         let repository = try SwiftGitX.Repository.open(at: localRoot)
         guard !repository.isHEADDetached else {
@@ -1338,7 +1348,16 @@ actor Repository {
         return source
     }
 
+    func requireSourceMutationEnabled(kind: ServiceKind, id: String, operation: String) throws {
+        guard !configuration.localEnabled else { return }
+        let package = try Self.loadPackage(at: localRoot, provenance: .local)
+        if package.services.contains(where: { $0.id.kind == kind && $0.id.runtimeID == id }) {
+            try requireLocalEnabled(operation: operation)
+        }
+    }
+
     private func editableSource(kind: ServiceKind, id: String) throws -> ActiveSource {
+        try requireSourceMutationEnabled(kind: kind, id: id, operation: #function)
         let source = try activeSource(kind: kind, id: id)
         guard source.provenance == .local else {
             throw Failure(message: "Only Local services are editable. Copy this service to Local before editing it.")

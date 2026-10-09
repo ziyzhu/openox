@@ -27,6 +27,9 @@ extension Conversation {
             JSONValue.object(["path": .string(root), "access": .string(root == "conversations" ? "readOnly" : "readWrite")])
         }
         return try await tracked(action, .object(args), purpose: purpose) {
+            if ["write", "edit", "delete"].contains(name), case .serviceItem(let kind, let domain, _) = location {
+                try await serviceManager.requireServiceSourceMutationEnabled(kind: kind, domain: domain, operation: "ox.fs.\(name)")
+            }
             let result = try await route.session.host.fileSystem(owner: self, runtime: route.session.runtime,
                 profileID: route.profileID, operation: name, arguments: .object(args), mounts: mounts)
             Log.session.info("bridge.fs.operation name=\(name) path=\(location.path) profile=\(route.profileID)")
