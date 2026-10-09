@@ -101,7 +101,7 @@ https://www.google.com/s2/favicons?domain_url=<percent-encoded-origin>&sz=128&al
 
 Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. Navigate Browser to the resolver and wait for the URL to settle. Because the service image loader does not follow redirects, save the final direct HTTPS `tN.gstatic.com/faviconV2` URL rather than the `google.com` resolver URL. Accept the result only when it returns `200`, is a square supported raster, visibly matches the product, and renders as the service avatar after reload. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at the rendered avatar size. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
 
-A customer-facing service is not complete without a visible verified icon when a qualifying first-party or Google-cached result exists. Omit `faviconUrl` only after exhausting both sources. Record the icon source internally; mention a missing icon to the user only when it affects the delivered experience.
+Always attempt to acquire a verified `faviconUrl` when creating a customer-facing web service, and repair missing or broken icons when updating one. Try first-party icons in the order above, then Google's cached favicon. Save a direct HTTPS URL to a supported raster image, reload the service, and visually confirm that its avatar renders and represents the product. Do not skip icon discovery or omit a valid verified icon. If neither source provides a valid icon, omit `faviconUrl` and report the missing icon as a limitation without blocking service delivery or Save. Never fabricate an image URL or use an unrelated icon. Record the icon source internally.
 
 ## 3. Explain the plan
 
@@ -123,7 +123,7 @@ Inspect complete Local Git status before creating, copying, or editing, and reme
 
 Use `ox.fs.edit` for focused changes and `ox.fs.write` for a clearer complete replacement. File operations enforce filesystem safety without validating service contents or changing running attachments. Local source is a working draft: files may temporarily be incomplete, missing, or inconsistent while you edit them in any order. Finish the complete set of edits, then call `ox.service.validate({ domain, purpose })` to check the whole service without changing or activating it. Fix any reported error and retry. Attach and Save use the same service validator and reject invalid drafts. A successful file write alone does not mean the service is ready to run or Save.
 
-Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl`, optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `skills/manage-skills/SKILL.md` after actions are verified.
+Author `domain`, `name`, optional `description`, required `baseUrl`, optional `faviconUrl` (include a verified icon whenever one can be obtained), optional local `$defs`, `actions`, and optional locale overlays. Skills belong at the repository root, not in service manifests or directories. Preserve repository skills that depend on this service; author new ones through `skills/manage-skills/SKILL.md` after actions are verified.
 
 Every action has:
 
@@ -245,7 +245,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and identify skills that need revision through `skills/manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
-13. Verify the favicon URL is a direct supported image without redirects, reload the service, and visually confirm its avatar appears. Treat a missing avatar as unfinished metadata when a qualifying first-party or Google-cached icon exists.
+13. For customer-facing services, verify the favicon URL is a direct HTTPS supported raster image without redirects, reload the service, and visually confirm its avatar appears and represents the product. If no valid icon can be obtained after trying first-party and Google-cached sources, report the limitation and continue without blocking service delivery or Save.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
@@ -257,7 +257,7 @@ Evaluate semantic usefulness as well as contract validity. The persisted catalog
 3. Correct unintended changes.
 4. If Local was already dirty before this work began, skip automatic Save and report that the verified changes remain unsaved. Do not commit, revert, or overwrite pre-existing changes. Otherwise, Save the intended verified Local changes without a separate confirmation. If new unrelated pending changes make the Save scope ambiguous, stop and resolve the scope before committing. Keep Git mechanics internal; use a purpose such as `Save Outlook service`.
 5. When Save is allowed, use Local Git internally to persist the reviewed service with a concise message describing what changed and why. Honor any runtime Action policy gate.
-6. Tell the user what improved, whether the capability was saved or remains unsaved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Mention a missing visible icon when relevant. Keep action IDs, files, revision identifiers, and implementation details internal unless the user asks for them.
+6. Tell the user what improved, whether the capability was saved or remains unsaved, what it can now do, what was tried, what still needs sign-in or human interaction, and any limitations. Report a missing or unverified avatar as a non-blocking limitation for a customer-facing service. Keep action IDs, files, revision identifiers, and implementation details internal unless the user asks for them.
 
 ## Recovery
 

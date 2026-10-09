@@ -13,6 +13,8 @@ Fulfill the original request first, then run at most one bounded improvement pas
 
 Read `references/web-service.md` for Local web-service authoring or substantive verification, including Browser fulfillment when successful discovery finds no suitable service or action for a website task. Inspection, copying, attachment changes, history, and straightforward deletion need no authoring reference.
 
+Always attempt to acquire and visually verify a favicon when creating a customer-facing web service or repairing a missing or broken icon; follow the icon discovery workflow in `references/web-service.md`. If no valid icon can be obtained, report the limitation without blocking service delivery or Save.
+
 For web-service authoring, read `references/helpers.js` only when a helper is needed. It is copyable source for `actions.js`, not an installed library, module, or runtime import.
 
 Read `references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
