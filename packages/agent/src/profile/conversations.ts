@@ -31,7 +31,15 @@ function pageSize(limit: number) {
 
 /** Application semantics over Pi's existing Session APIs; no registry, transcript or model copy. */
 export class OxConversations {
-  constructor(readonly profileID: string, private harness: Harness, private ready: () => void) {}
+  readonly profileID: string;
+  private harness: Harness;
+  private ready: () => void;
+
+  constructor(profileID: string, harness: Harness, ready: () => void) {
+    this.profileID = profileID;
+    this.harness = harness;
+    this.ready = ready;
+  }
 
   reference(conversationID: ConversationId): ConversationReference {
     const reference = { profileID: this.profileID, conversationID };

@@ -21,4 +21,4 @@ Preserve it unless a change is explicitly requested. This documents the intended
 
 ## Release flow
 
-Follow [references/release-flow.md](references/release-flow.md), including **What's New in This Version** for each release. Preserve other metadata and media unless their changes are requested and approved. Remote writes need explicit approval; App Review submission is always manual.
+Follow [references/release-flow.md](references/release-flow.md). For app updates, require saved, nonempty **What's New in This Version** text in every configured locale, including `zh-Hans`; English text alone is insufficient. Review translations before staging and verify all locales afterward. Preserve other metadata and media unless their changes are requested and approved. Remote writes need explicit approval; App Review submission is always manual.

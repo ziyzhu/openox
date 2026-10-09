@@ -44,8 +44,20 @@ function owned(path: string) {
 export class ProfileFiles {
   private tail: Promise<unknown> = Promise.resolve();
   get immutableArtifacts() { return this.artifacts !== undefined; }
-  constructor(private harness: Harness, private db: SqliteDatabase, readonly identity: string,
-    private createBlobID?: () => Promise<string>, private artifacts?: ArtifactFiles) {}
+  private harness: Harness;
+  private db: SqliteDatabase;
+  readonly identity: string;
+  private createBlobID?: () => Promise<string>;
+  private artifacts?: ArtifactFiles;
+
+  constructor(harness: Harness, db: SqliteDatabase, identity: string,
+    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles) {
+    this.harness = harness;
+    this.db = db;
+    this.identity = identity;
+    this.createBlobID = createBlobID;
+    this.artifacts = artifacts;
+  }
   private serialize<T>(body: () => Promise<T>): Promise<T> {
     const result = this.tail.then(body); this.tail = result.catch(() => {}); return result;
   }

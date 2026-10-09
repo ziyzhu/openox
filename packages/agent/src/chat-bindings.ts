@@ -12,7 +12,11 @@ const context = BACKGROUND_CONTEXT;
 export class ChatBindings {
   private readonly ids = new Map<string, ConversationId>();
   private tail: Promise<unknown> = Promise.resolve();
-  constructor(private readonly harness: Harness) {}
+  private readonly harness: Harness;
+
+  constructor(harness: Harness) {
+    this.harness = harness;
+  }
 
   async restore() {
     const records = await this.harness.commit(async tx => {

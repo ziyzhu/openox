@@ -10,8 +10,13 @@ export function hostEndpoint(): string {
 }
 
 export class HostRPCError extends Error {
-  constructor(message: string, readonly code?: number, readonly data?: unknown) {
+  readonly code?: number;
+  readonly data?: unknown;
+
+  constructor(message: string, code?: number, data?: unknown) {
     super(message);
+    this.code = code;
+    this.data = data;
     this.name = "HostRPCError";
   }
 }
@@ -27,7 +32,11 @@ export class HostConnection {
     timer: ReturnType<typeof setTimeout>;
   }>();
 
-  constructor(private readonly endpoint = hostEndpoint()) {}
+  private readonly endpoint: string;
+
+  constructor(endpoint = hostEndpoint()) {
+    this.endpoint = endpoint;
+  }
 
   request(method: string, params: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
     if (this.disposed) return Promise.reject(new Error("connection is closed"));

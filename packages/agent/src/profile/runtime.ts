@@ -54,7 +54,14 @@ export class ProfileRuntime {
   private projections = new Map<ConversationId, Projection>();
   private attaching = new Map<ConversationId, Promise<void>>();
   private closing?: Promise<void>;
-  private constructor(readonly harness: Harness, readonly registry: Registry, private options: ProfileRuntimeOptions) {
+  readonly harness: Harness;
+  readonly registry: Registry;
+  private options: ProfileRuntimeOptions;
+
+  private constructor(harness: Harness, registry: Registry, options: ProfileRuntimeOptions) {
+    this.harness = harness;
+    this.registry = registry;
+    this.options = options;
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
     this.env = mountedFileSystem(options.profileID, [...profileMounts(this.files, this.conversations), ...options.mounts ?? []]);

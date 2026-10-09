@@ -64,7 +64,11 @@ async function presentation(tx: Tx, id: ConversationId, change: ApplicationPrese
   if (change.unread !== undefined) (await tx.doc(ConversationReadState, id)).lastReadEntryID = change.unread ? null : latest;
 }
 export class ApplicationPresentation {
-  constructor(private runtime: ProfileRuntime) {}
+  private runtime: ProfileRuntime;
+
+  constructor(runtime: ProfileRuntime) {
+    this.runtime = runtime;
+  }
   private async hasTranscript(reference: ConversationReference) {
     let cursor: ConversationHistoryCursor | undefined;
     do {

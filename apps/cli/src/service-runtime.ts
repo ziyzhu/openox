@@ -29,7 +29,11 @@ export interface HostServiceRuntime {
 }
 
 class WebSocketHostServiceRuntime implements HostServiceRuntime {
-  constructor(private readonly endpoint?: string) {}
+  private readonly endpoint?: string;
+
+  constructor(endpoint?: string) {
+    this.endpoint = endpoint;
+  }
 
   status(timeoutMs: number) { return callHost("services.list", {}, timeoutMs, this.endpoint); }
 
