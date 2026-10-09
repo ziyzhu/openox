@@ -71,8 +71,9 @@ try {
   assert(local?.enabled && local.state === "ready", "Prepare enabled Local before testing");
   originalEnabled = local.enabled;
   const guide = (await call("ox.fs.read", { path: "skills/evolve/SKILL.md" })).text as string;
-  assert.match(guide, /inspect `ox.repository.list`.*Enable Local and continue.*explicitly requests or confirms enablement.*ox.repository.enable.*enabled and ready/s);
-  checks.push("bundled authoring guidance requires a user enablement handoff");
+  assert.match(guide, /inspect `ox.repository.list`.*ox.repository.enable.*existing Action permission system without a separate consent prompt.*enabled and ready/s);
+  assert.doesNotMatch(guide, /Enable Local and continue|a service-building request alone is not consent/);
+  checks.push("bundled authoring guidance uses runtime permissions without duplicate consent");
   const source = (await call("ox.fs.read", { path })).text as string;
   assert.equal(source.trim(), "window.ox.install(() => {});", "Use only an empty run-owned draft");
   const status = await call("ox.repository.git.status");
