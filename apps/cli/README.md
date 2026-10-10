@@ -39,7 +39,7 @@ With Bun installed, `npm install --global @openox/cli` also works. Use
 `bunx @openox/cli --help` without a global installation.
 
 For source installation and simulator setup, follow the
-[onboarding skill](../../.agents/skills/onboarding/SKILL.md).
+[setup skill](../../.agents/skills/setup/SKILL.md).
 
 ## Connect to a Host
 

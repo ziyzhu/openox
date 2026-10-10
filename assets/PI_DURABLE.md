@@ -489,5 +489,5 @@ Remaining decisions include artifact overwrite/rename and historical-reference p
 - [Durable coding-agent example](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/src/experimental/durable).
 - [Vacation-agent example](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/src/experimental/vacation).
 - [Portable execution environment](https://github.com/earendil-works/pi/blob/main/packages/durable/src/env/index.ts).
-- [Current Ox storage map](../.agents/skills/migrate/references/storage.md) — remains the description of implemented storage until migration lands.
+- [Current Ox storage map](../.agents/skills/release/references/storage.md) — remains the description of implemented storage until migration lands.
 - Apple: [JSContext](https://developer.apple.com/documentation/javascriptcore/jscontext), [JSVirtualMachine](https://developer.apple.com/documentation/javascriptcore/jsvirtualmachine), and [long-running tasks on iOS and iPadOS](https://developer.apple.com/documentation/backgroundtasks/performing-long-running-tasks-on-ios-and-ipados).

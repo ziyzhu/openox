@@ -2,9 +2,9 @@ import { Database } from "bun:sqlite";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, killChildren } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
-import { iosTarget, elements as nodes } from "../../../onboarding/scripts/ios.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget, elements as nodes } from "../../../setup/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun run test:agent-ui-ios --device ox-N --app /absolute/Ox.app --evidence /tmp/directory [--bundle id] [--models]\nActual temporary-chat UI, native Mock, Pi SQLite and process reopen. Requires an idle chat and Mock already selected. No Host transport or credential changes.",

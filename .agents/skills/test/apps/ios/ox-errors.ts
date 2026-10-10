@@ -3,8 +3,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
 
 const config = qaCommand({
   usage: "Usage: bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-N --host <ws-url> --chat <idle-QA-chat>\nRequires an installed build and enabled Host. Verifies structured ox errors without changing files, settings, or policies.",

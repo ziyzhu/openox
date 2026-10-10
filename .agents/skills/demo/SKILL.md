@@ -5,7 +5,7 @@ description: "Prepare and record Ox’s three-part iOS demo, native SwiftUI prev
 
 # Ox Demo
 
-Use the agent-independent `ios-simulator` skill for visible iOS interaction and the `ox-cli` skill to verify selected chats, models, service state, and completed replies. Use the `evolve` skill for the live Reddit service-creation scene. Follow the repository's simulator rules. Keep recordings, response drafts, and the run manifest outside the repository.
+Use the agent-independent `ios-simulator` skill for visible iOS interaction and the `ox-cli` skill to verify selected chats, models, service state, and completed replies. Use the `develop-services` skill for the live Reddit service-creation scene. Follow the repository's simulator rules. Keep recordings, response drafts, and the run manifest outside the repository.
 
 ## Story and opening
 
@@ -26,7 +26,7 @@ Introduce each chapter with its exact heading and description before its footage
 
 Use this mode when the user explicitly requests a controlled SwiftUI preview rather than live execution. Open `apps/ios/Ox/Development/OxDemoSceneView.swift` and use its `#Preview` scenes. Reuse production onboarding rows, chat header, composer, message bubbles, Markdown, service chips, and provider picker rows. Apply the production `.themed()` modifier; a SwiftUI-only theme override does not initialize the theme used by UIKit Markdown text. Reuse `ThinkingRow` for scripted progress and `ResponseFooterBlockView` for completed replies; keep response controls hidden during work and streaming. Use task-specific outcomes and limitations rather than generic success copy, and preserve the exact reply text when streaming word bursts. Match `ConversationPage`'s scaled control metrics: 44-point header icons and a 34-point composer circle inside a 44-point tap target. **Do not add player controls, demo labels, custom cards, overlays, simulated system controls, or other special recording UI.** Scene selection and timing belong outside the rendered app, in Xcode previews or launch configuration.
 
-Build/install using `ios-simulator` and OpenOx's `onboarding` configuration, or reuse a verified `--app` with `test:demo`. For a snapshot, launch the installed app on the reserved `UDID` with its verified `BUNDLE_ID`:
+Build/install using `ios-simulator` and OpenOx's `setup` configuration, or reuse a verified `--app` with `test:demo`. For a snapshot, launch the installed app on the reserved `UDID` with its verified `BUNDLE_ID`:
 
 ```bash
 SIMCTL_CHILD_OX_DEMO=1 SIMCTL_CHILD_OX_DEMO_SCENE=memory SIMCTL_CHILD_OX_DEMO_COMPLETE=1 \

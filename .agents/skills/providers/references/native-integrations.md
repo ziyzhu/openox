@@ -10,7 +10,7 @@ Verify request requirements, reasoning controls, intentional token caps, and ada
 
 ## Website services
 
-Websites do not supply the Ox agent model. Keep website authentication, conversation submission, uploads, and completion in ordinary services authored through `evolve`. Never add a browser-backed ProviderClient or automatically forward Ox history and tool declarations to a website.
+Websites do not supply the Ox agent model. Keep website authentication, conversation submission, uploads, and completion in ordinary services authored through Ox's built-in `evolve` System skill. Never add a browser-backed ProviderClient or automatically forward Ox history and tool declarations to a website.
 
 Verify fresh-page fetch and XHR, explicit prompt delivery, remote conversation/reply correlation, uncertain outcomes, and cancellation. Preserve drafts and do not retry an uncertain submission. Test signed-out/expired sessions only with synthetic fixtures or isolated sessions; unauthorized website handlers can clear live credentials. Website sessions and service sign-in remain independent of API provider credentials.
 

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
-import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget } from "../../../setup/scripts/ios.ts";
 import { bundledSkills } from "../../../../../packages/agent/src/core/bundled-skills.ts";
 
 const qa = qaCommand({

@@ -1,13 +1,13 @@
----
-name: migrate
-description: Design, implement, review, or verify changes to Ox persisted storage, including filenames, directory layouts, Codable schemas, UserDefaults, Keychain metadata, service repositories, profiles, chats, indexes, and legacy formats. Use whenever a change could affect data written by an older app build or read by a newer one; do not use for transient in-memory state with no persisted representation.
----
+# Storage compatibility
 
-# Migrate
+Use this guide whenever a change affects persisted filenames, directory layouts,
+Codable schemas, UserDefaults, Keychain metadata, service repositories, Profiles,
+chats, indexes, or legacy formats. It applies during development, not only release
+preparation; transient in-memory state with no persisted representation is excluded.
 
 Preserve user data across app upgrades. Treat a clean install as insufficient evidence whenever code changes a persisted path, name, identifier, encoding, ownership boundary, or input to derived indexing.
 
-Read [references/storage.md](references/storage.md) before changing or reviewing storage. Update it in the same change whenever a storage location, format, retention rule, backup policy, or owner changes.
+Read [storage.md](storage.md) before changing or reviewing storage. Update it in the same change whenever a storage location, format, retention rule, backup policy, or owner changes.
 
 ## Compatibility boundary
 
@@ -42,6 +42,47 @@ Keep a legacy read fallback during the migration window when it materially reduc
 
 Log structured detection, start, completion, deferral, and failure events without credentials or reusable secrets. Include the source and target milestone and bounded item counts so TestFlight diagnostics can distinguish absent data from failed discovery or indexing. For decoder failures, log the source-relative file, record number, coding path, and error kind without payload values; a “missing data” Cocoa error can mean an omitted field, not a missing file. A current milestone does not prove every historical transcript record uses the current encoding: retain structural compatibility probes at the conversion boundary.
 
+## Before and after templates
+
+Every persisted-storage change requires paired `before.json` and `after.json`
+device templates, immutable snapshots, and expected results before it is considered
+verified. Keep templates, snapshots, and evidence in a private workspace outside
+Git. Record the exact source revisions, build identities, schema milestones,
+snapshot hashes, and affected storage owners for both sides.
+
+Use the [setup skill](../../setup/SKILL.md) device-template workflow. Capture
+`before` from the actual predecessor build before changing its data; capture
+`after` from the changed build after migration and representative ordinary writes.
+Logical templates serialized with current types and provenance labels alone do
+not prove compatibility. Use `storage` replay entries for exact encoded data,
+including required preferences, app-group state, and SQLite sidecars captured
+with the app stopped. Provision device-bound credentials, bookmarks, and OS
+permissions separately; never put secrets in tracked templates.
+
+Validate both templates offline, then replay each on an isolated, reserved
+simulator using the matching build, bundle identifier, and explicit write
+permissions. Never replay over another agent's or personal data. Preserve
+immutable inputs and collect separate results for every matrix row:
+
+| Build | Template | Required result |
+| --- | --- | --- |
+| Predecessor | Before | Establish the predecessor baseline and expected user-visible data. |
+| Changed | Before | Read and migrate older data completely; perform ordinary writes and verify second-launch stability. |
+| Changed | After | Read its own output, preserve user edits, and verify second-launch stability. |
+| Predecessor | After | Verify the older reader against newer data, including ordinary writes and a return to the changed build. |
+
+The changed build reading `before` proves backward compatibility; the predecessor
+reading `after` proves forward compatibility of the older reader. Verify data
+completeness, ownership, retained edits, and bounded resource use, not just startup
+success. Compare complete before/after trees and structured migration logs.
+
+If an unsupported future milestone prevents the predecessor from reading `after`,
+verify actionable, fail-closed rejection without mutation. Report this as an
+explicit forward-compatibility break, not a successful compatibility test. Require
+maintainer approval for that boundary before release; never remove or rewrite
+milestones to make the test pass. Missing predecessor builds or snapshots block
+compatibility verification and must be reported, not replaced by a clean install.
+
 ## Verify upgrades
 
 Exercise an upgrade fixture produced by the oldest supported shipped representation. Prefer a snapshot written by the actual predecessor build; a fixture serialized only through current types is not evidence that every shipped representation is covered. Verify:
@@ -59,18 +100,18 @@ Also bound aggregate Profile imports: stage and verify conversations individuall
 
 Keep sanitized predecessor snapshots and upgrade evidence outside the repository. For Local services, include dirty and clean Git states when relevant. Run the relevant repository checks and exercise the installed iOS build through the startup flow before calling the migration verified.
 
-### Required repository gate
+## Required repository gate
 
 Run this gate after every `StorageMigrator` change, including refactors and diagnostic-only edits:
 
 1. Select a numbered QA simulator and use its assigned debug port.
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.
-3. Manually exercise an upgrade from a sanitized predecessor snapshot on the reserved simulator, then relaunch to verify second-run stability. Store snapshots and evidence outside the repository.
+3. Run the before/after template matrix on isolated reserved targets, including upgrade, second-launch stability, and the explicit older-reader check. Store templates, snapshots, and evidence outside the repository.
 4. Run `bun run typecheck` and the retained portable checks.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
 Use the shared `ios-simulator` skill for build/install/launch and container inspection,
-and `onboarding` for OpenOx's scheme, bundle identity, and assigned launch port.
+and `setup` for OpenOx's scheme, bundle identity, and assigned launch port.
 Use task-specific DerivedData outside the repository. Installing the new app must
 preserve the predecessor container; do not uninstall or erase as upgrade setup.
 

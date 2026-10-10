@@ -2,9 +2,9 @@ import { mkdtemp, mkdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { ROOT, killChildren, run } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
-import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget } from "../../../setup/scripts/ios.ts";
 
 const config = qaCommand({
   usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--app <Ox.app>] [--output <directory>] [--loopback]

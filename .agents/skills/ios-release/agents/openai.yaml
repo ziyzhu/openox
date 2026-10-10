@@ -1,4 +1,0 @@
-interface:
-  display_name: "iOS Release"
-  short_description: "Prepare and safely ship Ox App Store releases"
-  default_prompt: "Use $ios-release to version, prepare, and safely stage the next Ox iOS App Store release for my manual submission."

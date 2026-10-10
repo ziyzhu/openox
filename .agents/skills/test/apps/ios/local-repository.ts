@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
-import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget } from "../../../setup/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --chat <saved-QA-chat> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts or commits.",

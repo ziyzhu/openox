@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Services"
+  short_description: "Evolve services through Ox and improve the loop"
+  default_prompt: "Use $develop-services to build or update this service through Ox on a simulator, report authoring-loop improvements to developers, and prepare built-in promotion if requested."

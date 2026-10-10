@@ -1,14 +1,53 @@
 ---
 name: release
-description: Prepare and verify OpenOx npm and standalone CLI releases, inspect package artifacts, and invoke the authorized publication workflow. Use for package release work; App Store releases use ios-release and asc-cli; repository commit/version rules remain in AGENTS.md.
+description: Prepare and verify OpenOx iOS App Store, npm, and standalone CLI releases, and design or verify persisted-storage changes during development. Use for storage migrations and before/after compatibility templates, App Store metadata and manual review handoff, package checks, and authorized publication. App Store operations use asc-cli; commit/version rules remain in AGENTS.md.
 ---
 
 # Release
 
-Publication requires explicit user authorization. Never publish as a verification
-step or invoke this skill's publisher from ordinary CI.
+Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`.
+Choose the storage compatibility, App Store, or package workflow below. Remote writes and publication
+require explicit user authorization. Never publish as a verification step or
+invoke this skill's publisher from ordinary CI. App Review submission is manual.
+Website and infrastructure deployment remain in `openox-dev`.
 
-## Prepare
+## Storage compatibility
+
+For every persisted-storage change, including development work outside a release,
+follow [references/storage-compatibility.md](references/storage-compatibility.md)
+and update the canonical [storage map](references/storage.md) when affected.
+Require before/after device templates backed by actual build-written snapshots;
+verify newer readers with older data and older readers with newer data. Report
+unsupported downgrade boundaries explicitly and require approval before release.
+All migration and legacy-format handling remains behind `StorageMigrator`.
+
+## App Store releases
+
+Use the installed `asc-cli` skill for App Store Connect operations and
+[demo](../demo/SKILL.md) for requested screenshots or video capture. The app ID
+is `6802224502`. Follow [references/release-flow.md](references/release-flow.md)
+for inspection, release notes, approved staging, and manual review handoff.
+This workflow is not for TestFlight-only distribution.
+
+App Store Connect owns current listing metadata, screenshots, and previews.
+Read its live state during a release; do not keep local metadata copies, media
+libraries, or inventory manifests in either repository. Keep drafts, captures,
+downloads, validation output, and CLI input files in a private temporary workspace
+outside the repositories. Credentials, signing material, review contacts, and
+demo access also stay outside Git.
+
+Current English promotional text, supplied by the operator:
+
+> Connect anything, local, yours.
+
+Preserve it unless a change is explicitly requested. This is intended copy, not
+live verification. Do not automatically translate it or use it as release notes.
+For app updates, require saved, nonempty **What's New in This Version** text in
+every configured locale, including `zh-Hans`; English text alone is insufficient.
+Review translations before staging and verify all locales afterward. Preserve
+other metadata and media unless changes are requested and approved.
+
+## Prepare packages
 
 Follow repository `AGENTS.md` for commit/version requirements. Package metadata
 and package-owned build/check scripts remain the sources of truth. Preserve
@@ -29,7 +68,7 @@ Run `bun run ci`; CLI releases also require the four-platform standalone checks
 in `.github/workflows/cli-standalone.yml`. Each package's `package-check.ts` creates
 and verifies its tarball. Keep release artifacts outside the repository.
 
-## Publish
+## Publish packages
 
 The authorized `.github/workflows/publish-npm.yml` workflow owns publication and
 CLI GitHub Release delivery. It validates release tags, repository ancestry, and

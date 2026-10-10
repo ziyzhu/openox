@@ -44,6 +44,6 @@ The same build generates native filesystem contracts from `packages/agent/src/co
 Prompt scaffolds use explicit adapter-selected variants; prefer some duplicated wording over capability-driven prose parsing or rendered-text patching.
 
 Run `bun run ci` through the `test` skill after maintenance. Simulator provisioning
-belongs to `onboarding`; real-model behavior belongs to `evals`; publication belongs
+belongs to `setup`; real-model behavior belongs to `evals`; publication belongs
 to `release`. Individual check implementations may be invoked directly for debugging.
 Keep screenshots, traces, credentials, and diagnostics outside the repository.

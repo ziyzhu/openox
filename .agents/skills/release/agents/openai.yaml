@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release"
+  short_description: "Prepare Ox App Store, npm, and CLI releases"
+  default_prompt: "Use $release to prepare and verify the requested OpenOx App Store or package release, obtain approval before remote writes or publication, and leave App Review submission to me."

@@ -85,7 +85,7 @@ ox vm help <ox.function>
 
 ## Delegate service authoring to Ox
 
-Use the `evolve` skill for the service evolution and developer-feedback loop.
+Use the `develop-services` skill for the service evolution and developer-feedback loop.
 Drive an Ox chat on the user-selected simulator through the built-in
 `skills/evolve/SKILL.md` System skill for service exploration, authoring, repair, and live
 verification. While observing the run, use chat history and structured logs to

@@ -9,7 +9,7 @@ Verification code lives here: `apps/` owns CLI and iOS checks, `contracts/` owns
 Client-Host and Host-Service boundary checks, and `scripts/ci.sh` orchestrates
 portable CI. Eval definitions and real-model runs belong to the `evals` skill.
 Simulator setup, assigned ports, device validation, and PID claims belong to
-`onboarding`. No agent runtime is required to execute these commands.
+`setup`. No agent runtime is required to execute these commands.
 
 ## Commands
 
@@ -60,7 +60,7 @@ Linux ARM64/x64 using the same command and pins Bun 1.3.13.
 
 Follow the simulator ownership and baseline rules in repository `AGENTS.md`.
 Use the shared `ios-simulator` skill for builds, UI interaction, captures, and diagnostics;
-`onboarding` owns OpenOx scheme/signing/launch configuration. Use task-specific
+`setup` owns OpenOx scheme/signing/launch configuration. Use task-specific
 DerivedData. It avoids build-database locks, not concurrent source-generation races.
 A matched tap does not prove a native switch changed: wait for stable frames, use
 `idb ui tap X Y --duration 0.25 --udid "$UDID"` for switch controls, and verify AX value and behavior. Resolve coordinates from the current AX tree.

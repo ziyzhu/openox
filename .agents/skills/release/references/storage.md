@@ -105,7 +105,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - App log file — owner: Diagnostics/LogFile.swift
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
-- Developer bootstrap credentials — owner: .agents/skills/onboarding/scripts/bootstrap.ts
+- Developer bootstrap credentials — owner: .agents/skills/setup/scripts/bootstrap.ts
 
 ## Profile filesystem
 

@@ -1,9 +1,9 @@
 ---
-name: onboarding
+name: setup
 description: Set up an OpenOx checkout for local development or Pi, including CLI and skill dependencies, simulator provisioning, iOS signing, App Store authentication, bundled services, and first launch. Use when a contributor asks to get OpenOx running, configure a coding agent, or diagnose a setup failure.
 ---
 
-# Onboarding
+# Setup
 
 Help the contributor reach a verified working environment. First determine whether they need the CLI, the iOS app, coding-agent setup, or commit readiness. Inspect existing tools and configuration before changing anything; preserve their chosen simulator, bundle identifier, Apple team, and local data. Read the repository [AGENTS.md](../../../AGENTS.md) and relevant package documentation. Keep machine-specific values in ignored local files.
 
@@ -46,14 +46,14 @@ xcrun simctl clone "$OX1_UDID" ox-2
 xcrun simctl clone "$OX1_UDID" ox-3
 ```
 
-Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../migrate/references/storage.md#website-state). Other website state and provider settings need separate setup.
+Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../release/references/storage.md#website-state). Other website state and provider settings need separate setup.
 
 Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before running those commands. `scripts/simulator.ts` shares native device/runtime checks and PID claims with the test runners. `scripts/ios.ts` composes native commands for the QA harness without an external wrapper CLI. Claims coordinate repository runners only; they do not replace agent ownership checks. `scripts/bootstrap.ts` owns the explicit credential/artifact/website-state setup behind `bun run sim:bootstrap`.
 
 ## iOS signing and local configuration
 
 - Copy `apps/ios/Local.xcconfig.example` to the ignored `apps/ios/Local.xcconfig` if it does not exist. Set `OX_BUNDLE_IDENTIFIER` to the contributor's intended identifier and `OX_DEVELOPMENT_TEAM` to their Apple Developer team. Enable `CODE_SIGNING_ALLOWED = YES` for a build that needs Keychain. Do not put a team ID, certificate, profile, or credential in tracked files.
-- Check for a usable local signing identity with `security find-identity -v -p codesigning`. An App Store Connect API key or a certificate listed by `asc` does not supply the certificate's private key to this Mac. If the identity is absent, guide the contributor through Xcode's Apple Account and automatic signing setup, or use an existing private key they control. Do not create, revoke, or replace a certificate as a routine onboarding step.
+- Check for a usable local signing identity with `security find-identity -v -p codesigning`. An App Store Connect API key or a certificate listed by `asc` does not supply the certificate's private key to this Mac. If the identity is absent, guide the contributor through Xcode's Apple Account and automatic signing setup, or use an existing private key they control. Do not create, revoke, or replace a certificate as a routine setup step.
 - After building, inspect the actual `.app` with `codesign -dv --verbose=4 <app>` and `codesign -d --entitlements :- <app>`. For a Keychain `errSecMissingEntitlement` startup failure, check the app identifier, access groups, and embedded entitlements before changing simulator data. Apple's [Keychain entitlement diagnosis](https://developer.apple.com/documentation/security/errsecmissingentitlement) explains the failure. A successful build alone does not establish that Keychain works.
 
 ## First simulator run

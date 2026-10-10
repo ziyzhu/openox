@@ -1,10 +1,11 @@
 ---
-name: evolve
+name: develop-services
 description: Build or update Ox services through an Ox chat on a simulator, improve the shared authoring loop, notify developers of improvement opportunities, and promote verified Local web services into the built-in repository when requested. Use for development-driven service evolution and dogfooding the workflow users run directly in Ox.
 ---
 
-# Evolve Ox
+# Develop services
 
+This desktop development skill is distinct from Ox's built-in `evolve` System skill.
 Ox evolves services in two ways:
 
 - Development focused: a coding agent on the user's desktop drives Ox on a simulator to build or update services, observes the authoring loop, and improves it.

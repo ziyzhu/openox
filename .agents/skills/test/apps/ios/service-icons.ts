@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireFreePort, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireFreePort, requireSimulator } from "../../../setup/scripts/simulator.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/service-icons.ts --device ox-N --host <ws-url> --chat <saved-QA-chat> --domain <run-owned-MCP-domain> [--live] [--only <case,...>] [--output /tmp/directory]\nRequires an attached run-owned MCP fixture at http://127.0.0.1:<registryPort>/mcp-favicon-qa and an idle saved QA chat. Launch Ox with the matching OX_SERVICES_ENDPOINT. Starts its fixture server, verifies native image loading through ox, and restores the saved favicon URL. --live also contacts Google, httpbingo, and httpbin for public HTTPS ICO and redirect checks.",

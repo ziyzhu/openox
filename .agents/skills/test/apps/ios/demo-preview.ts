@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
-import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
-import { iosTarget, elements as flattenElements } from "../../../onboarding/scripts/ios.ts";
+import { qaCommand } from "../../../setup/scripts/qa-config.ts";
+import { claimSimulator, requireSimulator } from "../../../setup/scripts/simulator.ts";
+import { iosTarget, elements as flattenElements } from "../../../setup/scripts/ios.ts";
 
 const config = qaCommand({
   usage: "Usage: bun run test:demo --device ox-N [--app /absolute/Ox.app]\nExercises native demo scenes without player controls or live model/service calls.",

@@ -28,7 +28,7 @@ Only promote when the user requests a bundled update. Read the matching provider
 
 ## Maintain native support
 
-Read [native integrations](references/native-integrations.md) and the matching provider reference before changing native composition, transport, authentication, or artwork. These changes belong in code, not on-device guidance. Providers use API transports, including API-backed subscription/OAuth accounts. Websites are ordinary services authored through `evolve`, never providers or browser bridges for the agent loop.
+Read [native integrations](references/native-integrations.md) and the matching provider reference before changing native composition, transport, authentication, or artwork. These changes belong in code, not on-device guidance. Providers use API transports, including API-backed subscription/OAuth accounts. Websites are ordinary services authored through Ox's built-in `evolve` System skill, never providers or browser bridges for the agent loop.
 
 Run `bun run typecheck` after provider or catalog changes. Build runtime Swift changes with `xcodebuild`, install/launch with `simctl`, and exercise the UI with `idb`. Do not commit unless requested.
 
