@@ -763,6 +763,11 @@ private struct InvocationDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 section(invocation.preview?.argumentsTruncated == true ? "Input preview" : "Input") {
+                    Text(verbatim: invocation.name)
+                        .font(Theme.Fonts.captionMd)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("chat.invocation.function")
                     if invocation.preview?.argumentsTruncated == true { previewNotice }
                     inputValue
                 }
