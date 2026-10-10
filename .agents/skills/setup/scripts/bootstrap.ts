@@ -2,6 +2,7 @@ import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { callHost } from "../../../../apps/cli/src/host-rpc.ts";
 import { ROOT, run } from "../../../lib.ts";
 import { qaCommand, qaConfig } from "./qa-config.ts";
+import { launchTemplate } from "./template.ts";
 
 const MAX_BOOTSTRAP_BYTES = 64 * 1024 * 1024;
 const REGIONS = ["global", "china"] as const;
@@ -24,6 +25,8 @@ Options:
   --keys <path>                  API key file (default secrets/API_KEYS.json)
   --profile <path>               Bootstrap profile describing artifacts, providers, and website data
   --website-data-from <ox-N>     Copy website data from another running simulator
+  --template <path>              Apply a device template to the installed Debug app (relaunches)
+                                Template options: bun run sim:launch --help
   -h, --help                     Display this help`;
 
 function requiredString(value: unknown, label: string): string {
@@ -177,7 +180,8 @@ async function bootstrap(): Promise<void> {
 }
 
 try {
-  await bootstrap();
+  if (Bun.argv.includes("--template") || Bun.argv.some(arg => arg.startsWith("--template="))) await launchTemplate(Bun.argv.slice(2), false);
+  else await bootstrap();
 } catch (error) {
   console.error(`error: ${(error as Error).message}`);
   process.exitCode = 1;

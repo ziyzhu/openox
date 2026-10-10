@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "settings": {
+    "theme": "dark",
+    "language": "en",
+    "onboardingCompleted": true,
+    "defaultModel": {
+      "provider": "mock",
+      "model": "mock"
+    }
+  },
+  "userDefaults": {
+    "app": {
+      "set": {
+        "chat.importMemoryIntentDisplays": 3
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "qa",
+      "name": "Template QA",
+      "memory": "Prefer concise answers.",
+      "files": [
+        {
+          "path": "notes/example.md",
+          "content": {
+            "text": "# Example\nTemplate-owned shared content.\n"
+          }
+        }
+      ],
+      "chats": [
+        {
+          "id": "markdown",
+          "title": "Template chat",
+          "model": {
+            "provider": "mock",
+            "model": "mock"
+          },
+          "favorite": true,
+          "files": [
+            {
+              "id": "checklist",
+              "name": "checklist.md",
+              "content": {
+                "text": "- Verify settings\n- Verify process reopen\n"
+              }
+            }
+          ],
+          "messages": [
+            {
+              "role": "user",
+              "text": "Review this checklist.",
+              "attachments": ["checklist"]
+            },
+            {
+              "role": "assistant",
+              "reasoning": "The checklist covers the starting state and durable storage.",
+              "text": "## Ready\n- Settings are configured.\n- This chat was imported without a model call."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "selection": {
+    "profile": "qa",
+    "chat": "markdown"
+  }
+}

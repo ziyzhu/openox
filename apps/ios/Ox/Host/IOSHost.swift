@@ -132,8 +132,18 @@ final class IOSHost: OxHost {
         let services = services
         let conversations = conversations
         let storage = Task { @MainActor in
-            try await StorageMigrator.prepare(storage: .shared, services: services)
-            Log.app.info("IOSHost storage prepared")
+            do {
+                try await StorageMigrator.prepare(storage: .shared, services: services)
+                #if DEBUG && targetEnvironment(simulator)
+                try await DeviceTemplate.applyStorage(services: services)
+                #endif
+                Log.app.info("IOSHost storage prepared")
+            } catch {
+                #if DEBUG && targetEnvironment(simulator)
+                DeviceTemplate.reportFailure(error)
+                #endif
+                throw error
+            }
         }
         let profile = Task { @MainActor in
             try await storage.value
@@ -150,6 +160,9 @@ final class IOSHost: OxHost {
             await services.refreshServices(locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region))
             do { try ScheduledSkillScheduler.shared.activate() }
             catch { Log.app.warning("IOSHost schedules unavailable recoveryRequired=true error=\(error.localizedDescription)") }
+            #if DEBUG && targetEnvironment(simulator)
+            try await DeviceTemplate.finish(conversations: conversations)
+            #endif
             Log.app.info("IOSHost profile prepared")
             resumeOptionalStorageRecovery()
         }

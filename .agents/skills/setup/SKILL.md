@@ -65,6 +65,71 @@ Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before
 - For CLI access, enable **Settings > Host > Allow connections** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
 - Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
 
+## Device templates
+
+`bun run sim:launch --device ox-N --template <json>` builds, installs, and launches
+with declarative on-device data. `--app <Ox.app>` reuses a matching Debug Simulator
+artifact; `bun run sim:bootstrap --device ox-N --template <json>` applies to the
+installed artifact and relaunches it. Reserve the target first. Setup uses a local
+startup file, not Host access or a model call; Release and physical builds cannot
+apply templates. `--loopback` only opts into Debug localhost ingress and does not
+enable Host connections.
+
+The TypeScript contract is `scripts/template-schema.ts`; `templates/basic.json`
+is a runnable example. `--schema` prints JSON Schema directly from that contract.
+`--validate --template <json>` checks references and external
+inputs without a simulator. Omitted fields remain unchanged. Profiles get a
+run-owned name suffix; each application creates new Profiles rather than merging
+into existing data. Result manifests map template-local Profile/chat IDs to actual
+IDs. Settings support the existing Ox themes, not an invented system theme.
+
+UserDefaults supports strings, booleans, numbers, arrays, `{ "dictionary": {...} }`,
+`{ "data": "<base64>" }`, and `{ "date": "<UTC ISO timestamp>" }`; explicit `remove`
+clears keys. Typed settings and raw preferences cannot conflict. Profile files can
+populate nested skills as well as shared content; chat files own attachment bytes.
+Messages support user text/attachments and assistant text/reasoning; `packageFrom`
+imports an existing `.chat` package instead of `messages` for richer historical tool
+results and presentation. Neither path runs historical tools or calls a model.
+
+Credentials use `secret: { "env": "NAME" }` or `secret: { "fromFile": "path" }`;
+paths resolve relative to the template JSON. `--allow-keychain` authorizes declared
+writes/replacements. Named secrets require private flat JSON string-field objects;
+provider credentials use the normal binding owner. `removeProviders`, `removeSecrets`,
+and `removeAccounts` explicitly clear declared credentials under the same authorization.
+Raw OAuth/Secret accounts and
+explicit bindings support exact credential state. Never put credentials in tracked
+JSON or pass their values as arguments.
+
+`bun run sim:website-export --device ox-N --output /private/path/session.snapshot`
+captures cookies/local storage from an already reachable authorized Host. A template
+can restore `websiteState: { "restoreFrom": "/private/path/session.snapshot" }`.
+Restoration replaces those app-wide data types, leaves IndexedDB unchanged, and does
+not prove authentication: verify required websites after restoring. Sessions can
+expire or be device-bound. Snapshot files are credential-bearing, mode 0600, and
+must remain outside Git.
+
+`storage` entries name `documents`, `applicationSupport`, `appGroup`, or `caches`,
+a domain-relative destination `path`, external source `from`, and `provenance`
+(`build`, `storageVersion`). `--allow-storage-replay` explicitly authorizes replacing
+these paths while the app is stopped, retaining prior contents in private evidence.
+It also gates raw active-Profile/Secret-index preferences. This covers exact Profile,
+repository, schedule, share-inbox, and temporary-cache representations without new
+migrators. Logs, template control paths, overlapping sources/destinations, and linked inputs
+are rejected. Snapshot inputs are streamed and hashed; restored bytes are verified
+before launch. Limits are 512 MiB/100,000 entries per input and 1 GiB total. Predecessor evidence must come from the actual older build; provenance
+labels alone are not proof. Normal startup still runs `StorageMigrator`; never erase
+or uninstall as upgrade setup. Device-bound bookmarks and OS permissions still
+require provisioning. Unknown template fields fail rather than being ignored.
+
+Evidence includes a redacted manifest, original changed preferences, storage backups,
+AX tree, screenshot, and fresh logs outside the repository. Credential-bearing input
+is deleted after loading. Setup is not atomic across storage owners; inspect the
+manifest after failure. No automatic cleanup/rollback is provided yet: leave run-owned
+Profiles for review, remove them through Profile Settings, and restore changed
+preferences deliberately using `preferences-before.plist`. Keychain and website-state
+changes are not automatically undone. The launcher leaves the target running and
+releases its runner claim; coordinate continued interactive ownership.
+
 ## App Store authentication
 
 Use the [App Store Connect CLI](https://asccli.sh), installed by Homebrew as **`asc`**. Inspect an existing installation before adding another tool; the separate Homebrew formula `asccli` has different flags and authentication storage and is not required.

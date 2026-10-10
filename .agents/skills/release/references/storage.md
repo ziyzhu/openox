@@ -45,6 +45,9 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-chat cache Session; WAL sidecars
 │   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + conversation/shared files  Temporary-chat filesystem
 │   │   ├── PiDurableDiagnostics/<action>/<uuid>/session.sqlite  Upstream storage conformance/benchmarks; removed after each request
+│   │   ├── DeviceTemplates/<run UUID>/input.json Debug Simulator-only transient setup input
+│   │   ├── DeviceTemplates/<run UUID>/result.json redacted application result
+│   │   ├── DeviceTemplates/<run UUID>/preferences-before.plist original changed preferences
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
 ├── Documents/                               visible in Apple Files
@@ -106,6 +109,7 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/setup/scripts/bootstrap.ts
+- Debug Simulator device templates — schema/launcher: .agents/skills/setup/scripts/template-schema.ts and template.ts; native startup importer: Development/DeviceTemplate.swift. Control files live under Library/Caches/DeviceTemplates, are excluded from normal startup without explicit launch opt-in, and never become Profiles. Loaded input is removed and private credentials are released after application. Result/previous-preference files are purgeable QA artifacts; evidence copies stay outside Git. Template-created Profiles use ordinary production storage and remain until explicitly removed.
 
 ## Profile filesystem
 
@@ -733,7 +737,7 @@ Simulator bootstrap can make an explicit one-way copy of cookies and local
 storage between two running numbered simulators. It serializes the source's
 global website data store with WebKit, holds the opaque credential-bearing blob
 only in host process memory, replaces those target data types, then discards
-the blob. Profiles persist only whether website data should be copied. The transfer does not
+the blob. Bootstrap profiles persist only whether website data should be copied. Device templates can additionally reference an explicit private website-session snapshot captured by `sim:website-export`; those credential-bearing files stay outside Git with mode 0600. Restore uses the same cookie/local-storage owner and requires independent authentication verification. The simulator-to-simulator transfer does not
 merge state, continuously synchronize devices, enter logs or arguments, or
 become part of Ox and test artifacts.
 

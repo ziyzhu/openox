@@ -3,6 +3,9 @@ import SwiftUI
 @main
 struct OxApp: App {
     init() {
+        #if DEBUG && targetEnvironment(simulator)
+        DeviceTemplate.preparePreferences()
+        #endif
         #if DEBUG
         guard !OxDemoLaunch.enabled && !OxAppStoreScreenshotLaunch.enabled else { return }
         #endif

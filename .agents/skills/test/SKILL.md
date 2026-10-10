@@ -135,7 +135,13 @@ the `demo` skill for its workflow.
 Package-owned `package-check.ts` files verify release artifacts and consumers;
 never publish as a test. Model evaluation follows the `evals` skill and exploratory
 UI campaigns follow `gym`. Neither replaces live upgrade/auth/service verification.
-Committed service/storage replay fixtures are not maintained here.
+Committed service/storage replay fixtures are not maintained here. Device-template
+CLI E2E checks live in `apps/ios/template-cli.test.ts` and
+`apps/ios/template-launch-safety.test.ts`; setup owns their schema,
+launcher, and synthetic JSON. Exact predecessor inputs and website-session snapshots
+remain private external files. A current logical template does not establish upgrade
+compatibility; verify actual predecessor-written storage through normal startup and
+second-launch stability.
 
 Report commands, targets, results, limitations, and private evidence paths. State
 when real iOS, models, authentication, or services were not exercised. Keep logs,
