@@ -59,12 +59,12 @@ Linux ARM64/x64 using the same command and pins Bun 1.3.13.
 
 Follow the simulator ownership and baseline rules in repository `AGENTS.md`.
 Different simulators still share a checkout's DerivedData build database. Serialize
-shared builds, or use `sim --device ox-N build --project apps/ios/Ox.xcodeproj --scheme ios --derived-data /tmp/<campaign>/DerivedData --force`
-and launch the resulting `.app` with `sim run --app` on the same explicit device.
+shared builds, or use `xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath /tmp/<campaign>/DerivedData build`
+and install/launch the resulting `.app` with `xcrun simctl` on the same explicit UDID. Read the shared `ios-simulator` skill for the native workflow.
 Separate DerivedData avoids build-database locks, not concurrent source-generation races.
 A matched tap does not prove a native switch changed: wait for stable frames, use
-`sim tap ... --duration 0.25` for switch controls, and verify AX value and behavior.
-`ci:ios` requires sim, Xcode, an explicitly reserved numbered simulator, and Host
+`idb ui tap X Y --duration 0.25 --udid "$UDID"` for switch controls, and verify AX value and behavior. Resolve coordinates from the current AX tree.
+`ci:ios` requires idb, Xcode, an explicitly reserved numbered simulator, and Host
 connections already enabled. It never provisions, clones, uninstalls, erases,
 changes credentials, or enables Host access.
 
@@ -75,7 +75,7 @@ opts a Debug Simulator launch into `127.0.0.1`; it still requires Allow connecti
 uses ordinary Host APIs, and is compiled out on physical devices and Release builds.
 The opt-in is launch-only; relaunch without it to restore Tailscale-only networking.
 
-The runner force-builds/installs/launches bundled services through sim, following
+The runner builds bundled services with `xcodebuild` in evidence-local DerivedData, installs/launches with `simctl`, and verifies UI through idb, following
 [Apple's Simulator workflow](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices).
 It creates a temporary Mock chat, sends scenario `2`, verifies the completed reply
 and visible assistant message, then attempts to restore the prior saved chat.
@@ -84,7 +84,7 @@ temporary chat: use a dedicated QA target, not personal working state.
 
 Screenshots, build results, chat snapshots, and failure logs go in a new directory
 outside the repository; `--output` selects its parent. PID claims coordinate these
-runners only, not manual sim use or other agents. `test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` exercises the actual
+runners only, not manual native-tool use or other agents. `test:agent-ui-ios --device ox-1 --app /absolute/Ox.app` exercises the actual
 temporary-chat Pi path with native Mock already selected. It checks reasoning,
 Markdown, native snippet tools, separate worker ownership and drain-before-restart
 for Stop followed by queued input, committed SQLite history and process reopen.
@@ -97,7 +97,7 @@ and are diagnostic evidence, not Profile exports or power-loss verification.
 
 Keep Mock focused on model streaming, tool loops, handoffs, and model-visible context. Feature-specific regression setup, assertions, and cleanup belong in E2E runners, not new numbered Mock scenarios. The Mock menu is the source of truth for supported inputs; retired numbers fall back to that menu. Removing a Mock regression does not establish replacement coverage.
 
-Bundled skill boundaries use `bun .agents/skills/test/apps/ios/bundled-skills.ts --device ox-N --host ws://<assigned-host>:<assigned-port> --chat <seeded-saved-QA-chat> --temporary-chat <empty-temporary-QA-chat>` after installing a fresh build. Seed the saved Mock chat with `QA bundled skill verification seed. Reply QA only.` before creating the temporary chat; inspect after creation for its prepared ID. It verifies Pi-derived native schemas, canonical package bytes, references/helpers, discovery/search, mutation denial, old-path aliases, paginated Unicode reads, exact multi-edits and diffs, parallel-edit serialization, an editable run-owned copy with cleanup, and trusted activation versus temporary-chat mutation restrictions. After relaunch, wait for `ox host describe` to succeed; `sim run` readiness means frontmost, not Host readiness. Open the saved QA chat before creating the empty temporary chat so both are hydrated without discarding the temporary one. For the default delete-approval policy, leave the app on that Profile's Skills screen and pass `--ui-cleanup`; this confirms deletion of only the run-owned copy without widening policy. Mock `72 bundled` covers model-visible loading and System activation; it is not full workflow verification.
+Bundled skill boundaries use `bun .agents/skills/test/apps/ios/bundled-skills.ts --device ox-N --host ws://<assigned-host>:<assigned-port> --chat <seeded-saved-QA-chat> --temporary-chat <empty-temporary-QA-chat>` after installing a fresh build. Seed the saved Mock chat with `QA bundled skill verification seed. Reply QA only.` before creating the temporary chat; inspect after creation for its prepared ID. It verifies Pi-derived native schemas, canonical package bytes, references/helpers, discovery/search, mutation denial, old-path aliases, paginated Unicode reads, exact multi-edits and diffs, parallel-edit serialization, an editable run-owned copy with cleanup, and trusted activation versus temporary-chat mutation restrictions. After relaunch, wait for `ox host describe` to succeed; a successful native launch does not establish Host readiness. Open the saved QA chat before creating the empty temporary chat so both are hydrated without discarding the temporary one. For the default delete-approval policy, leave the app on that Profile's Skills screen and pass `--ui-cleanup`; this confirms deletion of only the run-owned copy without widening policy. Mock `72 bundled` covers model-visible loading and System activation; it is not full workflow verification.
 
 `settings.ts` requires an already reachable Host on the selected simulator's assigned port and an idle saved chat. It exercises language/theme, app-default and conversation-model setters, automatic-model reset, and repository listing/enablement through `ox`, checks validation, no-op results, and hidden compatibility aliases, relaunches the supplied app to verify persistence, and restores the original preferences and saved chat. VM helper namespace changes do not rename persisted Action identifiers; preserve existing approvals and user-authored helper calls. It does not enable Host access, change credentials, or reset data. Host ingress failures block live verification. For authorized local QA, launch the Debug Simulator app with `OX_HOST_LOOPBACK=1`; never widen physical-device/Release access or bypass approvals to make a test pass.
 
@@ -111,7 +111,7 @@ Bundled skill boundaries use `bun .agents/skills/test/apps/ios/bundled-skills.ts
 
 `image-widget.ts` verifies remote/local image display, zoom-viewer handoff, source
 validation, artifact rename, model-context separation, process reopen, and remote
-failure/retry through `ox` and `sim`. Use a dedicated saved Mock QA chat seeded with
+failure/retry through `ox`, `simctl`, and `idb`. Use a dedicated saved Mock QA chat seeded with
 `0` and a fresh app on the assigned loopback Host. It retains run-owned fixtures and
 the chat for human review; remove them through normal UI when finished. It never
 changes approval policies, provider credentials, or website state. Mock accepts

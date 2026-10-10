@@ -9,7 +9,7 @@ Ox owns provider and model management through `skills/manage-providers/SKILL.md`
 
 ## Drive Ox
 
-Read the `sim-cli` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
+Read the `ios-simulator` and `ox-cli` skills. Follow simulator ownership and data-preservation rules; use the selected device and matching Host endpoint.
 
 1. Establish whether the request is for an on-device change, bundled defaults, or native runtime support. On-device management does not authorize publication.
 2. Drive a real Ox chat through `skills/manage-providers/SKILL.md`. Let Ox inspect, research, propose, validate, save, and verify supported catalog changes. Do not substitute direct catalog edits for this workflow.
@@ -30,7 +30,7 @@ Only promote when the user requests a bundled update. Read the matching provider
 
 Read [native integrations](references/native-integrations.md) and the matching provider reference before changing native composition, transport, authentication, or artwork. These changes belong in code, not on-device guidance. Providers use API transports, including API-backed subscription/OAuth accounts. Websites are ordinary services authored through `evolve`, never providers or browser bridges for the agent loop.
 
-Run `bun run typecheck` after provider or catalog changes. Build and exercise runtime Swift changes with `sim`. Do not commit unless requested.
+Run `bun run typecheck` after provider or catalog changes. Build runtime Swift changes with `xcodebuild`, install/launch with `simctl`, and exercise the UI with `idb`. Do not commit unless requested.
 
 ## Provider references
 

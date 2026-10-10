@@ -69,10 +69,12 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 4. Run `bun run typecheck` and the retained portable checks.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
-For `ox-1`, the standard commands are:
+For reserved `ox-1`, resolve its unique `UDID`, use task-specific `DERIVED_DATA` outside the repository, and select the intended `BUNDLE_ID`. The standard commands are:
 
 ```sh
-sim --device ox-1 run ai.oxcraft.bot --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 --force
+xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build
+xcrun simctl install "$UDID" "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Ox.app"
+SIMCTL_CHILD_OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
 bun run typecheck
 ```
 

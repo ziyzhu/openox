@@ -15,7 +15,7 @@ user's authorized target and provider choices. Runs consume tokens and execute
 real tools; listing, validation, and comparison are local. Mock responses cannot
 establish prompt quality.
 
-Follow Simulator Setup ownership and baseline rules in `AGENTS.md`; use `sim-cli`
+Follow Simulator Setup ownership and baseline rules in `AGENTS.md`; use `ios-simulator`
 and `ox-cli` to prepare a numbered simulator. Build/install the current checkout,
 use bundled services and a sanitized QA Profile, and preserve simulator settings.
 The runner creates ordinary chats through this checkout's CLI. Read-only cases,
@@ -43,4 +43,4 @@ responses through eval-only handling. Controlled failure or injection coverage
 requires an ordinary test input/service and explicit authorization for its effects.
 Do not weaken cases to hide failures or change them during comparisons. Run
 `bun run evals --validate --suite all`, `bun run typecheck`, and the CLI E2E checks
-after changes. Host changes also need a `sim` build and live CLI verification.
+after changes. Host changes also need an `xcodebuild` build and live CLI verification.

@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget, elements as flattenElements } from "../../../onboarding/scripts/ios.ts";
 
 const config = qaCommand({
   usage: "Usage: bun run test:demo --device ox-N [--app /absolute/Ox.app]\nExercises native demo scenes without player controls or live model/service calls.",
@@ -14,28 +14,25 @@ const bundle = "ai.oxcraft.bot";
 const directory = await mkdtemp(join(tmpdir(), "ox-demo-preview-"));
 const release = claimSimulator(config.device);
 const checks: string[] = [];
-const launch = ["run", bundle,
-  ...(config.values.app ? ["--app", config.values.app] : ["--project", "apps/ios/Ox.xcodeproj", "--scheme", "ios"]),
-  "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`];
-const sim = async (...args: string[]) => JSON.parse((await run(["sim", "--device", config.device, ...args], { capture: true })).stdout);
-type Element = { AXUniqueId?: string; AXLabel?: string; AXValue?: string; frame?: { x: number; width: number; height: number }; children?: Element[] };
-const elements = async (): Promise<Element[]> => {
-  const tree = await sim("describe") as { accessibility: Element[] };
-  const flatten = (nodes: Element[]): Element[] => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
-  return flatten(tree.accessibility);
-};
+const ios = iosTarget(config.device);
+let app = config.values.app;
+const launch = (env: Record<string, string> = {}) => ios.launch(bundle, app!, { OX_DEBUG_ENDPOINT: config.debugEndpoint, ...env });
+const elements = async () => flattenElements(await ios.describe());
 const check = (condition: unknown, label: string) => {
   if (!condition) throw new Error(label);
   checks.push(label);
 };
-const wait = (id: string) => sim("wait", "--id", id, "--timeout", "10000", "--stable", "300");
+const wait = (id: string) => ios.wait({ id }, { timeout: 10_000, stable: 300 });
 const value = async (id: string) => (await elements()).find(element => element.AXUniqueId === id)?.AXValue ?? "";
 async function snapshot(label: string) {
   const output: Record<string, string | null> = {};
   for (const [name, path] of [["documents", "Documents"], ["local", "Library/Application Support/service-repositories/local"]] as const) {
     const dest = join(directory, label, name);
-    const pull = await run(["sim", "--device", config.device, "file", "pull", bundle, path, "--dest", dest], { capture: true, allowFailure: true });
-    if (pull.code !== 0) { output[name] = null; continue; }
+    try { await ios.pull(bundle, path, dest); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      output[name] = null; continue;
+    }
     const hash = createHash("sha256");
     const visit = async (root: string) => {
       for (const entry of (await readdir(root, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -51,23 +48,23 @@ async function snapshot(label: string) {
 }
 let launched = false;
 async function scene(name: string, completed = true, autoplay = false, time = 0) {
-  await sim(...launch, "--env", "OX_DEMO=1", "--env", `OX_DEMO_SCENE=${name}`,
-    "--env", `OX_DEMO_COMPLETE=${completed ? 1 : 0}`, "--env", `OX_DEMO_AUTOPLAY=${autoplay ? 1 : 0}`,
-    "--env", `OX_DEMO_TIME=${time}`);
+  await launch({ OX_DEMO: "1", OX_DEMO_SCENE: name, OX_DEMO_COMPLETE: completed ? "1" : "0",
+    OX_DEMO_AUTOPLAY: autoplay ? "1" : "0", OX_DEMO_TIME: String(time) });
   launched = true;
   const heading = ["connect", "local", "yours"].includes(name);
   await wait(heading ? "demo.chapter" : name === "providers" ? "demo.provider.chatgpt"
     : completed && !["planning", "publishing", "creative"].includes(name) ? "chat.message.user" : "chat.input");
   const tree = await elements();
   check(!tree.some(element => ["demo.playPause", "demo.record", "demo.disclosure", "demo.airplane"].includes(element.AXUniqueId ?? "")), `${name}: no custom player or simulated system UI`);
-  await sim("screenshot", "--out", join(directory, `${name}${autoplay ? "-autoplay" : name === "creative" ? `-${time}` : ""}.png`));
+  await ios.screenshot(join(directory, `${name}${autoplay ? "-autoplay" : name === "creative" ? `-${time}` : ""}.png`));
   return tree;
 }
 try {
-  if (!await requireSimulator(config.device)) await sim("devices", "boot", config.device);
+  if (!await requireSimulator(config.device)) await ios.boot();
+  app ??= await ios.build(join(directory, "DerivedData"), join(directory, "build.log"));
   const before = await snapshot("before");
   check(before.documents !== null, "installed profile snapshot available");
-  const defaultsBefore = await run(["sim", "--device", config.device, "defaults", "read", bundle, "chat.importMemoryIntentDisplays"], { capture: true, allowFailure: true });
+  const defaultsBefore = await ios.defaults(bundle, "chat.importMemoryIntentDisplays");
   let tree = await scene("connect");
   check(tree.some(element => element.AXLabel === "Connect anything, Ox works across AI assistants, apps, and websites to get things done for you."), "verbatim copy in native onboarding row");
   tree = await scene("memory");
@@ -81,13 +78,13 @@ try {
     check(tree.some(element => element.AXUniqueId === `conversation.servicePill.${domain}` && element.AXValue === "Signed in"), `native memory service chip with fixture auth status: ${domain}`);
   }
   check(!tree.some(element => element.AXLabel?.startsWith("Remove ")), "memory uses native status chips, not removable attachment chips");
-  await sim("tap", "--id", "demo.thinking");
-  await sim("wait", "--label", "Steps", "--timeout", "10000", "--stable", "300");
+  await ios.tap({ id: "demo.thinking" });
+  await ios.wait({ label: "Steps" }, { timeout: 10_000, stable: 300 });
   const steps = await elements();
   for (const text of ["Reading preferences exposed by ChatGPT, Claude, and Muse", "Merging overlaps and preserving source labels", "Saving the combined notes to Ox memory"]) {
     check(steps.some(element => element.AXValue === text), `native trace detail: ${text}`);
   }
-  await sim("screenshot", "--out", join(directory, "memory-steps.png"));
+  await ios.screenshot(join(directory, "memory-steps.png"));
   for (const [name, prompt, domains] of [
     ["planning", "Email Alex that the release is ready, schedule a review tomorrow at 10, and add a prep reminder at 9.", ["mail.google.com", "ios:calendar", "ios:reminders"]],
     ["publishing", "Open a pull request for feature/checklist in my demo repo, email Alex the link, and add a review reminder.", ["github.com", "mail.google.com", "ios:reminders"]],
@@ -117,8 +114,8 @@ try {
   await wait("demo.thinking");
   tree = await elements();
   check(!tree.some(element => element.AXUniqueId === "chat.message.copy"), "response controls stay hidden during work");
-  await sim("wait", "--id", "demo.reply", "--timeout", "20000", "--stable", "300");
-  await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "30000", "--stable", "300");
+  await ios.wait({ id: "demo.reply" }, { timeout: 20_000, stable: 300 });
+  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 30_000, stable: 300 });
   tree = await elements();
   check(tree.some(element => element.AXLabel === "Import my memory from ChatGPT, Claude, and Muse into Ox, and merge duplicates."), "timeline types, sends, and streams through native components");
   check(tree.some(element => element.AXUniqueId === "demo.reply" && element.AXLabel?.includes("Source labels are kept so you can review the merge.")), "word-burst stream preserves the complete reply");
@@ -133,7 +130,7 @@ try {
     ["service", "then used it to publish your post.", ["reddit.com"]],
     ["research", "The brief keeps each assistant's reasoning and trade-offs.", ["gemini.google.com", "claude.ai", "grok.com"]],
   ] as const).entries()) {
-    await sim(...launch, "--env", `OX_APP_STORE_SCREENSHOT=${name}`);
+    await launch({ OX_APP_STORE_SCREENSHOT: name });
     await wait("demo.reply");
     tree = await elements();
     check(tree.some(element => element.AXUniqueId === "chat.message.user"), `App Store ${name}: native user message`);
@@ -154,7 +151,7 @@ try {
     check(!tree.some(element => ["demo.chapter", "demo.playPause", "demo.record", "demo.disclosure", "demo.airplane", "chat.stop", "chat.send"].includes(element.AXUniqueId ?? "")), `App Store ${name}: static app-only scene without overlays or playback`);
     check(await value("chat.input") === "Type a message", `App Store ${name}: empty native composer placeholder`);
     const path = join(screenshotDirectory, `${String(index + 1).padStart(2, "0")}-${name}.png`);
-    await sim("screenshot", "--out", path);
+    await ios.screenshot(path);
     const png = await readFile(path);
     const width = png.readUInt32BE(16);
     const height = png.readUInt32BE(20);
@@ -199,13 +196,13 @@ try {
   await scene("connect");
   const after = await snapshot("after");
   check(JSON.stringify(before) === JSON.stringify(after), "profile and Local repository contents unchanged");
-  const defaultsAfter = await run(["sim", "--device", config.device, "defaults", "read", bundle, "chat.importMemoryIntentDisplays"], { capture: true, allowFailure: true });
+  const defaultsAfter = await ios.defaults(bundle, "chat.importMemoryIntentDisplays");
   check(defaultsBefore.code === defaultsAfter.code && defaultsBefore.stdout === defaultsAfter.stdout, "composer suggestion preference unchanged");
   console.log(JSON.stringify({ passed: true, checks, diagnostics: directory }, null, 2));
 } catch (error) {
   console.error(`Diagnostics: ${directory}`);
   throw error;
 } finally {
-  try { if (launched) await sim(...launch); }
+  try { if (launched) await launch(); }
   finally { release(); }
 }

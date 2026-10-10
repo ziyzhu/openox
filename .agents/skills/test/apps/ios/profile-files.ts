@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --chat <seeded-saved-Mock-QA-chat> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned chat, relaunches, and approves deletion of only its fixtures through ordinary chat approval. Never changes policies or credentials.",
@@ -16,6 +17,7 @@ const bundle = qa.values.bundle ?? Bun.env.OX_BUNDLE_ID
 const directory = resolve(qa.values.output ?? `/tmp/ox-profile-files-${Date.now()}`);
 assert(directory !== ROOT && !directory.startsWith(ROOT + "/"));
 const target = ["ox", "--host", qa.debugEndpoint, "--chat", qa.values.chat];
+const ios = iosTarget(qa.device);
 const prefix = `qa-files-${crypto.randomUUID().slice(0, 8)}`;
 const shared = `/${prefix}`;
 const checks: string[] = [];
@@ -107,51 +109,50 @@ try {
     assert(!folder.includes("/") && ![".", ".."].includes(folder));
     assert.equal((await call("ox.app.profile", {})).name, folder);
     const publicRoot = `Documents/Profiles/${folder}`;
-    const sim = ["sim", "--device", qa.device, "file"];
-    const listing = await json([...sim, "list", bundle, publicRoot]);
+    const physical = (path: string) => ios.containerPath(bundle, path);
+    const listing = await readdir(await physical(publicRoot), { withFileTypes: true });
     assert(!listing.some((entry: { name: string }) => /^(profile\.json|state\.sqlite|staging|payloads|\.files|\.migration-conversations)/.test(entry.name)));
     const fixture = join(directory, "external.md"), external = `${publicRoot}/${prefix}-external.md`;
     await writeFile(fixture, "External creation\n");
-    await json([...sim, "push", bundle, fixture, external]);
+    await copyFile(fixture, await physical(external));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-external.md` })).text, "External creation\n");
     const externalReference = await present(`/${prefix}-external.md`);
     await writeFile(fixture, "External edit\n");
-    await json([...sim, "push", bundle, fixture, external]);
+    await copyFile(fixture, await physical(external));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-external.md` })).text, "External edit\n");
     assert.equal((await present(externalReference.filename)).filename, externalReference.filename);
-    await json([...sim, "mv", bundle, external, `${publicRoot}/${prefix}-renamed.md`]);
+    await rename(await physical(external), await physical(`${publicRoot}/${prefix}-renamed.md`));
     await assert.rejects(() => present(externalReference.filename));
     assert.equal((await call("ox.fs.read", { path: `/${prefix}-renamed.md` })).text, "External edit\n");
     const renamedReference = await present(`/${prefix}-renamed.md`);
-    await json([...sim, "delete", bundle, `${publicRoot}/${prefix}-renamed.md`]);
+    await rm(await physical(`${publicRoot}/${prefix}-renamed.md`));
     await assert.rejects(() => present(renamedReference.filename));
-    await json([...sim, "push", bundle, fixture, `${publicRoot}/${prefix}-renamed.md`]);
+    await copyFile(fixture, await physical(`${publicRoot}/${prefix}-renamed.md`));
     await assert.rejects(() => present(renamedReference.filename));
     assert.notEqual((await present(`/${prefix}-renamed.md`)).filename, renamedReference.filename);
-    await json([...sim, "delete", bundle, `${publicRoot}/${prefix}-renamed.md`]);
+    await rm(await physical(`${publicRoot}/${prefix}-renamed.md`));
     const originalDocuments = join(directory, "original-documents"), memory = join(originalDocuments, "MEMORY.md");
-    await json([...sim, "pull", bundle, `${publicRoot}/MEMORY.md`, originalDocuments]);
+    await ios.pull(bundle, `${publicRoot}/MEMORY.md`, originalDocuments);
     try {
       await writeFile(fixture, (await readFile(memory, "utf8")) + `\n${prefix} external memory marker\n`);
-      await json([...sim, "push", bundle, fixture, `${publicRoot}/MEMORY.md`]);
+      await copyFile(fixture, await physical(`${publicRoot}/MEMORY.md`));
       assert((await call("ox.fs.read", { path: "/MEMORY.md" })).text.includes(`${prefix} external memory marker`));
-    } finally { await json([...sim, "push", bundle, memory, `${publicRoot}/MEMORY.md`]); }
+    } finally { await copyFile(memory, await physical(`${publicRoot}/MEMORY.md`)); }
     const skillName = `${prefix}-skill`, skillRoot = `${publicRoot}/skills/${skillName}`;
-    await json([...sim, "mkdir", bundle, skillRoot]);
+    await mkdir(await physical(skillRoot), { recursive: true });
     await writeFile(fixture, `---\nname: ${skillName}\ndescription: Verify external skill editing.\n---\n\nExternal skill marker.\n`);
-    await json([...sim, "push", bundle, fixture, `${skillRoot}/SKILL.md`]);
+    await copyFile(fixture, await physical(`${skillRoot}/SKILL.md`));
     assert((await call("ox.fs.read", { path: `/skills/${skillName}/SKILL.md` })).text.includes("External skill marker."));
     await call("ox.fs.read", { path: "/skills/manage-skills/SKILL.md" });
     await call("ox.fs.write", { path: `/skills/${skillName}/references/data.txt`, content: "Physical skill data\n" });
     const skillExport = join(directory, "skill-export"), skillData = join(skillExport, "data.txt");
-    await json([...sim, "pull", bundle, `${skillRoot}/references/data.txt`, skillExport]);
+    await ios.pull(bundle, `${skillRoot}/references/data.txt`, skillExport);
     assert.equal(await readFile(skillData, "utf8"), "Physical skill data\n");
-    await json([...sim, "delete", bundle, skillRoot]);
+    await rm(await physical(skillRoot), { recursive: true });
     await rejected("ox.fs.read", { path: `/skills/${skillName}/references/data.txt` });
     checks.push("public-only content, external create/edit/move/delete/recreate, authoritative Memory and physical user skills");
   }
-  await run(["sim", "--device", qa.device, "run", bundle, "--app", resolve(qa.values.app),
-    "--env", "OX_HOST_LOOPBACK=1", "--env", `OX_DEBUG_ENDPOINT=${qa.debugEndpoint}`], { capture: true });
+  await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   await waitForHost();
   await json([...target, "chat", "open", "--json"]);
   assert.equal((await call("ox.fs.read", { path: `${shared}/nested/current.html` })).text, "<h1>Current HTML</h1>\n");

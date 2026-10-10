@@ -29,39 +29,33 @@ ox host list --help
 
 Use macOS with Xcode supporting the assigned iOS 26 and iOS 27 runtimes. Install components in **Xcode > Settings > Components**, following [Apple's component installation guide](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components). An older Xcode may need upgrading before it can use a newer runtime. Keep existing Xcode installations and devices until replacements work; never erase simulator data to resolve a missing runtime.
 
-Install [sim](https://github.com/ziyzhu/ios-cli) from a separate source checkout:
+Use `xcodebuild` and `xcrun simctl` from Xcode, plus the [idb client and companion](https://github.com/facebook/idb) for UI automation. Follow current upstream installation guidance; a companion alone does not install the client. Verify:
 
 ```sh
-# Run inside the ios-cli checkout.
-bun install
-bun link
-sim --help
-```
-
-UI automation also requires [idb_companion](https://github.com/facebook/idb); follow its upstream installation instructions. Verify:
-
-```sh
-command -v sim idb_companion
+command -v idb idb_companion
 xcode-select -p
-sim devices
+xcodebuild -version
+xcrun simctl list devices available --json
+idb ui --help
+xcrun devicectl list devices --help
 ```
 
-Use the `sim-cli` skill for iOS interaction; see the coding-agent setup section below to install it. If unavailable, consult `sim --help`, command-specific help, and `sim agent-context`. Never guess flags or build directly with `xcodebuild`.
+Use the agent-independent `ios-simulator` skill for iOS interaction. If unavailable, consult installed native CLI help. Resolve the chosen name to a unique UDID and pass it explicitly to `simctl` and `idb`; never guess flags or rely on a default booted target.
 
 - Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [scripts/qa-config.ts](scripts/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
-- Before touching a device, coordinate ownership with other agents and inspect recent activity in `~/.sim-cli/logs/invocations.jsonl`. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `sim devices`.
+- Before touching a device, coordinate ownership with other agents and inspect repository QA claims. Those claims cover repository runners only; no activity signal proves exclusive ownership. Clone only free, shutdown simulators; preserve originals as backups and verify replacements with `xcrun simctl list devices available --json`.
 - When no suitable simulator exists, create it in Xcode's **Devices and Simulators** window using the assigned runtime. After reserving a suitable iOS 26 baseline, for example:
 
 ```sh
-sim devices clone <free-baseline-name-or-udid> ox-1
-sim devices clone ox-1 ox-2
-sim devices clone ox-1 ox-3
+xcrun simctl clone "$BASELINE_UDID" ox-1
+xcrun simctl clone "$OX1_UDID" ox-2
+xcrun simctl clone "$OX1_UDID" ox-3
 ```
 
 Use `ox-1` as the common website/provider baseline. Cloning does not establish that credentials or website logins still work. Verify configuration, default model, provider credentials, and website logins after building and installing. For explicit cookie/local-storage transfers between running, reserved targets, consult `bun run sim:bootstrap --help` and the [website-state limitations](../migrate/references/storage.md#website-state). Other website state and provider settings need separate setup.
 
-`scripts/simulator.ts` shares device/runtime checks and PID claims with the test runners. Claims coordinate repository runners only; they do not replace agent ownership checks. `scripts/bootstrap.ts` owns the explicit credential/artifact/website-state setup behind `bun run sim:bootstrap`.
+Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before running those commands. `scripts/simulator.ts` shares native device/runtime checks and PID claims with the test runners. `scripts/ios.ts` composes native commands for the QA harness without an external wrapper CLI. Claims coordinate repository runners only; they do not replace agent ownership checks. `scripts/bootstrap.ts` owns the explicit credential/artifact/website-state setup behind `bun run sim:bootstrap`.
 
 ## iOS signing and local configuration
 
@@ -72,10 +66,10 @@ Use `ox-1` as the common website/provider baseline. Cloning does not establish t
 ## First simulator run
 
 - Reserve an available numbered simulator and use its matching ports. Initialize the shared website/provider baseline before testing. Rebuild and reinstall after switching worktrees.
-- Build, install, and launch bundled services with `sim --device <simulator> run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:<debug-port> --force`.
-- To test loading a local repository separately, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `--env OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git`.
-- Confirm the normal UI with `sim --device <simulator> describe` and a screenshot. If accessibility frames disagree with the screenshot after a reboot or reinstall, restart only that reserved device's `idb_companion` before trusting coordinates. When installed apps share a display name, launch by bundle identifier rather than tapping the first matching Home Screen icon.
-- For CLI access, enable **Settings > Host > Allow connections** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `--env OX_HOST_LOOPBACK=1`; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
+- Build bundled services with `xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build`. Use a task-specific path outside the repository. Install the resulting `Build/Products/Debug-iphonesimulator/Ox.app` with `xcrun simctl install "$UDID" "$APP_PATH"`, then launch with `SIMCTL_CHILD_OX_DEBUG_ENDPOINT="ws://127.0.0.1:$DEBUG_PORT" xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"`.
+- To test loading a local repository separately, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `SIMCTL_CHILD_OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git` in the launch environment.
+- Confirm the normal UI with `idb ui describe-all --udid "$UDID"` and `idb screenshot "$SCREENSHOT_PATH" --udid "$UDID"`. If accessibility frames disagree with the screenshot after a reboot or reinstall, restart only that reserved device's `idb_companion` before trusting coordinates. When installed apps share a display name, launch by bundle identifier rather than tapping the first matching Home Screen icon.
+- For CLI access, enable **Settings > Host > Allow connections** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
 - Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
 
 ## App Store authentication and commit readiness
@@ -109,14 +103,7 @@ An unavailable key or denied API access blocks the prescribed commit check. Repo
 
 Run Pi from the checkout root. Pi loads `AGENTS.md` and discovers repository skills in `.agents/skills/` natively. Review the skills and trust this checkout when prompted; `/trust` saves the decision. Noninteractive runs need a saved trust decision or explicit `--approve` after review. No `.pi/settings.json`, provider pin, or MCP server is required. Keep personal model choices in `~/.pi/agent/settings.json`.
 
-Simulator workflows also use the external `sim-cli` skill. To make it available across projects, run from your `ios-cli` source checkout:
-
-```sh
-mkdir -p "$HOME/.agents/skills"
-ln -s "$PWD/skills/sim-cli" "$HOME/.agents/skills/sim-cli"
-```
-
-Inspect an existing destination before changing it; do not replace another installation blindly. Pi discovers `~/.agents/skills/` without extra settings. Run `/reload` after installing or editing skills. Use `sim` help as the fallback when the external skill is unavailable.
+Simulator workflows use the agent-independent `ios-simulator` skill maintained in dotfiles at `.agents/skills/ios-simulator/SKILL.md`, exposed through `~/.agents/skills/ios-simulator`. Run dotfiles `./setup check` and `./setup apply` to audit/apply its discovery links. Other contributors can use their own shared skill installation or native CLI help; the test runners require only Bun and the native iOS tools, not a coding-agent runtime or external wrapper checkout. Inspect existing destinations before changing links; never replace another installation blindly. Reload the coding agent's skills after updates where required.
 
 Additional browser/proxy skills are task-specific, not prerequisites for basic Pi use.
 

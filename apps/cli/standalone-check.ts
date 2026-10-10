@@ -18,10 +18,7 @@ const server = Bun.serve({
     if (server.upgrade(request)) return;
     const artifact = downloads.get(new URL(request.url).pathname);
     if (artifact) return new Response(Bun.file(artifact));
-    return Response.json({ devices: [{
-      name: "Standalone fixture", udid: "standalone-fixture", state: "Booted",
-      listeners: [{ port: server.port }],
-    }] });
+    return new Response("Not found", { status: 404 });
   },
   websocket: {
     message(socket, message) {
@@ -70,11 +67,17 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
     throw new Error("Standalone executable could not inspect the example repository");
   }
   await run([executable, "--repository", repositoryDirectory, "repository", "validate"]);
-  const discoveryEnvironment = { ...environment, OX_SIM_DAEMON_PORT: String(server.port) };
-  const candidates = JSON.parse(await run([executable, "host", "list", "--all", "--json"], discoveryEnvironment));
+  const candidates = JSON.parse(await run([executable, "host", "list", "--all", "--json"]));
   const configured = candidates.hosts.find((host: { source: string }) => host.source === "configuration");
   if (configured?.endpoint !== "ws://127.0.0.1:9876") throw new Error("Standalone loaded the working directory's .env");
-  const discovery = JSON.parse(await run([executable, "host", "list", "--json"], discoveryEnvironment));
+  const inventory = JSON.stringify({ devices: { fixture: [{ name: "Standalone fixture", udid: "standalone-fixture", state: "Booted" }] } });
+  await writeFile(join(tools, "xcrun"), `#!/bin/sh\nif [ "$2" = list ]; then\n  printf '%s\\n' '${inventory}'\nelse\n  printf '%s\\n' '1234 0 UIKitApplication:ai.openox.fixture'\nfi\n`);
+  await writeFile(join(tools, "lsof"), `#!/bin/sh\nprintf '%s\\n' 'p1234' 'n127.0.0.1:${server.port}'\n`);
+  for (const tool of ["xcrun", "lsof"]) await chmod(join(tools, tool), 0o755);
+  const discovery = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "host", "list", "--json"], { ...environment, PATH: tools }));
+  if (process.platform === "darwin" && !discovery.hosts.some((host: { source: string }) => host.source === "simctl")) {
+    throw new Error("Standalone Host discovery did not use native Simulator inventory and listeners");
+  }
   if (!discovery.hosts.some((host: { endpoint: string; reachable: boolean }) =>
     host.endpoint === `ws://127.0.0.1:${server.port}` && host.reachable)) {
     throw new Error("Standalone Host discovery missed the reachable fixture");

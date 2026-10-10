@@ -58,11 +58,14 @@ access. There is no separate Ox pairing credential, LAN, public-internet, or
 USB-forwarding fallback. Browser-origin handshakes are rejected. Turning off
 Allow connections closes existing Clients.
 
-Debug Simulator builds can explicitly opt into local development access:
+Debug Simulator builds can explicitly opt into local development access. Reserve ox-3, resolve its unique `UDID` with `xcrun simctl list devices available --json`, select the configured `BUNDLE_ID`, and use task-specific `DERIVED_DATA` outside the repository:
 
 ```sh
-sim --device ox-3 run <bundle-id> --project apps/ios/Ox.xcodeproj --scheme ios \
-  --env OX_DEBUG_ENDPOINT=ws://127.0.0.1:9103 --env OX_HOST_LOOPBACK=1
+xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug \
+  -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build
+xcrun simctl install "$UDID" "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Ox.app"
+SIMCTL_CHILD_OX_DEBUG_ENDPOINT=ws://127.0.0.1:9103 SIMCTL_CHILD_OX_HOST_LOOPBACK=1 \
+  xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
 ox --host ws://127.0.0.1:9103 host describe
 ```
 
@@ -81,7 +84,7 @@ ox host providers
 ox host logs --level warning
 ```
 
-`host list` probes simulator-daemon candidates and online iOS Tailscale peers;
+`host list` probes running Simulator application TCP listeners discovered through `simctl`/`lsof` and online iOS Tailscale peers; it does not start a discovery daemon.
 `--all` includes unavailable candidates. Physical-device discovery uses port
 9876; pass `--host` for another port.
 

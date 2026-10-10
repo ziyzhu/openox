@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../../../lib.ts";
 
-// These locks coordinate repository QA runners, not other agents or manual sim use.
 export function claimSimulator(device: string): () => void {
   const directory = join(tmpdir(), "ox-qa-tests");
   mkdirSync(directory, { recursive: true });
@@ -36,15 +35,20 @@ function staleClaim(path: string): boolean {
   } catch { return true; }
 }
 
-export async function requireSimulator(device: string): Promise<boolean> {
-  const { stdout } = await run(["sim", "devices"], { capture: true });
+export async function resolveSimulator(device: string) {
+  const { stdout } = await run(["xcrun", "simctl", "list", "devices", "available", "--json"], { capture: true });
   const inventory = JSON.parse(stdout) as {
-    devices?: Record<string, Array<{ name?: string; state?: string; isAvailable?: boolean }>>;
+    devices?: Record<string, Array<{ name: string; udid: string; state: string; isAvailable?: boolean }>>;
   };
-  const simulators = Object.entries(inventory.devices ?? {}).flatMap(([runtime, devices]) =>
-    devices.map(candidate => ({ ...candidate, runtime })));
-  const target = simulators.find(candidate => candidate.name === device && candidate.isAvailable !== false);
-  if (!target) throw new Error(`Simulator ${device} is unavailable; provision the QA pool first`);
+  const targets = Object.entries(inventory.devices ?? {}).flatMap(([runtime, devices]) =>
+    devices.map(candidate => ({ ...candidate, runtime })))
+    .filter(candidate => (candidate.name === device || candidate.udid === device) && candidate.isAvailable !== false);
+  if (targets.length !== 1) throw new Error(`Simulator ${device} is unavailable or ambiguous; provision the QA pool first`);
+  return targets[0]!;
+}
+
+export async function requireSimulator(device: string): Promise<boolean> {
+  const target = await resolveSimulator(device);
   const version = Number(device.slice(-1)) <= 3 ? 26 : 27;
   if (!target.runtime.includes(`.iOS-${version}-`)) throw new Error(`${device} must run iOS ${version}`);
   if (target.state !== "Booted" && target.state !== "Shutdown") throw new Error(`${device} is ${target.state}; wait before running QA`);

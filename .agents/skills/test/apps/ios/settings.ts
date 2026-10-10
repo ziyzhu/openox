@@ -5,12 +5,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const config = qaCommand({
   usage: "Usage: bun .agents/skills/test/apps/ios/settings.ts --device ox-N --host <ws-url> --app <Ox.app> [--output <directory>]\nRequires an idle, booted, reserved simulator with Host access already enabled. Exercises settings through ox, relaunches the installed build, and restores preferences and the previous saved chat.",
   options: { host: { type: "string" }, app: { type: "string" }, output: { type: "string" } },
 });
 if (!config.values.device || !config.values.host || !config.values.app) throw new Error("Pass --device, --host, and --app explicitly");
+const ios = iosTarget(config.device);
 const endpoint = new URL(config.values.host);
 if (!["ws:", "wss:"].includes(endpoint.protocol) || Number(endpoint.port) !== config.debugPort) {
   throw new Error(`Use the selected simulator's Host on port ${config.debugPort}`);
@@ -67,7 +69,7 @@ async function waitForSavedDefaultModel(): Promise<void> {
   const destination = join(evidence, "preferences");
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    await run(["sim", "--device", config.device, "file", "pull", bundle, `Library/Preferences/${bundle}.plist`, destination], { capture: true });
+    await ios.pull(bundle, `Library/Preferences/${bundle}.plist`, destination);
     const stored = await run(["plutil", "-extract", "llm\\.defaultModel", "raw", "-o", "-", join(destination, `${bundle}.plist`)], { capture: true, allowFailure: true });
     if (stored.code === 0) {
       const selection = JSON.parse(Buffer.from(stored.stdout.trim(), "base64").toString());
@@ -174,12 +176,11 @@ try {
   for (const candidate of repositories.repositories as Repository[]) {
     if (candidate.id !== repository.id) assert.equal(after.repositories.find((row: Repository) => row.id === candidate.id)?.enabled, candidate.enabled);
   }
-  await run(["sim", "--device", config.device, "screenshot", "--out", join(evidence, "before-relaunch.png")]);
+  await ios.screenshot(join(evidence, "before-relaunch.png"));
   await waitForSavedDefaultModel();
   chat = undefined;
-  await run(["sim", "--device", config.device, "run", bundle, "--app", app, "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`,
-    "--env", `OX_HOST_LOOPBACK=${endpoint.hostname === "127.0.0.1" ? "1" : "0"}`]);
-  await run(["sim", "--device", config.device, "wait", "--id", "chat.temporaryToggle", "--timeout", "30000", "--stable", "1000"]);
+  await ios.launch(bundle, app, { OX_DEBUG_ENDPOINT: config.debugEndpoint, OX_HOST_LOOPBACK: endpoint.hostname === "127.0.0.1" ? "1" : "0" });
+  await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 30_000, stable: 1000 });
   await waitForHost();
   await newChat();
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");

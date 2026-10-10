@@ -108,7 +108,7 @@ async function readArtifacts(directory: string, artifacts: BootstrapProfile["art
 }
 
 async function requireBooted(requested: string[]): Promise<void> {
-  const { stdout } = await run(["sim", "devices"], { capture: true });
+  const { stdout } = await run(["xcrun", "simctl", "list", "devices", "available", "--json"], { capture: true });
   const output = JSON.parse(stdout) as {
     devices?: Record<string, Array<{ name?: string; state?: string; isAvailable?: boolean }>>;
   };

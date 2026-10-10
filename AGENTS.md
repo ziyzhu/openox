@@ -18,7 +18,7 @@
 1. OpenOx owns App Store release guidance in `.agents/skills/app-store-release/SKILL.md`. App Store Connect is the source of truth for listing metadata and media; do not store local copies in either repository. Keep credentials, signing material, review contacts, demo access, and release evidence outside Git. Website and infrastructure deployment remain in `openox-dev`.
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
-1. Use `sim` and `ox` CLI for testing.
+1. Use the agent-independent `ios-simulator` skill with `xcodebuild`, `xcrun simctl`, and `idb` for iOS testing; use `xcrun devicectl` for paired physical-device lifecycle and `ox` for Host verification.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 1. Show screenshots after making UI changes for human to review.
 
@@ -42,11 +42,11 @@ Related:
 
 ## iOS Simulator Setup
 
-1. Use the fixed five-simulator pool: `ox-1`, `ox-2`, and `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Verify with `sim devices` before testing. Keep replaced devices as backups until their replacements are verified.
-1. Before using a simulator, check other agents' sessions and recent `sim` activity. Coordinate ownership and choose another device if it is in use. Never interrupt or change another agent's simulator.
-1. Each concurrent agent uses its own simulator and matching ports from `.agents/skills/onboarding/scripts/qa-config.ts`. Always pass `--device` explicitly.
+1. Use the fixed five-simulator pool: `ox-1`, `ox-2`, and `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Verify with `xcrun simctl list devices available --json` before testing. Keep replaced devices as backups until their replacements are verified.
+1. Before using a simulator, check other agents' sessions and the repository QA claims. Coordinate ownership and choose another device if it is in use. Never interrupt or change another agent's simulator.
+1. Each concurrent agent uses its own simulator and matching ports from `.agents/skills/onboarding/scripts/qa-config.ts`. Always pass `--device` explicitly to QA runners, resolve the unique simulator UDID, and use it explicitly in native commands.
 1. Start tests with the same website and provider state on all five simulators, using `ox-1` as the baseline. Copy only when both source and target are free; verify website logins, provider credentials, configuration, and default model afterward.
 1. Use `bun run sim:bootstrap --help` for state-copy options. It copies cookies/local storage and installs provider API keys; other website data and provider settings require separate setup. See [website state](.agents/skills/migrate/references/storage.md#website-state).
-1. Build and exercise iOS flows with `sim`, never `xcodebuild`. Rebuild and install after switching worktrees; keep screenshots and recordings outside the repository.
+1. Build with `xcodebuild` using task-specific DerivedData, install/launch with `simctl`, and inspect/drive UI with `idb`. Rebuild and install after switching worktrees; keep screenshots and recordings outside the repository. The shared `ios-simulator` skill lives in dotfiles under `~/.agents/skills/ios-simulator`; native CLI help is the fallback when it is unavailable.
 1. Use bundled services normally. Start a repository server on the matching port and verify `/health` only when testing repository installation or sync.
 1. Use standard text size for ordinary QA. Record settings before changing them and restore them afterward, including after failures.

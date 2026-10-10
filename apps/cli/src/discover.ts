@@ -4,8 +4,8 @@ import { hostEndpoint } from "./host-connection.ts";
 import { HostRPCClient } from "./host-rpc.ts";
 import { fail, type CliContext } from "./lib.ts";
 
-type Listener = { port: number; pid?: number; process?: string };
-type Device = { name: string; udid: string; state: string; listeners: Listener[] };
+type Device = { name: string; udid: string; state: string; isAvailable?: boolean };
+const execute = promisify(execFile);
 type HostCandidate = { endpoint: string; label: string; kind: string; source: string };
 
 export async function discover(args: string[], context: CliContext): Promise<void> {
@@ -26,21 +26,10 @@ export async function discover(args: string[], context: CliContext): Promise<voi
   const selected = normalizedEndpoint(context.host ?? hostEndpoint());
   const candidates = new Map<string, HostCandidate>();
   candidates.set(selected, { endpoint: selected, label: "configured Host", kind: "unknown", source: "configuration" });
-  const daemonPort = validPort(process.env.OX_SIM_DAEMON_PORT, 9909);
   let warning = "";
   try {
-    const payload = await discoverSimulators(daemonPort, timeoutMs);
-    for (const device of payload.devices ?? []) {
-      if (device.state !== "Booted") continue;
-      for (const listener of device.listeners ?? []) {
-        const endpoint = `ws://127.0.0.1:${listener.port}`;
-        candidates.set(endpoint, {
-          endpoint,
-          label: device.name,
-          kind: "ios-simulator",
-          source: "sim-daemon",
-        });
-      }
+    for (const candidate of await discoverSimulators(timeoutMs)) {
+      candidates.set(candidate.endpoint, candidate);
     }
   } catch (error) {
     warning = `simulator discovery unavailable: ${(error as Error).message}`;
@@ -82,44 +71,34 @@ export async function discover(args: string[], context: CliContext): Promise<voi
   if (warning) process.stderr.write(`${warning}\n`);
 }
 
-async function discoverSimulators(port: number, timeoutMs: number): Promise<{ devices?: Device[] }> {
-  const endpoint = `http://127.0.0.1:${port}/devices`;
-  try {
-    return await fetchDevices(endpoint, Math.min(timeoutMs, 500));
-  } catch {
-    const executable = Bun.which("sim");
-    if (!executable) throw new Error("sim is not installed");
-    const child = Bun.spawn([executable, "daemon", "--port", String(port)], { stdout: "ignore", stderr: "ignore" });
-    child.unref();
-  }
-  const deadline = Date.now() + timeoutMs;
-  let error = "sim daemon did not become ready";
-  while (Date.now() < deadline) {
+async function discoverSimulators(timeoutMs: number): Promise<HostCandidate[]> {
+  if (process.platform !== "darwin") return [];
+  const options = { timeout: timeoutMs, maxBuffer: 1024 * 1024 };
+  const { stdout } = await execute("xcrun", ["simctl", "list", "devices", "available", "--json"], options);
+  const inventory = JSON.parse(stdout) as { devices: Record<string, Device[]> };
+  const devices = Object.values(inventory.devices).flat().filter(device => device.state === "Booted" && device.isAvailable !== false);
+  return (await Promise.all(devices.map(async device => {
+    const { stdout: processes } = await execute("xcrun", ["simctl", "spawn", device.udid, "launchctl", "list"], options);
+    const pids = processes.split("\n").filter(line => line.includes("UIKitApplication:"))
+      .map(line => line.trim().split(/\s+/)[0]!).filter(pid => /^[1-9][0-9]*$/.test(pid));
+    if (!pids.length) return [];
+    let sockets: string;
     try {
-      return await fetchDevices(endpoint, Math.min(500, Math.max(1, deadline - Date.now())));
-    } catch (failure) {
-      error = (failure as Error).message;
-      await Bun.sleep(100);
+      sockets = (await execute("lsof", ["-nP", "-a", "-p", pids.join(","), "-iTCP", "-sTCP:LISTEN", "-Fn"], options)).stdout;
+    } catch (error) {
+      if ((error as { code?: number }).code === 1 && !(error as { stderr?: string }).stderr) return [];
+      throw error;
     }
-  }
-  throw new Error(error);
-}
-
-async function fetchDevices(endpoint: string, timeoutMs: number): Promise<{ devices?: Device[] }> {
-  const response = await fetch(endpoint, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<{ devices?: Device[] }>;
+    const ports = new Set([...sockets.matchAll(/^n.*:(\d+)$/gm)].map(match => Number(match[1])));
+    return [...ports].map(port => ({ endpoint: `ws://127.0.0.1:${port}`, label: device.name,
+      kind: "ios-simulator", source: "simctl" }));
+  }))).flat();
 }
 
 function positiveNumber(value: string | undefined, flag: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) fail(`${flag} requires a positive number`);
   return parsed;
-}
-
-function validPort(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
 }
 
 function normalizedEndpoint(value: string): string {

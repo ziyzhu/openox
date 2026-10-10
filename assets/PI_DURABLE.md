@@ -311,7 +311,7 @@ bounded integration path testable before proceeding.
 6. **Complete native capability, UI, provider and lifecycle parity.** Verify permissions/approval persistence, steering/follow-ups, subagents, compaction, retries/deferred/media, recovery and foreground/background leases. Restore provider login only with authorization; the current ChatGPT HTTP 401 remains an outstanding gate. Measure actual document/file workloads, long delta tails, large files and native memory on supported simulator/device targets; published Pi storage timings do not cover the new artifact backend. Exit: retained integration/native E2E campaigns and human UI review pass with documented device/OS coverage.
 7. **Activate and remove superseded paths.** Enable converted Profiles only after the previous gates; remove legacy Swift loop/compactor, per-chat transcript persistence and duplicate public file tools when all replacement consumers are verified. Preserve native credentials, permissions, Git, WebKit, diagnostics and device-owned state. Update canonical storage/API documentation in the same implementation changes. Exit: one Pi execution/transcript authority, one Profile folder store, no implicit persisted-chat adoption or silent legacy fallback.
 
-Use `sim` and `ox` for app testing, obey simulator ownership rules, keep diagnostics outside the repository, and provide screenshots for UI review.
+Use the agent-independent `ios-simulator` skill (`xcodebuild`, `simctl`, and `idb`) and `ox` for app testing, obey simulator ownership rules, keep diagnostics outside the repository, and provide screenshots for UI review.
 
 ### Verification gates
 

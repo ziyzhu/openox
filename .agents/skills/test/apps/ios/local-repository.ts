@@ -5,11 +5,13 @@ import { join, relative, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/local-repository.ts --device ox-N --host <ws-url> --chat <saved-QA-chat> --bundle <bundle-id> --domain <qa-draft-domain> [--output /tmp/directory]\nRequires enabled Local and an existing empty run-owned qa- web draft. Temporarily disables Local, verifies mutation refusals and unchanged source/configuration/Git bytes, then reenables and writes identical source. Restores enablement; creates no drafts or commits.",
   options: { host: { type: "string" }, chat: { type: "string" }, bundle: { type: "string" }, domain: { type: "string" }, output: { type: "string" } },
 });
+const ios = iosTarget(qa.device);
 const { host, chat, bundle, domain } = qa.values;
 assert(host && chat && bundle && domain?.startsWith("qa-"), "Pass an explicit Host, saved QA chat, bundle, and run-owned qa- domain");
 assert.equal(Number(new URL(host).port), qa.debugPort);
@@ -52,7 +54,7 @@ async function snapshot(name: string) {
   const target = join(directory, name);
   await mkdir(target, { recursive: true });
   for (const path of ["service-repositories/local", "service-repositories.json"]) {
-    await run(["sim", "--device", qa.device, "file", "pull", bundle!, `Library/Application Support/${path}`, "--dest", target], { capture: true });
+    await ios.pull(bundle!, `Library/Application Support/${path}`, target);
   }
   return fingerprint(target);
 }

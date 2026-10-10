@@ -1,9 +1,10 @@
 import { Database } from "bun:sqlite";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { ROOT, killChildren, run } from "../../../../lib.ts";
+import { ROOT, killChildren } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget, elements as nodes } from "../../../onboarding/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun run test:agent-ui-ios --device ox-N --app /absolute/Ox.app --evidence /tmp/directory [--bundle id] [--models]\nActual temporary-chat UI, native Mock, Pi SQLite and process reopen. Requires an idle chat and Mock already selected. No Host transport or credential changes.",
@@ -22,23 +23,15 @@ let interrupted = false;
 const interrupt = (signal: NodeJS.Signals) => { interrupted = true; killChildren(signal); };
 process.once("SIGINT", () => interrupt("SIGINT"));
 process.once("SIGTERM", () => interrupt("SIGTERM"));
-async function sim(...args: string[]) {
-  const { stdout } = await run(["sim", "--device", qa.device, ...args], { capture: true });
-  return JSON.parse(stdout);
-}
-function nodes(value: unknown): Record<string, any>[] {
-  if (Array.isArray(value)) return value.flatMap(nodes);
-  if (value && typeof value === "object") return [value as Record<string, any>, ...Object.values(value).flatMap(nodes)];
-  return [];
-}
+const ios = iosTarget(qa.device);
 async function launch(enabled: boolean) {
-  evidence.launch = await sim("run", bundle, "--app", qa.values.app!, "--env", `OX_DURABLE_TEMPORARY_SESSION=${enabled ? caseID : ""}`);
-  await sim("wait", "--id", "chat.temporaryToggle", "--timeout", "20000", "--stable", "1000");
-  const tree = await sim("describe");
+  evidence.launch = await ios.launch(bundle, qa.values.app!, { OX_DEBUG_ENDPOINT: qa.debugEndpoint, OX_DURABLE_TEMPORARY_SESSION: enabled ? caseID : "" });
+  await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 20_000, stable: 1000 });
+  const tree = await ios.describe();
   check(nodes(tree).some(node => node.AXUniqueId === "chat.modelPicker" && node.AXLabel === "Model: Mock"), "Select native Mock before the campaign; provider state is not changed automatically");
 }
 async function logs(): Promise<string[]> {
-  await sim("file", "pull", bundle, "Library/Application Support/logs.jsonl", "--dest", `${directory}/logs`);
+  await ios.pull(bundle, "Library/Application Support/logs.jsonl", `${directory}/logs`);
   return (await Bun.file(`${directory}/logs/logs.jsonl`).text()).split("\n").filter(Boolean).map(line => JSON.parse(line).msg ?? "");
 }
 async function waitForLog<T>(find: (messages: string[]) => T | undefined): Promise<T> {
@@ -54,19 +47,19 @@ async function attach() {
   const attached = (messages: string[]) => messages.map(message => /PiDurable rollout attached chat=([A-F0-9-]+) case=([A-F0-9-]+)/.exec(message))
     .filter(match => match?.[2] === caseID);
   const count = attached(await logs()).length;
-  await sim("tap", "--id", "chat.temporaryToggle", "--wait", "5000", "--stable", "200");
+  await ios.tap({ id: "chat.temporaryToggle" }, { timeout: 5000, stable: 200 });
   return waitForLog(messages => {
     const matches = attached(messages);
     return matches.length > count ? matches.at(-1)?.[1] : undefined;
   });
 }
 async function post(text: string) {
-  await sim("tap", "--id", "chat.input", "--wait", "5000", "--stable", "1000");
-  await sim("wait", "--id", "chat.input", "--stable", "1000");
-  await sim("type", text);
-  const draft = nodes(await sim("describe")).find(node => node.AXUniqueId === "chat.input");
+  await ios.tap({ id: "chat.input" }, { timeout: 5000, stable: 1000 });
+  await ios.wait({ id: "chat.input" }, { stable: 1000 });
+  await ios.text(text);
+  const draft = nodes(await ios.describe()).find(node => node.AXUniqueId === "chat.input");
   check(draft?.AXValue === text, "Composer did not receive exact input; never retry an uncertain send");
-  await sim("tap", "--id", "chat.send", "--wait", "5000", "--stable", "200");
+  await ios.tap({ id: "chat.send" }, { timeout: 5000, stable: 200 });
 }
 function metricFields(message: string) {
   return Object.fromEntries([...message.matchAll(/\b([A-Za-z]+)=([^\s]+)/g)].map(match => [match[1]!, match[2]!]));
@@ -122,11 +115,11 @@ async function send(chatID: string, text: string, stop = false) {
   const previous = new Set(summaries(await logs()).map(message => metricFields(message).submission));
   await post(text);
   if (stop) {
-    await sim("wait", "--id", "chat.stop", "--timeout", "10000");
-    await sim("tap", "--id", "chat.stop");
+    await ios.wait({ id: "chat.stop" }, { timeout: 10_000 });
+    await ios.tap({ id: "chat.stop" });
   }
   await waitForLog(messages => summaries(messages).some(message => !previous.has(metricFields(message).submission) && metricFields(message).outcome === outcome) ? true : undefined);
-  await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
+  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
   verifyTelemetry(await logs(), chatID, text, stop);
 }
 async function stopWithQueuedInput(chatID: string) {
@@ -136,10 +129,10 @@ async function stopWithQueuedInput(chatID: string) {
   await post("13");
   await waitForLog(messages => messages.filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).length > started ? true : undefined);
   await post("2");
-  await sim("tap", "--id", "chat.stop", "--wait", "5000");
+  await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
   await waitForLog(messages => count(messages, "aborted") > count(before, "aborted") && count(messages, "completed") > count(before, "completed") ? true : undefined);
-  await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "1000");
-  check(JSON.stringify(await sim("describe")).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
+  await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 1000 });
+  check(JSON.stringify(await ios.describe()).includes("Sorry that took a moment."), "Queued input completes after Stop without a late abort or presentation race");
   const after = (await logs()).slice(before.length);
   const workers = after.filter(message => message.includes(`Chat.worker start id=${chatID}`));
   check(workers.length === 2, "Stopped and queued submissions have separate worker owners");
@@ -156,14 +149,14 @@ async function verifyModelChanges(chatID: string) {
     const baseline = await logs();
     await post(prompt);
     await waitForLog(messages => matches(messages, "Chat.modelChange pending") > matches(baseline, "Chat.modelChange pending") ? true : undefined);
-    if (stop) await sim("tap", "--id", "chat.stop", "--wait", "5000");
+    if (stop) await ios.tap({ id: "chat.stop" }, { timeout: 5000 });
     await waitForLog(messages => matches(messages, `Chat.runOne end`) > matches(baseline, "Chat.runOne end")
       && messages.some(message => message.includes(`Chat.runOne end id=${chatID} outcome=${outcome}`)) ? true : undefined);
     const after = await logs();
     check(matches(after, "Chat.modelChange cancelled") > matches(baseline, "Chat.modelChange cancelled"), "Stop or failure cancels the pending selection");
     check(matches(after, "Chat.modelChange applied") === matches(baseline, "Chat.modelChange applied"), "Cancelled selections never apply");
-    await sim("wait", "--id", "chat.stop", "--missing", "--timeout", "10000", "--stable", "500");
-    await sim("screenshot", "--out", `${directory}/model-${outcome}.png`);
+    await ios.wait({ id: "chat.stop" }, { missing: true, timeout: 10_000, stable: 500 });
+    await ios.screenshot(`${directory}/model-${outcome}.png`);
   }
   const baseline = await logs();
   await post("23");
@@ -175,16 +168,16 @@ async function verifyModelChanges(chatID: string) {
   check(applied >= 0, "Successful submission applies the pending model");
   check(after.slice(applied + 1).some(message => message.includes(`PiDurable native model start chat=${chatID}`) && message.includes("model=mock-text-only")), "Next queued turn uses the requested native model");
   check(after.slice(0, applied).filter(message => message.includes(`PiDurable native model start chat=${chatID}`)).every(message => message.includes("model=mock ")), "The switching submission and cancelled requests retain the original model");
-  await sim("screenshot", "--out", `${directory}/model-applied.png`);
+  await ios.screenshot(`${directory}/model-applied.png`);
   await send(chatID, "23 defaults");
-  check(JSON.stringify(await sim("describe")).includes("Default model preferences were verified and restored."), "Default mutations, reset, validation, and restoration succeed through native Actions");
-  await sim("screenshot", "--out", `${directory}/model-defaults.png`);
+  check(JSON.stringify(await ios.describe()).includes("Default model preferences were verified and restored."), "Default mutations, reset, validation, and restoration succeed through native Actions");
+  await ios.screenshot(`${directory}/model-defaults.png`);
   Object.assign(evidence, { passed: true, firstChat: chatID, modelChanges: ["pending", "no-op", "cancelled", "failed-submission", "applied", "queued-turn", "default-selection", "automatic-reset", "validation", "restoration"] });
   console.log(`PASS actual native model APIs, deferred selection, no-op, Stop/failure cancellation, next queued turn, defaults, reset, validation and restoration; evidence ${directory}`);
 }
 async function inspect(name: string) {
   const root = `${directory}/${name}`;
-  await sim("file", "pull", bundle, `Library/Caches/PiDurableProof/NativeFiles/${caseID}`, "--dest", root);
+  await ios.pull(bundle, `Library/Caches/PiDurableProof/NativeFiles/${caseID}`, root);
   const db = new Database(`${root}/state.sqlite`, { readonly: true });
   try {
     check((db.query("PRAGMA integrity_check").get() as any)?.integrity_check === "ok", "Recovered stopped-process SQLite integrity");
@@ -209,26 +202,26 @@ try {
     await verifyModelChanges(firstChat);
   } else {
     await send(firstChat, "12");
-    check(JSON.stringify(await sim("describe")).includes("Done."), "Native reasoning reply is visible");
-    await sim("screenshot", "--out", `${directory}/reasoning.png`);
+    check(JSON.stringify(await ios.describe()).includes("Done."), "Native reasoning reply is visible");
+    await ios.screenshot(`${directory}/reasoning.png`);
     await send(firstChat, "74");
-    const progressTree = nodes(await sim("describe"));
+    const progressTree = nodes(await ios.describe());
     const progressTurn = progressTree.slice(progressTree.findIndex(node => node.AXUniqueId === "chat.message.user" && node.AXLabel === "74"));
     const answerIndex = progressTurn.findIndex(node => node.AXUniqueId === "chat.message.agent" && node.AXLabel === "The progress update stayed in order.");
     check(answerIndex >= 0, "Reasoning cannot split the final answer into separate transcript rows");
     const thinkingRows = progressTurn.filter(node => node.type === "Button" && /^(Thought for|Share progress|List artifacts)/.test(node.AXLabel ?? ""));
     check(thinkingRows.length === 2 && thinkingRows.every(node => progressTurn.indexOf(node) < answerIndex), "Each progress phase has one thinking row before the final answer, with no late duplicate");
-    await sim("screenshot", "--out", `${directory}/progress-reasoning.png`);
+    await ios.screenshot(`${directory}/progress-reasoning.png`);
     await send(firstChat, "10");
-    check(JSON.stringify(await sim("describe")).includes("Mock markdown"), "Native markdown reply is visible");
-    await sim("screenshot", "--out", `${directory}/two-turns.png`);
+    check(JSON.stringify(await ios.describe()).includes("Mock markdown"), "Native markdown reply is visible");
+    await ios.screenshot(`${directory}/two-turns.png`);
     await send(firstChat, "22");
-    check(JSON.stringify(await sim("describe")).includes("Both reads are back"), "Native snippet tools return to the Pi model loop");
-    await sim("screenshot", "--out", `${directory}/tools.png`);
+    check(JSON.stringify(await ios.describe()).includes("Both reads are back"), "Native snippet tools return to the Pi model loop");
+    await ios.screenshot(`${directory}/tools.png`);
     await send(firstChat, "13", true);
-    await sim("screenshot", "--out", `${directory}/cancelled.png`);
+    await ios.screenshot(`${directory}/cancelled.png`);
     await stopWithQueuedInput(firstChat);
-    await sim("screenshot", "--out", `${directory}/queued-after-stop.png`);
+    await ios.screenshot(`${directory}/queued-after-stop.png`);
     await launch(true);
     const before = await inspect("before-reopen");
     check(before.references.length === 1, "One Pi conversation before reopen");
@@ -242,9 +235,9 @@ try {
     await send(secondChat, "12");
     await send(secondChat, "80");
     await send(secondChat, "53");
-    check(JSON.stringify(await sim("describe")).includes("Recovered via the cached mirror"), "A failed native tool recovers without hiding its diagnostic outcome");
+    check(JSON.stringify(await ios.describe()).includes("Recovered via the cached mirror"), "A failed native tool recovers without hiding its diagnostic outcome");
     await send(secondChat, "29");
-    await sim("screenshot", "--out", `${directory}/reopened-session.png`);
+    await ios.screenshot(`${directory}/reopened-session.png`);
     await launch(false);
     const after = await inspect("after-reopen");
     check(after.references.length === 2, "New temporary chat routes to another Pi conversation in reopened Session");
@@ -255,13 +248,13 @@ try {
   }
 } catch (error) {
   Object.assign(evidence, { passed: false, error: String(error) });
-  if (launched) await sim("screenshot", "--out", `${directory}/failure.png`).catch(() => {});
+  if (launched) await ios.screenshot(`${directory}/failure.png`).catch(() => {});
   throw error;
 } finally {
   try {
     if (launched) {
       try {
-        await sim("run", bundle, "--app", qa.values.app!, "--env", "OX_DURABLE_TEMPORARY_SESSION=");
+        await ios.launch(bundle, qa.values.app!, { OX_DEBUG_ENDPOINT: qa.debugEndpoint, OX_DURABLE_TEMPORARY_SESSION: "" });
         evidence.optInCleared = true;
       } catch (error) {
         Object.assign(evidence, { optInCleared: false, restoreError: String(error) });

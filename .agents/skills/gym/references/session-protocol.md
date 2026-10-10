@@ -24,7 +24,7 @@ Repeat until the goal, abandonment condition, failure, or guardrail is reached:
 1. Observe the visible screen through an accessibility description and screenshot when visual context matters.
 2. Recall the persona, intent, prior actions, outcomes, and remaining budget.
 3. Choose one plausible user action or terminate. Use concise observable rationale such as `response still has no visible progress; low-patience persona abandons`.
-4. Execute through `sim`, preferring identifiers and labels over coordinates.
+4. Execute through `idb` on the explicit reserved UDID, preferring identifiers and labels over coordinates where installed help supports marker actions; otherwise resolve coordinates from the current AX tree.
 5. Record the action, target, timestamps, immediate outcome, relevant UI state, and errors.
 6. Feed an execution failure back into session memory once so the user can recover intelligently. Do not blindly repeat an unchanged action.
 
@@ -57,7 +57,7 @@ Record every artifact in `result.json` with its kind, relative path, capture tim
 
 Do not photograph or record credential entry, authentication codes, provider keys, or other reusable secrets. If an unrelated secret appears unexpectedly, stop capture and exclude that artifact from the report. Keep all raw evidence inside the assigned temporary directory.
 
-Do not run heavy traces during ordinary discovery. When the coordinator requests reproduction, record one deterministic interaction with `sim trace` and avoid concurrent diagnostics. `sim stats` covers the app process but not separate WebKit helpers; state that limitation when it matters.
+Do not run heavy traces during ordinary discovery. When the coordinator requests reproduction, record one deterministic interaction with native `xcrun xctrace` and avoid concurrent diagnostics. Read the `ios-simulator` skill and installed help for target/template support and recording finalization. App-only host resource samples exclude separate WebKit helpers; state that limitation when it matters.
 
 ## Session result
 

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 import { bundledSkills } from "../../../../../packages/agent/src/core/bundled-skills.ts";
 
 const qa = qaCommand({
@@ -14,6 +15,7 @@ if (!qa.values.host || !qa.values.chat || !qa.values["temporary-chat"]) throw ne
 assert.equal(Number(new URL(qa.values.host).port), qa.debugPort);
 const directory = resolve(qa.values.output ?? `/tmp/ox-bundled-skills-${Date.now()}`);
 assert(!directory.startsWith(ROOT + "/") && directory !== ROOT);
+const ios = iosTarget(qa.device);
 const checks: string[] = [];
 const copied = `qa-skill-${crypto.randomUUID().slice(0, 8)}`;
 let created = false;
@@ -175,16 +177,10 @@ try {
   try {
     if (created) {
       if (qa.values["ui-cleanup"]) {
-        await run(["sim", "--device", qa.device, "tap", "--label", `/${copied}`, "--duration", "1", "--wait", "5000"], { capture: true });
-        await run(["sim", "--device", qa.device, "tap", "--label", "Delete", "--wait", "5000", "--stable", "200"], { capture: true });
-        let confirmation = false;
-        for (let attempt = 0; attempt < 30 && !confirmation; attempt++) {
-          const tree = await run(["sim", "--device", qa.device, "describe"], { capture: true });
-          confirmation = tree.stdout.includes(`Delete /${copied}?`);
-          if (!confirmation) await Bun.sleep(100);
-        }
-        assert(confirmation, "Confirm deletion of exactly the run-owned copy");
-        await run(["sim", "--device", qa.device, "tap", "--label", "Delete", "--wait", "5000", "--stable", "200"], { capture: true });
+        await ios.tap({ label: `/${copied}` }, { duration: 1, timeout: 5000 });
+        await ios.tap({ label: "Delete" }, { timeout: 5000, stable: 200 });
+        await ios.wait({ label: `Delete /${copied}?` }, { timeout: 3000 });
+        await ios.tap({ label: "Delete" }, { timeout: 5000, stable: 200 });
       } else await call("ox.skill.delete", { name: copied });
       await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "chat", "open", "--json"], { capture: true });
       await run(["ox", "--host", qa.values.host, "chat", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"], { capture: true });

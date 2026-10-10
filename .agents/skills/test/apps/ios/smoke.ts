@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { ROOT, killChildren, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const config = qaCommand({
   usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>] [--loopback]
@@ -16,7 +17,8 @@ Evidence stays outside the repository.`,
   },
 });
 if (!config.values.device) throw new Error("Pass --device ox-N explicitly after reserving the simulator");
-if (!Bun.which("sim")) throw new Error("Install sim and configure Xcode before running iOS CI");
+if (!Bun.which("idb") || !Bun.which("xcodebuild")) throw new Error("Install idb and configure Xcode before running iOS CI");
+const ios = iosTarget(config.device);
 const endpoint = config.values.host ?? config.debugEndpoint;
 const url = new URL(endpoint);
 if (!["ws:", "wss:"].includes(url.protocol) || Number(url.port) !== config.debugPort) {
@@ -74,16 +76,15 @@ try {
   evidence = await evidenceDirectory();
   console.log(`iOS CI ${config.device}; evidence: ${evidence}`);
   if (!wasBooted) {
-    await run(["sim", "devices", "boot", config.device]);
+    await ios.boot();
     bootedByCi = true;
   }
   launched = true;
-  const build = await run([
-    "sim", "--device", config.device, "run", bundle,
-    "--project", "apps/ios/Ox.xcodeproj", "--scheme", "ios", "--configuration", "Debug", "--force",
-    "--env", `OX_DEBUG_ENDPOINT=${endpoint}`, "--env", `OX_HOST_LOOPBACK=${config.values.loopback ? "1" : "0"}`,
-  ], { capture: true });
-  await writeFile(join(evidence, "build.json"), build.stdout, { mode: 0o600 });
+  const app = await ios.build(join(evidence, "DerivedData"), join(evidence, "build.log"));
+  const launch = await ios.launch(bundle, app, {
+    OX_DEBUG_ENDPOINT: endpoint, OX_HOST_LOOPBACK: config.values.loopback ? "1" : "0",
+  });
+  await writeFile(join(evidence, "launch.json"), JSON.stringify(launch), { mode: 0o600 });
   await waitForHost();
   const rows = await ox("chat", "list", "--active") as Array<{ id: string }>;
   previousChat = rows[0]?.id;
@@ -102,8 +103,8 @@ try {
     throw new Error("Completed Mock chat snapshot is missing its reply");
   }
   await writeFile(join(evidence, "chat.json"), JSON.stringify({ outcome, snapshot }, null, 2), { mode: 0o600 });
-  await run(["sim", "--device", config.device, "wait", "--id", "chat.message.agent", "--timeout", "10000"]);
-  await run(["sim", "--device", config.device, "screenshot", "--out", join(evidence, "chat.png")]);
+  await ios.wait({ id: "chat.message.agent" }, { timeout: 10_000 });
+  await ios.screenshot(join(evidence, "chat.png"));
   completed = true;
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
@@ -121,10 +122,10 @@ try {
       }
     }
     if (launched && process.exitCode) {
-      const logs = await run(["sim", "--device", config.device, "logs"], { capture: true, allowFailure: true });
+      const logs = await ios.logs();
       if (evidence) await writeFile(join(evidence, "failure-logs.json"), logs.stdout + logs.stderr, { mode: 0o600 });
     }
-    if (bootedByCi) await run(["sim", "devices", "shutdown", config.device], { allowFailure: true });
+    if (bootedByCi) await ios.shutdown();
   } finally { release(); }
 }
 if (completed && !process.exitCode) console.log(`PASS iOS build, launch, Mock reply, and visible assistant message (${config.device})`);

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
+import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/image-widget.ts --device ox-N --chat <saved-Mock-QA-chat-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA artifacts and chat for visual review; never changes approval policies or credentials.",
@@ -35,19 +36,17 @@ function images(state: Awaited<ReturnType<typeof inspect>>) {
   return state.blocks.flatMap((block: { kind: { items?: { image?: { source: { type: string; artifact?: string; url?: string } } }[] } }) =>
     block.kind.items?.flatMap(item => item.image ? [item.image.source] : []) ?? []);
 }
-async function sim(...args: string[]) {
-  return run(["sim", "--device", qa.device, ...args], { capture: true });
-}
+const ios = iosTarget(qa.device);
 async function bottom() {
-  const tree = await json(["sim", "--device", qa.device, "describe"]);
+  const tree = await ios.describe();
   if (JSON.stringify(tree).includes('"chat.scrollToBottom"')) {
-    await sim("tap", "--id", "chat.scrollToBottom");
-    await sim("wait", "--id", "chat.scrollToBottom", "--missing", "--timeout", "5000");
+    await ios.tap({ id: "chat.scrollToBottom" });
+    await ios.wait({ id: "chat.scrollToBottom" }, { missing: true, timeout: 5000 });
   }
 }
 async function screenshot(name: string) {
-  await sim("screenshot", "--out", join(directory, `${name}.png`));
-  await writeFile(join(directory, `${name}-ax.json`), (await sim("describe")).stdout);
+  await ios.screenshot(join(directory, `${name}.png`));
+  await writeFile(join(directory, `${name}-ax.json`), JSON.stringify(await ios.describe()));
 }
 await requireSimulator(qa.device);
 const release = claimSimulator(qa.device);
@@ -63,12 +62,12 @@ try {
   const schema = await json([...target, "vm", "functions", "--json"]);
   assert.deepEqual(new Set(schema["ox.widget.image"].inputSchema.required), new Set(["image", "purpose"]));
   await present(imageURL);
-  await sim("wait", "--id", "chat.message.image.open", "--timeout", "30000", "--stable", "300");
+  await ios.wait({ id: "chat.message.image.open" }, { timeout: 30_000, stable: 300 });
   await screenshot("remote-inline");
-  await sim("tap", "--id", "chat.message.image.open");
-  await sim("wait", "--id", "chat.message.image.close", "--timeout", "5000", "--stable", "300");
+  await ios.tap({ id: "chat.message.image.open" });
+  await ios.wait({ id: "chat.message.image.close" }, { timeout: 5000, stable: 300 });
   await screenshot("remote-zoom");
-  await sim("tap", "--id", "chat.message.image.close");
+  await ios.tap({ id: "chat.message.image.close" });
   checks.push("remote HTTPS image renders inline and opens the zoomable viewer");
   for (const image of ["http://example.com/a.png", "https://user:password@example.com/a.png", "data:image/png;base64,AA==", `${prefix}-missing.png`]) {
     await assert.rejects(() => call("ox.widget.image", { image }), /HTTPS URL|does not exist|missing|not found/i);
@@ -87,7 +86,7 @@ try {
   await bottom();
   await screenshot("local-inline");
   checks.push("local artifact image references follow rename without attaching pixels to model context");
-  await sim("run", bundle, "--app", resolve(qa.values.app), "--env", "OX_HOST_LOOPBACK=1", "--env", `OX_DEBUG_ENDPOINT=${qa.debugEndpoint}`);
+  await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
   let ready = false;
   for (let attempt = 0; attempt < 40 && !ready; attempt++) {
     try { await json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--json"]); ready = true; }
@@ -101,10 +100,10 @@ try {
   checks.push("remote and renamed local image widgets survive process relaunch");
   await present("https://openox.ai/qa-image-widget-missing.png");
   await bottom();
-  await sim("wait", "--id", "chat.message.image.retry", "--timeout", "30000", "--stable", "300");
+  await ios.wait({ id: "chat.message.image.retry" }, { timeout: 30_000, stable: 300 });
   const failures = await json(["ox", "--host", qa.debugEndpoint, "host", "logs", "--grep", "ImageWidgetView.load failed", "--json"]);
-  await sim("tap", "--id", "chat.message.image.retry");
-  await sim("wait", "--id", "chat.message.image.retry", "--timeout", "30000", "--stable", "500");
+  await ios.tap({ id: "chat.message.image.retry" });
+  await ios.wait({ id: "chat.message.image.retry" }, { timeout: 30_000, stable: 500 });
   const retried = await json(["ox", "--host", qa.debugEndpoint, "host", "logs", "--grep", "ImageWidgetView.load failed", "--json"]);
   assert(retried.length > failures.length, "Retry must issue another image load");
   await screenshot("failure-retry");

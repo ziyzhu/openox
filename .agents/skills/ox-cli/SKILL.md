@@ -37,8 +37,8 @@ or tab session IDs; a live service is addressed by its domain.
 - Skills come from three sources: `ox profile skills` (a Profile's files),
   `ox repository skills` (a repository's files), and `ox vm skills` (what the
   agent in a chat actually sees).
-- Use `sim` to verify chat projection changes; the repository has no dedicated chat projection fixture command.
-- Use `sim` for iOS Simulator interaction.
+- Use `idb` with the `ios-simulator` skill to verify chat projection changes; the repository has no dedicated chat projection fixture command.
+- Use the agent-independent `ios-simulator` skill and native tools for iOS Simulator interaction.
 
 ## Connect to a Host and VM
 
@@ -67,7 +67,7 @@ ox --chat <chat-id> vm inspect
 ox --chat <chat-id> vm call ox.fs.read --args '<json>'
 ```
 
-A saved chat may be listed before it is hydrated. Run `ox --chat <full-id> chat open` before inspecting or sending to an unloaded chat. This selects it and discards an outgoing temporary chat. For a pending choice or authorized approval, inspect with `ox --chat <id> chat inspect --pending --json`, then use `ox --chat <id> chat respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `chats.open` or `chats.respond` require the app sidebar and prompt UI; with `sim`, `chat.confirm.Approve` is active while `chat.confirm.receipt.Approve` records an approval already completed.
+A saved chat may be listed before it is hydrated. Run `ox --chat <full-id> chat open` before inspecting or sending to an unloaded chat. This selects it and discards an outgoing temporary chat. For a pending choice or authorized approval, inspect with `ox --chat <id> chat inspect --pending --json`, then use `ox --chat <id> chat respond <answer> --prompt <prompt-id>`. Use a returned option label or an allowed custom answer; never infer approval. Stale IDs are rejected. Credential entry and app-only interactions remain in Ox. Older Hosts without `chats.open` or `chats.respond` require the app sidebar and prompt UI; in the idb accessibility tree, `chat.confirm.Approve` is active while `chat.confirm.receipt.Approve` records an approval already completed.
 
 First-time `ox.service.attach` from an idle chat can return a stopped outcome because interactive prompts require an active agent run. Inspect the app and logs before retrying; do not treat this as proof the user declined. For an authorized development task, attach through the app's Services picker, then use `ox.service.attach` to reload validated Local edits. Preserve genuine declined or blocked decisions.
 

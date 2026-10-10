@@ -13,7 +13,7 @@ Exercise Ox as a user would, preserve observable evidence, and return prioritize
 - Read [references/session-protocol.md](references/session-protocol.md) before driving simulators or delegating sessions.
 - Read [references/findings.md](references/findings.md) before judging sessions or writing the report.
 
-Also use the `sim-cli` and `ox-cli` skills. Consult their current help instead of guessing commands or flags.
+Also use the agent-independent `ios-simulator` and `ox-cli` skills. Consult installed native-tool and Ox help instead of guessing commands or flags.
 
 ## Relationship to deterministic tests
 
@@ -40,7 +40,7 @@ Default to `explore`. Use a recorded seed for every campaign and derived seed fo
 2. Discover configured models and eligible dimension values, then generate the session plan and its owned `/tmp/ox-gym.*` directory with `scripts/plan-run.ts`. Pass supported additional axes with `--dimension`, provider and model identifiers only, and never credentials. Pass `--authorize-real` only when the current request authorizes real-provider calls. Use `--previous` only when the user explicitly supplies prior ephemeral manifests for cumulative coverage.
 3. Materialize every selected dimension into concrete setup, prompts, fixtures, and actions before delegation. Verify the provider and language, then set `materializationStatus`, `providerVerification`, and `executionAuthorized` to ready values. Never delegate a planner-only session. Remove or mark a value unavailable when it cannot actually be exercised. Keep manifests, logs, screenshots, short screen recordings, traces, and reports inside the planner-created directory. Do not write campaign artifacts into the repository or a Profile.
 4. Follow the Simulator Setup reservation, runtime, and common-state rules in `AGENTS.md`. Claim only fixed `ox-1` through `ox-5` simulators. Give every concurrent process its own numbered simulator and matching service and debug ports from `.agents/skills/onboarding/scripts/qa-config.ts`; use its repository port only for explicit repository installation or sync verification.
-5. Before interaction timing begins, build and install through `sim`, launch Ox with bundled services, discover its Host, and establish the session's initial theme, language, model, and state. Reuse a verified prebuilt app where appropriate, but rebuild and reinstall after switching worktrees.
+5. Before interaction timing begins, build with `xcodebuild` and install through `simctl`, launch Ox with bundled services, discover its Host, and establish the session's initial theme, language, model, and state. Reuse a verified prebuilt app where appropriate, but rebuild and reinstall after switching worktrees.
 6. Run functional and exploratory sessions concurrently when resources allow. Keep one coordinator slot available. Have each driver follow the session protocol and return structured evidence.
 7. Aggregate candidate issues. Reproduce performance regressions and ambiguous high-severity findings sequentially on one owned simulator without competing QA activity. Shut down only simulators owned by this campaign; coordinate with other agents or defer clean performance measurements when their devices remain active. Never interrupt another agent's simulator. Parallel simulator or provider contention invalidates clean performance comparisons.
 8. Write `findings.md` and update `campaign.json` inside the owned temporary directory. Report the session outcomes, strongest findings, coverage gaps, limitations, and exact report path.
@@ -48,7 +48,7 @@ Default to `explore`. Use a recorded seed for every campaign and derived seed fo
 ## Non-negotiable boundaries
 
 - Each user interaction session has a hard 120-second wall-clock limit after its starting UI is ready. Retries do not reset it. The coordinator must interrupt an overrun.
-- Drive the visible UI with `sim`. Use accessibility identifiers and the current accessibility tree before coordinates. Do not replace an interaction under test with Host debug commands.
+- Drive the visible UI with `idb` on the explicit reserved UDID. Use accessibility identifiers and the current accessibility tree before coordinates. Do not replace an interaction under test with Host debug commands.
 - Use `ox` for Host discovery, chat inspection, structured logs, VM or service inspection, and supporting model-isolation evidence.
 - Default to read-only user goals. External mutations require explicit authorization and narrow cleanup. Never supply blanket approval flags.
 - Never read, print, log, or pass provider credentials through command-line arguments. Existing configured credentials remain inside Ox's supported boundaries.
