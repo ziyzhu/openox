@@ -1,9 +1,9 @@
 ---
-name: app-store-release
+name: ios-release
 description: Prepare Ox iOS App Store releases with asc, including What's New in This Version, approved staging, and manual App Review handoff. App Store Connect is the source of truth for listing metadata and media. Not for TestFlight-only distribution or npm releases.
 ---
 
-# App Store Release
+# iOS Release
 
 Run from the selected OpenOx checkout on `main` and follow its `AGENTS.md`. Use the installed `asc-cli` skill for App Store Connect operations and [demo](../demo/SKILL.md) for screenshots or video capture when requested. The app ID is `6802224502`.
 

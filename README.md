@@ -56,7 +56,7 @@ It covers CLI and skill dependencies, Pi setup, simulator provisioning, iOS
 signing, App Store authentication, bundled services, and a verified first launch.
 Local repository loading can be tested separately.
 
-Follow the [App Store release skill](.agents/skills/app-store-release/SKILL.md) for
+Follow the [iOS release skill](.agents/skills/ios-release/SKILL.md) for
 promotional copy, What's New, and approved staging. App Store Connect is the source
 of truth for listing metadata and media; App Review submission remains manual.
 
