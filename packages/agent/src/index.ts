@@ -11,7 +11,7 @@ export { activeHost, sameScope, hostContextText, type HostScope, type PromptHost
 export { executeGuidance, type ExecuteGuidanceInput } from "./core/tool-prompts";
 export { runtimeEvent, failureReceipt, outputTruncation, imageReadGuidance, type RuntimeEvent } from "./core/runtime-prompts";
 export { guidanceText } from "./core/guidance-texts";
-export { bundledSkills, skillActivationRequirements, type BundledSkill, type SkillActivationRequirement } from "./core/bundled-skills";
+export { bundledSkills, type BundledSkill } from "./core/bundled-skills";
 export { OxConversations, ConversationPresentation, ConversationFavorite, ConversationReadState,
   type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor, type PresentationChange } from "./profile/conversations";
 export type { ArtifactFiles, ArtifactRecord } from "./profile/artifacts";

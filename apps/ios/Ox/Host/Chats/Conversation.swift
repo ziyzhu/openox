@@ -1727,7 +1727,6 @@ final class Conversation: Identifiable {
         prompt: String? = nil
     ) async throws {
         try await requireWritableFileAction(action, args: args)
-        try await requireSkillActivation(action: action, args: args)
         switch await requestApproval(
             action: action,
             defaultPolicy: defaultPolicy,

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { ROOT, runCheck } from "../../../lib.ts";
 import { parseSkill, isSkillResourcePath, SYSTEM_SKILL_NAMES } from "../../../../packages/protocol/src/skills.ts";
 import { oxScaffold } from "../../../../packages/agent/src/core/ox-prompts.ts";
-import { bundledSkills, skillActivationRequirements } from "../../../../packages/agent/src/core/bundled-skills.ts";
+import { bundledSkills } from "../../../../packages/agent/src/core/bundled-skills.ts";
 
 export async function check(): Promise<string> {
   const root = join(ROOT, "packages/agent/skills");
@@ -38,7 +38,6 @@ export async function check(): Promise<string> {
   }
   if (files.size > 64 || bytes > 512 * 1024) throw new Error("Bundled skills exceed native resource limits");
   for (const name of SYSTEM_SKILL_NAMES) if (!oxScaffold.skills.includes(`skills/${name}/SKILL.md`)) throw new Error(`Missing System skill route: ${name}`);
-  if (skillActivationRequirements.some(requirement => !(SYSTEM_SKILL_NAMES as readonly string[]).includes(requirement.skill))) throw new Error("Activation requirement has no bundled skill");
   return `bundled skills ${bundledSkills.length} packages, ${files.size} files, ${bytes} bytes`;
 }
 

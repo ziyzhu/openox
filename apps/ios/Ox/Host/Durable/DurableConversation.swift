@@ -28,19 +28,6 @@ extension Conversation {
         try virtualMachine.fileSystem.location(path, defaultRoot: defaultRoot, resources: await resourceFiles())
     }
 
-    func requireSkillActivation(action: String, args: Any?) async throws {
-        try await durablePreparation?.value
-        guard let route = durableRoute else { throw RuntimeError.bridge("Agent skill authority is unavailable") }
-        let path = (args as? [String: Any])?["path"] as? String
-        for requirement in route.session.skills.activationRequirements where requirement.action == action {
-            if let prefix = requirement.pathPrefix, path?.hasPrefix(prefix) != true { continue }
-            guard skillSession.snapshots[requirement.skill]?.owner == .system else {
-                Log.session.warning("Skill.activation required action=\(action) skill=\(requirement.skill)")
-                throw RuntimeError.bridge("\(action): activate the bundled System skill by reading skills/\(requirement.skill)/SKILL.md in this submission. Custom copies cannot authorize this workflow.")
-            }
-        }
-    }
-
     func renderPrompt(configuration: AgentConfiguration) async throws -> RenderedChatPrompt {
         try await durablePreparation?.value
         guard let route = durableRoute else { throw RuntimeError.bridge("Pi conversation preparation has not completed") }

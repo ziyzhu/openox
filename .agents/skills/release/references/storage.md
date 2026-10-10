@@ -469,7 +469,7 @@ The mount resolves permissions from the selected source, never frontmatter.
 System, enabled repository, and active Profile packages share one catalog before
 service attachment. Duplicate non-System names require a Profile source selection;
 System packages always own their reserved names. Untrusted packages cannot shadow
-System names or satisfy trusted activation requirements. Local packages are writable only at
+System names or grant mutation permissions. Local packages are writable only at
 its current Git branch; installed, bundled, and historical packages are read-only. Every selected service exposes
 its manifest for discovery. Bundled, Remote, and Development source files remain
 hidden and read-only; Local exposes its additional source files at the same

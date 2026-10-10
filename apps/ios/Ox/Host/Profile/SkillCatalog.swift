@@ -79,11 +79,6 @@ nonisolated struct SkillCatalog: Sendable {
 }
 
 nonisolated struct BundledSkillPackages: Sendable {
-    struct Requirement: Decodable, Sendable {
-        let action: String
-        let skill: String
-        let pathPrefix: String?
-    }
     private struct Snapshot: Decodable {
         struct Package: Decodable {
             let name: String
@@ -92,10 +87,8 @@ nonisolated struct BundledSkillPackages: Sendable {
         }
         let scope: String
         let skills: [Package]
-        let activationRequirements: [Requirement]
     }
     let skills: [Skill]
-    let activationRequirements: [Requirement]
 
     init(data: Data, scope: String) throws {
         guard data.count <= 1024 * 1024 else { throw SkillError.invalidPackage }
@@ -114,15 +107,7 @@ nonisolated struct BundledSkillPackages: Sendable {
             try SkillFiles.validate(skill)
             return skill
         }
-        guard snapshot.activationRequirements.count <= 64, snapshot.activationRequirements.allSatisfy({ requirement in
-            SkillFiles.reservedNames.contains(requirement.skill) && requirement.action.hasPrefix("ox.") &&
-            (requirement.pathPrefix == nil || requirement.pathPrefix!.hasSuffix("/") && !requirement.pathPrefix!.hasPrefix("/") &&
-                requirement.pathPrefix!.dropLast().split(separator: "/", omittingEmptySubsequences: false).allSatisfy {
-                    $0.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$", options: .regularExpression) != nil
-                })
-        }) else { throw SkillError.invalidPackage }
-        activationRequirements = snapshot.activationRequirements
-        Log.agent.info("Skills.bundle scope=\(scope) packages=\(skills.count) requirements=\(activationRequirements.count)")
+        Log.agent.info("Skills.bundle scope=\(scope) packages=\(skills.count)")
     }
 }
 

@@ -78,6 +78,9 @@ try {
   const found = await call("ox.fs.glob", { path: "skills", pattern: "**/SKILL.md", options: { limit: 1000 } });
   for (const skill of bundledSkills) assert(found.paths.includes(`skills/${skill.name}/SKILL.md`));
   checks.push("one skills surface; all five bundled packages discoverable; no guidance root");
+  const copy = await call("ox.skill.copy", { source: "manage-skills", name: copied });
+  assert.equal(copy.name, copied); created = true;
+  checks.push("Profile copy succeeds without reading a System skill first");
   for (const skill of bundledSkills) {
     const canonical = await call("ox.fs.read", { path: `skills/${skill.name}/SKILL.md` });
     const legacy = await call("ox.fs.read", { path: `guidance/${skill.name}/guide.md` });
@@ -100,8 +103,6 @@ try {
   await rejected("ox.fs.read", { path: "guidance/../MEMORY.md" }, /Invalid (Profile file|virtual) path/);
   await rejected("ox.fs.read", { path: "skills/manage-skills/references/missing.md" }, /No skill named|missing|not found/i);
   assert.equal((await call("ox.fs.read", { path })).text, before.text);
-  const copy = await call("ox.skill.copy", { source: "manage-skills", name: copied });
-  assert.equal(copy.name, copied); created = true;
   const copyPath = `skills/${copied}/SKILL.md`;
   const copyText = (await call("ox.fs.read", { path: copyPath })).text;
   assert(copyText.includes(`name: ${copied}`) && copyText.includes("`references/user-skill.md`"));
@@ -167,10 +168,10 @@ try {
   await rejected("ox.fs.read", { path: "state.sqlite" }, /Invalid Profile file path/);
   await rejected("ox.fs.read", { path: `conversations/${qa.values.chat}/context.json` }, /Invalid Profile file path/);
   await call("ox.fs.grep", { path: "skills/manage-providers", pattern: "Manage" }, qa.values["temporary-chat"]);
-  await providerProbe("activate the bundled System skill");
+  await providerProbe("Temporary chats can't save changes");
   await call("ox.fs.read", { path: copyPath }, qa.values["temporary-chat"]);
   await rejected("ox.fs.write", { path: pagePath, content: "Temporary mutation must fail" }, /Temporary chats can't save changes/, qa.values["temporary-chat"]);
-  await providerProbe("activate the bundled System skill");
+  await providerProbe("Temporary chats can't save changes");
   await call("ox.fs.read", { path: "skills/manage-providers/SKILL.md" }, qa.values["temporary-chat"]);
   await providerProbe("Temporary chats can't save changes");
 } finally {

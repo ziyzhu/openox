@@ -8,7 +8,7 @@ import { ProfileFiles } from "./files";
 import type { ArtifactFiles } from "./artifacts";
 import { profileMounts } from "./filesystem";
 import { mountedFileSystem, type FileMount, type TextFileMount } from "../core/file-mounts";
-import { bundledSkills, skillActivationRequirements } from "../core/bundled-skills";
+import { bundledSkills } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
@@ -50,7 +50,7 @@ export class ProfileRuntime {
   readonly env: ReturnType<typeof mountedFileSystem>;
   get skillPackages() {
     this.ready();
-    return { scope: this.options.profileID, skills: bundledSkills, activationRequirements: skillActivationRequirements };
+    return { scope: this.options.profileID, skills: bundledSkills };
   }
   get textMounts(): { scope: string; mounts: TextFileMount[] } {
     this.ready();

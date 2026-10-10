@@ -32,14 +32,3 @@ export const bundledSkills: readonly BundledSkill[] = Object.freeze([
   skill("manage-skills", manageSkills, { "references/repository-skill.md": repositorySkill, "references/user-skill.md": userSkill }),
   skill("visualize", visualize),
 ]);
-
-export interface SkillActivationRequirement { action: string; skill: string; pathPrefix?: string }
-export const skillActivationRequirements: readonly SkillActivationRequirement[] = Object.freeze([
-  ...["save", "delete", "authenticate", "connect", "deauthenticate"].map(action => ({ action: `ox.provider.${action}`, skill: "manage-providers" })),
-  ...["create", "copy", "delete", "share"].map(action => ({ action: `ox.skill.${action}`, skill: "manage-skills" })),
-  ...["create", "update", "copy", "delete"].map(action => ({ action: `ox.service.${action}`, skill: "evolve" })),
-  ...["write", "edit", "delete"].flatMap(action => [
-    { action: `ox.fs.${action}`, skill: "manage-skills", pathPrefix: "skills/" },
-    { action: `ox.fs.${action}`, skill: "evolve", pathPrefix: "services/" },
-  ]),
-].map(requirement => Object.freeze(requirement)));
