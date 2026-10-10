@@ -12,6 +12,24 @@ async function swiftFiles(path: string): Promise<string[]> {
   return nested.flat();
 }
 
+const topLevelDeclaration = /^(?:(?:public|private|fileprivate|internal|nonisolated|final|@MainActor|@Observable)\s+)*(?:struct|enum|class|actor|protocol|typealias)\s+([A-Z]\w*)/gm;
+
+async function uiBoundaryFailures(): Promise<string[]> {
+  const appRoots = ["Host", "Client/Features", "Client/App"].map(path => join(ROOT, "apps/ios/Ox", path));
+  const appFiles = [...(await Promise.all(appRoots.map(swiftFiles))).flat(), join(ROOT, "apps/ios/Ox/Client/OxClient.swift")];
+  const appTypes = new Set<string>();
+  for (const file of appFiles) {
+    for (const match of (await readFile(file, "utf8")).matchAll(topLevelDeclaration)) appTypes.add(match[1]);
+  }
+  const failures: string[] = [];
+  for (const file of await swiftFiles(join(ROOT, "apps/ios/Ox/Client/UI"))) {
+    const code = (await readFile(file, "utf8")).replace(/\/\/.*$/gm, "").replace(/"(?:\\.|[^"\\\n])*"/g, '""');
+    const references = new Set([...code.matchAll(/\b[A-Z]\w*\b/g)].map(match => match[0]).filter(name => appTypes.has(name)));
+    for (const name of references) failures.push(`${relative(ROOT, file)}: UI must not reference app type ${name}`);
+  }
+  return failures;
+}
+
 export async function check(): Promise<string> {
   const clientRoots = [
     join(ROOT, "apps/ios/Ox/Client/Features"),
@@ -28,6 +46,8 @@ export async function check(): Promise<string> {
       }
     }
   }
+
+  failures.push(...await uiBoundaryFailures());
 
   const hostContract = await readFile(join(ROOT, "apps/ios/Ox/Host/OxHost.swift"), "utf8");
   if (!hostContract.includes("protocol OxHost: AnyObject")) {

@@ -77,187 +77,17 @@ enum Theme {
     }
 }
 
-extension View {
-    func chatCardOutline(cornerRadius: CGFloat = Theme.Radius.lg) -> some View {
-        overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Theme.Colors.onSurfaceMuted.opacity(0.18), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
-    }
-
-    func chipSurface<S: ShapeStyle>(_ fill: S) -> some View {
-        frame(height: Theme.Size.chipHeight)
-            .background(fill, in: Capsule(style: .continuous))
-    }
-
-    func contextMenuPreviewShape() -> some View {
-        contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-    }
-
-    func pressedSurface(_ isPressed: Bool) -> some View {
-        opacity(isPressed ? 0.7 : 1.0)
-    }
-
-    func minimumTouchTarget(alignment: Alignment = .center) -> some View {
-        frame(
-            minWidth: Theme.Size.minimumTouchTarget,
-            minHeight: Theme.Size.minimumTouchTarget,
-            alignment: alignment
-        )
-        .contentShape(Rectangle())
-    }
-}
-
-struct OxPressedSurfaceButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .pressedSurface(configuration.isPressed)
-    }
-}
-
-struct OxChipButton: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var filled: Bool = true
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.Fonts.labelMd)
-            .foregroundStyle(filled ? Theme.Colors.onPrimary : Theme.Colors.onSurface)
-            .padding(.horizontal, Theme.Spacing.md)
-            .chipSurface(
-                (filled ? Theme.Colors.primary : Theme.Colors.chipOnBackground)
-                    .opacity(configuration.isPressed ? 0.7 : 1.0)
-            )
-            .minimumTouchTarget()
-            .animation(nil, value: filled)
-            .animation(reduceMotion ? nil : Theme.Animation.press, value: configuration.isPressed)
-    }
-}
-
-struct Chip<Content: View>: View {
-    var fill = Theme.Colors.surfaceSunken
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.xs) { content() }
-            .padding(.horizontal, Theme.Spacing.md)
-            .chipSurface(fill)
-    }
-}
-
-struct ChipFlowLayout: Layout {
-    let spacing: CGFloat
-
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) -> CGSize {
-        let availableWidth = proposal.width ?? .infinity
-        var rowWidth: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var contentWidth: CGFloat = 0
-        var contentHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            let nextWidth = rowWidth == 0 ? size.width : rowWidth + spacing + size.width
-            if rowWidth > 0, nextWidth > availableWidth {
-                contentWidth = max(contentWidth, rowWidth)
-                contentHeight += rowHeight + spacing
-                rowWidth = size.width
-                rowHeight = size.height
-            } else {
-                rowWidth = nextWidth
-                rowHeight = max(rowHeight, size.height)
-            }
-        }
-
-        contentWidth = max(contentWidth, rowWidth)
-        contentHeight += rowHeight
-        return CGSize(width: proposal.width ?? contentWidth, height: contentHeight)
-    }
-
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + size.width > bounds.maxX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            subview.place(
-                at: CGPoint(x: x, y: y),
-                anchor: .topLeading,
-                proposal: ProposedViewSize(size)
-            )
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
-
-struct SidebarMenuButton: View {
-    let action: () -> Void
-
-    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 44
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                Capsule().frame(width: 19, height: 2.5)
-                Capsule().frame(width: 12, height: 2.5)
-            }
-            .foregroundStyle(Theme.Colors.onSurface)
-            .frame(width: size, height: size)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .accessibilityLabel(A11yLabel.openSidebar)
-        .accessibilityIdentifier(A11yID.Chat.openSidebar)
-    }
-}
-
-struct SheetDismissToolbarButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(.subheadline, weight: .semibold))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .minimumTouchTarget()
-        }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close")
-    }
-}
-
-struct TemporaryChatIcon: View {
-    let isActive: Bool
-
-    var body: some View {
-        Image(isActive ? "icon.temporary.checked" : "icon.temporary")
-            .resizable()
-            .scaledToFit()
-    }
-}
-
 nonisolated enum AppTheme: String, CaseIterable, Identifiable {
     case creatorPick
     case light
     case dark
+
+    private static let currentLock = OSAllocatedUnfairLock(initialState: AppTheme.creatorPick)
+
+    static var current: AppTheme {
+        get { currentLock.withLock { $0 } }
+        set { currentLock.withLock { $0 = newValue } }
+    }
 
     var id: String { rawValue }
 
@@ -277,38 +107,6 @@ nonisolated enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
-@MainActor @Observable final class ThemeManager {
-    static let shared = ThemeManager()
-
-    private static let key = "app.theme"
-    private static let sharedDefaults = UserDefaults(suiteName: AppStoragePaths.appGroupIdentifier)
-
-    nonisolated private static let currentTheme = OSAllocatedUnfairLock(initialState: AppTheme.creatorPick)
-    nonisolated static var current: AppTheme { currentTheme.withLock { $0 } }
-
-    var theme: AppTheme {
-        didSet {
-            guard oldValue != theme else { return }
-            let updatedTheme = theme
-            Self.currentTheme.withLock { $0 = updatedTheme }
-            Self.sharedDefaults?.set(updatedTheme.rawValue, forKey: Self.key)
-            Log.app.info("Theme.select theme=\(updatedTheme.rawValue)")
-        }
-    }
-
-    private init() {
-        let sharedValue = Self.sharedDefaults?.string(forKey: Self.key)
-        let stored = sharedValue.flatMap(AppTheme.init(rawValue:)) ?? .creatorPick
-        theme = stored
-        Self.currentTheme.withLock { $0 = stored }
-        if Self.sharedDefaults != nil {
-            Log.app.info("Theme.restore theme=\(stored.rawValue) source=shared")
-        } else {
-            Log.app.error("Theme.restore app-group unavailable")
-        }
-    }
-}
-
 private struct AppThemeKey: EnvironmentKey {
     static let defaultValue: AppTheme = .creatorPick
 }
@@ -317,20 +115,6 @@ extension EnvironmentValues {
     var appTheme: AppTheme {
         get { self[AppThemeKey.self] }
         set { self[AppThemeKey.self] = newValue }
-    }
-}
-
-extension View {
-    func themed() -> some View { modifier(ThemedModifier()) }
-}
-
-private struct ThemedModifier: ViewModifier {
-    @State private var manager = ThemeManager.shared
-
-    func body(content: Content) -> some View {
-        content
-            .environment(\.appTheme, manager.theme)
-            .preferredColorScheme(manager.theme.colorScheme)
     }
 }
 
@@ -371,7 +155,7 @@ struct DynamicColor: ShapeStyle {
 
     var uiColor: UIColor {
         let brand = self.brand, light = self.light, dark = self.dark
-        return UIColor { _ in UIColor(hex: ThemeManager.current.pick(brand, light, dark)) }
+        return UIColor { _ in UIColor(hex: AppTheme.current.pick(brand, light, dark)) }
     }
 }
 

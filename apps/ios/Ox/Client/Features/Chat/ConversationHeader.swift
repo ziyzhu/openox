@@ -60,3 +60,35 @@ struct ConversationOverflowMenu<Content: View>: View {
         .glassEffect(.regular.interactive(), in: Circle())
     }
 }
+
+struct SidebarMenuButton: View {
+    let action: () -> Void
+
+    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 44
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                Capsule().frame(width: 19, height: 2.5)
+                Capsule().frame(width: 12, height: 2.5)
+            }
+            .foregroundStyle(Theme.Colors.onSurface)
+            .frame(width: size, height: size)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel(A11yLabel.openSidebar)
+        .accessibilityIdentifier(A11yID.Chat.openSidebar)
+    }
+}
+
+struct TemporaryChatIcon: View {
+    let isActive: Bool
+
+    var body: some View {
+        Image(isActive ? "icon.temporary.checked" : "icon.temporary")
+            .resizable()
+            .scaledToFit()
+    }
+}
