@@ -707,19 +707,14 @@ final class ServiceManager {
     }
 
     func connectRepository(from origin: URL, locale: String?) async throws -> Repository.Descriptor {
-        repositoryState = .syncing
-        do {
-            try await repository.install(from: origin)
-            _ = await loadRepositories(locale: locale)
-            guard case .ready = repositoryState,
-                  let installed = repositories.first(where: { $0.origin == origin }) else {
+        try await performRepositoryMutation(locale: locale, failureContext: "connect failed=") {
+            try await self.repository.install(from: origin)
+        } verify: { _ in
+            guard case .ready = self.repositoryState,
+                  let installed = self.repositories.first(where: { $0.origin == origin }) else {
                 throw Repository.Failure(message: "The repository was installed but could not be loaded")
             }
             return installed
-        } catch {
-            repositoryState = .failed(error.localizedDescription)
-            Log.service.error("ServiceManager.repository connect failed=\(error.localizedDescription)")
-            throw error
         }
     }
 
@@ -731,20 +726,15 @@ final class ServiceManager {
     }
 
     func syncRepository(_ repositoryID: String, locale: String?) async throws -> Repository.Descriptor {
-        repositoryState = .syncing
-        do {
-            try await repository.update(repositoryID: repositoryID)
-            _ = await loadRepositories(locale: locale)
-            guard case .ready = repositoryState,
-                  let synced = repositories.first(where: { $0.id == repositoryID }),
+        try await performRepositoryMutation(locale: locale, failureContext: "sync failed id=\(repositoryID) error=") {
+            try await self.repository.update(repositoryID: repositoryID)
+        } verify: { _ in
+            guard case .ready = self.repositoryState,
+                  let synced = self.repositories.first(where: { $0.id == repositoryID }),
                   case .ready = synced.state else {
                 throw Repository.Failure(message: "The repository was updated but could not be loaded")
             }
             return synced
-        } catch {
-            repositoryState = .failed(error.localizedDescription)
-            Log.service.error("ServiceManager.repository sync failed id=\(repositoryID) error=\(error.localizedDescription)")
-            throw error
         }
     }
 
@@ -755,17 +745,12 @@ final class ServiceManager {
     }
 
     func disconnectRepository(_ repositoryID: String, locale: String?) async throws {
-        repositoryState = .syncing
-        do {
-            try await repository.remove(repositoryID: repositoryID)
-            _ = await loadRepositories(locale: locale)
-            guard case .ready = repositoryState else {
+        try await performRepositoryMutation(locale: locale, failureContext: "disconnect failed=") {
+            try await self.repository.remove(repositoryID: repositoryID)
+        } verify: { _ in
+            guard case .ready = self.repositoryState else {
                 throw Repository.Failure(message: "The repository was removed but services could not be reloaded")
             }
-        } catch {
-            repositoryState = .failed(error.localizedDescription)
-            Log.service.error("ServiceManager.repository disconnect failed=\(error.localizedDescription)")
-            throw error
         }
     }
 
@@ -1109,14 +1094,28 @@ final class ServiceManager {
         locale: String?,
         operation: @escaping @MainActor () async throws -> Void
     ) async -> [String] {
+        do {
+            return try await performRepositoryMutation(locale: locale, failureContext: "mutation failed=", operation: operation) { $0 }
+        } catch {
+            return []
+        }
+    }
+
+    private func performRepositoryMutation<Result>(
+        locale: String?,
+        failureContext: String,
+        operation: @escaping @MainActor () async throws -> Void,
+        verify: @MainActor ([String]) throws -> Result
+    ) async throws -> Result {
         repositoryState = .syncing
         do {
             try await operation()
-            return await loadRepositories(locale: locale)
+            let errors = await loadRepositories(locale: locale)
+            return try verify(errors)
         } catch {
             repositoryState = .failed(error.localizedDescription)
-            Log.service.error("ServiceManager.repository mutation failed=\(error.localizedDescription)")
-            return []
+            Log.service.error("ServiceManager.repository \(failureContext)\(error.localizedDescription)")
+            throw error
         }
     }
 

@@ -222,22 +222,3 @@ export function failResult(label: string, error: string): never {
 export function printResult(result: Record<string, unknown>): void {
   console.log(JSON.stringify(result.value ?? null, null, 2));
 }
-
-export function takeFlag(args: string[], ...names: string[]): { value: string | undefined; rest: string[] } {
-  const rest: string[] = [];
-  let value: string | undefined;
-  for (let index = 0; index < args.length; index++) {
-    const argument = args[index]!;
-    const assignment = names.map((name) => `${name}=`).find((prefix) => argument.startsWith(prefix));
-    if (assignment) {
-      value = argument.slice(assignment.length);
-      continue;
-    }
-    if (names.includes(argument)) {
-      value = args[++index];
-      continue;
-    }
-    rest.push(argument);
-  }
-  return { value, rest };
-}
