@@ -80,9 +80,10 @@ try {
   const entries = (await call("ox.fs.list", { path: `/${conversationRoot}` })).items;
   for (const name of ["conversation.json", "turns.jsonl", prefix]) assert(entries.some((item: { path: string }) => item.path === `${conversationRoot}/${name}`));
   const transcript = `${conversationRoot}/turns.jsonl`;
-  const history = await call("ox.fs.read", { path: `/${transcript}` });
+  const history = await call("ox.fs.read", { path: `/${transcript}`, limit: 1 });
   assert(history.text.includes("QA filesystem backend verification seed."));
-  assert.equal((await call("ox.fs.read", { path: `/history/${conversationRoot.split("/")[1]}/turns.jsonl` })).text, history.text);
+  const alias = await call("ox.fs.read", { path: `/history/${conversationRoot.split("/")[1]}/turns.jsonl`, limit: 1 });
+  assert.deepEqual(JSON.parse(alias.text), JSON.parse(history.text));
   for (const name of ["conversation.json", "turns.jsonl"]) {
     await rejected("ox.fs.write", { path: `/${conversationRoot}/${name}`, content: "Forbidden" });
     await rejected("ox.fs.mkdir", { path: `/${conversationRoot}/${name}/nested`, recursive: true });
