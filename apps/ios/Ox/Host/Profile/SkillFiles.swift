@@ -15,12 +15,11 @@ extension SkillFiles {
               values.isDirectory == true, values.isSymbolicLink != true else { throw SkillError.invalidPackage }
         var files: [String: String] = [:]
         var total = 0
-        let root = directory.standardizedFileURL.path + "/"
         guard let enumerator = manager.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]) else {
             throw SkillError.invalidPackage
         }
         while let url = enumerator.nextObject() as? URL {
-            let path = String(url.standardizedFileURL.path.dropFirst(root.count))
+            let path = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
             let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
             guard info.isSymbolicLink != true else { throw SkillError.invalidPackage }
             if info.isDirectory == true {

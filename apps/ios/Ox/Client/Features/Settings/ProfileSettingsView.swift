@@ -51,17 +51,21 @@ struct ProfileSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 if let profile {
-                    manageSection(for: profile)
-                    storageSection
-                    ProfileContentsView(
-                        profile: profile,
-                        initialSkillDraft: initialSkillDraft,
-                        artifactRefreshEpoch: artifactRefreshEpoch,
-                        onRenameArtifact: onRenameArtifact,
-                        onDeleteArtifact: onDeleteArtifact
-                    )
-                        .id(profile.url.path)
-                    deleteSection(for: profile)
+                    if profile.version == ProfileSchema.current {
+                        manageSection(for: profile)
+                        storageSection
+                        ProfileContentsView(
+                            profile: profile,
+                            initialSkillDraft: initialSkillDraft,
+                            artifactRefreshEpoch: artifactRefreshEpoch,
+                            onRenameArtifact: onRenameArtifact,
+                            onDeleteArtifact: onDeleteArtifact
+                        )
+                            .id(profile.url.path)
+                        deleteSection(for: profile)
+                    } else {
+                        ContentUnavailableView("Use this Profile", systemImage: "person.crop.circle")
+                    }
                 }
             }
             .settingsPagePadding()
@@ -79,6 +83,7 @@ struct ProfileSettingsView: View {
                         do {
                             try await storage.switchTo(profile)
                         } catch {
+                            operationErrorMessage = error.localizedDescription
                             Log.ui.error("ProfileSettings.select id=\(profile.id) failed: \(error.localizedDescription)")
                         }
                     }

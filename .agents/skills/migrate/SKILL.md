@@ -13,7 +13,7 @@ Read [references/storage.md](references/storage.md) before changing or reviewing
 
 Use `StorageMigrator` as the single startup and activation gate for persisted-format compatibility. Keep every migration entry point, ordered milestone, structural probe, and legacy transform in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not introduce domain-specific migrator types or migration files. Consumers must not invoke legacy repair independently or read potentially old state before the gate completes.
 
-Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to chats, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile.
+Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to chats, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile. Keep upgrades lazy: discovery must not migrate inactive Profiles, and their settings must not open old-format content before activation. Existing interrupted-publication recovery remains an application-wide prerequisite.
 
 Do not expect runtime code to infer arbitrary incompatibilities. Every incompatible change needs an explicit version milestone or an unambiguous structural probe for formats that predate versioning. Reject unknown future versions rather than interpreting them as current data.
 
@@ -29,6 +29,8 @@ Identify:
 - whether downgrade compatibility is required, and how partial migration is detected and resumed.
 
 Before running another checkout or older build against an existing app container, compare its current schema with the stored milestone. Use an isolated numbered QA simulator or a restored upgrade fixture when they differ. If downgrade compatibility is required, design and verify it explicitly; otherwise fail closed with an actionable message that tells the user to reinstall the version that last opened the data or a newer one.
+
+Build inventory-relative paths from traversed entry names, not by slicing absolute URL strings: Foundation enumeration can expand `/var` or `/tmp` aliases to `/private/...`. Verify aliased roots and nested entries while retaining symlink rejection. For URL enumerators, derive relative paths from `pathComponents.suffix(enumerator.level)`. Run `bun run typecheck` to catch the known absolute-path slicing and replacement patterns.
 
 Prefer ordered, retry-safe milestones. Stamp a milestone only after all of its operations succeed. Preserve a recoverable source or equivalent destination across interruption. Define collision behavior explicitly; never replace ambiguous user data. Preserve Local Git history, index state, working-tree changes, and detached views unless the migration specifically and safely transforms them.
 

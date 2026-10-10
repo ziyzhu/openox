@@ -722,7 +722,7 @@ actor Repository {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true else { throw Failure(message: "Service source contains a symbolic link.") }
             guard values.isRegularFile == true else { continue }
-            let path = String(url.path.dropFirst(source.root.path.count + 1))
+            let path = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
             files.append(.init(path: "services/\(service.id.path)/\(path)", data: try Data(contentsOf: url)))
         }
         let data = try ServicePackageCodec.encode(kind: service.id.kind, domain: id, files: files.sorted { $0.path < $1.path })
@@ -1011,7 +1011,7 @@ actor Repository {
         while let url = enumerator.nextObject() as? URL {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true, values.isRegularFile == true else { continue }
-            var relative = url.path.replacingOccurrences(of: source.root.path + "/", with: "", options: [.anchored])
+            var relative = url.pathComponents.suffix(enumerator.level).joined(separator: "/")
             if relative == "manifest.json" {
                 if FileManager.default.fileExists(atPath: source.root.appendingPathComponent("service.json").path) { continue }
                 relative = "service.json"
@@ -1437,14 +1437,14 @@ actor Repository {
                 includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles]
             ) else { continue }
-            var files: [URL] = []
+            var files: [(path: String, url: URL)] = []
             while let url = enumerator.nextObject() as? URL {
                 let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                if values.isSymbolicLink != true, values.isRegularFile == true { files.append(url) }
+                if values.isSymbolicLink != true, values.isRegularFile == true { files.append((path + "/" + url.pathComponents.suffix(enumerator.level).joined(separator: "/"), url)) }
             }
-            for url in files.sorted(by: { $0.path < $1.path }) {
-                digest.update(data: Data(url.path.replacingOccurrences(of: root.path + "/", with: "").utf8))
-                digest.update(data: try Data(contentsOf: url))
+            for file in files.sorted(by: { $0.path < $1.path }) {
+                digest.update(data: Data(file.path.utf8))
+                digest.update(data: try Data(contentsOf: file.url))
             }
         }
         return digest.finalize().map { String(format: "%02x", $0) }.joined()

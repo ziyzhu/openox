@@ -791,18 +791,18 @@ nonisolated enum StorageMigrator {
 
     private static func durableSourceInventory(at root: URL) throws -> [String: String] {
         var files: [String: String] = [:]
-        var directories = [root]
-        while let directory = directories.popLast() {
+        var directories = [(root, "")]
+        while let (directory, prefix) = directories.popLast() {
             for url in try FileManager.default.contentsOfDirectory(at: directory,
                 includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey]) {
                 let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey])
                 guard values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(url.lastPathComponent) }
-                let path = String(url.path.dropFirst(root.path.count + 1))
+                let path = prefix + url.lastPathComponent
                 if values.isDirectory == true {
                     guard ["chats", "skills", "artifacts"].contains(path) || path.hasPrefix("chats/") || path.hasPrefix("skills/") else {
                         throw StorageMigrationError.invalidApplicationStorage(path)
                     }
-                    directories.append(url); continue
+                    directories.append((url, path + "/")); continue
                 }
                 guard values.isRegularFile == true,
                     [ProfileIO.configName, "MEMORY.md", "SOUL.md", "skill-selections.json", "artifacts/.saved.json"].contains(path)
@@ -2174,8 +2174,8 @@ nonisolated enum StorageMigrator {
         let packageBackup = backup.appendingPathComponent(packageURL.lastPathComponent)
         if !manager.fileExists(atPath: packageBackup.path) { try manager.copyItem(at: packageURL, to: packageBackup) }
         var names = Set(package["skills"] as? [String] ?? [])
-        var oldDirectories: [URL] = []
-        var manifests: [(URL, Data)] = []
+        var oldDirectories: [String] = []
+        var manifests: [(String, Data)] = []
         var moved: [(URL, Skill)] = []
         for service in services {
             let parts = service.split(separator: ":", maxSplits: 1).map(String.init)
@@ -2204,7 +2204,7 @@ nonisolated enum StorageMigrator {
                 }
                 guard source.resolvingSymlinksInPath().standardizedFileURL.path == directory.resolvingSymlinksInPath().appendingPathComponent("skills/\(oldName)").standardizedFileURL.path else { throw SkillError.invalidPackage }
                 var skill = try SkillFiles.load(directory: manager.fileExists(atPath: source.path) ? source : savedSource)
-                oldDirectories.append(source)
+                oldDirectories.append(parts[0] + "/" + parts[1] + "/skills/" + oldName)
                 skill.name = migratedSkillName(domain: parts[1], name: oldName)
                 skill.instructions = migratedSkillInstructions(skill.instructions)
                 let dependency = parts[0] == "ios" ? service : parts[1]
@@ -2220,11 +2220,11 @@ nonisolated enum StorageMigrator {
                 names.insert(skill.name)
             }
             if manifest.removeValue(forKey: "skills") != nil {
-                manifests.append((file, try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])))
+                manifests.append((parts[0] + "/" + parts[1] + "/service.json", try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])))
             }
         }
-        for (file, _) in manifests {
-            let relative = String(file.path.dropFirst(root.path.count + 1))
+        for (relative, _) in manifests {
+            let file = root.appendingPathComponent(relative)
             let destination = backup.appendingPathComponent(relative)
             if !manager.fileExists(atPath: destination.path) {
                 try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -2232,8 +2232,8 @@ nonisolated enum StorageMigrator {
             }
         }
         for (destination, skill) in moved { try SkillFiles.write(skill, directory: destination) }
-        for (file, data) in manifests { try data.write(to: file, options: .atomic) }
-        for directory in oldDirectories where manager.fileExists(atPath: directory.path) {
+        for (file, data) in manifests { try data.write(to: root.appendingPathComponent(file), options: .atomic) }
+        for directory in oldDirectories.map({ root.appendingPathComponent($0) }) where manager.fileExists(atPath: directory.path) {
             try manager.removeItem(at: directory)
             let parent = directory.deletingLastPathComponent()
             if (try? manager.contentsOfDirectory(atPath: parent.path).isEmpty) == true { try manager.removeItem(at: parent) }
@@ -2243,7 +2243,7 @@ nonisolated enum StorageMigrator {
         package.removeValue(forKey: "contentHash")
         try JSONSerialization.data(withJSONObject: package, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]).write(to: current, options: .atomic)
         if clean, let git {
-            let paths = ["repository.json"] + manifests.map { String($0.0.path.dropFirst(root.path.count + 1)) } + moved.map { "skills/\($0.1.name)" } + oldDirectories.map { String($0.path.dropFirst(root.path.count + 1)) }
+            let paths = ["repository.json"] + manifests.map(\.0) + moved.map { "skills/\($0.1.name)" } + oldDirectories
             try git.add(paths: paths)
             let commit = try git.commit(message: "Move shared skills into repository version 3")
             Log.app.info("StorageMigrator.repositorySkills from=2 to=3 count=\(moved.count) commit=\(commit.id.abbreviated)")
@@ -2314,14 +2314,14 @@ nonisolated enum StorageMigrator {
         }
         guard values.isDirectory == true else { throw StorageMigrationError.invalidApplicationStorage(root.lastPathComponent) }
         var files: [String: String] = [:]
-        var directories = [root]
-        while let directory = directories.popLast() {
+        var directories = [(root, "")]
+        while let (directory, prefix) = directories.popLast() {
             for url in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)) {
                 let values = try url.resourceValues(forKeys: keys)
                 guard values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(url.lastPathComponent) }
-                if values.isDirectory == true { directories.append(url) }
+                let path = prefix + url.lastPathComponent
+                if values.isDirectory == true { directories.append((url, path + "/")) }
                 else {
-                    let path = String(url.path.dropFirst(root.path.count + 1))
                     files[path] = try durableSourceFingerprint(path, at: root)
                 }
             }
