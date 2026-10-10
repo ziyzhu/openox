@@ -41,7 +41,7 @@ The former repository replay command, harness, and committed response fixtures a
 
 ## Icon
 
-Check that the Local manifest's `faviconUrl` still returns a direct HTTPS PNG or JPEG without redirects, authentication, or cookies, fits the app's 1 MiB download limit, and remains recognizable at 20 px. Fetch the official compact mark with `.agents/skills/evolve/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/evolve/scripts/favicon-audit.sh <path-to-favicon.png>`.
+Check that the Local manifest's stable HTTPS `faviconUrl` still loads anonymously as PNG, JPEG, or ICO through the native image loader, within its 1 MiB, 4096×4096, 32-frame, and five-public-HTTPS-redirect limits, and remains recognizable at 20 px. Local delivery may use a smaller verified official icon; promotion still requires the qualifying source below. The built-in hosted output must remain a direct, anonymous HTTPS PNG without redirects. Fetch the official compact mark with `.agents/skills/evolve/scripts/favicon-128.sh <domain> <verified-favicon-url>` and audit it with `.agents/skills/evolve/scripts/favicon-audit.sh <path-to-favicon.png>`.
 
 Require an official square source that is at least 128×128, remains recognizable at 20 px, has an intentional background in the central safe area, and renders cleanly on light and dark backgrounds. Never upscale, reconstruct brand artwork, or accept a generic substitute.
 

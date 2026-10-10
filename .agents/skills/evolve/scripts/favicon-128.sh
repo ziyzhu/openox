@@ -20,7 +20,7 @@ log() {
 }
 
 fetch() {
-  curl -fsSL -A "$UA" "$1" -o "$2"
+  curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 5 --max-filesize 1048576 --connect-timeout 15 --max-time 30 -A "$UA" "$1" -o "$2"
 }
 
 resolve_url() {

@@ -84,14 +84,18 @@ Inspect only the requests, redirects, statuses, and response shapes needed for t
 
 ### Choose a favicon
 
-While Browser is on the service, inventory first-party public icon metadata in this order:
+Preserve an existing working icon unless the user requests a replacement. While Browser is on the service, collect and deduplicate official public icon candidates in this category order:
 
-1. Largest square `apple-touch-icon`.
-2. Largest square icon in a same-site web-app manifest.
-3. Largest square `icon`.
-4. Same-site `/apple-touch-icon.png` or `/favicon.ico`.
+1. `apple-touch-icon` links.
+2. Icons advertised by a linked web-app manifest.
+3. `icon` links, including `shortcut icon`.
+4. Same-site `/apple-touch-icon.png` and `/favicon.ico`, only after advertised candidates fail.
 
-Resolve relative URLs and choose the first category with a stable public HTTPS square PNG or JPEG at least 128×128, selecting the largest qualifying image within that category. Page JavaScript may load a candidate and return its final URL and natural dimensions. Store the final non-redirecting URL as `faviconUrl`, reload the service, and visually confirm the service avatar appears and remains recognizable. Do not select SVG because the service image loader does not support it.
+Resolve document links against `document.baseURI`, which includes any HTML base element. Resolve manifest icon `src` values against the manifest's final response URL, not the document URL. A public CDN image explicitly advertised by the website is an official candidate; it need not share the website host. Treat declared `sizes` and `type` as hints, not proof of the actual image. Respect link `media` conditions and manifest `purpose`: prefer a normal full-color mark usable in both light and dark mode; maskable icons reserve space for cropping, and monochrome icons may need tinting the avatar does not provide. Do not choose an unrelated logo or invent image paths beyond the two conventional paths above.
+
+Try square official PNG, JPEG, or ICO candidates at least 128×128 first, using category order to break ties and preferring sufficient avatar resolution over the largest file. Then try smaller official candidates that remain recognizable at 20 px before using a third-party cache. The service image loader accepts at most 1 MiB, at most 32 image frames, and source dimensions at most 4096×4096; it decodes the largest ICO frame and produces a PNG thumbnail up to 256 px. SVG is not supported. Page JavaScript may load a candidate to inspect natural dimensions, but browser success is not native-loader verification and an image element's `src` does not reveal its final URL after redirects.
+
+Save a stable public HTTPS advertised URL as `faviconUrl`, reload the service, and visually confirm the actual service avatar renders and represents the product in light and dark mode. The native loader fetches without cookies or credentials and follows at most five redirects, each to a policy-allowed public HTTPS URL. Do not pin an expiring or signed CDN URL when a stable advertised URL works. If the avatar fails, inspect available icon diagnostics and try the next candidate; do not accept a cookie-dependent image merely because Browser can display it.
 
 When no first-party candidate qualifies, request Google's cached favicon for the product's public origin only:
 
@@ -99,9 +103,9 @@ When no first-party candidate qualifies, request Google's cached favicon for the
 https://www.google.com/s2/favicons?domain_url=<percent-encoded-origin>&sz=128&alt=404
 ```
 
-Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. Navigate Browser to the resolver and wait for the URL to settle. Because the service image loader does not follow redirects, save the final direct HTTPS `tN.gstatic.com/faviconV2` URL rather than the `google.com` resolver URL. Accept the result only when it returns `200`, is a square supported raster, visibly matches the product, and renders as the service avatar after reload. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at the rendered avatar size. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
+Strip credentials, path, query, and fragment from the submitted origin so the request discloses no private or user-specific URL state. This fallback still discloses the public product origin to Google; do not use it when the user prohibits third-party icon requests. Save the stable resolver URL and verify it through the actual service avatar, not only Browser. Accept only a successful square supported image that visibly matches the product. Google may return less than 128×128 despite the requested size; accept a smaller cached result only when it remains recognizable at 20 px. Reject a `404`, placeholder, generic letter, unrelated mark, or result that does not render.
 
-Always attempt to acquire a verified `faviconUrl` when creating a customer-facing web service, and repair missing or broken icons when updating one. Try first-party icons in the order above, then Google's cached favicon. Save a direct HTTPS URL to a supported raster image, reload the service, and visually confirm that its avatar renders and represents the product. Do not skip icon discovery or omit a valid verified icon. If neither source provides a valid icon, omit `faviconUrl` and report the missing icon as a limitation without blocking service delivery or Save. Never fabricate an image URL or use an unrelated icon. Record the icon source internally.
+Always attempt to acquire a verified `faviconUrl` when creating a customer-facing web service, and repair missing or broken icons when updating one. Try suitable official images, including smaller usable ones, before Google's cache. Do not skip icon discovery or omit a valid verified icon. If no candidate works, omit `faviconUrl` and report the missing icon as a limitation without blocking service delivery or Save. Never fabricate an image URL or use an unrelated icon. Record the icon source internally.
 
 ## 3. Explain the plan
 
@@ -247,7 +251,7 @@ Return navigation destinations through URL actions so iOS owns full-page navigat
 10. Exercise declared standard pairs through `ox.service.signIn`, `ox.service.solve`, or `ox.service.pay` at their safe boundaries.
 11. Inspect repository skills that depend on this service when action IDs or contracts changed and identify skills that need revision through `skills/manage-skills/SKILL.md`.
 12. Confirm the service remains discoverable, its current manifest is in the VFS, and its actions are attached in this chat.
-13. For customer-facing services, verify the favicon URL is a direct HTTPS supported raster image without redirects, reload the service, and visually confirm its avatar appears and represents the product. If no valid icon can be obtained after trying first-party and Google-cached sources, report the limitation and continue without blocking service delivery or Save.
+13. For customer-facing services, verify the stable HTTPS favicon URL loads anonymously through the native image loader within its format, size, and redirect limits. Reload the service and visually confirm its avatar represents the product in light and dark mode. Preserve a working icon; otherwise try official candidates, including usable smaller images, before Google's cache. If none works, report the limitation without blocking service delivery or Save.
 14. Stop capture with `discard: true` and clear installed document-start scripts. Confirm both cleanup operations succeeded before reporting completion, saving, or ending an abandoned or blocked run.
 
 Evaluate semantic usefulness as well as contract validity. The persisted catalog and search index provide routing in current and future chats.
