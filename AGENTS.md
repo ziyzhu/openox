@@ -24,14 +24,11 @@
 
 ## Commit Rules
 
-1. Include the current iOS marketing version in every commit subject using `<imperative summary> (iOS <version>)`, including commits that do not modify the iOS app.
-1. Keep the App Store release check fast: run only `asc versions list --app 6802224502` before committing. The app ID is stable; do not list apps or make broader App Store Connect queries unless the user requests them.
-1. Treat the highest iOS version in a released state such as `READY_FOR_SALE` or `READY_FOR_DISTRIBUTION` as released. Use an existing higher unreleased App Store Connect version when one exists; otherwise advance `MARKETING_VERSION` in every build configuration to the next planned release before committing.
-1. Read `<version>` from `MARKETING_VERSION` in `apps/ios/Ox.xcodeproj/project.pbxproj`, confirm all build configurations agree, and compare it with the single versions-list response. Confirm it is higher than the released App Store Connect version, then use it in new commit subjects.
-1. Use the commit message template below. Describe the changes and testing performed; include related issues, pull requests, or commits, or write `None` when there are no related references. State when testing was not run and why.
+1. Use the commit message template below with a short imperative subject. Describe the changes and testing performed; include related issues, pull requests, or commits, or write `None` when there are no related references. State when testing was not run and why.
+1. Committing does not require iOS version checks, App Store Connect queries, version bumps, or version tags in commit messages.
 
 ```text
-<imperative summary> (iOS <version>)
+<imperative summary>
 
 Changes:
 - <what changed and why>
