@@ -109,7 +109,7 @@ test("CLI accepts the current RPC revision when the Host also supports newer rev
   } finally { fixture.close(); }
 });
 
-test("CLI spends the operation timeout on admission without sending the mutation", async () => {
+test("CLI spends the operation timeout on the version check without sending the mutation", async () => {
   const fixture = await exercise({ descriptionDelayMs: 100 });
   try {
     const result = await fixture.cli("chat", "new", "--temporary", "--timeout", "20");
@@ -137,7 +137,7 @@ async function watchRequests(options: FixtureOptions, ready: (requests: string[]
   return { requests: fixture.requests, stdout: await stdout, stderr: await stderr };
 }
 
-test("CLI admits the interface once for repeated requests on one connection", async () => {
+test("CLI checks the interface version once for repeated requests on one connection", async () => {
   const result = await watchRequests({}, requests => requests.filter(method => method === "chats.get").length >= 3);
   expect(result.requests.filter(method => method === "host.describe")).toEqual(["host.describe"]);
   expect(result.stderr).toBe("");

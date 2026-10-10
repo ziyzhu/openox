@@ -5,7 +5,7 @@ export type { HostDescription, HostChatRow } from "@openox/protocol";
 
 export class HostRPCClient {
   private readonly connection: HostConnection;
-  private admission?: { generation: number; ready: Promise<void> };
+  private versionCheck?: { generation: number; ready: Promise<void> };
 
   constructor(endpoint?: string) {
     this.connection = new HostConnection(endpoint);
@@ -14,7 +14,7 @@ export class HostRPCClient {
   async call(method: string, timeoutMs: number, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
     if (!validateParams(method, params)) throw new Error(`Invalid ${method} parameters; request not sent`);
     const deadline = Date.now() + timeoutMs;
-    if (method !== "host.describe") await this.admit(timeoutMs);
+    if (method !== "host.describe") await this.checkVersion(timeoutMs);
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error(`Timeout before ${method}; request not sent`);
     const result = await this.connection.request(method, params, remaining);
@@ -25,16 +25,16 @@ export class HostRPCClient {
     return result;
   }
 
-  private admit(timeoutMs: number): Promise<void> {
+  private checkVersion(timeoutMs: number): Promise<void> {
     const generation = this.connection.generation;
-    if (this.admission?.generation === generation) return this.admission.ready;
+    if (this.versionCheck?.generation === generation) return this.versionCheck.ready;
     const ready = this.describe(timeoutMs).then(description => {
       const supported = description.protocols.rpc ?? [];
       if (!supported.includes(RPC_VERSION)) {
         throw new Error(`Host RPC interface revisions ${supported.join(", ") || "unversioned"} do not support CLI revision ${RPC_VERSION}; update the Host and CLI together. Operation request not sent.`);
       }
     });
-    this.admission = { generation, ready };
+    this.versionCheck = { generation, ready };
     return ready;
   }
 

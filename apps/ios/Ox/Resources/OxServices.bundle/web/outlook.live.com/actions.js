@@ -1,9 +1,4 @@
-{
-  const __oxRuntime = window.ox;
-  const __oxRuntimeCallServiceAction = __oxRuntime.callServiceAction;
-  let __oxLegacyCall;
-  try {
-(() => {
+window.ox.install(({ action }) => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const clean = value => String(value || '').replace(/[\u200b-\u200d\ufeff]/g, '').replace(/\s+/g, ' ').trim();
   const hash = value => { let h = 2166136261; for (const ch of String(value)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
@@ -50,26 +45,5 @@
     async listEvents(args={}){ ensureRoute('calendar'); await waitFor(()=>document.querySelector('[role="main"]'),'listEvents calendar'); const start=new Date(args.start), end=new Date(args.end); if(!Number.isFinite(+start)||!Number.isFinite(+end)||start>=end)throw new Error('listEvents: invalid date range'); const events=[...document.querySelectorAll('[role="button"]')].filter(visible).filter(e=>{const s=clean(e.getAttribute('aria-label')||e.innerText); return s&&!/New event|Go to|Jump to|Calendar|month|week|date selection/i.test(s)&&(/\d{1,2}:\d{2}\s*(AM|PM)/i.test(s)||/all day/i.test(s));}).map(parseEventEl); return pageItems(events,args.cursor??null,args.limit??50); },
     async getEvent(args={}){ ensureRoute('calendar'); const id=String(args.id||''); const event=[...document.querySelectorAll('[role="button"]')].filter(visible).find(e=>(e.dataset.itemid||e.dataset.itemId||e.getAttribute('data-item-id')||hash(clean(e.getAttribute('aria-label')||e.innerText)))===id); if(!event)throw new Error('getEvent: event is not visible'); event.click(); await sleep(600); const pane=[...document.querySelectorAll('[role="dialog"], [role="main"], [role="complementary"]')].filter(visible).slice(-1)[0]; if(!pane)throw new Error('getEvent: details unavailable'); const text=clean(pane.innerText); const subject=clean(pane.querySelector('[role="heading"]')?.innerText)||clean(event.innerText)||clean(event.getAttribute('aria-label')).split(',')[0]; const timeText=clean([...pane.querySelectorAll('*')].find(e=>/\d{1,2}:\d{2}\s*(AM|PM)/i.test(clean(e.innerText)))?.innerText); const location=clean(pane.querySelector('[aria-label*="location" i]')?.innerText||pane.querySelector('[aria-label*="location" i]')?.getAttribute('aria-label')); const organizer=clean(pane.querySelector('[aria-label*="organizer" i]')?.innerText); const attendees=[...pane.querySelectorAll('[aria-label*="attendee" i]')].map(e=>clean(e.innerText||e.getAttribute('aria-label'))).filter(Boolean); return {id,subject,timeText,location,organizer,attendees,bodyText:text.slice(0,8000)}; }
   };
-  window.ox={async callServiceAction(name,args={}){if(!Object.prototype.hasOwnProperty.call(actions,name))throw new Error('unknown action: '+name);try{return await actions[name](args||{});}catch(e){throw new Error(name+': '+(e&&e.message?e.message:String(e)));}}};
-})();
-
-    if (typeof window.ox?.callServiceAction === "function") {
-      __oxLegacyCall = window.ox.callServiceAction.bind(window.ox);
-    }
-  } finally {
-    window.ox = __oxRuntime;
-    __oxRuntime.callServiceAction = __oxRuntimeCallServiceAction;
-  }
-  if (typeof __oxLegacyCall !== "function") throw new Error("legacy service dispatcher is unavailable");
-  window.ox.install(({ action }) => {
-  action("getSignInUrl", { async invoke(args) { return __oxLegacyCall("getSignInUrl", args); } });
-  action("getSignInState", { async invoke(args) { return __oxLegacyCall("getSignInState", args); } });
-  action("listFolders", { async invoke(args) { return __oxLegacyCall("listFolders", args); } });
-  action("listMessages", { async invoke(args) { return __oxLegacyCall("listMessages", args); } });
-  action("searchMessages", { async invoke(args) { return __oxLegacyCall("searchMessages", args); } });
-  action("getMessage", { async invoke(args) { return __oxLegacyCall("getMessage", args); } });
-  action("listCalendars", { async invoke(args) { return __oxLegacyCall("listCalendars", args); } });
-  action("listEvents", { async invoke(args) { return __oxLegacyCall("listEvents", args); } });
-  action("getEvent", { async invoke(args) { return __oxLegacyCall("getEvent", args); } });
-  });
-}
+  for (const [name, invoke] of Object.entries(actions)) action(name, { invoke });
+});
