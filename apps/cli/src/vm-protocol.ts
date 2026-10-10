@@ -1,9 +1,9 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
-const JSONValueSchema = Type.Recursive(Self => Type.Union([
+const JSONValueSchema = Type.Cyclic({ JSONValue: Type.Union([
   Type.Null(), Type.Boolean(), Type.Number(), Type.String(),
-  Type.Array(Self), Type.Record(Type.String(), Self),
-]), { $id: "JSONValue" });
+  Type.Array(Type.Ref("JSONValue")), Type.Record(Type.String(), Type.Ref("JSONValue")),
+]) }, "JSONValue");
 const sessionId = Type.Optional(Type.String({ minLength: 1 }));
 
 export const VMParamsSchemas = {

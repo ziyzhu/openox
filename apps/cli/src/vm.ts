@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { Value } from "@sinclair/typebox/value";
+import { Value } from "typebox/value";
 import { VMParamsSchemas, VMResultSchema } from "./vm-protocol.ts";
 import { callHost } from "./host-rpc.ts";
 import { fail, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";

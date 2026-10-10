@@ -1,7 +1,6 @@
 {
   "anyOf": [
     {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -13,25 +12,24 @@
       ],
       "properties": {
         "id": {
+          "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-          "type": "string"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "url": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -43,10 +41,10 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -61,10 +59,10 @@
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -78,17 +76,17 @@
                   ]
                 },
                 "header": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -106,24 +104,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -148,26 +146,26 @@
                   ]
                 },
                 "authorizeURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "redirectURI": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "authorizeParams": {
+                  "type": "object",
+                  "properties": {},
                   "additionalProperties": {
                     "type": "string"
-                  },
-                  "type": "object",
-                  "properties": {}
+                  }
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -184,24 +182,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -226,14 +224,14 @@
                   ]
                 },
                 "deviceAuthorizationURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -247,20 +245,19 @@
                   ]
                 },
                 "adapter": {
+                  "type": "string",
                   "minLength": 1,
                   "maxLength": 200,
-                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-                  "type": "string"
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "models": {
-          "maxItems": 1000,
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -268,31 +265,29 @@
             ],
             "properties": {
               "id": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "name": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "wireID": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "contextTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "outputTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "input": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -327,11 +322,11 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "output": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -366,26 +361,27 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "reasoningEfforts": {
-                "uniqueItems": true,
-                "maxItems": 100,
                 "type": "array",
                 "items": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
-                }
+                  "maxLength": 2048
+                },
+                "uniqueItems": true,
+                "maxItems": 100
               },
               "options": {
-                "additionalProperties": false,
                 "type": "object",
                 "properties": {
                   "serviceTier": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
+                    "maxLength": 2048
                   },
                   "adaptiveThinking": {
                     "type": "boolean"
@@ -393,10 +389,13 @@
                   "replayReasoning": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
-          }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 1000
         },
         "api": {
           "type": "string",
@@ -405,20 +404,19 @@
           ]
         },
         "options": {
-          "additionalProperties": false,
           "type": "object",
           "properties": {
             "headers": {
+              "type": "object",
+              "properties": {},
               "additionalProperties": {
                 "type": "string"
-              },
-              "type": "object",
-              "properties": {}
+              }
             },
             "extraBody": {
-              "additionalProperties": {},
               "type": "object",
-              "properties": {}
+              "properties": {},
+              "additionalProperties": {}
             },
             "maxTokensField": {
               "anyOf": [
@@ -523,12 +521,13 @@
                 }
               ]
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -540,25 +539,24 @@
       ],
       "properties": {
         "id": {
+          "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-          "type": "string"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "url": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -570,10 +568,10 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -588,10 +586,10 @@
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -605,17 +603,17 @@
                   ]
                 },
                 "header": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -633,24 +631,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -675,26 +673,26 @@
                   ]
                 },
                 "authorizeURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "redirectURI": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "authorizeParams": {
+                  "type": "object",
+                  "properties": {},
                   "additionalProperties": {
                     "type": "string"
-                  },
-                  "type": "object",
-                  "properties": {}
+                  }
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -711,24 +709,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -753,14 +751,14 @@
                   ]
                 },
                 "deviceAuthorizationURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -774,20 +772,19 @@
                   ]
                 },
                 "adapter": {
+                  "type": "string",
                   "minLength": 1,
                   "maxLength": 200,
-                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-                  "type": "string"
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "models": {
-          "maxItems": 1000,
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -795,31 +792,29 @@
             ],
             "properties": {
               "id": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "name": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "wireID": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "contextTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "outputTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "input": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -854,11 +849,11 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "output": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -893,26 +888,27 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "reasoningEfforts": {
-                "uniqueItems": true,
-                "maxItems": 100,
                 "type": "array",
                 "items": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
-                }
+                  "maxLength": 2048
+                },
+                "uniqueItems": true,
+                "maxItems": 100
               },
               "options": {
-                "additionalProperties": false,
                 "type": "object",
                 "properties": {
                   "serviceTier": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
+                    "maxLength": 2048
                   },
                   "adaptiveThinking": {
                     "type": "boolean"
@@ -920,10 +916,13 @@
                   "replayReasoning": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
-          }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 1000
         },
         "api": {
           "type": "string",
@@ -932,25 +931,24 @@
           ]
         },
         "options": {
-          "additionalProperties": false,
           "type": "object",
           "properties": {
             "headers": {
+              "type": "object",
+              "properties": {},
               "additionalProperties": {
                 "type": "string"
-              },
-              "type": "object",
-              "properties": {}
+              }
             },
             "extraBody": {
-              "additionalProperties": {},
               "type": "object",
-              "properties": {}
+              "properties": {},
+              "additionalProperties": {}
             },
             "sessionHeader": {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 2048,
-              "type": "string"
+              "maxLength": 2048
             },
             "reasoningEffort": {
               "anyOf": [
@@ -991,16 +989,17 @@
               ]
             },
             "accountHeader": {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 2048,
-              "type": "string"
+              "maxLength": 2048
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -1012,25 +1011,24 @@
       ],
       "properties": {
         "id": {
+          "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-          "type": "string"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "url": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1042,10 +1040,10 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1060,10 +1058,10 @@
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1077,17 +1075,17 @@
                   ]
                 },
                 "header": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1105,24 +1103,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -1147,26 +1145,26 @@
                   ]
                 },
                 "authorizeURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "redirectURI": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "authorizeParams": {
+                  "type": "object",
+                  "properties": {},
                   "additionalProperties": {
                     "type": "string"
-                  },
-                  "type": "object",
-                  "properties": {}
+                  }
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1183,24 +1181,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -1225,14 +1223,14 @@
                   ]
                 },
                 "deviceAuthorizationURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1246,20 +1244,19 @@
                   ]
                 },
                 "adapter": {
+                  "type": "string",
                   "minLength": 1,
                   "maxLength": 200,
-                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-                  "type": "string"
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "models": {
-          "maxItems": 1000,
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -1267,31 +1264,29 @@
             ],
             "properties": {
               "id": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "name": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "wireID": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "contextTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "outputTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "input": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -1326,11 +1321,11 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "output": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -1365,26 +1360,27 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "reasoningEfforts": {
-                "uniqueItems": true,
-                "maxItems": 100,
                 "type": "array",
                 "items": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
-                }
+                  "maxLength": 2048
+                },
+                "uniqueItems": true,
+                "maxItems": 100
               },
               "options": {
-                "additionalProperties": false,
                 "type": "object",
                 "properties": {
                   "serviceTier": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
+                    "maxLength": 2048
                   },
                   "adaptiveThinking": {
                     "type": "boolean"
@@ -1392,10 +1388,13 @@
                   "replayReasoning": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
-          }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 1000
         },
         "api": {
           "type": "string",
@@ -1404,42 +1403,42 @@
           ]
         },
         "options": {
-          "additionalProperties": false,
           "type": "object",
           "properties": {
             "headers": {
+              "type": "object",
+              "properties": {},
               "additionalProperties": {
                 "type": "string"
-              },
-              "type": "object",
-              "properties": {}
+              }
             },
             "extraBody": {
-              "additionalProperties": {},
               "type": "object",
-              "properties": {}
+              "properties": {},
+              "additionalProperties": {}
             },
             "version": {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 2048,
-              "type": "string"
+              "maxLength": 2048
             },
             "beta": {
-              "uniqueItems": true,
-              "maxItems": 100,
               "type": "array",
               "items": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
-              }
+                "maxLength": 2048
+              },
+              "uniqueItems": true,
+              "maxItems": 100
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -1451,25 +1450,24 @@
       ],
       "properties": {
         "id": {
+          "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-          "type": "string"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "url": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1481,10 +1479,10 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1499,10 +1497,10 @@
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1516,17 +1514,17 @@
                   ]
                 },
                 "header": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1544,24 +1542,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -1586,26 +1584,26 @@
                   ]
                 },
                 "authorizeURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "redirectURI": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "authorizeParams": {
+                  "type": "object",
+                  "properties": {},
                   "additionalProperties": {
                     "type": "string"
-                  },
-                  "type": "object",
-                  "properties": {}
+                  }
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1622,24 +1620,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -1664,14 +1662,14 @@
                   ]
                 },
                 "deviceAuthorizationURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1685,20 +1683,19 @@
                   ]
                 },
                 "adapter": {
+                  "type": "string",
                   "minLength": 1,
                   "maxLength": 200,
-                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-                  "type": "string"
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "models": {
-          "maxItems": 1000,
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -1706,31 +1703,29 @@
             ],
             "properties": {
               "id": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "name": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "wireID": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "contextTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "outputTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "input": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -1765,11 +1760,11 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "output": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -1804,26 +1799,27 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "reasoningEfforts": {
-                "uniqueItems": true,
-                "maxItems": 100,
                 "type": "array",
                 "items": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
-                }
+                  "maxLength": 2048
+                },
+                "uniqueItems": true,
+                "maxItems": 100
               },
               "options": {
-                "additionalProperties": false,
                 "type": "object",
                 "properties": {
                   "serviceTier": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
+                    "maxLength": 2048
                   },
                   "adaptiveThinking": {
                     "type": "boolean"
@@ -1831,10 +1827,13 @@
                   "replayReasoning": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
-          }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 1000
         },
         "api": {
           "type": "string",
@@ -1843,27 +1842,27 @@
           ]
         },
         "options": {
-          "additionalProperties": false,
           "type": "object",
           "properties": {
             "headers": {
+              "type": "object",
+              "properties": {},
               "additionalProperties": {
                 "type": "string"
-              },
-              "type": "object",
-              "properties": {}
+              }
             },
             "extraBody": {
-              "additionalProperties": {},
               "type": "object",
-              "properties": {}
+              "properties": {},
+              "additionalProperties": {}
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -1875,25 +1874,24 @@
       ],
       "properties": {
         "id": {
+          "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-          "type": "string"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "url": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 2048,
-          "type": "string"
+          "maxLength": 2048
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1905,10 +1903,10 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind"
@@ -1923,10 +1921,10 @@
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1940,17 +1938,17 @@
                   ]
                 },
                 "header": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "optional": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -1968,24 +1966,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -2010,26 +2008,26 @@
                   ]
                 },
                 "authorizeURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "redirectURI": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "authorizeParams": {
+                  "type": "object",
+                  "properties": {},
                   "additionalProperties": {
                     "type": "string"
-                  },
-                  "type": "object",
-                  "properties": {}
+                  }
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -2046,24 +2044,24 @@
                   ]
                 },
                 "clientID": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "scopes": {
-                  "uniqueItems": true,
-                  "maxItems": 100,
                   "type": "array",
                   "items": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
-                  }
+                    "maxLength": 2048
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 100
                 },
                 "tokenURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 },
                 "requestEncoding": {
                   "anyOf": [
@@ -2088,14 +2086,14 @@
                   ]
                 },
                 "deviceAuthorizationURL": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
+                  "maxLength": 2048
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "kind",
@@ -2109,20 +2107,19 @@
                   ]
                 },
                 "adapter": {
+                  "type": "string",
                   "minLength": 1,
                   "maxLength": 200,
-                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$",
-                  "type": "string"
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:@/-]*$"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "models": {
-          "maxItems": 1000,
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -2130,31 +2127,29 @@
             ],
             "properties": {
               "id": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "name": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "wireID": {
+                "type": "string",
                 "minLength": 1,
-                "maxLength": 2048,
-                "type": "string"
+                "maxLength": 2048
               },
               "contextTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "outputTokens": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "input": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -2189,11 +2184,11 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "output": {
-                "uniqueItems": true,
-                "minItems": 1,
                 "type": "array",
                 "items": {
                   "anyOf": [
@@ -2228,26 +2223,27 @@
                       ]
                     }
                   ]
-                }
+                },
+                "uniqueItems": true,
+                "minItems": 1
               },
               "reasoningEfforts": {
-                "uniqueItems": true,
-                "maxItems": 100,
                 "type": "array",
                 "items": {
+                  "type": "string",
                   "minLength": 1,
-                  "maxLength": 2048,
-                  "type": "string"
-                }
+                  "maxLength": 2048
+                },
+                "uniqueItems": true,
+                "maxItems": 100
               },
               "options": {
-                "additionalProperties": false,
                 "type": "object",
                 "properties": {
                   "serviceTier": {
+                    "type": "string",
                     "minLength": 1,
-                    "maxLength": 2048,
-                    "type": "string"
+                    "maxLength": 2048
                   },
                   "adaptiveThinking": {
                     "type": "boolean"
@@ -2255,10 +2251,13 @@
                   "replayReasoning": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
-          }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 1000
         },
         "api": {
           "type": "string",
@@ -2266,7 +2265,8 @@
             "web"
           ]
         }
-      }
+      },
+      "additionalProperties": false
     }
   ]
 }

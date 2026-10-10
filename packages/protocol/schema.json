@@ -18,12 +18,11 @@
   ],
   "definitions": {
     "EmptyRequest": {
-      "additionalProperties": false,
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": false
     },
     "DurableCommandParameters": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "caseID",
@@ -36,16 +35,16 @@
         "action": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "DurableCommandResult": {
-      "additionalProperties": true,
-      "description": "Experimental cache-only Pi Durable command result.",
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": true,
+      "description": "Experimental cache-only Pi Durable command result."
     },
     "SessionRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "sessionId": {
@@ -58,18 +57,18 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "GetLogsRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "limit": {
           "anyOf": [
             {
+              "type": "integer",
               "minimum": 1,
-              "maximum": 2000,
-              "type": "integer"
+              "maximum": 2000
             },
             {
               "type": "null"
@@ -79,9 +78,9 @@
         "cursor": {
           "anyOf": [
             {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 2048,
-              "type": "string"
+              "maxLength": 2048
             },
             {
               "type": "null"
@@ -91,13 +90,13 @@
         "level": {
           "anyOf": [
             {
+              "type": "string",
               "enum": [
                 "debug",
                 "info",
                 "warning",
                 "error"
-              ],
-              "type": "string"
+              ]
             },
             {
               "type": "null"
@@ -107,9 +106,9 @@
         "category": {
           "anyOf": [
             {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 80,
-              "type": "string"
+              "maxLength": 80
             },
             {
               "type": "null"
@@ -119,9 +118,9 @@
         "query": {
           "anyOf": [
             {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 200,
-              "type": "string"
+              "maxLength": 200
             },
             {
               "type": "null"
@@ -131,19 +130,19 @@
         "since": {
           "anyOf": [
             {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 40,
-              "type": "string"
+              "maxLength": 40
             },
             {
               "type": "null"
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ActionRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "domain",
@@ -174,10 +173,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "EvaluateRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "domain",
@@ -190,10 +189,10 @@
         "script": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ServiceRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "domain"
@@ -202,10 +201,10 @@
         "domain": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "NewChatRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "temporary": {
@@ -238,10 +237,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SendChatRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "text"
@@ -270,10 +269,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "RespondChatRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "promptId",
@@ -296,10 +295,10 @@
         "answer": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SetKeyRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "providerId"
@@ -323,12 +322,12 @@
             {
               "anyOf": [
                 {
-                  "const": "global",
-                  "type": "string"
+                  "type": "string",
+                  "const": "global"
                 },
                 {
-                  "const": "china",
-                  "type": "string"
+                  "type": "string",
+                  "const": "china"
                 }
               ]
             },
@@ -337,10 +336,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SetRegionRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "region"
@@ -349,10 +348,10 @@
         "region": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "BootstrapArtifactInput": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "name",
@@ -363,13 +362,13 @@
           "type": "string"
         },
         "data": {
-          "contentEncoding": "base64",
-          "type": "string"
+          "type": "string",
+          "contentEncoding": "base64"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "BootstrapArtifactsRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "artifacts"
@@ -381,10 +380,10 @@
             "$ref": "#/definitions/BootstrapArtifactInput"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "WriteArtifactRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "name",
@@ -395,26 +394,26 @@
           "type": "string"
         },
         "data": {
-          "contentEncoding": "base64",
-          "type": "string"
+          "type": "string",
+          "contentEncoding": "base64"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "RestoreWebsiteDataRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "data"
       ],
       "properties": {
         "data": {
-          "contentEncoding": "base64",
-          "type": "string"
+          "type": "string",
+          "contentEncoding": "base64"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SetAttachedServiceRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "domain": {
@@ -440,10 +439,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "PromptRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "prompt"
@@ -452,10 +451,10 @@
         "prompt": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "RepositoryGateRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "domain",
@@ -468,10 +467,10 @@
         "action": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "VMRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "sessionId": {
@@ -484,10 +483,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "VMFunctionsRequest": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "function": {
@@ -500,10 +499,10 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "VMCallRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "function",
@@ -524,10 +523,10 @@
           "type": "string"
         },
         "arguments": {}
-      }
+      },
+      "additionalProperties": true
     },
     "VMEvalRequest": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "script"
@@ -546,33 +545,33 @@
         "script": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ProviderModel": {
-      "additionalProperties": true,
-      "description": "Existing ProviderModel Codable payload; not a new model catalog format.",
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": true,
+      "description": "Existing ProviderModel Codable payload; not a new model catalog format."
     },
     "Message": {
-      "additionalProperties": true,
-      "description": "Existing tagged Agent Message Codable payload.",
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": true,
+      "description": "Existing tagged Agent Message Codable payload."
     },
     "Block": {
-      "additionalProperties": true,
-      "description": "Existing transcript Block Codable payload.",
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": true,
+      "description": "Existing transcript Block Codable payload."
     },
     "EmptyResult": {
-      "additionalProperties": true,
       "type": "object",
-      "properties": {}
+      "properties": {},
+      "additionalProperties": true
     },
     "HostDescription": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "implementation",
@@ -605,8 +604,8 @@
             "^(.*)$": {
               "type": "array",
               "items": {
-                "minimum": 1,
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               }
             }
           }
@@ -617,10 +616,10 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ChatRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "id",
@@ -663,10 +662,10 @@
         "active": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ListChatsResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "chats"
@@ -678,10 +677,10 @@
             "$ref": "#/definitions/ChatRow"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ChatTool": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "name",
@@ -700,10 +699,10 @@
         "strict": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ChatSnapshot": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "id",
@@ -759,10 +758,10 @@
         "pendingPrompt": {
           "$ref": "#/definitions/PendingChatPrompt"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "PendingChatPrompt": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "id",
@@ -790,10 +789,10 @@
         "requiresApp": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "RespondChatResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "chatId",
@@ -806,19 +805,19 @@
         "promptId": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "GetChatResult": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "data": {
           "$ref": "#/definitions/ChatSnapshot"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "NewChatResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "chatId",
@@ -835,10 +834,10 @@
         "model": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SendChatResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "chatId",
@@ -857,10 +856,10 @@
         "error": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "StopChatResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "chatId",
@@ -873,20 +872,20 @@
         "wasRunning": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ValueResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "value"
       ],
       "properties": {
         "value": {}
-      }
+      },
+      "additionalProperties": true
     },
     "VMLog": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "level",
@@ -899,10 +898,10 @@
         "message": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "VMControlResult": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "value": {},
@@ -912,10 +911,10 @@
             "$ref": "#/definitions/VMLog"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "PageRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "url",
@@ -940,10 +939,10 @@
         "canGoForward": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ServiceRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "domain",
@@ -991,10 +990,10 @@
         "favicon": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ListServicesResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "services"
@@ -1006,10 +1005,10 @@
             "$ref": "#/definitions/ServiceRow"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "SyncServicesResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "head",
@@ -1027,10 +1026,10 @@
         "services": {
           "type": "integer"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ModelRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "id",
@@ -1093,10 +1092,10 @@
         "wireProtocol": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ProviderRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "id",
@@ -1144,10 +1143,10 @@
             "$ref": "#/definitions/ModelRow"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ListProvidersResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "region",
@@ -1163,10 +1162,10 @@
             "$ref": "#/definitions/ProviderRow"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "LogRow": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "seq",
@@ -1199,10 +1198,10 @@
         "message": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "GetLogsResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "logs"
@@ -1220,10 +1219,10 @@
         "hasMore": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "ComposerFormattingResult": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "text",
@@ -1248,10 +1247,10 @@
         "visibleHasMarkedText": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "BootstrapArtifactsResult": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "artifacts": {
@@ -1260,32 +1259,32 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "WebsiteDataResult": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "data": {
-          "contentEncoding": "base64",
-          "type": "string"
+          "type": "string",
+          "contentEncoding": "base64"
         },
         "bytes": {
           "type": "integer"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "RepositorySaveGateResult": {
-      "additionalProperties": true,
       "type": "object",
       "properties": {
         "entered": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "Request": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "jsonrpc",
@@ -1293,8 +1292,8 @@
       ],
       "properties": {
         "jsonrpc": {
-          "const": "2.0",
-          "type": "string"
+          "type": "string",
+          "const": "2.0"
         },
         "id": {
           "anyOf": [
@@ -1321,18 +1320,18 @@
               }
             },
             {
-              "maxItems": 0,
               "type": "array",
-              "items": {}
+              "items": {},
+              "maxItems": 0
             }
           ]
         }
-      }
+      },
+      "additionalProperties": true
     },
     "Response": {
       "anyOf": [
         {
-          "additionalProperties": true,
           "type": "object",
           "required": [
             "jsonrpc",
@@ -1341,8 +1340,8 @@
           ],
           "properties": {
             "jsonrpc": {
-              "const": "2.0",
-              "type": "string"
+              "type": "string",
+              "const": "2.0"
             },
             "id": {
               "anyOf": [
@@ -1361,10 +1360,10 @@
             "error": {
               "not": {}
             }
-          }
+          },
+          "additionalProperties": true
         },
         {
-          "additionalProperties": true,
           "type": "object",
           "required": [
             "jsonrpc",
@@ -1373,8 +1372,8 @@
           ],
           "properties": {
             "jsonrpc": {
-              "const": "2.0",
-              "type": "string"
+              "type": "string",
+              "const": "2.0"
             },
             "id": {
               "anyOf": [
@@ -1390,7 +1389,6 @@
               ]
             },
             "error": {
-              "additionalProperties": true,
               "type": "object",
               "required": [
                 "code",
@@ -1404,17 +1402,18 @@
                   "type": "string"
                 },
                 "data": {}
-              }
+              },
+              "additionalProperties": true
             },
             "result": {
               "not": {}
             }
-          }
+          },
+          "additionalProperties": true
         }
       ]
     },
     "Error": {
-      "additionalProperties": true,
       "type": "object",
       "required": [
         "code",
@@ -1428,14 +1427,12 @@
           "type": "string"
         },
         "data": {}
-      }
+      },
+      "additionalProperties": true
     },
     "RequestBatch": {
-      "minItems": 1,
-      "maxItems": 64,
       "type": "array",
       "items": {
-        "additionalProperties": true,
         "type": "object",
         "required": [
           "jsonrpc",
@@ -1443,8 +1440,8 @@
         ],
         "properties": {
           "jsonrpc": {
-            "const": "2.0",
-            "type": "string"
+            "type": "string",
+            "const": "2.0"
           },
           "id": {
             "anyOf": [
@@ -1471,22 +1468,23 @@
                 }
               },
               {
-                "maxItems": 0,
                 "type": "array",
-                "items": {}
+                "items": {},
+                "maxItems": 0
               }
             ]
           }
-        }
-      }
+        },
+        "additionalProperties": true
+      },
+      "minItems": 1,
+      "maxItems": 64
     },
     "ResponseBatch": {
-      "minItems": 1,
       "type": "array",
       "items": {
         "anyOf": [
           {
-            "additionalProperties": true,
             "type": "object",
             "required": [
               "jsonrpc",
@@ -1495,8 +1493,8 @@
             ],
             "properties": {
               "jsonrpc": {
-                "const": "2.0",
-                "type": "string"
+                "type": "string",
+                "const": "2.0"
               },
               "id": {
                 "anyOf": [
@@ -1515,10 +1513,10 @@
               "error": {
                 "not": {}
               }
-            }
+            },
+            "additionalProperties": true
           },
           {
-            "additionalProperties": true,
             "type": "object",
             "required": [
               "jsonrpc",
@@ -1527,8 +1525,8 @@
             ],
             "properties": {
               "jsonrpc": {
-                "const": "2.0",
-                "type": "string"
+                "type": "string",
+                "const": "2.0"
               },
               "id": {
                 "anyOf": [
@@ -1544,7 +1542,6 @@
                 ]
               },
               "error": {
-                "additionalProperties": true,
                 "type": "object",
                 "required": [
                   "code",
@@ -1558,15 +1555,18 @@
                     "type": "string"
                   },
                   "data": {}
-                }
+                },
+                "additionalProperties": true
               },
               "result": {
                 "not": {}
               }
-            }
+            },
+            "additionalProperties": true
           }
         ]
-      }
+      },
+      "minItems": 1
     }
   }
 }

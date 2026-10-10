@@ -1,5 +1,5 @@
-import { Type, type Static } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { Type, type Static } from "typebox";
+import { Value } from "typebox/value";
 import { dirname, resolve } from "node:path";
 
 const object = <T extends Parameters<typeof Type.Object>[0]>(fields: T) => Type.Object(fields, { additionalProperties: false });
@@ -11,13 +11,13 @@ const path = Type.String({ minLength: 1, maxLength: 1024 });
 const secret = Type.Union([object({ env: Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]*$" }) }), object({ fromFile: path })]);
 const content = Type.Union([object({ text }), object({ fromFile: path })]);
 const model = object({ provider: credentialID, model: Type.String({ minLength: 1 }), thinking: Type.Optional(Type.String()) });
-const preference = Type.Recursive(self => Type.Union([
-  Type.String(), Type.Boolean(), Type.Number(), Type.Array(self),
+const preference = Type.Cyclic({ Preference: Type.Union([
+  Type.String(), Type.Boolean(), Type.Number(), Type.Array(Type.Ref("Preference")),
   object({ data: Type.String({ pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" }) }),
   object({ date: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }) }),
-  object({ dictionary: Type.Record(Type.String(), self) }),
-]), { $id: "#/$defs/Preference" });
-const defaults = object({ set: Type.Optional(Type.Record(Type.String({ minLength: 1 }), Type.Ref(preference))), remove: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true })) });
+  object({ dictionary: Type.Record(Type.String(), Type.Ref("Preference")) }),
+]) }, "Preference");
+const defaults = object({ set: Type.Optional(Type.Record(Type.String({ minLength: 1 }), preference)), remove: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true })) });
 const file = object({ path, content });
 const message = Type.Union([
   object({ role: Type.Literal("user"), text, attachments: Type.Optional(Type.Array(id)) }),
@@ -71,9 +71,6 @@ export const DeviceTemplateSchema = object({
   selection: Type.Optional(object({ profile: id, chat: Type.Optional(id) })),
 });
 
-DeviceTemplateSchema.$defs = { Preference: { ...preference } };
-delete DeviceTemplateSchema.$defs.Preference.$id;
-
 export type DeviceTemplate = Static<typeof DeviceTemplateSchema>;
 export type PreparedTemplate = Omit<DeviceTemplate, "keychain" | "websiteState" | "storage" | "profiles"> & {
   runID: string;
@@ -116,9 +113,9 @@ function validatePreference(value: Static<typeof preference>): void {
 }
 
 export function parseTemplate(value: unknown): DeviceTemplate {
-  if (!Value.Check(DeviceTemplateSchema, [preference], value)) {
-    const error = Value.Errors(DeviceTemplateSchema, [preference], value).First();
-    throw new Error(`Invalid template at ${error?.path || "/"}: ${error?.message ?? "schema mismatch"}`);
+  if (!Value.Check(DeviceTemplateSchema, value)) {
+    const error = Value.Errors(DeviceTemplateSchema, value)[0];
+    throw new Error(`Invalid template at ${error?.instancePath || "/"}: ${error?.message ?? "schema mismatch"}`);
   }
   const template = value;
   const profiles = template.profiles ?? [];

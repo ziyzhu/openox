@@ -5,8 +5,6 @@
   "$ref": "#/definitions/RepositoryPackage",
   "definitions": {
     "RepositoryPackage": {
-      "additionalProperties": false,
-      "$id": "https://openox.ai/schemas/repository-v3.json",
       "type": "object",
       "required": [
         "version",
@@ -16,41 +14,42 @@
       ],
       "properties": {
         "version": {
-          "const": 3,
-          "type": "number"
+          "type": "number",
+          "const": 3
         },
         "name": {
+          "type": "string",
           "minLength": 1,
-          "maxLength": 100,
-          "type": "string"
+          "maxLength": 100
         },
         "contentHash": {
-          "pattern": "^[a-f0-9]{64}$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "services": {
-          "maxItems": 256,
           "type": "array",
           "items": {
+            "type": "string",
             "minLength": 5,
             "maxLength": 253,
-            "pattern": "^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
-            "type": "string"
-          }
+            "pattern": "^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+          },
+          "maxItems": 256
         },
         "skills": {
-          "maxItems": 256,
           "type": "array",
           "items": {
+            "type": "string",
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-            "maxLength": 100,
-            "type": "string"
-          }
+            "maxLength": 100
+          },
+          "maxItems": 256
         }
-      }
+      },
+      "additionalProperties": false,
+      "$id": "https://openox.ai/schemas/repository-v3.json"
     },
     "ServiceManifest": {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "domain",
@@ -60,30 +59,29 @@
       ],
       "properties": {
         "domain": {
-          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
         },
         "kind": {
-          "const": "api",
-          "type": "string"
+          "type": "string",
+          "const": "api"
         },
         "auth": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "type"
               ],
               "properties": {
                 "type": {
-                  "const": "none",
-                  "type": "string"
+                  "type": "string",
+                  "const": "none"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "type",
@@ -92,29 +90,29 @@
               ],
               "properties": {
                 "type": {
-                  "const": "apiKey",
-                  "type": "string"
+                  "type": "string",
+                  "const": "apiKey"
                 },
                 "in": {
                   "anyOf": [
                     {
-                      "const": "header",
-                      "type": "string"
+                      "type": "string",
+                      "const": "header"
                     },
                     {
-                      "const": "query",
-                      "type": "string"
+                      "type": "string",
+                      "const": "query"
                     }
                   ]
                 },
                 "name": {
-                  "pattern": "^[A-Za-z0-9_-]+$",
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "type",
@@ -122,25 +120,25 @@
               ],
               "properties": {
                 "type": {
-                  "const": "http",
-                  "type": "string"
+                  "type": "string",
+                  "const": "http"
                 },
                 "scheme": {
                   "anyOf": [
                     {
-                      "const": "basic",
-                      "type": "string"
+                      "type": "string",
+                      "const": "basic"
                     },
                     {
-                      "const": "bearer",
-                      "type": "string"
+                      "type": "string",
+                      "const": "bearer"
                     }
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "type",
@@ -154,12 +152,12 @@
               ],
               "properties": {
                 "type": {
-                  "const": "oauth2",
-                  "type": "string"
+                  "type": "string",
+                  "const": "oauth2"
                 },
                 "flow": {
-                  "const": "authorizationCode",
-                  "type": "string"
+                  "type": "string",
+                  "const": "authorizationCode"
                 },
                 "authorizationURL": {
                   "type": "string"
@@ -168,8 +166,8 @@
                   "type": "string"
                 },
                 "clientID": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 },
                 "redirectURI": {
                   "type": "string"
@@ -177,43 +175,43 @@
                 "scopes": {
                   "type": "array",
                   "items": {
-                    "minLength": 1,
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "pkce": {
-                  "const": "S256",
-                  "type": "string"
+                  "type": "string",
+                  "const": "S256"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "name": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "description": {
           "type": "string"
         },
         "baseUrl": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "$defs": {
           "type": "object",
           "patternProperties": {
             "^(.*)$": {
-              "additionalProperties": true,
               "type": "object",
-              "properties": {}
+              "properties": {},
+              "additionalProperties": true
             }
           }
         },
         "actions": {
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -225,32 +223,32 @@
             ],
             "properties": {
               "id": {
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
               },
               "label": {
-                "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "description": {
                 "type": "string"
               },
               "baseUrl": {
-                "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "blocking": {
                 "type": "boolean"
               },
               "inputSchema": {
-                "additionalProperties": true,
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "additionalProperties": true
               },
               "outputSchema": {
-                "additionalProperties": true,
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "additionalProperties": true
               },
               "defaultArgs": {},
               "requireApproval": {
@@ -259,19 +257,19 @@
               "requireAuth": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
         },
         "locales": {
           "type": "object",
           "patternProperties": {
             "^(.*)$": {
-              "additionalProperties": false,
               "type": "object",
               "properties": {
                 "name": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 },
                 "description": {
                   "type": "string"
@@ -280,43 +278,44 @@
                   "type": "object",
                   "patternProperties": {
                     "^(.*)$": {
-                      "additionalProperties": false,
                       "type": "object",
                       "properties": {
                         "label": {
-                          "minLength": 1,
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1
                         },
                         "description": {
                           "type": "string"
                         }
-                      }
+                      },
+                      "additionalProperties": false
                     }
                   }
                 }
-              }
+              },
+              "additionalProperties": false
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "APIAuth": {
       "anyOf": [
         {
-          "additionalProperties": false,
           "type": "object",
           "required": [
             "type"
           ],
           "properties": {
             "type": {
-              "const": "none",
-              "type": "string"
+              "type": "string",
+              "const": "none"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
-          "additionalProperties": false,
           "type": "object",
           "required": [
             "type",
@@ -325,29 +324,29 @@
           ],
           "properties": {
             "type": {
-              "const": "apiKey",
-              "type": "string"
+              "type": "string",
+              "const": "apiKey"
             },
             "in": {
               "anyOf": [
                 {
-                  "const": "header",
-                  "type": "string"
+                  "type": "string",
+                  "const": "header"
                 },
                 {
-                  "const": "query",
-                  "type": "string"
+                  "type": "string",
+                  "const": "query"
                 }
               ]
             },
             "name": {
-              "pattern": "^[A-Za-z0-9_-]+$",
-              "type": "string"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
-          "additionalProperties": false,
           "type": "object",
           "required": [
             "type",
@@ -355,25 +354,25 @@
           ],
           "properties": {
             "type": {
-              "const": "http",
-              "type": "string"
+              "type": "string",
+              "const": "http"
             },
             "scheme": {
               "anyOf": [
                 {
-                  "const": "basic",
-                  "type": "string"
+                  "type": "string",
+                  "const": "basic"
                 },
                 {
-                  "const": "bearer",
-                  "type": "string"
+                  "type": "string",
+                  "const": "bearer"
                 }
               ]
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
-          "additionalProperties": false,
           "type": "object",
           "required": [
             "type",
@@ -387,12 +386,12 @@
           ],
           "properties": {
             "type": {
-              "const": "oauth2",
-              "type": "string"
+              "type": "string",
+              "const": "oauth2"
             },
             "flow": {
-              "const": "authorizationCode",
-              "type": "string"
+              "type": "string",
+              "const": "authorizationCode"
             },
             "authorizationURL": {
               "type": "string"
@@ -401,8 +400,8 @@
               "type": "string"
             },
             "clientID": {
-              "minLength": 1,
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "redirectURI": {
               "type": "string"
@@ -410,20 +409,20 @@
             "scopes": {
               "type": "array",
               "items": {
-                "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             },
             "pkce": {
-              "const": "S256",
-              "type": "string"
+              "type": "string",
+              "const": "S256"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
     "IOSCatalogManifest": {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "domain",
@@ -433,12 +432,12 @@
       ],
       "properties": {
         "domain": {
-          "pattern": "^ios:[a-z0-9]+(?:[.-][a-z0-9]+)*$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^ios:[a-z0-9]+(?:[.-][a-z0-9]+)*$"
         },
         "name": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "description": {
           "type": "string"
@@ -446,90 +445,89 @@
         "icon": {
           "anyOf": [
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "asset"
               ],
               "properties": {
                 "asset": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 }
-              }
+              },
+              "additionalProperties": false
             },
             {
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "system"
               ],
               "properties": {
                 "system": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 }
-              }
+              },
+              "additionalProperties": false
             }
           ]
         },
         "faviconUrl": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "permission": {
           "anyOf": [
             {
-              "const": "bluetooth",
-              "type": "string"
+              "type": "string",
+              "const": "bluetooth"
             },
             {
-              "const": "calendar",
-              "type": "string"
+              "type": "string",
+              "const": "calendar"
             },
             {
-              "const": "contacts",
-              "type": "string"
+              "type": "string",
+              "const": "contacts"
             },
             {
-              "const": "health",
-              "type": "string"
+              "type": "string",
+              "const": "health"
             },
             {
-              "const": "location",
-              "type": "string"
+              "type": "string",
+              "const": "location"
             },
             {
-              "const": "notifications",
-              "type": "string"
+              "type": "string",
+              "const": "notifications"
             },
             {
-              "const": "reminders",
-              "type": "string"
+              "type": "string",
+              "const": "reminders"
             }
           ]
         },
         "supportedIOS": {
-          "additionalProperties": false,
           "type": "object",
           "required": [
             "minimum"
           ],
           "properties": {
             "minimum": {
-              "pattern": "^(?:[1-9][0-9]*)(?:\\.[0-9]+){0,2}$",
-              "type": "string"
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]*)(?:\\.[0-9]+){0,2}$"
             },
             "maximum": {
-              "pattern": "^(?:[1-9][0-9]*)(?:\\.[0-9]+){0,2}$",
-              "type": "string"
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]*)(?:\\.[0-9]+){0,2}$"
             }
-          }
+          },
+          "additionalProperties": false
         },
         "actions": {
           "type": "array",
           "items": {
-            "additionalProperties": false,
             "type": "object",
             "required": [
               "id",
@@ -541,27 +539,27 @@
             ],
             "properties": {
               "id": {
-                "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
               },
               "label": {
-                "minLength": 1,
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "description": {
                 "type": "string"
               },
               "inputSchema": {
-                "additionalProperties": true,
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "additionalProperties": true
               },
               "outputSchema": {
                 "anyOf": [
                   {
-                    "additionalProperties": true,
                     "type": "object",
-                    "properties": {}
+                    "properties": {},
+                    "additionalProperties": true
                   },
                   {
                     "type": "null"
@@ -572,22 +570,22 @@
                 "type": "boolean"
               },
               "requireAuth": {
-                "const": false,
-                "type": "boolean"
+                "type": "boolean",
+                "const": false
               }
-            }
+            },
+            "additionalProperties": false
           }
         },
         "locales": {
           "type": "object",
           "patternProperties": {
             "^(.*)$": {
-              "additionalProperties": false,
               "type": "object",
               "properties": {
                 "name": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 },
                 "description": {
                   "type": "string"
@@ -596,28 +594,29 @@
                   "type": "object",
                   "patternProperties": {
                     "^(.*)$": {
-                      "additionalProperties": false,
                       "type": "object",
                       "properties": {
                         "label": {
-                          "minLength": 1,
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1
                         },
                         "description": {
                           "type": "string"
                         }
-                      }
+                      },
+                      "additionalProperties": false
                     }
                   }
                 }
-              }
+              },
+              "additionalProperties": false
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "MCPCatalogManifest": {
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "id",
@@ -626,33 +625,33 @@
       ],
       "properties": {
         "id": {
-          "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
         },
         "name": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "description": {
           "type": "string"
         },
         "endpoint": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "faviconUrl": {
-          "minLength": 1,
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "transport": {
           "anyOf": [
             {
-              "const": "streamable-http",
-              "type": "string"
+              "type": "string",
+              "const": "streamable-http"
             },
             {
-              "const": "sse",
-              "type": "string"
+              "type": "string",
+              "const": "sse"
             }
           ]
         },
@@ -660,21 +659,22 @@
           "type": "object",
           "patternProperties": {
             "^(.*)$": {
-              "additionalProperties": false,
               "type": "object",
               "properties": {
                 "name": {
-                  "minLength": 1,
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 },
                 "description": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

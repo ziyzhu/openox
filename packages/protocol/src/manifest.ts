@@ -1,5 +1,5 @@
-import { Type, type Static, type TSchema } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { Type, type Static, type TSchema } from "typebox";
+import { Value } from "typebox/value";
 import { validateModelActions, validateConversationAction, CONVERSATION_ACTION_ID, MODEL_GENERATION_ACTION_IDS } from "./model-actions.ts";
 
 const HOST_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -12,7 +12,7 @@ export function matchesServiceDomain(host: string, domain: string): boolean {
   return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
 }
 
-const JSONSchemaSchema = Type.Object({}, { additionalProperties: true });
+const JSONSchemaSchema = Type.Unsafe<Record<string, unknown>>(Type.Object({}, { additionalProperties: true }));
 export type JSONSchema = Record<string, unknown>;
 
 const SCHEMA_KEYS = new Set([
@@ -186,7 +186,7 @@ export const PAYMENT_STATUSES = ["none", "pending", "completed"] as const;
 const LocaleOverlaySchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
   description: Type.Optional(Type.String()),
-  actions: Type.Optional(Type.Record(Type.String(), Type.Object({
+  actions: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), Type.Object({
     label: Type.Optional(Type.String({ minLength: 1 })),
     description: Type.Optional(Type.String()),
   }, { additionalProperties: false }))),
@@ -211,9 +211,9 @@ export const ServiceManifestSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   baseUrl: Type.String({ minLength: 1 }),
-  $defs: Type.Optional(Type.Record(Type.String(), JSONSchemaSchema)),
+  $defs: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), JSONSchemaSchema)),
   actions: Type.Array(ActionSchema),
-  locales: Type.Optional(Type.Record(Type.String(), LocaleOverlaySchema)),
+  locales: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), LocaleOverlaySchema)),
 }, { additionalProperties: false });
 
 export type Action = Static<typeof ActionSchema>;
@@ -384,13 +384,13 @@ export function validateServiceManifest(input: unknown, profile: ManifestProfile
   if (repository && input && typeof input === "object" && !Array.isArray(input)) {
     const { faviconUrl, ...rest } = input as Record<string, unknown>;
     for (const e of Value.Errors(RepositoryExtensionsSchema, { faviconUrl })) {
-      at(e.path.replace(/^\//, "").replace(/\//g, "."), e.message);
+      at(e.instancePath.replace(/^\//, "").replace(/\//g, "."), e.message);
     }
     input = rest;
   }
 
   for (const e of Value.Errors(ServiceManifestSchema, input)) {
-    const path = e.path === "" ? "root" : e.path.replace(/^\//, "").replace(/\//g, ".");
+    const path = e.instancePath === "" ? "root" : e.instancePath.replace(/^\//, "").replace(/\//g, ".");
     at(path, e.message);
   }
   if (errors.length > 0) return { ok: false, errors };
@@ -567,15 +567,11 @@ export function validateAgainstSchema(
     ...(defs ?? {}),
     ...(((schema as { $defs?: Record<string, JSONSchema> }).$defs) ?? {}),
   };
-  const refs: TSchema[] = Object.entries(allDefs).map(([id, d]) => {
-    const t = toTypeBox(d) as TSchema & { $id?: string };
-    t.$id = id;
-    return t;
-  });
+  const refs = Object.fromEntries(Object.entries(allDefs).map(([id, definition]) => [id, toTypeBox(definition)]));
   const compiled = toTypeBox(schema);
   const errs: string[] = [];
-  for (const e of Value.Errors(compiled, refs, value)) {
-    errs.push(`${e.path || "/"} ${e.message}`);
+  for (const e of Value.Errors(refs, compiled, value)) {
+    errs.push(`${e.instancePath || "/"} ${e.message}`);
     if (errs.length >= 3) break;
   }
   return errs.length === 0 ? { ok: true } : { ok: false, errors: errs };

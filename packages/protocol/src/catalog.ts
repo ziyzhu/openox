@@ -1,5 +1,5 @@
-import { Type, type Static } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { Type, type Static } from "typebox";
+import { Value } from "typebox/value";
 import { validateJSONSchemaProfile } from "./manifest.ts";
 
 const ID_RE = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
@@ -22,7 +22,7 @@ const IOSActionSchema = Type.Object({
 const IOSLocaleSchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
   description: Type.Optional(Type.String()),
-  actions: Type.Optional(Type.Record(Type.String(), Type.Object({
+  actions: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), Type.Object({
     label: Type.Optional(Type.String({ minLength: 1 })),
     description: Type.Optional(Type.String()),
   }, { additionalProperties: false }))),
@@ -51,7 +51,7 @@ export const IOSCatalogManifestSchema = Type.Object({
     maximum: Type.Optional(Type.String({ pattern: IOS_VERSION_RE.source })),
   }, { additionalProperties: false }),
   actions: Type.Array(IOSActionSchema),
-  locales: Type.Optional(Type.Record(Type.String(), IOSLocaleSchema)),
+  locales: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), IOSLocaleSchema)),
 }, { additionalProperties: false });
 
 const MCPLocaleSchema = Type.Object({
@@ -69,7 +69,7 @@ export const MCPCatalogManifestSchema = Type.Object({
     Type.Literal("streamable-http"),
     Type.Literal("sse"),
   ])),
-  locales: Type.Optional(Type.Record(Type.String(), MCPLocaleSchema)),
+  locales: Type.Optional(Type.Record(Type.String({ pattern: "^(.*)$" }), MCPLocaleSchema)),
 }, { additionalProperties: false });
 
 export type IOSCatalogManifest = Static<typeof IOSCatalogManifestSchema>;

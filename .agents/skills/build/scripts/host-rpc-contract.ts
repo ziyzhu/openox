@@ -1,4 +1,4 @@
-import { type TSchema } from "@sinclair/typebox";
+import { Type, type TObject, type TSchema } from "typebox";
 import {
   Methods, Schemas, RPC_VERSION, RequestSchema, ResponseSchema, ErrorSchema, RequestBatchSchema, ResponseBatchSchema,
 } from "../../../../packages/protocol/src/contract.ts";
@@ -15,18 +15,21 @@ function portable(value: unknown): unknown {
 }
 
 function swiftType(schema: TSchema): string {
-  if (schema["x-swift-type"]) return schema["x-swift-type"];
-  if (schema.$ref) return schema.$ref;
-  if (schema.anyOf) return swiftType(schema.anyOf.find((item: TSchema) => item.type !== "null"));
-  if (schema.type === "array") return `[${swiftType(schema.items)}]`;
+  if ("x-swift-type" in schema && typeof schema["x-swift-type"] === "string") return schema["x-swift-type"];
+  if (Type.IsRef(schema)) return schema.$ref;
+  if (Type.IsUnion(schema)) {
+    const member = schema.anyOf.find(item => !Type.IsNull(item));
+    if (member) return swiftType(member);
+  }
+  if (Type.IsArray(schema)) return `[${swiftType(schema.items)}]`;
   const types: Record<string, string> = { string: "String", boolean: "Bool", integer: "Int", number: "Double" };
-  const type = types[schema.type];
+  const type = "type" in schema && typeof schema.type === "string" ? types[schema.type] : undefined;
   if (!type) throw new Error(`Unsupported Swift schema ${JSON.stringify(schema)}`);
   return type;
 }
 
 function swiftStruct(name: string): string {
-  const schema: TSchema = Schemas[name as keyof typeof Schemas];
+  const schema: TObject = Schemas[name as keyof typeof Schemas];
   const fields = Object.entries<TSchema>(schema.properties).map(([field, value]) =>
     `        let ${field}: ${swiftType(value)}${schema.required?.includes(field) ? "" : "?"}`);
   return `    struct ${name}: Decodable {${fields.length ? `\n${fields.join("\n")}\n    ` : ""}}`;

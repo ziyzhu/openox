@@ -1,9 +1,9 @@
-import { Value } from "@sinclair/typebox/value";
+import { Value } from "typebox/value";
 import { Methods, Schemas, RequestSchema, ResponseSchema, type MethodName } from "./contract.ts";
 
 export * from "./contract.ts";
 
-const references = Object.values(Schemas);
+const references = Schemas;
 export function isMethod(method: string): method is MethodName {
   return Object.hasOwn(Methods, method);
 }
@@ -12,11 +12,11 @@ export function isMethod(method: string): method is MethodName {
 export function validateParams(method: string, params: unknown): boolean {
   if (!isMethod(method)) return true;
   const normalized = params === undefined || (Array.isArray(params) && params.length === 0) ? {} : params;
-  return Value.Check(Schemas[Methods[method].params], references, normalized);
+  return Value.Check(references, Schemas[Methods[method].params], normalized);
 }
 
 export function validateResult(method: string, result: unknown): boolean {
-  return !isMethod(method) || Value.Check(Schemas[Methods[method].result], references, result);
+  return !isMethod(method) || Value.Check(references, Schemas[Methods[method].result], result);
 }
 
 export function validateRequest(value: unknown): boolean {

@@ -1,4 +1,4 @@
-import { Type, type TObject, type TProperties } from "@sinclair/typebox";
+import { Type, type TObject, type TProperties } from "typebox";
 import { join } from "node:path";
 import { ROOT, checkGenerated, writeGenerated, type Generated } from "../../../lib.ts";
 

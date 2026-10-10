@@ -9,7 +9,7 @@ const result = await Bun.build({
   outdir: outputDirectory,
   naming: "ox.js",
   target: "bun",
-  external: ["@sinclair/typebox", "@sinclair/typebox/*", "typescript"],
+  external: ["typebox", "typebox/*"],
 });
 
 if (!result.success) {

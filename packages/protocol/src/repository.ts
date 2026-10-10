@@ -1,5 +1,5 @@
-import { Type, type Static } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { Type, type Static } from "typebox";
+import { Value } from "typebox/value";
 import { SYSTEM_SKILL_NAMES } from "./skills.ts";
 
 export const REPOSITORY_VERSIONS = [3] as const;
@@ -11,7 +11,7 @@ const RepositoryServiceSchema = Type.String({
 });
 
 export const RepositoryPackageSchema = Type.Object({
-  version: Type.Union(REPOSITORY_VERSIONS.map(version => Type.Literal(version))),
+  version: Type.Literal(REPOSITORY_VERSIONS[0]),
   name: Type.String({ minLength: 1, maxLength: 100 }),
   contentHash: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
   services: Type.Array(RepositoryServiceSchema, { maxItems: 256 }),

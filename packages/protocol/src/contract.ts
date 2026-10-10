@@ -1,4 +1,4 @@
-import { Type, type Static, type TSchema } from "@sinclair/typebox";
+import { Type, type Static, type TSchema } from "typebox";
 
 export const RPC_VERSION = 1;
 const S = Type.String;
@@ -11,7 +11,7 @@ const optional = (schema: TSchema) => Type.Optional(schema);
 const nullable = (schema: TSchema) => optional(Type.Union([schema, Type.Null()]));
 const object = <P extends Record<string, TSchema>>(name: string, properties: P, options = {}) =>
   Type.Object(properties, { $id: name, additionalProperties: true, ...options });
-const swift = (schema: TSchema, name: string) => ({ ...schema, "x-swift-type": name });
+const swift = (schema: TSchema, name: string) => Object.assign(schema, { "x-swift-type": name });
 const json = () => swift(Type.Unknown(), "JSONValue");
 const data = () => swift(S({ contentEncoding: "base64" }), "Data");
 const opaque = (name: string, description: string) => object(name, {}, { description });
@@ -56,7 +56,7 @@ export const Schemas = {
   EmptyResult: object("EmptyResult", {}),
   HostDescription: object("HostDescription", {
     implementation: Type.Object({ name: S(), version: S(), build: S() }),
-    protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
+    protocols: Type.Record(S({ pattern: "^(.*)$" }), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   ChatRow: object("ChatRow", {
     id: S(), title: S(), model: Type.Union([S(), Type.Null()]), createdAt: S(),
@@ -152,7 +152,7 @@ export const Methods = {
 const id = Type.Union([S(), Type.Number(), Type.Null()]);
 export const RequestSchema = object("Request", {
   jsonrpc: Type.Literal("2.0"), id: optional(id), method: S(),
-  params: optional(Type.Union([Type.Record(S(), Type.Unknown()), A(Type.Unknown(), { maxItems: 0 })])),
+  params: optional(Type.Union([Type.Record(S({ pattern: "^(.*)$" }), Type.Unknown()), A(Type.Unknown(), { maxItems: 0 })])),
 });
 export const ErrorSchema = object("Error", { code: I(), message: S(), data: optional(Type.Unknown()) });
 export const ResponseSchema = Type.Union([
