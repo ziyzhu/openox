@@ -148,7 +148,7 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
   const activations: string[] = [];
   const models = createModels();
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
-  const tool = (name: string, args: ToolCall["arguments"]) => fauxAssistantMessage([{ type: "toolCall", id: crypto.randomUUID(), name: "execute", arguments: { operation: name, args } }], { stopReason: "toolUse" });
+  const tool = (name: string, args: ToolCall["arguments"]) => fauxAssistantMessage([{ type: "toolCall", id: crypto.randomUUID(), name: "execute", arguments: { operation: name, args: { purpose: "Verify mounted filesystem", ...args } } }], { stopReason: "toolUse" });
   faux.setResponses([tool("read", { path: "skills/manage-skills/SKILL.md" }), tool("read", { path: "notes/private/readme.md" }),
     tool("write", { path: "workspace/note.md", content: "original" }), tool("edit", { path: "workspace/note.md", edits: [{ oldText: "original", newText: "edited" }] }),
     tool("read", { path: "workspace/note.md" }), tool("write", { path: "notes/private/readme.md", content: "forbidden" }),
@@ -297,7 +297,7 @@ test("Profile ExecutionEnv exposes only visible, read-only Pi metadata and full-
   expect(await session.files.index()).toEqual({});
   // Use Pi's real model/tool loop, not merely a direct filesystem call.
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
-  faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "history", name: "execute", arguments: { operation: "read", args: { path } } }], { stopReason: "toolUse" }),
+  faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "history", name: "execute", arguments: { operation: "read", args: { purpose: "Read virtual history", path } } }], { stopReason: "toolUse" }),
     fauxAssistantMessage([{ type: "text", text: "read history" }])]);
   const models = createModels(); models.setProvider(faux.provider);
   const readerSession = await fixture("reader", undefined, { models });

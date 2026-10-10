@@ -106,7 +106,7 @@ public struct MockLLMClient: ProviderClient {
                     let source = String(intent.dropFirst("execute\n".count))
                     let scenario = Scenario(name: "execute") { context in
                         context.turn == 0
-                            ? [.tool(name: "execute", args: .object(["source": .string(source)])), .stop(.toolUse)]
+                            ? [.tool(name: "execute", args: .object(["purpose": .string("Run Mock scenario"), "source": .string(source)])), .stop(.toolUse)]
                             : [.say("(mock) Execution finished."), .stop(.stop)]
                     }
                     return (scenario, turn)
@@ -1091,7 +1091,7 @@ extension Scenario {
     }
 
     private static func execute(_ source: String) -> Step {
-        .tool(name: "execute", args: .object(["source": .string(source)]))
+        .tool(name: "execute", args: .object(["purpose": .string("Run Mock scenario"), "source": .string(source)]))
     }
 
     private static func htmlArtifact(_ id: String, _ document: String) -> String {

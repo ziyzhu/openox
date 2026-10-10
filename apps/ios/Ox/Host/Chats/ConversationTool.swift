@@ -22,6 +22,12 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         parameters: .object([
             "type": .string("object"),
             "properties": .object([
+                "purpose": .object([
+                    "type": .string("string"),
+                    "description": .string("Short (<10 words) description of this execution."),
+                    "minLength": .int(1),
+                    "maxLength": .int(80),
+                ]),
                 "source": .object([
                     "type": .string("string"),
                     "description": .string("JavaScript snippet body. Use `await`; print model-visible data with `console.log` or a top-level `return`."),
@@ -29,7 +35,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
                     "maxLength": .int(100_000),
                 ])
             ]),
-            "required": .array([.string("source")]),
+            "required": .array([.string("purpose"), .string("source")]),
             "additionalProperties": .bool(false),
         ])
     )
@@ -51,7 +57,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
             Log.session.warning("tool.execute rejected: missing 'source' (id=\(toolCallId))")
             return ToolResult(text: "missing 'source'", isError: true)
         }
-        Log.session.info("tool.execute id=\(toolCallId) source=\(LogPrivacy.text(source, limit: 4_096))")
+        Log.session.info("tool.execute id=\(toolCallId) purpose=\(LogPrivacy.text(args.objectValue?["purpose"]?.stringValue ?? "", limit: 80)) source=\(LogPrivacy.text(source, limit: 4_096))")
         return try await execute(source: source)
     }
 

@@ -16,14 +16,14 @@ nonisolated enum OxFileSystem {
             context.setObject(operation as AnyObject, forKeyedSubscript: "__nativeFS" as NSString)
         },
         jsFragment: """
-          list: (value) => __nativeFS('list', value ?? {}),
-          read: (value) => __nativeFS('read', value),
-          attach: (value) => __nativeFS('attach', value),
-          write: (value) => __nativeFS('write', value),
-          edit: (value) => __nativeFS('edit', value),
-          delete: (value) => __nativeFS('delete', value),
-          glob: (value) => __nativeFS('glob', value),
-          grep: (value) => __nativeFS('grep', value)
+          list: (value) => __nativeFS('list', __oxOptions(value, 'ox.fs.list')),
+          read: (value) => __nativeFS('read', __oxOptions(value, 'ox.fs.read')),
+          attach: (value) => __nativeFS('attach', __oxOptions(value, 'ox.fs.attach')),
+          write: (value) => __nativeFS('write', __oxOptions(value, 'ox.fs.write')),
+          edit: (value) => __nativeFS('edit', __oxOptions(value, 'ox.fs.edit')),
+          delete: (value) => __nativeFS('delete', __oxOptions(value, 'ox.fs.delete')),
+          glob: (value) => __nativeFS('glob', __oxOptions(value, 'ox.fs.glob')),
+          grep: (value) => __nativeFS('grep', __oxOptions(value, 'ox.fs.grep'))
         """
     )
 }

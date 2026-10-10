@@ -54,7 +54,21 @@ try {
   const functions = await run(["ox", "--host", qa.values.host, "vm", "functions", "--json"], { capture: true });
   const schemas = JSON.parse(functions.stdout);
   for (const name of ["read", "write", "edit"]) assert.deepEqual(schemas[`ox.fs.${name}`].inputSchema, JSON.parse(expected.stdout)[name]);
-  checks.push("native read/write/edit contracts are generated from pinned Pi schemas; purpose is optional");
+  for (const [name, schema] of Object.entries(schemas) as [string, { inputSchema: { required: string[] } }][]) {
+    assert.equal(schema.inputSchema.required[0], "purpose", `${name} requires purpose first`);
+  }
+  const rejectedPurposes = await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "vm", "eval", "--script", `
+    for (const name of Object.keys(ox.fs)) {
+      for (const args of [{}, { purpose: "" }, { purpose: "x".repeat(81) }]) {
+        try { await ox.fs[name](args); throw Error(name + " accepted invalid purpose"); }
+        catch (error) { if (!error.message.includes("purpose")) throw error; }
+      }
+    }
+    return true;
+  `, "--json"], { capture: true });
+  assert.equal(JSON.parse(rejectedPurposes.stdout).value, true);
+  checks.push("all built-ins require purpose first; filesystem rejects missing, empty, and oversized purposes before effects");
+  checks.push("native read/write/edit contracts are generated from pinned Pi schemas; purpose is required and listed first");
   const root = await call("ox.fs.list", {});
   assert(!root.items.some((item: { path: string }) => item.path === "guidance"));
   const catalog = await call("ox.fs.list", { path: "skills", options: { limit: 100 } });
@@ -136,8 +150,8 @@ try {
   await rejected("ox.fs.edit", { path: editPath, edits: [{ oldText: "ALPHA ", newText: "unsafe fuzzy match" }] }, /exactly once/);
   const { stdout: parallel } = await run(["ox", "--host", qa.values.host, "--chat", qa.values.chat, "vm", "eval", "--script", `
     await Promise.all([
-      ox.fs.edit({ path: ${JSON.stringify(editPath)}, edits: [{ oldText: "ALPHA", newText: "first" }] }),
-      ox.fs.edit({ path: ${JSON.stringify(editPath)}, edits: [{ oldText: "GAMMA", newText: "second" }] })
+      ox.fs.edit({ purpose: "Verify parallel edits", path: ${JSON.stringify(editPath)}, edits: [{ oldText: "ALPHA", newText: "first" }] }),
+      ox.fs.edit({ purpose: "Verify parallel edits", path: ${JSON.stringify(editPath)}, edits: [{ oldText: "GAMMA", newText: "second" }] })
     ]); console.log("Parallel edits completed");
   `, "--json"], { capture: true });
   assert(parallel.includes("Parallel edits completed"));
