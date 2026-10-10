@@ -6,14 +6,14 @@ enum Theme {
     enum Colors {
         static let primary         = DynamicColor(light: 0xFFA500, dark: 0xF5A030)
         static let primaryPressed  = DynamicColor(light: 0xD87A0A, dark: 0xC77410)
-        static let surface         = DynamicColor(brand: 0xFFFDF7, light: 0xFFFFFF, dark: 0x1C1C1E)
-        static let surfaceSunken   = DynamicColor(brand: 0xFBE9C7, light: 0xF2F2F7, dark: 0x2C2C2E)
-        static let chipOnBackground = DynamicColor(brand: 0xFBE9C7, light: 0xFFFFFF, dark: 0x2C2C2E)
-        static let chatSurface     = DynamicColor(brand: 0xFFFFFF, light: 0xFFFFFF, dark: 0x0A0A0A)
+        static let surface         = DynamicColor(light: 0xFFFDF7, dark: 0x1C1C1E)
+        static let surfaceSunken   = DynamicColor(light: 0xFBE9C7, dark: 0x2C2C2E)
+        static let chipOnBackground = DynamicColor(light: 0xFBE9C7, dark: 0x2C2C2E)
+        static let chatSurface     = DynamicColor(light: 0xFFFFFF, dark: 0x0A0A0A)
         static let bubble          = DynamicColor(light: 0xF3F3F3, dark: 0x1C1C1E)
-        static let background      = DynamicColor(brand: 0xFFF6E6, light: 0xFFFFFF, dark: 0x0A0A0A)
-        static let onSurface       = DynamicColor(brand: 0x000000, light: 0x000000, dark: 0xECECEC)
-        static let onSurfaceMuted  = DynamicColor(brand: 0x7A5A3A, light: 0x8E8E93, dark: 0x9A9A9A)
+        static let background      = DynamicColor(light: 0xFFF6E6, dark: 0x0A0A0A)
+        static let onSurface       = DynamicColor(light: 0x000000, dark: 0xECECEC)
+        static let onSurfaceMuted  = DynamicColor(light: 0x7A5A3A, dark: 0x9A9A9A)
         static let onPrimary       = DynamicColor(light: 0xFFFDF7, dark: 0xFFFDF7)
         static let error           = DynamicColor(light: 0xB8422E, dark: 0xE25A45)
     }
@@ -82,6 +82,8 @@ nonisolated enum AppTheme: String, CaseIterable, Identifiable {
     case light
     case dark
 
+    static let allCases: [AppTheme] = [.light, .dark]
+
     private static let currentLock = OSAllocatedUnfairLock(initialState: AppTheme.creatorPick)
 
     static var current: AppTheme {
@@ -93,8 +95,7 @@ nonisolated enum AppTheme: String, CaseIterable, Identifiable {
 
     var displayName: LocalizedStringKey {
         switch self {
-        case .creatorPick: "Ox"
-        case .light: "Light"
+        case .creatorPick, .light: "Light"
         case .dark:  "Dark"
         }
     }
@@ -119,19 +120,8 @@ extension EnvironmentValues {
 }
 
 struct DynamicColor: ShapeStyle {
-    let brand: UInt32
     let light: UInt32
     let dark: UInt32
-
-    init(brand: UInt32, light: UInt32, dark: UInt32) {
-        self.brand = brand
-        self.light = light
-        self.dark = dark
-    }
-
-    init(light: UInt32, dark: UInt32) {
-        self.init(brand: light, light: light, dark: dark)
-    }
 
     func resolve(in environment: EnvironmentValues) -> Color {
         color(for: environment.appTheme)
@@ -139,9 +129,8 @@ struct DynamicColor: ShapeStyle {
 
     func hex(for theme: AppTheme) -> UInt32 {
         switch theme {
-        case .creatorPick: brand
-        case .light: light
-        case .dark:  dark
+        case .creatorPick, .light: light
+        case .dark: dark
         }
     }
 
@@ -154,18 +143,8 @@ struct DynamicColor: ShapeStyle {
     }
 
     var uiColor: UIColor {
-        let brand = self.brand, light = self.light, dark = self.dark
-        return UIColor { _ in UIColor(hex: AppTheme.current.pick(brand, light, dark)) }
-    }
-}
-
-private extension AppTheme {
-    func pick(_ brand: UInt32, _ light: UInt32, _ dark: UInt32) -> UInt32 {
-        switch self {
-        case .creatorPick: brand
-        case .light: light
-        case .dark:  dark
-        }
+        let palette = self
+        return UIColor { _ in UIColor(hex: palette.hex(for: AppTheme.current)) }
     }
 }
 

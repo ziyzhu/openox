@@ -73,7 +73,7 @@ struct SettingsSheet: View {
     }
 
     private var themeBinding: Binding<AppTheme> {
-        Binding(get: { theme.theme }, set: { theme.theme = $0 })
+        Binding(get: { theme.theme == .dark ? .dark : .light }, set: { theme.theme = $0 })
     }
 
     private var defaultModelValue: Text {

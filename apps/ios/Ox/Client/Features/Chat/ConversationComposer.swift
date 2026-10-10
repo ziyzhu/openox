@@ -450,10 +450,10 @@ struct ConversationComposer: View, Equatable {
         .padding(.top, inputBarTopSpacing)
         .padding(.bottom, Theme.Spacing.sm)
         .background(alignment: .bottom) {
-            if appTheme == .creatorPick && isFieldFocused {
+            if appTheme.colorScheme == .light && isFieldFocused {
                 LinearGradient(
                     colors: [
-                        Theme.Colors.chatSurface.color(for: .creatorPick).opacity(0),
+                        Theme.Colors.chatSurface.color(for: appTheme).opacity(0),
                         Color(uiColor: .systemBackground)
                     ],
                     startPoint: .top,
