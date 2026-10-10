@@ -21,8 +21,8 @@ struct ActionPolicyPicker: View {
         HStack(spacing: Theme.Spacing.sm) {
             if let title {
                 Text(title)
-                    .font(Theme.Fonts.bodySm)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
                 Spacer(minLength: 0)
             }
             Menu {
@@ -45,9 +45,9 @@ struct ActionPolicyPicker: View {
                 HStack(spacing: Theme.Spacing.xs) {
                     Text(resolved?.title ?? "Default")
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(Theme.Icons.xs)
                 }
-                .font(Theme.Fonts.labelMd)
+                .font(Theme.Fonts.bodySm)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
         }
@@ -69,7 +69,8 @@ struct ActionSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
                     "Default",
-                    footer: "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority."
+                    footer: "By default, built-in Ox Actions are allowed except deletion. Services and devices use their declared defaults. Ask, Allow, or Block overrides that behavior for all Actions. More specific choices take priority.",
+                    layout: .group
                 ) {
                     ActionPolicyPicker(
                         title: "All Actions",
@@ -78,6 +79,7 @@ struct ActionSettingsView: View {
                         inheritLabel: "Use Default",
                         onChange: { serviceManager.defaultActionPolicy = $0 }
                     )
+                    .settingsRowPadding()
                 }
 
                 SettingsSection("Actions", layout: .group) {
