@@ -71,8 +71,8 @@
     "Allow connections" : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许连接" } } }
     },
-    "Connect through Tailscale while Ox is open." : {
-      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保持 Ox 打开，通过 Tailscale 连接。" } } }
+    "Off by default. Allow other devices on your Tailscale network to connect to Ox, manage chats, and run tools. Keep Ox open while connected. Only enable this on a trusted network." : {
+      "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "默认关闭。允许 Tailscale 网络中的其他设备连接到 Ox、管理聊天并运行工具。连接期间请保持 Ox 打开。仅在可信网络中启用。" } } }
     },
     "" : {
       "shouldTranslate" : false
