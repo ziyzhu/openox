@@ -21,6 +21,7 @@ bun run ci --standalone-only --out /tmp/ox-cli-artifacts
 bun run test:e2e
 bun run test:logs
 bun run ci:ios --device ox-1 --loopback
+bun run ci:ios --device ox-1 --loopback --app /absolute/Ox.app
 bun run test:demo --device ox-1
 bun .agents/skills/test/apps/ios/settings.ts --device ox-1 --host <ws-url> --app <Ox.app>
 bun .agents/skills/test/apps/ios/image-widget.ts --device ox-2 --chat <saved-Mock-QA-chat-seeded-with-0> --app <Ox.app>
@@ -58,14 +59,15 @@ Linux ARM64/x64 using the same command and pins Bun 1.3.13.
 ## Local iOS verification
 
 Follow the simulator ownership and baseline rules in repository `AGENTS.md`.
-Different simulators still share a checkout's DerivedData build database. Serialize
-shared builds, or use `xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath /tmp/<campaign>/DerivedData build`
-and install/launch the resulting `.app` with `xcrun simctl` on the same explicit UDID. Read the shared `ios-simulator` skill for the native workflow.
-Separate DerivedData avoids build-database locks, not concurrent source-generation races.
+Use the shared `ios-simulator` skill for builds, UI interaction, captures, and diagnostics;
+`onboarding` owns OpenOx scheme/signing/launch configuration. Use task-specific
+DerivedData. It avoids build-database locks, not concurrent source-generation races.
 A matched tap does not prove a native switch changed: wait for stable frames, use
 `idb ui tap X Y --duration 0.25 --udid "$UDID"` for switch controls, and verify AX value and behavior. Resolve coordinates from the current AX tree.
 `ci:ios` requires idb, Xcode, an explicitly reserved numbered simulator, and Host
-connections already enabled. It never provisions, clones, uninstalls, erases,
+connections already enabled. `--app /absolute/Ox.app` skips building and reuses a
+verified artifact; rebuild after source changes or switching worktrees. Install/launch
+checks the artifact's bundle identifier. Screenshots use `simctl`, not an idb companion. It never provisions, clones, uninstalls, erases,
 changes credentials, or enables Host access.
 
 The bundle comes from `--bundle`, `OX_BUNDLE_ID`, or `apps/ios/Local.xcconfig`.
@@ -75,8 +77,9 @@ opts a Debug Simulator launch into `127.0.0.1`; it still requires Allow connecti
 uses ordinary Host APIs, and is compiled out on physical devices and Release builds.
 The opt-in is launch-only; relaunch without it to restore Tailscale-only networking.
 
-The runner builds bundled services with `xcodebuild` in evidence-local DerivedData, installs/launches with `simctl`, and verifies UI through idb, following
-[Apple's Simulator workflow](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices).
+The runner builds in evidence-local DerivedData unless `--app` is supplied,
+installs/launches with `simctl`, and verifies UI through idb.
+This is a Host/chat smoke with visible UI evidence, not composer/Send interaction coverage.
 It creates a temporary Mock chat, sends scenario `2`, verifies the completed reply
 and visible assistant message, then attempts to restore the prior saved chat.
 It only shuts down a simulator it booted. Relaunching can discard an unsaved

@@ -26,14 +26,11 @@ Introduce each chapter with its exact heading and description before its footage
 
 Use this mode when the user explicitly requests a controlled SwiftUI preview rather than live execution. Open `apps/ios/Ox/Development/OxDemoSceneView.swift` and use its `#Preview` scenes. Reuse production onboarding rows, chat header, composer, message bubbles, Markdown, service chips, and provider picker rows. Apply the production `.themed()` modifier; a SwiftUI-only theme override does not initialize the theme used by UIKit Markdown text. Reuse `ThinkingRow` for scripted progress and `ResponseFooterBlockView` for completed replies; keep response controls hidden during work and streaming. Use task-specific outcomes and limitations rather than generic success copy, and preserve the exact reply text when streaming word bursts. Match `ConversationPage`'s scaled control metrics: 44-point header icons and a 34-point composer circle inside a 44-point tap target. **Do not add player controls, demo labels, custom cards, overlays, simulated system controls, or other special recording UI.** Scene selection and timing belong outside the rendered app, in Xcode previews or launch configuration.
 
-For a simulator snapshot, resolve the reserved target to `UDID` and use task-specific `DERIVED_DATA` outside the repository:
+Build/install using `ios-simulator` and OpenOx's `onboarding` configuration, or reuse a verified `--app` with `test:demo`. For a snapshot, launch the installed app on the reserved `UDID` with its verified `BUNDLE_ID`:
 
 ```bash
-xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug \
-  -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build
-xcrun simctl install "$UDID" "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Ox.app"
 SIMCTL_CHILD_OX_DEMO=1 SIMCTL_CHILD_OX_DEMO_SCENE=memory SIMCTL_CHILD_OX_DEMO_COMPLETE=1 \
-  xcrun simctl launch --terminate-running-process "$UDID" ai.oxcraft.bot
+  xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
 ```
 
 `OX_DEMO_SCENE` accepts `connect`, `memory`, `planning`, `publishing`, `local`, `offline`, `yours`, `providers`, `reddit`, `reuse`, or `creative`. Use `OX_DEMO_AUTOPLAY=1` without `OX_DEMO_COMPLETE=1` for the timeline. Relaunch without demo environment variables to return to normal Ox. This entry point and its fixtures are DEBUG-only; demo artwork is excluded from Release builds. Start recording before autoplay; simulator command latency can otherwise miss the opening chapter. Trim the relaunch transition and verify the opening in the exported video.
@@ -52,7 +49,7 @@ Use `OX_DEMO_AUTOPLAY=1` for looping playback or `OX_DEMO_TIME=<seconds>` withou
 
 `apps/ios/Ox/Development/OxAppStoreScreenshotView.swift` contains six named, static `#Preview`s with screenshot-specific conversation fixtures. They render completed conversations through the same production components, with no autoplay, titles, device frames, or overlays. Planning combines ChatGPT, Muse, and read-only Outlook inputs into a saved checklist. Service completes a Reddit posting request while creating its reusable service on the fly. Research compares Gemini, Claude, and Grok recommendations and saves a brief. The storyboard's separate prompts and typing-only planning/publishing scenes remain unchanged.
 
-After installing the prebuilt app with `xcrun simctl install "$UDID" "$APP_PATH"`, launch with `SIMCTL_CHILD_OX_APP_STORE_SCREENSHOT=planning xcrun simctl launch --terminate-running-process "$UDID" ai.oxcraft.bot`. The selector also accepts `publishing`, `memory`, `reminder`, `service`, and `research`. Capture with `idb screenshot "$SCREENSHOT_PATH" --udid "$UDID"` after `demo.reply` settles; `test:demo` exports and checks all six under its private `app-store/` diagnostics directory. Keep original PNGs at native resolution and check [Apple's screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/) for the target display class. These are illustrative layout previews, not evidence of actual writes or upload approval; verify depicted capabilities before publishing. Relaunch without the screenshot selector to restore normal Ox.
+Launch the installed app with `SIMCTL_CHILD_OX_APP_STORE_SCREENSHOT=planning xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"`. The selector also accepts `publishing`, `memory`, `reminder`, `service`, and `research`. Capture using the shared skill after `demo.reply` settles; `test:demo` exports and checks all six under its private `app-store/` diagnostics directory. Keep original PNGs at native resolution and check [Apple's screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/) for the target display class. These are illustrative layout previews, not evidence of actual writes or upload approval; verify depicted capabilities before publishing. Relaunch without the screenshot selector to restore normal Ox.
 
 For explicitly requested framed App Store artwork, compose outside the app with `bun .agents/skills/demo/scripts/app-store-previews.ts --sources <native-png-directory> --out <external-directory>`. It generates six self-contained HTML previews and a source-checksum manifest at 1320 × 2868. The first three use the exact README feature copy in order; their source filenames are `01-connect-anything.png`, `02-local-first.png`, and `03-yours.png`. Follow with `04-memory.png`, `05-reddit-task.png`, and `06-assistant-research.png`. Render individual pages in Chrome at 1320 × 2868 with device pixel ratio 1, then validate the six exported PNGs with `asc screenshots validate --path <png-directory> --device-type IPHONE_67`. This graphic treatment does not change native preview mode or authorize an upload.
 
@@ -86,7 +83,7 @@ Use the built-in **Ox** theme for these captures, not Dark or plain Light. Recor
 
 ## Record
 
-Record simulator footage with `idb video "$VIDEO_PATH" --udid "$UDID"`; retain the recording process/session and stop it with SIGINT, waiting for the file to finalize. Inspect installed `idb video --help` first. Use a supported physical-device recording flow when the selected phone cannot record through idb. Capture actual app and system interaction, without composited cards or overlays.
+Use the shared skill's native recording lifecycle; wait for recording readiness before launching autoplay or interacting. Use a supported physical-device recording flow for phone footage. Capture actual app and system interaction, without composited cards or overlays.
 
 ### 1. Connect anything
 

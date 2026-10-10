@@ -6,6 +6,7 @@ import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { waitForHost } from "./host.ts";
 
 const config = qaCommand({
   usage: "Usage: bun .agents/skills/test/apps/ios/settings.ts --device ox-N --host <ws-url> --app <Ox.app> [--output <directory>]\nRequires an idle, booted, reserved simulator with Host access already enabled. Exercises settings through ox, relaunches the installed build, and restores preferences and the previous saved chat.",
@@ -54,15 +55,6 @@ async function rejected(name: string, args: Record<string, unknown>, message: st
   assert.notEqual(result.code, 0, `${name} accepted invalid arguments`);
   assert.ok((result.stderr + result.stdout).includes(message), `${name} did not report the expected validation error`);
   results.push({ name, args, rejected: true });
-}
-
-async function waitForHost(): Promise<void> {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    try { await ox("host", "describe", "--timeout", "1000"); return; } catch {}
-    await Bun.sleep(200);
-  }
-  throw new Error(`Host unavailable at ${endpoint.href}`);
 }
 
 async function waitForSavedDefaultModel(): Promise<void> {
@@ -181,7 +173,7 @@ try {
   chat = undefined;
   await ios.launch(bundle, app, { OX_DEBUG_ENDPOINT: config.debugEndpoint, OX_HOST_LOOPBACK: endpoint.hostname === "127.0.0.1" ? "1" : "0" });
   await ios.wait({ id: "chat.temporaryToggle" }, { timeout: 30_000, stable: 1000 });
-  await waitForHost();
+  await waitForHost(endpoint.href, () => ox("host", "describe", "--timeout", "1000"));
   await newChat();
   assert.equal((await call("ox.app.defaultModel")).model.id, "mock-text-only");
   assert.equal((await call("ox.app.language")).selection, "zh-Hans");

@@ -69,13 +69,9 @@ Run this gate after every `StorageMigrator` change, including refactors and diag
 4. Run `bun run typecheck` and the retained portable checks.
 5. Confirm the installed app reaches its normal UI and logs `StorageMigrator.prepare done` followed by `IOSHost storage prepared` and `IOSHost profile prepared`.
 
-For reserved `ox-1`, resolve its unique `UDID`, use task-specific `DERIVED_DATA` outside the repository, and select the intended `BUNDLE_ID`. The standard commands are:
-
-```sh
-xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build
-xcrun simctl install "$UDID" "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Ox.app"
-SIMCTL_CHILD_OX_DEBUG_ENDPOINT=ws://127.0.0.1:9101 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
-bun run typecheck
-```
+Use the shared `ios-simulator` skill for build/install/launch and container inspection,
+and `onboarding` for OpenOx's scheme, bundle identity, and assigned launch port.
+Use task-specific DerivedData outside the repository. Installing the new app must
+preserve the predecessor container; do not uninstall or erase as upgrade setup.
 
 For every newly added ordered Profile milestone, compare complete before/after trees from an actual predecessor build and verify second-run stability. Sanitize snapshots without changing their encoded shape and retain them outside the repository. The former storage-replay RPC and committed fixture suite are no longer available; do not claim automated migration coverage from the iOS chat smoke.

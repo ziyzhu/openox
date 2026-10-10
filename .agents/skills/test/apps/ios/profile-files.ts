@@ -5,6 +5,7 @@ import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/profile-files.ts --device ox-N --chat <seeded-saved-Mock-QA-chat> --app /absolute/Ox.app [--bundle id] [--profile-folder name] [--output /tmp/directory]\nWrites run-owned files, creates/deletes a run-owned chat, relaunches, and approves deletion of only its fixtures through ordinary chat approval. Never changes policies or credentials.",
@@ -39,13 +40,8 @@ async function present(path: string) {
 async function rejected(name: string, args: Record<string, unknown>) {
   await assert.rejects(() => call(name, args));
 }
-async function waitForHost() {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try { await json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--json"]); return; }
-    catch { await Bun.sleep(250); }
-  }
-  throw new Error("Host must become ready after launch");
-}
+const ready = () => waitForHost(qa.debugEndpoint,
+  () => json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--timeout", "1000", "--json"]), 10_000);
 async function approve(script: string, purpose: string) {
   await json([...target, "chat", "send", `execute\n${script}`, "--no-wait", "--json"]);
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -63,7 +59,7 @@ await requireSimulator(qa.device);
 const release = claimSimulator(qa.device);
 try {
   await mkdir(directory, { recursive: true });
-  await waitForHost();
+  await ready();
   await json([...target, "chat", "open", "--json"]);
   const initial = await json([...target, "chat", "inspect", "--json"]);
   assert.equal(initial.isBusy, false);
@@ -153,7 +149,7 @@ try {
     checks.push("public-only content, external create/edit/move/delete/recreate, authoritative Memory and physical user skills");
   }
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
-  await waitForHost();
+  await ready();
   await json([...target, "chat", "open", "--json"]);
   assert.equal((await call("ox.fs.read", { path: `${shared}/nested/current.html` })).text, "<h1>Current HTML</h1>\n");
   assert.equal((await present(current.filename)).filename, current.filename);

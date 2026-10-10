@@ -5,6 +5,7 @@ import { ROOT, run } from "../../../../lib.ts";
 import { qaCommand } from "../../../onboarding/scripts/qa-config.ts";
 import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/simulator.ts";
 import { iosTarget } from "../../../onboarding/scripts/ios.ts";
+import { waitForHost } from "./host.ts";
 
 const qa = qaCommand({
   usage: "bun .agents/skills/test/apps/ios/image-widget.ts --device ox-N --chat <saved-Mock-QA-chat-seeded-with-0> --app /absolute/Ox.app [--bundle id] [--output /tmp/directory]\nUses the assigned loopback Host. Retains run-owned QA artifacts and chat for visual review; never changes approval policies or credentials.",
@@ -87,12 +88,8 @@ try {
   await screenshot("local-inline");
   checks.push("local artifact image references follow rename without attaching pixels to model context");
   await ios.launch(bundle, resolve(qa.values.app), { OX_HOST_LOOPBACK: "1", OX_DEBUG_ENDPOINT: qa.debugEndpoint });
-  let ready = false;
-  for (let attempt = 0; attempt < 40 && !ready; attempt++) {
-    try { await json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--json"]); ready = true; }
-    catch { await Bun.sleep(250); }
-  }
-  assert(ready, "Host must become ready after relaunch");
+  await waitForHost(qa.debugEndpoint,
+    () => json(["ox", "--host", qa.debugEndpoint, "host", "describe", "--timeout", "1000", "--json"]), 10_000);
   await json([...target, "chat", "open", "--json"]);
   assert.deepEqual(images(await inspect()), images(before));
   await bottom();

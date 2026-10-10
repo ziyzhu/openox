@@ -29,18 +29,11 @@ ox host list --help
 
 Use macOS with Xcode supporting the assigned iOS 26 and iOS 27 runtimes. Install components in **Xcode > Settings > Components**, following [Apple's component installation guide](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components). An older Xcode may need upgrading before it can use a newer runtime. Keep existing Xcode installations and devices until replacements work; never erase simulator data to resolve a missing runtime.
 
-Use `xcodebuild` and `xcrun simctl` from Xcode, plus the [idb client and companion](https://github.com/facebook/idb) for UI automation. Follow current upstream installation guidance; a companion alone does not install the client. Verify:
-
-```sh
-command -v idb idb_companion
-xcode-select -p
-xcodebuild -version
-xcrun simctl list devices available --json
-idb ui --help
-xcrun devicectl list devices --help
-```
-
-Use the agent-independent `ios-simulator` skill for iOS interaction. If unavailable, consult installed native CLI help. Resolve the chosen name to a unique UDID and pass it explicitly to `simctl` and `idb`; never guess flags or rely on a default booted target.
+Use the agent-independent `ios-simulator` skill for native-tool installation checks,
+target discovery, and interaction. UI automation needs both the idb client and
+companion; local screenshots/video need only `simctl`. If the skill is unavailable,
+consult installed native CLI help. Resolve the chosen name to a unique UDID and
+pass it explicitly; never rely on a default booted target.
 
 - Follow Simulator Setup in `AGENTS.md`: `ox-1` through `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Use [scripts/qa-config.ts](scripts/qa-config.ts) for all assigned ports. The QA harness accepts only those five names.
 - Missing iOS 27 support blocks `ox-4` and `ox-5`; do not substitute iOS 26 or change the pool policy. Partial setup can proceed on the first three reserved targets.
@@ -68,11 +61,11 @@ Resolve `BASELINE_UDID` and, after cloning, `OX1_UDID` from the inventory before
 - Reserve an available numbered simulator and use its matching ports. Initialize the shared website/provider baseline before testing. Rebuild and reinstall after switching worktrees.
 - Build bundled services with `xcodebuild -project apps/ios/Ox.xcodeproj -scheme ios -configuration Debug -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DERIVED_DATA" build`. Use a task-specific path outside the repository. Install the resulting `Build/Products/Debug-iphonesimulator/Ox.app` with `xcrun simctl install "$UDID" "$APP_PATH"`, then launch with `SIMCTL_CHILD_OX_DEBUG_ENDPOINT="ws://127.0.0.1:$DEBUG_PORT" xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"`.
 - To test loading a local repository separately, start `ox --repository examples/repository repository serve --port <registry-port>`, verify `curl -fsS http://127.0.0.1:<registry-port>/health`, and relaunch with `SIMCTL_CHILD_OX_SERVICES_ENDPOINT=http://localhost:<registry-port>/repository.git` in the launch environment.
-- Confirm the normal UI with `idb ui describe-all --udid "$UDID"` and `idb screenshot "$SCREENSHOT_PATH" --udid "$UDID"`. If accessibility frames disagree with the screenshot after a reboot or reinstall, restart only that reserved device's `idb_companion` before trusting coordinates. When installed apps share a display name, launch by bundle identifier rather than tapping the first matching Home Screen icon.
+- Verify the expected normal UI using the shared skill's AX/capture loop, not just launch success. When installed apps share a display name, launch by bundle identifier rather than tapping the first matching Home Screen icon.
 - For CLI access, enable **Settings > Host > Allow connections** and keep Ox foreground. Physical-device and Release Hosts require Tailscale on both devices. A Debug Simulator launch can explicitly opt into localhost with `SIMCTL_CHILD_OX_HOST_LOOPBACK=1` in the simctl launch environment; it binds only `127.0.0.1` on the assigned port and uses the same ordinary Host API. This flag is compiled out on physical devices and Release builds; a normal relaunch restores Tailscale-only access. `OX_DEBUG_ENDPOINT` selects the port, not the ingress mode. Verify `ox --host ws://127.0.0.1:<debug-port> host describe` for loopback, or use `ox host list`/the tailnet address for Tailscale. A `starting` log is not readiness. Preserve failure logs, never add unrestricted listeners or bypass approvals, and restore temporary settings afterward.
 - Use Mock for a no-cost smoke test; real provider calls require authorization. Enter provider credentials through Ox's secure UI when needed. The ignored `secrets/API_KEYS.json` is only for local test bootstrap; never request a key in chat or pass it on a command line.
 
-## App Store authentication and commit readiness
+## App Store authentication
 
 Use the [App Store Connect CLI](https://asccli.sh), installed by Homebrew as **`asc`**. Inspect an existing installation before adding another tool; the separate Homebrew formula `asccli` has different flags and authentication storage and is not required.
 
@@ -91,13 +84,7 @@ asc auth login --key-id <key-id> --issuer-id <issuer-id> \
   --private-key /absolute/path/to/AuthKey.p8 --name <account>
 ```
 
-Never paste private-key contents into chat, command arguments, or tracked files. Do not create or revoke API keys or signing certificates as a routine setup step. Missing credentials block the release check, not local builds; do not claim commit readiness without them. Before committing, follow all version rules in `AGENTS.md` and make only its required release query:
-
-```sh
-asc versions list --app 6802224502
-```
-
-An unavailable key or denied API access blocks the prescribed commit check. Report it instead of guessing the released version.
+Never paste private-key contents into chat, command arguments, or tracked files. Do not create or revoke API keys or signing certificates as a routine setup step. Missing credentials block App Store release work, not local builds or commits. Follow `AGENTS.md` for commit requirements; committing requires no App Store queries or version checks.
 
 ## Pi and portable agent skills
 

@@ -57,6 +57,8 @@ export function iosTarget(device: string) {
     return destination;
   };
   const launch = async (bundle: string, app: string, env: Record<string, string> = {}) => {
+    const identity = await run(["plutil", "-extract", "CFBundleIdentifier", "raw", "-o", "-", join(app, "Info.plist")], { capture: true });
+    if (identity.stdout.trim() !== bundle) throw new Error(`App bundle ${identity.stdout.trim()} does not match ${bundle}`);
     await simctl("install", await udid(), app);
     const result = await run(["xcrun", "simctl", "launch", "--terminate-running-process", await udid(), bundle], {
       capture: true, env: Object.fromEntries(Object.entries(env).map(([key, value]) => [`SIMCTL_CHILD_${key}`, value])),
@@ -82,7 +84,7 @@ export function iosTarget(device: string) {
         ...(options.duration ? ["--duration", String(options.duration)] : []), "--udid", await udid()], { capture: true });
     },
     async text(value: string) { await run(["idb", "ui", "text", value, "--udid", await udid()], { capture: true }); },
-    async screenshot(path: string) { await run(["idb", "screenshot", path, "--udid", await udid()], { capture: true }); },
+    async screenshot(path: string) { await simctl("io", await udid(), "screenshot", path); },
     async pull(bundle: string, path: string, destination: string) {
       const source = await containerPath(bundle, path);
       await mkdir(destination, { recursive: true });

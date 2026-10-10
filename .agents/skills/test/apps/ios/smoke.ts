@@ -7,17 +7,18 @@ import { claimSimulator, requireSimulator } from "../../../onboarding/scripts/si
 import { iosTarget } from "../../../onboarding/scripts/ios.ts";
 
 const config = qaCommand({
-  usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--output <directory>] [--loopback]
+  usage: `Usage: bun run ci:ios --device ox-N [--host <ws-url>] [--bundle <id>] [--app <Ox.app>] [--output <directory>] [--loopback]
 Reserve the device and prepare the common QA state first. Host connections must already be enabled.
-Builds/launches the app and runs a temporary Mock chat. Never resets app data or changes credentials/settings.
+Builds/launches the app and runs a temporary Mock chat. --app reuses a verified build instead of building.
+Never resets app data or changes credentials/settings.
 --loopback opts this Debug Simulator launch into localhost Host access; other launches remain Tailscale-only.
 Evidence stays outside the repository.`,
   options: {
-    host: { type: "string" }, bundle: { type: "string" }, output: { type: "string" }, loopback: { type: "boolean" },
+    host: { type: "string" }, bundle: { type: "string" }, app: { type: "string" }, output: { type: "string" }, loopback: { type: "boolean" },
   },
 });
 if (!config.values.device) throw new Error("Pass --device ox-N explicitly after reserving the simulator");
-if (!Bun.which("idb") || !Bun.which("xcodebuild")) throw new Error("Install idb and configure Xcode before running iOS CI");
+if (!Bun.which("idb") || !config.values.app && !Bun.which("xcodebuild")) throw new Error("Install idb and configure Xcode before running iOS CI");
 const ios = iosTarget(config.device);
 const endpoint = config.values.host ?? config.debugEndpoint;
 const url = new URL(endpoint);
@@ -80,7 +81,8 @@ try {
     bootedByCi = true;
   }
   launched = true;
-  const app = await ios.build(join(evidence, "DerivedData"), join(evidence, "build.log"));
+  const app = config.values.app ? resolve(config.values.app)
+    : await ios.build(join(evidence, "DerivedData"), join(evidence, "build.log"));
   const launch = await ios.launch(bundle, app, {
     OX_DEBUG_ENDPOINT: endpoint, OX_HOST_LOOPBACK: config.values.loopback ? "1" : "0",
   });
@@ -128,4 +130,4 @@ try {
     if (bootedByCi) await ios.shutdown();
   } finally { release(); }
 }
-if (completed && !process.exitCode) console.log(`PASS iOS build, launch, Mock reply, and visible assistant message (${config.device})`);
+if (completed && !process.exitCode) console.log(`PASS iOS ${config.values.app ? "prebuilt app" : "build"}, launch, Mock reply, and visible assistant message (${config.device})`);
