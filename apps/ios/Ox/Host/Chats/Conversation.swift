@@ -1388,6 +1388,13 @@ final class Conversation: Identifiable {
         Log.session.info("Chat.embedVideo source=\(video.source.artifact?.fileName ?? "remote")")
     }
 
+    func embedImage(_ image: ImageWidget) {
+        let standalone = ensureExecutionContext()
+        document.apply(.embedImage(image))
+        if standalone { finishStandaloneExecution() }
+        Log.session.info("Chat.embedImage source=\(image.source.artifact == nil ? "remote" : "artifact")")
+    }
+
     private func embedServiceInspector(_ link: ServiceInspectorLink) {
         let standalone = ensureExecutionContext()
         document.apply(.embedServiceInspector(link))

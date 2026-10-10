@@ -17,6 +17,7 @@ nonisolated enum ChatDocumentEvent {
     case embedServiceInspector(ServiceInspectorLink)
     case embedShoveler(Shoveler)
     case embedVideo(VideoWidget)
+    case embedImage(ImageWidget)
     case embedArtifact(Artifact)
     case embedSkill(Skill)
     case attachMedia(Artifact)
@@ -84,6 +85,7 @@ nonisolated struct ChatDocument {
                                 case let .serviceInspector(link): state.apply(.embedServiceInspector(link))
                                 case let .shoveler(shoveler): state.apply(.embedShoveler(shoveler))
                                 case let .video(video): state.apply(.embedVideo(video))
+                                case let .image(image): state.apply(.embedImage(image))
                                 case let .artifact(artifact): state.apply(.embedArtifact(artifact))
                                 case let .skill(skill): state.apply(.embedSkill(skill))
                                 case let .media(artifact): state.apply(.attachMedia(artifact))
@@ -243,6 +245,7 @@ nonisolated struct ChatDocument {
                 case .artifact(let artifact): return [artifact]
                 case .shoveler(let shoveler): return shoveler.cards.compactMap(\.artifact)
                 case .video(let video): return video.source.artifact.map { [$0] } ?? []
+                case .image(let image): return image.source.artifact.map { [$0] } ?? []
                 case .text, .progress, .serviceControl, .serviceInspector, .skill: return []
                 }
             }
@@ -305,6 +308,9 @@ nonisolated struct ChatDocument {
             reconcileTail()
         case let .embedVideo(video):
             embedVideo(video)
+
+        case let .embedImage(image):
+            mutateExecution { $0.effects.append(.image(image)) }
             reconcileTail()
         case let .embedArtifact(artifact):
             embedArtifact(artifact)
@@ -912,6 +918,9 @@ nonisolated struct ChatDocument {
                     return Materialization(completesExecution: true)
                 case .video:
                     guard invocation.name == Actions.widgetVideo else { continue }
+                    return Materialization(completesExecution: true)
+                case .image:
+                    guard invocation.name == Actions.widgetImage else { continue }
                     return Materialization(completesExecution: true)
                 case .invocation:
                     return nil

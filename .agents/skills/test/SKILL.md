@@ -23,6 +23,7 @@ bun run test:logs
 bun run ci:ios --device ox-1 --loopback
 bun run test:demo --device ox-1
 bun .agents/skills/test/apps/ios/settings.ts --device ox-1 --host <ws-url> --app <Ox.app>
+bun .agents/skills/test/apps/ios/image-widget.ts --device ox-2 --chat <saved-Mock-QA-chat-seeded-with-0> --app <Ox.app>
 bun .agents/skills/test/apps/ios/durable-chat.ts --device ox-1 --app <Ox.app> --evidence /tmp/ox-model-qa --models
 ```
 
@@ -101,6 +102,16 @@ Bundled skill boundaries use `bun .agents/skills/test/apps/ios/bundled-skills.ts
 `local-repository.ts --device ox-N --host <ws-url> --chat <saved-QA-chat> --bundle <bundle-id> --domain <qa-draft-domain>` verifies disabled Local mutation refusals against the native Host and byte-identical source, Git, and configuration snapshots. Use enabled Local, an empty run-owned `qa-` web draft, and an idle saved Mock chat seeded with `QA Local repository enablement regression. Reply QA only.` It restores enablement and writes identical source after reenabling; it creates no drafts or commits. Delete the prepared run-owned draft through the normal UI afterward. This checks runtime safety, not real-model prompting.
 
 `durable-chat.ts --models` uses native Mock scenario `23` through the actual UI without Host ingress. It verifies deferred switches, pending no-ops, Stop/failure cancellation, and the next queued turn's model, then runs `23 defaults` to verify default selection/reset, invalid arguments, current-chat isolation, and restoration. It uses the explicit temporary SQLite fixture and restores the normal launch environment; it does not change provider credentials and restores the original new-chat default. This fixture requires automatic or Mock defaults. Default relaunch checks require the Host-based suite; persisted-chat model reload is not covered.
+
+`image-widget.ts` verifies remote/local image display, zoom-viewer handoff, source
+validation, artifact rename, model-context separation, process reopen, and remote
+failure/retry through `ox` and `sim`. Use a dedicated saved Mock QA chat seeded with
+`0` and a fresh app on the assigned loopback Host. It retains run-owned fixtures and
+the chat for human review; remove them through normal UI when finished. It never
+changes approval policies, provider credentials, or website state. Mock accepts
+`execute\n<JavaScript>` for runner-supplied tool calls; keep feature fixtures in E2E
+rather than numbered scenarios. After seeding, use the prepared saved ID from
+`chat inspect`, not the provisional ID returned by `chat new`.
 
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use

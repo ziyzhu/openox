@@ -107,11 +107,11 @@ nonisolated enum DurableChatProjection {
 
         mutating func appendAssistant(_ assistant: AssistantMessage, namespace: String, turnID: TurnID?) {
             let candidates = decorations.filter { decoration in
-                guard decoration.generation.model == assistant.model,
-                      abs(decoration.generation.at.timeIntervalSince(assistant.timestamp)) < 0.001 else { return false }
+                guard decoration.generation.model == assistant.model else { return false }
                 let calls = assistant.content.toolCalls
                 if calls.isEmpty {
-                    return decoration.generation.assistantMessage?.content == assistant.content
+                    return abs(decoration.generation.at.timeIntervalSince(assistant.timestamp)) < 0.001
+                        && decoration.generation.assistantMessage?.content == assistant.content
                 }
                 return calls.allSatisfy { call in
                     !decoration.matchingSteps(for: call).isEmpty

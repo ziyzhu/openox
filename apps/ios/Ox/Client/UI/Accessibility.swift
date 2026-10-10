@@ -229,6 +229,9 @@ nonisolated enum A11yID {
             static func skill(_ name: String) -> String { "conversation.message.skill.\(name)" }
             static func shoveler(_ blockId: String) -> String { "conversation.message.shoveler.\(blockId)" }
             static let videoPlay = "chat.message.video.play"
+            static let imageOpen = "chat.message.image.open"
+            static let imageClose = "chat.message.image.close"
+            static let imageRetry = "chat.message.image.retry"
         }
 
         enum Attach {

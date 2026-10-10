@@ -71,6 +71,7 @@ public protocol OxFunctionBridge: AnyObject {
     func chooseUser(body: String, options: [String], purpose: String) async throws -> JSONValue?
     func presentShoveler(value: JSONValue?, purpose: String) async throws -> JSONValue?
     func presentVideo(value: JSONValue?, purpose: String) async throws -> JSONValue?
+    func presentImage(value: JSONValue?, purpose: String) async throws -> JSONValue?
     func importWebArtifact(url: String, filename: String?, purpose: String) async throws -> JSONValue?
     func renameArtifact(filename: String, newFilename: String, purpose: String) async throws -> JSONValue?
     func presentArtifact(filename: String, purpose: String) async throws -> JSONValue?

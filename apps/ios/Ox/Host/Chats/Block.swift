@@ -58,10 +58,11 @@ nonisolated enum ContentItem: Equatable, Codable {
     case serviceInspector(ServiceInspectorLink)
     case shoveler(Shoveler)
     case video(VideoWidget)
+    case image(ImageWidget)
     case artifact(Artifact)
     case skill(Skill)
 
-    private enum CodingKeys: String, CodingKey { case text, progress, serviceControl, serviceInspector, shoveler, video, artifact, skill }
+    private enum CodingKeys: String, CodingKey { case text, progress, serviceControl, serviceInspector, shoveler, video, image, artifact, skill }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -77,6 +78,8 @@ nonisolated enum ContentItem: Equatable, Codable {
             self = .shoveler(try c.decode(Shoveler.self, forKey: .shoveler))
         } else if c.contains(.video) {
             self = .video(try c.decode(VideoWidget.self, forKey: .video))
+        } else if c.contains(.image) {
+            self = .image(try c.decode(ImageWidget.self, forKey: .image))
         } else if c.contains(.serviceControl) {
             self = .serviceControl(try c.decode(ServiceControl.self, forKey: .serviceControl))
         } else if c.contains(.serviceInspector) {
@@ -85,7 +88,7 @@ nonisolated enum ContentItem: Equatable, Codable {
             throw DecodingError.dataCorruptedError(
                 forKey: .text,
                 in: c,
-                debugDescription: "Content item must contain text, progress, shoveler, video, artifact, skill, or service control"
+                debugDescription: "Content item must contain text, progress, shoveler, video, image, artifact, skill, or service control"
             )
         }
     }
@@ -99,6 +102,7 @@ nonisolated enum ContentItem: Equatable, Codable {
         case let .serviceInspector(link): try c.encode(link, forKey: .serviceInspector)
         case let .shoveler(shoveler): try c.encode(shoveler, forKey: .shoveler)
         case let .video(video): try c.encode(video, forKey: .video)
+        case let .image(image): try c.encode(image, forKey: .image)
         case let .artifact(artifact): try c.encode(artifact, forKey: .artifact)
         case let .skill(skill): try c.encode(skill, forKey: .skill)
         }

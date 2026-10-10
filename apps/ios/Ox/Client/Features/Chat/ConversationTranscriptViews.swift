@@ -1311,6 +1311,9 @@ struct BlockView: View, Equatable {
                     case let .video(video):
                         VideoWidgetView(video: video)
                             .padding(.horizontal, 4)
+                    case let .image(image):
+                        ImageWidgetView(image: image)
+                            .padding(.horizontal, 4)
                     case let .artifact(artifact):
                         if artifact.exists {
                             let sourceID = "block:\(block.id.uuidString):\(index):\(artifact.id)"

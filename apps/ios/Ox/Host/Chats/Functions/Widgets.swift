@@ -40,6 +40,35 @@ extension Conversation {
         }
     }
 
+    public func presentImage(value: JSONValue?, purpose: String) async throws -> JSONValue? {
+        guard let sourceValue = value?.objectValue?["image"]?.stringValue else {
+            throw RuntimeError.bridge("ox.widget.image: image is required")
+        }
+        let args: JSONValue = .object(["image": .string(sourceValue)])
+        return try await trackedEffect(Actions.widgetImage, args, purpose: purpose, apply: embedImage) {
+            let source: WidgetMediaSource
+            if let components = URLComponents(string: sourceValue), components.scheme != nil {
+                guard components.scheme == "https",
+                      components.host?.isEmpty == false,
+                      components.user == nil,
+                      components.password == nil else {
+                    throw RuntimeError.bridge("ox.widget.image: image must be a public HTTPS URL or an existing image artifact filename")
+                }
+                source = .remote(sourceValue)
+            } else {
+                let artifact = try await repository.artifact(named: sourceValue, in: scope)
+                guard artifact.exists else {
+                    throw RuntimeError.bridge("ox.widget.image: image artifact does not exist: \(sourceValue)")
+                }
+                guard artifact.kind == .image else {
+                    throw RuntimeError.bridge("ox.widget.image: artifact is not an image: \(artifact.fileName)")
+                }
+                source = .artifact(artifact)
+            }
+            return (.null, ImageWidget(source: source))
+        }
+    }
+
     public func presentVideo(value: JSONValue?, purpose: String) async throws -> JSONValue? {
         guard let fields = value?.objectValue,
               let sourceValue = fields["video"]?.stringValue else {

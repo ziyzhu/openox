@@ -23,6 +23,17 @@ nonisolated enum OxWidgets {
                     ])
                 ),
                 (
+                    "ox.widget.image",
+                    .object([
+                        "description": .string(ModelGuidance.text("ox.widget.image")),
+                        "inputSchema": object([
+                            "image": string(minLength: 1, maxLength: 2_000),
+                            "purpose": string(minLength: 1, maxLength: 80),
+                        ], required: ["image", "purpose"]),
+                        "outputSchema": .object(["type": .string("null")]),
+                    ])
+                ),
+                (
                     "ox.widget.video",
                     .object([
                         "description": .string(ModelGuidance.text("ox.widget.video")),
@@ -45,6 +56,15 @@ nonisolated enum OxWidgets {
                 }
             }
             context.setObject(shoveler as AnyObject, forKeyedSubscript: "__nativeWidgetShoveler" as NSString)
+            let image: @convention(block) (JSValue, JSValue) -> JSValue = { value, purpose in
+                env.call {
+                    try await $0.presentImage(
+                        value: jsValueToJSON(value),
+                        purpose: purpose.toString()!
+                    )
+                }
+            }
+            context.setObject(image as AnyObject, forKeyedSubscript: "__nativeWidgetImage" as NSString)
             let video: @convention(block) (JSValue, JSValue) -> JSValue = { value, purpose in
                 env.call {
                     try await $0.presentVideo(
@@ -57,6 +77,7 @@ nonisolated enum OxWidgets {
         },
         jsFragment: """
           shoveler: (value) => { const options = __oxOptions(value, 'ox.widget.shoveler'); return __nativeWidgetShoveler({ cards: options.cards }, String(options.purpose)); },
+          image: (value) => { const options = __oxOptions(value, 'ox.widget.image'); return __nativeWidgetImage({ image: options.image }, String(options.purpose)); },
           video: (value) => { const options = __oxOptions(value, 'ox.widget.video'); return __nativeWidgetVideo({ video: options.video }, String(options.purpose)); }
         """
     )

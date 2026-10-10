@@ -163,6 +163,7 @@ nonisolated enum ExecutionEffect: Equatable, Sendable {
     case serviceInspector(ServiceInspectorLink)
     case shoveler(Shoveler)
     case video(VideoWidget)
+    case image(ImageWidget)
     case artifact(Artifact)
     case skill(Skill)
     case media(Artifact)
@@ -472,6 +473,9 @@ nonisolated extension Turn {
                         return .video(VideoWidget(
                             source: .artifact(replace(artifact))
                         ))
+                    case let .image(image):
+                        guard let artifact = image.source.artifact else { return effect }
+                        return .image(ImageWidget(source: .artifact(replace(artifact))))
                     case .invocation, .progress, .serviceControl, .serviceInspector, .skill: return effect
                     }
                 }
@@ -560,7 +564,7 @@ nonisolated extension Step: Codable {
 }
 
 nonisolated extension ExecutionEffect: Codable {
-    private enum CodingKeys: String, CodingKey { case type, invocation, progress, serviceControl, serviceInspector, shoveler, video, artifact, skill, media }
+    private enum CodingKeys: String, CodingKey { case type, invocation, progress, serviceControl, serviceInspector, shoveler, video, image, artifact, skill, media }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -571,6 +575,7 @@ nonisolated extension ExecutionEffect: Codable {
         case "serviceInspector": self = .serviceInspector(try c.decode(ServiceInspectorLink.self, forKey: .serviceInspector))
         case "shoveler": self = .shoveler(try c.decode(Shoveler.self, forKey: .shoveler))
         case "video": self = .video(try c.decode(VideoWidget.self, forKey: .video))
+        case "image": self = .image(try c.decode(ImageWidget.self, forKey: .image))
         case "artifact": self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
         case "skill": self = .skill(try c.decode(Skill.self, forKey: .skill))
         case "media": self = .media(try c.decode(Artifact.self, forKey: .media))
@@ -588,6 +593,7 @@ nonisolated extension ExecutionEffect: Codable {
         case let .serviceInspector(v): try c.encode("serviceInspector", forKey: .type); try c.encode(v, forKey: .serviceInspector)
         case let .shoveler(v): try c.encode("shoveler", forKey: .type); try c.encode(v, forKey: .shoveler)
         case let .video(v): try c.encode("video", forKey: .type); try c.encode(v, forKey: .video)
+        case let .image(v): try c.encode("image", forKey: .type); try c.encode(v, forKey: .image)
         case let .artifact(v): try c.encode("artifact", forKey: .type); try c.encode(v, forKey: .artifact)
         case let .skill(v): try c.encode("skill", forKey: .type); try c.encode(v, forKey: .skill)
         case let .media(v): try c.encode("media", forKey: .type); try c.encode(v, forKey: .media)

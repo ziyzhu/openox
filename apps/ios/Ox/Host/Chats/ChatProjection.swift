@@ -108,7 +108,7 @@ nonisolated enum ChatProjection {
                 let artifact: Artifact?
                 switch effect {
                 case let .artifact(value), let .media(value): artifact = value
-                case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .skill: artifact = nil
+                case .invocation, .progress, .serviceControl, .serviceInspector, .shoveler, .video, .image, .skill: artifact = nil
                 }
                 guard let artifact, !artifacts.contains(where: {
                     $0.fileName.caseInsensitiveCompare(artifact.fileName) == .orderedSame
@@ -167,7 +167,7 @@ nonisolated enum ChatProjection {
                       switch item {
                       case let .text(text): text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                       case .progress: false
-                      case .serviceControl, .serviceInspector, .shoveler, .video, .artifact, .skill: true
+                      case .serviceControl, .serviceInspector, .shoveler, .video, .image, .artifact, .skill: true
                       }
                   }) {
                 previous -= 1
@@ -266,6 +266,10 @@ nonisolated enum ChatProjection {
                                 flushTrace()
                                 openGroup(at: createdAt, entry: entry)
                                 bubble.append(.video(video))
+                            case let .image(image):
+                                flushTrace()
+                                openGroup(at: createdAt, entry: entry)
+                                bubble.append(.image(image))
                             case let .artifact(artifact):
                                 guard consumeEmbed(
                                     .artifact(artifact.fileName.lowercased()),
@@ -326,7 +330,7 @@ nonisolated enum ChatProjection {
                 case let .artifact(artifact): key = .artifact(artifact.fileName.lowercased())
                 case let .serviceInspector(link): key = .serviceInspector(link.domain.lowercased())
                 case let .skill(skill): key = .skill(skill.name.lowercased())
-                case .invocation, .progress, .serviceControl, .shoveler, .video, .media: key = nil
+                case .invocation, .progress, .serviceControl, .shoveler, .video, .image, .media: key = nil
                 }
                 if let key { counts[key, default: 0] += 1 }
             }

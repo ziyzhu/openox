@@ -92,6 +92,7 @@ nonisolated enum Actions {
     static let artifactPresent = "ox.artifact.present"
     static let widgetShoveler = "ox.widget.shoveler"
     static let widgetVideo = "ox.widget.video"
+    static let widgetImage = "ox.widget.image"
     static let userChoose = "ox.user.choose"
     static let userFollow = "ox.user.follow"
     static let userReportProgress = "ox.user.reportProgress"
@@ -117,7 +118,7 @@ nonisolated enum Actions {
         memoryRead, memoryWrite, memoryReplaceText,
         artifactList, artifactImport, artifactWrite, artifactReplaceText, artifactRename,
         artifactDelete, artifactPresent,
-        widgetShoveler, widgetVideo, userChoose, userFollow, userReportProgress,
+        widgetShoveler, widgetVideo, widgetImage, userChoose, userFollow, userReportProgress,
     ]
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
@@ -213,6 +214,7 @@ nonisolated enum Actions {
         case artifactPresent: L10n.string("Present an artifact")
         case widgetShoveler: L10n.string("Display cards")
         case widgetVideo: L10n.string("Display video")
+        case widgetImage: L10n.string("Display image")
         case userChoose: L10n.string("Ask a question")
         case userFollow: L10n.string("Suggest next steps")
         case userReportProgress: L10n.string("Report progress")

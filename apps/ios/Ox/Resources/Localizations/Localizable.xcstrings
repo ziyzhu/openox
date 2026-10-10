@@ -2964,6 +2964,17 @@
         }
       }
     },
+    "Couldn't load image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载图片"
+          }
+        }
+      }
+    },
     "Couldn't load video" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3825,6 +3836,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示名称"
+          }
+        }
+      }
+    },
+    "Display image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示图片"
           }
         }
       }
@@ -7549,6 +7571,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先规划工作，再精简计划。"
+          }
+        }
+      }
+    },
+    "Loading image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载图片"
+          }
+        }
+      }
+    },
+    "Open image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开图片"
+          }
+        }
+      }
+    },
+    "Pinch or double-tap to zoom" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双指缩放或轻点两下以缩放"
           }
         }
       }

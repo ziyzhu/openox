@@ -2,6 +2,7 @@ import { providerIdentity } from "./provider-prompts";
 
 export const guidanceTexts: Record<string, string> = {
   "ox.widget.shoveler": "Display one horizontal strip of cards in the conversation. A card with an `artifact` filename opens that artifact; other cards are read-only: `await ox.widget.shoveler({ purpose, cards })`.",
+  "ox.widget.image": "Display one inline, aspect-fit image in the conversation; tap to open a zoomable viewer: `await ox.widget.image({ purpose, image })`. `image` may be a public HTTPS URL or an existing image artifact filename. Remote images are fetched without credentials and are not saved as artifacts. This displays the image to the user, not to the model; use `ox.fs.attach` when the model needs original pixels.",
   "ox.widget.video": "Display one inline video player in the conversation: `await ox.widget.video({ purpose, video })`. `video` may be a public HTTPS URL or an existing video artifact filename.",
   "ox.schedule.create": "Schedule a frozen snapshot of one resolved skill package after explicit user confirmation: `await ox.schedule.create({ purpose, skill, argument?, frequency, fireAt?, hour?, minute?, weekday?, timeZone? })`. Use `fireAt` for `once`; use `hour` and `minute` for `daily`; add a weekday name for `weekly`. Times are best-effort on iOS.",
   "ox.schedule.list": "List scheduled skill invocations for the active Profile: `await ox.schedule.list({ purpose })`.",

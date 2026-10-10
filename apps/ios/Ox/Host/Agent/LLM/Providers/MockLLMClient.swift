@@ -102,6 +102,15 @@ public struct MockLLMClient: ProviderClient {
             case .user(let u):
                 let text = Self.firstText(of: u)
                 let intent = Self.intent(in: text)
+                if intent.hasPrefix("execute\n") {
+                    let source = String(intent.dropFirst("execute\n".count))
+                    let scenario = Scenario(name: "execute") { context in
+                        context.turn == 0
+                            ? [.tool(name: "execute", args: .object(["source": .string(source)])), .stop(.toolUse)]
+                            : [.say("(mock) Execution finished."), .stop(.stop)]
+                    }
+                    return (scenario, turn)
+                }
                 if let scenario = scenarios[intent.lowercased()] { return (scenario, turn) }
                 if intent.hasPrefix("[system]") { continue }
                 return (fallback, turn)

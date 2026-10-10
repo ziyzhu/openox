@@ -402,6 +402,7 @@ nonisolated enum ChatPackageCodec {
                         case .artifact(let artifact), .media(let artifact): result.append(artifact)
                         case .shoveler(let shoveler): result += shoveler.cards.compactMap(\.artifact)
                         case .video(let video): result += video.source.artifact.map { [$0] } ?? []
+                        case .image(let image): result += image.source.artifact.map { [$0] } ?? []
                         case .invocation, .progress, .serviceControl, .serviceInspector, .skill: break
                         }
                     }

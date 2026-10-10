@@ -296,7 +296,7 @@ private struct QuickLookArtifactView: UIViewControllerRepresentable {
     }
 }
 
-private struct ZoomableImageView: UIViewRepresentable {
+struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
 
     func makeUIView(context: Context) -> ZoomingImageScrollView {
@@ -308,7 +308,7 @@ private struct ZoomableImageView: UIViewRepresentable {
     }
 }
 
-private final class ZoomingImageScrollView: UIScrollView, UIScrollViewDelegate {
+final class ZoomingImageScrollView: UIScrollView, UIScrollViewDelegate {
     private let imageView = UIImageView()
     private var laidOutSize = CGSize.zero
 

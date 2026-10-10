@@ -490,9 +490,13 @@ Opening a card resolves that reference in the active Profile and uses the same
 native artifact preview as other chat artifact references. Chat package export
 includes artifacts referenced only by Shoveler cards.
 
-Video widgets persist a public HTTPS source or an artifact filename in the chat
-transcript. Artifact-backed videos participate in rename, package export, and
-collision rewriting like other artifact references.
+Video and image widgets persist a public HTTPS source or an artifact filename in
+the chat transcript. Artifact-backed widgets participate in rename, package export,
+and collision rewriting like other artifact references. Image widgets add an
+`image` execution effect and content item using the same tagged source encoding as
+video; existing records are unchanged and require no transform. Older builds cannot
+read new image effects. Remote image bytes are credential-free, bounded, held only
+for presentation, and never published as artifacts or model attachments.
 
 The Share extension converts user-selected shared text into a Markdown file in
 the app-group staging directory, then atomically moves its directory to Pending.
