@@ -1840,7 +1840,13 @@ final class Conversation: Identifiable {
         let text = replacingText ?? cut.text
         Log.session.info("Chat.rerun id=\(id) at=\(blockId) cutEntry=\(cut.cutEntry) edited=\(replacingText != nil)")
         cancelAll()
-        guard let branched = conversationManager?.branch(from: self, atBlock: blockId, submit: false) else { return nil }
+        let snapshot = continuation(
+            before: cut.cutEntry,
+            intent: cut.text,
+            attachments: cut.attachments,
+            skillInvocation: cut.skillInvocation
+        )
+        guard let branched = conversationManager?.branch(from: self, snapshot: snapshot) else { return nil }
         return branched.enqueue(
             text,
             attachments: cut.attachments,
@@ -1849,12 +1855,12 @@ final class Conversation: Identifiable {
     }
 
     func branchSnapshot(at blockId: UUID) -> ChatContinuation? {
-        guard let cut = rerunCut(at: blockId) else { return nil }
+        guard let target = document.blocksWithTurn().first(where: { $0.0.id == blockId })?.1 else { return nil }
         return continuation(
-            before: cut.cutEntry,
-            intent: cut.text,
-            attachments: cut.attachments,
-            skillInvocation: cut.skillInvocation
+            before: target + 1,
+            intent: "",
+            attachments: [],
+            skillInvocation: nil
         )
     }
 

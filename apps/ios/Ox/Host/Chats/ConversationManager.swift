@@ -473,12 +473,16 @@ final class ConversationManager {
     }
 
     @discardableResult
-    func branch(from chat: Conversation, atBlock blockID: UUID, submit: Bool = true) -> Conversation? {
-        guard let reference = chat.conversationReference else { Log.session.error("ChatManager.branch requires a qualified persisted conversation"); return nil }
+    func branch(from chat: Conversation, atBlock blockID: UUID) -> Conversation? {
         guard let result = chat.branchSnapshot(at: blockID) else {
             Log.session.warning("ChatManager.branch failed block=\(blockID)")
             return nil
         }
+        return branch(from: chat, snapshot: result)
+    }
+
+    func branch(from chat: Conversation, snapshot result: ChatContinuation) -> Conversation? {
+        guard let reference = chat.conversationReference else { Log.session.error("ChatManager.branch requires a qualified persisted conversation"); return nil }
         let selection = result.meta.model ?? providerRegistry.sessionModel
         let client = providerRegistry.client(for: selection)
         let model = providerRegistry.model(for: selection, client: client)
@@ -500,9 +504,6 @@ final class ConversationManager {
         records[ChatID(branched.id)] = Record(chat: branched, accessOrdinal: hydrationOrdinal)
         if branched.state.turns != result.turns { persist(branched) }
         setCurrent(branched)
-        if submit {
-            branched.enqueue(result.intent, attachments: result.attachments, skillInvocation: result.skillInvocation)
-        }
         return branched
     }
 

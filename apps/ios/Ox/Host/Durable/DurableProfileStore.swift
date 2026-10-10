@@ -129,18 +129,25 @@ actor DurableProfileStore {
                 for (offset, model) in models.enumerated() where model.objectValue?["role"]?.stringValue == "user" {
                     if users == index {
                         guard offset == 0, let previous else { throw RuntimeError.bridge("Selected turn cannot be split at a committed boundary") }
-                        var request: [String: JSONValue] = ["action": .string("conversationFork"), "reference": source.value, "entryID": .int(previous)]
-                        if let title { request["title"] = .string(title) }
-                        let result = try await command(scope: scope, value: .object(request))
-                        guard let reference = result.objectValue?["reference"] else { throw RuntimeError.bridge("Missing fork identity") }
-                        return try JSONDecoder().decode(DurableConversationReference.self, from: Data(reference.jsonString().utf8))
+                        return try await fork(in: scope, from: source, atEntry: previous, title: title)
                     }
                     users += 1
                 }
             }
             previous = entryID
         }
+        if users == index, let previous {
+            return try await fork(in: scope, from: source, atEntry: previous, title: title)
+        }
         throw RuntimeError.bridge("Selected user turn is not committed in Pi")
+    }
+
+    private func fork(in scope: ProfileScope, from source: DurableConversationReference, atEntry entryID: Int, title: String?) async throws -> DurableConversationReference {
+        var request: [String: JSONValue] = ["action": .string("conversationFork"), "reference": source.value, "entryID": .int(entryID)]
+        if let title { request["title"] = .string(title) }
+        let result = try await command(scope: scope, value: .object(request))
+        guard let reference = result.objectValue?["reference"] else { throw RuntimeError.bridge("Missing fork identity") }
+        return try JSONDecoder().decode(DurableConversationReference.self, from: Data(reference.jsonString().utf8))
     }
 
     nonisolated func reference(for id: ChatID, in scope: ProfileScope) throws -> DurableConversationReference {
