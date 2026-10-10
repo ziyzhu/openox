@@ -479,7 +479,8 @@ struct ConversationPage: View {
 
     private var page: some View {
         let interaction = activeInteraction
-        let showsComposer = interaction == nil && isModelConfigured
+        let isSignIn = if case .serviceControl(let item) = interaction, case .signIn = item.control { true } else { false }
+        let showsComposer = (interaction == nil || isSignIn) && isModelConfigured
         let authProbe = conversation.pendingServiceControl.flatMap { item -> Conversation.PendingServiceControl? in
             guard isAttached(item.control), case .signIn = item.control else { return nil }
             return item
