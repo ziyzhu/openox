@@ -1185,7 +1185,7 @@ struct BlockView: View, Equatable {
             .padding(.horizontal, 4)
         case .contextCompaction:
             contextCompactionDivider
-        case .prompt, .serviceControl, .responseFooter:
+        case .serviceControl, .responseFooter:
             EmptyView()
         }
     }

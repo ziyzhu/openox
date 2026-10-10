@@ -104,6 +104,7 @@ final class Conversation: Identifiable {
         let allowsCustomAnswer: Bool
         let autoApproval: AutoApproval?
         let secretEntry: SecretEntryRequest?
+        let permission: PermissionPresentation?
     }
 
     enum Interaction: Equatable {
@@ -675,7 +676,7 @@ final class Conversation: Identifiable {
                 }
                 let answer = await awaitPrompt(
                     prompt: prompt.body, options: prompt.options,
-                    presentation: .application, resolution: prompt.resolution
+                    presentation: .application
                 )
                 return answer == Self.abortedAnswer ? nil : answer
             }
@@ -1479,25 +1480,10 @@ final class Conversation: Identifiable {
         presentation: ChatPromptPresentation = .conversation,
         autoApproval: PendingPrompt.AutoApproval? = nil,
         secretEntry: SecretEntryRequest? = nil,
-        permission: PermissionPresentation? = nil,
-        resolution: ((String) -> String?)? = nil
+        permission: PermissionPresentation? = nil
     ) async -> String {
         defer { secretEntry?.cancel() }
-        let stepID = StepID()
-        document.apply(.appendPrompt(
-            AgentPrompt(prompt: prompt, options: options, outcome: .pending, permission: permission),
-            choice: kind == .choice,
-            id: stepID
-        ))
-        markActivity()
-        let blockId = stepID.rawValue
-        guard transcript.contains(where: { block in
-            guard block.id == blockId, case .prompt = block.kind else { return false }
-            return true
-        }) else {
-            Log.session.error("Chat.awaitPrompt rejected id=\(id) step=\(stepID.rawValue)")
-            return Self.abortedAnswer
-        }
+        let blockId = UUID()
         let pending = PendingPrompt(
             id: blockId,
             kind: kind,
@@ -1506,26 +1492,16 @@ final class Conversation: Identifiable {
             presentation: presentation,
             allowsCustomAnswer: allowsCustomAnswer,
             autoApproval: autoApproval,
-            secretEntry: secretEntry
+            secretEntry: secretEntry,
+            permission: permission
         )
         Log.session.info("Chat.awaitPrompt id=\(id) kind=\(kind.rawValue) presentation=\(String(describing: presentation)) options=\(options.count)")
         let result = await waitForPrompt(pending)
-        let answer: String
-        let cancelled: Bool
-        switch result {
-        case .answered(let value):
-            answer = value
-            cancelled = false
-        case .cancelled:
-            answer = Self.abortedAnswer
-            cancelled = true
-        }
-        let resolved = cancelled ? L10n.string( "Stopped") : resolution?(answer)
-        document.apply(cancelled
-            ? .cancelPrompt(id: stepID, answer: answer, resolution: resolved)
-            : .resolvePrompt(id: stepID, answer: answer, resolution: resolved))
         markActivity()
-        return answer
+        switch result {
+        case .answered(let answer): return answer
+        case .cancelled: return Self.abortedAnswer
+        }
     }
 
     func resolvePrompt(blockId: UUID, answer: String) {

@@ -1,17 +1,5 @@
 import SwiftUI
 
-struct ConversationPromptBlock: Equatable {
-    let kind: ChatPromptKind
-    let prompt: String
-    let options: [String]
-    let answer: String?
-    let resolution: String?
-    let permission: PermissionPresentation?
-    let allowsCustomAnswer: Bool
-    let isActive: Bool
-    let secretEntry: SecretEntryRequest?
-}
-
 struct ConversationBlock: Identifiable, Equatable {
     enum ResponseFooterPhase: Equatable {
         case streaming
@@ -26,7 +14,6 @@ struct ConversationBlock: Identifiable, Equatable {
         case agentContent(ContentItem)
         case thinking(ThinkingTrace)
         case contextCompaction(ContextCompaction)
-        case prompt(ConversationPromptBlock)
         case serviceControl(ServiceControl, interactionID: UUID?)
         case responseFooter(text: String, phase: ResponseFooterPhase)
     }
@@ -42,7 +29,7 @@ struct ConversationBlock: Identifiable, Equatable {
     var isUserInitiated: Bool {
         switch kind {
         case .userText, .userSkill: true
-        case .agentContent, .thinking, .contextCompaction, .prompt, .serviceControl, .responseFooter: false
+        case .agentContent, .thinking, .contextCompaction, .serviceControl, .responseFooter: false
         }
     }
 
@@ -61,17 +48,9 @@ struct ConversationBlock: Identifiable, Equatable {
         return trace.isEmpty && trace.completedAt == nil
     }
 
-    var activePrompt: ConversationPromptBlock? {
-        guard case .prompt(let prompt) = kind, prompt.isActive else { return nil }
-        return prompt
-    }
-
     var isActiveInteraction: Bool {
-        switch kind {
-        case .prompt(let prompt): prompt.isActive
-        case .serviceControl(_, let interactionID): interactionID != nil
-        case .userText, .userSkill, .agentContent, .thinking, .contextCompaction, .responseFooter: false
-        }
+        guard case .serviceControl(_, let interactionID) = kind else { return false }
+        return interactionID != nil
     }
 }
 
@@ -94,7 +73,6 @@ extension ConversationBlock {
         interaction: Conversation.Interaction?
     ) -> [ConversationBlock] {
         var projectedTurns: [ProjectedTurn] = []
-        let pendingPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = interaction { prompt } else { nil }
         let pendingServiceControl: Conversation.PendingServiceControl? = if case .serviceControl(let control) = interaction { control } else { nil }
         let serviceControlLocation = pendingServiceControl.flatMap { pending in
             if let source = pending.source { return source }
@@ -114,27 +92,7 @@ extension ConversationBlock {
                 projectedTurns.append(ProjectedTurn(id: source.turnID))
             }
             let turnIndex = projectedTurns.count - 1
-            if case let .prompt(kind, prompt, options, answer, resolution, permission) = block.kind {
-                let activePrompt = pendingPrompt?.id == block.id ? pendingPrompt : nil
-                projectedTurns[turnIndex].blocks.append(ConversationBlock(
-                    id: block.id,
-                    sourceBlockID: block.id,
-                    createdAt: block.createdAt,
-                    kind: .prompt(ConversationPromptBlock(
-                        kind: kind,
-                        prompt: prompt,
-                        options: options,
-                        answer: answer,
-                        resolution: resolution,
-                        permission: permission,
-                        allowsCustomAnswer: activePrompt?.allowsCustomAnswer ?? false,
-                        isActive: activePrompt != nil,
-                        secretEntry: activePrompt?.secretEntry
-                    )),
-                    spacingBefore: ConversationTranscriptMetrics.blockSpacing
-                ))
-                continue
-            }
+            if case .prompt = block.kind { continue }
             if case .thinking(let trace) = block.kind {
                 let index = projectedTurns[turnIndex].thinkingCount
                 projectedTurns[turnIndex].thinkingCount += 1

@@ -521,14 +521,14 @@ struct ConversationPage: View {
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
         let blocks = projection.blocks
-        let dockedPromptBlock = blocks.last { $0.activePrompt != nil }
+        let dockedPrompt: Conversation.PendingPrompt? = if case .prompt(let prompt) = activeInteraction { prompt } else { nil }
         let browserPage = browserPage
         let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
             guard case .agentContent(.serviceInspector) = block.kind else { return nil }
             return block.id
         }
         let transcript = transcript(
-            blocks: blocks.filter { $0.activePrompt == nil },
+            blocks: blocks,
             latestCanvasBlockIDs: projection.latestCanvasBlockIDs,
             totalBlockCount: totalBlockCount,
             sourceRange: requestedSourceRange,
@@ -589,8 +589,8 @@ struct ConversationPage: View {
                             totalBlockCount: totalBlockCount,
                             floatsTopStrip: floatsTopStrip
                         )
-                    } else if let dockedPromptBlock, let prompt = dockedPromptBlock.activePrompt {
-                        promptDock(prompt, sourceBlockID: dockedPromptBlock.sourceBlockID, totalBlockCount: totalBlockCount)
+                    } else if let dockedPrompt {
+                        promptDock(dockedPrompt, totalBlockCount: totalBlockCount)
                     }
                 }
                 .frame(maxWidth: Theme.ContainerWidth.readable)
@@ -598,11 +598,11 @@ struct ConversationPage: View {
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
                     scroller.viewportResized()
                 }
-                .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPromptBlock?.id)
+                .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPrompt?.id)
         }
         .background(Theme.Colors.chatSurface)
         .overlay(alignment: .bottom) {
-            if !showsComposer, dockedPromptBlock == nil, scroller.showsJumpButton {
+            if !showsComposer, dockedPrompt == nil, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
                     transcriptWindow.showLatest(total: totalBlockCount)
                     DispatchQueue.main.async { scroller.rideToBottom() }
@@ -1062,9 +1062,6 @@ struct ConversationPage: View {
                         .transition(.opacity)
                 }
             }
-        case .prompt(let prompt):
-            promptBlock(prompt, sourceBlockID: block.sourceBlockID)
-                .padding(.horizontal, 4)
         case .serviceControl(let control, let interactionID):
             serviceControlBlock(control, interactionID: interactionID)
                 .padding(.horizontal, 4)
@@ -1074,56 +1071,43 @@ struct ConversationPage: View {
     }
 
     @ViewBuilder
-    private func promptBlock(_ prompt: ConversationPromptBlock, sourceBlockID: UUID) -> some View {
-        if let request = prompt.secretEntry, prompt.isActive {
+    private func promptCard(_ pending: Conversation.PendingPrompt) -> some View {
+        if let request = pending.secretEntry {
             SecretEntryRequestCard(request: request, onSaved: {
-                conversation.resolvePrompt(blockId: sourceBlockID, answer: "Saved")
+                conversation.resolvePrompt(blockId: pending.id, answer: "Saved")
             }, onCancel: {
-                conversation.resolvePrompt(blockId: sourceBlockID, answer: "Cancelled")
+                conversation.resolvePrompt(blockId: pending.id, answer: "Cancelled")
             })
             .id(request.id)
         } else {
-        switch prompt.kind {
-        case .permission:
-            if let request = PermissionRequest(
-                id: sourceBlockID,
-                prompt: prompt.prompt,
-                options: prompt.options,
-                presentation: prompt.permission
-            ) {
-                PermissionRequestCard(
-                    request: request,
-                    selection: prompt.answer,
-                    resolution: prompt.resolution
-                ) { option in
-                    guard prompt.isActive else { return }
-                    conversation.resolvePrompt(blockId: sourceBlockID, answer: option)
+            switch pending.kind {
+            case .permission:
+                if let request = PermissionRequest(
+                    id: pending.id,
+                    prompt: pending.prompt,
+                    options: pending.options,
+                    presentation: pending.permission
+                ) {
+                    PermissionRequestCard(request: request) { option in
+                        conversation.resolvePrompt(blockId: pending.id, answer: option)
+                    }
+                } else {
+                    ActivityBubble()
                 }
-                .allowsHitTesting(prompt.isActive)
-                .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
-            } else if prompt.isActive {
-                ActivityBubble()
+            case .choice:
+                AgentChoiceRequestCard(
+                    request: AgentChoiceRequest(
+                        id: pending.id,
+                        prompt: pending.prompt,
+                        options: pending.options,
+                        allowsCustomAnswer: pending.allowsCustomAnswer
+                    ),
+                    composerButtonSize: composerButtonSize,
+                    onCustomFocusChange: { choiceInputFocused = $0 }
+                ) { option in
+                    conversation.resolvePrompt(blockId: pending.id, answer: option)
+                }
             }
-        case .choice:
-            let request = AgentChoiceRequest(
-                id: sourceBlockID,
-                prompt: prompt.prompt,
-                options: prompt.options,
-                allowsCustomAnswer: prompt.allowsCustomAnswer
-            )
-            AgentChoiceRequestCard(
-                request: request,
-                selection: prompt.answer,
-                resolution: prompt.resolution,
-                composerButtonSize: composerButtonSize,
-                onCustomFocusChange: { choiceInputFocused = $0 }
-            ) { option in
-                guard prompt.isActive else { return }
-                conversation.resolvePrompt(blockId: sourceBlockID, answer: option)
-            }
-            .allowsHitTesting(prompt.isActive)
-            .opacity(prompt.isActive || prompt.answer != nil ? 1 : 0.6)
-        }
         }
     }
 
@@ -1276,7 +1260,7 @@ struct ConversationPage: View {
             kind = .userText(text, attachments: attachments)
         case .userSkill(let invocation, let attachments):
             kind = .userSkill(invocation, attachments: attachments)
-        case .agentContent, .thinking, .contextCompaction, .prompt, .serviceControl, .responseFooter:
+        case .agentContent, .thinking, .contextCompaction, .serviceControl, .responseFooter:
             return nil
         }
         return Block(id: block.sourceBlockID, createdAt: block.createdAt, kind: kind)
@@ -1747,11 +1731,11 @@ struct ConversationPage: View {
     }
 
     private func promptDock(
-        _ prompt: ConversationPromptBlock,
-        sourceBlockID: UUID,
+        _ pending: Conversation.PendingPrompt,
         totalBlockCount: Int
     ) -> some View {
-        promptBlock(prompt, sourceBlockID: sourceBlockID)
+        promptCard(pending)
+            .id(pending.id)
             .background(
                 Theme.Colors.chatSurface,
                 in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
@@ -1771,10 +1755,10 @@ struct ConversationPage: View {
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .onAppear {
-                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(sourceBlockID) kind=\(String(describing: prompt.kind)) secret=\(prompt.secretEntry != nil) phase=presented")
+                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) kind=\(pending.kind.rawValue) secret=\(pending.secretEntry != nil) phase=presented")
             }
             .onDisappear {
-                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(sourceBlockID) phase=dismissed")
+                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(pending.id) phase=dismissed")
             }
     }
 
