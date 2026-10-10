@@ -13,6 +13,8 @@
     "Add file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加文件" } } } },
     "File added" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已添加文件" } } } },
     "File unavailable" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件不可用" } } } },
+    "Couldn't open file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开文件" } } } },
+    "Choose a file inside this Profile. Use Add attachment to import a file from another location." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请选择此档案内的文件。若要从其他位置导入文件，请使用“添加附件”。" } } } },
     "No files yet" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无文件" } } } },
     "Deleted file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件已删除" } } } },
     "Deleted file: %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件已删除：%@" } } } },

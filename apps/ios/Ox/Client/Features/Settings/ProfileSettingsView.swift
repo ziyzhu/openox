@@ -306,6 +306,7 @@ private struct ProfileContentsView: View {
     @State private var context: Context?
     @State private var editingSkill: SkillDraft?
     @State private var openingImportedSkill: Bool
+    @State private var filesPresented = false
 
     init(
         profile: Profile,
@@ -351,8 +352,8 @@ private struct ProfileContentsView: View {
             layout: .group
         ) {
             VStack(spacing: 0) {
-                NavigationLink {
-                    if let context { artifactsView(context) }
+                Button {
+                    filesPresented = true
                 } label: {
                     SettingsDisclosureRow(
                         title: "Files",
@@ -422,20 +423,7 @@ private struct ProfileContentsView: View {
         .navigationDestination(isPresented: $openingImportedSkill) {
             if let context { skillsView(context) }
         }
-    }
-
-    private func artifactsView(_ context: Context) -> some View {
-        ArtifactsView(
-            scope: context.scope,
-            emptyStateReady: true,
-            refreshEpoch: artifactRefreshEpoch,
-            onRename: { artifact, newFilename in
-                try await onRenameArtifact(artifact, newFilename, context.scope)
-            },
-            onDelete: { artifact in
-                try await onDeleteArtifact(artifact, context.scope)
-            }
-        )
+        .profileFilesBrowser(scope: context?.scope, isPresented: $filesPresented)
     }
 
     private func skillsView(_ context: Context) -> some View {
