@@ -9,17 +9,16 @@
 1. Keep agent prompts and bundled System skills in `packages/agent`; use the normal skills catalog and package layout, scoped resource/capability contracts, and runtime permissions independent of skill activation instead of a separate guidance inventory or mount.
 1. Keep the three feature headings and descriptions identical across `README.md`, `apps/ios/Ox/Client/Features/Onboarding/OnboardingView.swift`, and the website at `../openox-dev/web/index.html`; update the onboarding translations when this copy changes.
 1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.
-1. For every persisted-storage change, follow `.agents/skills/release/references/storage-compatibility.md`: require before/after device templates backed by actual predecessor/changed-build snapshots and test both newer readers with older data and older readers with newer data. Keep templates, snapshots, and evidence outside Git. Safe rejection is not full compatibility; report breaks and require maintainer approval before release.
+1. Persisted-storage changes require actual predecessor/changed-build evidence for newer readers with older data and older readers with newer data. Report incompatibilities and obtain maintainer approval before release; safe rejection is not full compatibility.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.
 1. Reference Apple development documentation for iOS changes.
 1. Prefer springs configured with duration and bounce for movement and gesture settling; start with zero bounce and tune duration in context. See [Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/).
 1. Use perceptual animation completion (`.logicallyComplete`) for user-facing handoffs unless full animation removal is required; do not infer spring completion from a fixed delay.
 1. Keep temporary screenshots, recordings, traces, and diagnostics outside the repository.
-1. OpenOx owns App Store release guidance in `.agents/skills/release/SKILL.md`. App Store Connect is the source of truth for listing metadata and media; do not store local copies in either repository. Keep credentials, signing material, review contacts, demo access, and release evidence outside Git. Website and infrastructure deployment remain in `openox-dev`.
+1. App Store Connect owns listing metadata and media; do not keep local copies in either repository. Keep release credentials, signing material, review contacts, demo access, and evidence outside Git. Website and infrastructure deployment belong in `openox-dev`.
 1. Reproduce the issue first before attempting to fix it so that you can verify the fix.
 1. Do not add unit tests; prefer E2E tests.
-1. Use the agent-independent `ios-simulator` skill with `xcodebuild`, `xcrun simctl`, and `idb` for iOS testing; use `xcrun devicectl` for paired physical-device lifecycle and `ox` for Host verification.
 1. For each commit, review lines of code and cyclomatic complexity, prefer low.
 1. Show screenshots after making UI changes for human to review.
 
@@ -40,14 +39,3 @@ Testing:
 Related:
 - <related references or None>
 ```
-
-## iOS Simulator Setup
-
-1. Use the fixed five-simulator pool: `ox-1`, `ox-2`, and `ox-3` run iOS 26; `ox-4` and `ox-5` run iOS 27. Verify with `xcrun simctl list devices available --json` before testing. Keep replaced devices as backups until their replacements are verified.
-1. Before using a simulator, check other agents' sessions and the repository QA claims. Coordinate ownership and choose another device if it is in use. Never interrupt or change another agent's simulator.
-1. Each concurrent agent uses its own simulator and matching ports from `.agents/skills/setup/scripts/qa-config.ts`. Always pass `--device` explicitly to QA runners, resolve the unique simulator UDID, and use it explicitly in native commands.
-1. Start tests with the same website and provider state on all five simulators, using `ox-1` as the baseline. Copy only when both source and target are free; verify website logins, provider credentials, configuration, and default model afterward.
-1. Use `bun run sim:bootstrap --help` for state-copy options. It copies cookies/local storage and installs provider API keys; other website data and provider settings require separate setup. See [website state](.agents/skills/release/references/storage.md#website-state).
-1. Build with `xcodebuild` using task-specific DerivedData, install/launch with `simctl`, and inspect/drive UI with `idb`. Rebuild and install after switching worktrees; keep screenshots and recordings outside the repository. The shared `ios-simulator` skill lives in dotfiles under `~/.agents/skills/ios-simulator`; native CLI help is the fallback when it is unavailable.
-1. Use bundled services normally. Start a repository server on the matching port and verify `/health` only when testing repository installation or sync.
-1. Use standard text size for ordinary QA. Record settings before changing them and restore them afterward, including after failures.

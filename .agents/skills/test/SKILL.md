@@ -58,7 +58,7 @@ Linux ARM64/x64 using the same command and pins Bun 1.3.13.
 
 ## Local iOS verification
 
-Follow the simulator ownership and baseline rules in repository `AGENTS.md`.
+Follow [setup](../setup/SKILL.md) for simulator ownership, runtimes, assigned ports, and baseline state.
 Use the shared `ios-simulator` skill for builds, UI interaction, captures, and diagnostics;
 `setup` owns OpenOx scheme/signing/launch configuration. Use task-specific
 DerivedData. It avoids build-database locks, not concurrent source-generation races.
