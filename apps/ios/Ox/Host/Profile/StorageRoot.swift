@@ -59,7 +59,7 @@ final class StorageRoot {
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
         }
-        let migrated = try await StorageMigrator.migrate(chosen)
+        let migrated = try await ProfileMigrator.migrate(chosen)
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
         Log.app.info("StorageRoot.resolve profiles=\(self.profiles.count) iCloud=\(self.iCloudAvailable) root=\(self.root.path)")
@@ -86,7 +86,7 @@ final class StorageRoot {
         guard profile.id != activeId else { return }
         isBusy = true
         defer { isBusy = false }
-        let migrated = try await StorageMigrator.migrate(profile)
+        let migrated = try await ProfileMigrator.migrate(profile)
         update(migrated.id) { $0 = migrated }
         try await activate(migrated)
         switchEpoch += 1
@@ -98,7 +98,7 @@ final class StorageRoot {
         defer { isBusy = false }
         do {
             guard location == .local else { throw RuntimeError.bridge("Create a local Profile; live SQLite synchronization is unsupported") }
-            let created = try await StorageMigrator.createFreshProfile(name: name, base: base)
+            let created = try await ProfileMigrator.createFreshProfile(name: name, base: base)
             profiles.append(created)
             sortProfiles()
         } catch {
@@ -112,7 +112,7 @@ final class StorageRoot {
         defer { isBusy = false }
         do {
             let opened = try profileStore.open(url, local: localDocs, cloud: cloudDocs)
-            let migrated = try await StorageMigrator.migrate(opened)
+            let migrated = try await ProfileMigrator.migrate(opened)
             if let index = profiles.firstIndex(where: { $0.id == migrated.id }) {
                 profiles[index] = migrated
             } else {
@@ -197,7 +197,7 @@ final class StorageRoot {
         if let current = profiles.first(where: { $0.id == activeId }) {
             if !isActive(current) || current.version != ProfileSchema.current {
                 do {
-                    let migrated = try await StorageMigrator.migrate(current)
+                    let migrated = try await ProfileMigrator.migrate(current)
                     update(migrated.id) { $0 = migrated }
                     try await activate(migrated)
                     switchEpoch += 1
@@ -214,7 +214,7 @@ final class StorageRoot {
     private func fallbackToAnyProfile() async {
         if let next = profiles.first {
             do {
-                let migrated = try await StorageMigrator.migrate(next)
+                let migrated = try await ProfileMigrator.migrate(next)
                 update(migrated.id) { $0 = migrated }
                 try await activate(migrated)
                 switchEpoch += 1
@@ -223,7 +223,7 @@ final class StorageRoot {
             }
         } else if let seeded = await seedDefaultProfile() {
             do {
-                let migrated = try await StorageMigrator.migrate(seeded)
+                let migrated = try await ProfileMigrator.migrate(seeded)
                 profiles = [migrated]
                 try await activate(migrated)
                 switchEpoch += 1
@@ -235,7 +235,7 @@ final class StorageRoot {
         let location = Profile.Location.local
         guard let base = baseDir(for: location) else { return nil }
         do {
-            let created = try await StorageMigrator.createFreshProfile(name: Self.defaultName, base: base, unique: true)
+            let created = try await ProfileMigrator.createFreshProfile(name: Self.defaultName, base: base, unique: true)
             return created
         } catch {
             Log.app.error("StorageRoot.seed name=\(Self.defaultName) location=\(location.rawValue) failed: \(error.localizedDescription)")

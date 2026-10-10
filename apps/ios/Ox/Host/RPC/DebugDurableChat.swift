@@ -72,7 +72,7 @@ private enum DurableChatController {
             let physical = requestedBackend != false
             let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                 .appending(path: "PiDurableProof/\(physical ? "NativeFiles" : "Native")/\(caseID.uuidString)")
-            if physical { try await StorageMigrator.prepareTemporaryWorkspace(at: directory, identity: caseID) }
+            if physical { try await ProfileMigrator.prepareTemporaryWorkspace(at: directory, identity: caseID) }
             let runtime = DurableRuntime(databaseURL: directory.appending(path: physical ? "state.sqlite" : "session.sqlite"),
                 fileRoot: physical ? directory : nil) { method, params, stream in try await host.handle(method, params, stream: stream) }
             let artifactScope = physical ? ProfileScope(profileID: caseID, root: directory, location: .local) : nil

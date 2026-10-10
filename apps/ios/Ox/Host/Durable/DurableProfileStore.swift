@@ -153,7 +153,7 @@ actor DurableProfileStore {
     nonisolated func reference(for id: ChatID, in scope: ProfileScope) throws -> DurableConversationReference {
         guard let profileID = scope.profileID else { throw RuntimeError.bridge("No Profile identity") }
         if let reference = DurableConversationReference(compatibilityID: id, profileID: profileID) { return reference }
-        guard let reference = try StorageMigrator.durableConversationReference(for: id.rawValue, in: scope) else {
+        guard let reference = try ProfileMigrator.durableConversationReference(for: id.rawValue, in: scope) else {
             throw RuntimeError.bridge("Conversation is not part of this Profile")
         }
         return reference

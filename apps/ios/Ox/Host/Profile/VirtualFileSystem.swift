@@ -126,7 +126,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw Error.invalidPath(rawPath)
         }
-        if let legacy = try StorageMigrator.legacyWorkflowLocation(parts) { return legacy }
+        if let legacy = try ProfileMigrator.legacyWorkflowLocation(parts) { return legacy }
         if resources.owns(path) { return .resource(path) }
         switch parts {
         case ["MEMORY.md"]: return .memory

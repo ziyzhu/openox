@@ -227,7 +227,7 @@ final class ScheduledSkills {
         guard !isLoaded else { return }
         if !retry, let message = preparation?.failureMessage { throw StorageMigrationError.recoveryRequired(message) }
         do {
-            all = try StorageMigrator.prepareScheduledSkills(at: url)
+            all = try ApplicationStorageMigrator.prepareScheduledSkills(at: url)
             preparation = .ready
             Log.app.info("ScheduledSkills.load count=\(all.count)")
         } catch {

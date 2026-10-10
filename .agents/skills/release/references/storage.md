@@ -96,11 +96,16 @@ Choice, approval, and secret-entry prompts are transient `Conversation` interact
 - UserDefaults model state — owner: Host/ModelProviders/ProviderRegistry.swift
 - Keychain credentials — owner: Host/Profile/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
-- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/StorageMigration.swift
+- App-group theme — current value owners: Theme.swift and ShareExtension; legacy migration owner: Host/Profile/ApplicationStorageMigrator.swift
 - Fixed app-storage paths and backup policy — owner: Host/Profile/AppStoragePaths.swift
 - Active and saved profiles — owners: Host/Profile/StorageRoot.swift and Host/Profile/ProfileStore.swift
 - Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Chats/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ChatMeta, Turn, RPC, or compatibility-ID formats.
-- All compatibility detection, orchestration, and migration steps — owner: Host/Profile/StorageMigration.swift
+- Compatibility startup/recovery ordering — owner: Host/Profile/StorageMigration.swift
+- Profile milestones, conversion, and publication recovery — owner: Host/Profile/ProfileMigrator.swift
+- App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Profile/ApplicationStorageMigrator.swift
+- Credential conversion — owner: Host/Profile/CredentialMigrator.swift
+- Repository compatibility — owner: Host/Profile/RepositoryMigrator.swift
+- Shared stateless conversion and verified-copy helpers — owner: Host/Profile/StorageMigrationSupport.swift
 - Artifact metadata — owner: Host/Profile/Artifact.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift
 - Service repositories — owner: Services/Repository/Repository.swift
@@ -201,7 +206,7 @@ Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in his
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
 Local production Profiles now activate Pi after the storage gate. No live cloud/external database synchronization or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
 
-`StorageMigrator.stageDurableProfile` now builds a separate caller-owned local
+`ProfileMigrator.stageDurableProfile` now builds a separate caller-owned local
 staging folder containing `profile.json`, `state.sqlite` and `artifacts/`. It accepts
 only the current native representation, pins source-file reads without following
 links, retains source files, fingerprints the source before/after installation,
@@ -218,7 +223,7 @@ staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now
 
 The predecessor Pi Profile was `profile.json`, `state.sqlite`, and immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
-`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded retrieval notice instead of embedding their full bytes. Existing live-capture references remain readable. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` can read their UTF-8 JSON ranges after reopening, with a 32 MiB per-read limit and committed-Profile identity checks. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
+`ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded omission notice instead of embedding their full bytes. Existing archive descriptors remain available to migration readers. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` reads only chat-local captured JavaScript output; model-facing archive retrieval is retired. Existing archives and migration readers are retained without a storage-format change. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
 
 New native Action traces retain bounded JSON previews rather than complete inner results. `Invocation.preview` records argument, result, and purpose clipping; optional `sources` retains bounded query/domain/link metadata for source chips. `Execution.invocationTrace` counts retained and omitted calls and preview bytes. Each execution retains at most 256 Actions and a 64 KiB combined preview/source budget, with 8 KiB arguments and 4 KiB results per call. Preview traversal also limits depth, nodes, keys, and array items. Purpose/error text is limited to 500 Unicode scalars. `ThinkingTrace.omittedInvocations` projects omissions into the inspector. These optional fields are additive; older records, canonical Pi context, source archives, and artifact effects are unchanged. Recording is synchronous and nonthrowing; approvals, Actions, and JavaScript receive complete original values. Temporary chats use the same preview policy. Actual artifact effects keep their existing byte-retention policy; diagnostic previews do not publish artifacts.
 
@@ -228,16 +233,17 @@ Provider media uses request-owned verified bytes, and preview/share/HTML sibling
 
 ## Compatibility gate
 
-`StorageMigrator` is the single compatibility entry point. App-wide structural
+`StorageMigrator` coordinates startup and recovery. App-wide structural
 migrations run before the Host and its storage consumers are constructed. Host
 preparation then validates application storage, migrates the selected Profile,
 and prepares the Local service repository before chats, service discovery, or
 search indexing load persisted state. Selecting or opening another Profile also
 migrates it before publishing its `ProfileScope`.
 
-The same `StorageMigrator` owns ordered Profile milestones and the scoped
-transforms used by the gate. All of that code stays in the single
-`Host/Profile/StorageMigration.swift` file. Service-repository repair remains
+`ProfileMigrator` owns ordered Profile milestones and publication recovery;
+`ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator`
+own their scoped transforms. `StorageMigrationSupport` shares stateless helpers.
+The coordinator preserves prerequisite ordering. Service-repository repair remains
 structurally detected because the old Local layouts predate a shared application
 schema marker. Profile milestone identifiers are immutable after any build can
 stamp them. Unknown Profile versions and unsuccessful migrations fail closed at
@@ -459,7 +465,7 @@ and copy into a distinct-name Profile package for customization. Relative resour
 links preserve customization; custom copies do not authorize System-gated effects.
 The trusted runtime supplies scoped packages and activation requirements to hosts.
 No guidance bundle, generated inventory, or separate workflow mount remains.
-`StorageMigrator.legacyWorkflowLocation` redirects old `guidance/<name>/guide.md`
+`ProfileMigrator.legacyWorkflowLocation` redirects old `guidance/<name>/guide.md`
 and reference/helper paths to canonical skills without exposing another root.
 Only the five known names are accepted; aliases have the same read-only permission
 and activation behavior. Persisted formats and captured historical snapshots remain

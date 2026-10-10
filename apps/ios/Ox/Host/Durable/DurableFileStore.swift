@@ -104,7 +104,7 @@ nonisolated final class DurableFileStore {
             let token = UUID().uuidString
             handles[token] = Handle(fd: fd, name: path, stage: nil, size: size)
             return token
-        case "workspaceReadRange", "payloadVerify", "payloadRead":
+        case "workspaceReadRange", "payloadVerify":
             guard let path = params["path"] as? String, let size = params["size"] as? Int, size >= 0,
                   let digest = params["sha256"] as? String else { throw failure("Invalid file range") }
             if op != "workspaceReadRange" {

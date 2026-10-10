@@ -143,24 +143,26 @@ export async function check(): Promise<string> {
     failures.push("apps/ios/Ox: legacy DebugServer or OxHostAPI reference remains");
   }
 
-  const storageMigrationCallers = new Set([
-    "apps/ios/Ox/Host/IOSHost.swift",
-    "apps/ios/Ox/Host/Profile/StorageMigration.swift",
-    "apps/ios/Ox/Host/Profile/StorageRoot.swift",
-    "apps/ios/Ox/Host/Profile/ScheduledSkills.swift",
-    "apps/ios/Ox/Host/Durable/DurableProfileStore.swift",
-    "apps/ios/Ox/Host/RPC/DebugDurableChat.swift",
-    "apps/ios/Ox/Host/Services/Repository/Repository.swift",
-  ]);
+  const migrationOwners = ["StorageMigrator", "ProfileMigrator", "ApplicationStorageMigrator", "CredentialMigrator", "RepositoryMigrator", "StorageMigrationSupport"];
+  const migrationFiles = ["StorageMigration", ...migrationOwners.slice(1)].map(name => `apps/ios/Ox/Host/Profile/${name}.swift`);
+  const migrationCallers: Record<string, Set<string>> = {
+    StorageMigrator: new Set([migrationFiles[0], "apps/ios/Ox/Host/IOSHost.swift"]),
+    ProfileMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/StorageRoot.swift", "apps/ios/Ox/Host/Durable/DurableProfileStore.swift", "apps/ios/Ox/Host/RPC/DebugDurableChat.swift"]),
+    ApplicationStorageMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Profile/ScheduledSkills.swift"]),
+    CredentialMigrator: new Set(migrationFiles),
+    RepositoryMigrator: new Set([...migrationFiles, "apps/ios/Ox/Host/Services/Repository/Repository.swift"]),
+    StorageMigrationSupport: new Set(migrationFiles),
+  };
   for (const [index, source] of allSource.entries()) {
     const path = relative(ROOT, allSwiftFiles[index]);
-    if (source.includes("ProfileMigrator") || source.includes("ProfileMigrationError")) {
-      failures.push(`${path}: StorageMigrator must be the only persisted-storage migrator`);
-    }
-    const readOnlySkillCompatibility = path === "apps/ios/Ox/Host/Profile/VirtualFileSystem.swift"
-      && [...source.matchAll(/StorageMigrator\.([a-zA-Z0-9_]+)/g)].every(match => match[1] === "legacyWorkflowLocation");
-    if (source.includes("StorageMigrator.") && !storageMigrationCallers.has(path) && !readOnlySkillCompatibility) {
-      failures.push(`${path}: persisted compatibility must enter through an approved StorageMigrator caller`);
+    for (const owner of migrationOwners) {
+      const calls = [...source.matchAll(new RegExp(`\\b${owner}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g"))];
+      const readOnlySkillCompatibility = owner === "ProfileMigrator"
+        && path === "apps/ios/Ox/Host/Profile/VirtualFileSystem.swift"
+        && calls.every(match => match[1] === "legacyWorkflowLocation");
+      if (calls.length && !migrationCallers[owner].has(path) && !readOnlySkillCompatibility) {
+        failures.push(`${path}: persisted compatibility must enter through an approved ${owner} caller`);
+      }
     }
   }
 

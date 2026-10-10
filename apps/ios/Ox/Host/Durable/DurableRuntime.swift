@@ -73,19 +73,6 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         return try JSONDecoder().decode(JSONValue.self, from: Data(try await command(request.jsonString()).utf8))
     }
 
-    func readPayload(id: String) async throws -> String {
-        let parts = id.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 4, parts[0] == "payload", parts[1].count == 64,
-              parts[1].allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
-              let offset = Int(parts[2]), let length = Int(parts[3]), offset >= 0, length >= 0,
-              length <= 32 * 1024 * 1024 else { throw failure("Invalid or oversized bounded payload reference") }
-        let result = try await command(.object(["action": .string("payloadRead"),
-            "path": .string("artifacts/payload-" + parts[1] + ".json"), "offset": .int(offset), "length": .int(length)]))
-        guard let encoded = result.objectValue?["base64"]?.stringValue, let data = Data(base64Encoded: encoded),
-              let text = String(data: data, encoding: .utf8) else { throw failure("Payload is not valid UTF-8") }
-        return text
-    }
-
     func readFile(_ file: JSONValue) async throws -> Data {
         guard let reference = file.objectValue?["id"]?.stringValue ?? file.objectValue?["reference"]?.stringValue ?? file.objectValue?["path"]?.stringValue else { throw failure("Invalid file reference") }
         let current = try await command(.object(["action": .string("fileStat"), "path": .string(reference)]))

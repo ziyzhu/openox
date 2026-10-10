@@ -11,7 +11,7 @@ Read [storage.md](storage.md) before changing or reviewing storage. Update it in
 
 ## Compatibility boundary
 
-Use `StorageMigrator` as the single startup and activation gate for persisted-format compatibility. Keep every migration entry point, ordered milestone, structural probe, and legacy transform in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not introduce domain-specific migrator types or migration files. Consumers must not invoke legacy repair independently or read potentially old state before the gate completes.
+Use `StorageMigrator` as the ordered startup and recovery coordinator. Keep compatibility transforms in `ProfileMigrator`, `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator` under `apps/ios/Ox/Host/Profile/`; share stateless conversion and verified-copy helpers through `StorageMigrationSupport`. Profile activation must pass through `ProfileMigrator` before publishing its scope; repositories and schedules must pass through their scoped preparation before loading. Runtime consumers must not infer legacy formats or read potentially old state before preparation completes.
 
 Run application-wide migration before constructing storage consumers. Resolve and migrate the active Profile before publishing it to chats, skills, artifacts, or other readers. Prepare the Local service repository before service discovery and search indexing. Apply the same gate before activating another Profile. Keep upgrades lazy: discovery must not migrate inactive Profiles, and their settings must not open old-format content before activation. Existing interrupted-publication recovery remains an application-wide prerequisite.
 
@@ -102,7 +102,7 @@ Keep sanitized predecessor snapshots and upgrade evidence outside the repository
 
 ## Required repository gate
 
-Run this gate after every `StorageMigrator` change, including refactors and diagnostic-only edits:
+Run this gate after every coordinator or scoped migrator change, including refactors and diagnostic-only edits:
 
 1. Select a numbered QA simulator and use its assigned debug port.
 2. Force-build, install, and launch the DEBUG app on that simulator with bundled services.

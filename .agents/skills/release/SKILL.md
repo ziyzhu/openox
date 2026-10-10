@@ -19,7 +19,7 @@ and update the canonical [storage map](references/storage.md) when affected.
 Require before/after device templates backed by actual build-written snapshots;
 verify newer readers with older data and older readers with newer data. Report
 unsupported downgrade boundaries explicitly and require approval before release.
-All migration and legacy-format handling remains behind `StorageMigrator`.
+`StorageMigrator` coordinates startup and recovery; scoped Profile, application-storage, credential, and repository migrators own compatibility transforms.
 
 ## App Store releases
 

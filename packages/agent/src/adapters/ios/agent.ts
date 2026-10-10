@@ -252,17 +252,6 @@ export class IOSAgentAdapter {
         return args.action === "fileStat" ? { file: record } : { artifact: record };
       }
       case "fileAdopt": await this.adopt(args.artifact!); return this.fileReceipt(args.artifact!.path);
-      case "payloadRead": {
-        const path = artifactPath(canonical(args.path!));
-        if (session.workspace) {
-          const record = await session.workspace.record(path);
-          if (!record || !record.hidden || path !== `artifacts/payload-${record.sha256}.json`) throw new Error("Payload is not committed in this Profile");
-          return { base64: await session.workspace.readRange(record.id, args.offset!, args.length!) };
-        }
-        const record = await session.harness.snapshot(ProfileArtifact, path, context);
-        if (!this.artifacts?.readPayload || !record || path !== `artifacts/payload-${record.sha256}.json` || !record.binary) throw new Error("Payload is not committed in this Profile");
-        return { base64: await this.artifacts.readPayload(record, args.offset!, args.length!) };
-      }
       case "fileSaved": await this.fileSaved(args.path!, args.saved!); return {};
       case "fileMove":
         if (!session.workspace) throw new Error("Workspace unavailable");

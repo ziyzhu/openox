@@ -731,7 +731,7 @@ actor Repository {
     }
 
     func exportLocalRepository() throws -> URL {
-        if localPreparation?.failureMessage != nil { return try StorageMigrator.exportRecoverySource(at: localRoot) }
+        if localPreparation?.failureMessage != nil { return try RepositoryMigrator.exportRecoverySource(at: localRoot) }
         try materializeLocalRepository()
         let manager = FileManager.default
         let exportRoot = manager.temporaryDirectory
@@ -1289,12 +1289,12 @@ actor Repository {
             )
             Log.service.info("Repository.local materialized")
         }
-        try StorageMigrator.migrateLegacyLocalRepository(at: localRoot, seed: localRepositorySeed)
+        try RepositoryMigrator.migrateLegacyLocalRepository(at: localRoot, seed: localRepositorySeed)
         try installLocalRepositoryMetadata()
-        try StorageMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
-        try StorageMigrator.migrateLegacyLocalServiceActions(at: localRoot)
-        try StorageMigrator.migrateLocalRepositoryVersion(at: localRoot)
-        _ = try StorageMigrator.prepareRepository(at: localRoot, local: true)
+        try RepositoryMigrator.migrateLegacyLocalServiceManifests(at: localRoot)
+        try RepositoryMigrator.migrateLegacyLocalServiceActions(at: localRoot)
+        try RepositoryMigrator.migrateLocalRepositoryVersion(at: localRoot)
+        _ = try RepositoryMigrator.prepareRepository(at: localRoot, local: true)
         _ = try Self.loadPackage(at: localRoot, provenance: .local)
         _ = try Self.gitState(at: localRoot)
     }
@@ -1320,7 +1320,7 @@ actor Repository {
                 ),
                 root: localRoot,
                 package: package,
-                contentRoot: try StorageMigrator.prepareRepository(at: localRoot, local: true)
+                contentRoot: try RepositoryMigrator.prepareRepository(at: localRoot, local: true)
             )
         } catch {
             return LoadedRepository(
@@ -1597,7 +1597,7 @@ actor Repository {
         guard FileManager.default.fileExists(atPath: repositoryManifestURL(at: root).path) else {
             throw Failure(message: "The repository is missing repository.json at its root.")
         }
-        let root = try StorageMigrator.prepareRepository(at: root, local: provenance == .local)
+        let root = try RepositoryMigrator.prepareRepository(at: root, local: provenance == .local)
         let packageURL = repositoryManifestURL(at: root)
         let values = try packageURL.resourceValues(forKeys: [.isSymbolicLinkKey, .fileSizeKey])
         guard values.isSymbolicLink != true, (values.fileSize ?? 0) <= 512_000 else {

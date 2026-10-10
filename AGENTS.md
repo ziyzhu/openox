@@ -8,7 +8,7 @@
 1. Keep model-facing guides self-contained and free of external links; explain required concepts inline.
 1. Keep agent prompts and bundled System skills in `packages/agent`; use the normal skills catalog and package layout, scoped resource/capability contracts, and runtime permissions independent of skill activation instead of a separate guidance inventory or mount.
 1. Keep the three feature headings and descriptions identical across `README.md`, `apps/ios/Ox/Client/Features/Onboarding/OnboardingView.swift`, and the website at `../openox-dev/web/index.html`; update the onboarding translations when this copy changes.
-1. Keep all persisted-storage migration and legacy-format handling behind `StorageMigrator` in `apps/ios/Ox/Host/Profile/StorageMigration.swift`; do not add other migrator types or migration files.
+1. Keep persisted-storage migration and legacy-format handling in scoped migration owners: `ProfileMigrator`, `ApplicationStorageMigrator`, `CredentialMigrator`, and `RepositoryMigrator`. Keep `StorageMigrator` as the ordered startup/recovery coordinator; recover Profile publications before discovery and prepare storage before runtime consumers read it. Preserve milestone identifiers, journals, and failure policies when refactoring.
 1. Persisted-storage changes require actual predecessor/changed-build evidence for newer readers with older data and older readers with newer data. Report incompatibilities and obtain maintainer approval before release; safe rejection is not full compatibility.
 1. Do not modify the service manifest schema without maintainer approval.
 1. UX must hold up across supported devices and use equal outer-edge padding.

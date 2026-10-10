@@ -63,10 +63,6 @@ final class JavaScriptOutputStore {
 extension Conversation {
     public func readJavaScriptOutput(id: String, purpose: String) async throws -> JSONValue? {
         try await tracked(Actions.outputRead, .object(["id": .string(id)]), purpose: purpose) {
-            if id.hasPrefix("payload:") {
-                guard let route = durableRoute else { throw RuntimeError.bridge("No durable payload owner is attached to this chat") }
-                return .string(try await route.session.runtime.readPayload(id: id))
-            }
             return .string(try javaScriptOutputs.read(id))
         }
     }
