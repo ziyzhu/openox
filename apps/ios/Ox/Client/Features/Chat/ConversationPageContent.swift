@@ -61,6 +61,11 @@ struct ConversationBlock: Identifiable, Equatable {
         return trace.isEmpty && trace.completedAt == nil
     }
 
+    var activePrompt: ConversationPromptBlock? {
+        guard case .prompt(let prompt) = kind, prompt.isActive else { return nil }
+        return prompt
+    }
+
     var isActiveInteraction: Bool {
         switch kind {
         case .prompt(let prompt): prompt.isActive

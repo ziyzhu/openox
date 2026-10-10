@@ -521,13 +521,14 @@ struct ConversationPage: View {
         let requestedSourceRange = projection.sourceRange
         let requestedSourceIDs = projection.sourceBlockIDs
         let blocks = projection.blocks
+        let dockedPromptBlock = blocks.last { $0.activePrompt != nil }
         let browserPage = browserPage
         let servicePageOwnerIDs = blocks.compactMap { block -> UUID? in
             guard case .agentContent(.serviceInspector) = block.kind else { return nil }
             return block.id
         }
         let transcript = transcript(
-            blocks: blocks,
+            blocks: blocks.filter { $0.activePrompt == nil },
             latestCanvasBlockIDs: projection.latestCanvasBlockIDs,
             totalBlockCount: totalBlockCount,
             sourceRange: requestedSourceRange,
@@ -581,22 +582,27 @@ struct ConversationPage: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if showsComposer {
-                    composerDock(
-                        isChatEmpty: conversation.canChangeRetention && blocks.isEmpty,
-                        totalBlockCount: totalBlockCount,
-                        floatsTopStrip: floatsTopStrip
-                    )
-                        .frame(maxWidth: Theme.ContainerWidth.readable)
-                        .frame(maxWidth: .infinity)
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
-                            scroller.viewportResized()
-                        }
+                VStack(spacing: 0) {
+                    if showsComposer {
+                        composerDock(
+                            isChatEmpty: conversation.canChangeRetention && blocks.isEmpty,
+                            totalBlockCount: totalBlockCount,
+                            floatsTopStrip: floatsTopStrip
+                        )
+                    } else if let dockedPromptBlock, let prompt = dockedPromptBlock.activePrompt {
+                        promptDock(prompt, sourceBlockID: dockedPromptBlock.sourceBlockID, totalBlockCount: totalBlockCount)
+                    }
                 }
+                .frame(maxWidth: Theme.ContainerWidth.readable)
+                .frame(maxWidth: .infinity)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
+                    scroller.viewportResized()
+                }
+                .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0), value: dockedPromptBlock?.id)
         }
         .background(Theme.Colors.chatSurface)
         .overlay(alignment: .bottom) {
-            if !showsComposer, scroller.showsJumpButton {
+            if !showsComposer, dockedPromptBlock == nil, scroller.showsJumpButton {
                 ScrollToBottomButton(composerButtonSize: composerButtonSize) {
                     transcriptWindow.showLatest(total: totalBlockCount)
                     DispatchQueue.main.async { scroller.rideToBottom() }
@@ -1738,6 +1744,38 @@ struct ConversationPage: View {
                 reduceMotion ? nil : Theme.Animation.standard,
                 value: scroller.showsJumpButton
             )
+    }
+
+    private func promptDock(
+        _ prompt: ConversationPromptBlock,
+        sourceBlockID: UUID,
+        totalBlockCount: Int
+    ) -> some View {
+        promptBlock(prompt, sourceBlockID: sourceBlockID)
+            .background(
+                Theme.Colors.chatSurface,
+                in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 16, y: 4)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.bottom, Theme.Spacing.sm)
+            .overlay(alignment: .top) {
+                if scroller.showsJumpButton {
+                    ScrollToBottomButton(composerButtonSize: composerButtonSize) {
+                        transcriptWindow.showLatest(total: totalBlockCount)
+                        DispatchQueue.main.async { scroller.rideToBottom() }
+                    }
+                        .offset(y: -Theme.Size.minimumTouchTarget - Theme.Spacing.xs)
+                        .transition(.opacity)
+                }
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .onAppear {
+                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(sourceBlockID) kind=\(String(describing: prompt.kind)) secret=\(prompt.secretEntry != nil) phase=presented")
+            }
+            .onDisappear {
+                Log.ui.info("ChatUX.promptDock conversation=\(conversation.id) prompt=\(sourceBlockID) phase=dismissed")
+            }
     }
 
     private var modelAccessNotice: some View {
