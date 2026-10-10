@@ -41,7 +41,7 @@ test("internal template materializer creates dormant current Profiles in a subpr
     });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
     expect(stderr).not.toContain("xcrun");
-    expect(code).toBe(0);
+    expect(code, stderr).toBe(0);
     const result = JSON.parse(stdout);
     const profile = result.profiles.qa;
     const config = await Bun.file(join(profile.state, "profile.json")).json();

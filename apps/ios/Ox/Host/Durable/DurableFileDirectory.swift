@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 import CryptoKit
 
-nonisolated final class DurableWorkspaceStore {
+nonisolated final class DurableFileDirectory {
     private let root: URL
     private var descriptor: Int32 = -1
     private let stateRoot: URL
@@ -23,7 +23,7 @@ nonisolated final class DurableWorkspaceStore {
             Darwin.close(descriptor); descriptor = -1
         }
         descriptor = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-        guard descriptor >= 0 else { throw failure("Open workspace scope") }
+        guard descriptor >= 0 else { throw failure("Open Profile file scope") }
     }
 
     private func components(_ path: String, privateStage: Bool = false) throws -> [String] {
@@ -32,7 +32,7 @@ nonisolated final class DurableWorkspaceStore {
         let reserved = (privateContent ? [] : ["payloads"]) + ["profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "skill-selections.json", "services", "files", "history", "chats"]
         guard !path.isEmpty, path.utf8.count <= 4096, parts.count <= 64,
               !reserved.contains(parts[0].lowercased()), !parts[0].lowercased().hasPrefix("state.sqlite-"), parts.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") && $0.utf8.count <= 240 && !$0.contains("\\") && !$0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) }) else {
-            throw failure("Invalid workspace path", code: EACCES)
+            throw failure("Invalid Profile file path", code: EACCES)
         }
         if parts[0] == "conversations", parts.count > 1 {
             guard let id = Int(parts[1]), id >= 0, String(id) == parts[1] else { throw failure("Invalid conversation directory", code: EINVAL) }
@@ -49,11 +49,11 @@ nonisolated final class DurableWorkspaceStore {
             guard stateDescriptor >= 0 else { throw failure("Pin private staging scope") }
         }
         var current = dup(usePrivateStage ? stateDescriptor : descriptor)
-        guard current >= 0 else { throw failure("Pin workspace directory") }
+        guard current >= 0 else { throw failure("Pin Profile directory") }
         do {
             for part in parts.dropLast() {
                 let next = openat(current, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-                guard next >= 0 else { throw failure("Open workspace parent") }
+                guard next >= 0 else { throw failure("Open Profile file parent") }
                 Darwin.close(current); current = next
             }
             return (current, parts.last!)
@@ -64,10 +64,10 @@ nonisolated final class DurableWorkspaceStore {
         let (directory, name) = try parent(path, privateStage: privateStage)
         defer { Darwin.close(directory) }
         let fd = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-        guard fd >= 0 else { throw failure("Open workspace file") }
+        guard fd >= 0 else { throw failure("Open Profile file") }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1 else {
-            Darwin.close(fd); throw failure("Workspace file must be an owned regular file", code: EACCES)
+            Darwin.close(fd); throw failure("Profile file must be an owned regular file", code: EACCES)
         }
         return fd
     }
@@ -82,10 +82,10 @@ nonisolated final class DurableWorkspaceStore {
         var info = stat()
         if fstatat(directory, name, &info, AT_SYMLINK_NOFOLLOW) != 0 {
             if errno == ENOENT { return false }
-            throw failure("Inspect workspace destination")
+            throw failure("Inspect Profile file destination")
         }
         guard info.st_mode & S_IFMT == (expectedDirectory ? S_IFDIR : S_IFREG), expectedDirectory || info.st_nlink == 1 else {
-            throw failure("Workspace destination is a link or has the wrong type", code: EACCES)
+            throw failure("Profile file destination is a link or has the wrong type", code: EACCES)
         }
         return true
     }
@@ -93,7 +93,7 @@ nonisolated final class DurableWorkspaceStore {
     func entries(_ fd: Int32) throws -> [String] {
         let copy = dup(fd)
         guard copy >= 0 else { throw failure("Pin directory listing") }
-        guard let stream = fdopendir(copy) else { Darwin.close(copy); throw failure("Read workspace directory") }
+        guard let stream = fdopendir(copy) else { Darwin.close(copy); throw failure("Read Profile directory") }
         defer { closedir(stream) }
         rewinddir(stream)
         var names: [String] = []
@@ -127,17 +127,17 @@ nonisolated final class DurableWorkspaceStore {
                 count += 1
                 let path = prefix.isEmpty ? name : prefix + "/" + name
                 bytes += path.utf8.count
-                guard count <= 10_000, bytes <= 4 * 1024 * 1024 else { throw failure("Workspace inventory exceeds limit", code: EINVAL) }
+                guard count <= 10_000, bytes <= 4 * 1024 * 1024 else { throw failure("Profile file inventory exceeds limit", code: EINVAL) }
                 do { _ = try components(path) }
                 catch { ignored += 1; continue }
                 var info = stat()
                 if fstatat(directory, name, &info, AT_SYMLINK_NOFOLLOW) != 0 {
                     if errno == ENOENT { continue }
-                    throw failure("Inspect external workspace entry")
+                    throw failure("Inspect external Profile file entry")
                 }
                 if info.st_mode & S_IFMT == S_IFDIR {
                     let fd = openat(directory, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-                    guard fd >= 0 else { throw failure("Pin workspace inventory directory") }
+                    guard fd >= 0 else { throw failure("Pin Profile file inventory directory") }
                     defer { Darwin.close(fd) }
                     directories.append(path)
                     try visit(fd, path)
@@ -152,7 +152,7 @@ nonisolated final class DurableWorkspaceStore {
                     let fd = try openFile(path)
                     defer { Darwin.close(fd) }
                     var pinned = stat()
-                    guard fstat(fd, &pinned) == 0, pinned.st_dev == info.st_dev, pinned.st_ino == info.st_ino else { throw failure("Workspace entry changed during inventory", code: EBUSY) }
+                    guard fstat(fd, &pinned) == 0, pinned.st_dev == info.st_dev, pinned.st_ino == info.st_ino else { throw failure("Profile file entry changed during inventory", code: EBUSY) }
                     var hash = SHA256()
                     var text = Data()
                     var offset = 0
@@ -160,7 +160,7 @@ nonisolated final class DurableWorkspaceStore {
                     while offset < info.st_size {
                         let read = pread(fd, &buffer, min(buffer.count, Int(info.st_size) - offset), off_t(offset))
                         if read < 0 && errno == EINTR { continue }
-                        guard read > 0 else { throw failure("Workspace file changed during inventory", code: EBUSY) }
+                        guard read > 0 else { throw failure("Profile file changed during inventory", code: EBUSY) }
                         let data = Data(buffer.prefix(read))
                         hash.update(data: data)
                         if info.st_size <= 200 * 1024 { text.append(data) }
@@ -170,7 +170,7 @@ nonisolated final class DurableWorkspaceStore {
                     guard fstat(fd, &after) == 0, after.st_size == info.st_size,
                           after.st_mtimespec.tv_sec == info.st_mtimespec.tv_sec, after.st_mtimespec.tv_nsec == info.st_mtimespec.tv_nsec,
                           after.st_ctimespec.tv_sec == info.st_ctimespec.tv_sec, after.st_ctimespec.tv_nsec == info.st_ctimespec.tv_nsec else {
-                        throw failure("Workspace file changed during inventory", code: EBUSY)
+                        throw failure("Profile file changed during inventory", code: EBUSY)
                     }
                     let digest = hash.finalize().map { String(format: "%02x", $0) }.joined()
                     let binary = info.st_size > 200 * 1024 || text.contains(0) || String(data: text, encoding: .utf8) == nil
@@ -179,7 +179,7 @@ nonisolated final class DurableWorkspaceStore {
             }
         }
         try visit(descriptor, "")
-        if ignored > 0 { Log.agent.info("Workspace.inventory ignored entries=\(ignored)") }
+        if ignored > 0 { Log.agent.info("ProfileFiles.inventory ignored entries=\(ignored)") }
         return ["files": files, "directories": directories]
     }
 
@@ -192,7 +192,7 @@ nonisolated final class DurableWorkspaceStore {
     }
 
     func validate(_ operations: [[String: Any]]) throws {
-        guard operations.count <= 20_000 else { throw failure("Workspace mutation exceeds entry limit", code: EINVAL) }
+        guard operations.count <= 20_000 else { throw failure("Profile file mutation exceeds entry limit", code: EINVAL) }
         let created = Set(operations.filter { $0["op"] as? String == "mkdir" }.compactMap { $0["path"] as? String })
         let departures = Set(operations.compactMap { operation -> String? in
             if operation["op"] as? String == "remove" { return operation["path"] as? String }
@@ -200,7 +200,7 @@ nonisolated final class DurableWorkspaceStore {
             return nil
         })
         for operation in operations {
-            guard let op = operation["op"] as? String, let path = operation["path"] as? String else { throw failure("Invalid workspace mutation", code: EINVAL) }
+            guard let op = operation["op"] as? String, let path = operation["path"] as? String else { throw failure("Invalid Profile file mutation", code: EINVAL) }
             if let source = operation["source"] as? String, let size = operation["size"] as? Int, let digest = operation["sha256"] as? String {
                 try verify(source, size: size, digest: digest, privateStage: op == "replace")
             }
@@ -231,15 +231,15 @@ nonisolated final class DurableWorkspaceStore {
                     guard try entries(fd).allSatisfy({ departures.contains(path + "/" + $0) }) else { throw failure("Directory contains untracked files", code: ENOTEMPTY) }
                 }
             default:
-                throw failure("Unknown workspace mutation", code: EINVAL)
+                throw failure("Unknown Profile file mutation", code: EINVAL)
             }
         }
     }
 
     func apply(_ operations: [[String: Any]], preparingLegacy: Bool = false) throws {
-        guard operations.count <= 20_000 else { throw failure("Workspace mutation exceeds entry limit", code: EINVAL) }
+        guard operations.count <= 20_000 else { throw failure("Profile file mutation exceeds entry limit", code: EINVAL) }
         for operation in operations {
-            guard let op = operation["op"] as? String, let path = operation["path"] as? String else { throw failure("Invalid workspace mutation", code: EINVAL) }
+            guard let op = operation["op"] as? String, let path = operation["path"] as? String else { throw failure("Invalid Profile file mutation", code: EINVAL) }
             let directory: Int32, name: String
             do { (directory, name) = try parent(path) }
             catch {
@@ -250,12 +250,12 @@ nonisolated final class DurableWorkspaceStore {
             switch op {
             case "mkdir":
                 if !(try existing(directory, name, directory: true)) {
-                    guard mkdirat(directory, name, 0o700) == 0 else { throw failure("Create workspace directory") }
+                    guard mkdirat(directory, name, 0o700) == 0 else { throw failure("Create Profile directory") }
                 }
             case "remove":
                 guard let isDirectory = operation["directory"] as? Bool else { throw failure("Invalid removal", code: EINVAL) }
                 if try existing(directory, name, directory: isDirectory) {
-                    guard unlinkat(directory, name, isDirectory ? AT_REMOVEDIR : 0) == 0 else { throw failure("Remove workspace entry") }
+                    guard unlinkat(directory, name, isDirectory ? AT_REMOVEDIR : 0) == 0 else { throw failure("Remove Profile file entry") }
                 }
             case "replace", "move":
                 guard let source = operation["source"] as? String, let size = operation["size"] as? Int,
@@ -283,23 +283,23 @@ nonisolated final class DurableWorkspaceStore {
                 if op == "replace", !(preparingLegacy && operation["previous"] == nil && source.hasPrefix("artifacts/.stage-")) {
                     try validateReplacement(operation, directory: directory, name: name, path: path)
                 }
-                guard renameatx_np(sourceDirectory, sourceName, directory, name, op == "move" ? UInt32(RENAME_EXCL) : 0) == 0 else { throw failure("Publish workspace file") }
+                guard renameatx_np(sourceDirectory, sourceName, directory, name, op == "move" ? UInt32(RENAME_EXCL) : 0) == 0 else { throw failure("Publish Profile file") }
                 try synchronize(sourceDirectory)
             default:
-                throw failure("Unknown workspace mutation", code: EINVAL)
+                throw failure("Unknown Profile file mutation", code: EINVAL)
             }
             try synchronize(directory)
         }
-        Log.agent.info("Workspace.apply completed operations=\(operations.count)")
+        Log.agent.info("ProfileFiles.apply completed operations=\(operations.count)")
     }
 
     private func synchronize(_ fd: Int32) throws {
-        guard fsync(fd) == 0 else { throw failure("Synchronize workspace") }
-        if fcntl(fd, F_FULLFSYNC) != 0, errno != ENOTSUP, errno != EINVAL { throw failure("Flush workspace device") }
+        guard fsync(fd) == 0 else { throw failure("Synchronize Profile files") }
+        if fcntl(fd, F_FULLFSYNC) != 0, errno != ENOTSUP, errno != EINVAL { throw failure("Flush Profile file device") }
     }
 
     private func failure(_ operation: String, code: Int32? = nil) -> NSError {
         let value = code ?? errno
-        return NSError(domain: "OxWorkspace", code: Int(value), userInfo: [NSLocalizedDescriptionKey: "\(operation): \(String(cString: strerror(value)))"])
+        return NSError(domain: "OxProfileFiles", code: Int(value), userInfo: [NSLocalizedDescriptionKey: "\(operation): \(String(cString: strerror(value)))"])
     }
 }

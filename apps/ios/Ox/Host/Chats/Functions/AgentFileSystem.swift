@@ -49,8 +49,8 @@ extension Conversation {
             if ["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"].contains(name) {
                 for candidate in [path, args["to"]?.stringValue].compactMap({ $0 }) {
                     let root = candidate.split(separator: "/").first.map(String.init) ?? ""
-                    let temporaryWorkspace = isTemporary && route.artifactScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)
-                    if !["files", "services"].contains(root), !temporaryWorkspace { try requireProfileMutation(action) }
+                    let temporaryFiles = isTemporary && route.artifactScope != nil && !["MEMORY.md", "SOUL.md", "skills", "history"].contains(root)
+                    if !["files", "services"].contains(root), !temporaryFiles { try requireProfileMutation(action) }
                     if root == "services", case .serviceItem(let kind, let domain, _) = try await fileSystemLocation(candidate) {
                         try await serviceManager.requireServiceSourceMutationEnabled(kind: kind, domain: domain, operation: "ox.fs.\(name)")
                     }

@@ -1,6 +1,6 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { AgentDoc, defineDoc, type ConversationId, type Cursor, type EntryId, type Harness } from "@earendil-works/pi-durable";
-import { WorkspaceState } from "./workspace";
+import { ProfileFileState } from "./file-store";
 
 /** Pi IDs are database-local. Application references always include their owning Profile. */
 export interface ConversationReference { readonly profileID: string; readonly conversationID: ConversationId }
@@ -56,7 +56,7 @@ export class OxConversations {
   }
   private async handle(reference: ConversationReference) {
     const id = this.id(reference);
-    if ((await this.harness.snapshot(WorkspaceState, context))?.deletedConversations.includes(id)) throw new Error("Conversation not found");
+    if ((await this.harness.snapshot(ProfileFileState, context))?.deletedConversations.includes(id)) throw new Error("Conversation not found");
     const conversation = await this.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     return conversation;
@@ -105,7 +105,7 @@ export class OxConversations {
     if (cursor && cursor.profileID !== this.profileID) throw new Error("Conversation list Profile mismatch");
     this.ready();
     const page = await this.harness.commit(tx => tx.scanConversations({}, pageSize(limit), cursor?.pi), context);
-    const deleted = (await this.harness.snapshot(WorkspaceState, context))?.deletedConversations ?? [];
+    const deleted = (await this.harness.snapshot(ProfileFileState, context))?.deletedConversations ?? [];
     const metadata = await Promise.all(page.items.filter(record => !deleted.includes(record.id)).map(record => this.metadata(this.reference(record.id))));
     return { items: metadata.filter(item => item.presentation?.visible),
       next: page.next ? { profileID: this.profileID, pi: page.next } : undefined };

@@ -16,7 +16,7 @@ export { OxConversations, ConversationPresentation, ConversationFavorite, Conver
   type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor, type PresentationChange } from "./profile/conversations";
 export type { ArtifactFiles, ArtifactRecord } from "./profile/artifacts";
 export type { FileRecord } from "./profile/file-record";
-export { ProfileWorkspace, WorkspaceState, type WorkspaceBackend, type WorkspaceFile } from "./profile/workspace";
+export { ProfileFileState, type ProfileFileBackend, type ProfileFileRecord } from "./profile/file-store";
 export { AgentFileSystem, type FileOperation, type FileRequest } from "./core/filesystem";
 export { filesystemContract, filesystemInputs } from "./core/filesystem-contract";
 export { installOxProfile, ConversationApplicationMetadata, type NormalizedProfileDraft, type ProfileInstallHost } from "./profile/install";

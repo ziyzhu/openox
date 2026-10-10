@@ -35,11 +35,11 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     },
     remove: async path => { await call("delete", path); },
   };
-  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.workspace || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "chats" ? "unlisted" : "listed",
+  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "chats" ? "unlisted" : "listed",
     source: { kind: "backend", backend, path: mount.path === "chats" ? "history" : mount.path } }));
-  if (runtime.workspace) {
+  if (runtime.files.physical) {
     for (const mount of runtime.env.mounts.filter(mount => mount.path === "")) {
-      if (mount.source.kind !== "backend") throw new Error("Invalid workspace mount");
+      if (mount.source.kind !== "backend") throw new Error("Invalid Profile file mount");
       inputs.push(operation === "read" ? { ...mount, source: { ...mount.source, backend: { ...mount.source.backend, read: backend.read } } } : mount);
     }
   }

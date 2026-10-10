@@ -1,11 +1,11 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { defineDoc, defineDocFamily, type Harness } from "@earendil-works/pi-durable";
+import { defineDoc, defineDocFamily, type Harness, type ConversationId } from "@earendil-works/pi-durable";
 import { FileError } from "@earendil-works/pi-durable/env";
 import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { artifactPath, artifactRecord, type ArtifactFiles } from "./artifacts";
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
 import { canonical } from "../core/file-paths";
-import { publicDocument, type ProfileWorkspace } from "./workspace";
+import { publicDocument, ProfileFileStore, type ProfileFileBackend, type ProfileFileRecord } from "./file-store";
 export { canonical } from "../core/file-paths";
 
 const context = BACKGROUND_CONTEXT;
@@ -50,18 +50,50 @@ export class ProfileFiles {
   readonly identity: string;
   private createBlobID?: () => Promise<string>;
   private artifacts?: ArtifactFiles;
-  private bindingMode: "legacy" | "workspace" | "prepare";
-  private workspace?: ProfileWorkspace;
-  usePublicFiles(workspace: ProfileWorkspace) { this.workspace = workspace; }
+  private bindingMode: "legacy" | "physical" | "prepare";
+  private store?: ProfileFileStore;
+  private publicFiles = false;
+  get physical() { return this.store !== undefined; }
+  usePublicFiles() { this.publicFiles = true; }
+  private physicalStore() {
+    if (!this.store) throw new FileError("not_supported", "Physical Profile files are unavailable");
+    return this.store;
+  }
+  state() { return this.physicalStore().state(); }
+  record(path: string, reference = true) { return this.physicalStore().record(path, reference); }
+  listFiles() { return this.physicalStore().listFiles(); }
+  info(path: string) { return this.physicalStore().info(path); }
+  list(path: string) { return this.physicalStore().list(path); }
+  readRange(path: string, offset: number, length: number) { return this.physicalStore().readRange(path, offset, length); }
+  mkdir(path: string, recursive = false) { return this.physicalStore().mkdir(path, recursive); }
+  move(from: string, to: string) { return this.physicalStore().move(from, to); }
+  copy(from: string, to: string) { return this.physicalStore().copy(from, to); }
+  saved(path: string, saved: boolean) { return this.physicalStore().saved(path, saved); }
+  writeDocument(path: string, content: string) { return this.physicalStore().writeDocument(path, content); }
+  seedDocument(path: string, content: string) { return this.physicalStore().seedDocument(path, content); }
+  documentBatch(writes: { path: string; text: string }[], removes: string[]) { return this.physicalStore().documentBatch(writes, removes); }
+  activatePublicFiles() { return this.physicalStore().activatePublicFiles(); }
+  install(files: ProfileFileRecord[] = [], conversations: number[] = []) { return this.physicalStore().install(files, conversations); }
+  installFileIndex(files: ProfileFileRecord[]) { return this.physicalStore().installFileIndex(files); }
+  assignArchiveOwners(owners: Map<string, number>) { return this.physicalStore().assignArchiveOwners(owners); }
+  async createConversation(id: ConversationId) { await this.store?.createConversation(id); }
+  async deleteConversation(id: ConversationId) { await this.store?.deleteConversation(id); }
 
   constructor(harness: Harness, db: SqliteDatabase, identity: string,
-    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles, bindingMode: "legacy" | "workspace" | "prepare" = "legacy") {
+    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles, bindingMode: "legacy" | "physical" | "prepare" = "legacy",
+    backend?: ProfileFileBackend, publicFiles = false) {
     this.harness = harness;
     this.db = db;
     this.identity = identity;
     this.createBlobID = createBlobID;
     this.artifacts = artifacts;
     this.bindingMode = bindingMode;
+    if (bindingMode !== "legacy") {
+      if (!backend) throw new Error("Physical filesystem backend is required");
+      if (bindingMode === "physical" && artifacts) throw new Error("Current filesystem cannot use the legacy artifact backend");
+      this.store = new ProfileFileStore(harness, backend, publicFiles);
+      this.publicFiles = publicFiles;
+    }
   }
   private serialize<T>(body: () => Promise<T>): Promise<T> {
     const result = this.tail.then(body); this.tail = result.catch(() => {}); return result;
@@ -70,7 +102,7 @@ export class ProfileFiles {
     if (!this.identity) throw new Error("An immutable Profile identity is required");
     const existing = await this.harness.snapshot(ProfileIndex, context);
     if (existing?.identity && existing.identity !== this.identity) throw new Error("Profile identity does not match immutable runtime scope");
-    const backend = this.bindingMode === "workspace" ? this.workspace ? "public-profile-files-v1" : "profile-files-v1" : this.artifacts ? "artifact-files-v1" : "fixture-blobs-v1";
+    const backend = this.bindingMode === "physical" ? this.publicFiles ? "public-profile-files-v1" : "profile-files-v1" : this.artifacts ? "artifact-files-v1" : "fixture-blobs-v1";
     const binding = await this.harness.snapshot(FilesystemBinding, context);
     if (binding?.backend && binding.backend !== backend && !(this.bindingMode === "prepare" && ["workspace-files-v1", "profile-files-v1", "public-profile-files-v1"].includes(binding.backend))) throw new Error("Filesystem backend mismatch; explicit conversion is required");
     if (this.artifacts || this.bindingMode !== "legacy") {
@@ -88,9 +120,10 @@ export class ProfileFiles {
       index.identity = this.identity;
       if (this.bindingMode !== "prepare" || !binding?.backend) (await tx.doc(FilesystemBinding)).backend = backend;
     }, context);
+    if (this.bindingMode === "physical") await this.physicalStore().initialize();
   }
-  async bindWorkspace(publicFiles = false) {
-    if (this.bindingMode !== "prepare") throw new Error("Workspace binding requires StorageMigrator preparation");
+  async bindPhysicalFiles(publicFiles = false) {
+    if (this.bindingMode !== "prepare") throw new Error("Profile file binding requires StorageMigrator preparation");
     await this.harness.commit(async tx => {
       const index = await tx.doc(ProfileIndex);
       for (const path of Object.keys(index.files)) if (path.startsWith("artifacts/")) delete index.files[path];
@@ -116,19 +149,19 @@ export class ProfileFiles {
       throw new Error("Unsupported blob fixture schema; open a fresh fixture rather than repairing legacy storage at runtime");
     }
   }
-  async flush() { await this.tail; }
-  async close() { await this.flush(); await this.artifacts?.close(); }
+  async flush() { await this.tail; await this.store?.flush(); }
+  async close() { await this.tail; await this.artifacts?.close(); await this.store?.close(); }
   flushFile(path: string) {
     path = canonical(path);
     return this.serialize(async () => {
-      if (this.workspace && publicDocument(canonical(path))) { await this.workspace.flush(); return; }
+      if (this.store && (!this.isStoredDocument(path) || this.publicFiles && publicDocument(path))) { await this.store.flush(); return; }
       if (!(await this.index())[path]) throw new FileError("not_found", "File not found", path);
       if (this.artifacts && path.startsWith("artifacts/")) await this.artifacts.flush(artifactPath(path));
     });
   }
   /** Historical attachment access does not depend on membership in the visible file index. */
   readReference(path: string): Promise<string | Uint8Array> {
-    return this.serialize(() => this.readArtifact(artifactPath(path)));
+    return this.store ? this.store.read(path, true) : this.serialize(() => this.readArtifact(artifactPath(path)));
   }
   private async readArtifact(path: string): Promise<string | Uint8Array> {
     if (!this.artifacts) throw new Error("File-backed artifacts are not installed");
@@ -143,14 +176,19 @@ export class ProfileFiles {
   async integrity() { return (await this.db.get<{ integrity_check: string }>("PRAGMA integrity_check"))?.integrity_check; }
   async index() {
     const index = (await this.harness.snapshot(ProfileIndex, context))!.files;
-    if (!this.workspace) return index;
-    const documents = (await this.workspace.listFiles()).filter(file => !file.hidden && publicDocument(file.path));
+    if (!this.publicFiles) return index;
+    const documents = (await this.physicalStore().listFiles()).filter(file => !file.hidden && publicDocument(file.path));
     return { ...Object.fromEntries(Object.entries(index).filter(([path]) => !publicDocument(path))), ...Object.fromEntries(documents.map(file => [file.path, { size: file.size, mtime: file.mtime, binary: file.binary }])) };
   }
-  read(path: string): Promise<string | Uint8Array> { return this.serialize(() => this.readLocked(path)); }
+  private isStoredDocument(path: string) { return publicDocument(path) || path === "skill-selections.json"; }
+  read(path: string): Promise<string | Uint8Array> {
+    path = canonical(path);
+    if (this.store && !this.isStoredDocument(path)) return this.store.read(path);
+    return this.serialize(() => this.readLocked(path));
+  }
   private async readLocked(path: string): Promise<string | Uint8Array> {
     path = canonical(path);
-    if (this.workspace && publicDocument(path)) return this.workspace.read(path);
+    if (this.publicFiles && publicDocument(path)) return this.physicalStore().read(path);
     const metadata = (await this.index())[path];
     if (!metadata) throw new FileError("not_found", "File not found", path);
     if (this.artifacts && path.startsWith("artifacts/")) return this.readArtifact(artifactPath(path));
@@ -170,14 +208,16 @@ export class ProfileFiles {
     }
     return content;
   }
-  async write(path: string, content: string | Uint8Array) {
-    path = canonical(path); owned(path);
+  async write(path: string, content: string | Uint8Array, expected?: string) {
+    path = canonical(path);
+    if (this.store && !this.isStoredDocument(path)) return this.store.write(path, content, expected);
+    owned(path);
     const size = typeof content === "string" ? new TextEncoder().encode(content).length : content.length;
     if (size > (typeof content === "string" ? textLimit : binaryLimit)) throw new FileError("invalid", "File exceeds size limit", path);
     if (content instanceof Uint8Array) content = content.slice();
-    if (this.workspace && publicDocument(path)) {
+    if (this.publicFiles && publicDocument(path)) {
       if (typeof content !== "string") throw new FileError("invalid", "Profile documents require UTF-8 text", path);
-      await this.workspace.writeDocument(path, content); return;
+      await this.physicalStore().writeDocument(path, content, expected); return;
     }
     await this.serialize(async () => {
       if (!(await this.index())[path] && Object.keys(await this.index()).length >= 10_000) throw new Error("Profile file count limit reached");
@@ -214,8 +254,10 @@ export class ProfileFiles {
     });
   }
   async edit(path: string, edits: { oldText: string; newText: string }[]) {
-    path = canonical(path); owned(path);
-    if (this.workspace && publicDocument(path)) { await this.workspace.edit(path, edits, true); return; }
+    path = canonical(path);
+    if (this.store && !this.isStoredDocument(path)) { await this.store.edit(path, edits); return; }
+    owned(path);
+    if (this.publicFiles && publicDocument(path)) { await this.physicalStore().edit(path, edits, true); return; }
     if (this.artifacts && path.startsWith("artifacts/")) {
       throw new FileError("not_supported", "Artifact references are immutable; write the edited content to a distinct filename", path);
     }
@@ -238,9 +280,11 @@ export class ProfileFiles {
       }, context);
     });
   }
-  async remove(path: string) {
-    path = canonical(path); owned(path);
-    if (this.workspace && publicDocument(path)) { await this.workspace.documentBatch([], [path]); return; }
+  async remove(path: string, directory = false, recursive = false) {
+    path = canonical(path);
+    if (this.store && !this.isStoredDocument(path)) { await this.store.remove(path, directory, recursive); return; }
+    owned(path);
+    if (this.publicFiles && publicDocument(path)) { await this.physicalStore().documentBatch([], [path]); return; }
     await this.serialize(() => this.harness.commit(async tx => {
       delete (await tx.doc(ProfileIndex)).files[path];
       if (!this.artifacts || !path.startsWith("artifacts/")) await tx.retireDoc(ProfileFile, path);

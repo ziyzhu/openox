@@ -23,7 +23,7 @@ actor DurableAgentHost {
         weak var runtime: DurableRuntime?
         let runtimeProfileID: String?
         let artifactScope: ProfileScope?
-        let isolatedWorkspace: Bool
+        let isolatedFiles: Bool
         let latency: TurnLatencyTrace?
         let turnID: UUID?
         var conversationID: Int?
@@ -115,17 +115,17 @@ actor DurableAgentHost {
     }
 
     func bind(chatID: String, scope: ProfileScope, configuration: AgentConfiguration, runtime: DurableRuntime,
-              runtimeProfileID: String? = nil, artifactScope: ProfileScope? = nil, isolatedWorkspace: Bool, emit: @escaping EventSink) throws {
+              runtimeProfileID: String? = nil, artifactScope: ProfileScope? = nil, isolatedFiles: Bool, emit: @escaping EventSink) throws {
         guard configuration.shouldStopAfterTurn == nil else {
             throw RuntimeError.bridge("Pi Durable does not support shouldStopAfterTurn; remove the hook before running")
         }
         let previous = bindings[chatID]
-        if let previous, previous.scope != scope || previous.runtimeProfileID != runtimeProfileID || previous.artifactScope != artifactScope || previous.isolatedWorkspace != isolatedWorkspace {
+        if let previous, previous.scope != scope || previous.runtimeProfileID != runtimeProfileID || previous.artifactScope != artifactScope || previous.isolatedFiles != isolatedFiles {
             throw RuntimeError.bridge("Native conversation cannot change its immutable Profile route")
         }
         previous?.toolHydration?.task.cancel()
         bindings[chatID] = Binding(scope: scope, configuration: configuration, emit: emit, runtime: runtime,
-                                   runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedWorkspace: isolatedWorkspace,
+                                   runtimeProfileID: runtimeProfileID, artifactScope: artifactScope, isolatedFiles: isolatedFiles,
                                    latency: LogContext.latency, turnID: LogContext.turnID, conversationID: previous?.conversationID)
     }
 

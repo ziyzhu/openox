@@ -68,9 +68,9 @@ nonisolated enum ProfileMigrator {
 
     static let durableProfileVersion = "2026-10-05-pi-durable"
 
-    static let workspaceProfileVersion = "2026-10-10-profile-filesystem"
+    static let profileFilesystemVersion = "2026-10-10-profile-filesystem"
 
-    static let workspaceBindingVersion = "2026-10-10-workspace-binding"
+    static let fileBindingVersion = "2026-10-10-workspace-binding"
 
     static let filesystemProfileVersion = "2026-10-10-profile-files"
 
@@ -117,7 +117,7 @@ nonisolated enum ProfileMigrator {
                 "documents": .array([]), "artifacts": .array([]), "conversations": .array([])])
             _ = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": draft]).jsonString())
             await runtime.dispose()
-            try await prepareWorkspace(at: stage, profileID: manifest.id)
+            try await prepareFiles(at: stage, profileID: manifest.id)
             try ProfileIO.writeConfig(manifest, to: stage)
             try syncDurableDirectory(stage)
             let profile = Profile(id: manifest.id, name: candidate, location: .local, url: stage, createdAt: manifest.createdAt, version: filesystemProfileVersion)
@@ -129,26 +129,26 @@ nonisolated enum ProfileMigrator {
         }
     }
 
-    static func prepareTemporaryWorkspace(at root: URL, identity: UUID) async throws {
-        try await prepareWorkspace(at: root, profileID: identity)
+    static func prepareTemporaryFiles(at root: URL, identity: UUID) async throws {
+        try await prepareFiles(at: root, profileID: identity)
         try await preparePublicFiles(content: root, state: root, profileID: identity)
     }
 
-    private static func prepareWorkspace(at root: URL, profileID: UUID) async throws {
+    private static func prepareFiles(at root: URL, profileID: UUID) async throws {
         let runtime = DurableRuntime(databaseURL: root.appendingPathComponent("state.sqlite"), fileRoot: root) { method, _, _ in
-            throw RuntimeError.bridge("Workspace preparation forbids native capabilities: \(method)")
+            throw RuntimeError.bridge("Profile file preparation forbids native capabilities: \(method)")
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
-                "artifactFiles": .bool(true), "prepareWorkspace": .bool(true)]))
-            let result = try await runtime.command(.object(["action": .string("workspacePrepare")]))
+                "artifactFiles": .bool(true), "prepareFiles": .bool(true)]))
+            let result = try await runtime.command(.object(["action": .string("filesPrepare")]))
             _ = try await runtime.command(.object(["action": .string("close")]))
             await runtime.dispose()
             try syncDurableDirectory(root)
-            Log.app.info("StorageMigrator.workspace prepared profile=\(profileID) result=\(result.jsonString())")
+            Log.app.info("ProfileMigrator.files prepared profile=\(profileID) result=\(result.jsonString())")
         } catch {
             await runtime.dispose()
-            Log.app.error("StorageMigrator.workspace failed profile=\(profileID) error=\(error.localizedDescription)")
+            Log.app.error("ProfileMigrator.files failed profile=\(profileID) error=\(error.localizedDescription)")
             throw error
         }
     }
@@ -159,7 +159,7 @@ nonisolated enum ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
-                "workspace": .bool(true), "prepareWorkspace": .bool(true), "artifactFiles": .bool(true)]))
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
             let result = try await runtime.command(.object(["action": .string("publicFilesPrepare"), "splitStorage": .bool(content != state)]))
             _ = try await runtime.command(.object(["action": .string("close")]))
             await runtime.dispose()
@@ -178,7 +178,7 @@ nonisolated enum ProfileMigrator {
               !manager.fileExists(atPath: destination.path), !manager.fileExists(atPath: ProfileIO.stateDirectory(profile.id).path) else {
             throw StorageMigrationError.collision(destination.lastPathComponent)
         }
-        try await prepareWorkspace(at: profile.url, profileID: profile.id)
+        try await prepareFiles(at: profile.url, profileID: profile.id)
         let journalRoot = try durableJournalDirectory(profile.id)
         let sourceCopy = journalRoot.appendingPathComponent("public-source-" + UUID().uuidString)
         let inventory = try await Task.detached(priority: .userInitiated) {
@@ -199,7 +199,7 @@ nonisolated enum ProfileMigrator {
         }
         do {
             _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profile.id.uuidString),
-                "workspace": .bool(true), "prepareWorkspace": .bool(true), "artifactFiles": .bool(true)]))
+                "physicalFiles": .bool(true), "prepareFiles": .bool(true), "artifactFiles": .bool(true)]))
             let result = try await runtime.command(.object(["action": .string("publicFilesInventory")]))
             for file in result.objectValue?["files"]?.arrayValue ?? [] {
                 guard let path = file.objectValue?["path"]?.stringValue, path.hasPrefix("artifacts/"), path.split(separator: "/").count == 2 else {
@@ -1034,11 +1034,11 @@ nonisolated enum ProfileMigrator {
             }
             return try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name))
         }
-        if config.version == workspaceBindingVersion {
+        if config.version == fileBindingVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
-                throw StorageMigrationError.invalidApplicationStorage("local workspace Profile database")
+                throw StorageMigrationError.invalidApplicationStorage("local Profile filesystem database")
             }
-            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            try await prepareFiles(at: profile.url, profileID: profile.id)
             var manifest = config
             manifest.version = filesystemProfileVersion
             try ProfileIO.writeConfig(manifest, to: profile.url)
@@ -1046,28 +1046,28 @@ nonisolated enum ProfileMigrator {
             migrated.version = filesystemProfileVersion
             return try await migrate(migrated)
         }
-        if config.version == workspaceProfileVersion {
+        if config.version == profileFilesystemVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
-                throw StorageMigrationError.invalidApplicationStorage("local workspace Profile database")
+                throw StorageMigrationError.invalidApplicationStorage("local Profile filesystem database")
             }
-            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            try await prepareFiles(at: profile.url, profileID: profile.id)
             var manifest = config
-            manifest.version = workspaceBindingVersion
+            manifest.version = fileBindingVersion
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
-            migrated.version = workspaceBindingVersion
+            migrated.version = fileBindingVersion
             return try await migrate(migrated)
         }
         if config.version == durableProfileVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local Pi Profile database")
             }
-            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            try await prepareFiles(at: profile.url, profileID: profile.id)
             var manifest = config
-            manifest.version = workspaceProfileVersion
+            manifest.version = profileFilesystemVersion
             try ProfileIO.writeConfig(manifest, to: profile.url)
             try syncDurableDirectory(profile.url)
-            migrated.version = workspaceProfileVersion
+            migrated.version = profileFilesystemVersion
             return try await migrate(migrated)
         }
         guard profile.location == .local else { throw StorageMigrationError.invalidApplicationStorage("Pi Profiles require an offline local import; live cloud/external database synchronization is unsupported") }

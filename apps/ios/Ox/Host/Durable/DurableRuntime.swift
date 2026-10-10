@@ -82,7 +82,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         for key in ["path", "size", "sha256"] {
             if let expected = file.objectValue?[key], expected != fields[key] { throw failure("File changed while preparing read; reacquire its metadata") }
         }
-        let operation = fields["id"] == nil ? "open" : "workspaceOpen"
+        let operation = fields["id"] == nil ? "open" : "filesOpen"
         return try await withCheckedThrowingContinuation { continuation in
             nativeQueue.async { [self] in
                 do {

@@ -39,9 +39,9 @@ Bundled System skills:
 ${bundledSkills.map(skill => `- \`skills/${skill.name}/SKILL.md\` — ${skill.description}`).join("\n")}
 Use evolve after successful discovery finds no suitable website capability, a service defect is confirmed, or ordinary use reveals a concrete reusable improvement. Fulfill the original request first, then follow its bounded improvement pass.`;
 
-const isolatedWorkspace = `<durable_test_workspace>
+const isolatedFiles = `<durable_test_files>
 This conversation uses a purgeable temporary Session, not a saved Profile. Use ox.fs through execute as the only filesystem API. Temporary-conversation restrictions, Files grants, source ownership, and native permissions remain authoritative. Shell execution is unavailable. Do not claim a file mutation succeeded without its result.
-</durable_test_workspace>`;
+</durable_test_files>`;
 
 export const oxScaffold: PromptScaffold = { identity: fullIdentity, operatingRules, skills };
 
@@ -74,6 +74,6 @@ export function composeOxPrompt(input: SystemPromptInput, isolated = false, scaf
   if (!input.hostContext) throw new Error("Ox prompt requires host context");
   activeHost(input.hostContext);
   const prompt = composeSystemPrompt(input, scaffold);
-  const sections = isolated ? { ...prompt.sections, ox_workspace: isolatedWorkspace } : prompt.sections;
+  const sections = isolated ? { ...prompt.sections, ox_files: isolatedFiles } : prompt.sections;
   return { ...prompt, sections, rendered: Object.values(sections).join("\n\n") };
 }

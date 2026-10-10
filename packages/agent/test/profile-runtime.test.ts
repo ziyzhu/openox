@@ -142,7 +142,7 @@ test("dedicated file tools are absent and cannot mutate Profile documents", asyn
 });
 
 test("one execute filesystem surface composes scoped text and physical mounts without shadowing or fallback", async () => {
-  const root = await mkdtemp("/tmp/ox-mounted-workspace-");
+  const root = await mkdtemp("/tmp/ox-mounted-files-");
   await writeFile(join(root, "denied.md"), "Do not expose these bytes");
   const permissions: string[] = [];
   const activations: string[] = [];
@@ -150,22 +150,22 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
   const faux = fauxProvider({ provider: "fixture", models: [{ id: "mock" }], tokensPerSecond: 100_000 });
   const tool = (name: string, args: ToolCall["arguments"]) => fauxAssistantMessage([{ type: "toolCall", id: crypto.randomUUID(), name: "execute", arguments: { operation: name, args: { purpose: "Verify mounted filesystem", ...args } } }], { stopReason: "toolUse" });
   faux.setResponses([tool("read", { path: "skills/manage-skills/SKILL.md" }), tool("read", { path: "notes/private/readme.md" }),
-    tool("write", { path: "workspace/note.md", content: "original" }), tool("edit", { path: "workspace/note.md", edits: [{ oldText: "original", newText: "edited" }] }),
-    tool("read", { path: "workspace/note.md" }), tool("write", { path: "notes/private/readme.md", content: "forbidden" }),
-    tool("write", { path: "workspace/../MEMORY.md", content: "forbidden" }), tool("read", { path: "workspace/denied.md" }),
+    tool("write", { path: "working/note.md", content: "original" }), tool("edit", { path: "working/note.md", edits: [{ oldText: "original", newText: "edited" }] }),
+    tool("read", { path: "working/note.md" }), tool("write", { path: "notes/private/readme.md", content: "forbidden" }),
+    tool("write", { path: "working/../MEMORY.md", content: "forbidden" }), tool("read", { path: "working/denied.md" }),
     fauxAssistantMessage([{ type: "text", text: "done" }])]);
   models.setProvider(faux.provider);
   try {
     const first = await fixture("mount-first", undefined, { models, onSkillActivation: async (_, __, name) => { activations.push(name); return "native activation context"; }, authorizeFile: async (_, action, path) => { permissions.push(`${action}:${path}`); }, mounts: [
       { path: "notes/private", access: "readOnly", source: { kind: "text", files: { "readme.md": "first private notes" } } },
-      { path: "workspace", access: "readWrite", source: { kind: "backend", backend: {
-        id: "qa-physical-workspace",
+      { path: "working", access: "readWrite", source: { kind: "backend", backend: {
+        id: "qa-physical-files",
         info: async path => { const metadata = await stat(join(root, path)); return { path: "/" + path, name: path.split("/").at(-1)!, kind: metadata.isDirectory() ? "directory" : "file", size: metadata.size, mtimeMs: metadata.mtimeMs }; },
         list: async path => Promise.all((await readdir(join(root, path))).map(async name => {
           const child = [path, name].filter(Boolean).join("/"); const metadata = await stat(join(root, child));
           return { path: "/" + child, name, kind: metadata.isDirectory() ? "directory" as const : "file" as const, size: metadata.size, mtimeMs: metadata.mtimeMs };
         })),
-        read: async path => { if (path === "denied.md") throw new FileError("permission_denied", "Workspace access denied", path); return readFile(join(root, path), "utf8"); },
+        read: async path => { if (path === "denied.md") throw new FileError("permission_denied", "File access denied", path); return readFile(join(root, path), "utf8"); },
         write: async (path, content) => { await writeFile(join(root, path), content); },
         edit: async (path, edits) => { let text = await readFile(join(root, path), "utf8"); for (const edit of edits) { if (text.split(edit.oldText).length !== 2) throw new Error("Ambiguous edit"); text = text.replace(edit.oldText, edit.newText); } await writeFile(join(root, path), text); },
       } } },
@@ -184,12 +184,12 @@ test("one execute filesystem surface composes scoped text and physical mounts wi
     expect(results.map(message => message.isError === true)).toEqual([false, false, false, false, false, true, true, true]);
     expect(JSON.stringify(results[1])).toContain("first private notes");
     expect(JSON.stringify(results[4])).toContain("edited");
-    expect(JSON.stringify(results[7])).toContain("Workspace access denied");
+    expect(JSON.stringify(results[7])).toContain("File access denied");
     expect(await readFile(join(root, "note.md"), "utf8")).toBe("edited");
-    expect(permissions).toEqual(["write:workspace/note.md", "edit:workspace/note.md"]);
+    expect(permissions).toEqual(["write:working/note.md", "edit:working/note.md"]);
     expect(getOrThrow(await first.env.listDir("notes", context)).map(entry => entry.path)).toEqual(["/notes/private"]);
     expect(getOrThrow(await second.env.listDir("notes", context)).map(entry => entry.path)).toEqual(["/notes/shared"]);
-    expect(getOrThrow(await second.env.exists("workspace/note.md", context))).toBe(false);
+    expect(getOrThrow(await second.env.exists("working/note.md", context))).toBe(false);
     expect(getOrThrow(await second.env.readTextFile("notes/shared/readme.md", context))).toBe("second shared notes");
     await expect(fixture("overlap", undefined, { mounts: [{ path: "skills/nested", access: "readOnly", source: { kind: "text", files: {} } }] })).rejects.toThrow("Overlapping");
     await first.close();
@@ -421,9 +421,9 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(modelRequests[1]!.systemPrompt).toContain("frozen memory");
     expect(modelRequests[1]!.systemPrompt).not.toContain("new live memory");
     expect(JSON.stringify(modelRequests[1]!.messages.at(-1))).not.toContain("files/a");
-    const isolated = await adapter.command({ action: "attach", config: { ...config, chatID: "isolated", isolatedWorkspace: true } }) as typeof attached;
-    await adapter.command({ action: "run", reference: isolated.reference, content: "workspace" });
-    expect(modelRequests[2]!.systemPrompt).toContain("<durable_test_workspace>");
+    const isolated = await adapter.command({ action: "attach", config: { ...config, chatID: "isolated", isolatedFiles: true } }) as typeof attached;
+    await adapter.command({ action: "run", reference: isolated.reference, content: "files" });
+    expect(modelRequests[2]!.systemPrompt).toContain("<durable_test_files>");
     const retained = await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 });
     await adapter.command({ action: "close" });
     storage = backend(path);
@@ -432,7 +432,7 @@ test("bounded iOS commands route qualified references and execute structured pro
     expect(await adapter.command({ action: "fileMounts" })).toEqual(mounts);
     expect(await adapter.command({ action: "conversationHistory", reference: attached.reference, limit: 100 })).toEqual(retained);
     for (const [config_, reference_] of [[updated, attached.reference], [{ ...config, chatID: "second-uuid" }, second.reference],
-      [{ ...config, chatID: "isolated", isolatedWorkspace: true }, isolated.reference]] as const) {
+      [{ ...config, chatID: "isolated", isolatedFiles: true }, isolated.reference]] as const) {
       await adapter.command({ action: "attach", config: config_, reference: reference_ });
     }
     await adapter.command({ action: "run", reference: attached.reference, content: "after reopen" });

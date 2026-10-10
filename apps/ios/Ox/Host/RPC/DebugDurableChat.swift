@@ -72,13 +72,13 @@ private enum DurableChatController {
             let physical = requestedBackend != false
             let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                 .appending(path: "PiDurableProof/\(physical ? "NativeFiles" : "Native")/\(caseID.uuidString)")
-            if physical { try await ProfileMigrator.prepareTemporaryWorkspace(at: directory, identity: caseID) }
+            if physical { try await ProfileMigrator.prepareTemporaryFiles(at: directory, identity: caseID) }
             let runtime = DurableRuntime(databaseURL: directory.appending(path: physical ? "state.sqlite" : "session.sqlite"),
                 fileRoot: physical ? directory : nil) { method, params, stream in try await host.handle(method, params, stream: stream) }
             let artifactScope = physical ? ProfileScope(profileID: caseID, root: directory, location: .local) : nil
             sessions[caseID] = Session(runtime: runtime, host: host, scope: chat.scope, artifactFiles: physical, artifactScope: artifactScope)
             do {
-                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(caseID.uuidString), "artifactFiles": .bool(physical), "workspace": .bool(physical), "publicFiles": .bool(physical)]).jsonString())
+                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(caseID.uuidString), "artifactFiles": .bool(physical), "physicalFiles": .bool(physical), "publicFiles": .bool(physical)]).jsonString())
                 sessions[caseID]?.opening = false
             } catch { await runtime.dispose(); sessions.removeValue(forKey: caseID); throw error }
         }

@@ -5,7 +5,7 @@ import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type Entry
 import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor } from "./conversations";
 import { ConversationApplicationMetadata } from "./install";
 import type { ProfileRuntime } from "./runtime";
-import { WorkspaceState } from "./workspace";
+import { ProfileFileState } from "./file-store";
 
 const context = BACKGROUND_CONTEXT;
 export interface ApplicationAgentChange {
@@ -118,7 +118,7 @@ export class ApplicationPresentation {
       if (latest === null) latest = (await tx.appendEntry(id, { kind: "ox.native.presentation", data: {} })).id;
       await presentation(tx, id, { metadata: frozen.metadata ?? {}, title: frozen.title ?? "", favorite: frozen.favorite ?? false, unread: frozen.unread ?? false }, latest, true);
     } }, context);
-    await this.runtime.workspace?.createConversation(conversation.id);
+    await this.runtime.files.createConversation(conversation.id);
     return { conversationID: conversation.id, reference: this.runtime.conversations.reference(conversation.id) };
   }
   async populate(reference: ConversationReference, entries: EntryDraft[]) {
@@ -177,12 +177,12 @@ export class ApplicationPresentation {
     if (!conversation) throw new Error("Conversation not found");
     await conversation.commit(async tx => {
       (await tx.doc(ConversationPresentation, id)).visible = false;
-      if (this.runtime.workspace) {
-        const state = await tx.doc(WorkspaceState);
+      if (this.runtime.files.physical) {
+        const state = await tx.doc(ProfileFileState);
         if (!state.deletedConversations.includes(id)) state.deletedConversations.push(id);
       }
     }, context);
     await conversation.abort(context);
-    await this.runtime.workspace?.deleteConversation(id);
+    await this.runtime.files.deleteConversation(id);
   }
 }

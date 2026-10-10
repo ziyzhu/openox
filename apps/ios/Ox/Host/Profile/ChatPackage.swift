@@ -482,7 +482,7 @@ extension ProfileRepository {
             guard total <= ChatPackageCodec.maximumPackageBytes else { throw ChatPackageError.tooLarge }
             if var text = String(data: data, encoding: .utf8), data.count <= ArtifactLimits.textBytes {
                 for candidate in inventory where candidate.path != file.path {
-                    let relative = Self.relativeWorkspacePath(from: file.path, to: candidate.path)
+                    let relative = Self.relativeFilePath(from: file.path, to: candidate.path)
                     let encoded = relative.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? relative
                     guard text.contains(relative) || text.contains(encoded) else { continue }
                     let destination = Self.packageFileName(candidate)
@@ -504,7 +504,7 @@ extension ProfileRepository {
         return identity + (suffix.isEmpty ? "" : "." + suffix)
     }
 
-    nonisolated private static func relativeWorkspacePath(from: String, to: String) -> String {
+    nonisolated private static func relativeFilePath(from: String, to: String) -> String {
         var source = from.split(separator: "/").dropLast().map(String.init)
         var destination = to.split(separator: "/").map(String.init)
         while !source.isEmpty, source.first == destination.first { source.removeFirst(); destination.removeFirst() }

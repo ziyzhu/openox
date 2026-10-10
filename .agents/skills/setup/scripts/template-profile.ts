@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { nativeDatabase } from "../../../../packages/agent/src/sqlite.ts";
 import { openProfileRuntime, type ProfileRuntimeOptions } from "../../../../packages/agent/src/profile/runtime.ts";
 import { ApplicationPresentation } from "../../../../packages/agent/src/profile/presentation.ts";
-import type { WorkspaceBackend, WorkspaceFile, WorkspaceMutation, WorkspaceObservation } from "../../../../packages/agent/src/profile/workspace.ts";
+import type { ProfileFileBackend, ProfileFileRecord, FileMutation, FileObservation } from "../../../../packages/agent/src/profile/file-store.ts";
 import { relativeStoragePath, type PreparedTemplate } from "./template-schema.ts";
 
 const digest = (bytes: Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
@@ -28,7 +28,7 @@ function database(path: string) {
   });
 }
 
-function stagedWorkspace(content: string, staging: string): WorkspaceBackend {
+function stagedFiles(content: string, staging: string): ProfileFileBackend {
   const file = (path: string) => join(content, relativeStoragePath(path));
   const source = (path: string) => {
     if (!/^staging\/[A-F0-9-]+$/.test(path)) throw new Error("Invalid staged template file");
@@ -36,7 +36,7 @@ function stagedWorkspace(content: string, staging: string): WorkspaceBackend {
   };
   const bytes = async (record: { path: string; size: number; sha256: string }) => {
     const data = new Uint8Array(await Bun.file(record.path.startsWith("staging/") ? source(record.path) : file(record.path)).arrayBuffer());
-    if (data.length !== record.size || digest(data) !== record.sha256) throw new Error("Template workspace integrity mismatch");
+    if (data.length !== record.size || digest(data) !== record.sha256) throw new Error("Template file integrity mismatch");
     return data;
   };
   const inventory = async () => {
@@ -46,13 +46,13 @@ function stagedWorkspace(content: string, staging: string): WorkspaceBackend {
         const child = path ? `${path}/${entry.name}` : entry.name;
         if (entry.isDirectory()) { directories.push(child); await visit(child); }
         else if (entry.isFile()) files.push(child);
-        else throw new Error("Template workspace contains a non-regular entry");
+        else throw new Error("Template files contain a non-regular entry");
       }
     };
     await visit("");
     return { files, directories };
   };
-  const validate = async (operations: WorkspaceMutation[]) => {
+  const validate = async (operations: FileMutation[]) => {
     for (const operation of operations) {
       file(operation.path);
       if (operation.op === "replace") {
@@ -80,9 +80,9 @@ function stagedWorkspace(content: string, staging: string): WorkspaceBackend {
         else await rm(destination, { recursive: operation.directory });
       }
     },
-    async snapshot(known: WorkspaceFile[]) {
+    async snapshot(known: ProfileFileRecord[]) {
       const entries = await inventory();
-      const files: WorkspaceObservation[] = [];
+      const files: FileObservation[] = [];
       for (const path of entries.files) {
         const data = new Uint8Array(await Bun.file(file(path)).arrayBuffer());
         const info = await stat(file(path));
@@ -128,16 +128,16 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
       const state = join(root, "Library/Application Support/Profiles", id);
       const staging = join(root, "staging", id);
       for (const path of [content, state, staging]) await mkdir(path, { recursive: true, mode: 0o700 });
-      const backend = stagedWorkspace(content, staging);
+      const backend = stagedFiles(content, staging);
       const runtime = await openProfileRuntime({ database: database(join(state, "state.sqlite")), profileID: id, models: dormantModels,
-        prepareWorkspace: true, publicFiles: true, workspaceBackend: backend });
+        fileStorage: { kind: "prepare", publicFiles: true, backend } });
       const chats: Record<string, number> = {};
       try {
-        await runtime.workspace!.install();
-        await runtime.files.bindWorkspace(true);
-        if (input.memory !== undefined) await runtime.workspace!.writeDocument("MEMORY.md", input.memory);
-        if (input.soul !== undefined) await runtime.workspace!.writeDocument("SOUL.md", input.soul);
-        for (const item of input.files ?? []) await runtime.workspace!.write(item.path, decoded(item.data));
+        await runtime.files.install([], []);
+        await runtime.files.bindPhysicalFiles(true);
+        if (input.memory !== undefined) await runtime.files.writeDocument("MEMORY.md", input.memory);
+        if (input.soul !== undefined) await runtime.files.writeDocument("SOUL.md", input.soul);
+        for (const item of input.files ?? []) await runtime.files.write(item.path, decoded(item.data));
         const presentation = new ApplicationPresentation(runtime);
         for (const chat of input.chats ?? []) {
           const created = await presentation.create({ title: chat.title, favorite: chat.favorite, unread: chat.unread,
@@ -149,8 +149,9 @@ export async function materializeProfiles(template: PreparedTemplate, parent: st
           chats[chat.id] = created.conversationID;
           const attachments = new Map<string, string>();
           for (const item of chat.files ?? []) {
-            const record = await runtime.workspace!.write(`conversations/${created.conversationID}/${item.name}`, decoded(item.data));
-            attachments.set(item.id, record.id);
+            const path = `conversations/${created.conversationID}/${item.name}`;
+            await runtime.files.write(path, decoded(item.data));
+            attachments.set(item.id, (await runtime.files.record(path, false))!.id);
           }
           const entries: EntryDraft[] = (chat.messages ?? []).map((message, index): EntryDraft => {
             const content: Array<{ type: "text"; text: string; oxAttachment?: string; oxProfileID?: string }> = [{ type: "text", text: message.text }];

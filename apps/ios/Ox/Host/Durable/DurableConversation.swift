@@ -49,7 +49,7 @@ extension Conversation {
         }
         try await session.host.bind(chatID: chatID, scope: scope, configuration: configuration, runtime: session.runtime,
                                     runtimeProfileID: route.profileID.uuidString, artifactScope: route.artifactScope,
-                                    isolatedWorkspace: route.reference == nil) { [weak self] event in
+                                    isolatedFiles: route.reference == nil) { [weak self] event in
             await self?.receiveAgentEvent(event)
         }
         if let reference = route.reference { try await session.host.expectReference(chatID: chatID, reference: reference.value) }
@@ -57,7 +57,7 @@ extension Conversation {
         let thinkingLevel = effort.flatMap { ["off", "minimal", "low", "medium", "high", "xhigh", "max"].contains($0) ? $0 : nil }
         let config: JSONValue = .object([
             "chatID": .string(chatID), "model": .string(configuration.model.id), "promptState": configuration.promptState,
-            "isolatedWorkspace": .bool(route.reference == nil),
+            "isolatedFiles": .bool(route.reference == nil),
             "providerID": .string(configuration.client.id),
             "thinkingLevel": thinkingLevel.map(JSONValue.string) ?? .null,
             "nativeReasoningEffort": thinkingLevel == nil ? effort.map(JSONValue.string) ?? .null : .null,

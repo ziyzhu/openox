@@ -5,16 +5,16 @@ import { canonical } from "../core/file-paths";
 import type { FileRecord } from "./file-record";
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
 
-export type WorkspaceMutation =
+export type FileMutation =
   | { op: "mkdir"; path: string }
   | { op: "replace"; path: string; source: string; size: number; sha256: string; previous: { size: number; sha256: string } | null }
   | { op: "move"; path: string; source: string; size: number; sha256: string }
   | { op: "remove"; path: string; directory: boolean };
-export interface WorkspaceBackend {
+export interface ProfileFileBackend {
   stage(bytes: Uint8Array): Promise<FileRecord>;
-  apply(operations: WorkspaceMutation[]): Promise<void | { conflict: boolean }>;
-  snapshot(files: WorkspaceFile[]): Promise<{ files: WorkspaceObservation[]; directories: string[] }>;
-  validate(operations: WorkspaceMutation[]): Promise<void>;
+  apply(operations: FileMutation[]): Promise<void | { conflict: boolean }>;
+  snapshot(files: ProfileFileRecord[]): Promise<{ files: FileObservation[]; directories: string[] }>;
+  validate(operations: FileMutation[]): Promise<void>;
   read(record: FileRecord): Promise<Uint8Array>;
   readRange(record: FileRecord, offset: number, length: number): Promise<string>;
   close(): Promise<void>;
@@ -23,7 +23,7 @@ export interface WorkspaceBackend {
   verify(record: FileRecord): Promise<void>;
   sweep(): Promise<void>;
 }
-export type WorkspaceFile = {
+export type ProfileFileRecord = {
   path: string;
   size: number;
   sha256: string;
@@ -36,14 +36,14 @@ export type WorkspaceFile = {
   hidden?: boolean;
   stamp?: string;
 }
-export type WorkspaceObservation = FileRecord & { binary: boolean; mtime: number; stamp: string };
-export const WorkspaceState = defineDoc<{
+export type FileObservation = FileRecord & { binary: boolean; mtime: number; stamp: string };
+export const ProfileFileState = defineDoc<{
   initialized: boolean;
-  files: Record<string, WorkspaceFile>;
+  files: Record<string, ProfileFileRecord>;
   directories: string[];
   deletedConversations: number[];
-  pending: WorkspaceMutation[];
-  pendingIndex?: { files: Record<string, WorkspaceFile | null>; directories: string[] } | null;
+  pending: FileMutation[];
+  pendingIndex?: { files: Record<string, ProfileFileRecord | null>; directories: string[] } | null;
 }>({
   kind: "ox.workspace", version: 1, scope: "session",
   initial: () => ({ initialized: false, files: {}, directories: [], deletedConversations: [], pending: [], pendingIndex: null }),
@@ -60,11 +60,11 @@ export function documentPath(input: string) {
   if (path.split("/").some(part => new TextEncoder().encode(part).length > 240) || new TextEncoder().encode(path).length > 4096 || path.split("/").length > 64) throw new FileError("invalid", "Profile document path exceeds limits", input);
   return path;
 }
-export function workspacePath(input: string) {
+export function workingFilePath(input: string) {
   const path = canonical(input);
   const parts = path.split("/");
   if (!path || reserved.has(parts[0]!.toLowerCase()) || parts[0]!.toLowerCase().startsWith("state.sqlite-") || parts.some(part => new TextEncoder().encode(part).length > 240 || /[\x00-\x1f\x7f]/u.test(part)) || new TextEncoder().encode(path).length > 4096 || parts.length > 64) {
-    throw new FileError("permission_denied", "Path is not writable workspace content", input);
+    throw new FileError("permission_denied", "Path is not writable Profile content", input);
   }
   if (parts[0] === "conversations" && (parts.length < 2 || !/^(0|[1-9][0-9]*)$/.test(parts[1]!) || !Number.isSafeInteger(Number(parts[1])))) {
     throw new FileError("invalid", "Expected a canonical conversation directory", input);
@@ -76,29 +76,29 @@ const beneath = (path: string, root: string) => path === root || path.startsWith
 const owner = (path: string) => path.startsWith("conversations/") ? Number(path.split("/")[1]) : null;
 const managed = (path: string) => path === "conversations" || /^conversations\/[0-9]+$/.test(path);
 
-export class ProfileWorkspace {
+export class ProfileFileStore {
   private tail: Promise<unknown> = Promise.resolve();
   private harness: Harness;
-  private backend: WorkspaceBackend;
+  private backend: ProfileFileBackend;
   private external: boolean;
-  constructor(harness: Harness, backend: WorkspaceBackend, external = false) { this.harness = harness; this.backend = backend; this.external = external; }
+  constructor(harness: Harness, backend: ProfileFileBackend, external = false) { this.harness = harness; this.backend = backend; this.external = external; }
   private serialize<T>(body: () => Promise<T>) {
     const next = this.tail.then(async () => { await this.recover(); if (this.external) await this.reconcile(); return body(); });
     this.tail = next.catch(() => {});
     return next;
   }
-  async state() { return (await this.harness.snapshot(WorkspaceState, context)) ?? { initialized: false, files: {}, directories: [], deletedConversations: [], pending: [], pendingIndex: null }; }
+  async state() { return (await this.harness.snapshot(ProfileFileState, context)) ?? { initialized: false, files: {}, directories: [], deletedConversations: [], pending: [], pendingIndex: null }; }
   private async recover() {
     const state = await this.state();
     if (!state.pending.length) return true;
     const result = await this.backend.apply(state.pending);
     if (result?.conflict) {
-      if (!this.external) throw new FileError("invalid", "Workspace recovery requires storage preparation");
+      if (!this.external) throw new FileError("invalid", "Profile file recovery requires storage preparation");
       await this.reconcile(true);
       return false;
     }
     await this.harness.commit(async tx => {
-      const current = await tx.doc(WorkspaceState);
+      const current = await tx.doc(ProfileFileState);
       if (current.pendingIndex) {
         for (const [id, file] of Object.entries(current.pendingIndex.files)) {
           if (file) current.files[id] = file; else delete current.files[id];
@@ -120,7 +120,7 @@ export class ProfileWorkspace {
     const snapshot = await this.backend.snapshot(Object.values(state.files).filter(file => !file.hidden));
     const active = (path: string) => !state.deletedConversations.some(id => beneath(path, `conversations/${id}`));
     const accepted = (path: string) => {
-      try { publicDocument(path) ? documentPath(path) : workspacePath(path); return active(path); }
+      try { publicDocument(path) ? documentPath(path) : workingFilePath(path); return active(path); }
       catch { return false; }
     };
     const files = Object.fromEntries(Object.entries(state.files).filter(([, file]) => file.hidden));
@@ -136,7 +136,7 @@ export class ProfileWorkspace {
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
     const changed = clearPending || comparable(files) !== comparable(state.files) || JSON.stringify(directories) !== JSON.stringify(state.directories);
     if (changed) await this.harness.commit(async tx => {
-      const current = await tx.doc(WorkspaceState);
+      const current = await tx.doc(ProfileFileState);
       current.files = files; current.directories = directories;
       if (clearPending) { current.pending = []; current.pendingIndex = null; }
     }, context);
@@ -146,6 +146,7 @@ export class ProfileWorkspace {
     await this.serialize(async () => {});
   }
   async flush() { await this.tail; await this.recover(); }
+  async close() { await this.backend.close(); }
   async initialize() {
     await this.flush();
     const state = await this.state();
@@ -153,20 +154,20 @@ export class ProfileWorkspace {
       await (await this.harness.conversation(id as ConversationId, context))?.abort(context);
       if (state.directories.includes(`conversations/${id}`) || Object.values(state.files).some(file => file.owner === id)) await this.deleteConversation(id as ConversationId);
     }
-    if (!(await this.state()).initialized) throw new Error("Workspace requires StorageMigrator preparation");
+    if (!(await this.state()).initialized) throw new Error("Profile files require StorageMigrator preparation");
     await this.backend.sweep();
   }
-  async install(files: WorkspaceFile[] = [], conversations: number[] = []) {
+  async install(files: ProfileFileRecord[] = [], conversations: number[] = []) {
     await this.serialize(async () => {
       if ((await this.state()).initialized) return;
       for (const file of files) await this.backend.verify(file);
       const directories = new Set(["conversations", ...conversations.map(id => `conversations/${id}`)]);
       for (const file of files) {
-        workspacePath(file.path);
+        workingFilePath(file.path);
         for (let path = parent(file.path); path; path = parent(path)) directories.add(path);
       }
       await this.harness.commit(async tx => {
-        const state = await tx.doc(WorkspaceState);
+        const state = await tx.doc(ProfileFileState);
         state.files = Object.fromEntries(files.map(file => [file.id, file]));
         state.directories = [...directories];
         state.pending = [...directories].sort((a, b) => a.length - b.length).map(path => ({ op: "mkdir", path }));
@@ -175,35 +176,35 @@ export class ProfileWorkspace {
       await this.recover();
     });
   }
-  private async commit(files: Record<string, WorkspaceFile>, directories: string[], operations: WorkspaceMutation[]) {
-    if (Object.keys(files).length + directories.length > 10_000) throw new FileError("invalid", "Workspace entry limit reached");
+  private async commit(files: Record<string, ProfileFileRecord>, directories: string[], operations: FileMutation[]) {
+    if (Object.keys(files).length + directories.length > 10_000) throw new FileError("invalid", "Profile file entry limit reached");
     const previous = await this.state();
     const changes = Object.fromEntries([...new Set([...Object.keys(previous.files), ...Object.keys(files)])]
       .filter(id => JSON.stringify(previous.files[id]) !== JSON.stringify(files[id])).map(id => [id, files[id] ?? null]));
     await this.backend.validate(operations);
     await this.harness.commit(async tx => {
-      const state = await tx.doc(WorkspaceState);
+      const state = await tx.doc(ProfileFileState);
       if (operations.length) state.pendingIndex = { files: changes, directories };
       else { state.files = files; state.directories = directories; state.pendingIndex = null; }
       state.pending = operations;
     }, context);
     if (!(await this.recover())) throw new FileError("invalid", "External changes interrupted the operation; inspect current files before continuing");
   }
-  private resolve(state: Awaited<ReturnType<ProfileWorkspace["state"]>>, input: string, reference = true) {
+  private resolve(state: Awaited<ReturnType<ProfileFileStore["state"]>>, input: string, reference = true) {
     const path = canonical(input), files = Object.values(state.files);
     return reference ? files.find(file => file.id === path || file.aliases?.includes(path)) : files.find(file => file.path === path);
   }
   record(input: string, reference = true) { return this.serialize(async () => this.resolve(await this.state(), input, reference)); }
   listFiles() { return this.serialize(async () => Object.values((await this.state()).files)); }
-  private assertActive(state: Awaited<ReturnType<ProfileWorkspace["state"]>>, path: string) {
+  private assertActive(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string) {
     const id = owner(path);
-    if (id !== null && (!state.directories.includes(`conversations/${id}`) || state.deletedConversations.includes(id))) throw new FileError("not_found", "Conversation workspace unavailable", path);
+    if (id !== null && (!state.directories.includes(`conversations/${id}`) || state.deletedConversations.includes(id))) throw new FileError("not_found", "Conversation files unavailable", path);
   }
-  private findPath(state: Awaited<ReturnType<ProfileWorkspace["state"]>>, path: string) {
+  private findPath(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string) {
     return Object.values(state.files).find(file => file.path.toLowerCase() === path.toLowerCase())?.path
       ?? state.directories.find(directory => directory.toLowerCase() === path.toLowerCase());
   }
-  private parents(state: Awaited<ReturnType<ProfileWorkspace["state"]>>, path: string, recursive: boolean) {
+  private parents(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, recursive: boolean) {
     const missing: string[] = [];
     for (let current = parent(path); current; current = parent(current)) {
       const existing = this.findPath(state, current);
@@ -259,10 +260,10 @@ export class ProfileWorkspace {
     const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
     if (bytes.length > (typeof content === "string" ? 200 * 1024 : 32 * 1024 * 1024)) throw new FileError("invalid", "File exceeds size limit", path);
     const directories = this.parents(state, path, true);
-    if (Object.keys(state.files).length + state.directories.length + directories.length + (existing ? 0 : 1) > 10_000) throw new FileError("invalid", "Workspace entry limit reached");
+    if (Object.keys(state.files).length + state.directories.length + directories.length + (existing ? 0 : 1) > 10_000) throw new FileError("invalid", "Profile file entry limit reached");
     const id = existing?.id ?? await this.identifier(path);
     const staged = await this.backend.stage(bytes);
-    const file: WorkspaceFile = { ...staged, id, path, aliases: existing?.aliases ?? [], binary: typeof content !== "string", saved: existing?.saved ?? false, mtime: Date.now(), owner: owner(path) };
+    const file: ProfileFileRecord = { ...staged, id, path, aliases: existing?.aliases ?? [], binary: typeof content !== "string", saved: existing?.saved ?? false, mtime: Date.now(), owner: owner(path) };
     await this.commit({ ...state.files, [id]: file }, [...state.directories, ...directories], [
       ...directories.map(path => ({ op: "mkdir" as const, path })),
       { op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256,
@@ -271,7 +272,7 @@ export class ProfileWorkspace {
     return file;
   }
   write(input: string, content: string | Uint8Array, expected?: string) {
-    const path = workspacePath(input);
+    const path = workingFilePath(input);
     if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
     const frozen = typeof content === "string" ? content : content.slice();
     return this.serialize(() => this.writeLocked(path, frozen, expected));
@@ -296,7 +297,7 @@ export class ProfileWorkspace {
     const changes = writes.map(file => ({ ...file, path: documentPath(file.path) }));
     const deleted = removes.map(documentPath);
     return this.serialize(async () => {
-      const state = await this.state(), files = { ...state.files }, directories = new Set(state.directories), operations: WorkspaceMutation[] = [];
+      const state = await this.state(), files = { ...state.files }, directories = new Set(state.directories), operations: FileMutation[] = [];
       for (const path of deleted) {
         const file = Object.values(files).find(file => file.path === path);
         if (file) { delete files[file.id]; operations.push({ op: "remove", path, directory: false }); }
@@ -316,7 +317,7 @@ export class ProfileWorkspace {
     });
   }
   edit(input: string, edits: { oldText: string; newText: string }[], document = false) {
-    const path = document ? documentPath(input) : workspacePath(input);
+    const path = document ? documentPath(input) : workingFilePath(input);
     return this.serialize(async () => {
       const file = this.resolve(await this.state(), path, false);
       if (!file || file.hidden || file.binary) throw new FileError("invalid", "Edit requires an existing text file", path);
@@ -333,7 +334,7 @@ export class ProfileWorkspace {
     });
   }
   mkdir(input: string, recursive = false) {
-    const path = workspacePath(input);
+    const path = workingFilePath(input);
     if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
     return this.serialize(async () => {
       const state = await this.state(); this.assertActive(state, path);
@@ -346,7 +347,7 @@ export class ProfileWorkspace {
     });
   }
   remove(input: string, directory = false, recursive = false) {
-    const path = workspacePath(input);
+    const path = workingFilePath(input);
     if (managed(path)) throw new FileError("permission_denied", "Use conversation deletion for managed directories", path);
     return this.serialize(async () => {
       const state = await this.state(); this.assertActive(state, path);
@@ -358,7 +359,7 @@ export class ProfileWorkspace {
       await this.removeLocked(state, path);
     });
   }
-  private async removeLocked(state: Awaited<ReturnType<ProfileWorkspace["state"]>>, path: string, conversation?: number) {
+  private async removeLocked(state: Awaited<ReturnType<ProfileFileStore["state"]>>, path: string, conversation?: number) {
     const removed = Object.values(state.files).filter(file => beneath(file.path, path) || (conversation !== undefined && file.owner === conversation));
     const ids = new Set(removed.map(file => file.id));
     const directories = state.directories.filter(directory => beneath(directory, path)).sort((a, b) => b.length - a.length);
@@ -368,7 +369,7 @@ export class ProfileWorkspace {
     ]);
   }
   move(input: string, destination: string) {
-    const source = workspacePath(input), target = workspacePath(destination);
+    const source = workingFilePath(input), target = workingFilePath(destination);
     if (managed(source) || managed(target) || beneath(target, source)) throw new FileError("invalid", "Cannot move managed directories or into the source tree", source);
     return this.serialize(async () => {
       const state = await this.state(); this.assertActive(state, source); this.assertActive(state, target);
@@ -376,7 +377,7 @@ export class ProfileWorkspace {
       if (!this.findPath(state, source)) throw new FileError("not_found", "Source not found", source);
       if (this.findPath(state, target)) throw new FileError("invalid", "Destination already exists", target);
       const added = this.parents(state, target, true);
-      const files = { ...state.files }, operations: WorkspaceMutation[] = added.map(path => ({ op: "mkdir", path }));
+      const files = { ...state.files }, operations: FileMutation[] = added.map(path => ({ op: "mkdir", path }));
       const renamedDirectories = state.directories.filter(path => beneath(path, source)).map(path => target + path.slice(source.length));
       operations.push(...renamedDirectories.sort((a, b) => a.length - b.length).map(path => ({ op: "mkdir" as const, path })));
       for (const file of Object.values(files).filter(file => beneath(file.path, source))) {
@@ -392,7 +393,7 @@ export class ProfileWorkspace {
     });
   }
   copy(input: string, destination: string) {
-    const source = workspacePath(input), target = workspacePath(destination);
+    const source = workingFilePath(input), target = workingFilePath(destination);
     return this.serialize(async () => {
       const state = await this.state(); this.assertActive(state, source); this.assertActive(state, target);
       if (this.findPath(state, target)) throw new FileError("invalid", "Destination already exists", target);
@@ -409,17 +410,17 @@ export class ProfileWorkspace {
       await this.commit({ ...state.files, [file.id]: { ...file, saved } }, state.directories, []);
     });
   }
-  installFileIndex(files: WorkspaceFile[]) {
+  installFileIndex(files: ProfileFileRecord[]) {
     return this.serialize(async () => {
       await this.harness.commit(async tx => {
-        (await tx.doc(WorkspaceState)).files = Object.fromEntries(files.map(file => [file.id, file]));
+        (await tx.doc(ProfileFileState)).files = Object.fromEntries(files.map(file => [file.id, file]));
       }, context);
     });
   }
   assignArchiveOwners(owners: Map<string, number>) {
     return this.serialize(async () => {
       await this.harness.commit(async tx => {
-        const state = await tx.doc(WorkspaceState);
+        const state = await tx.doc(ProfileFileState);
         for (const file of Object.values(state.files)) {
           const id = owners.get(file.path);
           if (file.hidden && file.owner === null && id !== undefined) file.owner = id;
@@ -439,7 +440,7 @@ export class ProfileWorkspace {
   deleteConversation(id: ConversationId) {
     return this.serialize(async () => {
       await this.harness.commit(async tx => {
-        const state = await tx.doc(WorkspaceState);
+        const state = await tx.doc(ProfileFileState);
         if (!state.deletedConversations.includes(id)) state.deletedConversations.push(id);
       }, context);
       await this.removeLocked(await this.state(), `conversations/${id}`, id);

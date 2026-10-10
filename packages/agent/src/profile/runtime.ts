@@ -12,7 +12,7 @@ import { bundledSkills } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
-import { ProfileWorkspace, workspacePath, type WorkspaceBackend } from "./workspace";
+import { workingFilePath, type ProfileFileBackend } from "./file-store";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
@@ -23,10 +23,7 @@ export interface ProfileRuntimeOptions {
   registry?: Registry;
   settings?: HarnessSettings;
   artifacts?: ArtifactFiles;
-  workspace?: boolean;
-  workspaceBackend?: WorkspaceBackend;
-  prepareWorkspace?: boolean;
-  publicFiles?: boolean;
+  fileStorage?: { kind: "physical" | "prepare"; backend: ProfileFileBackend; publicFiles?: boolean };
   mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
   createBlobID?(): Promise<string>;
@@ -44,7 +41,6 @@ interface Projection {
 
 export class ProfileRuntime {
   readonly files: ProfileFiles;
-  readonly workspace?: ProfileWorkspace;
   readonly filesystem = new AgentFileSystem();
   readonly conversations: OxConversations;
   readonly env: ReturnType<typeof mountedFileSystem>;
@@ -69,28 +65,22 @@ export class ProfileRuntime {
     this.registry = registry;
     this.options = options;
     this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts,
-      options.prepareWorkspace ? "prepare" : options.workspace ? "workspace" : "legacy");
+      options.fileStorage?.kind === "prepare" ? "prepare" : options.fileStorage ? "physical" : "legacy", options.fileStorage?.backend, options.fileStorage?.publicFiles);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
-    if (options.workspace || options.prepareWorkspace) {
-      if (!options.workspaceBackend) throw new Error("Physical filesystem backend is required");
-      if (options.workspace && !options.prepareWorkspace && options.artifacts) throw new Error("Current filesystem cannot use the legacy artifact backend");
-      this.workspace = new ProfileWorkspace(harness, options.workspaceBackend, options.publicFiles);
-      if (options.publicFiles) this.files.usePublicFiles(this.workspace);
-    }
     const mounts = profileMounts(this.files, this.conversations);
-    if (this.workspace) {
-      const workspace = this.workspace;
+    if (this.files.physical) {
+      const files = this.files;
       const backend = {
-        id: `workspace:${options.profileID}`, assertWritable: workspacePath,
-        info: (path: string) => workspace.info(path), list: (path: string) => workspace.list(path),
-        read: (path: string) => workspace.read(path),
-        write: async (path: string, content: string | Uint8Array, _context: unknown, expected?: string) => { await workspace.write(path, content, expected); },
-        edit: (path: string, edits: { oldText: string; newText: string }[]) => workspace.edit(path, edits),
-        remove: (path: string) => workspace.remove(path), flush: () => workspace.flush(),
-        createDirectory: (path: string, _context: unknown, recursive?: boolean) => workspace.mkdir(path, recursive),
-        removeDirectory: (path: string, recursive: boolean) => workspace.remove(path, true, recursive),
-        move: (from: string, to: string) => workspace.move(from, to),
-        copy: async (from: string, to: string) => { await workspace.copy(from, to); },
+        id: `profile-files:${options.profileID}`, assertWritable: workingFilePath,
+        info: (path: string) => files.info(path), list: (path: string) => files.list(path),
+        read: (path: string) => files.read(path),
+        write: async (path: string, content: string | Uint8Array, _context: unknown, expected?: string) => { await files.write(path, content, expected); },
+        edit: (path: string, edits: { oldText: string; newText: string }[]) => files.edit(path, edits),
+        remove: (path: string) => files.remove(path), flush: () => files.flush(),
+        createDirectory: (path: string, _context: unknown, recursive?: boolean) => files.mkdir(path, recursive),
+        removeDirectory: (path: string, recursive: boolean) => files.remove(path, true, recursive),
+        move: (from: string, to: string) => files.move(from, to),
+        copy: async (from: string, to: string) => { await files.copy(from, to); },
       };
       const history = mounts.find(mount => mount.path === "conversations");
       if (!history || history.source.kind !== "backend") throw new Error("Missing conversation history mount");
@@ -110,12 +100,11 @@ export class ProfileRuntime {
         settings: options.settings, env: () => runtime!.env, onReport: options.onReport }, context);
       runtime = new ProfileRuntime(harness, registry, options);
       await runtime.files.initialize();
-      if (options.workspace && !options.prepareWorkspace) await runtime.workspace!.initialize();
-      registry.install(profileTools(runtime.files, !!runtime.workspace));
+      registry.install(profileTools(runtime.files, runtime.files.physical));
       return runtime;
     } catch (error) {
       try { if (harness) await harness.close(context); else await options.database.close(); }
-      finally { await options.artifacts?.close(); await options.workspaceBackend?.close(); }
+      finally { await options.artifacts?.close(); await options.fileStorage?.backend.close(); }
       throw error;
     }
   }
@@ -123,7 +112,7 @@ export class ProfileRuntime {
   private ready() { if (this.closing) throw new Error("Profile runtime closed or closing"); }
   private async conversation(id: ConversationId) {
     this.ready();
-    if (this.workspace && (await this.workspace.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
+    if (this.files.physical && (await this.files.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
     const conversation = await this.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     return conversation;
@@ -240,7 +229,7 @@ export class ProfileRuntime {
   async inspect(reference?: ConversationId | ConversationReference) {
     const id = reference === undefined ? undefined : this.scopedID(reference);
     this.ready();
-    return { inspection: await this.harness.inspect(context), files: this.workspace ? await this.workspace.listFiles() : await this.files.index(), usage: await this.harness.usage(context),
+    return { inspection: await this.harness.inspect(context), files: this.files.physical ? await this.files.listFiles() : await this.files.index(), usage: await this.harness.usage(context),
       streamEnds: Object.fromEntries([...this.projections].filter(([, projection]) => projection.ending).map(([id, projection]) => [id, projection.ending])),
       messages: id === undefined ? undefined : (await (await this.conversation(id)).context(context)).messages };
   }
@@ -249,12 +238,10 @@ export class ProfileRuntime {
     if (!this.closing) this.closing = (async () => {
       await this.filesystem.close();
       await this.files.flush();
-      await this.workspace?.flush();
       await Promise.allSettled(this.attaching.values());
       await this.harness.close(context);
       await this.env.cleanup(context);
       await this.files.close();
-      await this.options.workspaceBackend?.close();
       await Promise.all([...this.projections.values()].map(projection => projection.stream.closed));
       this.projections.clear();
     })();

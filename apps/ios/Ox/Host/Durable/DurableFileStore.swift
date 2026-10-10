@@ -15,8 +15,8 @@ nonisolated final class DurableFileStore {
     }
     private let root: URL
     private let stateRoot: URL
-    private let workspace: DurableWorkspaceStore
-    private let privateWorkspace: DurableWorkspaceStore
+    private let publicFiles: DurableFileDirectory
+    private let privateFiles: DurableFileDirectory
     private var privateDirectory: Int32 = -1
     private var directory: Int32 = -1
     private var lock: Int32 = -1
@@ -28,8 +28,8 @@ nonisolated final class DurableFileStore {
 
     init(root: URL, stateRoot: URL? = nil) {
         self.root = root; self.stateRoot = stateRoot ?? root
-        workspace = DurableWorkspaceStore(root: root, stateRoot: stateRoot)
-        privateWorkspace = DurableWorkspaceStore(root: stateRoot ?? root, privateContent: true)
+        publicFiles = DurableFileDirectory(root: root, stateRoot: stateRoot)
+        privateFiles = DurableFileDirectory(root: stateRoot ?? root, privateContent: true)
     }
     deinit { close() }
 
@@ -38,19 +38,19 @@ nonisolated final class DurableFileStore {
         if op == "close" { close(); return NSNull() }
         try acquire()
         switch op {
-        case "workspaceInventory":
-            return try workspace.inventory(previous: params["files"] as? [[String: Any]] ?? [])
-        case "workspaceVerify":
+        case "filesInventory":
+            return try publicFiles.inventory(previous: params["files"] as? [[String: Any]] ?? [])
+        case "filesVerify":
             guard let path = params["path"] as? String, let size = params["size"] as? Int, size >= 0,
                   let digest = params["sha256"] as? String else { throw failure("Invalid file verification") }
             let source = payloadPath(path)
-            try (source == nil ? workspace : privateWorkspace).verify(source ?? path, size: size, digest: digest)
+            try (source == nil ? publicFiles : privateFiles).verify(source ?? path, size: size, digest: digest)
             return NSNull()
-        case "workspaceSweep":
+        case "filesSweep":
             guard handles.isEmpty else { throw failure("Cannot sweep active file transfers") }
             var removed = 0
             for fd in [privateDirectory, directory] where fd >= 0 {
-                for name in try workspace.entries(fd) where name.hasPrefix(".stage-") || name.hasPrefix(".write-") {
+                for name in try publicFiles.entries(fd) where name.hasPrefix(".stage-") || name.hasPrefix(".write-") {
                     Darwin.close(try openFile(fd, name, flags: O_RDONLY))
                     guard unlinkat(fd, name, 0) == 0 else { throw posix("Remove orphaned staging") }
                     removed += 1
@@ -61,7 +61,7 @@ nonisolated final class DurableFileStore {
             return NSNull()
         case "inventory":
             guard try legacyDirectory(create: false) else { return [String]() }
-            return try workspace.entries(directory).filter { !$0.hasPrefix(".") }.map { "artifacts/" + $0 }
+            return try publicFiles.entries(directory).filter { !$0.hasPrefix(".") }.map { "artifacts/" + $0 }
         case "retireLegacyOwner":
             if legacyLock >= 0 {
                 var info = stat()
@@ -71,7 +71,7 @@ nonisolated final class DurableFileStore {
                 Darwin.close(legacyLock); legacyLock = -1
             }
             return NSNull()
-        case "workspaceApply", "workspaceValidate", "workspacePreparePending":
+        case "filesApply", "filesValidate", "filesPreparePending":
             guard let operations = params["operations"] as? [[String: Any]] else { throw failure("Invalid file operations") }
             do {
                 let publicOperations = operations.filter { payloadPath($0["path"] as? String ?? "") == nil }
@@ -80,38 +80,38 @@ nonisolated final class DurableFileStore {
                     translated["path"] = payloadPath(operation["path"] as! String)
                     return translated
                 }
-                for (store, mutations) in [(workspace, publicOperations), (privateWorkspace, privateOperations)] where !mutations.isEmpty {
-                    if op == "workspaceValidate" { try store.validate(mutations) }
-                    else { try store.apply(mutations, preparingLegacy: op == "workspacePreparePending") }
+                for (store, mutations) in [(publicFiles, publicOperations), (privateFiles, privateOperations)] where !mutations.isEmpty {
+                    if op == "filesValidate" { try store.validate(mutations) }
+                    else { try store.apply(mutations, preparingLegacy: op == "filesPreparePending") }
                 }
             } catch {
                 let failure = error as NSError
-                if op == "workspaceApply", failure.domain == "OxDurablePayload" ||
-                    (failure.domain == "OxWorkspace" && [ENOENT, EEXIST, ENOTEMPTY, EACCES, ELOOP].contains(Int32(failure.code))) {
+                if op == "filesApply", failure.domain == "OxDurablePayload" ||
+                    (failure.domain == "OxProfileFiles" && [ENOENT, EEXIST, ENOTEMPTY, EACCES, ELOOP].contains(Int32(failure.code))) {
                     Log.agent.warning("Filesystem.recovery conflict operations=\(operations.count) domain=\(failure.domain) code=\(failure.code)")
                     return ["conflict": true]
                 }
                 throw error
             }
-            if op == "workspacePreparePending" { Log.agent.info("Filesystem.recovery predecessor operations=\(operations.count)") }
+            if op == "filesPreparePending" { Log.agent.info("Filesystem.recovery predecessor operations=\(operations.count)") }
             return NSNull()
-        case "workspaceOpen":
+        case "filesOpen":
             guard handles.count < 4, let path = params["path"] as? String, let size = params["size"] as? Int,
                   (0...32 * 1024 * 1024).contains(size) else { throw failure("Invalid file read") }
             let source = payloadPath(path)
-            let fd = try (source == nil ? workspace : privateWorkspace).openFile(source ?? path)
+            let fd = try (source == nil ? publicFiles : privateFiles).openFile(source ?? path)
             try checkSize(fd, size: size)
             let token = UUID().uuidString
             handles[token] = Handle(fd: fd, name: path, stage: nil, size: size)
             return token
-        case "workspaceReadRange", "payloadVerify":
+        case "filesReadRange", "payloadVerify":
             guard let path = params["path"] as? String, let size = params["size"] as? Int, size >= 0,
                   let digest = params["sha256"] as? String else { throw failure("Invalid file range") }
-            if op != "workspaceReadRange" {
+            if op != "filesReadRange" {
                 guard path == "artifacts/payload-" + digest + ".json" else { throw failure("Invalid predecessor payload") }
             }
             let source = payloadPath(path)
-            let fd = try (source == nil ? workspace : privateWorkspace).openFile(source ?? path)
+            let fd = try (source == nil ? publicFiles : privateFiles).openFile(source ?? path)
             defer { Darwin.close(fd) }
             try DurablePayloadWriter.verify(fd, size: size, digest: digest)
             if op == "payloadVerify" { return NSNull() }
@@ -121,8 +121,8 @@ nonisolated final class DurableFileStore {
         case "release":
             if let token = params["token"] as? String { release(token) }
             return NSNull()
-        case "begin", "workspaceStage", "open", "flush":
-            let isPrivate = op == "workspaceStage"
+        case "begin", "filesStage", "open", "flush":
+            let isPrivate = op == "filesStage"
             if !isPrivate { _ = try legacyDirectory(create: true) }
             let target = isPrivate ? privateDirectory : directory
             let name = isPrivate ? ".stage-" + UUID().uuidString : try basename(params["path"] as? String)
@@ -198,7 +198,7 @@ nonisolated final class DurableFileStore {
               let size = fields["size"]?.intValue, let digest = fields["sha256"]?.stringValue,
               path == "artifacts/payload-" + digest + ".json", length <= 64 * 1024 * 1024 else { throw failure("Invalid bounded payload capture") }
         let source = payloadPath(path)
-        let fd = try (source == nil ? workspace : privateWorkspace).openFile(source ?? path)
+        let fd = try (source == nil ? publicFiles : privateFiles).openFile(source ?? path)
         defer { Darwin.close(fd) }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_size == size else { throw failure("Payload capture size mismatch") }
