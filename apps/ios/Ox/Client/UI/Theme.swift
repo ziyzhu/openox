@@ -12,7 +12,7 @@ enum Theme {
         static let chatSurface     = DynamicColor(brand: 0xFFFFFF, light: 0xFFFFFF, dark: 0x0A0A0A)
         static let bubble          = DynamicColor(light: 0xF3F3F3, dark: 0x1C1C1E)
         static let background      = DynamicColor(brand: 0xFFF6E6, light: 0xFFFFFF, dark: 0x0A0A0A)
-        static let onSurface       = DynamicColor(brand: 0x3A2410, light: 0x000000, dark: 0xECECEC)
+        static let onSurface       = DynamicColor(brand: 0x000000, light: 0x000000, dark: 0xECECEC)
         static let onSurfaceMuted  = DynamicColor(brand: 0x7A5A3A, light: 0x8E8E93, dark: 0x9A9A9A)
         static let onPrimary       = DynamicColor(light: 0xFFFDF7, dark: 0xFFFDF7)
         static let error           = DynamicColor(light: 0xB8422E, dark: 0xE25A45)
