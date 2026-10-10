@@ -917,6 +917,10 @@ final class ServiceManager {
         try await repository.writeLocalSource(kind: kind.repositoryKind, id: domain, path: path, data: data)
     }
 
+    func updateServiceManifest(kind: ServicesMount.Kind, domain: String, fields: [String: JSONValue]) async throws {
+        try await repository.updateLocalManifest(kind: kind.repositoryKind, id: domain, fields: fields)
+    }
+
     func deleteServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws {
         try await repository.deleteLocalSource(kind: kind.repositoryKind, id: domain, path: path)
     }

@@ -952,6 +952,29 @@ actor Repository {
         Log.service.info("Repository.local write id=\(id) path=\(path.joined(separator: "/")) bytes=\(data.count)")
     }
 
+    func updateLocalManifest(kind: ServiceKind, id: String, fields: [String: JSONValue]) throws {
+        let source = try editableSource(kind: kind, id: id)
+        let data = try readSource(source, path: ["service.json"])
+        guard var manifest = try JSONDecoder().decode(JSONValue.self, from: data).objectValue else {
+            throw Failure(message: "Invalid service manifest.")
+        }
+        for (key, value) in fields {
+            if value == .null {
+                manifest.removeValue(forKey: key)
+            } else {
+                manifest[key] = value
+            }
+        }
+        let definition = try ServiceDefinition(manifest: .object(manifest), repositoryID: Self.localID, provenance: .local)
+        guard definition.domain == id, definition.isAPI == (kind == .api) else {
+            throw Failure(message: "Manifest identity does not match its directory.")
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try writeLocalSource(kind: kind, id: id, path: ["service.json"], data: encoder.encode(JSONValue.object(manifest)))
+        Log.service.info("Repository.local update id=\(id) kind=\(kind.rawValue) fields=\(fields.keys.sorted().joined(separator: ","))")
+    }
+
     func deleteLocalSource(kind: ServiceKind, id: String, path: [String]) throws {
         let source = try editableSource(kind: kind, id: id)
         let url = try sourceURL(source, path: path)

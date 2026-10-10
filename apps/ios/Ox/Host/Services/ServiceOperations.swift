@@ -196,27 +196,59 @@ final class ServiceOperations {
         }
     }
 
-    func updateService(domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
+    func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue? {
         let identifier = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let directMatches = serviceManager.services.filter { service in
+        let matches = serviceManager.services.filter { service in
             guard let endpoint = service.definition.mcpEndpoint else { return false }
-            return service.domain == identifier
-                || service.definition.name.lowercased() == identifier
-                || endpoint.host?.lowercased() == identifier
+            return service.definition.name.lowercased() == identifier || endpoint.host?.lowercased() == identifier
         }
-        guard directMatches.count <= 1 else {
-            throw RuntimeError.bridge("ox.service.update: multiple saved MCP services match '\(identifier)'; use the assigned domain from ox.service.list.")
+        let exact = serviceManager.service(domain: identifier)
+        guard exact != nil || matches.count <= 1 else {
+            throw RuntimeError.bridge("ox.service.update: multiple MCP services match '\(identifier)'; use the assigned domain from ox.service.list.")
         }
-        guard let service = directMatches.first, let currentEndpoint = service.definition.mcpEndpoint else {
-            throw RuntimeError.bridge("ox.service.update: requires an existing MCP service; edit Local web source with ox.fs.")
+        guard let service = exact ?? matches.first else {
+            throw RuntimeError.bridge("ox.service.update: service '\(identifier)' does not exist; use ox.service.create for a new service.")
         }
-        return try await saveMCP(
-            endpoint: endpoint ?? currentEndpoint.absoluteString,
-            transport: transport ?? service.definition.mcpTransport?.rawValue,
-            faviconURL: faviconURL,
-            replacing: service,
-            purpose: purpose
-        )
+        let kind = serviceKind(service)
+        let allowed: Set<String>
+        switch kind {
+        case "web": allowed = ["name", "description", "baseUrl", "faviconUrl", "actions", "$defs"]
+        case "api": allowed = ["name", "description", "baseUrl", "faviconUrl", "actions", "$defs", "auth"]
+        case "mcp": allowed = ["endpoint", "transport", "faviconUrl"]
+        default: throw RuntimeError.bridge("ox.service.update: native services are read-only.")
+        }
+        let unsupported = Set(fields.keys).subtracting(allowed).sorted()
+        guard unsupported.isEmpty else {
+            throw RuntimeError.bridge("ox.service.update: unsupported fields for \(kind): \(unsupported.joined(separator: ", ")); supported fields: \(allowed.sorted().joined(separator: ", ")).")
+        }
+        if let currentEndpoint = service.definition.mcpEndpoint {
+            guard service.definition.repositoryID == nil else {
+                throw RuntimeError.bridge("ox.service.update: repository MCP definitions are read-only.")
+            }
+            return try await saveMCP(
+                endpoint: fields["endpoint"]?.stringValue ?? currentEndpoint.absoluteString,
+                transport: fields["transport"]?.stringValue ?? service.definition.mcpTransport?.rawValue,
+                faviconURL: fields["faviconUrl"],
+                replacing: service,
+                purpose: purpose
+            )
+        }
+        guard !fields.isEmpty else {
+            throw RuntimeError.bridge("ox.service.update: provide at least one manifest field for a Local \(kind) service.")
+        }
+        let sourceKind: ServicesMount.Kind = kind == "api" ? .api : .web
+        var args = fields
+        args["domain"] = .string(service.domain)
+        return try await tracked(Actions.serviceUpdate, .object(args), purpose: purpose) {
+            try await self.serviceManager.updateServiceManifest(kind: sourceKind, domain: service.domain, fields: fields)
+            return .object([
+                "domain": .string(service.domain),
+                "kind": .string(kind),
+                "manifestPath": .string("services/\(kind)/\(service.domain)/service.json"),
+                "source": .string("local"),
+                "reloadRequired": .bool(true),
+            ])
+        }
     }
 
     private func saveMCP(endpoint: String, transport: String?, faviconURL: JSONValue?, replacing: Service?, purpose: String) async throws -> JSONValue? {

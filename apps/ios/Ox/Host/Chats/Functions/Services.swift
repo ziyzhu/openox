@@ -33,8 +33,8 @@ extension Conversation: OxFunctionBridge {
         try await serviceOperations.createService(kind: kind, domain: domain, endpoint: endpoint, transport: transport, faviconURL: faviconURL, purpose: purpose)
     }
 
-    public func updateService(domain: String, endpoint: String?, transport: String?, faviconURL: JSONValue?, purpose: String) async throws -> JSONValue? {
-        try await serviceOperations.updateService(domain: domain, endpoint: endpoint, transport: transport, faviconURL: faviconURL, purpose: purpose)
+    public func updateService(domain: String, fields: [String: JSONValue], purpose: String) async throws -> JSONValue? {
+        try await serviceOperations.updateService(domain: domain, fields: fields, purpose: purpose)
     }
 
     public func copyService(domain: String, purpose: String) async throws -> JSONValue? {

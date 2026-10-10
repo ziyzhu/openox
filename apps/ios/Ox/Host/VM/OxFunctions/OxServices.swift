@@ -152,10 +152,16 @@ nonisolated enum OxServices {
                         "inputSchema": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253), "description": .string("Assigned MCP domain, saved connection name, or unique endpoint host.")]),
+                                "domain": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(253), "description": .string("Existing service domain. Direct MCP also accepts a saved connection name or unique endpoint host.")]),
+                                "name": .object(["type": .string("string"), "minLength": .int(1), "description": .string("Local web/API display name.")]),
+                                "description": .object(["type": .array([.string("string"), .string("null")]), "description": .string("Local web/API description; null removes it.")]),
+                                "baseUrl": .object(["type": .string("string"), "format": .string("uri"), "description": .string("Local web execution URL or API HTTPS base URL. Web URLs must remain on the service domain or its subdomains.")]),
+                                "actions": .object(["type": .string("array"), "items": .object(["type": .string("object")]), "description": .string("Replace the complete Local web/API action declarations. Handlers remain in actions.js; edit them with ox.fs and validate before attaching.")]),
+                                "$defs": .object(["type": .array([.string("object"), .string("null")]), "description": .string("Replace Local web/API shared JSON Schema definitions; null removes them.")]),
+                                "auth": .object(["type": .string("object"), "description": .string("Replace Local API authentication configuration, never credentials. Supported objects: {type: 'none'}; {type: 'apiKey', in: 'header'|'query', name: '<header-or-query-name>'}; {type: 'http', scheme: 'basic'|'bearer'}; or {type: 'oauth2', flow: 'authorizationCode', authorizationURL: '<HTTPS URL>', tokenURL: '<HTTPS URL>', clientID: '<registered public client>', redirectURI: '<app callback URI>', scopes: ['<scope>'], pkce: 'S256'}. OAuth endpoints cannot contain credentials, query, or fragment; callback uses a non-HTTP app scheme without query or fragment. Requires setup again.")]),
                                 "endpoint": .object(["type": .string("string"), "minLength": .int(1), "maxLength": .int(2048)]),
                                 "transport": .object(["type": .string("string"), "enum": .array([.string("auto"), .string("streamable-http"), .string("sse")])]),
-                                "faviconUrl": .object(["type": .array([.string("string"), .string("null")]), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Public HTTPS PNG, JPEG, or ICO URL, or null to use icons advertised by the MCP server.")]),
+                                "faviconUrl": .object(["type": .array([.string("string"), .string("null")]), "format": .string("uri"), "pattern": .string("^https://"), "maxLength": .int(2048), "description": .string("Public HTTPS PNG, JPEG, or ICO URL. Local web/API and direct MCP support this field; null removes a Local override or restores MCP-advertised icons.")]),
                             ]),
                             "required": .array([.string("domain")]),
                             "additionalProperties": .bool(false),
@@ -370,8 +376,11 @@ nonisolated enum OxServices {
             ctx.setObject(createBlock as AnyObject, forKeyedSubscript: "__nativeServiceCreate" as NSString)
 
             let updateBlock: @convention(block) (JSValue, JSValue) -> JSValue = { optionsValue, purposeValue in
-                let fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
-                return env.call(suspendingTimeout: true) { try await $0.updateService(domain: fields["domain"]?.stringValue ?? "", endpoint: fields["endpoint"]?.stringValue, transport: fields["transport"]?.stringValue, faviconURL: fields["faviconUrl"], purpose: purposeValue.toString()!) }
+                var fields = jsValueToJSON(optionsValue)?.objectValue ?? [:]
+                let domain = fields.removeValue(forKey: "domain")?.stringValue ?? ""
+                fields.removeValue(forKey: "purpose")
+                let settings = fields
+                return env.call(suspendingTimeout: true) { try await $0.updateService(domain: domain, fields: settings, purpose: purposeValue.toString()!) }
             }
             ctx.setObject(updateBlock as AnyObject, forKeyedSubscript: "__nativeServiceUpdate" as NSString)
 
