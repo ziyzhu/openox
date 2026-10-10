@@ -5,6 +5,7 @@ import { mountedFileSystem, type FileBackend, type FileMount } from "../../core/
 import { canonical } from "../../core/file-paths";
 import type { FileOperation, FileRequest } from "../../core/filesystem";
 import { native } from "./bridge";
+import { conversationRecordPath } from "../../profile/file-store";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
@@ -35,12 +36,18 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
     },
     remove: async path => { await call("delete", path); },
   };
-  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "chats" ? "unlisted" : "listed",
+  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.files.physical || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: ["chats", "history"].includes(mount.path) ? "unlisted" : "listed",
     source: { kind: "backend", backend, path: mount.path === "chats" ? "history" : mount.path } }));
   if (runtime.files.physical) {
     for (const mount of runtime.env.mounts.filter(mount => mount.path === "")) {
       if (mount.source.kind !== "backend") throw new Error("Invalid Profile file mount");
-      inputs.push(operation === "read" ? { ...mount, source: { ...mount.source, backend: { ...mount.source.backend, read: backend.read } } } : mount);
+      const profile = mount.source.backend;
+      inputs.push({ ...mount, source: { ...mount.source, backend: { ...profile,
+        read: async (path, context) => {
+          if (conversationRecordPath(path)) await profile.info(path, context);
+          return operation === "read" || conversationRecordPath(path) ? backend.read(path, context) : profile.read(path, context);
+        },
+      } } });
     }
   }
   inputs.push(...runtime.textMounts.mounts.map(mount => ({ path: mount.path, access: mount.access, source: { kind: "text" as const, files: mount.files } })));

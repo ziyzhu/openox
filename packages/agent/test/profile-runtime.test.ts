@@ -279,7 +279,7 @@ test("Profile ExecutionEnv exposes only visible, read-only Pi metadata and full-
   const original = await visible.commit(tx => tx.appendEntry(visible.id, { kind: "pi.user", model: [{ role: "user", content: "old scrollback", timestamp: 1 }] }), context);
   await visible.commit(tx => tx.appendEntry(visible.id, { kind: "pi.reset", head: "self" }), context);
   expect(value(await session.env.listDir("/chats", context)).map(info => info.name)).toEqual([String(visible.id)]);
-  expect(value(await session.env.listDir(`/conversations/${visible.id}`, context)).map(info => info.name)).toEqual(["metadata", "history"]);
+  expect(value(await session.env.listDir(`/conversations/${visible.id}`, context)).map(info => info.name)).toEqual(["conversation.json", "turns.jsonl"]);
   const metadata = JSON.parse(value(await session.env.readTextFile(`/conversations/${visible.id}/metadata`, context)));
   expect(metadata.reference).toEqual(reference); expect(metadata.presentation.title).toBe("Virtual");
   const history = JSON.parse(value(await session.env.readTextFile(`/conversations/${visible.id}/history`, context)));

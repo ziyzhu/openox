@@ -11,6 +11,15 @@ extension Conversation {
 
     func fileBackend(operation: String, path: String, arguments: JSONValue) async throws -> JSONValue {
         try requireFileBackendScope()
+        var path = path
+        var parts = path.split(separator: "/").map(String.init)
+        if parts.count == 3, parts[0] == "conversations", ["conversation.json", "turns.jsonl"].contains(parts[2]) {
+            parts[0] = "history"
+            if let id = Int(parts[1]), id >= 0, let profileID = scope.profileID {
+                parts[1] = DurableConversationReference(profileID: profileID, conversationID: id).compatibilityID.description
+            }
+            path = parts.joined(separator: "/")
+        }
         let value: JSONValue?
         switch operation {
         case "info":

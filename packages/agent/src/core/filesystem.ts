@@ -71,10 +71,13 @@ export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest 
   const resolve = (path: string) => {
     if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
       const parts = canonical(path).split("/");
-      if (parts[0] === "chats" || (parts[0] === "conversations" && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(parts[1] ?? ""))) {
-        parts[0] = "history";
+      const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(parts[1] ?? "");
+      if (parts[0] === "chats" || parts[0] === "history" || (parts[0] === "conversations" && uuid)) {
+        parts[0] = uuid ? "history" : "conversations";
         if (parts[2] === "chat.json") parts[2] = "conversation.json";
         if (parts[2] === "messages.jsonl") parts[2] = "turns.jsonl";
+        if (parts[2] === "metadata") parts[2] = "conversation.json";
+        if (parts[2] === "history") parts[2] = "turns.jsonl";
       }
       return parts.join("/");
     }
@@ -287,8 +290,9 @@ export class AgentFileSystem {
     const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", options.ignoreCase);
     const root = getOrThrow(await env.fileInfo(base, context));
     if (operation === "glob" && root.kind !== "directory") throw new FileError("not_directory", "Not a directory", base);
-    const excluded = base ? [] : ["files", ...(operation === "grep" ? ["history", ...env.mounts.some(mount => mount.path === "") ? [] : ["conversations"]] : [])];
+    const excluded = base ? [] : ["files"];
     const candidates = await fileCandidates(env, root, new Set(excluded), context);
+    if (operation === "grep" && base !== "conversations" && !base.startsWith("conversations/")) candidates.paths = candidates.paths.filter(path => !/^conversations\/[^/]+\/(conversation\.json|turns\.jsonl|metadata|history)$/.test(path));
     if (operation === "grep") return grepFiles(env, candidates, args, match, context);
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));
     const count = options.limit ?? 100;

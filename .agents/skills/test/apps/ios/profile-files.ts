@@ -66,7 +66,8 @@ try {
   assert.equal(initial.model.id, "mock");
   assert(initial.messages[0]?.user?.content[0]?.text?.text.startsWith("QA filesystem backend verification seed."));
   const root = await call("ox.fs.list", { path: "/" });
-  assert(root.items.some((item: { path: string }) => item.path === "history"));
+  assert(root.items.some((item: { path: string }) => item.path === "conversations"));
+  assert(!root.items.some((item: { path: string }) => ["history", "chats"].includes(item.path)));
   assert(!root.items.some((item: { path: string }) => /^(state\.sqlite|profile\.json|\.)/.test(item.path)));
   for (const path of ["/state.sqlite", "/state.sqlite-wal", "/state.sqlite-other", "/STATE.SQLITE", "/profile.json", "/.files"]) {
     await rejected("ox.fs.read", { path });
@@ -76,6 +77,20 @@ try {
   const created = await call("ox.fs.write", { path: `${prefix}/nested/note.md`, content: "# Current file\nVersion one\n" });
   assert.match(created.path, /^conversations\/[0-9]+\//);
   const conversationRoot = created.path.split("/").slice(0, 2).join("/");
+  const entries = (await call("ox.fs.list", { path: `/${conversationRoot}` })).items;
+  for (const name of ["conversation.json", "turns.jsonl", prefix]) assert(entries.some((item: { path: string }) => item.path === `${conversationRoot}/${name}`));
+  const transcript = `${conversationRoot}/turns.jsonl`;
+  const history = await call("ox.fs.read", { path: `/${transcript}` });
+  assert(history.text.includes("QA filesystem backend verification seed."));
+  assert.equal((await call("ox.fs.read", { path: `/history/${conversationRoot.split("/")[1]}/turns.jsonl` })).text, history.text);
+  for (const name of ["conversation.json", "turns.jsonl"]) {
+    await rejected("ox.fs.write", { path: `/${conversationRoot}/${name}`, content: "Forbidden" });
+    await rejected("ox.fs.mkdir", { path: `/${conversationRoot}/${name}/nested`, recursive: true });
+  }
+  const search = { pattern: "QA filesystem backend verification seed.", options: { literal: true, glob: "**/turns.jsonl" } };
+  assert((await call("ox.fs.grep", { ...search, path: "/conversations" })).matches.some((match: { path: string }) => match.path === transcript));
+  assert.equal((await call("ox.fs.grep", { ...search, path: "/" })).matches.length, 0);
+  checks.push("unified conversation records and files, old history aliases, read-only reserved names and explicit transcript search");
   const original = await present(created.path);
   await call("ox.fs.edit", { path: `/${created.path}`, edits: [{ oldText: "Version one", newText: "Version two" }] });
   await rejected("ox.fs.edit", { path: `/${created.path}`, edits: [{ oldText: "Missing", newText: "Unexpected" }] });

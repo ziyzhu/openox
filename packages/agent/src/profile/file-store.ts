@@ -60,6 +60,7 @@ export function documentPath(input: string) {
   if (path.split("/").some(part => new TextEncoder().encode(part).length > 240) || new TextEncoder().encode(path).length > 4096 || path.split("/").length > 64) throw new FileError("invalid", "Profile document path exceeds limits", input);
   return path;
 }
+export const conversationRecordPath = (path: string) => /^conversations\/(0|[1-9][0-9]*)\/(conversation\.json|turns\.jsonl)(?:\/|$)/.test(path);
 export function workingFilePath(input: string) {
   const path = canonical(input);
   const parts = path.split("/");

@@ -14,7 +14,7 @@ The model uses `execute` → `ox.fs.*` as its only filesystem surface; no dedica
 
 Production identity is `{profileID, conversationID}`. Conversation IDs are database-local; references and history cursors are Profile-qualified. Production attachment configures an existing conversation's ephemeral native route without creating `ox.chat` UUID documents. `src/chat-bindings.ts` retains explicit temporary/debug UUID compatibility only. There is no `ox.chats` registry.
 
-Full fork-aware history and active model context are distinct. Native rich turns are immutable presentation decorations; canonical Pi models own text, calls, and results. Runtime code never decodes migration `sourceJSON` archives. Model/provider credential metadata lives separately from Pi transport aliases. Forks retain Pi history/compaction semantics and receive independent current native transport/extension routes.
+Full fork-aware history and active model context are distinct. The agent filesystem groups writable working files and read-only virtual `conversation.json` / `turns.jsonl` under `conversations/<id>/`; transcripts are projected from Pi, not persisted as duplicate files. Root text searches skip virtual conversation records; explicitly search `conversations/` to retrieve history. Native rich turns are immutable presentation decorations; canonical Pi models own text, calls, and results. Runtime code never decodes migration `sourceJSON` archives. Model/provider credential metadata lives separately from Pi transport aliases. Forks retain Pi history/compaction semantics and receive independent current native transport/extension routes.
 
 ## Profile storage
 

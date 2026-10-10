@@ -12,7 +12,7 @@ import { bundledSkills } from "../core/bundled-skills";
 import { OxConversations, type ConversationReference } from "./conversations";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
-import { workingFilePath, type ProfileFileBackend } from "./file-store";
+import { type ProfileFileBackend } from "./file-store";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
@@ -68,26 +68,6 @@ export class ProfileRuntime {
       options.fileStorage?.kind === "prepare" ? "prepare" : options.fileStorage ? "physical" : "legacy", options.fileStorage?.backend, options.fileStorage?.publicFiles);
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
     const mounts = profileMounts(this.files, this.conversations);
-    if (this.files.physical) {
-      const files = this.files;
-      const backend = {
-        id: `profile-files:${options.profileID}`, assertWritable: workingFilePath,
-        info: (path: string) => files.info(path), list: (path: string) => files.list(path),
-        read: (path: string) => files.read(path),
-        write: async (path: string, content: string | Uint8Array, _context: unknown, expected?: string) => { await files.write(path, content, expected); },
-        edit: (path: string, edits: { oldText: string; newText: string }[]) => files.edit(path, edits),
-        remove: (path: string) => files.remove(path), flush: () => files.flush(),
-        createDirectory: (path: string, _context: unknown, recursive?: boolean) => files.mkdir(path, recursive),
-        removeDirectory: (path: string, recursive: boolean) => files.remove(path, true, recursive),
-        move: (from: string, to: string) => files.move(from, to),
-        copy: async (from: string, to: string) => { await files.copy(from, to); },
-      };
-      const history = mounts.find(mount => mount.path === "conversations");
-      if (!history || history.source.kind !== "backend") throw new Error("Missing conversation history mount");
-      mounts.splice(0, mounts.length, ...mounts.filter(mount => !["artifacts", "conversations"].includes(mount.path)),
-        { ...history, path: "history", source: { ...history.source, path: "conversations" } },
-        { path: "", access: "readWrite", source: { kind: "backend", backend } });
-    }
     this.env = mountedFileSystem(options.profileID, [...mounts, ...options.mounts ?? []]);
   }
 
