@@ -10,7 +10,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     private let queue = DispatchQueue(label: "ox.durable.javascript", qos: .userInitiated)
     private let nativeQueue = DispatchQueue(label: "ox.durable.native", qos: .userInitiated)
     private let database: DurableDatabase
-    private let artifacts: DurableArtifactStore?
+    private let files: DurableFileStore?
     private let storageDiagnostics: Bool
     private var context: JSContext?
     private struct TimerHandle {
@@ -25,8 +25,8 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     private var cancelledIDs: Set<Int> = []
     private var fatalError: String?
 
-    init(databaseURL: URL, storageDiagnostics: Bool = false, artifactRoot: URL? = nil, nativeHandler: NativeHandler? = nil) {
-        artifacts = artifactRoot.map(DurableArtifactStore.init)
+    init(databaseURL: URL, storageDiagnostics: Bool = false, fileRoot: URL? = nil, nativeHandler: NativeHandler? = nil) {
+        files = fileRoot.map { DurableFileStore(root: $0, stateRoot: databaseURL.deletingLastPathComponent()) }
         database = DurableDatabase(url: databaseURL)
         self.nativeHandler = nativeHandler
         self.storageDiagnostics = storageDiagnostics
@@ -65,10 +65,11 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         return try BundledSkillPackages(data: data, scope: scope.uuidString)
     }
 
-    func publishArtifact(data: Data, filename: String) async throws -> JSONValue {
+    func publishFile(data: Data, filename: String, reference: JSONValue? = nil) async throws -> JSONValue {
         _ = try ArtifactStore.validatedFilename(filename)
-        let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string("artifacts/" + filename),
-                                        "base64": .string(data.base64EncodedString())])
+        let directory = reference?.objectValue?["conversationID"]?.intValue.map { "conversations/\($0)/" } ?? "imports/"
+        let request = JSONValue.object(["action": .string("fileWriteBinary"), "path": .string(directory + filename),
+                                        "base64": .string(data.base64EncodedString()), "reference": reference ?? .null])
         return try JSONDecoder().decode(JSONValue.self, from: Data(try await command(request.jsonString()).utf8))
     }
 
@@ -85,32 +86,39 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         return text
     }
 
-    func readArtifact(_ artifact: JSONValue) async throws -> Data {
-        guard let fields = artifact.objectValue, let path = fields["path"]?.stringValue, let size = fields["size"]?.intValue,
-              let digest = fields["sha256"]?.stringValue, (0...32 * 1024 * 1024).contains(size) else { throw failure("Invalid artifact descriptor") }
+    func readFile(_ file: JSONValue) async throws -> Data {
+        guard let reference = file.objectValue?["id"]?.stringValue ?? file.objectValue?["reference"]?.stringValue ?? file.objectValue?["path"]?.stringValue else { throw failure("Invalid file reference") }
+        let current = try await command(.object(["action": .string("fileStat"), "path": .string(reference)]))
+        guard let fields = current.objectValue?["file"]?.objectValue, let path = fields["path"]?.stringValue,
+              let size = fields["size"]?.intValue, let digest = fields["sha256"]?.stringValue,
+              (0...32 * 1024 * 1024).contains(size) else { throw failure("File unavailable") }
+        for key in ["path", "size", "sha256"] {
+            if let expected = file.objectValue?[key], expected != fields[key] { throw failure("File changed while preparing read; reacquire its metadata") }
+        }
+        let operation = fields["id"] == nil ? "open" : "workspaceOpen"
         return try await withCheckedThrowingContinuation { continuation in
             nativeQueue.async { [self] in
                 do {
-                    guard let artifacts else { throw failure("No physical artifact owner") }
-                    guard let token = try artifacts.perform(["op": "open", "path": path, "size": size]) as? String else { throw failure("Cannot pin artifact") }
-                    defer { _ = try? artifacts.perform(["op": "release", "token": token]) }
+                    guard let files else { throw failure("No physical filesystem owner") }
+                    guard let token = try files.perform(["op": operation, "path": path, "size": size]) as? String else { throw failure("Cannot pin file") }
+                    defer { _ = try? files.perform(["op": "release", "token": token]) }
                     var data = Data()
                     data.reserveCapacity(size)
                     while data.count < size {
                         let length = min(128 * 1024, size - data.count)
-                        guard let bytes = try artifacts.perform(["op": "read", "token": token, "offset": data.count, "length": length]) as? [UInt8], bytes.count == length else {
-                            throw failure("Artifact read incomplete")
+                        guard let bytes = try files.perform(["op": "read", "token": token, "offset": data.count, "length": length]) as? [UInt8], bytes.count == length else {
+                            throw failure("File read incomplete")
                         }
                         data.append(contentsOf: bytes)
                     }
-                    _ = try artifacts.perform(["op": "verify", "token": token, "sha256": digest])
+                    _ = try files.perform(["op": "verify", "token": token, "sha256": digest])
                     continuation.resume(returning: data)
                 } catch { continuation.resume(throwing: error) }
             }
         }
     }
 
-    func readArtifact(descriptor: JSONValue) async throws -> Data { try await readArtifact(descriptor) }
+    func readFile(descriptor: JSONValue) async throws -> Data { try await readFile(descriptor) }
 
     /// Only after Harness.close() has joined all invocations and closed its connection.
     func dispose() async {
@@ -125,8 +133,8 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                 nativeQueue.sync {
                     do {
                         _ = try database.perform("close", sql: "", params: [])
-                        artifacts?.close()
-                    } catch { Log.agent.error("PiDurable database disposal failed; artifact ownership retained: \(error.localizedDescription)") }
+                        files?.close()
+                    } catch { Log.agent.error("PiDurable database disposal failed; file ownership retained: \(error.localizedDescription)") }
                 }
                 context = nil
                 continuation.resume()
@@ -160,7 +168,12 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         }
         let complete: @convention(block) (Int, JSValue, JSValue) -> Void = { [weak self] id, json, error in
             guard let self, let call = self.calls.removeValue(forKey: id) else { return }
-            if !error.isNull && !error.isUndefined { call.resume(throwing: self.failure(error.toString())) }
+            if !error.isNull && !error.isUndefined {
+                let message = error.toString() ?? "Unknown native command failure"
+                if let value = JSONValue.parse(jsonString: message), let failure = OxFunctionError(value: value) {
+                    call.resume(throwing: failure)
+                } else { call.resume(throwing: self.failure(message)) }
+            }
             else { call.resume(returning: json.toString() ?? "null") }
         }
         let timer: @convention(block) (JSValue, Double) -> Int = { [weak self] callback, ms in
@@ -206,7 +219,9 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             globalThis.__oxDurableCommand = (entry, json, id) => {
                 Promise.resolve().then(() => OxDurable[entry](JSON.parse(json))).then(
                     value => __oxDurableComplete(id, JSON.stringify(value), null),
-                    error => __oxDurableComplete(id, null, String(error) + '\\n' + (error.stack || ''))
+                    error => __oxDurableComplete(id, null, typeof error.code === 'string' && typeof error.recovery === 'string'
+                        ? JSON.stringify({ code: error.code, message: error.message, recovery: error.recovery })
+                        : String(error) + '\\n' + (error.stack || ''))
                 );
             };
             """, withSourceURL: URL(string: "ox-trusted://durable-command.js"))
@@ -224,13 +239,13 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             let value = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
             guard let method = value?["method"] as? String, let params = value?["params"] as? [String: Any] else { throw failure("Invalid native request") }
             switch method {
-            case "artifacts":
-                guard let artifacts else { throw failure("Native artifact files are not installed in this runtime") }
-                deliver(id, value: try artifacts.perform(params))
+            case "files":
+                guard let files else { throw failure("Native filesystem is not installed in this runtime") }
+                deliver(id, value: try files.perform(params))
             case "sql":
                 // One folder owner precedes SQLite initialization, including failed opens,
                 // and remains held until the database closes.
-                if params["op"] as? String != "close" { try artifacts?.acquire() }
+                if params["op"] as? String != "close" { try files?.acquire() }
                 guard let op = params["op"] as? String, let sql = params["sql"] as? String, let bindings = params["params"] as? [Any] else { throw failure("Invalid SQL request") }
                 deliver(id, value: try database.perform(op, sql: sql, params: bindings))
             case "uuid": deliver(id, value: UUID().uuidString)
@@ -247,7 +262,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                         do {
                             let value = try await nativeHandler(method, params) { [weak self] event in self?.stream(id, event: event) }
                             self?.finish(id, json: value.jsonString(), error: nil)
-                        } catch { self?.finish(id, json: "null", error: error.localizedDescription) }
+                        } catch { self?.finish(id, json: "null", error: OxFunctionError.from(error).value.jsonString()) }
                     }
                 }
             }

@@ -44,7 +44,7 @@ final class ProfileStore {
     func profiles(local: URL, cloud: URL?) -> [Profile] {
         records = loadRecords()
         var profilesByID: [UUID: Profile] = [:]
-        for profile in managedProfiles(in: local, location: .local) + managedProfiles(in: cloud, location: .iCloud) {
+        for profile in ProfileIO.registeredProfiles() + managedProfiles(in: local, location: .local) + managedProfiles(in: ProfileIO.publicProfiles, location: .local) + managedProfiles(in: cloud, location: .iCloud) {
             if let existing = profilesByID[profile.id] {
                 Log.app.warning("ProfileStore.duplicate id=\(profile.id) first=\(existing.location.rawValue) second=\(profile.location.rawValue)")
             } else {
@@ -142,7 +142,7 @@ final class ProfileStore {
 
     private func managedLocation(for url: URL, local: URL, cloud: URL?) -> Profile.Location? {
         let parent = canonical(url.deletingLastPathComponent())
-        if parent == canonical(local) { return .local }
+        if parent == canonical(local) || parent == canonical(ProfileIO.publicProfiles) { return .local }
         if let cloud, parent == canonical(cloud) { return .iCloud }
         return nil
     }

@@ -24,7 +24,7 @@ private final class InlineCanvasSession {
         let canvas = OxCanvas(title: artifact.userFacingName, serviceManager: serviceManager, presentations: presentations)
         self.presentations = presentations
         self.canvas = canvas
-        page = HTMLArtifactPage.make(scope: source.scope, canvas: canvas)
+        page = HTMLArtifactPage.make(scope: source.scope, canvas: canvas, documentURL: HTMLArtifactPage.documentURL(for: source))
     }
 
     var isReady: Bool {
@@ -38,7 +38,7 @@ private final class InlineCanvasSession {
             let document = try await HTMLArtifactDocument.read(source)
             try Task.checkCancellation()
             Log.ui.info("InlineCanvas.loading filename=\(artifact.fileName) bytes=\(document.byteCount)")
-            for try await event in page.load(html: document.html, baseURL: HTMLArtifactPage.baseURL) {
+            for try await event in page.load(html: document.html, baseURL: document.baseURL) {
                 guard event == .finished else { continue }
                 try Task.checkCancellation()
                 phase = .ready
@@ -91,11 +91,11 @@ struct InlineCanvasCard: View {
                     service: nil,
                     fallbackSystemImage: "square.on.square",
                     title: artifact.userFacingName,
-                    subtitle: String(localized: "Canvas"),
+                    subtitle: String(localized: "HTML"),
                     mount: nil,
                     inlinePageAnchorID: nil,
                     isPresented: isPresented,
-                    placeholder: .progress(String(localized: "Loading canvas…")),
+                    placeholder: .progress(String(localized: "Loading HTML…")),
                     activate: nil,
                     expand: nil,
                     cancel: nil,
@@ -182,7 +182,7 @@ private struct InlineCanvasPageCard: View {
                 service: nil,
                 fallbackSystemImage: "square.on.square",
                 title: artifact.userFacingName,
-                subtitle: String(localized: "Canvas"),
+                subtitle: String(localized: "HTML"),
                 mount: session.isReady && pageMount.isInline(page: session.page, ownerID: rowID)
                     ? WebPageMount(page: session.page, ownerID: rowID, coordinator: pageMount)
                     : nil,
@@ -196,7 +196,7 @@ private struct InlineCanvasPageCard: View {
                 expandAccessibilityIdentifier: A11yID.Chat.canvasExpand(artifact.id),
                 cancelAccessibilityIdentifier: "",
                 webContentMode: .canvas,
-                expandAccessibilityLabel: String(localized: "Expand canvas")
+                expandAccessibilityLabel: String(localized: "Open HTML")
             )
             CanvasInteractionView(canvas: canvas)
         }
@@ -210,7 +210,7 @@ private struct InlineCanvasPageCard: View {
 
     private var placeholder: LivePageCard.Placeholder {
         switch session.phase {
-        case .loading, .ready: .progress(String(localized: "Loading canvas…"))
+        case .loading, .ready: .progress(String(localized: "Loading HTML…"))
         case .failed(let message): .unavailable(message)
         }
     }

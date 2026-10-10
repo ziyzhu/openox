@@ -27,6 +27,14 @@ actor ProfileRepository {
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(name) }
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
         try FileManager.default.moveItem(at: profile.url, to: destination)
+        do {
+            guard var config = ProfileIO.readPrivateConfig(profile.id) else { throw CocoaError(.fileReadCorruptFile) }
+            config.contentDirectory = destination.lastPathComponent
+            try ProfileIO.writeConfig(config, to: ProfileIO.stateDirectory(profile.id))
+        } catch {
+            try FileManager.default.moveItem(at: destination, to: profile.url)
+            throw error
+        }
         var renamed = profile; renamed.name = destination.lastPathComponent; renamed.url = destination
         return renamed
     }
@@ -43,7 +51,8 @@ actor ProfileRepository {
 
     func deleteProfile(_ profile: Profile) async throws {
         try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
-        try FileManager.default.removeItem(at: profile.url)
+        if FileManager.default.fileExists(atPath: profile.url.path) { try FileManager.default.removeItem(at: profile.url) }
+        try FileManager.default.removeItem(at: ProfileIO.stateDirectory(profile.id))
         deleted = deleted.filter { $0.key.profileID != profile.id }
     }
 
@@ -59,12 +68,12 @@ actor ProfileRepository {
         return scope.root.appendingPathComponent("artifacts")
     }
 
-    func skillsDirectory(in scope: ProfileScope) throws -> URL { throw RuntimeError.bridge("Skills are Pi documents, not a physical directory") }
+    func skillsDirectory(in scope: ProfileScope) throws -> URL { try requireProfile(in: scope); return scope.root.appendingPathComponent("skills", isDirectory: true) }
 
     func file(named name: String, in scope: ProfileScope) throws -> URL {
         try requireProfile(in: scope)
         guard name == ProfileIO.configName else { throw RuntimeError.bridge("Profile documents are stored in Pi") }
-        return scope.root.appendingPathComponent(name)
+        return scope.stateRoot.appendingPathComponent(name)
     }
 
     func readTextFile(named name: String, in scope: ProfileScope) async throws -> String? {
@@ -115,7 +124,8 @@ actor ProfileRepository {
         let value = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("applicationLoad"), "reference": reference.value]))
         let fields = value.objectValue ?? [:]
         let meta = try decodeMeta(fields, reference: reference, scope: scope)
-        let turns = try DurableChatProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope)
+        let files = try await artifactListing(in: scope)
+        let turns = try DurableChatProjection.turns(from: fields["entries"]?.arrayValue ?? [], scope: scope, files: files)
         return ChatLoadResult(state: ChatState(meta: meta, turns: turns, context: nil), needsPersistence: false)
     }
 
@@ -180,7 +190,10 @@ actor ProfileRepository {
     func virtualChatMetadata(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) async throws -> Data {
         let loaded = snapshot == nil ? await loadChat(id, in: scope)?.state : nil
         guard let state = snapshot ?? loaded else { throw RuntimeError.bridge("Conversation unavailable") }
-        return try JSONEncoder().encode(state.meta)
+        let reference = try await DurableProfileStore.shared.reference(for: id, in: scope)
+        var metadata = try encoded(state.meta).objectValue ?? [:]
+        metadata["workingDirectory"] = .string("conversations/\(reference.conversationID)")
+        return Data(try JSONValue.object(metadata).jsonString().utf8)
     }
 
     func virtualChatTranscript(_ id: ChatID, in scope: ProfileScope, snapshot: ChatState? = nil) async throws -> Data {
@@ -201,21 +214,35 @@ actor ProfileRepository {
 
     func importChatPackage(_ payload: ChatPackagePayload, in scope: ProfileScope) async throws -> ChatState {
         let prepared = try ChatPackageCodec.prepare(payload)
-        let directory = try artifactsDirectory(in: scope)
-        let names = Dictionary(uniqueKeysWithValues: prepared.artifacts.keys.map { ($0.lowercased(), UUID().uuidString + "-" + $0) })
-        let materialized = try prepared.materialized(artifactNames: names, directory: directory)
-        for (name, data) in materialized.artifacts { _ = try await writeArtifact(data: data, named: name, in: scope) }
-        let alias = "ox-native:" + UUID().uuidString
-        let entries = try materialized.turns.map { turn -> JSONValue in
-            .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try encoded(turn)]),
-                "model": .array(ChatProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
-        }
-        let result = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("conversationCreate"), "entries": .array(entries),
+        let result = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("conversationCreate"),
             "metadata": .object(["createdAt": .double(payload.header.createdAt.timeIntervalSinceReferenceDate), "attachedServiceDomains": .array([])]),
             "title": .string(String(payload.header.title.prefix(60)))]))
         guard let value = result.objectValue?["reference"] else { throw RuntimeError.bridge("Imported conversation identity missing") }
         let reference = try decodeReference(value, scope: scope)
-        return try await load(reference, scope: scope).state
+        do {
+            var names: [String: String] = [:], dependencies: [String: String] = [:]
+            for (name, data) in prepared.artifacts {
+                let artifact = try await importArtifact(data: data, suggestedName: name, in: scope, conversation: reference)
+                names[name.lowercased()] = artifact.fileName
+                dependencies[name.lowercased()] = artifact.displayName
+            }
+            let directory = scope.root.appendingPathComponent("conversations/\(reference.conversationID)")
+            let materialized = try prepared.materialized(artifactNames: names, directory: directory, dependencyNames: dependencies)
+            for (name, data) in materialized.artifacts { _ = try await writeArtifact(data: data, named: name, in: scope) }
+            let alias = "ox-native:" + UUID().uuidString
+            let entries = try materialized.turns.map { turn -> JSONValue in
+                .object(["kind": .string("ox.native.turn"), "data": .object(["turn": try encoded(turn)]),
+                    "model": .array(ChatProjection.makeWireMessages(from: [turn]).map { DurableMessageCodec.message($0, provider: alias, profileID: scope.profileID) })])
+            }
+            _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
+                "action": .string("conversationPopulate"), "reference": reference.value, "entries": .array(entries),
+            ]))
+            return try await load(reference, scope: scope).state
+        } catch {
+            do { try await deleteConversation(reference.compatibilityID, in: scope) }
+            catch { Log.app.error("ProfileRepository.import cleanup failed chat=\(reference.conversationID) error=\(error.localizedDescription)") }
+            throw error
+        }
     }
 
     private func encoded<T: Encodable>(_ value: T) throws -> JSONValue { try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value)) }

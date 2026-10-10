@@ -16,8 +16,8 @@ nonisolated enum DurableChatProjection {
         }
     }
 
-    static func turns(from entries: [JSONValue], scope: ProfileScope) throws -> [Turn] {
-        let annotations = annotations(from: entries, scope: scope)
+    static func turns(from entries: [JSONValue], scope: ProfileScope, files: ArtifactDirectoryListing? = nil) throws -> [Turn] {
+        let annotations = annotations(from: entries, scope: scope, files: files)
         let decorations = annotations.flatMap { turn -> [Decoration] in
             guard case .agent(let agent, _) = turn else { return [] }
             return agent.generations.map { generation in
@@ -39,7 +39,7 @@ nonisolated enum DurableChatProjection {
             let data = fields["data"]?.objectValue
             let turnID = data?["turn"]?.objectValue?["id"]?.stringValue.flatMap(UUID.init(uuidString:)).map { TurnID($0) }
             for (index, value) in models.enumerated() where value.objectValue?["role"]?.stringValue != "system" {
-                let message = try DurableMessageCodec.decode(value, scope: scope, includeTransientReferences: false)
+                let message = try DurableMessageCodec.decode(value, scope: scope, includeTransientReferences: false, files: files)
                 try builder.append(message, namespace: "\(namespace):\(index)", turnID: turnID)
             }
         }
@@ -47,9 +47,10 @@ nonisolated enum DurableChatProjection {
         return builder.turns
     }
 
-    private static func annotations(from entries: [JSONValue], scope: ProfileScope) -> [Turn] {
+    private static func annotations(from entries: [JSONValue], scope: ProfileScope, files: ArtifactDirectoryListing?) -> [Turn] {
         let decoder = JSONDecoder()
         decoder.userInfo[.profileScope] = scope
+        decoder.userInfo[.artifactDirectoryListing] = files
         var order: [TurnID] = []
         var latest: [TurnID: Turn] = [:]
         for entry in entries {

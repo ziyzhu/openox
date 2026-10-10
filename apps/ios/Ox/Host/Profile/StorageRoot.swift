@@ -55,6 +55,10 @@ final class StorageRoot {
     func resolve() async throws {
         cloudDocs = await ProfileRepository.cloudDocuments()
         loadSavedProfiles()
+        for profile in profiles.filter({ $0.location == .local }) {
+            let migrated = try await StorageMigrator.migrate(profile)
+            update(profile.id) { $0 = migrated }
+        }
         if profiles.isEmpty, let seeded = await seedDefaultProfile() { profiles = [seeded] }
         guard let chosen = profiles.first(where: { $0.id == storedActiveId }) ?? profiles.first else {
             throw StorageMigrationError.activeProfileUnavailable
@@ -255,7 +259,7 @@ final class StorageRoot {
 
     private func baseDir(for location: Profile.Location) -> URL? {
         switch location {
-        case .local: localDocs
+        case .local: ProfileIO.publicProfiles
         case .iCloud: cloudDocs
         case .external: nil
         }

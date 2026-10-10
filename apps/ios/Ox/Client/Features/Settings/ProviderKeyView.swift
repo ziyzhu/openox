@@ -1,11 +1,6 @@
 import SwiftUI
 
 struct ProviderAuthenticationView: View {
-    private struct WebsiteSignIn: Identifiable {
-        let id = UUID()
-        let session: ServiceBrowserSession
-    }
-
     private enum AuthenticationMethod {
         case apiKey
         case subscription
@@ -15,7 +10,6 @@ struct ProviderAuthenticationView: View {
     @Binding var apiKey: String
     let onChange: () -> Void
     var onAuthenticated: (() -> Void)? = nil
-    @Environment(ServiceManager.self) private var serviceManager
 
     @State private var authenticationMethod: AuthenticationMethod
     @State private var apiKeySaved = false
@@ -25,8 +19,6 @@ struct ProviderAuthenticationView: View {
     @State private var busy = false
     @State private var showSignOutConfirm = false
     @State private var signInError: String?
-    @State private var websiteSignIn: WebsiteSignIn?
-    @State private var websiteAuthenticationRevision = 0
     @State private var presentations = AppPresentationCoordinator()
 
     init(
@@ -82,17 +74,13 @@ struct ProviderAuthenticationView: View {
             }
 
             if !client.acceptsAPIKey, client.subscriptionAccount == nil {
-                if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web, let website = client.website {
-                    websiteAuthenticationContent(website: website)
-                } else {
-                    Text("Not required")
-                        .font(Theme.Fonts.bodyMd)
-                        .foregroundStyle(Theme.Colors.onSurface)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .settingsRowPadding()
-                        .settingsSurface(singleRow: true)
-                        .accessibilityIdentifier(A11yID.Chat.modelAuthNone)
-                }
+                Text("Not required")
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .settingsRowPadding()
+                    .settingsSurface(singleRow: true)
+                    .accessibilityIdentifier(A11yID.Chat.modelAuthNone)
             }
         }
         .alert("Sign out of \(client.displayName)?", isPresented: $showSignOutConfirm) {
@@ -106,125 +94,7 @@ struct ProviderAuthenticationView: View {
         .onAppear {
             if let account = client.subscriptionAccount { refreshSubscription(account) }
         }
-        .task(id: websiteAuthenticationRevision) {
-            guard let service = websiteService, websiteSignIn == nil else { return }
-            let revision = websiteAuthenticationRevision
-            let state = await service.checkAccess(
-                policy: .current,
-                reason: .modelSignIn
-            )
-            guard !Task.isCancelled, websiteSignIn == nil,
-                  websiteAuthenticationRevision == revision else { return }
-            if state.isAuthenticated || state == .notRequired { onAuthenticated?() }
-        }
-        .onChange(of: websiteService?.auth) { _, _ in onChange() }
-        .fullScreenCover(item: $websiteSignIn, onDismiss: {
-            websiteAuthenticationRevision &+= 1
-        }) { signIn in
-            ServiceBrowserView(session: signIn.session)
-        }
         .appPresentations(presentations)
-    }
-
-    private var websiteService: Service? {
-        guard let provider = client as? WebServiceModelProvider else { return nil }
-        return serviceManager.service(domain: provider.domain)
-    }
-
-    @ViewBuilder
-    private func websiteAuthenticationContent(website: URL) -> some View {
-        if busy {
-            websiteAuthenticationProgress("Signing in…")
-        } else {
-            switch websiteService?.auth {
-            case .unknown?, .checking?:
-                websiteAuthenticationProgress("Checking sign-in…")
-            case .signingIn?:
-                websiteAuthenticationProgress("Signing in…")
-            case .observed?, .authorized?, .authorizationRequired?, .notAuthorized?:
-                Button {
-                    if websiteService?.signInState.isAuthenticated == true {
-                        let session = ServiceBrowserSession(url: website, serviceManager: serviceManager)
-                        websiteSignIn = WebsiteSignIn(session: session)
-                    } else {
-                        signInModelService()
-                    }
-                } label: {
-                    if websiteService?.signInState.isAuthenticated == true {
-                        websiteSignedInRow
-                    } else {
-                        SettingsActionButtonLabel {
-                            Text("Sign in with \(client.displayName)")
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Chat.modelKeySignIn(client.id))
-            case .notRequired?:
-                Text("Not required")
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                    .settingsRowPadding()
-            case .unavailable?, nil:
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    SettingsNoticeMessage(message: String(localized: "Sign-in unavailable"), systemImage: "exclamationmark.circle")
-                    Button {
-                        websiteAuthenticationRevision &+= 1
-                    } label: {
-                        SettingsActionButtonLabel { Text("Try Again") }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(websiteService == nil)
-                    .accessibilityIdentifier("provider.authentication.retry")
-                }
-            }
-        }
-    }
-
-    private func websiteAuthenticationProgress(_ title: LocalizedStringKey) -> some View {
-        SettingsActionButtonLabel {
-            CellularAutomatonLoader.small
-            Text(title)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("provider.authentication.progress")
-    }
-
-    private func signInModelService() {
-        guard !busy, let service = websiteService else { return }
-        busy = true
-        signInError = nil
-        Task { @MainActor in
-            defer { busy = false }
-            do {
-                try await service.requestAccess(using: presentations)
-                if service.signInState.isAuthenticated { onAuthenticated?() }
-            } catch {
-                signInError = error.localizedDescription
-                Log.ui.warning("ProviderAuthentication.modelService domain=\(service.domain) error=\(LogPrivacy.text(error.localizedDescription))")
-            }
-        }
-    }
-
-    private var websiteSignedInRow: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(Theme.Colors.primary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: client.displayName)
-                    .font(Theme.Fonts.labelMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                Text("Signed in")
-                    .font(Theme.Fonts.captionMd)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            }
-            Spacer()
-            Image(systemName: "arrow.up.right")
-                .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        }
-        .settingsRowPadding()
-        .settingsSurface(singleRow: true)
     }
 
     private var authenticationMethodPicker: some View {

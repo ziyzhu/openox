@@ -22,13 +22,13 @@ struct ArtifactPickerSheet: View {
         NavigationStack {
             Group {
                 if loading {
-                    ContentLoadingView(label: "Loading artifacts…")
+                    ContentLoadingView(label: "Loading files…")
                 } else if let loadErrorMessage {
-                    ContentUnavailableView("Artifact unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
+                    ContentUnavailableView("File unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
                 } else if artifacts.isEmpty {
                     LibraryEmptyNote(
                         destination: .artifacts,
-                        title: "No artifacts yet",
+                        title: "No files yet",
                         detail: "Add a file or photo, or ask Ox to create something in a chat."
                     )
                     .padding(Theme.Spacing.lg)
@@ -41,10 +41,10 @@ struct ArtifactPickerSheet: View {
                 }
             }
             .background(Theme.Colors.background)
-            .navigationTitle("Artifacts")
+            .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Chat.ArtifactPicker.list)
-            .searchable(text: $query, prompt: "Search artifacts")
+            .searchable(text: $query, prompt: "Search files")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -64,7 +64,7 @@ struct ArtifactPickerSheet: View {
             }
             .task(id: StorageRoot.currentScope?.root) { await load() }
         }
-        .alert("Couldn't download artifact", isPresented: Binding(
+        .alert("Couldn't download file", isPresented: Binding(
             get: { attachErrorMessage != nil },
             set: { if !$0 { attachErrorMessage = nil } }
         )) {

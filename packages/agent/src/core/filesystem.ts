@@ -10,9 +10,9 @@ import { filesystemContract } from "./filesystem-contract";
 import { bundledSkills } from "./bundled-skills";
 
 const tools = { read: createReadTool(), write: createWriteTool(), edit: createEditTool() };
-export type FileOperation = "list" | "read" | "write" | "edit" | "delete" | "glob" | "grep";
+export type FileOperation = "list" | "read" | "write" | "edit" | "delete" | "mkdir" | "rmdir" | "move" | "copy" | "glob" | "grep";
 export interface FileRequest {
-  path?: string; purpose?: string; offset?: number; limit?: number; content?: string;
+  path?: string; from?: string; to?: string; recursive?: boolean; purpose?: string; offset?: number; limit?: number; content?: string;
   edits?: { oldText: string; newText: string }[]; pattern?: string;
   options?: { limit?: number; glob?: string; ignoreCase?: boolean; literal?: boolean; contextLines?: number };
 }
@@ -20,7 +20,7 @@ type SearchMatch = { path: string; line: number; text: string; before: string[];
 type Candidates = { paths: string[]; truncated: boolean };
 const maximumFiles = 1_000;
 const maximumEntries = 10_000;
-const mutations = new Set(["write", "edit", "delete"]);
+const mutations = new Set(["write", "edit", "delete", "mkdir", "rmdir", "move", "copy"]);
 const immutableRoots = new Set(bundledSkills.map(skill => `skills/${skill.name}`));
 const encoder = new TextEncoder();
 const item = (info: FileInfo) => ({ path: canonical(info.path), name: info.name, type: info.kind, size: info.kind === "directory" ? null : info.size });
@@ -66,19 +66,40 @@ function validateMutation(operation: FileOperation, args: FileRequest, path: str
   if (operation === "write" && encoder.encode(args.content!).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", path);
   if (immutableRoots.has(path.split("/").slice(0, 2).join("/"))) throw new FileError("permission_denied", "Bundled System skills are read-only; copy to a distinct name to customize", path);
 }
+export function resolveFileRequest(args: FileRequest, cwd: string): FileRequest {
+  const roots = new Set(["MEMORY.md", "SOUL.md", "skills", "services", "files", "artifacts", "conversations", "history", "chats"]);
+  const resolve = (path: string) => {
+    if (path.startsWith("/") || roots.has(path.split("/")[0]!)) {
+      const parts = canonical(path).split("/");
+      if (parts[0] === "chats" || (parts[0] === "conversations" && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(parts[1] ?? ""))) {
+        parts[0] = "history";
+        if (parts[2] === "chat.json") parts[2] = "conversation.json";
+        if (parts[2] === "messages.jsonl") parts[2] = "turns.jsonl";
+      }
+      return parts.join("/");
+    }
+    if (path === "." || path === "") return canonical(cwd);
+    return canonical([canonical(cwd), path].filter(Boolean).join("/"));
+  };
+  return { ...args, ...(args.from === undefined ? { path: resolve(args.path ?? ".") } : { from: resolve(args.from), to: resolve(args.to!) }) };
+}
 export function validateFileRequest(operation: FileOperation, args: FileRequest): FileRequest {
   const schema = filesystemContract[`ox.fs.${operation}`]?.inputSchema;
   if (!schema || !Value.Check(schema, args)) throw new FileError("invalid", `Invalid ox.fs.${operation} arguments`);
-  const path = canonical(args.path ?? ".");
+  const path = canonical(args.from ?? args.path ?? ".");
+  const destination = args.to === undefined ? undefined : canonical(args.to);
+  if (destination !== undefined && (!destination || destination.length > 4_096 || destination.split("/").length > 64)) throw new FileError("invalid", "Invalid transfer destination", destination);
+  if (destination !== undefined) validateMutation(operation, args, destination);
   if (path.length > 4_096 || path.split("/").length > 64) throw new FileError("invalid", "Virtual path exceeds resource limits", path);
   if (operation === "read") {
     limit(args.offset, 1, Number.MAX_SAFE_INTEGER);
     limit(args.limit, 2_000, Number.MAX_SAFE_INTEGER);
   }
   if (mutations.has(operation)) validateMutation(operation, args, path);
-  return { ...args, path };
+  return { ...args, ...(args.from === undefined ? { path } : { from: path, to: destination }) };
 }
 function toolEnvironment(env: MountedExecutionEnv, args: FileRequest, onRead: (lines: number) => void) {
+  let expected: string | undefined;
   return { ...env,
     readBinaryFile: async (...values: Parameters<typeof env.readBinaryFile>) => {
       const bytes = await env.readBinaryFile(...values);
@@ -93,12 +114,13 @@ function toolEnvironment(env: MountedExecutionEnv, args: FileRequest, onRead: (l
       if (text.ok && args.edits) {
         if (encoder.encode(text.value).length > 200 * 1024) throw new FileError("invalid", "Text edit exceeds 200 KiB", args.path);
         requireExactEdits(text.value, args.edits);
+        expected = text.value;
       }
       return text;
     },
     writeFile: async (...values: Parameters<typeof env.writeFile>) => {
       if (typeof values[1] !== "string" || encoder.encode(values[1]).length > 200 * 1024) throw new FileError("invalid", "Text write exceeds 200 KiB", args.path);
-      return env.writeFile(...values);
+      return expected === undefined ? env.writeFile(...values) : env.writeChecked(values[0], values[1], expected, values[2]);
     },
   };
 }
@@ -211,10 +233,11 @@ export class AgentFileSystem {
   private async invokeScoped(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest, context: Context): Promise<unknown> {
     context.abortSignal?.throwIfAborted();
     args = validateFileRequest(operation, args);
-    const path = args.path!;
+    const path = args.from ?? args.path!;
     if (mutations.has(operation)) {
-      env.assertWritable(path);
-      const key = path.toLowerCase();
+      if (operation !== "copy") env.assertWritable(path);
+      if (args.to !== undefined) env.assertWritable(args.to);
+      const key = env.id;
       const previous = this.mutations.get(key) ?? Promise.resolve();
       const next = previous.catch(() => {}).then(() => this.perform(env, operation, args, context));
       this.mutations.set(key, next);
@@ -225,13 +248,26 @@ export class AgentFileSystem {
 
   private async perform(env: MountedExecutionEnv, operation: FileOperation, args: FileRequest, context: Context): Promise<unknown> {
     context.abortSignal?.throwIfAborted();
-    const path = args.path!;
+    const path = args.from ?? args.path!;
+    if (operation === "mkdir") {
+      getOrThrow(await env.createDir(path, { recursive: args.recursive ?? false }, context));
+      return item(getOrThrow(await env.fileInfo(path, context)));
+    }
+    if (operation === "rmdir") {
+      getOrThrow(await env.removeDirectory(path, args.recursive ?? false, context));
+      return { path, deleted: true };
+    }
+    if (operation === "move" || operation === "copy") {
+      getOrThrow(await env.transfer(path, args.to!, operation === "copy", context));
+      return item(getOrThrow(await env.fileInfo(args.to!, context)));
+    }
     if (operation === "list") {
       const entries = getOrThrow(await env.listDir(path, context));
       const count = args.options?.limit ?? 50;
       return { items: entries.slice(0, count).map(item), truncated: entries.length > count };
     }
     if (operation === "delete") {
+      if ((getOrThrow(await env.fileInfo(path, context))).kind === "directory") throw new FileError("is_directory", "Use rmdir for directories", path);
       getOrThrow(await env.remove(path, undefined, context));
       return { path, deleted: true };
     }
@@ -251,7 +287,7 @@ export class AgentFileSystem {
     const match = expression(literal ? escaped(args.pattern!) : args.pattern!, operation === "glob", options.ignoreCase);
     const root = getOrThrow(await env.fileInfo(base, context));
     if (operation === "glob" && root.kind !== "directory") throw new FileError("not_directory", "Not a directory", base);
-    const excluded = base ? [] : ["files", ...(operation === "grep" ? ["conversations"] : [])];
+    const excluded = base ? [] : ["files", ...(operation === "grep" ? ["history", ...env.mounts.some(mount => mount.path === "") ? [] : ["conversations"]] : [])];
     const candidates = await fileCandidates(env, root, new Set(excluded), context);
     if (operation === "grep") return grepFiles(env, candidates, args, match, context);
     const paths = candidates.paths.filter(path => match.test(relativePath(base, path)));

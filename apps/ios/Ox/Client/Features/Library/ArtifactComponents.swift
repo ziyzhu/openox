@@ -78,19 +78,10 @@ struct ArtifactContextMenu: View {
     let canMutate: Bool
     let onRename: () -> Void
     let onDelete: () -> Void
-    var isSaved: Bool? = nil
-    var onToggleSaved: (() -> Void)? = nil
     var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
         if artifact.availability == .local {
-            if let isSaved, let onToggleSaved {
-                Button(action: onToggleSaved) {
-                    Label(isSaved ? "Unsave" : "Save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
-                }
-                .accessibilityIdentifier(A11yID.Artifacts.save(artifact.id))
-            }
-
             ArtifactShareButton(artifact: artifact, scope: scope) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
@@ -179,7 +170,7 @@ private struct ArtifactMutationAlerts: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("Rename an artifact", isPresented: presented { if case .renaming = $0 { true } else { false } }) {
+            .alert("Rename file", isPresented: presented { if case .renaming = $0 { true } else { false } }) {
                 TextField("Name", text: renameDraft)
                 Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Rename") {
@@ -190,12 +181,12 @@ private struct ArtifactMutationAlerts: ViewModifier {
                 .disabled(!canSubmitRename)
                 .accessibilityIdentifier(A11yID.Artifacts.renameSubmit)
             }
-            .alert("Rename an artifact", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
+            .alert("Rename file", isPresented: presented { if case .renameFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }
             } message: {
                 Text(failureMessage)
             }
-            .alert("Delete this artifact?", isPresented: presented { if case .deleting = $0 { true } else { false } }) {
+            .alert("Delete this file?", isPresented: presented { if case .deleting = $0 { true } else { false } }) {
                 Button("Cancel", role: .cancel) { mutation = nil }
                 Button("Delete", role: .destructive) {
                     guard case .deleting(let artifact) = mutation else { return }
@@ -204,9 +195,9 @@ private struct ArtifactMutationAlerts: ViewModifier {
                 }
                 .accessibilityIdentifier(A11yID.Artifacts.deleteConfirm)
             } message: {
-                Text("This hides the artifact from your library. Existing chat references and historical files are kept.")
+                Text("This deletes the file. Existing chat references will show it as deleted.")
             }
-            .alert("Couldn't delete artifact", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
+            .alert("Couldn't delete file", isPresented: presented { if case .deleteFailed = $0 { true } else { false } }) {
                 Button("OK", role: .cancel) { mutation = nil }
             } message: {
                 Text(failureMessage)

@@ -1135,7 +1135,7 @@ struct RootView: View {
             sharedNoteImporting = false
             if !outcome.imported.isEmpty {
                 artifactRefreshEpoch &+= 1
-                sharedNoteToast = Toast(message: L10n.string("Note added to Artifacts", comment: ""))
+                sharedNoteToast = Toast(message: L10n.string("File added", comment: ""))
                 Log.ui.info("ShareImport.imported count=\(outcome.imported.count) scope=\(scope.generation)")
             }
             if !outcome.failures.isEmpty {

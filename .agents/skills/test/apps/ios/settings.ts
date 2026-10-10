@@ -63,6 +63,21 @@ async function waitForHost(): Promise<void> {
   throw new Error(`Host unavailable at ${endpoint.href}`);
 }
 
+async function waitForSavedDefaultModel(): Promise<void> {
+  const destination = join(evidence, "preferences");
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    await run(["sim", "--device", config.device, "file", "pull", bundle, `Library/Preferences/${bundle}.plist`, destination], { capture: true });
+    const stored = await run(["plutil", "-extract", "llm\\.defaultModel", "raw", "-o", "-", join(destination, `${bundle}.plist`)], { capture: true, allowFailure: true });
+    if (stored.code === 0) {
+      const selection = JSON.parse(Buffer.from(stored.stdout.trim(), "base64").toString());
+      if (selection.providerID === "mock" && selection.modelID === "mock-text-only") return;
+    }
+    await Bun.sleep(200);
+  }
+  throw new Error("Default model has not reached on-device preferences; do not terminate before persistence");
+}
+
 async function newChat(): Promise<void> {
   const created = await ox("chat", "new", "--temporary", "--provider", "mock", "--model", "mock");
   assert.equal(typeof created.chatId, "string");
@@ -119,6 +134,11 @@ try {
     await rejected(setter, {}, "selection");
     await rejected(setter, { selection: choices[0], unexpected: true }, "unexpected");
   }
+  const providers = await call("ox.provider.list") as Array<{ id: string; api: string; source: string }>;
+  assert.ok(providers.length > 0 && providers.every(provider => provider.api !== "web" && provider.source !== "web-service"), "Websites must remain services, never model providers");
+  for (const provider of ["claude-web", "qwen-web", "kimi-web", "grok-web", "web:gemini.google.com"]) {
+    await rejected("ox.conversation.setModel", { selection: { provider, model: "website-default" } }, "existing provider");
+  }
   const selection = { provider: "mock", model: "mock-text-only" };
   const idle = await call("ox.conversation.setModel", { selection });
   assert.equal(idle.status, "applied");
@@ -155,8 +175,10 @@ try {
     if (candidate.id !== repository.id) assert.equal(after.repositories.find((row: Repository) => row.id === candidate.id)?.enabled, candidate.enabled);
   }
   await run(["sim", "--device", config.device, "screenshot", "--out", join(evidence, "before-relaunch.png")]);
+  await waitForSavedDefaultModel();
   chat = undefined;
-  await run(["sim", "--device", config.device, "run", bundle, "--app", app, "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`]);
+  await run(["sim", "--device", config.device, "run", bundle, "--app", app, "--env", `OX_DEBUG_ENDPOINT=${config.debugEndpoint}`,
+    "--env", `OX_HOST_LOOPBACK=${endpoint.hostname === "127.0.0.1" ? "1" : "0"}`]);
   await run(["sim", "--device", config.device, "wait", "--id", "chat.temporaryToggle", "--timeout", "30000", "--stable", "1000"]);
   await waitForHost();
   await newChat();

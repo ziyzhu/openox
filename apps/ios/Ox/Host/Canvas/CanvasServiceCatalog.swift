@@ -11,7 +11,7 @@ nonisolated enum CanvasServiceCatalog {
 
     static func validate(function: String, arguments: JSONValue) throws {
         guard let schema = schemas[function]?.objectValue?["inputSchema"] else {
-            throw RuntimeError.bridge("Function unavailable in canvas: \(function)")
+            throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
         let violations = JSONSchemaValidator.validate(arguments, against: schema, definitions: [:])
         guard violations.isEmpty else {
@@ -21,7 +21,7 @@ nonisolated enum CanvasServiceCatalog {
 
     static func script(documentID: UUID) throws -> String {
         guard let url = Bundle.main.url(forResource: "CanvasSDK", withExtension: "js") else {
-            throw RuntimeError.bridge("Canvas SDK unavailable")
+            throw RuntimeError.bridge("HTML service SDK unavailable")
         }
         let runtime = try String(contentsOf: url, encoding: .utf8)
         let catalog: JSONValue = .object(["schemas": .object(schemas), "help": .object(help)])
@@ -86,7 +86,7 @@ extension ServiceOperations {
             return try await solveService(domain: fields["domain"]?.stringValue ?? "", args: fields["args"] ?? .object([:]), purpose: purpose)
         case "ox.service.pay":
             return try await payService(domain: fields["domain"]?.stringValue ?? "", args: fields["args"] ?? .object([:]), purpose: purpose)
-        default: throw RuntimeError.bridge("Function unavailable in canvas: \(function)")
+        default: throw RuntimeError.bridge("Function unavailable in HTML: \(function)")
         }
     }
 }

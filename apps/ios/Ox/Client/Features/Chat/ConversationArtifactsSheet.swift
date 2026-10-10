@@ -26,7 +26,7 @@ struct ConversationArtifactsSheet: View {
             }
             .scrollIndicators(.hidden)
             .background(Theme.Colors.background)
-            .navigationTitle("Artifacts")
+            .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Chat.Artifact.list)
             .toolbar {

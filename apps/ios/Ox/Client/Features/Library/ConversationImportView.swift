@@ -36,7 +36,7 @@ struct ConversationImportView: View {
                 .accessibilityIdentifier(A11yID.ConversationImport.preview)
 
                 Label(
-                    "\(proposal.header.artifactCount) artifacts · \(artifactSize)",
+                    "\(proposal.header.artifactCount) files · \(artifactSize)",
                     systemImage: "doc.on.doc"
                 )
                 .font(Theme.Fonts.bodySm)

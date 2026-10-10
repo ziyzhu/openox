@@ -622,7 +622,7 @@ struct ConversationComposer: View, Equatable {
     }
 
     private var artifactAccessibilityLabel: String {
-        chatArtifacts.count == 1 ? "1 artifact" : "\(chatArtifacts.count) artifacts"
+        String(localized: "\(chatArtifacts.count) files")
     }
 
     private var artifactButton: some View {
@@ -643,7 +643,7 @@ struct ConversationComposer: View, Equatable {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: OxActionIconKind.artifacts.systemImage)
-                Text("Artifacts")
+                Text("Files")
                 Text(verbatim: "· \(chatArtifacts.count)")
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }

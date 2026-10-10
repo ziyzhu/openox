@@ -29,6 +29,10 @@ nonisolated enum ProfileSchema {
         "2026-09-27-outcome-skills",
         "2026-09-28-provider-skill",
         "2026-10-05-pi-durable",
+        "2026-10-10-profile-filesystem",
+        "2026-10-10-workspace-binding",
+        "2026-10-10-profile-files",
+        "2026-10-11-public-profile-files",
     ]
     static var current: String { versions.last! }
 
@@ -104,6 +108,10 @@ nonisolated enum StoragePreparation: Equatable, Sendable {
 nonisolated enum StorageMigrator {
     private static let legacyChatSchemaVersion = 6
     static let durableProfileVersion = "2026-10-05-pi-durable"
+    static let workspaceProfileVersion = "2026-10-10-profile-filesystem"
+    static let workspaceBindingVersion = "2026-10-10-workspace-binding"
+    static let filesystemProfileVersion = "2026-10-10-profile-files"
+    static let publicProfileVersion = "2026-10-11-public-profile-files"
     static let nativeProfileVersion = "2026-09-28-provider-skill"
 
     static func legacyWorkflowLocation(_ parts: [String]) throws -> VirtualFileSystem.Location? {
@@ -133,10 +141,11 @@ nonisolated enum StorageMigrator {
             candidate = "\(stem) \(suffix)"; suffix += 1
         }
         let destination = base.appendingPathComponent(candidate)
-        let stage = base.appendingPathComponent(".pi-fresh-" + UUID().uuidString)
+        var manifest = ProfileConfig.fresh()
+        manifest.version = filesystemProfileVersion
+        let stage = try durableJournalDirectory(manifest.id).appendingPathComponent("fresh-" + UUID().uuidString)
         try manager.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        let manifest = ProfileConfig.fresh()
-        let runtime = DurableRuntime(databaseURL: stage.appendingPathComponent("state.sqlite"), artifactRoot: stage) { method, _, _ in
+        let runtime = DurableRuntime(databaseURL: stage.appendingPathComponent("state.sqlite"), fileRoot: stage) { method, _, _ in
             throw RuntimeError.bridge("Fresh Profile installation forbids native capabilities: \(method)")
         }
         do {
@@ -144,16 +153,191 @@ nonisolated enum StorageMigrator {
                 "documents": .array([]), "artifacts": .array([]), "conversations": .array([])])
             _ = try await runtime.command(JSONValue.object(["action": .string("installProfile"), "draft": draft]).jsonString())
             await runtime.dispose()
+            try await prepareWorkspace(at: stage, profileID: manifest.id)
             try ProfileIO.writeConfig(manifest, to: stage)
             try syncDurableDirectory(stage)
-            try manager.moveItem(at: stage, to: destination)
-            try syncDurableDirectory(base)
-            guard let profile = ProfileIO.profile(at: destination, location: .local) else { throw StorageMigrationError.profileMigrationFailed(candidate) }
-            return profile
+            let profile = Profile(id: manifest.id, name: candidate, location: .local, url: stage, createdAt: manifest.createdAt, version: filesystemProfileVersion)
+            return try await migratePublicProfile(profile, config: manifest, destination: destination)
         } catch {
             await runtime.dispose()
             Log.app.error("StorageMigrator.fresh failed stage=\(stage.lastPathComponent) error=\(error.localizedDescription)")
             throw error
+        }
+    }
+
+    static func prepareTemporaryWorkspace(at root: URL, identity: UUID) async throws {
+        try await prepareWorkspace(at: root, profileID: identity)
+        try await preparePublicFiles(content: root, state: root, profileID: identity)
+    }
+
+    private static func prepareWorkspace(at root: URL, profileID: UUID) async throws {
+        let runtime = DurableRuntime(databaseURL: root.appendingPathComponent("state.sqlite"), fileRoot: root) { method, _, _ in
+            throw RuntimeError.bridge("Workspace preparation forbids native capabilities: \(method)")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
+                "artifactFiles": .bool(true), "prepareWorkspace": .bool(true)]))
+            let result = try await runtime.command(.object(["action": .string("workspacePrepare")]))
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+            try syncDurableDirectory(root)
+            Log.app.info("StorageMigrator.workspace prepared profile=\(profileID) result=\(result.jsonString())")
+        } catch {
+            await runtime.dispose()
+            Log.app.error("StorageMigrator.workspace failed profile=\(profileID) error=\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private static func preparePublicFiles(content: URL, state: URL, profileID: UUID) async throws {
+        let runtime = DurableRuntime(databaseURL: state.appendingPathComponent("state.sqlite"), fileRoot: content) { method, _, _ in
+            throw RuntimeError.bridge("Public files preparation forbids native capabilities: \(method)")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profileID.uuidString),
+                "workspace": .bool(true), "prepareWorkspace": .bool(true), "artifactFiles": .bool(true)]))
+            let result = try await runtime.command(.object(["action": .string("publicFilesPrepare"), "splitStorage": .bool(content != state)]))
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+            try syncDurableDirectory(state)
+            try syncDurableDirectory(content)
+            Log.app.info("StorageMigrator.publicFiles prepared profile=\(profileID) result=\(result.jsonString())")
+        } catch {
+            await runtime.dispose()
+            throw error
+        }
+    }
+
+    private static func migratePublicProfile(_ profile: Profile, config: ProfileConfig, destination: URL) async throws -> Profile {
+        let manager = FileManager.default
+        guard destination.deletingLastPathComponent().standardizedFileURL.path == ProfileIO.publicProfiles.standardizedFileURL.path,
+              !manager.fileExists(atPath: destination.path), !manager.fileExists(atPath: ProfileIO.stateDirectory(profile.id).path) else {
+            throw StorageMigrationError.collision(destination.lastPathComponent)
+        }
+        try await prepareWorkspace(at: profile.url, profileID: profile.id)
+        let journalRoot = try durableJournalDirectory(profile.id)
+        let sourceCopy = journalRoot.appendingPathComponent("public-source-" + UUID().uuidString)
+        let inventory = try await Task.detached(priority: .userInitiated) {
+            try copyMigrationSource(from: profile.url, to: sourceCopy)
+        }.value
+        let content = journalRoot.appendingPathComponent("public-content-" + UUID().uuidString)
+        try manager.copyItem(at: sourceCopy, to: content)
+        try manager.createDirectory(at: ProfileIO.privateProfiles, withIntermediateDirectories: true)
+        try AppStoragePaths.excludeFromBackup(ProfileIO.privateProfiles)
+        let state = ProfileIO.privateProfiles.appendingPathComponent(".public-state-" + UUID().uuidString)
+        try manager.createDirectory(at: state, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        for name in ["state.sqlite", "state.sqlite-wal", "state.sqlite-shm"] {
+            let file = content.appendingPathComponent(name)
+            if manager.fileExists(atPath: file.path) { try manager.moveItem(at: file, to: state.appendingPathComponent(name)) }
+        }
+        let runtime = DurableRuntime(databaseURL: state.appendingPathComponent("state.sqlite"), fileRoot: content) { method, _, _ in
+            throw RuntimeError.bridge("Public file inventory forbids native capabilities: \(method)")
+        }
+        do {
+            _ = try await runtime.command(.object(["action": .string("open"), "profileID": .string(profile.id.uuidString),
+                "workspace": .bool(true), "prepareWorkspace": .bool(true), "artifactFiles": .bool(true)]))
+            let result = try await runtime.command(.object(["action": .string("publicFilesInventory")]))
+            for file in result.objectValue?["files"]?.arrayValue ?? [] {
+                guard let path = file.objectValue?["path"]?.stringValue, path.hasPrefix("artifacts/"), path.split(separator: "/").count == 2 else {
+                    throw StorageMigrationError.invalidApplicationStorage("private file migration path")
+                }
+                let target = state.appendingPathComponent("payloads", isDirectory: true).appendingPathComponent(String(path.dropFirst(10)))
+                try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                try manager.moveItem(at: content.appendingPathComponent(path), to: target)
+            }
+            _ = try await runtime.command(.object(["action": .string("close")]))
+            await runtime.dispose()
+        } catch { await runtime.dispose(); throw error }
+        for name in [ProfileIO.configName, ".files", ".migration-conversations"] {
+            let file = content.appendingPathComponent(name)
+            if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
+        }
+        try await preparePublicFiles(content: content, state: state, profileID: profile.id)
+        var manifest = config
+        manifest.version = publicProfileVersion
+        manifest.contentDirectory = destination.lastPathComponent
+        try ProfileIO.writeConfig(manifest, to: state)
+        try syncDurableDirectory(state)
+        let journal: [String: Any] = ["format": 1, "phase": "prepared", "profileID": profile.id.uuidString,
+            "source": profile.url.path, "destination": destination.path, "content": content.path, "state": state.path,
+            "backup": journalRoot.appendingPathComponent("original-" + UUID().uuidString).path, "inventory": inventory]
+        try writePublicProfileJournal(journal, profileID: profile.id)
+        try publishPublicProfileJournal(journal)
+        do { try manager.removeItem(at: sourceCopy) }
+        catch { Log.app.warning("StorageMigrator.publicFiles sourceCopy cleanup deferred error=\(error.localizedDescription)") }
+        guard let published = ProfileIO.profile(at: destination, location: .local) else { throw StorageMigrationError.profileMigrationFailed(profile.name) }
+        return published
+    }
+
+    private static func writePublicProfileJournal(_ journal: [String: Any], profileID: UUID) throws {
+        let root = try durableJournalDirectory(profileID)
+        let file = root.appendingPathComponent("public-journal.json")
+        try JSONSerialization.data(withJSONObject: journal, options: [.sortedKeys]).write(to: file, options: .atomic)
+        let fd = open(file.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw StorageMigrationError.invalidApplicationStorage("public Profile publication journal") }
+        defer { Darwin.close(fd) }
+        guard fsync(fd) == 0 else { throw StorageMigrationError.invalidApplicationStorage("public Profile journal durability") }
+        try syncDurableDirectory(root)
+    }
+
+    private static func publishPublicProfileJournal(_ journal: [String: Any]) throws {
+        guard journal["format"] as? Int == 1, let idText = journal["profileID"] as? String, let id = UUID(uuidString: idText),
+              let sourcePath = journal["source"] as? String, let destinationPath = journal["destination"] as? String,
+              let contentPath = journal["content"] as? String, let statePath = journal["state"] as? String,
+              let backupPath = journal["backup"] as? String, let inventory = journal["inventory"] as? [String: String] else {
+            throw StorageMigrationError.invalidApplicationStorage("public Profile publication journal")
+        }
+        let source = URL(fileURLWithPath: sourcePath), destination = URL(fileURLWithPath: destinationPath)
+        let content = URL(fileURLWithPath: contentPath), state = URL(fileURLWithPath: statePath), backup = URL(fileURLWithPath: backupPath)
+        let journalRoot = try durableJournalDirectory(id), target = ProfileIO.stateDirectory(id)
+        guard destination.deletingLastPathComponent().standardizedFileURL.path == ProfileIO.publicProfiles.standardizedFileURL.path,
+              state.deletingLastPathComponent().standardizedFileURL.path == ProfileIO.privateProfiles.standardizedFileURL.path,
+              state.lastPathComponent.hasPrefix(".public-state-"), content.deletingLastPathComponent().path == journalRoot.path,
+              content.lastPathComponent.hasPrefix("public-content-"), backup.deletingLastPathComponent().path == journalRoot.path,
+              backup.lastPathComponent.hasPrefix("original-"), [ProfileRepository.localDocuments(), ProfileIO.publicProfiles, journalRoot].map(\.path).contains(source.deletingLastPathComponent().path) else {
+            throw StorageMigrationError.invalidApplicationStorage("public Profile publication paths")
+        }
+        let manager = FileManager.default
+        if manager.fileExists(atPath: source.path) {
+            guard !manager.fileExists(atPath: backup.path), try migrationSourceInventory(at: source) == inventory else { throw StorageMigrationError.collision(source.lastPathComponent) }
+            try manager.moveItem(at: source, to: backup)
+            try syncDurableDirectory(source.deletingLastPathComponent())
+            try syncDurableDirectory(journalRoot)
+        }
+        if manager.fileExists(atPath: state.path) {
+            guard !manager.fileExists(atPath: target.path), let config = ProfileIO.readConfig(at: state), config.id == id,
+                  config.version == publicProfileVersion, config.contentDirectory == destination.lastPathComponent else {
+                throw StorageMigrationError.collision(target.lastPathComponent)
+            }
+            try manager.moveItem(at: state, to: target)
+            try syncDurableDirectory(ProfileIO.privateProfiles)
+        } else {
+            guard let config = ProfileIO.readPrivateConfig(id), config.version == publicProfileVersion,
+                  config.contentDirectory == destination.lastPathComponent else { throw StorageMigrationError.invalidApplicationStorage("published private Profile") }
+        }
+        try manager.createDirectory(at: ProfileIO.publicProfiles, withIntermediateDirectories: true)
+        try AppStoragePaths.excludeFromBackup(ProfileIO.publicProfiles)
+        if manager.fileExists(atPath: content.path) {
+            guard !manager.fileExists(atPath: destination.path) else { throw StorageMigrationError.collision(destination.lastPathComponent) }
+            try manager.moveItem(at: content, to: destination)
+            try syncDurableDirectory(ProfileIO.publicProfiles)
+        } else if !manager.fileExists(atPath: destination.path) { throw StorageMigrationError.invalidApplicationStorage("published Profile content") }
+        var published = journal; published["phase"] = "published"
+        try writePublicProfileJournal(published, profileID: id)
+        Log.app.info("StorageMigrator.publicFiles published id=\(id) from=\(filesystemProfileVersion) to=\(publicProfileVersion) sourceBackupRetained=true")
+    }
+
+    private static func recoverPublicProfilePublications() throws {
+        let base = AppStoragePaths.applicationSupport.appendingPathComponent("StorageMigration/PiProfiles")
+        guard FileManager.default.fileExists(atPath: base.path) else { return }
+        for root in try FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
+            let file = root.appendingPathComponent("public-journal.json")
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            guard let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] else {
+                throw StorageMigrationError.invalidApplicationStorage("public Profile recovery journal")
+            }
+            if journal["phase"] as? String == "prepared" { try publishPublicProfileJournal(journal) }
+            else if journal["phase"] as? String != "published" { throw StorageMigrationError.invalidApplicationStorage("public Profile recovery phase") }
         }
     }
 
@@ -260,7 +444,7 @@ nonisolated enum StorageMigrator {
                 attributes: [.posixPermissions: 0o700])
             return try durableProfileDraft(profile, destination: destination)
         }.value
-        let runtime = DurableRuntime(databaseURL: destination.appendingPathComponent("state.sqlite"), artifactRoot: destination) { method, params, _ in
+        let runtime = DurableRuntime(databaseURL: destination.appendingPathComponent("state.sqlite"), fileRoot: destination) { method, params, _ in
             guard method == "profileInstallConversation", let index = params.objectValue?["index"]?.intValue,
                   (0..<prepared.conversationCount).contains(index) else {
                 throw StorageMigrationError.invalidApplicationStorage("staged conversation request")
@@ -324,7 +508,7 @@ nonisolated enum StorageMigrator {
         let conversationDirectory = destination.appendingPathComponent(".migration-conversations", isDirectory: true)
         try manager.createDirectory(at: conversationDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         var payloads: [String: JSONValue] = [:]
-        let payloadStore = DurableArtifactStore(root: destination)
+        let payloadStore = DurableFileStore(root: destination)
         defer { payloadStore.close() }
         func archive(_ data: Data) throws -> JSONValue {
             let writer = try payloadStore.payloadWriter()
@@ -512,7 +696,7 @@ nonisolated enum StorageMigrator {
     }
 
     private static func durableCheckpointBoundary(_ checkpoint: AgentContextCheckpoint,
-        records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)], originalMessages: JSONValue?, store: DurableArtifactStore) throws -> Int? {
+        records: [(turn: Turn, source: JSONValue, missingPurposes: Set<UUID>)], originalMessages: JSONValue?, store: DurableFileStore) throws -> Int? {
         let turns = records.map(\.turn)
         if let boundary = checkpoint.boundary(in: turns) { return boundary }
         guard checkpoint.schemaVersion == AgentContextCheckpoint.currentSchemaVersion,
@@ -704,7 +888,7 @@ nonisolated enum StorageMigrator {
 
     private final class DurableTranscriptReader {
         private let descriptor: Int32
-        private let store: DurableArtifactStore
+        private let store: DurableFileStore
         private var buffer = [UInt8](repeating: 0, count: 128 * 1024)
         private var count = 0
         private var index = 0
@@ -715,7 +899,7 @@ nonisolated enum StorageMigrator {
         private(set) var position = 0
         private(set) var externalized = 0
 
-        init(descriptor: Int32, store: DurableArtifactStore) {
+        init(descriptor: Int32, store: DurableFileStore) {
             self.descriptor = descriptor
             self.store = store
         }
@@ -964,6 +1148,8 @@ nonisolated enum StorageMigrator {
     static func prepare(storage: StorageRoot, services: ServiceManager) async throws {
         Log.app.info("StorageMigrator.prepare start")
         try recoverDurablePublications()
+        try recoverPublicProfilePublications()
+        try privatizeAbandonedProfileStages()
         try validateApplicationStorage()
         try migrateLegacySecrets()
         try migrateManagedOAuthAccounts()
@@ -1269,17 +1455,61 @@ nonisolated enum StorageMigrator {
 
     static func migrate(_ profile: Profile) async throws -> Profile {
         try recoverDurablePublications()
+        try recoverPublicProfilePublications()
         guard let config = ProfileIO.readConfig(at: profile.url), config.id == profile.id, sourceVersion(for: config.version) != nil else {
             Log.app.error("StorageMigrator.reject unknown version=\(profile.version) id=\(profile.id)")
             throw StorageMigrationError.unsupportedProfileVersion(profile.name, profile.version)
         }
         var migrated = profile
         migrated.version = config.version
+        if config.version == publicProfileVersion {
+            guard profile.location == .local, config.contentDirectory == profile.name,
+                  FileManager.default.fileExists(atPath: ProfileIO.stateDirectory(profile.id).appendingPathComponent("state.sqlite").path) else {
+                throw StorageMigrationError.invalidApplicationStorage("private Profile database")
+            }
+            return migrated
+        }
+        if config.version == filesystemProfileVersion {
+            guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
+                throw StorageMigrationError.invalidApplicationStorage("local filesystem Profile database")
+            }
+            return try await migratePublicProfile(migrated, config: config, destination: ProfileIO.publicProfiles.appendingPathComponent(profile.name))
+        }
+        if config.version == workspaceBindingVersion {
+            guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
+                throw StorageMigrationError.invalidApplicationStorage("local workspace Profile database")
+            }
+            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            var manifest = config
+            manifest.version = filesystemProfileVersion
+            try ProfileIO.writeConfig(manifest, to: profile.url)
+            try syncDurableDirectory(profile.url)
+            migrated.version = filesystemProfileVersion
+            return try await migrate(migrated)
+        }
+        if config.version == workspaceProfileVersion {
+            guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
+                throw StorageMigrationError.invalidApplicationStorage("local workspace Profile database")
+            }
+            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            var manifest = config
+            manifest.version = workspaceBindingVersion
+            try ProfileIO.writeConfig(manifest, to: profile.url)
+            try syncDurableDirectory(profile.url)
+            migrated.version = workspaceBindingVersion
+            return try await migrate(migrated)
+        }
         if config.version == durableProfileVersion {
             guard profile.location == .local, FileManager.default.fileExists(atPath: profile.url.appendingPathComponent("state.sqlite").path) else {
                 throw StorageMigrationError.invalidApplicationStorage("local Pi Profile database")
             }
-            return migrated
+            try await prepareWorkspace(at: profile.url, profileID: profile.id)
+            var manifest = config
+            manifest.version = workspaceProfileVersion
+            try ProfileIO.writeConfig(manifest, to: profile.url)
+            try syncDurableDirectory(profile.url)
+            migrated.version = workspaceProfileVersion
+            return try await migrate(migrated)
         }
         guard profile.location == .local else { throw StorageMigrationError.invalidApplicationStorage("Pi Profiles require an offline local import; live cloud/external database synchronization is unsupported") }
         let working = profile.url.deletingLastPathComponent().appendingPathComponent(".pi-source-work-" + UUID().uuidString)
@@ -1307,7 +1537,7 @@ nonisolated enum StorageMigrator {
         catch { Log.app.warning("StorageMigrator.pi workingCopy cleanup deferred error=\(error.localizedDescription)") }
         migrated.version = durableProfileVersion
         Log.app.info("StorageMigrator.pi activated id=\(profile.id) sourcePreserved=true")
-        return migrated
+        return try await migrate(migrated)
     }
 
     private static func migrateTheme(
@@ -1432,6 +1662,26 @@ nonisolated enum StorageMigrator {
         }
         guard let separator = action.lastIndex(of: ":"), action[..<separator].contains(".") else { return action }
         return "web:\(action)"
+    }
+
+    private static func privatizeAbandonedProfileStages() throws {
+        let manager = FileManager.default, documents = ProfileRepository.localDocuments()
+        let recovery = AppStoragePaths.applicationSupport.appendingPathComponent("StorageMigration/RetainedStages", isDirectory: true)
+        let prefixes = [".pi-source-work-", ".pi-stage-", ".pi-fresh-"]
+        for source in try manager.contentsOfDirectory(at: documents, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]) {
+            guard let prefix = prefixes.first(where: { source.lastPathComponent.hasPrefix($0) }),
+                  UUID(uuidString: String(source.lastPathComponent.dropFirst(prefix.count))) != nil else { continue }
+            let values = try source.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard values.isDirectory == true, values.isSymbolicLink != true else { throw StorageMigrationError.invalidApplicationStorage(source.path) }
+            try manager.createDirectory(at: recovery, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try AppStoragePaths.excludeFromBackup(recovery)
+            let destination = recovery.appendingPathComponent(source.lastPathComponent, isDirectory: true)
+            guard !manager.fileExists(atPath: destination.path) else { throw StorageMigrationError.invalidApplicationStorage(destination.path) }
+            try manager.moveItem(at: source, to: destination)
+            try syncDurableDirectory(recovery)
+            try syncDurableDirectory(documents)
+            Log.app.info("StorageMigrator.publicFiles retained abandonedStage=\(source.lastPathComponent)")
+        }
     }
 
     private static func validateApplicationStorage() throws {

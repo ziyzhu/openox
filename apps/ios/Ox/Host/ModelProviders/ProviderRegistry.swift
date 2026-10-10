@@ -20,7 +20,6 @@ nonisolated enum ProviderSource: String, Sendable {
     case bundled
     case override
     case added
-    case webService = "web-service"
 }
 
 @MainActor
@@ -34,8 +33,6 @@ final class ProviderRegistry {
     private let bundled: [BundledProviderDefinition]
     private var catalog: ProviderCatalog
     private var catalogAvailable = true
-    private var modelServices: [ServiceDefinition] = []
-    private var discoveredServiceModels: [String: [ProviderModel]] = [:]
     private(set) var allClients: [any ProviderClient] = []
     private(set) var defaultModel: ModelSelection?
 
@@ -86,17 +83,7 @@ final class ProviderRegistry {
         return bundled.map { replacements[$0.definition.id] ?? $0.definition }
             + catalog.providers.filter { !bundledIDs.contains($0.id) }
     }
-    var definitions: [ProviderDefinition] {
-        var result = catalogDefinitions
-        for service in modelServices {
-            let id = WebServiceModelProvider.providerID(domain: service.domain)
-            guard let url = service.baseURL, let client = client(id: id) else { continue }
-            let definition = ProviderDefinition(id: id, name: service.name, url: url, api: .web,
-                                                auth: .init(kind: .custom, adapter: id), models: client.models.map { .init($0) })
-            result.append(definition)
-        }
-        return result
-    }
+    var definitions: [ProviderDefinition] { catalogDefinitions }
     var defaultDefinitions: [ProviderDefinition] { bundled.map(\.definition) }
 
     var clients: [any ProviderClient] { allClients.filter { !$0.models.isEmpty } }
@@ -118,7 +105,6 @@ final class ProviderRegistry {
     }
 
     func source(id: String) -> ProviderSource {
-        if modelServices.contains(where: { WebServiceModelProvider.providerID(domain: $0.domain) == id }) { return .webService }
         let isBundled = bundled.contains { $0.definition.id == id }
         let isSaved = catalog.providers.contains { $0.id == id }
         if isBundled { return isSaved ? .override : .bundled }
@@ -137,7 +123,7 @@ final class ProviderRegistry {
 
     func client(for selection: ModelSelection?) -> any ProviderClient {
         let selection = selection ?? sessionModel
-        return client(id: selection.providerID) ?? unavailableClient
+        return client(id: selection.providerID) ?? UnavailableProviderClient(id: selection.providerID)
     }
 
     func model(for selection: ModelSelection?, client: any ProviderClient) -> ProviderModel {
@@ -145,10 +131,6 @@ final class ProviderRegistry {
         if var model = client.models.first(where: { $0.id == selection.modelID }) {
             model.reasoningEffort = selection.reasoningEffort.flatMap { model.reasoningEfforts.contains($0) ? $0 : nil } ?? model.lowestReasoningEffort
             return model
-        }
-        if client is WebServiceModelProvider {
-            let id = selection.modelID.hasPrefix("website:") ? String(selection.modelID.dropFirst(8)) : selection.modelID
-            return WebServiceModelProvider.model(id: id, name: selection.modelID, input: [.text, .image, .pdf])
         }
         return ProviderModel(id: selection.modelID, displayName: selection.modelID, maxTokens: 4_096, maxContext: 32_768, supportsTools: true)
     }
@@ -185,18 +167,11 @@ final class ProviderRegistry {
         if let effort = selection.reasoningEffort, !model.reasoningEfforts.contains(effort) {
             throw RuntimeError.bridge("This model does not support the requested thinking level")
         }
-        if let provider = client as? WebServiceModelProvider {
-            guard let service = IOSHost.shared.services.service(domain: provider.domain),
-                  service.signInState.isAuthenticated || service.signInState == .notRequired else {
-                throw RuntimeError.bridge("Verify this website provider's sign-in before selecting its model")
-            }
-        } else {
-            let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
-            let signedIn = client.subscriptionAccount?.isSignedIn == true
-            let needsAuthentication = (try? definition(id: client.id).auth.requiresCredential) ?? (client.usesAPIKey || client.subscriptionAccount != nil)
-            guard !needsAuthentication || hasCredential || signedIn else {
-                throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
-            }
+        let hasCredential = client.acceptsAPIKey && Credentials.key(for: client.credentialID) != nil
+        let signedIn = client.subscriptionAccount?.isSignedIn == true
+        let needsAuthentication = (try? definition(id: client.id).auth.requiresCredential) ?? (client.usesAPIKey || client.subscriptionAccount != nil)
+        guard !needsAuthentication || hasCredential || signedIn else {
+            throw RuntimeError.bridge("Authenticate this provider through ox.provider.authenticate before selecting its model")
         }
         model.reasoningEffort = selection.reasoningEffort ?? model.lowestReasoningEffort
         return SelectedModel(client: client, model: model)
@@ -243,11 +218,6 @@ final class ProviderRegistry {
     }
 
     func updateDiscoveredModels(_ models: [ProviderModel], for clientID: String) throws {
-        if modelServices.contains(where: { WebServiceModelProvider.providerID(domain: $0.domain) == clientID }) {
-            discoveredServiceModels[clientID] = models
-            rebuildClients()
-            return
-        }
         guard client(id: clientID)?.canLoadModels == true,
               let bundledDefinition = bundled.first(where: { $0.definition.id == clientID })?.definition,
               let defaultModel = bundledDefinition.models.first else {
@@ -285,7 +255,6 @@ final class ProviderRegistry {
 
     func authenticationStatus(id: String) -> String {
         guard let definition = try? definition(id: id) else { return "unavailable" }
-        if definition.api == .web { return "browser-session" }
         if definition.auth.kind == .none { return "not-required" }
         if client(id: id)?.subscriptionAccount?.isSignedIn == true { return "authenticated" }
         if Credentials.key(for: definition.credentialID) != nil { return "credential-stored" }
@@ -312,25 +281,7 @@ final class ProviderRegistry {
             do { resolved.append(try ProviderClientFactory.make(definition, presentation: presentation(for: definition))) }
             catch { Log.agent.error("ProviderRegistry.resolve provider=\(definition.id) error=\(error.localizedDescription)") }
         }
-        for service in modelServices {
-            let id = WebServiceModelProvider.providerID(domain: service.domain)
-            let models = discoveredServiceModels[id] ?? [WebServiceModelProvider.model(id: "website-default", name: "Default")]
-            resolved.append(WebServiceModelProvider(id: id, domain: service.domain, displayName: "\(service.name) Web",
-                                                    website: service.baseURL, models: models,
-                                                    regions: WebServiceModelProvider.regions(domain: service.domain)))
-        }
         allClients = resolved
-    }
-
-    func refreshModelServices(_ services: [Service]) {
-        let next = services.filter { $0.definition.supportsModelGeneration }.map(\.definition)
-        let unchanged = Set(next.filter { candidate in
-            modelServices.contains { $0.domain == candidate.domain && $0.repositoryID == candidate.repositoryID && $0.manifest == candidate.manifest }
-        }.map { WebServiceModelProvider.providerID(domain: $0.domain) })
-        discoveredServiceModels = discoveredServiceModels.filter { unchanged.contains($0.key) }
-        modelServices = next
-        rebuildClients()
-        Log.agent.info("ProviderRegistry.modelServices count=\(modelServices.count)")
     }
 
     private var unavailableClient: any ProviderClient { UnavailableProviderClient() }
@@ -358,9 +309,11 @@ final class ProviderRegistry {
 }
 
 nonisolated private struct UnavailableProviderClient: ProviderClient {
-    let id = "unconfigured"
+    let id: String
     let displayName = "Model"
     let models = [ProviderModel(id: "unconfigured", displayName: "Model", maxTokens: 4_096, maxContext: 32_768)]
+
+    init(id: String = "unconfigured") { self.id = id }
 
     func stream(model: ProviderModel, systemPrompt: String?, messages: [Message], tools: [any AgentTool], options: StreamOptions) -> AsyncThrowingStream<AssistantEvent, Error> {
         streamingTask(model: model, messages: messages) { _ in

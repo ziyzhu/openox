@@ -14,7 +14,8 @@ extension Conversation {
             let artifact = try await ArtifactImporter.importDataAsync(
                 response.data,
                 suggestedName: suggestedName,
-                in: scope
+                in: scope,
+                conversation: durableRoute?.reference
             )
             Log.session.info("bridge.artifact.import filename=\(artifact.fileName) bytes=\(response.data.count)")
             return try Self.encodeToJSON(ArtifactLibrary.Item(artifact))
@@ -26,12 +27,7 @@ extension Conversation {
         return try await tracked(Actions.artifactRename, args, purpose: purpose) {
             try requireProfileMutation(Actions.artifactRename)
             let artifact = try await repository.renameArtifact(named: filename, to: newFilename, in: scope)
-            renameArtifactReferences(
-                from: filename,
-                to: artifact.fileName,
-                directory: artifact.fileURL.deletingLastPathComponent()
-            )
-            onPersistableChange?()
+            artifactFilesChanged()
             Log.session.info("bridge.artifact.rename from=\(filename) to=\(artifact.fileName)")
             return try Self.encodeToJSON(ArtifactLibrary.Item(artifact))
         }
@@ -74,7 +70,8 @@ extension Conversation {
             artifacts.append(try await ArtifactImporter.importDataAsync(
                 value.data,
                 suggestedName: value.suggestedFilename,
-                in: scope
+                in: scope,
+                conversation: durableRoute?.reference
             ))
         }
         for artifact in artifacts { embedArtifact(artifact) }

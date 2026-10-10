@@ -724,7 +724,7 @@ final class ServiceOperations {
             let control = ServiceControl.signIn(domain: domain, serviceName: service.title)
             Log.session.info("bridge.service.signIn handoff domain=\(domain) auth=\(service.signInState.rawValue)")
             guard await presentControl(control, service) != nil else {
-                throw RuntimeError.bridge("ox.service.signIn: the user cancelled or sign-in failed")
+                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.signIn: the user cancelled or sign-in failed.", recovery: "Do not reopen sign-in automatically. Ask the user whether to continue, then inspect the service's sign-in state before trying again.")
             }
             return .object([
                 "domain": .string(domain),
@@ -748,7 +748,7 @@ final class ServiceOperations {
             let control = ServiceControl.botControl(domain: domain, serviceName: service.title, args: args)
             Log.session.info("bridge.service.solve handoff domain=\(domain)")
             guard await presentControl(control, service) != nil else {
-                throw RuntimeError.bridge("ox.service.solve: the user cancelled or verification failed")
+                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.solve: the user cancelled or verification failed.", recovery: "Do not reopen verification automatically. Ask the user whether to continue and inspect the service state before trying again.")
             }
             return .null
         }
@@ -770,7 +770,7 @@ final class ServiceOperations {
             let control = ServiceControl.payment(domain: domain, serviceName: service.title, args: args)
             Log.session.info("bridge.service.payment handoff domain=\(domain)")
             guard let result = await presentControl(control, service) else {
-                throw RuntimeError.bridge("ox.service.pay: the user cancelled or checkout did not complete")
+                throw OxFunctionError(code: "handoff_incomplete", message: "ox.service.pay: the user cancelled or checkout did not complete.", recovery: "Do not reopen checkout automatically. Inspect the transaction status to avoid duplicate payment, and ask the user whether to continue.")
             }
             return result
         }

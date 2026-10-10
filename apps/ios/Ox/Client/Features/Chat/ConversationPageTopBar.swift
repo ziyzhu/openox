@@ -40,7 +40,7 @@ struct ConversationPageTopBar: View {
             }
             if hasArtifacts {
                 Button(action: onShowArtifacts) {
-                    Label("Artifacts", systemImage: OxActionIconKind.artifacts.systemImage)
+                    Label("Files", systemImage: OxActionIconKind.artifacts.systemImage)
                 }
                 .accessibilityIdentifier(A11yID.Chat.Artifact.open)
             }

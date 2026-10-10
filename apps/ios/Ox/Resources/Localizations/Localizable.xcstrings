@@ -1,6 +1,47 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Markdown" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Markdown" } } } },
+    "HTML" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "HTML" } } } },
+    "Loading files…" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载文件…" } } } },
+    "Loading file…" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载文件…" } } } },
+    "Loading HTML…" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载 HTML…" } } } },
+    "Open HTML" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 HTML" } } } },
+    "Open file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开文件" } } } },
+    "Close file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭文件" } } } },
+    "Share file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享文件" } } } },
+    "Add file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加文件" } } } },
+    "File added" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已添加文件" } } } },
+    "File unavailable" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件不可用" } } } },
+    "No files yet" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无文件" } } } },
+    "Deleted file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件已删除" } } } },
+    "Deleted file: %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件已删除：%@" } } } },
+    "Invalid filename: %@" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件名无效：%@" } } } },
+    "A file named %@ already exists." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名为 %@ 的文件已存在。" } } } },
+    "Couldn't add file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法添加文件" } } } },
+    "Couldn't download file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法下载文件" } } } },
+    "Couldn't delete file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法删除文件" } } } },
+    "Couldn't save Markdown" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法保存 Markdown" } } } },
+    "Rename file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名文件" } } } },
+    "Delete this file?" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除此文件？" } } } },
+    "This deletes the file. Existing chat references will show it as deleted." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会删除文件。现有聊天中的引用将显示文件已删除。" } } } },
+    "Filter and sort files" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "筛选和排序文件" } } } },
+    "Files & images" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件与图片" } } } },
+    "Profiles hold chats, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "档案包含聊天、文件、性格和记忆。可保留多个档案，随时切换，并在本地储存或通过 iCloud 同步。" } } } },
+    "This removes it from iCloud and all your devices — chats, files, character and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从 iCloud 和你的所有设备中移除档案，包括聊天、文件、性格和记忆。此操作无法撤销。" } } } },
+    "This removes it from this device — chats, files, character and memory. This can't be undone." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从此设备中移除档案，包括聊天、文件、性格和记忆。此操作无法撤销。" } } } },
+    "%lld files" : {
+      "localizations" : {
+        "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld file" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld files" } } } } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 个文件" } }
+      }
+    },
+    "%lld files · %@" : {
+      "localizations" : {
+        "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld file · %@" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld files · %@" } } } } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 个文件 · %@" } }
+      }
+    },
     "Categories" : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分类" } } }
     },

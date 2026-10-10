@@ -8,7 +8,7 @@ const swiftString = (text: string) => JSON.stringify(text).replace(/\\u([0-9a-f]
 export function nativeGuidanceSource() {
   const entries = Object.entries(guidanceTexts).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     .map(([key, value]) => `        ${swiftString(key)}: ${swiftString(value)},`).join("\n");
-  const execute = (variant: "ox" | "website") => swiftString(executeGuidance({ catalog: "__OX_CATALOG__", variant,
+  const execute = () => swiftString(executeGuidance({ catalog: "__OX_CATALOG__", variant: "ox",
     timeoutSeconds: 999001, maxLines: 999002, maxBytes: 999003 * 1024, maxFetches: 999004, maxTransientAttachments: 999005 }))
     .replaceAll("__OX_CATALOG__", "\\(catalog)").replaceAll("999001", "\\(timeoutSeconds)")
     .replaceAll("999002", "\\(maxLines)").replaceAll("999003", "\\(maxBytes / 1024)")
@@ -39,9 +39,8 @@ ${entries}
         words.indices.contains(value) ? words[value] : String(value)
     }
 
-    static func execute(catalog: String, website: Bool, timeoutSeconds: Int, maxLines: Int, maxBytes: Int, maxFetches: Int, maxTransientAttachments: Int) -> String {
-        if website { return ${execute("website")} }
-        return ${execute("ox")}
+    static func execute(catalog: String, timeoutSeconds: Int, maxLines: Int, maxBytes: Int, maxFetches: Int, maxTransientAttachments: Int) -> String {
+        return ${execute()}
     }
 }
 `;

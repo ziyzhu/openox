@@ -12,6 +12,7 @@ import { bundledSkills, skillActivationRequirements } from "../core/bundled-skil
 import { OxConversations, type ConversationReference } from "./conversations";
 import { profileTools } from "./tools";
 import { AgentFileSystem } from "../core/filesystem";
+import { ProfileWorkspace, workspacePath, type WorkspaceBackend } from "./workspace";
 
 const context = BACKGROUND_CONTEXT;
 export type CommittedEvent = AgentEvent & { partial?: AssistantMessage };
@@ -22,6 +23,10 @@ export interface ProfileRuntimeOptions {
   registry?: Registry;
   settings?: HarnessSettings;
   artifacts?: ArtifactFiles;
+  workspace?: boolean;
+  workspaceBackend?: WorkspaceBackend;
+  prepareWorkspace?: boolean;
+  publicFiles?: boolean;
   mounts?: readonly FileMount[];
   /** Only for the explicitly retained, purgeable SQLite-blob fixtures. */
   createBlobID?(): Promise<string>;
@@ -39,6 +44,7 @@ interface Projection {
 
 export class ProfileRuntime {
   readonly files: ProfileFiles;
+  readonly workspace?: ProfileWorkspace;
   readonly filesystem = new AgentFileSystem();
   readonly conversations: OxConversations;
   readonly env: ReturnType<typeof mountedFileSystem>;
@@ -62,9 +68,37 @@ export class ProfileRuntime {
     this.harness = harness;
     this.registry = registry;
     this.options = options;
-    this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts);
+    this.files = new ProfileFiles(harness, options.database, options.profileID, options.createBlobID, options.artifacts,
+      options.prepareWorkspace ? "prepare" : options.workspace ? "workspace" : "legacy");
     this.conversations = new OxConversations(options.profileID, harness, () => this.ready());
-    this.env = mountedFileSystem(options.profileID, [...profileMounts(this.files, this.conversations), ...options.mounts ?? []]);
+    if (options.workspace || options.prepareWorkspace) {
+      if (!options.workspaceBackend) throw new Error("Physical filesystem backend is required");
+      if (options.workspace && !options.prepareWorkspace && options.artifacts) throw new Error("Current filesystem cannot use the legacy artifact backend");
+      this.workspace = new ProfileWorkspace(harness, options.workspaceBackend, options.publicFiles);
+      if (options.publicFiles) this.files.usePublicFiles(this.workspace);
+    }
+    const mounts = profileMounts(this.files, this.conversations);
+    if (this.workspace) {
+      const workspace = this.workspace;
+      const backend = {
+        id: `workspace:${options.profileID}`, assertWritable: workspacePath,
+        info: (path: string) => workspace.info(path), list: (path: string) => workspace.list(path),
+        read: (path: string) => workspace.read(path),
+        write: async (path: string, content: string | Uint8Array, _context: unknown, expected?: string) => { await workspace.write(path, content, expected); },
+        edit: (path: string, edits: { oldText: string; newText: string }[]) => workspace.edit(path, edits),
+        remove: (path: string) => workspace.remove(path), flush: () => workspace.flush(),
+        createDirectory: (path: string, _context: unknown, recursive?: boolean) => workspace.mkdir(path, recursive),
+        removeDirectory: (path: string, recursive: boolean) => workspace.remove(path, true, recursive),
+        move: (from: string, to: string) => workspace.move(from, to),
+        copy: async (from: string, to: string) => { await workspace.copy(from, to); },
+      };
+      const history = mounts.find(mount => mount.path === "conversations");
+      if (!history || history.source.kind !== "backend") throw new Error("Missing conversation history mount");
+      mounts.splice(0, mounts.length, ...mounts.filter(mount => !["artifacts", "conversations"].includes(mount.path)),
+        { ...history, path: "history", source: { ...history.source, path: "conversations" } },
+        { path: "", access: "readWrite", source: { kind: "backend", backend } });
+    }
+    this.env = mountedFileSystem(options.profileID, [...mounts, ...options.mounts ?? []]);
   }
 
   static async open(options: ProfileRuntimeOptions) {
@@ -76,11 +110,12 @@ export class ProfileRuntime {
         settings: options.settings, env: () => runtime!.env, onReport: options.onReport }, context);
       runtime = new ProfileRuntime(harness, registry, options);
       await runtime.files.initialize();
-      registry.install(profileTools(runtime.files));
+      if (options.workspace && !options.prepareWorkspace) await runtime.workspace!.initialize();
+      registry.install(profileTools(runtime.files, !!runtime.workspace));
       return runtime;
     } catch (error) {
       try { if (harness) await harness.close(context); else await options.database.close(); }
-      finally { await options.artifacts?.close(); }
+      finally { await options.artifacts?.close(); await options.workspaceBackend?.close(); }
       throw error;
     }
   }
@@ -88,6 +123,7 @@ export class ProfileRuntime {
   private ready() { if (this.closing) throw new Error("Profile runtime closed or closing"); }
   private async conversation(id: ConversationId) {
     this.ready();
+    if (this.workspace && (await this.workspace.state()).deletedConversations.includes(id)) throw new Error("Conversation not found");
     const conversation = await this.harness.conversation(id, context);
     if (!conversation) throw new Error("Conversation not found");
     return conversation;
@@ -204,7 +240,7 @@ export class ProfileRuntime {
   async inspect(reference?: ConversationId | ConversationReference) {
     const id = reference === undefined ? undefined : this.scopedID(reference);
     this.ready();
-    return { inspection: await this.harness.inspect(context), files: await this.files.index(), usage: await this.harness.usage(context),
+    return { inspection: await this.harness.inspect(context), files: this.workspace ? await this.workspace.listFiles() : await this.files.index(), usage: await this.harness.usage(context),
       streamEnds: Object.fromEntries([...this.projections].filter(([, projection]) => projection.ending).map(([id, projection]) => [id, projection.ending])),
       messages: id === undefined ? undefined : (await (await this.conversation(id)).context(context)).messages };
   }
@@ -213,10 +249,12 @@ export class ProfileRuntime {
     if (!this.closing) this.closing = (async () => {
       await this.filesystem.close();
       await this.files.flush();
+      await this.workspace?.flush();
       await Promise.allSettled(this.attaching.values());
       await this.harness.close(context);
       await this.env.cleanup(context);
       await this.files.close();
+      await this.options.workspaceBackend?.close();
       await Promise.all([...this.projections.values()].map(projection => projection.stream.closed));
       this.projections.clear();
     })();

@@ -5,6 +5,7 @@ import { AgentDoc, type ConversationId, type Cursor, type EntryDraft, type Entry
 import { ConversationFavorite, ConversationPresentation, ConversationReadState, type ConversationReference, type ConversationListCursor, type ConversationHistoryCursor } from "./conversations";
 import { ConversationApplicationMetadata } from "./install";
 import type { ProfileRuntime } from "./runtime";
+import { WorkspaceState } from "./workspace";
 
 const context = BACKGROUND_CONTEXT;
 export interface ApplicationAgentChange {
@@ -117,7 +118,20 @@ export class ApplicationPresentation {
       if (latest === null) latest = (await tx.appendEntry(id, { kind: "ox.native.presentation", data: {} })).id;
       await presentation(tx, id, { metadata: frozen.metadata ?? {}, title: frozen.title ?? "", favorite: frozen.favorite ?? false, unread: frozen.unread ?? false }, latest, true);
     } }, context);
+    await this.runtime.workspace?.createConversation(conversation.id);
     return { conversationID: conversation.id, reference: this.runtime.conversations.reference(conversation.id) };
+  }
+  async populate(reference: ConversationReference, entries: EntryDraft[]) {
+    if (!Array.isArray(entries) || entries.some(entry => entry.kind !== "ox.native.turn" || entry.head !== undefined || entry.edits !== undefined)) throw new Error("Imported entries require native turns without foreign identities");
+    const id = this.runtime.conversations.id(reference), conversation = await this.runtime.harness.conversation(id, context);
+    if (!conversation) throw new Error("Conversation not found");
+    const frozen = JSON.parse(JSON.stringify(entries)) as EntryDraft[];
+    await conversation.commit(async tx => {
+      if ((await ledger(tx, id)).some(entry => entry.model?.length)) throw new Error("Only an empty conversation can receive imported turns");
+      let latest: number | null = null;
+      for (const entry of frozen) latest = (await tx.appendEntry(id, entry)).id;
+      await presentation(tx, id, { unread: false }, latest, true);
+    }, context);
   }
   async load(reference: ConversationReference) {
     const id = this.runtime.conversations.id(reference);
@@ -157,5 +171,18 @@ export class ApplicationPresentation {
       await presentation(tx, id, frozen, latest);
     }, context);
   }
-  async delete(reference: ConversationReference) { await this.runtime.conversations.present(reference, { visible: false }); }
+  async delete(reference: ConversationReference) {
+    const id = this.runtime.conversations.id(reference);
+    const conversation = await this.runtime.harness.conversation(id, context);
+    if (!conversation) throw new Error("Conversation not found");
+    await conversation.commit(async tx => {
+      (await tx.doc(ConversationPresentation, id)).visible = false;
+      if (this.runtime.workspace) {
+        const state = await tx.doc(WorkspaceState);
+        if (!state.deletedConversations.includes(id)) state.deletedConversations.push(id);
+      }
+    }, context);
+    await conversation.abort(context);
+    await this.runtime.workspace?.deleteConversation(id);
+  }
 }

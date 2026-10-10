@@ -74,10 +74,6 @@ extension Conversation {
         guard let client = ProviderRegistry.shared.client(id: definition.id) else {
             throw RuntimeError.bridge("Provider authentication UI is unavailable")
         }
-        if client.models.first.flatMap({ client.wireProtocol(for: $0) }) == .web,
-           (try? await client.websiteSessionIsAuthenticated()) == true {
-            return .object(["id": .string(definition.id), "status": .string(ProviderAuthenticationSession.Outcome.authenticated.rawValue)])
-        }
         guard let presenter = presentations.providerAuthentication else {
             throw RuntimeError.bridge("Provider authentication UI is unavailable")
         }
@@ -85,7 +81,9 @@ extension Conversation {
         let outcome = await presenter.present(session: session)
         try Task.checkCancellation()
         guard outcome == .authenticated || outcome == .credentialStored else {
-            throw RuntimeError.bridge(outcome == .cancelled ? "Provider authentication was cancelled" : "Provider authentication could not be presented")
+            throw outcome == .cancelled
+                ? OxFunctionError(code: "cancelled", message: "Provider authentication was cancelled.", recovery: "Stop. Do not reopen authentication unless the user asks.")
+                : OxFunctionError(code: "authentication_unavailable", message: "Provider authentication could not be presented.", recovery: "Ask the user to open provider settings and sign in there; do not repeatedly reopen authentication.")
         }
         return .object(["id": .string(definition.id), "status": .string(outcome.rawValue)])
     }
@@ -124,23 +122,19 @@ extension Conversation {
 
     private func providerAccess(_ definition: ProviderDefinition, client: (any ProviderClient)?) -> JSONValue {
         var methods: [String] = []
-        if definition.api == .web {
-            methods.append("browser-session")
-        } else {
-            if client?.subscriptionAccount != nil {
-                methods.append(definition.auth.kind == .oauth ? "oauth" : "subscription")
-            }
-            if let client, client.acceptsAPIKey {
-                methods.append(client.credentialKind.providerInformationValue)
-            }
-            if methods.isEmpty {
-                methods.append(definition.auth.kind == .none ? "none" : definition.auth.kind.rawValue)
-            }
+        if client?.subscriptionAccount != nil {
+            methods.append(definition.auth.kind == .oauth ? "oauth" : "subscription")
+        }
+        if let client, client.acceptsAPIKey {
+            methods.append(client.credentialKind.providerInformationValue)
+        }
+        if methods.isEmpty {
+            methods.append(definition.auth.kind == .none ? "none" : definition.auth.kind.rawValue)
         }
         return .object([
             "methods": .array(methods.map(JSONValue.string)),
             "credentialKind": client.flatMap { $0.acceptsAPIKey ? $0.credentialKind.providerInformationValue : nil }.map(JSONValue.string) ?? .null,
-            "acceptsSecret": .bool(definition.api != .web && client?.acceptsAPIKey == true),
+            "acceptsSecret": .bool(client?.acceptsAPIKey == true),
             "optional": .bool(definition.auth.optional == true),
             "notice": client?.authNotice.map(JSONValue.string) ?? .null,
         ])

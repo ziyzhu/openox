@@ -430,12 +430,15 @@ nonisolated extension ChatFormat {
 
 nonisolated extension Turn {
     func replacingArtifact(named oldName: String, with newName: String, directory: URL) -> Turn {
-        func replace(_ artifact: Artifact) -> Artifact {
+        mappingArtifacts { artifact in
             artifact.fileName.caseInsensitiveCompare(oldName) == .orderedSame
                 ? Artifact(fileName: newName, directory: directory)
                 : artifact
         }
-        func replace(_ content: [ContentBlock]) -> [ContentBlock] {
+    }
+
+    func mappingArtifacts(_ replace: (Artifact) -> Artifact) -> Turn {
+        func replaceContent(_ content: [ContentBlock]) -> [ContentBlock] {
             content.map { block in
                 guard case .attachment(let artifact) = block else { return block }
                 return .attachment(replace(artifact))
@@ -448,7 +451,7 @@ nonisolated extension Turn {
         case .agent(var turn, let id):
             for index in turn.steps.indices {
                 if var result = turn.steps[index].toolResult {
-                    result.content = replace(result.content)
+                    result.content = replaceContent(result.content)
                     turn.steps[index].toolResult = result
                 }
                 guard case var .execute(execution) = turn.steps[index].kind else { continue }
@@ -483,7 +486,7 @@ nonisolated extension Turn {
             }
             for index in turn.generations.indices {
                 guard var assistant = turn.generations[index].assistantMessage else { continue }
-                assistant.content = replace(assistant.content)
+                assistant.content = replaceContent(assistant.content)
                 turn.generations[index].assistantMessage = assistant
             }
             return .agent(turn, id: id)

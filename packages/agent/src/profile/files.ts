@@ -5,6 +5,7 @@ import type { SqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite";
 import { artifactPath, artifactRecord, type ArtifactFiles } from "./artifacts";
 import { SYSTEM_SKILL_NAMES } from "@openox/protocol/skills";
 import { canonical } from "../core/file-paths";
+import { publicDocument, type ProfileWorkspace } from "./workspace";
 export { canonical } from "../core/file-paths";
 
 const context = BACKGROUND_CONTEXT;
@@ -49,14 +50,18 @@ export class ProfileFiles {
   readonly identity: string;
   private createBlobID?: () => Promise<string>;
   private artifacts?: ArtifactFiles;
+  private bindingMode: "legacy" | "workspace" | "prepare";
+  private workspace?: ProfileWorkspace;
+  usePublicFiles(workspace: ProfileWorkspace) { this.workspace = workspace; }
 
   constructor(harness: Harness, db: SqliteDatabase, identity: string,
-    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles) {
+    createBlobID?: () => Promise<string>, artifacts?: ArtifactFiles, bindingMode: "legacy" | "workspace" | "prepare" = "legacy") {
     this.harness = harness;
     this.db = db;
     this.identity = identity;
     this.createBlobID = createBlobID;
     this.artifacts = artifacts;
+    this.bindingMode = bindingMode;
   }
   private serialize<T>(body: () => Promise<T>): Promise<T> {
     const result = this.tail.then(body); this.tail = result.catch(() => {}); return result;
@@ -65,10 +70,10 @@ export class ProfileFiles {
     if (!this.identity) throw new Error("An immutable Profile identity is required");
     const existing = await this.harness.snapshot(ProfileIndex, context);
     if (existing?.identity && existing.identity !== this.identity) throw new Error("Profile identity does not match immutable runtime scope");
-    const backend = this.artifacts ? "artifact-files-v1" : "fixture-blobs-v1";
+    const backend = this.bindingMode === "workspace" ? this.workspace ? "public-profile-files-v1" : "profile-files-v1" : this.artifacts ? "artifact-files-v1" : "fixture-blobs-v1";
     const binding = await this.harness.snapshot(FilesystemBinding, context);
-    if (binding?.backend && binding.backend !== backend) throw new Error("Filesystem backend mismatch; explicit conversion is required");
-    if (this.artifacts) {
+    if (binding?.backend && binding.backend !== backend && !(this.bindingMode === "prepare" && ["workspace-files-v1", "profile-files-v1", "public-profile-files-v1"].includes(binding.backend))) throw new Error("Filesystem backend mismatch; explicit conversion is required");
+    if (this.artifacts || this.bindingMode !== "legacy") {
       if (await this.db.get("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ox_blobs', 'ox_blob_chunks') LIMIT 1")) {
         throw new Error("Legacy blob fixture requires explicit conversion; open a fresh file-backed fixture");
       }
@@ -81,7 +86,19 @@ export class ProfileFiles {
       const index = await tx.doc(ProfileIndex);
       if (index.identity && index.identity !== this.identity) throw new Error("Profile identity does not match immutable runtime scope");
       index.identity = this.identity;
-      (await tx.doc(FilesystemBinding)).backend = backend;
+      if (this.bindingMode !== "prepare" || !binding?.backend) (await tx.doc(FilesystemBinding)).backend = backend;
+    }, context);
+  }
+  async bindWorkspace(publicFiles = false) {
+    if (this.bindingMode !== "prepare") throw new Error("Workspace binding requires StorageMigrator preparation");
+    await this.harness.commit(async tx => {
+      const index = await tx.doc(ProfileIndex);
+      for (const path of Object.keys(index.files)) if (path.startsWith("artifacts/")) delete index.files[path];
+      if (publicFiles) for (const path of Object.keys(index.files)) if (publicDocument(path)) {
+        delete index.files[path];
+        await tx.retireDoc(ProfileFile, path);
+      }
+      (await tx.doc(FilesystemBinding)).backend = publicFiles ? "public-profile-files-v1" : "profile-files-v1";
     }, context);
   }
   private async validateBlobFixture() {
@@ -104,6 +121,7 @@ export class ProfileFiles {
   flushFile(path: string) {
     path = canonical(path);
     return this.serialize(async () => {
+      if (this.workspace && publicDocument(canonical(path))) { await this.workspace.flush(); return; }
       if (!(await this.index())[path]) throw new FileError("not_found", "File not found", path);
       if (this.artifacts && path.startsWith("artifacts/")) await this.artifacts.flush(artifactPath(path));
     });
@@ -123,10 +141,16 @@ export class ProfileFiles {
     return record.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   }
   async integrity() { return (await this.db.get<{ integrity_check: string }>("PRAGMA integrity_check"))?.integrity_check; }
-  async index() { return (await this.harness.snapshot(ProfileIndex, context))!.files; }
+  async index() {
+    const index = (await this.harness.snapshot(ProfileIndex, context))!.files;
+    if (!this.workspace) return index;
+    const documents = (await this.workspace.listFiles()).filter(file => !file.hidden && publicDocument(file.path));
+    return { ...Object.fromEntries(Object.entries(index).filter(([path]) => !publicDocument(path))), ...Object.fromEntries(documents.map(file => [file.path, { size: file.size, mtime: file.mtime, binary: file.binary }])) };
+  }
   read(path: string): Promise<string | Uint8Array> { return this.serialize(() => this.readLocked(path)); }
   private async readLocked(path: string): Promise<string | Uint8Array> {
     path = canonical(path);
+    if (this.workspace && publicDocument(path)) return this.workspace.read(path);
     const metadata = (await this.index())[path];
     if (!metadata) throw new FileError("not_found", "File not found", path);
     if (this.artifacts && path.startsWith("artifacts/")) return this.readArtifact(artifactPath(path));
@@ -150,7 +174,11 @@ export class ProfileFiles {
     path = canonical(path); owned(path);
     const size = typeof content === "string" ? new TextEncoder().encode(content).length : content.length;
     if (size > (typeof content === "string" ? textLimit : binaryLimit)) throw new FileError("invalid", "File exceeds size limit", path);
-    if (content instanceof Uint8Array) content = content.slice(); // Freeze admission before waiting for the mutation queue.
+    if (content instanceof Uint8Array) content = content.slice();
+    if (this.workspace && publicDocument(path)) {
+      if (typeof content !== "string") throw new FileError("invalid", "Profile documents require UTF-8 text", path);
+      await this.workspace.writeDocument(path, content); return;
+    }
     await this.serialize(async () => {
       if (!(await this.index())[path] && Object.keys(await this.index()).length >= 10_000) throw new Error("Profile file count limit reached");
       if (this.artifacts && path.startsWith("artifacts/")) {
@@ -187,6 +215,7 @@ export class ProfileFiles {
   }
   async edit(path: string, edits: { oldText: string; newText: string }[]) {
     path = canonical(path); owned(path);
+    if (this.workspace && publicDocument(path)) { await this.workspace.edit(path, edits, true); return; }
     if (this.artifacts && path.startsWith("artifacts/")) {
       throw new FileError("not_supported", "Artifact references are immutable; write the edited content to a distinct filename", path);
     }
@@ -211,6 +240,7 @@ export class ProfileFiles {
   }
   async remove(path: string) {
     path = canonical(path); owned(path);
+    if (this.workspace && publicDocument(path)) { await this.workspace.documentBatch([], [path]); return; }
     await this.serialize(() => this.harness.commit(async tx => {
       delete (await tx.doc(ProfileIndex)).files[path];
       if (!this.artifacts || !path.startsWith("artifacts/")) await tx.retireDoc(ProfileFile, path);

@@ -24,6 +24,8 @@ bun run ci:ios --device ox-1 --loopback
 bun run test:demo --device ox-1
 bun .agents/skills/test/apps/ios/settings.ts --device ox-1 --host <ws-url> --app <Ox.app>
 bun .agents/skills/test/apps/ios/image-widget.ts --device ox-2 --chat <saved-Mock-QA-chat-seeded-with-0> --app <Ox.app>
+bun .agents/skills/test/apps/ios/profile-files.ts --device ox-3 --chat <seeded-saved-Mock-QA-chat> --app <Ox.app>
+bun .agents/skills/test/apps/ios/ox-errors.ts --device ox-2 --host <ws-url> --chat <idle-QA-chat>
 bun .agents/skills/test/apps/ios/durable-chat.ts --device ox-1 --app <Ox.app> --evidence /tmp/ox-model-qa --models
 ```
 
@@ -105,6 +107,8 @@ Bundled skill boundaries use `bun .agents/skills/test/apps/ios/bundled-skills.ts
 
 `durable-chat.ts --models` uses native Mock scenario `23` through the actual UI without Host ingress. It verifies deferred switches, pending no-ops, Stop/failure cancellation, and the next queued turn's model, then runs `23 defaults` to verify default selection/reset, invalid arguments, current-chat isolation, and restoration. It uses the explicit temporary SQLite fixture and restores the normal launch environment; it does not change provider credentials and restores the original new-chat default. This fixture requires automatic or Mock defaults. Default relaunch checks require the Host-based suite; persisted-chat model reload is not covered.
 
+`ox-errors.ts` checks the live VM's three-field `code`, `message`, and `recovery` errors across schema validation, filesystem/native bridges, denied System mutations, missing service attachments, serialization, console output, and uncaught failures. It also verifies help, aliases, parallel failures, and successful calls. Use an idle QA chat and a fresh installed build; it does not change files, settings, policies, or chat selection.
+
 `image-widget.ts` verifies remote/local image display, zoom-viewer handoff, source
 validation, artifact rename, model-context separation, process reopen, and remote
 failure/retry through `ox` and `sim`. Use a dedicated saved Mock QA chat seeded with
@@ -114,6 +118,8 @@ changes approval policies, provider credentials, or website state. Mock accepts
 `execute\n<JavaScript>` for runner-supplied tool calls; keep feature fixtures in E2E
 rather than numbered scenarios. After seeding, use the prepared saved ID from
 `chat inspect`, not the provisional ID returned by `chat new`.
+
+`profile-files.ts` uses a saved Mock chat whose first message starts with `QA filesystem backend verification seed.` and a fresh installed app. It verifies conversation-relative writes, private paths, checked edits, directory moves retiring old references, same-path live edits, independent copies, current attachment types, empty-directory persistence, and process reopen. It creates and deletes one run-owned chat to verify transferred-back ownership cleanup and shared-copy survival, then removes its shared fixtures through ordinary chat approval without changing Action policies. It does not establish hidden predecessor-archive retention, predecessor upgrade, package round trips, real-provider submission, or physical-device power-loss safety. Pass `--profile-folder <active-local-name>` to also verify the public/private split, external create/edit/move/delete/recreate, physical Memory, and writable user skill resources. Original Memory bytes are restored even after failure. The old artifact presentation helper is used only to inspect the compatibility reference facade. A queued send followed by idle is not proof that a Mock tool ran; verify its result or independent filesystem effect, and retain submission/approval evidence when either is absent.
 
 `test:demo` checks native preview
 presentation and unchanged profile/repository state, not live integrations; use

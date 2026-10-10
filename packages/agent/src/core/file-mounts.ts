@@ -8,11 +8,14 @@ export interface FileBackend {
   info(path: string, context: Context): Promise<FileInfo>;
   list(path: string, context: Context): Promise<FileInfo[]>;
   read(path: string, context: Context): Promise<string | Uint8Array>;
-  write?(path: string, content: string | Uint8Array, context: Context): Promise<void>;
+  write?(path: string, content: string | Uint8Array, context: Context, expected?: string): Promise<void>;
   edit?(path: string, edits: { oldText: string; newText: string }[], context: Context): Promise<void>;
   remove?(path: string, context: Context): Promise<void>;
   flush?(path: string, context: Context): Promise<void>;
-  createDirectory?(path: string, context: Context): Promise<void>;
+  createDirectory?(path: string, context: Context, recursive?: boolean): Promise<void>;
+  removeDirectory?(path: string, recursive: boolean, context: Context): Promise<void>;
+  move?(from: string, to: string, context: Context): Promise<void>;
+  copy?(from: string, to: string, context: Context): Promise<void>;
 }
 export type FileMount = {
   readonly path: string;
@@ -28,6 +31,9 @@ export interface MountedExecutionEnv extends ExecutionEnv {
   readonly mounts: readonly FileMount[];
   assertWritable(path: string): void;
   editFile(path: string, edits: { oldText: string; newText: string }[], context: Context): Promise<Result<void, FileError>>;
+  writeChecked(path: string, content: string, expected: string, context: Context): Promise<Result<void, FileError>>;
+  removeDirectory(path: string, recursive: boolean, context: Context): Promise<Result<void, FileError>>;
+  transfer(from: string, to: string, copy: boolean, context: Context): Promise<Result<void, FileError>>;
 }
 
 function freezeTextFiles(files: Readonly<Record<string, string>>) {
@@ -66,7 +72,7 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
   if (!scope) throw new FileError("invalid", "Filesystem scope identity is required");
   const mounts = Object.freeze(inputs.map(mount => {
     const path = canonical(mount.path);
-    if (!path || path !== mount.path || !["readOnly", "readWrite"].includes(mount.access)) throw new FileError("invalid", "Invalid filesystem mount", mount.path);
+    if (path !== mount.path || !["readOnly", "readWrite"].includes(mount.access)) throw new FileError("invalid", "Invalid filesystem mount", mount.path);
     const source = mount.source.kind === "text" ? Object.freeze({ kind: "text" as const, files: freezeTextFiles(mount.source.files) }) : Object.freeze({ ...mount.source });
     if (source.kind === "text" && mount.access !== "readOnly") throw new FileError("invalid", "Text mounts must be read-only", path);
     const backend = source.kind === "text" ? textBackend({ path, access: "readOnly", files: source.files }) : source.backend;
@@ -74,22 +80,22 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
     return Object.freeze({ ...mount, source, path, backend, backendPath: canonical(source.kind === "backend" ? source.path ?? "" : "") }) as FileMount & { backend: FileBackend; backendPath: string };
   }));
   for (const mount of mounts) for (const other of mounts) {
-    if (mount !== other && (mount.path === other.path || mount.path.startsWith(other.path + "/"))) throw new FileError("invalid", `Overlapping filesystem mounts: ${mount.path} and ${other.path}`);
+    if (mount !== other && (mount.path === other.path || (other.path && mount.path.startsWith(other.path + "/")))) throw new FileError("invalid", `Overlapping filesystem mounts: ${mount.path} and ${other.path}`);
   }
   let closed = false;
   const path = (input: string) => { if (closed) throw new FileError("invalid", "Filesystem view is closed"); return canonical(input); };
   const route = (input: string, mutation = false) => {
     const name = path(input);
-    const mount = mounts.find(mount => name === mount.path || name.startsWith(mount.path + "/"));
+    const mount = mounts.find(mount => mount.path && (name === mount.path || name.startsWith(mount.path + "/"))) ?? mounts.find(mount => mount.path === "");
     if (!mount) throw new FileError("not_found", "No mount owns this path", input);
     if (mutation && mount.access !== "readWrite") throw new FileError("permission_denied", "Mount is read-only", input);
-    const relative = name === mount.path ? "" : name.slice(mount.path.length + 1);
+    const relative = !mount.path ? name : name === mount.path ? "" : name.slice(mount.path.length + 1);
     const target = [mount.backendPath, relative].filter(Boolean).join("/");
     if (mutation) mount.backend.assertWritable?.(target);
     return { mount, name, target };
   };
   const result = async <T>(body: () => Promise<T>): Promise<Result<T, FileError>> => {
-    try { return ok(await body()); } catch (error) { return err(error instanceof FileError ? error : new FileError("unknown", String(error))); }
+    try { return ok(await body()); } catch (error) { return err(error instanceof FileError ? error : new FileError("unknown", error instanceof Error ? error.message : String(error), undefined, error instanceof Error ? error : undefined)); }
   };
   const call = <T>(input: string, mutation: boolean, body: (backend: FileBackend, target: string) => Promise<T>) =>
     result(async () => { const { mount, target } = route(input, mutation); return body(mount.backend, target); });
@@ -121,9 +127,14 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
       if ((await info(input, context)).kind !== "directory") throw new FileError("not_directory", "Not a directory", input);
       const prefix = name ? name + "/" : "";
       const children = mounts.filter(mount => mount.visibility !== "unlisted" && mount.path.startsWith(prefix)).map(mount => mount.path.slice(prefix.length).split("/")[0]!);
-      if (children.length) return (await Promise.all([...new Set(children)].sort().map(async child => {
-        try { return await info(prefix + child, context); } catch (error) { if (error instanceof FileError && error.code === "not_found") return undefined; throw error; }
-      }))).filter((entry): entry is FileInfo => entry !== undefined);
+      const fallback = mounts.find(mount => mount.path === "");
+      if (children.length && (!name || !fallback)) {
+        const entries = fallback && !name ? await fallback.backend.list(fallback.backendPath, context) : [];
+        const projected = (await Promise.all([...new Set(children)].filter(Boolean).sort().map(async child => {
+          try { return await info(prefix + child, context); } catch (error) { if (error instanceof FileError && error.code === "not_found") return undefined; throw error; }
+        }))).filter((entry): entry is FileInfo => entry !== undefined);
+        return [...new Map([...entries, ...projected].map(entry => [entry.path, entry])).values()].sort((a, b) => a.name.localeCompare(b.name));
+      }
       const { mount, target } = route(input);
       const entries = await mount.backend.list(target, context);
       return entries.map(entry => {
@@ -153,6 +164,10 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
       if (!backend.write) throw new FileError("not_supported", "Mount does not support writes", input);
       await backend.write(target, content, context);
     }),
+    writeChecked: async (input, content, expected, context) => call(input, true, async (backend, target) => {
+      if (!backend.write) throw new FileError("not_supported", "Mount does not support writes", input);
+      await backend.write(target, content, context, expected);
+    }),
     editFile: async (input, edits, context) => call(input, true, async (backend, target) => {
       if (!backend.edit) throw new FileError("not_supported", "Mount does not support atomic edits", input);
       await backend.edit(target, edits, context);
@@ -165,11 +180,22 @@ export function mountedFileSystem(scope: string, inputs: readonly FileMount[]): 
       if (!backend.flush) throw new FileError("not_supported", "Mount does not support flush", input);
       await backend.flush(target, context);
     }),
-    createDir: async (input, _options, context) => result(async () => {
+    removeDirectory: async (input, recursive, context) => call(input, true, async (backend, target) => {
+      if (!backend.removeDirectory) throw new FileError("not_supported", "Mount does not support directory removal", input);
+      await backend.removeDirectory(target, recursive, context);
+    }),
+    transfer: async (from, to, copy, context) => result(async () => {
+      const source = route(from, !copy), destination = route(to, true);
+      if (source.mount.backend !== destination.mount.backend) throw new FileError("not_supported", "Transfers across filesystem mounts are unavailable", from);
+      const operation = copy ? source.mount.backend.copy : source.mount.backend.move;
+      if (!operation) throw new FileError("not_supported", "Mount does not support this transfer", from);
+      await operation(source.target, destination.target, context);
+    }),
+    createDir: async (input, options, context) => result(async () => {
       const name = path(input);
-      if (!name || mounts.some(mount => mount.path.startsWith(name + "/"))) return;
+      if (!name || mounts.some(mount => mount.path.startsWith(name + "/"))) throw new FileError("permission_denied", "Mount roots are managed", input);
       const { mount, target } = route(input, true);
-      if (mount.backend.createDirectory) await mount.backend.createDirectory(target, context);
+      if (mount.backend.createDirectory) await mount.backend.createDirectory(target, context, options?.recursive);
       else if ((await mount.backend.info(target, context)).kind !== "directory") throw new FileError("not_directory", "Mount does not support directory creation", input);
     }),
     appendFile: unavailable, truncateFile: unavailable, renameFile: unavailable,

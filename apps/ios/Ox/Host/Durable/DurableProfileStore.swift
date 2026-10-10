@@ -63,11 +63,11 @@ actor DurableProfileStore {
         guard scope.location == .local else { throw RuntimeError.bridge("Pi Profiles require local storage; import an offline snapshot into a local Profile") }
         let opening = Task<Session, Error> {
             let host = DurableAgentHost()
-            let runtime = DurableRuntime(databaseURL: root.appendingPathComponent("state.sqlite"), artifactRoot: root) { method, params, stream in
+            let runtime = DurableRuntime(databaseURL: scope.stateRoot.appendingPathComponent("state.sqlite"), fileRoot: root) { method, params, stream in
                 try await host.handle(method, params, stream: stream)
             }
             do {
-                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(profileID.uuidString), "artifactFiles": .bool(true)]).jsonString())
+                _ = try await runtime.command(JSONValue.object(["action": .string("open"), "profileID": .string(profileID.uuidString), "artifactFiles": .bool(true), "workspace": .bool(true), "publicFiles": .bool(true)]).jsonString())
                 let resources = try await runtime.fileMounts(scope: profileID)
                 Log.agent.info("PiDurable Profile opened profile=\(profileID)")
                 return Session(runtime: runtime, host: host, scope: scope, resources: resources, skills: try await runtime.skillPackages(scope: profileID))
@@ -83,14 +83,14 @@ actor DurableProfileStore {
         return try JSONDecoder().decode(JSONValue.self, from: Data(try await session.runtime.command(value.jsonString()).utf8))
     }
 
-    func readArtifact(scope: ProfileScope, artifact: JSONValue) async throws -> Data {
-        try await session(in: scope).runtime.readArtifact(artifact)
+    func readFile(scope: ProfileScope, file: JSONValue) async throws -> Data {
+        try await session(in: scope).runtime.readFile(file)
     }
 
-    func readArtifactData(path: String, in scope: ProfileScope) async throws -> Data {
-        let result = try await command(scope: scope, value: .object(["action": .string("fileArtifact"), "path": .string(path)]))
-        guard let artifact = result.objectValue?["artifact"], artifact != .null else { throw RuntimeError.bridge("Artifact is not committed in this Profile") }
-        return try await readArtifact(scope: scope, artifact: artifact)
+    func readFileData(path: String, in scope: ProfileScope) async throws -> Data {
+        let result = try await command(scope: scope, value: .object(["action": .string("fileStat"), "path": .string(path)]))
+        guard let file = result.objectValue?["file"], file != .null else { throw RuntimeError.bridge("File is not committed in this Profile") }
+        return try await readFile(scope: scope, file: file)
     }
 
     func close(in scope: ProfileScope) async throws {

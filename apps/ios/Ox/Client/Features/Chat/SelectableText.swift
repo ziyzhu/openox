@@ -402,7 +402,7 @@ struct SelectableText: UIViewRepresentable {
             case .web:
                 return UITextItem.MenuConfiguration(menu: defaultMenu)
             case .artifact:
-                let open = UIAction(title: L10n.string("Open", comment: "Opens an artifact linked from an assistant message."),
+                let open = UIAction(title: L10n.string("Open", comment: "Opens a file linked from an assistant message."),
                                     image: UIImage(systemName: "arrow.up.right.circle")) { [weak self] _ in
                     self?.open(url)
                 }

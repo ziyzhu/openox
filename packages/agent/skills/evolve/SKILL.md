@@ -19,7 +19,7 @@ For web-service authoring, read `references/helpers.js` only when a helper is ne
 
 Read `references/api-service.md` for direct HTTP API services with API-key, Basic, Bearer, or OAuth authentication.
 
-Read `references/model-service.md` when adding or editing standard model-generation Actions on a web service. Model providers use the same copy-to-Local, conflict resolution, validation, and Save workflow as other services.
+Read `references/model-service.md` when adding or editing website conversation Actions. Websites remain services, not Ox model providers; never build a browser bridge for the agent loop. API-backed providers are managed through `skills/manage-providers/SKILL.md`.
 
 ## Ownership and safeguards
 

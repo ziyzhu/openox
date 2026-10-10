@@ -34,12 +34,14 @@ nonisolated public struct TransientAttachment: Sendable, Equatable {
     public let mimeType: String
     public let displayName: String
     public let data: Data
+    public let reference: String?
 
-    public init(kind: Kind, mimeType: String, displayName: String, data: Data) {
+    public init(kind: Kind, mimeType: String, displayName: String, data: Data, reference: String? = nil) {
         self.kind = kind
         self.mimeType = mimeType
         self.displayName = displayName
         self.data = data
+        self.reference = reference
     }
 }
 

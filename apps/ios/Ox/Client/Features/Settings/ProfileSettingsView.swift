@@ -139,9 +139,9 @@ struct ProfileSettingsView: View {
             if profile?.location == .external {
                 Text("This closes the Profile in Ox. Its folder and contents stay in Files.")
             } else if profile?.location == .iCloud {
-                Text("This removes it from iCloud and all your devices — chats, artifacts, character and memory. This can't be undone.")
+                Text("This removes it from iCloud and all your devices — chats, files, character and memory. This can't be undone.")
             } else {
-                Text("This removes it from this device — chats, artifacts, character and memory. This can't be undone.")
+                Text("This removes it from this device — chats, files, character and memory. This can't be undone.")
             }
         }
     }
@@ -355,7 +355,7 @@ private struct ProfileContentsView: View {
                     if let context { artifactsView(context) }
                 } label: {
                     SettingsDisclosureRow(
-                        title: "Artifacts",
+                        title: "Files",
                         value: artifactsSummary,
                         isLoading: context == nil
                     )

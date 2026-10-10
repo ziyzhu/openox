@@ -40,6 +40,10 @@ nonisolated enum Actions {
     static let fsWrite = "ox.fs.write"
     static let fsEdit = "ox.fs.edit"
     static let fsDelete = "ox.fs.delete"
+    static let fsMkdir = "ox.fs.mkdir"
+    static let fsRmdir = "ox.fs.rmdir"
+    static let fsMove = "ox.fs.move"
+    static let fsCopy = "ox.fs.copy"
     static let fsGlob = "ox.fs.glob"
     static let fsGrep = "ox.fs.grep"
     static let visionAnalyze = "ox.vision.analyze"
@@ -105,7 +109,7 @@ nonisolated enum Actions {
         appLogs, appRenameChat,
         webSearch, webFetch,
     ] + BrowserFunctionCatalog.actionNames + [
-        fsList, fsRead, fsAttach, outputRead, fsWrite, fsEdit, fsDelete, fsGlob, fsGrep,
+        fsList, fsRead, fsAttach, outputRead, fsWrite, fsEdit, fsDelete, fsMkdir, fsRmdir, fsMove, fsCopy, fsGlob, fsGrep,
         visionAnalyze,
         serviceFind, serviceList, serviceListAttached, serviceInspect, serviceValidate, serviceCreate,
         serviceUpdate, serviceCopy, serviceDelete, repositoryConnect, repositorySync, repositoryEnable, repositoryDisconnect,
@@ -123,7 +127,7 @@ nonisolated enum Actions {
 
     static func defaultPolicy(for action: String) -> ActionPolicy {
         guard builtIn.contains(action) else { return .ask }
-        return action.hasSuffix(".delete") ? .ask : .allow
+        return action.hasSuffix(".delete") || action == fsRmdir ? .ask : .allow
     }
 
     static func label(for action: String) -> String? {
@@ -162,7 +166,8 @@ nonisolated enum Actions {
         case fsRead, outputRead: L10n.string("Read a file")
         case fsWrite: L10n.string("Write a file")
         case fsEdit: L10n.string("Edit a file")
-        case fsDelete: L10n.string("Delete a file")
+        case fsDelete, fsRmdir: L10n.string("Delete a file")
+        case fsMkdir, fsMove, fsCopy: L10n.string("Write a file")
         case fsGlob: L10n.string("Find files")
         case fsGrep: L10n.string("Search files")
         case fsAttach: L10n.string("Add attachment")

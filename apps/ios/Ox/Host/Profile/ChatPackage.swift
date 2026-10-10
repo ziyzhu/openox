@@ -8,14 +8,22 @@ extension UTType {
     nonisolated static let chatPackage = UTType(exportedAs: AppConfiguration.chatTypeIdentifier, conformingTo: .zip)
 }
 
+nonisolated struct ChatPackageFiles: Sendable {
+    let data: [String: Data]
+    let names: [String: String]
+}
+
 nonisolated struct ChatPackageDocument: Transferable, Sendable {
     let state: ChatState
     let fileName: String
+    let scope: ProfileScope? = StorageRoot.currentScope
 
     static var transferRepresentation: some TransferRepresentation {
         DataRepresentation(exportedContentType: .chatPackage) { document in
+            guard let scope = document.scope else { throw CocoaError(.fileNoSuchFile) }
+            let files = try await ProfileRepository.shared.chatPackageFiles(document.state, in: scope)
             let data = try await Task.detached(priority: .userInitiated) {
-                try ChatPackageCodec.encode(document.state)
+                try ChatPackageCodec.encode(document.state, files: files.data, fileNames: files.names)
             }.value
             Log.ui.info("ChatPackage.export chat=\(document.state.meta.id) turns=\(document.state.turns.count) bytes=\(data.count)")
             return data
@@ -67,7 +75,7 @@ nonisolated struct MaterializedChatPackage: Sendable {
 }
 
 nonisolated extension PreparedChatPackage {
-    func materialized(artifactNames: [String: String], directory: URL) throws -> MaterializedChatPackage {
+    func materialized(artifactNames: [String: String], directory: URL, dependencyNames: [String: String]? = nil) throws -> MaterializedChatPackage {
         var updatedTurns = turns
         for (source, destination) in artifactNames {
             updatedTurns = updatedTurns.map {
@@ -91,7 +99,7 @@ nonisolated extension PreparedChatPackage {
             let destination = artifactNames[source.lowercased()] ?? source
             var rewritten = data
             if var text = String(data: data, encoding: .utf8) {
-                for (originalKey, replacement) in artifactNames {
+                for (originalKey, replacement) in dependencyNames ?? artifactNames {
                     guard originalKey.caseInsensitiveCompare(replacement) != .orderedSame else { continue }
                     let original = artifacts.keys.first { $0.lowercased() == originalKey } ?? originalKey
                     text = text.replacingOccurrences(of: original, with: replacement)
@@ -154,20 +162,35 @@ nonisolated enum ChatPackageCodec {
     static let maximumPackageBytes = 128 * 1024 * 1024
     static let maximumEntryBytes = 32 * 1024 * 1024
     private static let maximumHeaderBytes = 1024 * 1024
-    private static let maximumEntries = 256
+    static let maximumEntries = 256
     private static let packageVersion = 1
     private static let headerPath = "chat.json"
     private static let turnsPath = "turns.jsonl"
     private static let contextPath = "context.json"
     private static let artifactsPrefix = "artifacts/"
 
-    static func encode(_ state: ChatState) throws -> Data {
+    static func encode(_ state: ChatState, files: [String: Data]? = nil, fileNames: [String: String] = [:]) throws -> Data {
         guard !state.turns.isEmpty else { throw ChatPackageError.invalidTranscript }
-        let prepared = try validate(turns: state.turns, context: state.context)
+        var prepared = try validate(turns: state.turns, context: state.context)
+        if !fileNames.isEmpty {
+            let directory = FileManager.default.temporaryDirectory
+            var turns = prepared.turns
+            for (source, destination) in fileNames { turns = turns.map { $0.replacingArtifact(named: source, with: destination, directory: directory) } }
+            let context: AgentContextCheckpoint?
+            if let retained = prepared.context, let boundary = prepared.contextBoundary {
+                context = AgentContextCheckpoint(messages: retained.messages.map { $0.replacingArtifacts(fileNames, directory: directory) },
+                    tokensBefore: retained.tokensBefore, turns: turns, through: boundary)
+            } else { context = nil }
+            prepared = try validate(turns: turns, context: context)
+        }
         let turns = try encodeTurns(prepared.turns)
         let context = try prepared.context.map { try JSONEncoder().encode($0) }
-        let directArtifacts = try artifactData(turns: prepared.turns, context: prepared.context)
-        let artifacts = try includingArtifactDependencies(directArtifacts.data, directory: directArtifacts.directory)
+        let artifacts: [String: Data]
+        if let files { artifacts = files }
+        else {
+            let directArtifacts = try artifactData(turns: prepared.turns, context: prepared.context)
+            artifacts = try includingArtifactDependencies(directArtifacts.data, directory: directArtifacts.directory)
+        }
 
         var bodyFiles = [ZipArchiveCodec.File(path: turnsPath, data: turns)]
         if let context { bodyFiles.append(.init(path: contextPath, data: context)) }
@@ -384,7 +407,7 @@ nonisolated enum ChatPackageCodec {
         return result
     }
 
-    private static func referencedArtifacts(turns: [Turn], context: AgentContextCheckpoint?) -> [Artifact] {
+    static func referencedArtifacts(turns: [Turn], context: AgentContextCheckpoint?) -> [Artifact] {
         var result: [Artifact] = []
         for turn in turns {
             switch turn {
@@ -431,6 +454,61 @@ nonisolated enum ChatPackageCodec {
             case .checksumMismatch: throw ChatPackageError.checksumMismatch
             }
         }
+    }
+}
+
+extension ProfileRepository {
+    func chatPackageFiles(_ state: ChatState, in scope: ProfileScope) async throws -> ChatPackageFiles {
+        let inventory = try await profileFiles(prefix: "", in: scope).filter { $0.reference != nil }
+        var pending: [DurableProfileFile] = []
+        var names: [String: String] = [:]
+        for artifact in ChatPackageCodec.referencedArtifacts(turns: state.turns, context: state.context) {
+            guard let file = inventory.first(where: { $0.reference == artifact.fileName }) ?? inventory.first(where: { $0.aliases?.contains(artifact.fileName) == true }) else {
+                throw ChatPackageError.missingArtifact(artifact.fileName)
+            }
+            names[artifact.fileName.lowercased()] = Self.packageFileName(file)
+            if !pending.contains(where: { $0.reference == file.reference }) { pending.append(file) }
+        }
+        var result: [String: Data] = [:]
+        var total = 0
+        while !pending.isEmpty {
+            let file = pending.removeFirst(), name = Self.packageFileName(file)
+            if result[name] != nil { continue }
+            guard result.count < ChatPackageCodec.maximumEntries - 3,
+                  file.size <= ChatPackageCodec.maximumEntryBytes, file.size <= ChatPackageCodec.maximumPackageBytes - total else { throw ChatPackageError.tooLarge }
+            let descriptor = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(file))
+            let data = try await DurableProfileStore.shared.readFile(scope: scope, file: descriptor)
+            total += data.count
+            guard total <= ChatPackageCodec.maximumPackageBytes else { throw ChatPackageError.tooLarge }
+            if var text = String(data: data, encoding: .utf8), data.count <= ArtifactLimits.textBytes {
+                for candidate in inventory where candidate.path != file.path {
+                    let relative = Self.relativeWorkspacePath(from: file.path, to: candidate.path)
+                    let encoded = relative.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? relative
+                    guard text.contains(relative) || text.contains(encoded) else { continue }
+                    let destination = Self.packageFileName(candidate)
+                    text = text.replacingOccurrences(of: encoded, with: destination)
+                    if encoded != relative { text = text.replacingOccurrences(of: relative, with: destination) }
+                    if result[destination] == nil && !pending.contains(where: { $0.reference == candidate.reference }) { pending.append(candidate) }
+                    guard pending.count + result.count < ChatPackageCodec.maximumEntries - 3 else { throw ChatPackageError.tooLarge }
+                }
+                result[name] = Data(text.utf8)
+            } else { result[name] = data }
+        }
+        Log.app.info("ChatPackage.files profile=\(scope.profileID?.uuidString ?? "temporary") files=\(result.count) bytes=\(total)")
+        return ChatPackageFiles(data: result, names: names)
+    }
+
+    nonisolated private static func packageFileName(_ file: DurableProfileFile) -> String {
+        let identity = URL(fileURLWithPath: file.reference!).deletingPathExtension().lastPathComponent
+        let suffix = URL(fileURLWithPath: file.path).pathExtension
+        return identity + (suffix.isEmpty ? "" : "." + suffix)
+    }
+
+    nonisolated private static func relativeWorkspacePath(from: String, to: String) -> String {
+        var source = from.split(separator: "/").dropLast().map(String.init)
+        var destination = to.split(separator: "/").map(String.init)
+        while !source.isEmpty, source.first == destination.first { source.removeFirst(); destination.removeFirst() }
+        return (Array(repeating: "..", count: source.count) + destination).joined(separator: "/")
     }
 }
 

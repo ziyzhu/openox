@@ -65,9 +65,7 @@ final class ServiceManager {
         case ready(UInt64)
     }
 
-    private var resolvedServices = ResolvedServices() {
-        didSet { ProviderRegistry.shared.refreshModelServices(resolvedServices.services) }
-    }
+    private var resolvedServices = ResolvedServices()
     var services: [Service] { resolvedServices.services }
     private var byDomain: [String: Service] { resolvedServices.byDomain }
     private(set) var monoRepositoryRevision: UInt64 = 0 {
@@ -125,7 +123,6 @@ final class ServiceManager {
     }
 
     @ObservationIgnored private var attachedServiceDomainsByChat: [UUID: Set<String>] = [:]
-    @ObservationIgnored var webModelContexts: [UUID: WebModelContext] = [:]
     @ObservationIgnored var webConversations: [UUID: WebConversation] = [:]
     @ObservationIgnored var openingWebConversations: [UUID: WebConversation.Opening] = [:]
 
@@ -198,7 +195,6 @@ final class ServiceManager {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.actionScheduler.releaseIdle(reason: .memoryWarning)
-                self.closeWebModelContexts(reason: "memoryWarning")
                 self.closeWebConversations()
             }
         }
@@ -469,17 +465,8 @@ final class ServiceManager {
     func removeAttachedServices(for chatID: UUID) {
         let previous = attachedServiceDomainsByChat.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         attachedServiceDomainsByChat.removeValue(forKey: chatID)
-        webModelContexts.removeValue(forKey: chatID)?.close()
         closeWebConversations(owner: .chat(chatID))
         updateMCPActivation(from: previous)
-    }
-
-    private func closeWebModelContexts(reason: String) {
-        guard !webModelContexts.isEmpty else { return }
-        Log.service.info("ModelService.release reason=\(reason) count=\(webModelContexts.count)")
-        let contexts = webModelContexts.values
-        webModelContexts.removeAll()
-        contexts.forEach { $0.close() }
     }
 
     private func updateMCPActivation(from previous: Set<String>) {
@@ -1167,7 +1154,6 @@ final class ServiceManager {
 
     func serviceCapabilitiesDidChange(_ service: Service) {
         guard byDomain[service.domain] === service else { return }
-        ProviderRegistry.shared.refreshModelServices(services)
         monoRepositoryRevision &+= 1
         reindexMonoRepository()
     }

@@ -11,10 +11,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
 
     var name: String { Self.schema.name }
     var description: String { Self.schema.description }
-    var websiteDescription: String { Self.websiteDescription }
     var parameters: JSONValue { Self.schema.parameters }
-
-    private static let websiteDescription = executeDescription(website: true)
 
     static let schema = ToolSchema(
         name: "execute",
@@ -40,10 +37,9 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         ])
     )
 
-    private static func executeDescription(website: Bool = false) -> String {
+    private static func executeDescription() -> String {
         ModelGuidance.execute(
             catalog: OxFunctionCatalog.helpTree(),
-            website: website,
             timeoutSeconds: Int(VirtualMachine.defaultTimeout),
             maxLines: JavaScriptOutputLimits.maxLines,
             maxBytes: JavaScriptOutputLimits.maxBytes,

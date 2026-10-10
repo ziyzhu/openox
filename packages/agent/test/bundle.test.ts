@@ -1,7 +1,7 @@
 import { beforeAll, expect, it } from "bun:test";
 import { createContext, runInContext } from "node:vm";
 import { defaultSoul, responseDirective } from "../src/core/prompts";
-import { websiteInstructions, providerIdentity } from "../src/core/provider-prompts";
+import { providerIdentity } from "../src/core/provider-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { nativeGuidanceSource } from "../native-guidance";
 import { bundledSkills } from "../src/core/bundled-skills";
@@ -22,22 +22,7 @@ it("ships a standalone prompt renderer and byte-identical default SOUL without a
     realm.language = language;
     expect(runInContext("OxPrompts.responseDirective(language)", realm)).toBe(responseDirective(language));
   }
-  for (const input of [
-    { systemPrompt: null, actionsJSON: "" },
-    { systemPrompt: "summarization instructions", actionsJSON: "" },
-    { systemPrompt: "Ox instructions", actionsJSON: JSON.stringify([{ function: { description: "Read files / 文档", name: "execute", parameters: { type: "object" } }, type: "function" }]) },
-  ]) {
-    realm.input = input;
-    const rendered = runInContext("OxPrompts.websiteInstructions(input)", realm) as string;
-    expect(rendered).toBe(websiteInstructions(input));
-    expect(rendered.includes("<ox_actions>")).toBe(input.actionsJSON !== "");
-    expect(rendered).toContain("Answer the latest user request or continue from its Ox Action result.");
-    if (input.systemPrompt) expect(rendered).toContain(input.systemPrompt);
-    if (input.actionsJSON) expect(rendered).toContain(input.actionsJSON);
-    expect(rendered).not.toContain("uploaded_file");
-  }
   expect(() => runInContext("OxPrompts.responseDirective({})", realm)).toThrow("Response language requires");
-  expect(() => runInContext("OxPrompts.websiteInstructions({})", realm)).toThrow("Website prompt requires");
   for (const [key, text] of Object.entries(guidanceTexts)) {
     realm.key = key;
     expect(runInContext("OxPrompts.guidanceText(key)", realm)).toBe(text);
@@ -98,7 +83,7 @@ it("uses explicit prompt variants without inferring prose from capabilities and 
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
   expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'ox'})", realm)).toContain("ox.service.inspect");
-  expect(runInContext("OxPrompts.executeGuidance({...guide,variant:'website'})", realm)).not.toContain("ox.service.inspect");
+  expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'website'})", realm)).toThrow("Unknown execution guidance variant");
   expect(() => runInContext("OxPrompts.executeGuidance({...guide,variant:'__proto__'})", realm)).toThrow("Unknown execution guidance variant");
 });
 

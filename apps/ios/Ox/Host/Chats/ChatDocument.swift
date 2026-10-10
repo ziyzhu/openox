@@ -235,6 +235,15 @@ nonisolated struct ChatDocument {
         reproject()
     }
 
+    mutating func refreshArtifacts(_ files: [String: Artifact]) {
+        let updated = turns.map { turn in
+            turn.mappingArtifacts { files[$0.fileName] ?? files[$0.fileName.lowercased()] ?? $0.updatingAvailability(.unavailable) }
+        }
+        guard updated != turns else { return }
+        turns = updated
+        reproject()
+    }
+
     private static func artifacts(in block: Block) -> [Artifact] {
         switch block.kind {
         case .userText(_, let attachments), .userSkill(_, let attachments):

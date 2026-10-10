@@ -329,7 +329,7 @@ enum A11yLabel {
     static var pin: String { L10n.string("Pin", comment: "") }
     static var unpin: String { L10n.string("Unpin", comment: "") }
     static var services: String { L10n.string("Services", comment: "") }
-    static var artifacts: String { L10n.string("Artifacts", comment: "") }
+    static var artifacts: String { L10n.string("Files", comment: "") }
     static var skills: String { L10n.string("Skills", comment: "") }
     static var openSidebar: String { L10n.string("Open chat history", comment: "") }
     static var resizeSidebar: String { L10n.string("Resize chat history", comment: "") }
@@ -340,7 +340,7 @@ enum A11yLabel {
     static var scrollToBottom: String { L10n.string("Scroll to bottom", comment: "") }
     static var copyMessage: String { L10n.string("Copy message", comment: "") }
     static var shareMessage: String { L10n.string("Share message", comment: "") }
-    static var shareArtifact: String { L10n.string("Share artifact", comment: "") }
+    static var shareArtifact: String { L10n.string("Share file", comment: "") }
     static var copyCode: String { L10n.string("Copy code", comment: "") }
     static var branchMessage: String { L10n.string("Branch from this reply", comment: "") }
     static var retryMessage: String { L10n.string("Regenerate reply", comment: "") }

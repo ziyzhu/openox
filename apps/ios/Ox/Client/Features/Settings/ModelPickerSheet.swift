@@ -89,7 +89,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
                         "Profiles",
-                        footer: "Profiles hold chats, artifacts, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
+                        footer: "Profiles hold chats, files, character, and memory. Keep several, switch anytime, and store locally or sync with iCloud.",
                         layout: .group
                     ) {
                         VStack(spacing: 0) {
@@ -504,10 +504,8 @@ struct ModelPickerContent: View {
     private let mode: Mode
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(ServiceManager.self) private var serviceManager
     @State private var choosingProvider = false
     @State private var authRevision = 0
-    @State private var verifiedWebsiteProviderID: String?
     @State private var selectedRegion: LLMRegion
     @State private var providerSelection: ProviderSelection
     @State private var selectedModelID: String
@@ -595,11 +593,6 @@ struct ModelPickerContent: View {
 
     private var isAuthenticated: Bool {
         guard let selectedClient else { return false }
-        if let provider = selectedClient as? WebServiceModelProvider {
-            guard verifiedWebsiteProviderID == provider.id,
-                  let service = serviceManager.service(domain: provider.domain) else { return false }
-            return service.signInState.isAuthenticated || service.signInState == .notRequired
-        }
         let hasKey = selectedClient.usesAPIKey
             && !apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let signedIn = selectedClient.subscriptionAccount?.isSignedIn == true
@@ -1025,7 +1018,6 @@ struct ModelPickerContent: View {
 
     private func providerDidChange() {
         dismissKeyboard()
-        if verifiedWebsiteProviderID != selectedClientID { verifiedWebsiteProviderID = nil }
         customError = nil
         providerCredentialError = nil
         loadCredentialDraft()
@@ -1184,14 +1176,12 @@ struct ModelPickerContent: View {
     }
 
     private func authenticationDidComplete(for client: any ProviderClient) {
-        if client is WebServiceModelProvider { verifiedWebsiteProviderID = client.id }
         if case .selection = mode {
             applySelection()
             return
         }
         guard case .authentication(let session) = mode else { return }
-        let website = client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
-        let signedIn = client.subscriptionAccount?.isSignedIn == true || website
+        let signedIn = client.subscriptionAccount?.isSignedIn == true
         session.complete(signedIn ? .authenticated : .credentialStored)
         dismiss()
     }
@@ -1208,8 +1198,7 @@ private struct ProviderPickerView: View {
 
     var body: some View {
         let directClients = clients.filter { $0.inferenceLocation == .onDevice }
-            + clients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey && !isWebsite($0) }
-            + clients.filter(isWebsite)
+            + clients.filter { $0.subscriptionAccount != nil && !$0.acceptsAPIKey }
         let directIDs = Set(directClients.map(\.id))
         let apiClients = clients.filter { !directIDs.contains($0.id) }
             .sorted { ($0.gettingStartedOffer?.priority ?? .max) < ($1.gettingStartedOffer?.priority ?? .max) }
@@ -1242,10 +1231,6 @@ private struct ProviderPickerView: View {
         )
     }
 
-    private func isWebsite(_ client: any ProviderClient) -> Bool {
-        client.models.first.flatMap { client.wireProtocol(for: $0) } == .web
-    }
-
     private func providerOption(_ client: any ProviderClient, showsSubtitle: Bool = false) -> SettingsSelectionOption<String?> {
         SettingsSelectionOption(
             id: client.id,
@@ -1253,7 +1238,6 @@ private struct ProviderPickerView: View {
             title: client.displayName,
             faviconDomain: client.website?.host,
             faviconURL: client.iconURL,
-            serviceDomain: (client as? WebServiceModelProvider)?.domain,
             subtitle: showsSubtitle ? subtitle(for: client) : nil,
             accessibilityIdentifier: A11yID.Chat.modelProviderOption(client.id)
         )
@@ -1273,7 +1257,6 @@ struct SettingsSelectionOption<Value: Hashable>: Identifiable {
     var systemImage: String? = nil
     var faviconDomain: String? = nil
     var faviconURL: URL? = nil
-    var serviceDomain: String? = nil
     var subtitle: String? = nil
     let accessibilityIdentifier: String
     var children: [SettingsSelectionOption<Value>] = []
@@ -1285,7 +1268,6 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
     @Binding var selection: Value
     var onSelect: ((Value) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
-    @Environment(ServiceManager.self) private var serviceManager
 
     var body: some View {
         ScrollView {
@@ -1344,9 +1326,7 @@ struct SettingsSelectionPickerView<Value: Hashable>: View {
 
     private func optionLabel(_ option: SettingsSelectionOption<Value>) -> some View {
         HStack(spacing: SettingsLayout.horizontalInset) {
-            if let domain = option.serviceDomain, let service = serviceManager.service(domain: domain) {
-                ServiceAvatar(service: service, size: 24, shape: .roundedRect(3))
-            } else if let faviconDomain = option.faviconDomain {
+            if let faviconDomain = option.faviconDomain {
                 DomainFavicon(domain: faviconDomain, size: 24, overrideURL: option.faviconURL)
             }
             if let systemImage = option.systemImage {

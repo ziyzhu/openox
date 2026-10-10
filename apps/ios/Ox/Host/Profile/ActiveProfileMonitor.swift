@@ -22,8 +22,8 @@ nonisolated enum ProfileContentArea: String, CaseIterable, Sendable {
         case "SOUL.md": return [.soul]
         case "skills": return [.skills]
         case "chats": return [.chats]
-        case "artifacts": return [.artifacts]
-        default: return [.configuration]
+        case "profile.json": return [.configuration]
+        default: return [.artifacts]
         }
     }
 }

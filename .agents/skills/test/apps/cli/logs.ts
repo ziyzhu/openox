@@ -1,13 +1,13 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
+import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 
 const rows = Array.from({ length: 2_807 }, (_, seq) => ({
   seq, time: "2026-10-04T00:00:00.000Z", level: seq % 7 === 0 ? "error" : "info",
   category: seq % 3 === 0 ? "Session" : "Perf", thread: "main", location: "[fixture:1]",
   message: seq === 0 ? "oldest retained failure" : `record ${seq}`,
 }));
-let legacy = false;
+let rpcV1WithoutPagination = false;
 let repeatingCursor = false;
 const levels = ["debug", "info", "warning", "error"];
 const server = Bun.serve({
@@ -20,6 +20,13 @@ const server = Bun.serve({
     message(socket, message) {
       const request = JSON.parse(String(message));
       try {
+        if (request.method === "host.describe") {
+          socket.send(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {
+            implementation: { name: "Logs E2E Host", version: "1", build: "1" },
+            protocols: { rpc: [RPC_VERSION] }, methods: ["host.describe", "logs.list"],
+          } }));
+          return;
+        }
         assert.equal(request.method, "logs.list");
         assert.ok(validateParams("logs.list", request.params));
         const params = request.params ?? {};
@@ -38,7 +45,7 @@ const server = Bun.serve({
         const logs = matches.slice(-(params.limit ?? 2_000));
         const hasMore = matches.length > logs.length;
         const nextCursor = hasMore ? Buffer.from(JSON.stringify({ before: logs[0]!.seq, signature })).toString("base64") : undefined;
-        const result = legacy ? { logs } : { logs, hasMore, nextCursor: repeatingCursor ? "stuck" : nextCursor };
+        const result = rpcV1WithoutPagination ? { logs } : { logs, hasMore, nextCursor: repeatingCursor ? "stuck" : nextCursor };
         assert.ok(validateResult("logs.list", result));
         socket.send(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }));
       } catch (error) {
@@ -86,10 +93,10 @@ try {
   for (const args of [["--limit", "0"], ["--limit", "2001"], ["--limit", "1.5"], ["--all", "--follow"], ["--page", "--tail", "1"]]) {
     assert.equal((await cli(host, ...args)).code, 1, args.join(" "));
   }
-  legacy = true;
+  rpcV1WithoutPagination = true;
   assert.ok(Array.isArray(await json(host)), "ordinary reads remain compatible with old Hosts");
   assert.match((await cli(host, "--all")).stderr, /does not support log pagination/);
-  legacy = false;
+  rpcV1WithoutPagination = false;
   repeatingCursor = true;
   assert.match((await cli(host, "--all", "--limit", "1")).stderr, /invalid log pagination cursor/);
   console.log("PASS CLI process E2E: older pages, appends, all/tail, sparse server filters, cursor errors, validation, old Hosts");

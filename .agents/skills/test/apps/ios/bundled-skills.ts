@@ -61,7 +61,7 @@ try {
     for (const name of Object.keys(ox.fs)) {
       for (const args of [{}, { purpose: "" }, { purpose: "x".repeat(81) }]) {
         try { await ox.fs[name](args); throw Error(name + " accepted invalid purpose"); }
-        catch (error) { if (!error.message.includes("purpose")) throw error; }
+        catch (error) { if (error.code !== "invalid_argument" || !error.message.includes("purpose")) throw error; }
       }
     }
     return true;

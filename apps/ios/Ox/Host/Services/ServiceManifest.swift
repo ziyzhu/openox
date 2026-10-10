@@ -321,13 +321,9 @@ nonisolated struct ServiceDefinition: Sendable {
         !isAPI && !isIOS && !isMCP && actionIndex[WebConversationContract.actionID] != nil
     }
 
-    var supportsModelGeneration: Bool {
-        !isAPI && !isIOS && !isMCP && (ModelServiceContract.requiredActionIDs.isSubset(of: Set(actionIndex.keys))
-            || (supportsConversation && actionIndex[ModelServiceContract.list] != nil))
-    }
-
     func isStandardAction(_ id: String) -> Bool {
-        Manifest.STANDARD_ACTION_IDS.contains(id) || (supportsModelGeneration && ModelServiceContract.actionIDs.contains(id))
+        Manifest.STANDARD_ACTION_IDS.contains(id)
+            || (!isAPI && !isIOS && !isMCP && ModelServiceContract.generationIDs.contains(id))
     }
 }
 

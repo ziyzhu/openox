@@ -7,9 +7,8 @@
 
 ## Ox account placement
 
-Ox presents Claude Website in Global. It uses the consumer website session inside Ox and is separate from the Anthropic API-key provider. The website model accepts text, image, and PDF input and checks completed answers against Claude's conversation record. User and Action attachments go through its native file input. Existing website drafts must be cleared by the user before Ox submits. Ox Action calls use an experimental prompt-based envelope.
+Claude Website remains an ordinary service using its consumer website session inside Ox, separate from the Anthropic API and Claude subscription providers. It can be consulted through explicit service Actions, but cannot run the Ox agent model. Preserve existing website drafts and verify submissions against remote conversation records.
 
 ## Runtime sources
 
-- Website provider: [claude.ai/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/claude.ai/actions.js)
-- Provider identity and region: [WebServiceModelProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/WebServiceModelProvider.swift)
+- Website service: [claude.ai/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/claude.ai/actions.js)

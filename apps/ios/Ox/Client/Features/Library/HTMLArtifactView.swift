@@ -89,7 +89,7 @@ struct HTMLArtifactView: View {
                 .id(document)
             case .failed(let message):
                 ContentUnavailableView(
-                    "Artifact unavailable",
+                    "File unavailable",
                     systemImage: artifact.exists ? "exclamationmark.triangle" : "questionmark.folder",
                     description: Text(message)
                 )
@@ -139,13 +139,13 @@ private struct HTMLArtifactLoadingView: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             CellularAutomatonLoader()
-            Text("Loading artifact…")
+            Text("Loading file…")
                 .font(.subheadline)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .opacity(labelVisibility == .visible ? 1 : 0)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Loading artifact…"))
+        .accessibilityLabel(Text("Loading file…"))
         .task {
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
@@ -160,12 +160,14 @@ nonisolated struct HTMLArtifactDocument: Hashable, Sendable {
     private static let contentSecurityPolicy = "default-src 'none'; img-src data: blob: ox-artifact:; media-src data: blob: ox-artifact:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'"
 
     let html: String
+    let baseURL: URL
     let scope: ProfileScope
     let byteCount: Int
 
     static func read(_ source: ArtifactPreviewSource) async throws -> Self {
         guard source.artifact.kind == .html else { throw ArtifactError.unsupportedType(source.artifact.fileName) }
         guard let scope = source.scope else { throw CocoaError(.fileReadNoPermission) }
+        let baseURL = HTMLArtifactPage.documentURL(for: source)
         let data = try await source.read()
         guard data.count <= ArtifactLimits.textBytes else {
             throw ArtifactError.textTooLarge(bytes: data.count, limit: ArtifactLimits.textBytes)
@@ -174,6 +176,7 @@ nonisolated struct HTMLArtifactDocument: Hashable, Sendable {
         let secured = "<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" content=\"\(contentSecurityPolicy)\"></head><body>\(source)</body></html>"
         return Self(
             html: secured,
+            baseURL: baseURL,
             scope: scope,
             byteCount: data.count
         )
@@ -206,7 +209,7 @@ private struct HTMLArtifactWebView: View {
         let canvas = OxCanvas(title: title, serviceManager: serviceManager, presentations: presentations)
         _presentations = State(initialValue: presentations)
         _canvas = State(initialValue: canvas)
-        _page = State(initialValue: HTMLArtifactPage.make(scope: document.scope, canvas: canvas))
+        _page = State(initialValue: HTMLArtifactPage.make(scope: document.scope, canvas: canvas, documentURL: document.baseURL))
     }
 
     var body: some View {
@@ -231,7 +234,7 @@ private struct HTMLArtifactWebView: View {
     private func load() async {
         Log.ui.info("HTMLArtifactWebView.loading bytes=\(document.byteCount)")
         do {
-            for try await event in page.load(html: document.html, baseURL: HTMLArtifactPage.baseURL) {
+            for try await event in page.load(html: document.html, baseURL: document.baseURL) {
                 guard event == .finished else { continue }
                 guard !Task.isCancelled else { return }
                 onNavigation(.ready)
@@ -255,10 +258,17 @@ private enum HTMLArtifactNavigation {
 enum HTMLArtifactPage {
     nonisolated static let resourceScheme = "ox-artifact"
     static let mapHandler = "oxMap"
-    static let baseURL = CanvasWebBridge.documentURL
+    nonisolated static func documentURL(for source: ArtifactPreviewSource) -> URL {
+        guard let root = source.scope?.root.standardizedFileURL.pathComponents else { return CanvasWebBridge.documentURL }
+        let path = source.artifact.fileURL.standardizedFileURL.pathComponents.dropFirst(root.count).joined(separator: "/")
+        var components = URLComponents()
+        components.scheme = resourceScheme
+        components.path = "/" + path
+        return components.url ?? CanvasWebBridge.documentURL
+    }
     static let hostScript = #"""
         (() => {
-          const denied = () => Promise.reject(new DOMException("Unavailable in an artifact", "NotAllowedError"));
+          const denied = () => Promise.reject(new DOMException("Unavailable in this HTML file", "NotAllowedError"));
           try { Object.defineProperty(navigator, "geolocation", { value: undefined }); } catch (_) {}
           try { Object.defineProperty(navigator, "mediaDevices", { value: { getUserMedia: denied } }); } catch (_) {}
           class OxMap extends HTMLElement {
@@ -296,10 +306,10 @@ enum HTMLArtifactPage {
         })();
         """#
 
-    static func make(scope: ProfileScope?, canvas: OxCanvas) -> WebPage {
+    static func make(scope: ProfileScope?, canvas: OxCanvas, documentURL: URL) -> WebPage {
         let mapHandler = ArtifactMapHandler()
         let contentController = WKUserContentController()
-        contentController.addScriptMessageHandler(CanvasWebBridge(canvas: canvas), contentWorld: .page, name: "oxCanvas")
+        contentController.addScriptMessageHandler(CanvasWebBridge(canvas: canvas, documentURL: documentURL), contentWorld: .page, name: "oxCanvas")
         do {
             contentController.addUserScript(WKUserScript(
                 source: try CanvasServiceCatalog.script(documentID: canvas.id),
@@ -328,7 +338,7 @@ enum HTMLArtifactPage {
         configuration.deviceSensorAuthorization = .init(decision: .deny)
         return WebPage(
             configuration: configuration,
-            navigationDecider: ArtifactNavigationDecider(),
+            navigationDecider: ArtifactNavigationDecider(documentURL: documentURL),
             dialogPresenter: RejectingArtifactDialogs()
         )
     }
@@ -337,17 +347,21 @@ enum HTMLArtifactPage {
 private struct RejectingArtifactDialogs: WebPage.DialogPresenting {}
 
 private struct ArtifactNavigationDecider: WebPage.NavigationDeciding {
+    let documentURL: URL
     private var admittedDocument = false
+
+    init(documentURL: URL) { self.documentURL = documentURL }
+
     mutating func decidePolicy(
         for action: WebPage.NavigationAction,
         preferences: inout WebPage.NavigationPreferences
     ) async -> WKNavigationActionPolicy {
         guard let url = action.request.url else { return .cancel }
-        if !admittedDocument, CanvasWebBridge.isDocumentURL(url) {
+        if !admittedDocument, CanvasWebBridge.isDocumentURL(url, expected: documentURL) {
             admittedDocument = true
             return .allow
         }
-        if action.navigationType == .linkActivated, CanvasWebBridge.isDocumentURL(url), url.fragment != nil {
+        if action.navigationType == .linkActivated, CanvasWebBridge.isDocumentURL(url, expected: documentURL), url.fragment != nil {
             return .allow
         }
         if action.navigationType == .linkActivated,
@@ -390,13 +404,13 @@ private nonisolated struct ArtifactResourceHandler: URLSchemeHandler, Sendable {
     private func response(for request: URLRequest) async throws -> (HTTPURLResponse, Data, String) {
         guard let url = request.url, url.scheme == HTMLArtifactPage.resourceScheme,
               let scope else { throw CocoaError(.fileReadNoPermission) }
-        let name = try ArtifactStore.validatedFilename(url.lastPathComponent)
-        guard url.path == "/" + name else { throw ArtifactError.invalidFilename(name) }
+        let name = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard url.host == nil, !name.isEmpty, !name.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else { throw ArtifactError.invalidFilename(name) }
         let type = UTType(filenameExtension: URL(fileURLWithPath: name).pathExtension) ?? .data
         guard type.conforms(to: .image) || type.conforms(to: .audio) || type.conforms(to: .movie) else {
             throw ArtifactError.unsupportedType(name)
         }
-        let data = try await ProfileRepository.shared.readArtifactData(named: name, in: scope)
+        let data = try await ProfileRepository.shared.readArtifactData(named: "/" + name, in: scope)
         let resource = try ResourceResponse(
             mimeType: type.preferredMIMEType ?? "application/octet-stream",
             data: data,

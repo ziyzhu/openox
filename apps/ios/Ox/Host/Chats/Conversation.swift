@@ -501,7 +501,7 @@ final class Conversation: Identifiable {
                 }
             }
             guard let service else {
-                throw RuntimeError.bridge("\(label): service '\(parts[0]):\(parts[1])' isn't attached to this chat.")
+                throw OxFunctionError(code: "service_not_attached", message: "\(label): service '\(parts[0]):\(parts[1])' isn't attached to this chat.", recovery: "Find the service with ox.service.find and attach its exact returned domain with ox.service.attach before invoking its actions.")
             }
             return (service, parts[2])
         }
@@ -730,6 +730,7 @@ final class Conversation: Identifiable {
     }
 
     private var artifactFilesRevision = 0
+    @ObservationIgnored private var artifactRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var referencedArtifactsCache: ReferencedArtifactsCache?
     var transcript: [Block] { document.projection }
     var transcriptBlockCount: Int { document.blockCount }
@@ -744,6 +745,18 @@ final class Conversation: Identifiable {
 
     func artifactFilesChanged() {
         artifactFilesRevision &+= 1
+        guard !isTemporary else { return }
+        artifactRefreshTask?.cancel()
+        artifactRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let listing = try await repository.artifactListing(in: scope)
+                guard !Task.isCancelled, let files = listing.files else { return }
+                document.refreshArtifacts(files)
+            } catch {
+                Log.session.warning("Chat.files refresh failed id=\(id) error=\(error.localizedDescription)")
+            }
+        }
     }
 
     func blocksWithTurnID(in range: Range<Int>) -> (range: Range<Int>, blocks: [(block: Block, turnID: TurnID)]) {
@@ -1698,9 +1711,9 @@ final class Conversation: Identifiable {
             prompt: "\(title)\n\(message)"
         ) {
         case .approved: return
-        case .denied: throw RuntimeError.bridge("ox.service.attach: the user declined to attach \(service.title).")
-        case .blocked: throw RuntimeError.bridge("ox.service.attach: the user blocked this Action in Settings.")
-        case .stopped: throw RuntimeError.bridge("ox.service.attach: the user stopped before attaching \(service.title).")
+        case .denied: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user declined to attach \(service.title).", recovery: "Stop. Do not request this attachment again unless the user asks.")
+        case .blocked: throw OxFunctionError(code: "permission_denied", message: "ox.service.attach: the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
+        case .stopped: throw OxFunctionError(code: "cancelled", message: "ox.service.attach: the user stopped before attaching \(service.title).", recovery: "Stop. Do not reopen the attachment request unless the user asks.")
         }
     }
 
@@ -1723,16 +1736,16 @@ final class Conversation: Identifiable {
             prompt: prompt
         ) {
         case .approved: return
-        case .denied: throw RuntimeError.bridge("\(action): the user declined.")
-        case .blocked: throw RuntimeError.bridge("\(action): the user blocked this Action in Settings.")
-        case .stopped: throw RuntimeError.bridge("\(action): the user stopped before answering.")
+        case .denied: throw OxFunctionError(code: "permission_denied", message: "\(action): the user declined.", recovery: "Stop. Do not repeat the action unless the user asks.")
+        case .blocked: throw OxFunctionError(code: "permission_denied", message: "\(action): the user blocked this Action in Settings.", recovery: "Do not bypass the policy. Ask the user to change it in Settings only if they want to allow this action.")
+        case .stopped: throw OxFunctionError(code: "cancelled", message: "\(action): the user stopped before answering.", recovery: "Stop. Do not reopen the request unless the user asks.")
         }
     }
 
     func requireProfileMutation(_ action: String) throws {
         guard retention == .persisted else {
             Log.session.info("Chat.temporary blocked action=\(action)")
-            throw RuntimeError.bridge("\(action): Temporary chats can't save changes. Continue in a Profile stored on this device to keep this result.")
+            throw OxFunctionError(code: "profile_required", message: "\(action): Temporary chats can't save changes.", recovery: "Ask the user to continue in a Profile stored on this device to keep this result.")
         }
     }
 

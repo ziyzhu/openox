@@ -45,7 +45,7 @@ Use `ox.provider.authenticate` for native user-entered setup, or `ox.provider.co
 
 For requested live verification, explain any billable inference or attachment upload and stay within the authorized scope. Exercise the actual configured model through a supported Ox chat/model selection path, not an invented provider-test API. Verify tools or attachments only when claimed: upload success alone does not prove the model can read a file. Authentication status and schema validation are not successful inference. Preserve drafts, existing chats, and the user's working provider.
 
-Website providers come from model-capable services. Do not save website definitions or freeze their discovered models into the native catalog. Use the service's model Actions for discovery and verification; read `skills/evolve/SKILL.md` when website behavior needs repair. Test expired/signed-out behavior only with isolated sessions or synthetic fixtures; removing authentication from a live website request can clear the user's session.
+Model providers use API transports, including API-backed subscription and OAuth accounts. Websites are services, never model providers. An AI website may be consulted through an explicit service Action; it receives only that Action's supplied inputs, not automatic Ox history, system instructions, or tool declarations. Read `skills/evolve/SKILL.md` when website behavior needs repair.
 
 ## Restore, disable, or remove
 

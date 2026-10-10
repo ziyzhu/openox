@@ -149,6 +149,7 @@ export async function check(): Promise<string> {
     "apps/ios/Ox/Host/Profile/StorageRoot.swift",
     "apps/ios/Ox/Host/Profile/ScheduledSkills.swift",
     "apps/ios/Ox/Host/Durable/DurableProfileStore.swift",
+    "apps/ios/Ox/Host/RPC/DebugDurableChat.swift",
     "apps/ios/Ox/Host/Services/Repository/Repository.swift",
   ]);
   for (const [index, source] of allSource.entries()) {

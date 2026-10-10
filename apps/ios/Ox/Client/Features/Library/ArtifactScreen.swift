@@ -93,7 +93,7 @@ struct ArtifactScreen<Content: View>: View {
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: Circle())
-                .accessibilityLabel("Close artifact")
+                .accessibilityLabel("Close file")
                 .accessibilityIdentifier(dismissIdentifier)
                 .padding(.top, geometry.safeAreaInsets.top + Theme.Spacing.sm)
                 .padding(.trailing, Theme.Spacing.md)
@@ -142,6 +142,7 @@ struct ArtifactZoomPreviewScreen: View {
     @State private var image: UIImage?
     @State private var pdfDocument: PDFDocument?
     @State private var snapshot: ArtifactPreviewSnapshot?
+    @State private var previewURL: URL?
     @State private var loadState = LoadState.loading
 
     init(artifact: Artifact, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
@@ -173,6 +174,7 @@ struct ArtifactZoomPreviewScreen: View {
         .task(id: artifact.fileURL) {
             await loadArtifact()
         }
+        .quickLookPreview($previewURL)
     }
 
     @ViewBuilder
@@ -198,8 +200,13 @@ struct ArtifactZoomPreviewScreen: View {
             }
         case .text, .file:
             if let snapshot, loadState == .ready, QLPreviewController.canPreview(snapshot.url as NSURL) {
-                QuickLookArtifactView(snapshot: snapshot)
-                    .accessibilityLabel(artifact.userFacingName)
+                Button {
+                    previewURL = snapshot.url
+                } label: {
+                    Label("Open file", systemImage: "doc")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel(artifact.userFacingName)
             } else if loadState == .loading {
                 loading
             } else {
@@ -211,13 +218,13 @@ struct ArtifactZoomPreviewScreen: View {
     }
 
     private var loading: some View {
-        ContentLoadingView(label: "Loading artifact…")
+        ContentLoadingView(label: "Loading file…")
             .accessibilityIdentifier("artifacts.preview.loading")
     }
 
     private var unavailable: some View {
         ContentUnavailableView(
-            "Artifact unavailable",
+            "File unavailable",
             systemImage: "questionmark.folder",
             description: Text(artifact.userFacingName)
         )
@@ -247,6 +254,7 @@ struct ArtifactZoomPreviewScreen: View {
                 let loaded = try await source.snapshot()
                 snapshot = loaded
                 loadState = .ready
+                if QLPreviewController.canPreview(loaded.url as NSURL) { previewURL = loaded.url }
             case .html:
                 loadState = .unavailable
             }
@@ -257,42 +265,6 @@ struct ArtifactZoomPreviewScreen: View {
             Log.ui.error("ArtifactZoomPreviewScreen.read file=\(artifact.fileName) error=\(error.localizedDescription)")
         }
         Log.ui.info("ArtifactZoomPreviewScreen.ready filename=\(artifact.fileName) kind=\(artifact.kind.rawValue) success=\(loadState == .ready) elapsed=\(ContinuousClock.now - started)")
-    }
-}
-
-private struct QuickLookArtifactView: UIViewControllerRepresentable {
-    let snapshot: ArtifactPreviewSnapshot
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(snapshot: snapshot)
-    }
-
-    func makeUIViewController(context: Context) -> QLPreviewController {
-        let controller = QLPreviewController()
-        controller.dataSource = context.coordinator
-        return controller
-    }
-
-    func updateUIViewController(_ controller: QLPreviewController, context: Context) {
-        guard context.coordinator.snapshot.url != snapshot.url else { return }
-        context.coordinator.snapshot = snapshot
-        controller.reloadData()
-    }
-
-    final class Coordinator: NSObject, QLPreviewControllerDataSource {
-        var snapshot: ArtifactPreviewSnapshot
-
-        init(snapshot: ArtifactPreviewSnapshot) {
-            self.snapshot = snapshot
-        }
-
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
-            1
-        }
-
-        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem {
-            snapshot.url as NSURL
-        }
     }
 }
 

@@ -196,9 +196,6 @@ extension Conversation {
         guard let client = registry.client(id: provider), client.models.contains(where: { $0.id == model }) else {
             throw RuntimeError.bridge("Choose an existing provider from ox.provider.list and an exact available model ID from ox.provider.get")
         }
-        if let authenticated = try await client.websiteSessionIsAuthenticated(), !authenticated {
-            throw RuntimeError.bridge("Sign in to this website provider before selecting its model")
-        }
         return try registry.resolveSelection(selection)
     }
 

@@ -31,10 +31,14 @@ nonisolated struct ProfileScope: Hashable, Sendable {
     let root: URL
     let location: Profile.Location
     let generation: UUID
+    var stateRoot: URL {
+        guard let profileID, ProfileIO.readPrivateConfig(profileID)?.contentDirectory != nil else { return root }
+        return ProfileIO.stateDirectory(profileID)
+    }
 
     init(profileID: UUID?, root: URL, location: Profile.Location, generation: UUID = UUID()) {
         self.profileID = profileID
-        self.root = root
+        self.root = URL(fileURLWithPath: root.standardizedFileURL.path, isDirectory: true)
         self.location = location
         self.generation = generation
     }
@@ -44,6 +48,7 @@ nonisolated struct ProfileConfig: Codable, Sendable {
     var id: UUID
     var createdAt: Date
     var version: String
+    var contentDirectory: String? = nil
 
     static var currentVersion: String { ProfileSchema.current }
 
@@ -55,9 +60,31 @@ nonisolated struct ProfileConfig: Codable, Sendable {
 nonisolated enum ProfileIO {
     static let configName = "profile.json"
 
-    // A coordinated read so an evicted (cloud-only) profile.json is pulled down and
-    // waited on, rather than read as a placeholder.
+    static var publicProfiles: URL { ProfileRepository.localDocuments().appendingPathComponent("Profiles", isDirectory: true) }
+    static var privateProfiles: URL { AppStoragePaths.applicationSupport.appendingPathComponent("Profiles", isDirectory: true) }
+    static func stateDirectory(_ id: UUID) -> URL { privateProfiles.appendingPathComponent(id.uuidString, isDirectory: true) }
+
+    static func readPrivateConfig(_ id: UUID) -> ProfileConfig? {
+        readManifest(at: stateDirectory(id))
+    }
+
+    static func registeredProfiles() -> [Profile] {
+        let directories = (try? FileManager.default.contentsOfDirectory(at: privateProfiles, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+        return directories.compactMap { directory in
+            guard let id = UUID(uuidString: directory.lastPathComponent), let config = readPrivateConfig(id), config.id == id,
+                  let name = config.contentDirectory, name == ProfileRepository.cleanName(name), !name.hasPrefix("."), !name.contains("/") else { return nil }
+            return Profile(id: id, name: name, location: .local, url: publicProfiles.appendingPathComponent(name, isDirectory: true), createdAt: config.createdAt, version: config.version)
+        }
+    }
+
     static func readConfig(at folder: URL) -> ProfileConfig? {
+        if let profile = registeredProfiles().first(where: { $0.url.standardizedFileURL.path == folder.standardizedFileURL.path }) {
+            return readPrivateConfig(profile.id)
+        }
+        return readManifest(at: folder)
+    }
+
+    private static func readManifest(at folder: URL) -> ProfileConfig? {
         let url = folder.appendingPathComponent(configName, isDirectory: false)
         var data: Data?
         var coordError: NSError?
@@ -83,14 +110,13 @@ nonisolated enum ProfileIO {
         try data.write(to: url, options: .atomic)
     }
 
-    // A folder is a Profile iff it directly contains a profile.json.
     static func profile(at folder: URL, location: Profile.Location) -> Profile? {
         guard let config = readConfig(at: folder) else { return nil }
         return Profile(
             id: config.id,
             name: folder.lastPathComponent,
             location: location,
-            url: folder,
+            url: URL(fileURLWithPath: folder.standardizedFileURL.path, isDirectory: true),
             createdAt: config.createdAt,
             version: config.version
         )

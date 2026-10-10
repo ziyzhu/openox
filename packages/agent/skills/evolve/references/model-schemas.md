@@ -1,6 +1,6 @@
 # Standard website Action schemas
 
-Generated from packages/protocol/src/model-actions.ts by bun run build:services. conversation is the shared submit/read/cancel Action; add listModels for model-provider discovery. The existing four model Actions and optional continueModelGeneration remain supported during transition. Copy exact schemas; do not mix protocols on one conversation page.
+Generated from packages/protocol/src/model-actions.ts by bun run build:services. conversation is the service submit/read/cancel Action; listModels lists website choices without registering an Ox model provider. Legacy model-generation schemas remain for installed-service validation only. Copy exact schemas; do not mix protocols on one conversation page.
 
 ```json
 {

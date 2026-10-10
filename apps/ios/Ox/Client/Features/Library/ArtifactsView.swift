@@ -5,7 +5,6 @@ import UIKit
 
 private struct ArtifactRecord: Identifiable, Sendable {
     let artifact: Artifact
-    let isSaved: Bool
 
     var id: String { artifact.id }
 }
@@ -47,19 +46,6 @@ struct ArtifactsView: View {
     let onRename: (Artifact, String) async throws -> Artifact
     let onDelete: (Artifact) async throws -> Void
 
-    private enum ArtifactTab: String, CaseIterable, Identifiable {
-        case saved
-        case all
-
-        var id: Self { self }
-        var title: LocalizedStringKey {
-            switch self {
-            case .saved: "Saved"
-            case .all: "All"
-            }
-        }
-    }
-
     private enum ArtifactFilter: String, CaseIterable, Identifiable {
         case all
         case images
@@ -98,7 +84,6 @@ struct ArtifactsView: View {
     @State private var dedicatedPreview: Artifact?
     @State private var loading = true
     @State private var query = ""
-    @State private var tab: ArtifactTab = .saved
     @State private var filter: ArtifactFilter = .all
     @State private var sort: ArtifactSort = .modified
     @State private var descending = true
@@ -109,7 +94,6 @@ struct ArtifactsView: View {
     @State private var errorMessage: String?
     @State private var loadErrorMessage: String?
     @State private var mutation: ArtifactMutation?
-    @State private var savedErrorMessage: String?
     @State private var downloadErrorMessage: String?
     @State private var downloadingIDs: Set<String> = []
 
@@ -119,34 +103,21 @@ struct ArtifactsView: View {
                 Group {
                     if loading {
                         if emptyStateReady {
-                            ContentLoadingView(label: "Loading artifacts…")
+                            ContentLoadingView(label: "Loading files…")
                         } else {
                             Color.clear
                         }
                     } else if let loadErrorMessage {
-                        ContentUnavailableView("Artifact unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
+                        ContentUnavailableView("File unavailable", systemImage: "exclamationmark.triangle", description: Text(loadErrorMessage))
                     } else if records.isEmpty {
                         ScrollView {
                             VStack(spacing: Theme.Spacing.sm) {
                                 LibraryEmptyNote(
                                     destination: .artifacts,
-                                    title: "No artifacts yet",
+                                    title: "No files yet",
                                     detail: "Add a file or photo, or ask Ox to create something in a chat."
                                 )
                             }
-                            .padding(.horizontal, Theme.Spacing.lg)
-                            .padding(.bottom, Theme.Spacing.lg)
-                            .opacity(emptyStateReady ? 1 : 0)
-                            .accessibilityHidden(!emptyStateReady)
-                        }
-                        .scrollIndicators(.hidden)
-                    } else if displayedRecords.isEmpty && tab == .saved && query.isEmpty {
-                        ScrollView {
-                            LibraryEmptyNote(
-                                destination: .artifacts,
-                                title: "No saved artifacts",
-                                detail: "Long press an artifact in All files to save it."
-                            )
                             .padding(.horizontal, Theme.Spacing.lg)
                             .padding(.bottom, Theme.Spacing.lg)
                             .opacity(emptyStateReady ? 1 : 0)
@@ -188,8 +159,6 @@ struct ArtifactsView: View {
                                             canMutate: artifact.availability == .local,
                                             onRename: { mutation = .rename(record.artifact) },
                                             onDelete: { mutation = .deleting(record.artifact) },
-                                            isSaved: record.isSaved,
-                                            onToggleSaved: { toggleSaved(record) },
                                             scope: scope
                                         )
                                     } preview: {
@@ -215,14 +184,14 @@ struct ArtifactsView: View {
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .background(Theme.Colors.background)
-            .navigationTitle("Artifacts")
+            .navigationTitle("Files")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     addMenu
                 }
             }
-            .searchable(text: $query, prompt: "Search artifacts")
+            .searchable(text: $query, prompt: "Search files")
             .navigationDestination(isPresented: dedicatedPreviewPresented) {
                 if let artifact = dedicatedPreview {
                     ArtifactNavigationPage(artifact: artifact, scope: scope)
@@ -247,7 +216,6 @@ struct ArtifactsView: View {
         }
         .task(id: refreshEpoch) { await load() }
         .onChange(of: query) { _, _ in updateDisplayedRecords() }
-        .onChange(of: tab) { _, _ in updateDisplayedRecords() }
         .onChange(of: filter) { _, _ in updateDisplayedRecords() }
         .onChange(of: sort) { _, _ in updateDisplayedRecords() }
         .onChange(of: descending) { _, _ in updateDisplayedRecords() }
@@ -271,7 +239,7 @@ struct ArtifactsView: View {
             }
             .ignoresSafeArea()
         }
-        .alert("Couldn't add artifact", isPresented: Binding(
+        .alert("Couldn't add file", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
@@ -284,15 +252,7 @@ struct ArtifactsView: View {
             onRename: rename,
             onDelete: delete
         )
-        .alert("Couldn't update artifact", isPresented: Binding(
-            get: { savedErrorMessage != nil },
-            set: { if !$0 { savedErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { savedErrorMessage = nil }
-        } message: {
-            Text(savedErrorMessage ?? "")
-        }
-        .alert("Couldn't download artifact", isPresented: Binding(
+        .alert("Couldn't download file", isPresented: Binding(
             get: { downloadErrorMessage != nil },
             set: { if !$0 { downloadErrorMessage = nil } }
         )) {
@@ -337,18 +297,6 @@ struct ArtifactsView: View {
 
     private var artifactControls: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            ForEach(ArtifactTab.allCases) { option in
-                Button {
-                    Haptics.impact(.artifactTabSelected)
-                    tab = option
-                } label: {
-                    Text(option.title)
-                        .frame(minWidth: 48)
-                }
-                .buttonStyle(OxChipButton(filled: tab == option))
-                .accessibilityAddTraits(tab == option ? .isSelected : [])
-                .accessibilityIdentifier(A11yID.Artifacts.filter(option.rawValue))
-            }
             Spacer()
             filterAndSortMenu
         }
@@ -381,7 +329,7 @@ struct ArtifactsView: View {
         } label: {
             Image(systemName: "plus")
         }
-        .accessibilityLabel("Add artifact")
+        .accessibilityLabel("Add file")
         .accessibilityIdentifier(A11yID.Artifacts.add)
     }
 
@@ -413,7 +361,7 @@ struct ArtifactsView: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter and sort artifacts")
+        .accessibilityLabel("Filter and sort files")
         .accessibilityValue(Text(filter.title))
         .accessibilityIdentifier(A11yID.Artifacts.filterAndSort)
     }
@@ -422,13 +370,12 @@ struct ArtifactsView: View {
         displayedRecords = records
             .filter { record in
                 let matchesQuery = query.isEmpty || record.artifact.userFacingName.localizedCaseInsensitiveContains(query)
-                let matchesTab = tab == .all || record.isSaved
                 let matchesFilter = switch filter {
                 case .all: true
                 case .images: record.artifact.kind == .image
                 case .documents: record.artifact.kind != .image
                 }
-                return matchesQuery && matchesTab && matchesFilter
+                return matchesQuery && matchesFilter
             }
             .sorted { left, right in
                 let comparison = comparison(left.artifact, right.artifact)
@@ -476,11 +423,10 @@ struct ArtifactsView: View {
     private func load() async {
         let repository = ProfileRepository.shared
         do {
-            let savedNames = try await repository.savedArtifactNames(in: scope)
             let artifacts = try await repository.artifacts(in: scope)
             try Task.checkCancellation()
             records = artifacts.map { artifact in
-                ArtifactRecord(artifact: artifact, isSaved: savedNames.contains { $0.caseInsensitiveCompare(artifact.fileName) == .orderedSame })
+                ArtifactRecord(artifact: artifact)
             }
             loadErrorMessage = nil
             updateDisplayedRecords()
@@ -491,22 +437,6 @@ struct ArtifactsView: View {
             loading = false
             loadErrorMessage = error.localizedDescription
             Log.ui.error("ArtifactsView.load profile=\(scope.profileID?.uuidString ?? "nil") error=\(error.localizedDescription)")
-        }
-    }
-
-    private func toggleSaved(_ record: ArtifactRecord) {
-        Task {
-            do {
-                try await ProfileRepository.shared.setArtifactSaved(
-                    !record.isSaved,
-                    named: record.artifact.fileName,
-                    in: scope
-                )
-                await load()
-            } catch {
-                Log.ui.error("ArtifactsView.saved file=\(record.artifact.fileName) error=\(error.localizedDescription)")
-                savedErrorMessage = error.localizedDescription
-            }
         }
     }
 

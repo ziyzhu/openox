@@ -28,6 +28,10 @@ const schemas = {
     outputSchema: object({ ...itemProperties, diff: string("Changed lines."), patch: string("Unified patch."), firstChangedLine: integer("First changed line.", 1, Number.MAX_SAFE_INTEGER) },
       ["path", "name", "type", "size", "diff", "patch"]) },
   delete: { inputSchema: input({ path }, ["path"]), outputSchema: object({ path, deleted: boolean("Deleted.") }, ["path", "deleted"]) },
+  mkdir: { inputSchema: input({ path, recursive: boolean("Create missing parents; accept an existing directory.") }, ["path"]), outputSchema: item },
+  rmdir: { inputSchema: input({ path, recursive: boolean("Explicitly delete the directory and its contents.") }, ["path"]), outputSchema: object({ path, deleted: boolean("Deleted.") }, ["path", "deleted"]) },
+  move: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
+  copy: { inputSchema: input({ from: path, to: path }, ["from", "to"]), outputSchema: item },
   glob: { inputSchema: input({ path, pattern: string("Glob supporting *, **, and ?."), options: object({ limit: integer("Maximum paths.", 1, 1_000) }) }, ["pattern"]),
     outputSchema: object({ paths: array(path), truncated: boolean("More paths remain.") }, ["paths", "truncated"]) },
   grep: { inputSchema: input({ path, pattern: string("Regular expression or literal text."), options: object({

@@ -9,8 +9,9 @@ nonisolated struct ArtifactPreviewSource: Sendable {
 
     init(artifact: Artifact, scope: ProfileScope? = StorageRoot.currentScope) {
         self.artifact = artifact
-        let expected = scope?.root.appendingPathComponent("artifacts", isDirectory: true).appendingPathComponent(artifact.fileName)
-        self.scope = expected?.standardizedFileURL == artifact.fileURL.standardizedFileURL ? scope : nil
+        let root = scope?.root.standardizedFileURL.pathComponents
+        let path = artifact.fileURL.standardizedFileURL.pathComponents
+        self.scope = root.map { path.count > $0.count && path.starts(with: $0) } == true ? scope : nil
     }
 
     func read() async throws -> Data {
@@ -36,7 +37,7 @@ nonisolated final class ArtifactPreviewSnapshot: Sendable {
     private let directory: URL
 
     init(artifact: Artifact, data: Data) throws {
-        let name = try ArtifactStore.validatedFilename(artifact.fileName)
+        let name = try ArtifactStore.validatedFilename(artifact.displayName)
         directory = try FileStaging.createDirectory(in: FileManager.default.temporaryDirectory, prefix: "artifact-preview")
         url = directory.appendingPathComponent(name, isDirectory: false)
         do {
@@ -77,7 +78,7 @@ nonisolated private struct ArtifactShareContent: Transferable, Sendable {
             }
         }
         .exportingCondition { UTType($0.source.artifact.typeIdentifier)?.conforms(to: type) == true }
-        .suggestedFileName { $0.source.artifact.fileName }
+        .suggestedFileName { $0.source.artifact.displayName }
     }
 }
 

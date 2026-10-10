@@ -1,7 +1,8 @@
 export const countWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const countWord = (value: number) => countWords[value] ?? String(value);
+const oxErrorGuidance = "Built-in errors provide `code`, `message`, and `recovery`. Use the stable code and recovery guidance rather than parsing message wording. Print caught errors with `console.error(error)` or return `{ code: error.code, message: error.message, recovery: error.recovery }` so recovery information remains visible.";
 export interface ExecuteGuidanceInput {
-  catalog: string; variant?: "ox" | "website" | "portable"; timeoutSeconds: number; maxLines: number; maxBytes: number;
+  catalog: string; variant?: "ox" | "portable"; timeoutSeconds: number; maxLines: number; maxBytes: number;
   maxFetches?: number; maxTransientAttachments?: number; canCancelLoops?: boolean;
 }
 
@@ -14,15 +15,6 @@ export function executeGuidance(input: ExecuteGuidanceInput) {
 }
 
 const templates: Record<NonNullable<ExecuteGuidanceInput["variant"]>, (input: ExecuteGuidanceInput) => string> = {
-  website: input => `Run JavaScript inside an async function. \`await\` works. Print model-visible results with \`console.log\` or a top-level \`return\`. Use \`ox.user\` and service handoff helpers when the snippet must wait for the user.
-
-The \`ox\` namespace provides these built-in capabilities:
-
-${input.catalog}
-
-Signatures shown above are callable contracts. Every built-in also has a synchronous \`.help()\` method for its complete description, input schema, and output schema. Inspect unfamiliar or nested options before use. Every operational \`ox.*\` call requires a short \`purpose\` describing the visible step; \`.help()\` does not.
-
-Each execution is self-contained. The runtime waits for up to ${input.timeoutSeconds} seconds of active execution time; this does not forcibly stop an infinite JavaScript loop. Waiting for a service action or user handoff does not consume that time. Keep intermediate results in JavaScript and print or return only concise model-visible output. Use \`Promise.allSettled\` for independent reads when partial success is useful; serialize writes and approval-dependent operations. Calls are not rolled back on failure; inspect outcomes before retrying writes.`,
   ox: input => `Run JavaScript inside an async function. \`await\` works. Print model-visible results with \`console.log\` or a top-level \`return\`. Use \`ox.user\` and service handoff helpers when the snippet must wait for the user.
 
 The \`ox\` namespace provides these built-in capabilities:
@@ -35,7 +27,7 @@ Operational \`ox.*\` calls require a short \`purpose\` describing the visible st
 
 The runtime waits for up to ${input.timeoutSeconds} seconds of active execution time; this does not forcibly stop an infinite JavaScript loop. Use bounded loops. Waiting for a service action, sign-in, verification, payment, or user choice does not consume that time. Each execution may call \`ox.web.fetch\` at most ${countWord(input.maxFetches ?? 8)} times and add at most ${countWord(input.maxTransientAttachments ?? 4)} transient attachments to model context; presented artifacts do not count toward that attachment limit. Every execution is self-contained: never store state on \`globalThis\`. Batch larger work across executions and print concise progress, cursors, or partial results so the next execution can continue, or persist continuation state through an authorized virtual file.
 
-Combine dependent operations in one snippet when they fit these budgets. Parallelize independent reads with \`Promise.allSettled\` when partial success is useful; an uncaught \`Promise.all\` rejection ends the execution and cancels pending calls. Serialize writes and approval-dependent operations. Await every call whose outcome matters; pending unawaited calls are cancelled when the snippet ends. Keep intermediate results in JavaScript; filter, aggregate, project fields, and limit rows before printing or returning only what the next reasoning step needs. Print caught errors as \`error.message\` or \`console.error(error)\`, not JSON. Calls are real and are not rolled back on script failure. Use the failure receipt and inspect external state before retrying a write; failed or incomplete calls may still have had an effect.
+Combine dependent operations in one snippet when they fit these budgets. Parallelize independent reads with \`Promise.allSettled\` when partial success is useful; an uncaught \`Promise.all\` rejection ends the execution and cancels pending calls. Serialize writes and approval-dependent operations. Await every call whose outcome matters; pending unawaited calls are cancelled when the snippet ends. Keep intermediate results in JavaScript; filter, aggregate, project fields, and limit rows before printing or returning only what the next reasoning step needs. ${oxErrorGuidance} Calls are real and are not rolled back on script failure. Use the failure receipt and inspect external state before retrying a write; failed or incomplete calls may still have had an effect.
 
 \`ox.fs\` is the only filesystem API. \`read({ purpose, path, offset?, limit? })\` returns at most 2,000 lines or 50 KiB; use its nextOffset and diagnostics to continue. File-read pagination and execution-output clipping are separate limits. Combined console and return output is limited to the last ${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB, whichever is reached first, independent of the model. Oversized output includes a reference for \`ox.output.read\`; retrieve the complete string, then print the relevant slice or filtered result. Do not treat a truncated preview as the complete record. Output references are chat-local and expire when the chat is unloaded.`,
   portable: input => `Run JavaScript inside an async function. \`await\` works. Print model-visible results with \`console.log\` or a top-level \`return\`.

@@ -1,3 +1,5 @@
+import { oxError, type OxErrorFields } from "./ox-error";
+
 declare const __oxDurableRequest: (id: number, json: string) => void;
 let sequence = 0;
 const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void; cleanup(): void; event?(value: unknown): void }>();
@@ -37,8 +39,12 @@ export function deliver(id: number, json: string, error: string | null) {
   if (!callbacks) return; // Native cancellation completion or an expired generation.
   pending.delete(id);
   callbacks.cleanup();
-  if (error !== null) callbacks.reject(new Error(error));
-  else {
+  if (error !== null) {
+    let fields: Partial<OxErrorFields> | undefined;
+    try { fields = JSON.parse(error); } catch {}
+    callbacks.reject(fields && typeof fields.code === "string" && typeof fields.message === "string" && typeof fields.recovery === "string"
+      ? oxError(Object.assign(new Error(fields.message), fields)) : new Error(error));
+  } else {
     try { callbacks.resolve(JSON.parse(json)); }
     catch (error) { callbacks.reject(error instanceof Error ? error : new Error(String(error))); }
   }

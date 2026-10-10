@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ROOT } from "../../../../lib.ts";
-import { validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
+import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 import type { EvalBlock, EvalMessage, Report } from "../../../evals/scripts/types.ts";
 import { SYSTEM_SKILL_NAMES } from "../../../../../packages/protocol/src/skills.ts";
 
@@ -52,7 +52,7 @@ async function exercise(scenario: Scenario = "pass") {
         const chat = chats.get(id);
         let result: unknown;
         switch (request.method) {
-          case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { host: [1] },
+          case "host.describe": result = { implementation: { name: "Eval E2E Host", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION] },
             methods: ["chats.new", "chats.send", "chats.get", "chats.stop", "chats.open", "logs.list", "providers.list", "vm.call"] }; break;
           case "providers.list": result = { region: "global", providers }; break;
           case "chats.new":

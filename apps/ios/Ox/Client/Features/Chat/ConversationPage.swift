@@ -276,14 +276,8 @@ struct ConversationPage: View {
     private var providerRegistry: ProviderRegistry { .shared }
     private var isModelConfigured: Bool { providerRegistry.defaultModel != nil }
 
-    private var modelService: Service? {
-        guard let provider = conversation.client as? WebServiceModelProvider else { return nil }
-        return serviceManager.service(domain: provider.domain)
-    }
-
     private var modelAccessNeedsAttention: Bool {
-        guard let service = modelService else { return false }
-        return !service.signInState.isAuthenticated && service.signInState != .notRequired
+        providerRegistry.client(id: conversation.modelSelection.providerID) == nil
     }
 
     @State var composer = ConversationComposerModel()
@@ -676,10 +670,6 @@ struct ConversationPage: View {
                 toast = Toast(message: msg)
             }
             await refreshAttachedServiceAuth()
-        }
-        .task(id: "\(modelService?.domain ?? ""):\(scenePhase)") {
-            guard scenePhase == .active, let service = modelService else { return }
-            await service.checkAccess(policy: .current, reason: .modelSignIn)
         }
         .task(id: authProbe?.id) {
             await resolveSignInControl(authProbe)
@@ -1786,16 +1776,12 @@ struct ConversationPage: View {
     }
 
     private var modelAccessNoticeTitle: String {
-        switch modelService?.auth {
-        case .unknown?, .checking?: L10n.string("Checking sign-in…")
-        case .unavailable?: L10n.string("Sign-in unavailable")
-        default: String(localized: "Sign in with \(conversation.client.displayName)")
-        }
+        L10n.string("Choose a model")
     }
 
     private func ensureModelAccess() -> Bool {
         guard modelAccessNeedsAttention else { return true }
-        Log.ui.info("ChatPage.modelAccess blocked conversation=\(conversation.id) provider=\(conversation.client.id) state=\(modelService?.signInState.rawValue ?? "unknown")")
+        Log.ui.info("ChatPage.modelAccess blocked conversation=\(conversation.id) provider=\(conversation.modelSelection.providerID) reason=unavailable")
         modalPresentation = .modelPicker
         return false
     }

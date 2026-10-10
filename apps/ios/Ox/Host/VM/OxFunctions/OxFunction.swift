@@ -2,7 +2,7 @@ import Foundation
 import JavaScriptCore
 
 nonisolated struct OxFunctionEnvironment {
-    let makePromise: (Bool, @escaping @MainActor (@escaping (JSONValue?) -> Void, @escaping (String) -> Void) async -> Void) -> JSValue
+    let makePromise: (Bool, @escaping @MainActor (@escaping (JSONValue?) -> Void, @escaping (OxFunctionError) -> Void) async -> Void) -> JSValue
     let bridge: () -> (any OxFunctionBridge)?
 
     func call(
@@ -11,13 +11,13 @@ nonisolated struct OxFunctionEnvironment {
     ) -> JSValue {
         makePromise(suspendingTimeout) { resolve, reject in
             guard let bridge = bridge() else {
-                reject("virtual machine bridge released")
+                reject(OxFunctionError(code: "runtime_unavailable", message: "The execution's Host bridge is no longer available.", recovery: "Start a new execution. Inspect any possible effects before retrying a write."))
                 return
             }
             do {
                 resolve(try await body(bridge))
             } catch {
-                reject(error.localizedDescription)
+                reject(.from(error))
             }
         }
     }

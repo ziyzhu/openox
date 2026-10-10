@@ -164,10 +164,10 @@ final class Service: NSObject, Identifiable {
         case blockingAction
         case authenticationProbe
         case dangerousBrowserControl
-        case modelGeneration
+        case conversation
 
         var isAuthenticationProbe: Bool { self == .authenticationProbe }
-        var requiresExclusiveAccess: Bool { self != .standard && self != .modelGeneration }
+        var requiresExclusiveAccess: Bool { self != .standard && self != .conversation }
     }
 
     final class Action {

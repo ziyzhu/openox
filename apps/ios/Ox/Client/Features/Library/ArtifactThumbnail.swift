@@ -81,7 +81,7 @@ struct ArtifactThumbnail: View {
                     filePreview(symbol: "doc")
                 }
             } else {
-                filePreview(symbol: "questionmark.document", name: String(localized: "Missing artifact"))
+                filePreview(symbol: "questionmark.document", name: String(localized: "Deleted file"))
             }
         }
         .frame(width: style.size, height: style.size)

@@ -186,7 +186,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
     private func installOxBridge(into ctx: JSContext, environment: RunEnvironment) {
         let thread = self.thread
 
-        let makePromise: (Bool, @escaping @MainActor (@escaping (JSONValue?) -> Void, @escaping (String) -> Void) async -> Void) -> JSValue = { [weak ctx] suspendingTimeout, body in
+        let makePromise: (Bool, @escaping @MainActor (@escaping (JSONValue?) -> Void, @escaping (OxFunctionError) -> Void) async -> Void) -> JSValue = { [weak ctx] suspendingTimeout, body in
             guard let ctx, let handle = environment.handle, !handle.isSettled else {
                 Log.agent.debug("virtual machine bridge promise requested with no active run — leaked async?")
                 return JSValue(undefinedIn: nil)
@@ -209,12 +209,14 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
                         if handle.isSettled { return }
                         thread.perform { callbacks.resolve?.call(withArguments: [value?.toAny() ?? NSNull()]) }
                     },
-                    { msg in
+                    { failure in
                         if handle.isSettled { return }
                         thread.perform {
                             guard let owningCtx = callbacks.reject?.context else { return }
-                            let err = JSValue(newErrorFromMessage: msg, in: owningCtx)
-                                ?? JSValue(object: msg, in: owningCtx)!
+                            let err = JSValue(newErrorFromMessage: failure.message, in: owningCtx)!
+                            for (key, value) in failure.value.objectValue ?? [:] {
+                                err.setObject(value.toAny(), forKeyedSubscript: key as NSString)
+                            }
                             callbacks.reject?.call(withArguments: [err])
                         }
                     }
@@ -229,7 +231,7 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
                 let args = jsValueToJSON(value) ?? .null
                 return makePromise(false) { resolve, reject in
                     do { resolve(try await request(args)) }
-                    catch { reject(error.localizedDescription) }
+                    catch { reject(.from(error)) }
                 }
             }
             ctx.setObject(invoke as AnyObject, forKeyedSubscript: "__apiRequest" as NSString)
@@ -241,8 +243,8 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
             tool.installNatives(ctx, env)
         }
 
-        let helpCatalog = OxFunctionCatalog.build()
-        let helpTextCatalog = OxFunctionCatalog.buildHelpText()
+        let helpCatalog = OxFunctionCatalog.build(compatibility: true)
+        let helpTextCatalog = OxFunctionCatalog.buildHelpText(compatibility: true)
         ctx.setObject(helpCatalog.toAny(), forKeyedSubscript: "__oxHelpCatalog" as NSString)
         ctx.setObject(helpTextCatalog.toAny(), forKeyedSubscript: "__oxHelpTextCatalog" as NSString)
         let helpTextCharacters = helpTextCatalog.objectValue?.values.reduce(0) { $0 + ($1.stringValue?.count ?? 0) } ?? 0
@@ -346,10 +348,10 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
         };
         const __oxOptions = (value, name) => {
           if (value == null || typeof value !== 'object' || Array.isArray(value)) {
-            throw new TypeError(name + ' expects one options object.' + __oxHelpDetail(name));
+            throw Object.assign(new TypeError(name + ' expects one options object.' + __oxHelpDetail(name)), { code: 'invalid_argument', recovery: 'Use ' + name + '.help() and pass one options object matching its input schema.' });
           }
           const error = __oxValidationError(value, __oxHelpCatalog[name]?.inputSchema, '');
-          if (error != null) throw new TypeError(name + ': ' + error + __oxHelpDetail(name));
+          if (error != null) throw Object.assign(new TypeError(name + ': ' + error + __oxHelpDetail(name)), { code: 'invalid_argument', recovery: 'Correct the reported fields using ' + name + '.help() before calling again.' });
           return value;
         };
         const ox = {
@@ -360,9 +362,24 @@ nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
           for (const [key, member] of Object.entries(value)) {
             const name = `${prefix}.${key}`;
             if (typeof member === 'function') {
+              const normalizeError = error => {
+                const failure = error instanceof Error ? error : new Error(String(error));
+                Object.defineProperty(failure, 'message', { value: failure.message, enumerable: true, writable: true, configurable: true });
+                if (typeof failure.code !== 'string') failure.code = 'operation_failed';
+                if (typeof failure.recovery !== 'string') failure.recovery = 'Inspect the resource and ' + name + '.help(). Verify possible effects before retrying a write; do not repeat a cancelled or denied user interaction.';
+                Object.defineProperty(failure, 'toJSON', { value: () => ({ code: failure.code, message: failure.message, recovery: failure.recovery }), configurable: true });
+                return failure;
+              };
+              const wrapped = (...args) => {
+                try {
+                  const result = member(...args);
+                  return result instanceof Promise ? result.catch(error => { throw normalizeError(error); }) : result;
+                } catch (error) { throw normalizeError(error); }
+              };
+              value[key] = wrapped;
               const schema = __oxHelpCatalog[name];
               if (schema != null) {
-                Object.defineProperty(member, 'help', {
+                Object.defineProperty(wrapped, 'help', {
                   value: () => __oxHelpTextCatalog[name],
                   enumerable: false,
                   writable: false,
@@ -450,7 +467,14 @@ nonisolated private final class JSPromiseCallbacks: @unchecked Sendable {
 }
 
 nonisolated private func jsErrorString(_ value: JSValue) -> String {
-    let message = value.toString() ?? "unknown JavaScript error"
+    let message: String
+    if value.isObject,
+       let code = value.objectForKeyedSubscript("code"), code.isString,
+       let recovery = value.objectForKeyedSubscript("recovery"), recovery.isString {
+        message = JSONValue.object(["code": .string(code.toString() ?? "operation_failed"),
+                                    "message": .string(value.objectForKeyedSubscript("message")?.toString() ?? "Unknown error"),
+                                    "recovery": .string(recovery.toString() ?? "")]).jsonString()
+    } else { message = value.toString() ?? "unknown JavaScript error" }
     guard value.isObject,
           let stack = value.objectForKeyedSubscript("stack"), stack.isString,
           let frames = stack.toString(), !frames.isEmpty else { return message }

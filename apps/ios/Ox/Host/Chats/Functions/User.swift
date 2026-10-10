@@ -26,7 +26,7 @@ extension Conversation {
         ]), purpose: purpose) {
             let answer = await awaitPrompt(prompt: body, options: options, allowsCustomAnswer: true)
             guard answer != Self.abortedAnswer else {
-                throw RuntimeError.bridge("ox.user.choose: the user stopped before answering")
+                throw OxFunctionError(code: "cancelled", message: "ox.user.choose: the user stopped before answering.", recovery: "Stop. Do not reopen the choice unless the user asks.")
             }
             return .string(answer)
         }

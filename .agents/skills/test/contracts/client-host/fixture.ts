@@ -1,4 +1,4 @@
-import { validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
+import { RPC_VERSION, validateParams, validateResult } from "../../../../../packages/protocol/src/index.ts";
 
 const chatId = "standalone-smoke";
 const text = "Hello from the fixture.";
@@ -9,7 +9,7 @@ const snapshot = {
 };
 const results: Record<string, unknown> = {
   "host.describe": {
-    implementation: { name: "Ox fixture", version: "1", build: "1" }, protocols: { repository: [3] },
+    implementation: { name: "Ox fixture", version: "1", build: "1" }, protocols: { rpc: [RPC_VERSION], repository: [3] },
     methods: ["host.describe", "chats.list", "chats.new", "chats.send", "chats.get"],
   },
   "chats.list": { chats: [{ id: chatId, title: "Standalone smoke test", model: null,

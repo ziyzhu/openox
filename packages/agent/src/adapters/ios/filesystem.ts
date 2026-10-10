@@ -8,7 +8,7 @@ import { native } from "./bridge";
 
 export interface NativeFileMount { path: string; access: "readOnly" | "readWrite" }
 export async function invokeFilesystem(runtime: ProfileRuntime, capability: string, mounts: NativeFileMount[], operation: FileOperation, args: FileRequest, signal: AbortSignal) {
-  if (!capability || !Array.isArray(mounts) || !["list", "read", "write", "edit", "delete", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
+  if (!capability || !Array.isArray(mounts) || !["list", "read", "write", "edit", "delete", "mkdir", "rmdir", "move", "copy", "glob", "grep"].includes(operation)) throw new Error("Invalid filesystem capability");
   const context = withAbortSignal(signal, BACKGROUND_CONTEXT);
   const originals = new Map<string, string>();
   const call = async <T>(op: string, path: string, values: object = {}) => {
@@ -29,13 +29,20 @@ export async function invokeFilesystem(runtime: ProfileRuntime, capability: stri
       if (operation === "edit") originals.set(path, result.text);
       return result.text;
     },
-    write: async (path, content) => {
+    write: async (path, content, _context, expected) => {
       if (typeof content !== "string") throw new FileError("not_supported", "Use explicit media publication for binary files", path);
-      await call("write", path, { content, expected: originals.get(path) });
+      await call("write", path, { content, expected: expected ?? originals.get(path) });
     },
     remove: async path => { await call("delete", path); },
   };
-  const inputs: FileMount[] = mounts.map(mount => ({ ...mount, source: { kind: "backend", backend, path: mount.path } }));
+  const inputs: FileMount[] = mounts.filter(mount => mount.path !== "" && (!runtime.workspace || !["artifacts", "conversations"].includes(mount.path))).map(mount => ({ ...mount, visibility: mount.path === "chats" ? "unlisted" : "listed",
+    source: { kind: "backend", backend, path: mount.path === "chats" ? "history" : mount.path } }));
+  if (runtime.workspace) {
+    for (const mount of runtime.env.mounts.filter(mount => mount.path === "")) {
+      if (mount.source.kind !== "backend") throw new Error("Invalid workspace mount");
+      inputs.push(operation === "read" ? { ...mount, source: { ...mount.source, backend: { ...mount.source.backend, read: backend.read } } } : mount);
+    }
+  }
   inputs.push(...runtime.textMounts.mounts.map(mount => ({ path: mount.path, access: mount.access, source: { kind: "text" as const, files: mount.files } })));
   const env = mountedFileSystem(runtime.conversations.profileID, inputs);
   try {

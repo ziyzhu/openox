@@ -24,6 +24,9 @@ export class HostRPCError extends Error {
 export class HostConnection {
   private socket?: WebSocket;
   private disposed = false;
+  private connectionGeneration = 0;
+
+  get generation(): number { return this.connectionGeneration; }
   private readonly pending = new Map<string, {
     request: { jsonrpc: "2.0"; id: string; method: string; params: Record<string, unknown> };
     sent: boolean;
@@ -128,6 +131,7 @@ export class HostConnection {
   private disconnect(message: string): void {
     const socket = this.socket;
     this.socket = undefined;
+    if (socket) this.connectionGeneration++;
     for (const id of this.pending.keys()) this.finish(id, pending => pending.reject(requestFailure(message, pending.sent)));
     socket?.close();
   }

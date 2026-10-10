@@ -60,11 +60,11 @@ final class OxCanvas {
     func call(function: String, arguments: JSONValue) async throws -> JSONValue? {
         try requireRunning()
         try CanvasServiceCatalog.validate(function: function, arguments: arguments)
-        guard arguments.jsonString().utf8.count <= 1_048_576 else { throw RuntimeError.bridge("Canvas request exceeds 1 MiB") }
+        guard arguments.jsonString().utf8.count <= 1_048_576 else { throw RuntimeError.bridge("HTML request exceeds 1 MiB") }
         let now = Date()
         requestTimes.removeAll { now.timeIntervalSince($0) > 60 }
         guard pending.count < 16, requestTimes.count < 120 else {
-            throw RuntimeError.bridge("Canvas service call limit reached; wait before retrying")
+            throw RuntimeError.bridge("HTML service call limit reached; wait before retrying")
         }
         requestTimes.append(now)
         let requestID = UUID()
@@ -89,7 +89,7 @@ final class OxCanvas {
             let result = try await operations.call(function: function, arguments: arguments)
             try requireRunning()
             guard (result?.jsonString().utf8.count ?? 0) <= 8 * 1_048_576 else {
-                throw RuntimeError.bridge("Canvas response exceeds 8 MiB")
+                throw RuntimeError.bridge("HTML response exceeds 8 MiB")
             }
             return result
         }
@@ -129,7 +129,7 @@ final class OxCanvas {
 
     private func requireRunning() throws {
         try Task.checkCancellation()
-        guard state == .running else { throw RuntimeError.bridge("Canvas has closed") }
+        guard state == .running else { throw RuntimeError.bridge("HTML page has closed") }
     }
 
     private func resolveService(_ domain: String) async throws -> Service {
@@ -221,7 +221,7 @@ final class OxCanvas {
                     throw RuntimeError.bridge("Browser exports are available only to chat agents.")
                 },
                 importArtifact: { _, _ in
-                    throw RuntimeError.bridge("Browser export artifacts are available only to chat agents.")
+                    throw RuntimeError.bridge("Browser export files are available only to chat agents.")
                 },
                 choose: { [unowned self] prompt in
                     await waitForInteraction(.choice(UUID(), prompt.body, prompt.options))?.stringValue
@@ -305,7 +305,7 @@ final class OxCanvas {
         try requireRunning()
         let added = artifacts.reduce(0) { $0 + $1.data.count }
         guard outputBytes + added <= 20 * 1_048_576, outputs.count + artifacts.count <= 32 else {
-            throw RuntimeError.bridge("Canvas output limit reached")
+            throw RuntimeError.bridge("HTML output limit reached")
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         for artifact in artifacts {

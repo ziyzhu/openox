@@ -49,7 +49,7 @@ private struct ConversationArtifactRow: View {
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 } else if !artifact.exists {
-                    Text("Deleted artifact")
+                    Text("Deleted file")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 }
@@ -1340,7 +1340,7 @@ struct BlockView: View, Equatable {
                                 .padding(.horizontal, 4)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(String(
-                                    format: L10n.string("Deleted artifact: %@"),
+                                    format: L10n.string("Deleted file: %@"),
                                     artifact.userFacingName
                                 ))
                                 .accessibilityIdentifier(A11yID.Chat.Message.artifact(artifact.id))

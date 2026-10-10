@@ -32,21 +32,28 @@ types remain authoritative in their `Codable` implementations.
 │   │   ├── external-profiles.json           external profile folder bookmarks
 │   │   ├── device-folder-grants.json         security-scoped folder bookmarks
 │   │   ├── scheduled-skills.json             device-owned scheduled skill snapshots
+│   │   ├── Profiles/<uuid>/profile.json    private identity, version, public-folder registration
+│   │   ├── Profiles/<uuid>/state.sqlite    conversations, settings, file references/derived metadata; WAL sidecars
+│   │   ├── Profiles/<uuid>/staging/        private owner lock and recoverable transfer staging
+│   │   ├── Profiles/<uuid>/payloads/       private source/diagnostic archives, not attachment history
+│   │   ├── StorageMigration/RetainedStages/ abandoned predecessor working copies/stages
+│   │   ├── StorageMigration/PiProfiles/<uuid>/public-journal.json public/private publication and retained original
 │   │   ├── StorageMigration/PiProfiles/<uuid>/journal.json  publication journal + conversion mappings
 │   │   ├── StorageMigration/PiProfiles/<uuid>/source-<uuid>/ retained native source Profile
 │   │   └── logs.jsonl                       capped structured diagnostics
 │   ├── Caches/
 │   │   ├── PiDurableProof/Native/<uuid>/session.sqlite  Opt-in temporary-chat cache Session; WAL sidecars
-│   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + artifacts/  Temporary-chat physical backend
+│   │   ├── PiDurableProof/NativeFiles/<uuid>/state.sqlite + conversation/shared files  Temporary-chat filesystem
 │   │   ├── PiDurableDiagnostics/<action>/<uuid>/session.sqlite  Upstream storage conformance/benchmarks; removed after each request
 │   │   └── ServiceSearchVectors.plist       purgeable service-search embeddings
 │   └── ...                                  system-managed framework state
-├── Documents/                               local Profile catalog
-│   ├── .pi-source-work-<uuid>/               isolated legacy migration working copy
-│   └── <ProfileName>/
-│       ├── profile.json
-│       ├── state.sqlite                     Pi execution, full history, application documents; WAL sidecars
-│       └── artifacts/<filename>             immutable physical text/binary files; hidden-index payload-<sha256>.json archives
+├── Documents/                               visible in Apple Files
+│   └── Profiles/<ProfileName>/              public Profile content
+│       ├── MEMORY.md, SOUL.md               authoritative editable Profile documents
+│       ├── skills/<name>/...                authoritative editable user skill packages
+│       ├── conversations/<Pi-ID>/...        mutable conversation-owned files and directories
+│       ├── <shared folders>/...             mutable Profile-owned files; no required hierarchy
+│       └── artifacts/<filename>             retained ordinary predecessor files only
 ├── Keychain                                 provider and service credentials
 └── WKWebsiteDataStore(forIdentifier:)       shared app-wide website state
 
@@ -77,6 +84,8 @@ that provider when it was the saved default.
 
 Primary owners:
 
+Choice, approval, and secret-entry prompts are transient `Conversation` interactions, not new persisted presentation steps. Resolving one returns its answer to the waiting operation without recording a separate prompt receipt. Older prompt steps remain readable but are omitted from chat display. Model-facing tool results and explicit Always allow policies retain their existing persistence.
+
 - UserDefaults onboarding state — owner: App.swift
 - UserDefaults Host access toggle — owner: Platform/Models/HostAccess.swift; app-wide, retained across Profile switches, follows device backup policy, removed with app preferences. Additive Boolean key with no predecessor representation or migration; missing state defaults off, including upgrades from builds that listened automatically.
 - UserDefaults import-memory starter count — owner: Client/Features/Chat/ChatComposer.swift
@@ -98,7 +107,21 @@ Primary owners:
 - Scheduled skill definitions and run state — owners: Host/Profile/ScheduledSkills.swift and Host/Chats/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/onboarding/scripts/bootstrap.ts
 
+## Profile filesystem
+
+`ProfileWorkspace` owns ordinary file identities, paths, ownership, directories, and a resumable mutation journal in the `ox.workspace` Pi document. File bytes live in the Profile directory, never in SQLite blobs. `DurableFileStore` owns the native lock, staged transfers, pinned reads, verification, and atomic replacement; it composes descriptor-relative `DurableWorkspaceStore` operations. Normal runtimes inject `WorkspaceBackend` directly, without `ArtifactFiles`, an artifact index, or immutable publication. Memory, soul, and user skills are authoritative physical public files; their predecessor Pi text documents are retired only by trusted preparation. Skill selections remain private Pi documents, and bundled System resources stay app-managed/read-only. Services and granted device folders retain their scoped mounts and permissions.
+
+New files have opaque registrations with an initial extension hint, not artifact paths. Same-path edits retain references. Rename and move retire the old registration and create a new one; old messages show the file as deleted rather than following it. Current paths determine content type. Messages read current contents; copy creates an independent file, and deletion makes references unavailable. Request-owned verified bytes and temporary exports/previews are not persisted attachment versions. Empty directories persist. Relative workspace paths use `conversations/<Pi-ID>/`; `/` addresses the Profile root. Read-only history lives under `history/`, with `chats/` and UUID conversation paths retained as compatibility aliases. Generic operations cannot mutate conversation roots, mounted roots, database/sidecars, the manifest, hidden staging, or private archives.
+
+Ownership follows destination folders, not references. Conversation deletion records a tombstone before aborting work and removing its files, directories, and proven-owned private archives. Startup retries interrupted deletion. Moved-out shared files survive; forks and other references do not transfer ownership. Mutation intent and a prospective metadata delta commit before filesystem effects; registrations publish only after replay verifies completed replacements/moves. Conflict reconciliation starts from the prior committed registrations, so failed moves do not invalidate references at unchanged source paths. The additive nullable `pendingIndex` contains only file metadata changes and directories, never file bytes. Preflight rejects collisions, links, untracked destinations, and unexpected directory contents. Exact edits reject stale reads. Limits are 200 KiB text, 32 MiB ordinary binary files, and 10,000 workspace entries. External content is reconciled before filesystem operations and through foreground/presentation refresh. Inventory is bounded, descriptor-pinned, link-safe, and caches hashes using modification/change/size stamps, without tracking inode identity. Observed missing paths retire registrations; recreating that path does not revive them. A delete/recreate between observations is indistinguishable from same-path replacement and is treated as an edit. Recovery conflicts discard interrupted intents and reconcile actual disk state, never reconstruct deleted attachment bytes or blindly overwrite external edits. Simulator evidence does not establish physical-device power-loss durability.
+
+`StorageMigrator` appends `2026-10-10-profile-filesystem`, `2026-10-10-workspace-binding`, and `2026-10-10-profile-files` after the Pi milestone. Trusted preparation inventories predecessor metadata, preserves legacy aliases in the normalized file index, removes artifact entries from the text-document index, retires the predecessor lock, and binds `ox.filesystem` to `profile-files-v1`. The gate alone resumes the prototype journal format. Ambiguous/shared/saved predecessor files remain Profile-owned. Private generated archives receive conversation ownership only from matching canonical source descriptors and their producing entry IDs; ambiguous producers remain Profile-owned. Existing artifact UI, wire fields, and user-authored helpers are compatibility facades over the filesystem, not another store; artifact helpers are excluded from normal discovery. `2026-10-11-public-profile-files` adds a fingerprint-verified, recoverably published split: public `Documents/Profiles/<name>` and private `Application Support/Profiles/<UUID>`. The private manifest registers the public folder; backups and abandoned stages remain private. Hidden source payloads move to private `payloads/` with legacy aliases; preparation binds `public-profile-files-v1`. This is local-only and does not change the existing refusal of live Pi cloud/external activation. Public Profile folder relocation outside Ox is not followed automatically. A full file-manager UI remains deferred; current viewers resolve nested workspace files and refresh deleted references.
+
+Chat export verifies live metadata and bytes, maps references to current file types, and includes referenced local dependencies in the existing portable package format. Import first creates an empty conversation, publishes files directly into its final working directory, rewrites references and sibling dependencies, then populates turns. Failures attempt conversation-owned cleanup and log cleanup failures; this is not an atomic package transaction. Retained migration source backups remain private recovery material outside the active Profile, not attachment history.
+
 ## Pi Durable Sessions and upstream diagnostics
+
+The legacy cache and physical-publication formats below are predecessor representations consumed through `StorageMigrator`; ordinary temporary chats now use the same filesystem in their isolated `NativeFiles` cache. SQLite-blob caches remain explicit diagnostic fixtures only.
 
 `DurableChatController` owns opt-in temporary-chat Sessions under
 `Library/Caches/PiDurableProof/Native/<uuid>/`. Several temporary chats share each
@@ -140,7 +163,7 @@ fixtures, conversion/package experiments and the agent-overhead benchmark have
 been removed. Existing retired cache directories remain untouched and ignored;
 no production Profile format or compatibility milestone is changed.
 
-### Physical files and conversation projections
+### Predecessor physical files and conversation projections
 
 `NativeFiles` uses `state.sqlite` and flat ordinary files in
 `artifacts/`, including UTF-8 text artifacts. The native `DurableArtifactStore`
@@ -187,7 +210,7 @@ runtime registry. Physical artifacts are digest-checked and flushed before Pi
 metadata commits. The installer closes SQLite and its artifact owner before the
 staged manifest receives `2026-10-05-pi-durable`. This appended milestone is now registered for local production activation. Legacy milestones run on a fingerprint-verified `.pi-source-work-<uuid>` copy rather than the original Profile. A prepared publication journal retains conversion mappings and original source fingerprints; the untouched source moves to a private retained backup before stage publication. The working copy is removed after publication; failed working copies remain hidden and are never adopted implicitly. Recovery runs before Profile enumeration and completes interrupted publication before consumers open. Failed unjournaled stages are retained for diagnosis and never reused implicitly. Fresh Profiles install and validate an empty dormant Pi database before publishing their manifest.
 
-The current local Profile is `profile.json`, `state.sqlite`, and ordinary immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
+The predecessor Pi Profile was `profile.json`, `state.sqlite`, and immutable files at `artifacts/<filename>`. `profile.json` alone owns identity, creation date, and migration milestone; database bindings are integrity checks. Production identity is `(Profile ID, Pi conversation ID)`. Native UUIDs are deterministic presentation projections, not a registry. Source UUID conversion mappings remain in `StorageMigrator` journals.
 
 `ox.native.presentation` entries retain immutable current rich UI decorations without contributing model context. `ox.conversation.metadata` stores `nativeProviderID` for credential routing and native-only reasoning options; Pi AgentDoc owns model/thinking choices. Canonical Pi models override decoration text/calls/results. New migration entries retain exact source JSON through `{path,size,sha256}` file references; older inline `sourceJSON` entries remain readable without rewriting. Runtime presentation never decodes the source archive. Legacy invocation arguments and results larger than 16 KiB use `oxPayload: {format:1,source,offset,length}` plus a bounded retrieval notice instead of embedding their full bytes. Existing live-capture references remain readable. These content-addressed immutable `artifacts/payload-<sha256>.json` archives are committed as `ox.artifact` metadata without entering the visible `ox.profile` file index. They share the native artifact owner, are retained with history, and have no automatic reclamation. `ox.output.read` can read their UTF-8 JSON ranges after reopening, with a 32 MiB per-read limit and committed-Profile identity checks. Publication and streaming digest verification precede migration references; no raw payload SQL blobs are introduced. New Actions do not create diagnostic archives. Whole skill package and selection changes use one Pi document/index commit. Artifact edits/renames choose new immutable filenames and retain prior metadata/bytes.
 
@@ -371,7 +394,9 @@ milestones. A milestone is stamped only after every required operation succeeds;
 an interrupted migration preserves a recoverable source or equivalent
 destination and resumes on the next activation.
 
-## Artifacts
+## Predecessor artifacts
+
+This section records the native representation preceding Pi and the filesystem. It is not the current runtime storage model.
 
 `artifacts/` is a flat directory of ordinary files plus a hidden `.saved.json`
 index containing the basenames the user saved. The case-insensitive basename is
@@ -688,9 +713,9 @@ pages with the same persistent store but separate DOM, history, and
 `sessionStorage`.
 
 Website conversations use owned pages separate from the ordinary Action pool.
-`WebConversation` routes the shared `conversation` Action for provider,
-chat-tool, Canvas, and direct Client owners; legacy provider Actions also use its
-page lifecycle through `WebModelContext`. Owners share the persistent website
+`WebConversation` routes the shared `conversation` Action for chat-tool,
+Canvas, and direct Client owners. Websites cannot run the Ox agent's model loop.
+Owners share the persistent website
 account store, but not pages, DOM, history, session storage, or conversation IDs.
 The native conversation/submission registry is process-local and is never
 checkpointed. Opaque handles appearing in archived tool results cannot restore
@@ -728,9 +753,11 @@ default; deleting an added definition removes it entirely. A saved definition
 with no models disables that provider for model selection. An empty saved catalog
 uses bundled defaults. `ox.provider.default` returns a fresh copy of
 bundled definitions without changing storage. Provider JSON excludes credentials.
-Website model providers come only from model web services and are never saved
-in the catalog; their discovered models stay in memory until the service
-changes. Catalog format compatibility, conversion from the earlier format-1 overlay
+Providers use API transports; website services never enter the provider catalog.
+Existing website defaults and chat selections remain stored as unavailable choices
+until the user explicitly selects a replacement. They cannot silently fall back to
+another provider. History, credentials, website state, service sources, and approvals
+are retained; no new persisted format or Profile milestone is introduced. Catalog format compatibility, conversion from the earlier format-1 overlay
 (deleted built-ins become saved replacements with no models), removal of legacy
 saved website provider definitions,
 legacy `llm.customProviders`, and regional selection transforms belong solely
@@ -810,9 +837,13 @@ needed for diagnosis but never credentials or reusable secrets.
 
 | State | Location | Backup or sync | Removal |
 |---|---|---|---|
-| Local Profile content | App Documents | No device backup | Delete or move the Profile |
+| Local Profile content | Documents/Profiles/<name> | No device backup | Delete or move the Profile |
+| Local Profile state | Application Support/Profiles/<UUID> | No device backup or Files exposure | Delete the Profile |
+| Profile migration recovery | Application Support/StorageMigration | Private retained source/stage material | Explicit recovery/diagnostic cleanup |
 | iCloud Profile content | iCloud Documents | iCloud Drive | Delete or move the Profile |
-| Temporary chat | Memory | None | Leave chat or terminate process |
+| Temporary chat | Memory and isolated filesystem cache | None; cache is purgeable | Leave chat; private cache by eviction, app deletion, or explicit QA cleanup after close |
+| Conversation-owned files | Profile directory | Profile policy | Delete owner conversation or delete file |
+| Shared files | Profile directory | Profile policy | Delete file, folder, or Profile |
 | Active provider catalog | UserDefaults | Device backup policy | Delete provider or app |
 | Secret values | Keychain | This device only | Sign out generated entry or delete any entry |
 | Secret metadata and bindings | UserDefaults | Device backup policy | Sign out or delete entry |

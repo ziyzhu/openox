@@ -49,7 +49,7 @@ struct MarkdownArtifactView: View {
             switch phase {
             case .loading:
                 CellularAutomatonLoader()
-                    .accessibilityLabel("Loading artifact…")
+                    .accessibilityLabel("Loading file…")
             case .ready(let document):
                 switch mode {
                 case .viewing:
@@ -81,7 +81,7 @@ struct MarkdownArtifactView: View {
                 }
             case .failed(let message):
                 ContentUnavailableView(
-                    "Artifact unavailable",
+                    "File unavailable",
                     systemImage: artifact.exists ? "exclamationmark.triangle" : "questionmark.folder",
                     description: Text(message)
                 )
@@ -106,7 +106,7 @@ struct MarkdownArtifactView: View {
             }
         }
         .task { await load() }
-        .alert("Couldn't save note", isPresented: Binding(
+        .alert("Couldn't save Markdown", isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
         )) {

@@ -161,7 +161,7 @@ private enum BuiltInActionGroup: String, CaseIterable, Identifiable {
         case .conversations: "Chats"
         case .models: "Models & secrets"
         case .web: "Web & browser"
-        case .artifacts: "Artifacts & images"
+        case .artifacts: "Files & images"
         case .memory: "Memory"
         case .skills: "Skills & schedules"
         case .services: "Services"

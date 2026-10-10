@@ -67,6 +67,7 @@ actor DurableAgentHost {
                     arguments: JSONValue, mounts: [JSONValue]) async throws -> JSONValue {
         guard fileCapabilities.count < 128 else { throw RuntimeError.bridge("Too many concurrent filesystem capabilities") }
         let capability = UUID().uuidString
+        let reference = await owner.durableRoute?.reference
         let state = FileCapability(owner: owner, scope: await owner.scope, operation: operation,
             roots: Set(mounts.compactMap { $0.objectValue?["path"]?.stringValue }))
         fileCapabilities[capability] = state
@@ -74,7 +75,8 @@ actor DurableAgentHost {
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             let result = try await runtime.command(.object(["action": .string("filesystem"), "profileID": .string(profileID.uuidString),
-                "capability": .string(capability), "operation": .string(operation), "arguments": arguments, "fileMounts": .array(mounts)]))
+                "capability": .string(capability), "operation": .string(operation), "arguments": arguments, "fileMounts": .array(mounts),
+                "reference": reference?.value ?? .null]))
             try Task.checkCancellation()
             return result
         } onCancel: {
@@ -90,7 +92,8 @@ actor DurableAgentHost {
               let capability = fileCapabilities[token], !capability.cancelled.withLock({ $0 }),
               StorageRoot.currentScope == capability.scope,
               let path = fields["path"]?.stringValue, let root = path.split(separator: "/").first,
-              capability.roots.contains(String(root)), let operation = fields["op"]?.stringValue,
+              let operation = fields["op"]?.stringValue,
+              capability.roots.contains(String(root)) || (operation == "read" && capability.roots.contains("")),
               ["info", "list", "read", "write", "delete", "activate"].contains(operation) else {
             throw RuntimeError.bridge("Filesystem backend capability is expired or outside its scope")
         }
@@ -287,8 +290,13 @@ actor DurableAgentHost {
                 for attachment in message.transientAttachments {
                     let suffix = UTType(mimeType: attachment.mimeType)?.preferredFilenameExtension ?? "bin"
                     let filename = "media-\(UUID().uuidString).\(suffix)"
-                    let publication = try await runtime.publishArtifact(data: attachment.data, filename: filename)
-                    guard let receipt = publication.objectValue?["artifact"] else { throw RuntimeError.bridge("Missing immutable artifact publication") }
+                    let publication: JSONValue
+                    if let reference = attachment.reference {
+                        publication = try await runtime.command(.object(["action": .string("fileStat"), "path": .string(reference)]))
+                    } else {
+                        publication = try await runtime.publishFile(data: attachment.data, filename: filename, reference: fields["reference"])
+                    }
+                    guard let receipt = publication.objectValue?["file"], receipt != .null else { throw RuntimeError.bridge("Attachment file unavailable") }
                     content.append(try DurableMessageCodec.transientReference(attachment, receipt: receipt, profileID: profileID!))
                 }
             } catch {

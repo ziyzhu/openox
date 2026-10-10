@@ -1,12 +1,6 @@
-/** File bytes belong to the native Profile owner, never to Pi documents or SQL blobs.
- * Publication is write-once at a readable relative path. A failed metadata commit
- * leaves an unreferenced file; it must not make any previously referenced file change.
- */
-export interface ArtifactRecord {
-  path: string;
-  size: number;
-  sha256: string;
-}
+import type { FileRecord } from "./file-record";
+
+export type ArtifactRecord = FileRecord;
 export interface ArtifactFiles {
   publish(path: string, bytes: Uint8Array): Promise<ArtifactRecord>;
   read(record: ArtifactRecord): Promise<Uint8Array>;

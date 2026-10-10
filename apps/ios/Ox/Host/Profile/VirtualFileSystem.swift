@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated public struct VirtualFileSystem: Sendable {
-    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "conversations"]
+    static let hostRoots = ["MEMORY.md", "SOUL.md", "artifacts", "skills", "services", "history"]
     static let maximumReadBytes = ArtifactLimits.textBytes
     static let maximumSearchFiles = 1_000
 
@@ -47,10 +47,10 @@ nonisolated public struct VirtualFileSystem: Sendable {
             case .service(let kind, let domain): "services/\(kind.rawValue)/\(domain)"
             case .serviceItem(let kind, let domain, let components):
                 "services/\(kind.rawValue)/\(domain)/\(components.joined(separator: "/"))"
-            case .chats: "conversations"
-            case .chat(let id): "conversations/\(id)"
-            case .chatMetadata(let id): "conversations/\(id)/conversation.json"
-            case .chatTurns(let id): "conversations/\(id)/turns.jsonl"
+            case .chats: "history"
+            case .chat(let id): "history/\(id)"
+            case .chatMetadata(let id): "history/\(id)/conversation.json"
+            case .chatTurns(let id): "history/\(id)/turns.jsonl"
             case .files: "files"
             case .deviceFolder(let id): "files/\(id)"
             case .deviceItem(let id, let components): "files/\(id)/\(components.joined(separator: "/"))"
@@ -118,6 +118,7 @@ nonisolated public struct VirtualFileSystem: Sendable {
               !path.hasSuffix("/"),
               !path.contains("\\") else { throw Error.invalidPath(rawPath) }
         var parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        if parts.first == "history" { parts[0] = "conversations" }
         if parts.first == "chats" {
             parts[0] = "conversations"
             if parts.count == 3, parts[2] == "chat.json" { parts[2] = "conversation.json" }

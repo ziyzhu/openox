@@ -85,7 +85,7 @@ extension Conversation {
                     fileSystemItem(path: "artifacts", type: "directory", size: nil),
                     fileSystemItem(path: "skills", type: "directory", size: nil),
                     fileSystemItem(path: "services", type: "directory", size: nil),
-                    fileSystemItem(path: "conversations", type: "directory", size: nil),
+                    fileSystemItem(path: "history", type: "directory", size: nil),
                 ]
                 if self.attachedServices.contains(where: { $0.domain == "ios:files" }) {
                     rootItems.append(fileSystemItem(path: "files", type: "directory", size: nil))
@@ -148,7 +148,7 @@ extension Conversation {
                 }
             case .chats:
                 items = await fileSystemChatSummaries().map {
-                    fileSystemItem(path: "conversations/\(ChatID($0.id))", type: "directory", size: nil)
+                    fileSystemItem(path: "history/\(ChatID($0.id))", type: "directory", size: nil)
                 }
             case .chat(let id):
                 let sizes = try await repository.virtualChatFileSizes(
@@ -157,8 +157,8 @@ extension Conversation {
                     snapshot: conversationManager?.readableChatState(id, in: scope)
                 )
                 items = [
-                    fileSystemItem(path: "conversations/\(id)/conversation.json", type: "file", size: sizes.metadata),
-                    fileSystemItem(path: "conversations/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
+                    fileSystemItem(path: "history/\(id)/conversation.json", type: "file", size: sizes.metadata),
+                    fileSystemItem(path: "history/\(id)/turns.jsonl", type: "file", size: sizes.transcript),
                 ]
             case .files:
                 items = DeviceFolderStore.shared.grants.map {
@@ -198,6 +198,20 @@ extension Conversation {
     }
 
     private func readFileBackend(path: String, options: JSONValue?, purpose: String) async throws -> JSONValue? {
+        let root = path.split(separator: "/").first.map(String.init) ?? ""
+        if let route = durableRoute, root == "artifacts" || !VirtualFileSystem.hostRoots.contains(root) || (!isTemporary && ["MEMORY.md", "SOUL.md"].contains(root)) {
+            let record = try await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
+            if record.objectValue?["file"] != .null, record.objectValue?["file"] != nil {
+                let media = try await fileSystemMedia(path: path)
+                let readOptions = ArtifactLibrary.readOptions(from: options)
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try ArtifactLibrary.read(data: media.data, kind: media.kind, options: readOptions)
+                }.value
+                let unsupported = media.kind == .image
+                    ? try ModelPromptRenderer.shared.render(.imageReadGuidance, input: .object(["path": .string(path)])) : result.unsupported
+                return fileSystemReadJSON(path: path, result: FileSystemRead(text: result.text, truncated: result.truncated, unsupported: unsupported))
+            }
+        }
         let location = try await fileSystemLocation(path)
         let args = fileSystemArgs(path: location.path, options: options)
         return try await fileBackendEffect(Actions.fsRead, args, purpose: purpose) {
@@ -213,7 +227,7 @@ extension Conversation {
             ? try WebFetchRequest(url: path) : nil
         let source: String
         if let webRequest { source = webRequest.url.absoluteString }
-        else { source = try await fileSystemLocation(path).path }
+        else { source = path.hasPrefix("/") ? String(path.dropFirst()) : path }
         let args: JSONValue = .object(["path": .string(source)])
         return try await tracked(Actions.fsAttach, args, purpose: purpose) {
             let attachment: TransientAttachment
@@ -225,9 +239,11 @@ extension Conversation {
                 }.value
             } else {
                 let media = try await self.fileSystemMedia(path: source)
-                attachment = try await Task.detached(priority: .userInitiated) {
+                let prepared = try await Task.detached(priority: .userInitiated) {
                     try WebAttachmentFactory.make(data: media.data, filename: media.filename, mimeType: media.mimeType)
                 }.value
+                attachment = TransientAttachment(kind: prepared.kind, mimeType: prepared.mimeType, displayName: prepared.displayName,
+                    data: prepared.data, reference: media.reference)
             }
             try Task.checkCancellation()
             try appendTransientAttachment(attachment)
@@ -236,21 +252,32 @@ extension Conversation {
         }
     }
 
-    struct FileSystemMedia: Sendable {
+    nonisolated struct FileSystemMedia: Sendable {
         let filename: String
         let mimeType: String
         let kind: Artifact.Kind
         let data: Data
+        let reference: String?
 
-        init(artifact: Artifact, data: Data) {
-            filename = artifact.fileName
+        init(artifact: Artifact, data: Data, reference: String? = nil) {
+            filename = artifact.displayName
             mimeType = artifact.mimeType
             kind = artifact.kind
             self.data = data
+            self.reference = reference
         }
     }
 
     func fileSystemMedia(path: String) async throws -> FileSystemMedia {
+        if let route = durableRoute {
+            let result = try? await route.session.runtime.command(.object(["action": .string("fileStat"), "path": .string(path), "byPath": .bool(true)]))
+            if let record = result?.objectValue?["file"]?.objectValue, record["hidden"]?.boolValue != true,
+               let actual = record["path"]?.stringValue, let reference = record["reference"]?.stringValue {
+                let artifact = Artifact(fileName: reference, directory: route.artifactScope?.root ?? scope.root, relativePath: actual)
+                let data = try await route.session.runtime.readFile(.object(record))
+                return FileSystemMedia(artifact: artifact, data: data, reference: reference)
+            }
+        }
         let location = try await fileSystemLocation(path)
         try await authorizeFileAccess(location, operation: .read)
         let media: FileSystemMedia
@@ -295,7 +322,7 @@ extension Conversation {
                     return try await self.writeFileSystem(location, content: content, expected: expected)
                 }
                 if let expected, try await self.fileSystemUTF8Text(location) != expected {
-                    throw RuntimeError.bridge("File changed after reading; read again before editing")
+                    throw OxFunctionError(code: "file_changed", message: "File changed after reading: \(path)", recovery: "Read the file again with ox.fs.read, then rebuild the edit from the current content.")
                 }
                 try Task.checkCancellation()
                 return try await self.writeFileSystem(location, content: content)
@@ -368,7 +395,12 @@ extension Conversation {
     func requireWritableFileAction(_ action: String, args: Any?) async throws {
         guard [Actions.fsWrite, Actions.fsEdit, Actions.fsDelete].contains(action),
               let path = (args as? [String: Any])?["path"] as? String else { return }
-        try await requireWritableFileContext(fileSystemLocation(path), action: action)
+        let root = path.split(separator: "/").first.map(String.init) ?? ""
+        if ["MEMORY.md", "SOUL.md", "skills", "services", "files"].contains(root) {
+            try await requireWritableFileContext(fileSystemLocation(path), action: action)
+        } else if !isTemporary || durableRoute?.artifactScope == nil {
+            try requireProfileMutation(action)
+        }
     }
 
     private func requireWritableFileContext(_ location: VirtualFileSystem.Location, action: String) async throws {
@@ -635,7 +667,7 @@ extension Conversation {
                     defer { try? file.close() }
                     let current = try file.read(upToCount: ArtifactLimits.textBytes + 1) ?? Data()
                     guard String(data: current, encoding: .utf8) == expected else {
-                        throw RuntimeError.bridge("File changed after reading; read again before editing")
+                        throw OxFunctionError(code: "file_changed", message: "File changed after reading: \(location.path)", recovery: "Read the file again with ox.fs.read, then rebuild the edit from the current content.")
                     }
                 }
                 try Task.checkCancellation()

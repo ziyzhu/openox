@@ -18,7 +18,7 @@ nonisolated enum ProviderClientFactory {
         let native: any ProviderClient
         switch definition.api {
         case .web:
-            throw RuntimeError.bridge("Website model providers are resolved from services")
+            throw RuntimeError.bridge("Websites are services, not model providers. Choose an API-backed provider.")
         case .openAIChatCompletions:
             let auth: any OpenAITransportAuth
             if definition.auth.kind == .custom { auth = try customAuth(definition) }
@@ -86,7 +86,7 @@ nonisolated enum ProviderClientFactory {
 
     static func validateAdapter(_ definition: ProviderDefinition) throws {
         guard definition.api != .web else {
-            throw RuntimeError.bridge("Edit this model provider through its Local web service")
+            throw RuntimeError.bridge("Websites are services, not model providers. Choose an API-backed provider.")
         }
         guard definition.auth.kind == .custom else { return }
         let expected: (URL, LLMWireProtocol)?
@@ -152,10 +152,6 @@ nonisolated private struct DefinedProviderClient: ProviderClient {
     var canLoadModels: Bool { native.canLoadModels }
 
     func wireProtocol(for model: ProviderModel) -> LLMWireProtocol? { definition.api }
-
-    func websiteSessionIsAuthenticated() async throws -> Bool? {
-        try await native.websiteSessionIsAuthenticated()
-    }
 
     func loadModels() async throws -> [ProviderModel] {
         try await native.loadModels()

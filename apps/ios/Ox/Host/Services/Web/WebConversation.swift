@@ -5,14 +5,12 @@ import CryptoKit
 @MainActor
 final class WebConversation {
     enum Owner: Equatable {
-        case provider(UUID)
         case chat(UUID)
         case canvas(UUID)
         case client
 
         var logLabel: String {
             switch self {
-            case .provider(let id): "provider:\(id.uuidString.prefix(8))"
             case .chat(let id): "chat:\(id.uuidString.prefix(8))"
             case .canvas(let id): "canvas:\(id.uuidString.prefix(8))"
             case .client: "client"
@@ -65,7 +63,7 @@ final class WebConversation {
         guard service.manager.webConversations.count + service.manager.openingWebConversations.count <= 12 else {
             throw WebsiteProviderError("Too many website conversations are open or opening")
         }
-        guard let action = await service.resolvedAction(actionID, role: .modelGeneration) else {
+        guard let action = await service.resolvedAction(actionID, role: .conversation) else {
             throw WebsiteProviderError("The website conversation service is unavailable")
         }
         try await requireAccess(service: service, action: action.definition)
@@ -111,15 +109,8 @@ final class WebConversation {
         try Task.checkCancellation()
         try checkPage()
         lastUsed = Date()
-        if [ModelServiceContract.start, ModelServiceContract.resume].contains(actionID) {
-            isBusy = true
-            activeSince = Date()
-        }
-        let value = try await service.invokeAction(actionID, args: args, role: .modelGeneration, in: page).get()
+        let value = try await service.invokeAction(actionID, args: args, role: .conversation, in: page).get()
         try checkPage()
-        if actionID == ModelServiceContract.read,
-           let terminal = value.objectValue?["events"]?.arrayValue?.last?.objectValue?["type"]?.stringValue,
-           ["completed", "failed"].contains(terminal) { isBusy = false }
         return value
     }
 

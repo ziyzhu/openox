@@ -12,14 +12,14 @@
 
 Ox presents the Kimi API in Global and China. These are separate service surfaces with region-specific credentials; never silently reuse one region's credential for the other. Kimi For Coding is a separate subscription choice in Global.
 
-The Kimi Website provider is a separate China chat option with text, image, and PDF input. It uses the signed-in Ox browser session for `www.kimi.com` and does not use the Kimi Open Platform API key. Kimi's regional sign-in guidance identifies `kimi.com` as mainland China and `kimi.ai` as international. An international website integration needs its own verified session and service support; do not move an existing China session to the international domain. User attachments and live Ox Action media use the signed-in website upload flow. Its website RPC is distinct from the official developer API and may change independently. The website chat service remains a separate Ox service.
+Kimi Website remains an ordinary service using the signed-in browser session for `www.kimi.com`, not a model provider or an Open Platform API credential. Kimi identifies `kimi.com` as mainland China and `kimi.ai` as international; do not move an existing session between domains. Website service Actions receive explicit inputs only.
 
 ## Runtime sources
 
 - Provider composition and regional account mapping: [KimiProvider.swift](../../../../apps/ios/Ox/Host/Agent/LLM/Providers/KimiProvider.swift)
 - Models: [provider-models.json](../../../../apps/ios/Ox/Host/ModelProviders/provider-models.json)
 - Kimi For Coding models: [CuratedProviderModels.swift](../../../../apps/ios/Ox/Host/ModelProviders/CuratedProviderModels.swift)
-- Website provider: [www.kimi.com/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/www.kimi.com/actions.js)
+- Website service: [www.kimi.com/actions.js](../../../../apps/ios/Ox/Resources/OxServices.bundle/web/www.kimi.com/actions.js)
 
 ## Implementation comparison
 
