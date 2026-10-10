@@ -1,5 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
+  "compilerOptions": { "skipLibCheck": true },
   "include": ["**/*.ts", "../packages/agent/src/skill-assets.d.ts"],
   "exclude": ["node_modules"]
 }
