@@ -50,7 +50,7 @@
 	<string>Copyright © 2026 Ziyuan Zhu</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER).chat.*</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).conversation.*</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).scheduled-skills</string>
 	</array>
 	<key>UIBackgroundModes</key>

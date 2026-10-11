@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Background time ended" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台运行时间已结束"
+          }
+        }
+      }
+    },
     "Couldn't Open Link" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开链接" } } } },
     "Ox couldn't prepare the selected Profile. Try opening the link again." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 无法准备所选档案。请重试打开链接。" } } } },
     "Markdown" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Markdown" } } } },
@@ -11,6 +22,17 @@
     "Open HTML" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 HTML" } } } },
     "Open file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开文件" } } } },
     "Close file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭文件" } } } },
+    "Payment needed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要付款"
+          }
+        }
+      }
+    },
     "Share file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享文件" } } } },
     "Add file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加文件" } } } },
     "File added" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已添加文件" } } } },
@@ -28,6 +50,17 @@
     "Couldn't save Markdown" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法保存 Markdown" } } } },
     "Rename file" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名文件" } } } },
     "Delete this file?" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除此文件？" } } } },
+    "Sign-in needed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要登录"
+          }
+        }
+      }
+    },
     "This deletes the file. Existing conversation references will show it as deleted." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会删除文件。现有对话中的引用将显示文件已删除。" } } } },
     "Filter and sort files" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "筛选和排序文件" } } } },
     "Files & images" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件与图片" } } } },
@@ -54,6 +87,17 @@
     },
     "Models & secrets" : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模型与密钥" } } }
+    },
+    "Verification needed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要验证"
+          }
+        }
+      }
     },
     "Web & browser" : {
       "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网页与浏览器" } } }
@@ -4798,6 +4842,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "包含压缩后的上下文"
+          }
+        }
+      }
+    },
+    "Input needed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你的回应"
           }
         }
       }

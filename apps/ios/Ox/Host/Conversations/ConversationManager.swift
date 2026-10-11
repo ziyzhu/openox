@@ -637,6 +637,11 @@ final class ConversationManager {
         return meta
     }
 
+    func notifyPendingInteractions() {
+        for record in records.values { record.hydration.conversation?.notifyPendingInteraction() }
+        current?.notifyPendingInteraction()
+    }
+
     func flushAll() {
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ConversationManager.flushAll", expirationHandler: nil)
         Task { [weak self] in

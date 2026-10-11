@@ -177,6 +177,19 @@ final class Conversation: Identifiable {
             }
         }
 
+        var backgroundPhase: ConversationBackgroundExecution.Phase {
+            switch interaction {
+            case .prompt(let prompt) where prompt.kind == .permission: .permissionNeeded
+            case .prompt: .inputNeeded
+            case .serviceControl(let control):
+                switch control.control {
+                case .signIn: .signInNeeded
+                case .botControl: .verificationNeeded
+                case .payment: .paymentNeeded
+                }
+            }
+        }
+
         var serviceDomain: String? {
             guard case .serviceControl(let control, _) = self else { return nil }
             return control.control.domain
@@ -352,6 +365,7 @@ final class Conversation: Identifiable {
     @ObservationIgnored private var attachedServiceDomains: [String] = []
     @ObservationIgnored private var interactionWaiter: InteractionWaiter?
     @ObservationIgnored private var interactionQueue: [InteractionWaiter] = []
+    @ObservationIgnored private var attentionNotificationID: String?
 
     var interaction: Interaction? {
         guard let run = activeRun,
@@ -1289,10 +1303,18 @@ final class Conversation: Identifiable {
     private func activateInteraction(_ waiter: InteractionWaiter) {
         interactionWaiter = waiter
         replaceRunPhase(.awaiting(waiter.interaction))
-        activeRun?.backgroundExecution?.finish(success: true)
+        activeRun?.backgroundExecution?.finish(.awaitingInput(waiter.backgroundPhase))
         activeRun?.backgroundExecution = nil
         Log.session.info("Conversation.interaction active id=\(waiter.id) queued=\(interactionQueue.count)")
         observeActionPolicy()
+        notifyPendingInteraction()
+    }
+
+    func notifyPendingInteraction() {
+        guard let waiter = interactionWaiter,
+              attentionNotificationID == nil,
+              UIApplication.shared.applicationState == .background else { return }
+        deliverAttentionNotification(interactionID: waiter.id, phase: waiter.backgroundPhase)
     }
 
     private func observeActionPolicy() {
@@ -1319,6 +1341,7 @@ final class Conversation: Identifiable {
     }
 
     private func advanceInteraction() {
+        clearAttentionNotification()
         while !interactionQueue.isEmpty {
             let waiter = interactionQueue.removeFirst()
             if case .prompt(let prompt, let continuation) = waiter,
@@ -1344,6 +1367,7 @@ final class Conversation: Identifiable {
     }
 
     private func cancelInteractions() {
+        clearAttentionNotification()
         var waiters = interactionQueue
         if let interactionWaiter { waiters.insert(interactionWaiter, at: 0) }
         interactionWaiter = nil
@@ -2183,6 +2207,35 @@ final class Conversation: Identifiable {
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
     }
 
+    private func deliverAttentionNotification(interactionID: UUID, phase: ConversationBackgroundExecution.Phase) {
+        let identifier = "conversation.attention.\(id.uuidString).\(interactionID.uuidString)"
+        attentionNotificationID = identifier
+        let notificationTitle = title
+        Task {
+            do {
+                let delivered = try await NotificationProvider.shared.deliverIfAuthorized(
+                    identifier: identifier,
+                    title: notificationTitle,
+                    body: phase.subtitle,
+                    isCurrent: { [weak self] in
+                        self?.interactionWaiter?.id == interactionID
+                            && UIApplication.shared.applicationState == .background
+                    }
+                )
+                Log.session.info("Conversation.attentionNotify id=\(interactionID) phase=\(phase.rawValue) delivered=\(delivered)")
+            } catch {
+                Log.session.error("Conversation.attentionNotify failed id=\(interactionID) error=\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func clearAttentionNotification() {
+        guard let identifier = attentionNotificationID else { return }
+        attentionNotificationID = nil
+        NotificationProvider.shared.dismiss(identifier: identifier)
+        Log.session.info("Conversation.attentionNotify cleared id=\(identifier)")
+    }
+
     private func deliverCompletionNotification(_ notification: CompletionNotification) {
         let chatId = id.uuidString
         Task {
@@ -2388,13 +2441,22 @@ final class Conversation: Identifiable {
         defer { if !submissions.isEmpty { startWorker() } }
         let backgroundExecutionExpired = run.backgroundExecutionExpired
         let conversationFailed = notice.errorMessage != nil
-        let conversationSucceeded = !submissionPresentation.isCancelled && notice.errorMessage == nil
+        let conversationStopped = submissionPresentation.isCancelled || run.task.isCancelled
+        let conversationSucceeded = !conversationStopped && !conversationFailed
         let hasUnreadResult = conversationSucceeded || conversationFailed
-        let leaseSucceeded = !backgroundExecutionExpired
-        if conversationFailed { run.backgroundExecution?.updatePhase(.failed) }
+        let backgroundOutcome: ConversationBackgroundExecution.Outcome = if backgroundExecutionExpired {
+            .expired
+        } else if conversationStopped {
+            .stopped
+        } else if conversationFailed {
+            .failed
+        } else {
+            .completed
+        }
         settleModelSelectionChange(runID: runID, succeeded: conversationSucceeded && !run.task.isCancelled)
         let completionNotification = conversationSucceeded ? run.completionNotification : nil
-        run.backgroundExecution?.finish(success: leaseSucceeded)
+        run.backgroundExecution?.finish(backgroundOutcome)
+        clearAttentionNotification()
         finishFinishingDiagnostics(next: "idle")
         activeRun = nil
         if hasUnreadResult, !isTranscriptVisible {
@@ -2402,7 +2464,7 @@ final class Conversation: Identifiable {
             Log.session.info("Conversation.unread id=\(id)")
             onPersistableChange?()
         }
-        Log.session.info("Conversation.worker finish id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) conversationFailed=\(conversationFailed) conversationSucceeded=\(conversationSucceeded) leaseSucceeded=\(leaseSucceeded)")
+        Log.session.info("Conversation.worker finish id=\(id) run=\(runID.rawValue.uuidString.prefix(8)) conversationFailed=\(conversationFailed) conversationSucceeded=\(conversationSucceeded) conversationStopped=\(conversationStopped) backgroundOutcome=\(backgroundOutcome.logLabel)")
         guard let completionNotification else { return }
         guard UIApplication.shared.applicationState != .active else {
             Log.session.info("Conversation.notify skipped id=\(id) reason=active")
@@ -2466,6 +2528,7 @@ final class Conversation: Identifiable {
             self?.expireBackgroundExecution(runID: runID)
         }
         activeRun?.backgroundExecution = execution
+        activeRun?.backgroundExecutionExpired = false
         execution.submit()
     }
 
