@@ -34,6 +34,12 @@ struct OxApp: App {
 }
 
 private struct OxApplicationView: View {
+    private enum IncomingWebLink {
+        case pending(URL)
+        case failed(URL)
+    }
+
+    @State private var incomingWebLink: IncomingWebLink?
     @AppStorage("app.hasCompletedOnboarding") private var onboarded = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var skillImports = SkillImportCoordinator()
@@ -62,6 +68,15 @@ private struct OxApplicationView: View {
             .environment(client.services)
             .environment(hostAccess)
             .onOpenURL { url in
+                if case .web = ConversationLinkDestination(url) {
+                    incomingWebLink = .pending(url)
+                    Log.ui.info("Browser.externalLink received url=\(LogPrivacy.url(url.absoluteString))")
+                    return
+                }
+                guard url.isFileURL else {
+                    Log.ui.info("DocumentImport.ignored scheme=\(url.scheme ?? "none")")
+                    return
+                }
                 switch url.pathExtension.lowercased() {
                 case "skill": skillImports.receive(url)
                 case "chat": chatImports.receive(url)
@@ -96,6 +111,34 @@ private struct OxApplicationView: View {
             } message: {
                 Text(verbatim: serviceImports.importedDomain ?? "")
             }
+            .alert("Couldn't Open Link", isPresented: Binding(
+                get: { if case .failed = incomingWebLink { return true }; return false },
+                set: { if !$0, case .failed = incomingWebLink { incomingWebLink = nil } }
+            )) {
+                Button("Try Again") {
+                    if case .failed(let url) = incomingWebLink { incomingWebLink = .pending(url) }
+                }
+                Button("Cancel", role: .cancel) { incomingWebLink = nil }
+            } message: {
+                Text("Ox couldn't prepare the selected Profile. Try opening the link again.")
+            }
+            .task(id: incomingURLToOpen) {
+                guard let url = incomingURLToOpen else { return }
+                do {
+                    try await client.prepare()
+                    try Task.checkCancellation()
+                    guard incomingURLToOpen == url else { return }
+                    if LinkOpener.open(url: url, serviceManager: client.services) {
+                        incomingWebLink = nil
+                        Log.ui.info("Browser.externalLink opened url=\(LogPrivacy.url(url.absoluteString))")
+                    }
+                } catch is CancellationError {
+                } catch {
+                    guard !Task.isCancelled, incomingURLToOpen == url else { return }
+                    incomingWebLink = .failed(url)
+                    Log.ui.error("Browser.externalLink preparationFailed error=\(LogPrivacy.text(error.localizedDescription))")
+                }
+            }
             .task { await AppRegion.shared.refresh() }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 webSocketTransport.reconcile()
@@ -111,6 +154,16 @@ private struct OxApplicationView: View {
                     ScheduledSkillScheduler.shared.refresh()
                 }
             }
+    }
+
+    private var incomingURLToOpen: URL? {
+        guard onboarded, scenePhase == .active, presentations.canOpenBrowser,
+              serviceImports.proposal == nil, serviceImports.errorMessage == nil,
+              serviceImports.importedDomain == nil,
+              skillImports.proposal == nil, skillImports.errorMessage == nil,
+              chatImports.proposal == nil, chatImports.errorMessage == nil,
+              case .pending(let url) = incomingWebLink else { return nil }
+        return url
     }
 
     @ViewBuilder

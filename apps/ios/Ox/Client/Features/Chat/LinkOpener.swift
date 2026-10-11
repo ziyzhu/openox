@@ -26,24 +26,25 @@ enum ConversationLinkDestination: Equatable {
 
 @MainActor
 enum LinkOpener {
-    static func open(url: URL, serviceManager: ServiceManager) {
+    @discardableResult
+    static func open(url: URL, serviceManager: ServiceManager) -> Bool {
         guard case .web = ConversationLinkDestination(url) else {
             Log.ui.warning("LinkOpener.rejected url=\(LogPrivacy.url(url.absoluteString))")
-            return
+            return false
         }
+        let coordinator = AppPresentationCoordinator.shared
+        if case .browser(let session) = coordinator.presented?.content {
+            return session.navigate(to: url)
+        }
+        guard coordinator.canOpenBrowser else { return false }
+        let session: ServiceBrowserSession
         if let service = serviceManager.attachedService(for: url) {
-            Log.ui.info("LinkOpener.open disposition=service-browser domain=\(service.domain) url=\(LogPrivacy.url(url.absoluteString))")
-            let session = ServiceBrowserSession(service: service, url: url, serviceManager: serviceManager)
-            if !AppPresentationCoordinator.shared.presentBrowser(session) {
-                UIApplication.shared.open(url)
-            }
-            return
+            session = ServiceBrowserSession(service: service, url: url, serviceManager: serviceManager)
+        } else {
+            session = ServiceBrowserSession(url: url, serviceManager: serviceManager)
         }
         Log.ui.info("LinkOpener.open disposition=browser url=\(LogPrivacy.url(url.absoluteString))")
-        let session = ServiceBrowserSession(url: url)
-        if !AppPresentationCoordinator.shared.presentBrowser(session) {
-            UIApplication.shared.open(url)
-        }
+        return coordinator.presentBrowser(session)
     }
 }
 

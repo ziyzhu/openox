@@ -67,7 +67,7 @@ A matched tap does not prove a native switch changed: wait for stable frames, us
 `ci:ios` requires idb, Xcode, an explicitly reserved numbered simulator, and Host
 connections already enabled. `--app /absolute/Ox.app` skips building and reuses a
 verified artifact; rebuild after source changes or switching worktrees. Install/launch
-checks the artifact's bundle identifier. Screenshots use `simctl`, not an idb companion. It never provisions, clones, uninstalls, erases,
+checks the artifact's bundle identifier. Screenshots use `simctl`, not an idb companion. For browser ingress, `simctl openurl` uses the simulator's selected browser, not necessarily Ox. A temporary macOS CoreSimulator harness can target `SimDevice.launchApplicationWithID:options:error:` with `payload_url` as an **NSURL**, not a string; keep the harness outside Git and distinguish targeted URL-delivery evidence from default-browser eligibility. It never provisions, clones, uninstalls, erases,
 changes credentials, or enables Host access.
 
 The bundle comes from `--bundle`, `OX_BUNDLE_ID`, or `apps/ios/Local.xcconfig`.

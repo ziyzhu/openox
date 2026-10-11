@@ -1,6 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Couldn't Open Link" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开链接" } } } },
+    "Ox couldn't prepare the selected Profile. Try opening the link again." : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Ox 无法准备所选档案。请重试打开链接。" } } } },
     "Markdown" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Markdown" } } } },
     "HTML" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "HTML" } } } },
     "Loading files…" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载文件…" } } } },
