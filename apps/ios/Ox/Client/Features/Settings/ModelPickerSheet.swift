@@ -29,9 +29,6 @@ struct ModelPickerSheet: View {
 
 struct SettingsSheet: View {
     let ready: Bool
-    let artifactRefreshEpoch: Int
-    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
-    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
     let onSelectService: (Service) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -54,15 +51,9 @@ struct SettingsSheet: View {
         initialProfileID: UUID?,
         initialSkillDraft: SkillDraft?,
         ready: Bool,
-        artifactRefreshEpoch: Int,
-        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
-        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void,
         onSelectService: @escaping (Service) -> Void
     ) {
         self.ready = ready
-        self.artifactRefreshEpoch = artifactRefreshEpoch
-        self.onRenameArtifact = onRenameArtifact
-        self.onDeleteArtifact = onDeleteArtifact
         self.onSelectService = onSelectService
         _profilePath = State(initialValue: initialProfileID.map { [$0] } ?? [])
         _pendingSkillDraft = State(initialValue: initialSkillDraft)
@@ -263,10 +254,7 @@ struct SettingsSheet: View {
             .navigationDestination(for: UUID.self) { profileID in
                 ProfileSettingsView(
                     profileID: profileID,
-                    initialSkillDraft: pendingSkillDraft,
-                    artifactRefreshEpoch: artifactRefreshEpoch,
-                    onRenameArtifact: onRenameArtifact,
-                    onDeleteArtifact: onDeleteArtifact
+                    initialSkillDraft: pendingSkillDraft
                 )
             }
         }
@@ -276,7 +264,8 @@ struct SettingsSheet: View {
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false }
         }
-        .task {
+        .task(id: profilePath.isEmpty) {
+            guard profilePath.isEmpty else { return }
             await storage.refreshAvailability()
         }
         .fileImporter(

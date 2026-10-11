@@ -512,7 +512,6 @@ struct RootView: View {
     @State private var presentation: Presentation?
     @State private var startup = Startup.idle
     @State private var activeProfileMonitor = ActiveProfileMonitor()
-    @State private var artifactRefreshEpoch = 0
     @State private var childNavigationActive = false
     @State private var sharedNoteImporting = false
     @State private var sharedNoteImportError: String?
@@ -613,9 +612,6 @@ struct RootView: View {
                             initialProfileID: profileID,
                             initialSkillDraft: skillDraft,
                             ready: startup == .ready,
-                            artifactRefreshEpoch: artifactRefreshEpoch,
-                            onRenameArtifact: renameArtifact,
-                            onDeleteArtifact: deleteArtifact,
                             onSelectService: { startConversation(with: $0) }
                         )
                     case .services(let conversationID):
@@ -1134,7 +1130,6 @@ struct RootView: View {
             let outcome = await SharedNoteInbox.consume(in: scope)
             sharedNoteImporting = false
             if !outcome.imported.isEmpty {
-                artifactRefreshEpoch &+= 1
                 sharedNoteToast = Toast(message: L10n.string("File added", comment: ""))
                 Log.ui.info("ShareImport.imported count=\(outcome.imported.count) scope=\(scope.generation)")
             }
@@ -1192,7 +1187,6 @@ struct RootView: View {
             Skills.shared.refresh()
         }
         if areas.contains(.artifacts) {
-            artifactRefreshEpoch &+= 1
             conversations.artifactFilesChanged()
         }
         if areas.contains(.chats), reason != "filesystem" || showSidebar {

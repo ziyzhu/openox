@@ -3,9 +3,6 @@ import SwiftUI
 struct ProfileSettingsView: View {
     let profileID: UUID
     let initialSkillDraft: SkillDraft?
-    let artifactRefreshEpoch: Int
-    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
-    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var renaming = false
@@ -14,20 +11,6 @@ struct ProfileSettingsView: View {
     @State private var confirmingDelete = false
 
     private var storage: StorageRoot { .shared }
-
-    init(
-        profileID: UUID,
-        initialSkillDraft: SkillDraft?,
-        artifactRefreshEpoch: Int,
-        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
-        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
-    ) {
-        self.profileID = profileID
-        self.initialSkillDraft = initialSkillDraft
-        self.artifactRefreshEpoch = artifactRefreshEpoch
-        self.onRenameArtifact = onRenameArtifact
-        self.onDeleteArtifact = onDeleteArtifact
-    }
 
     private var profile: Profile? {
         storage.profiles.first { $0.id == profileID }
@@ -54,13 +37,7 @@ struct ProfileSettingsView: View {
                     if profile.version == ProfileSchema.current {
                         manageSection(for: profile)
                         storageSection
-                        ProfileContentsView(
-                            profile: profile,
-                            initialSkillDraft: initialSkillDraft,
-                            artifactRefreshEpoch: artifactRefreshEpoch,
-                            onRenameArtifact: onRenameArtifact,
-                            onDeleteArtifact: onDeleteArtifact
-                        )
+                        ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
                         deleteSection(for: profile)
                     } else {
@@ -99,9 +76,6 @@ struct ProfileSettingsView: View {
                 .accessibilityIdentifier(A11yID.Settings.profileSelection)
                 .accessibilityValue(isSelected ? String(localized: "Selected") : "")
             }
-        }
-        .task(id: profileID) {
-            await storage.refreshAvailability()
         }
         .alert("Rename Profile", isPresented: $renaming) {
             TextField("Name", text: $nameDraft)
@@ -290,184 +264,153 @@ struct ProfileSettingsView: View {
 }
 
 private struct ProfileContentsView: View {
-    private struct Context {
-        let scope: ProfileScope
-        let memory: UserMemory
-        let soul: Soul
-        let skills: Skills
-        var artifactCount: Int
-
-        func waitUntilCurrent() async throws {
-            try await memory.waitUntilCurrent()
-            try await soul.waitUntilCurrent()
-            await skills.waitUntilCurrent()
-        }
-    }
-
     let profile: Profile
-    let artifactRefreshEpoch: Int
-    let onRenameArtifact: (Artifact, String, ProfileScope) async throws -> Artifact
-    let onDeleteArtifact: (Artifact, ProfileScope) async throws -> Void
-    @State private var context: Context?
     @State private var editingSkill: SkillDraft?
     @State private var openingImportedSkill: Bool
     @State private var filesPresented = false
 
-    init(
-        profile: Profile,
-        initialSkillDraft: SkillDraft?,
-        artifactRefreshEpoch: Int,
-        onRenameArtifact: @escaping (Artifact, String, ProfileScope) async throws -> Artifact,
-        onDeleteArtifact: @escaping (Artifact, ProfileScope) async throws -> Void
-    ) {
+    init(profile: Profile, initialSkillDraft: SkillDraft?) {
         self.profile = profile
-        self.artifactRefreshEpoch = artifactRefreshEpoch
-        self.onRenameArtifact = onRenameArtifact
-        self.onDeleteArtifact = onDeleteArtifact
         _editingSkill = State(initialValue: initialSkillDraft)
         _openingImportedSkill = State(initialValue: initialSkillDraft != nil)
     }
 
-    private var memorySummary: Text {
-        let trimmed = context?.memory.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard let first = trimmed.split(whereSeparator: \.isNewline).first else {
-            return Text("Empty")
-        }
-        return Text(verbatim: String(first))
-    }
-
-    private var soulSummary: Text {
-        guard let soul = context?.soul.text, let defaultText = try? Soul.defaultText() else { return Text("Custom") }
-        return soul == defaultText ? Text("Default") : Text("Custom")
-    }
-
-    private var artifactsSummary: Text {
-        guard let count = context?.artifactCount, count > 0 else { return Text("None") }
-        return Text(verbatim: "\(count)")
-    }
-
-    private var skillsSummary: Text {
-        guard let count = context?.skills.all.count, count > 0 else { return Text("None") }
-        return Text(verbatim: "\(count)")
+    private var scope: ProfileScope {
+        ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
     }
 
     var body: some View {
-        SettingsSection(
-            "Profile",
-            layout: .group
-        ) {
+        SettingsSection("Profile", layout: .group) {
             VStack(spacing: 0) {
-                Button {
-                    filesPresented = true
-                } label: {
-                    SettingsDisclosureRow(
-                        title: "Files",
-                        value: artifactsSummary,
-                        isLoading: context == nil
-                    )
+                Button { filesPresented = true } label: {
+                    SettingsDisclosureRow(title: "Files", value: Text(""))
                 }
                 .buttonStyle(.plain)
-                .disabled(context == nil)
                 .accessibilityIdentifier(A11yID.Settings.artifacts)
 
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    if let context { skillsView(context) }
+                    destination(.skills)
                 } label: {
-                    SettingsDisclosureRow(
-                        title: "Skills",
-                        value: skillsSummary,
-                        isLoading: context?.skills.isLoaded != true
-                    )
+                    SettingsDisclosureRow(title: "Skills", value: Text(""))
                 }
                 .buttonStyle(.plain)
-                .disabled(context?.skills.isLoaded != true)
                 .accessibilityIdentifier(A11yID.Settings.skills)
 
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    if let context { CharacterEditorView(soul: context.soul) }
+                    destination(.character)
                 } label: {
-                    SettingsDisclosureRow(
-                        title: "Character",
-                        value: soulSummary,
-                        isLoading: context?.soul.isLoaded != true
-                    )
+                    SettingsDisclosureRow(title: "Character", value: Text(""))
                 }
                 .buttonStyle(.plain)
-                .disabled(context?.soul.isLoaded != true)
                 .accessibilityIdentifier(A11yID.Settings.soul)
 
                 Divider().settingsContentInset()
 
                 NavigationLink {
-                    if let context { MemoryEditorView(memory: context.memory) }
+                    destination(.memory)
                 } label: {
-                    SettingsDisclosureRow(
-                        title: "Memory",
-                        value: memorySummary,
-                        isLoading: context?.memory.isLoaded != true
-                    )
+                    SettingsDisclosureRow(title: "Memory", value: Text(""))
                 }
                 .buttonStyle(.plain)
-                .disabled(context?.memory.isLoaded != true)
                 .accessibilityIdentifier(A11yID.Settings.memory)
             }
         }
-        .task(id: profile.url.path) {
-            await load()
-        }
-        .task(id: artifactRefreshEpoch) {
-            await refreshArtifactCount()
-        }
-        .onAppear {
-            Task { await refreshArtifactCount() }
-        }
         .navigationDestination(isPresented: $openingImportedSkill) {
-            if let context { skillsView(context) }
+            destination(.skills)
         }
-        .profileFilesBrowser(scope: context?.scope, isPresented: $filesPresented)
+        .profileFilesBrowser(scope: scope, isPresented: $filesPresented)
     }
 
-    private func skillsView(_ context: Context) -> some View {
-        SkillsListView(
-            skills: context.skills,
-            editing: $editingSkill,
-            ready: true,
-            profileID: profile.id
-        )
+    private func destination(_ kind: ProfileContentDestination.Kind) -> some View {
+        ProfileContentDestination(scope: scope, profileID: profile.id, kind: kind, editingSkill: $editingSkill)
+    }
+}
+
+private struct ProfileContentDestination: View {
+    enum Kind {
+        case skills
+        case character
+        case memory
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .skills: "Skills"
+            case .character: "Character"
+            case .memory: "Memory"
+            }
+        }
+    }
+
+    private enum Content {
+        case skills(Skills)
+        case character(Soul)
+        case memory(UserMemory)
+        case failed(String)
+    }
+
+    let scope: ProfileScope
+    let profileID: UUID
+    let kind: Kind
+    @Binding var editingSkill: SkillDraft?
+    @State private var content: Content?
+
+    var body: some View {
+        Group {
+            switch content {
+            case .skills(let skills):
+                SkillsListView(skills: skills, editing: $editingSkill, ready: true, profileID: profileID)
+            case .character(let soul):
+                CharacterEditorView(soul: soul)
+            case .memory(let memory):
+                MemoryEditorView(memory: memory)
+            case .failed(let message):
+                ContentUnavailableView {
+                    Label("Couldn't load Profile", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(verbatim: message)
+                } actions: {
+                    Button("Retry") { Task { await load() } }
+                }
+            case nil:
+                ContentLoadingView(label: "Loading…")
+            }
+        }
+        .background(Theme.Colors.background)
+        .navigationTitle(kind.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: scope) { await load() }
     }
 
     private func load() async {
-        context = nil
-        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
-        let loaded = Context(
-            scope: scope,
-            memory: UserMemory(scope: scope),
-            soul: Soul(scope: scope),
-            skills: Skills(scope: scope),
-            artifactCount: 0
-        )
+        content = nil
         do {
-            try await loaded.waitUntilCurrent()
-            let artifacts = try await ProfileRepository.shared.artifacts(in: scope)
+            let loaded: Content
+            switch kind {
+            case .skills:
+                let skills = Skills(scope: scope)
+                await skills.waitUntilCurrent()
+                if let message = skills.errorMessage { throw RuntimeError.bridge(message) }
+                loaded = .skills(skills)
+            case .character:
+                let soul = Soul(scope: scope)
+                try await soul.waitUntilCurrent()
+                loaded = .character(soul)
+            case .memory:
+                let memory = UserMemory(scope: scope)
+                try await memory.waitUntilCurrent()
+                loaded = .memory(memory)
+            }
+            try Task.checkCancellation()
+            content = loaded
+        } catch is CancellationError {
+        } catch {
             guard !Task.isCancelled else { return }
-            var complete = loaded
-            complete.artifactCount = artifacts.count
-            context = complete
-        } catch { Log.ui.error("ProfileSettings.artifacts failed=\(error.localizedDescription)") }
+            content = .failed(error.localizedDescription)
+            Log.ui.error("ProfileSettings.content failed=\(error.localizedDescription)")
+        }
     }
-
-    private func refreshArtifactCount() async {
-        guard var current = context else { return }
-        do {
-            let artifacts = try await ProfileRepository.shared.artifacts(in: current.scope)
-            guard !Task.isCancelled, context?.scope == current.scope else { return }
-            current.artifactCount = artifacts.count
-            context = current
-        } catch { Log.ui.error("ProfileSettings.artifacts refresh failed=\(error.localizedDescription)") }
-    }
-
 }
